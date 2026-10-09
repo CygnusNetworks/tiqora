@@ -383,6 +383,8 @@ describe("TicketTable quick edit", () => {
         { value: 1, label: "Ada Agent", hint: "ada" },
         { value: 2, label: "Bob Agent", hint: "bob" },
       ],
+      ownerTicketId: 11,
+      onRequestOwners: vi.fn(),
       onRequestOptions: vi.fn(),
       onPatch: vi.fn(),
       ...overrides,
@@ -405,6 +407,18 @@ describe("TicketTable quick edit", () => {
     expect(onPatch).toHaveBeenCalledWith(11, { state_id: 4 });
     // No route change: still on "/".
     expect(window.location.pathname).toBe("/");
+  });
+
+  it("asks for the owner choices of the clicked row and shows none on rows not opened yet", async () => {
+    const onRequestOwners = vi.fn();
+    await renderTable([makeItem(), makeItem({ id: 12 })], {
+      quickEdit: quickEditProps({ onRequestOwners, ownerTicketId: 11 }),
+    });
+
+    fireEvent.click(screen.getByTestId("ticket-row-owner-12"));
+    expect(onRequestOwners).toHaveBeenCalledWith(12);
+    // ownerTicketId is still 11 (the caller has not reacted yet): row 12 offers nothing.
+    expect(screen.queryByTestId("ticket-row-owner-menu-12-option-2")).not.toBeInTheDocument();
   });
 
   it("clicking the owner cell opens a searchable listbox and patches owner_id", async () => {

@@ -313,18 +313,6 @@ export {
   type AppointmentOut,
   type OccurrenceOut,
   type TicketLinkOut,
-  // ProcessManagement (BPM)
-  type ProcessSummaryOut,
-  type ActivityDialogSummaryOut,
-  type ActivityDialogRefOut,
-  type ProcessActivityOut,
-  type ProcessDetailOut,
-  type TicketProcessStateOut,
-  type ActivityDialogFieldOut,
-  type ActivityDialogDetailOut,
-  type ProcessStartIn,
-  type ActivityDialogSubmitIn,
-  type ActivityDialogSubmitOut,
   // Reference (agent pickers)
   type PriorityRef,
   type StateRef,

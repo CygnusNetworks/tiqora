@@ -1,37 +1,35 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Link } from "@tanstack/react-router";
-import { api, type ProcessSummaryOut } from "@/lib/api";
+import { deployStatusApi, type AdminProcess } from "@/lib/deployStatusApi";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
+import { DeployStatusCard } from "@/components/process/DeployStatusCard";
 import { Badge } from "@/components/ui/Badge";
 
-type Row = ProcessSummaryOut & { activityCount: number };
+const STATE_TONE: Record<string, "success" | "muted" | "warn"> = {
+  Active: "success",
+  Inactive: "muted",
+  FadeAway: "warn",
+};
 
 /**
  * Read-only process list — no editing, no visual designer (see
  * ProcessDetailPage.tsx and the "read-only" note badge below). Process
  * design must be done in Znuny's own admin interface.
  *
- * ``ProcessSummaryOut`` (``GET /api/v1/process/``) doesn't carry an
- * activity count, so this fetches each process's detail in parallel to
- * derive one — acceptable here since process counts are admin-page-scale
- * (a handful, not thousands), unlike the paginated ticket-list endpoints.
+ * ``GET /api/v1/admin/processes`` lists every process of the deployed set with its state
+ * (Active / Inactive / FadeAway) and activity count, so the page needs no per-process detail
+ * calls and also shows the processes agents cannot start.
  */
 export function ProcessesPage() {
   const { t } = useTranslation();
 
   const listQ = useQuery({
     queryKey: ["admin", "processes"],
-    queryFn: async ({ signal }): Promise<Row[]> => {
-      const summaries = await api.listProcesses(signal);
-      const details = await Promise.all(
-        summaries.map((s) => api.getProcess(s.entity_id, signal)),
-      );
-      return summaries.map((s, i) => ({ ...s, activityCount: details[i].activities.length }));
-    },
+    queryFn: ({ signal }) => deployStatusApi.processes(signal),
   });
 
-  const columns: DataTableColumn<Row>[] = [
+  const columns: DataTableColumn<AdminProcess>[] = [
     {
       key: "name",
       header: t("admin.processes.name"),
@@ -48,9 +46,20 @@ export function ProcessesPage() {
     },
     { key: "entity_id", header: t("admin.processes.entityId"), mono: true, render: (r) => r.entity_id },
     {
+      key: "state",
+      header: t("admin.processes.stateLabel"),
+      render: (r) => (
+        <Badge tone={STATE_TONE[r.state_name] ?? "muted"} data-testid={`process-state-${r.entity_id}`}>
+          {r.state_name
+            ? t(`admin.processes.states.${r.state_name}`, { defaultValue: r.state_name })
+            : "—"}
+        </Badge>
+      ),
+    },
+    {
       key: "activityCount",
       header: t("admin.processes.activityCount"),
-      render: (r) => <Badge tone="muted">{r.activityCount}</Badge>,
+      render: (r) => <Badge tone="muted">{r.activity_count}</Badge>,
     },
   ];
 
@@ -63,6 +72,7 @@ export function ProcessesPage() {
         <Badge tone="muted">{t("admin.readOnly")}</Badge>
       </div>
       <p className="text-sm text-muted">{t("admin.processes.readOnlyNote")}</p>
+      <DeployStatusCard kind="process" />
       <DataTable
         columns={columns}
         rows={listQ.data ?? []}

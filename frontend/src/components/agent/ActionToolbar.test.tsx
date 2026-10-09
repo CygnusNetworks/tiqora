@@ -24,12 +24,9 @@ const {
   createCustomer: vi.fn(),
 }));
 
-const listReferenceAgents = vi.hoisted(() =>
-  vi.fn().mockResolvedValue([
-    { id: 2, login: "ada", full_name: "Ada Lovelace" },
-    { id: 9, login: "bob", full_name: "Bob Agent" },
-  ]),
-);
+// Scoped owner/responsible lists (the server applies queue permissions and ACLs).
+const fieldOptionsFetch = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/fieldOptionsApi", () => ({ fieldOptionsApi: { fetch: fieldOptionsFetch } }));
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -39,7 +36,6 @@ vi.mock("@/lib/api", async () => {
       patchTicket,
       listReferencePriorities,
       listReferenceStates,
-      listReferenceAgents,
       searchReferenceCustomers,
       createCustomer,
       getCustomer: vi.fn().mockResolvedValue(null),
@@ -233,12 +229,46 @@ describe("ActionToolbar", () => {
   });
 
   it("prefills the owner picker with the current owner_id", async () => {
+    fieldOptionsFetch.mockResolvedValue({
+      options: { owner: [{ value: "2", label: "Ada Lovelace" }] },
+    });
     wrap(<ActionToolbar ticket={makeTicket({ owner_id: 2 })} />);
     fireEvent.click(screen.getByTestId("toolbar-owner"));
     // SelectField trigger button shows the pre-selected agent's label.
     const trigger = await screen.findByTestId("agent-picker-select");
     expect(trigger.tagName).toBe("BUTTON");
     expect(trigger).toHaveTextContent("Ada Lovelace");
+  });
+
+  it("loads the ticket-scoped owner list for the owner dialog and the responsible list for the other", async () => {
+    fieldOptionsFetch.mockImplementation(async (body: { fields: string[] }) => ({
+      options: {
+        [body.fields[0]]:
+          body.fields[0] === "owner"
+            ? [{ value: "2", label: "Ada Lovelace" }]
+            : [{ value: "9", label: "Bob Agent" }],
+      },
+    }));
+    const { unmount } = wrap(<ActionToolbar ticket={makeTicket({ owner_id: 2 })} />);
+    fireEvent.click(screen.getByTestId("toolbar-owner"));
+    fireEvent.click(await screen.findByTestId("agent-picker-select"));
+    expect(await screen.findByRole("option", { name: /Ada Lovelace/ })).toBeInTheDocument();
+    expect(screen.queryByText("Bob Agent")).not.toBeInTheDocument();
+    expect(fieldOptionsFetch).toHaveBeenCalledWith(
+      { fields: ["owner"], context: { action: "AgentTicketOwner", ticket_id: 7 } },
+      expect.anything(),
+    );
+    unmount();
+
+    wrap(<ActionToolbar ticket={makeTicket({ owner_id: 2 })} />);
+    fireEvent.click(screen.getByTestId("toolbar-responsible"));
+    fireEvent.click(await screen.findByTestId("agent-picker-select"));
+    expect(await screen.findByRole("option", { name: /Bob Agent/ })).toBeInTheDocument();
+    expect(screen.queryByText("Ada Lovelace")).not.toBeInTheDocument();
+    expect(fieldOptionsFetch).toHaveBeenCalledWith(
+      { fields: ["responsible"], context: { action: "AgentTicketResponsible", ticket_id: 7 } },
+      expect.anything(),
+    );
   });
 
   it("shows the current customer once and offers to create an unknown sender", async () => {

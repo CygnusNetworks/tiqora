@@ -213,4 +213,24 @@ describe("ProcessWidget", () => {
       i18n.t("process.start.forbidden"),
     );
   });
+
+  it("hides the start button and the dialog buttons when AgentTicketProcess is forbidden", async () => {
+    const forbidden = new Set(["AgentTicketNote"]);
+    ticketState.mockResolvedValue(notInProcessState);
+    const first = wrap(<ProcessWidget ticketId={42} allowedActions={forbidden} />);
+    await screen.findByTestId("process-widget-inactive");
+    expect(screen.queryByTestId("process-widget-start-button")).not.toBeInTheDocument();
+    first.unmount();
+
+    ticketState.mockResolvedValue(activeState);
+    wrap(<ProcessWidget ticketId={42} allowedActions={forbidden} />);
+    await screen.findByTestId("process-widget-activity-name");
+    expect(screen.queryByTestId("process-dialog-button-ActivityDialog-1")).not.toBeInTheDocument();
+  });
+
+  it("keeps start and dialogs when AgentTicketProcess is allowed", async () => {
+    ticketState.mockResolvedValue(activeState);
+    wrap(<ProcessWidget ticketId={42} allowedActions={new Set(["AgentTicketProcess"])} />);
+    expect(await screen.findByTestId("process-dialog-button-ActivityDialog-1")).toBeInTheDocument();
+  });
 });

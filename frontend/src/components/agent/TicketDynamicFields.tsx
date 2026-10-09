@@ -7,6 +7,7 @@ import { phoneApi, type DynamicFieldDef } from "@/lib/phoneApi";
 import { apiErrorMessage } from "@/lib/avatarApi";
 import { usePatchTicket, ticketPerms } from "@/lib/ticket";
 import { displayTimeZone } from "@/lib/timeZone";
+import { actionAllowed, type AllowedActions } from "@/lib/aclActions";
 import {
   DF_KIND,
   DynamicFieldsForm,
@@ -45,10 +46,17 @@ function displayValue(df: TicketDf, def: DynamicFieldDef | undefined, t: TFuncti
  * `Ticket::Frontend::AgentTicketFreeText###DynamicField` (also fields the
  * ticket has no value for yet). Only changed fields are sent.
  */
-export function TicketDynamicFields({ ticket }: { ticket: TicketDetail }) {
+export function TicketDynamicFields({
+  ticket,
+  allowedActions = null,
+}: {
+  ticket: TicketDetail;
+  /** Action ACL result: editing needs `AgentTicketFreeText` (`null` = unknown, allowed). */
+  allowedActions?: AllowedActions;
+}) {
   const { t } = useTranslation();
   const zone = displayTimeZone();
-  const canEdit = ticketPerms(ticket).rw;
+  const canEdit = ticketPerms(ticket).rw && actionAllowed(allowedActions, SCREEN);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<DynamicFieldValues>({});
   const [errors, setErrors] = useState<FieldErrors>({});

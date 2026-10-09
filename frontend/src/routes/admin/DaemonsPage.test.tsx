@@ -192,4 +192,25 @@ describe("DaemonsPage", () => {
     fireEvent.click(screen.getByTestId("daemons-help-takeover-postmaster"));
     expect(screen.getByTestId("daemons-help-takeover-postmaster-panel")).toBeInTheDocument();
   });
+
+  it("shows the deploy-live banner while deploy_watch runs from drafts", async () => {
+    const watch = (mode: string) =>
+      poller({ slug: "deploy_watch", last_result: { mode } as DaemonServiceOut["last_result"] });
+    getDaemons.mockResolvedValue({ services: [poller(), watch("live")] });
+    renderPage();
+    const banner = await screen.findByTestId("daemons-deploy-live");
+    expect(banner).toHaveTextContent(i18n.t("admin.daemons.deployLive"));
+  });
+
+  it("hides the deploy-live banner once a deployed revision is in use", async () => {
+    getDaemons.mockResolvedValue({
+      services: [
+        poller(),
+        poller({ slug: "deploy_watch", last_result: { mode: "deployed" } as DaemonServiceOut["last_result"] }),
+      ],
+    });
+    renderPage();
+    await screen.findByTestId("daemon-row-deploy_watch");
+    expect(screen.queryByTestId("daemons-deploy-live")).not.toBeInTheDocument();
+  });
 });

@@ -14,6 +14,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { stateLabel } from "@/lib/status";
 import { ticketPerms, usePatchTicket } from "@/lib/ticket";
 import { fromZonedInputValue } from "@/lib/timeZone";
+import { useAgentOptions } from "@/lib/agentOptions";
 
 
 // The ticket's customer dialog lives with the other customer components.
@@ -493,9 +494,9 @@ export function AgentPickerDialog({
 }) {
   const { t } = useTranslation();
   const [agentId, setAgentId] = useState(String(currentId ?? ""));
-  const agentsQ = useQuery({
-    queryKey: ["reference", "agents"],
-    queryFn: () => api.listReferenceAgents(),
+  // Scoped like Znuny's owner/responsible dialogs: queue permissions and ACLs of this ticket.
+  const agentsQ = useAgentOptions(field === "owner_id" ? "owner" : "responsible", {
+    ticket_id: ticketId,
   });
   const patch = usePatchTicket(ticketId, onClose);
 
@@ -508,11 +509,7 @@ export function AgentPickerDialog({
           </div>
         ) : (
           <SelectField
-            items={(agentsQ.data ?? []).map((a) => ({
-              value: String(a.id),
-              label: a.full_name,
-              hint: a.login,
-            }))}
+            items={agentsQ.items.map((a) => ({ value: String(a.value), label: a.label }))}
             value={agentId || null}
             onChange={setAgentId}
             placeholder={t("ticket.dialog.selectPlaceholder")}

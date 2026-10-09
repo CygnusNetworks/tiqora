@@ -1,6 +1,6 @@
 /**
  * Process endpoints (`/api/v1/process`) typed from the generated schema. Hand-written wrapper
- * like `./phoneApi.ts`; the older untyped process methods on `api` stay for the admin pages.
+ * like `./phoneApi.ts`.
  */
 import type { Schemas } from "@tiqora/api-client";
 import { api } from "./api";
@@ -13,6 +13,7 @@ export type NewProcessTicketIn = Schemas["NewProcessTicketIn"];
 export type NewProcessTicketOut = Schemas["NewProcessTicketOut"];
 export type ActivityDialogSubmitOut = Schemas["ActivityDialogSubmitOut"];
 export type TicketAclActions = Schemas["TicketAclActionsOut"];
+export type ProcessDetail = Schemas["ProcessDetailOut"];
 
 const enc = encodeURIComponent;
 const ticketQuery = (opts?: { ticketId?: number }) =>
@@ -46,6 +47,10 @@ export const processApi = {
   },
   ticketState(ticketId: number, signal?: AbortSignal) {
     return api.request<TicketProcessState>("GET", `/api/v1/process/ticket/${ticketId}/state`, { signal });
+  },
+  /** One process with its activities and their dialogs (read-only admin view). */
+  detail(processEntityId: string, signal?: AbortSignal) {
+    return api.request<ProcessDetail>("GET", `/api/v1/process/${enc(processEntityId)}`, { signal });
   },
   aclActions(ticketId: number, signal?: AbortSignal) {
     return api.request<TicketAclActions>("GET", `/api/v1/tickets/${ticketId}/acl-actions`, { signal });

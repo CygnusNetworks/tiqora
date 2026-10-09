@@ -277,7 +277,7 @@ export function DaemonsPage() {
                         (svc.last_result as { mode?: string } | null)?.mode === "live" && (
                           <div
                             className="mt-0.5 text-xs text-amber"
-                            data-testid="daemon-deploy-live"
+                            data-testid="daemons-deploy-live"
                           >
                             {t("admin.daemons.deployLive")}
                           </div>

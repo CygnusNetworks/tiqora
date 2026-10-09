@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { processApi } from "@/lib/processApi";
+import { actionAllowed, type AllowedActions } from "@/lib/aclActions";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { StartProcessDialog } from "./StartProcessDialog";
@@ -25,11 +26,14 @@ export function ProcessWidget({
   hideInactiveStart = false,
   startOpen: startOpenProp,
   onStartOpenChange,
+  allowedActions = null,
 }: {
   ticketId: number;
   hideInactiveStart?: boolean;
   startOpen?: boolean;
   onStartOpenChange?: (open: boolean) => void;
+  /** Action ACL result: starting and dialogs need `AgentTicketProcess` (`null` = unknown, allowed). */
+  allowedActions?: AllowedActions;
 }) {
   const { t } = useTranslation();
   const [startOpenLocal, setStartOpenLocal] = useState(false);
@@ -59,6 +63,8 @@ export function ProcessWidget({
   const inProcess = Boolean(state.process_entity_id);
   // Znuny: an Inactive process takes no further steps (FadeAway tickets keep going).
   const switchedOff = state.process_state === "Inactive";
+  // An Action ACL on AgentTicketProcess removes start and dialogs like Znuny's zoom menu does.
+  const processAllowed = actionAllowed(allowedActions, "AgentTicketProcess");
 
   // Not in a process: optional start affordance (or dialog-only when the
   // ticket-zoom ⋮ menu owns the trigger).
@@ -68,7 +74,7 @@ export function ProcessWidget({
         className={hideInactiveStart ? undefined : "flex justify-end"}
         data-testid="process-widget-inactive"
       >
-        {!hideInactiveStart && state.can_start && (
+        {!hideInactiveStart && state.can_start && processAllowed && (
           <button
             type="button"
             onClick={() => setStartOpen(true)}
@@ -119,7 +125,7 @@ export function ProcessWidget({
             <p className="text-sm text-muted" data-testid="process-widget-inactive-note">
               {t("process.widget.inactive")}
             </p>
-          ) : (state.available_dialogs ?? []).length === 0 ? (
+          ) : !processAllowed || (state.available_dialogs ?? []).length === 0 ? (
             <p className="text-sm text-muted">{t("process.widget.noDialogs")}</p>
           ) : (
             <div className="flex flex-wrap gap-2">

@@ -69,4 +69,26 @@ describe("TicketZoomOverflowMenu", () => {
     fireEvent.click(screen.getByTestId("ticket-zoom-overflow-trigger"));
     expect(screen.queryByTestId("overflow-start-process")).toBeNull();
   });
+
+  it("hides internal note and start process when the Action ACL forbids them", () => {
+    wrap({ allowedActions: new Set(["AgentTicketPrint"]) });
+    fireEvent.click(screen.getByTestId("ticket-zoom-overflow-trigger"));
+    expect(screen.getByTestId("overflow-tab-history")).toBeInTheDocument();
+    expect(screen.queryByTestId("overflow-internal-note")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("overflow-start-process")).not.toBeInTheDocument();
+  });
+
+  it("keeps note and start process while allowed or unknown", () => {
+    wrap({ allowedActions: new Set(["AgentTicketNote", "AgentTicketProcess"]) });
+    fireEvent.click(screen.getByTestId("ticket-zoom-overflow-trigger"));
+    expect(screen.getByTestId("overflow-internal-note")).toBeInTheDocument();
+    expect(screen.getByTestId("overflow-start-process")).toBeInTheDocument();
+  });
+
+  it("shows everything while the ACL result is null", () => {
+    wrap({ allowedActions: null });
+    fireEvent.click(screen.getByTestId("ticket-zoom-overflow-trigger"));
+    expect(screen.getByTestId("overflow-internal-note")).toBeInTheDocument();
+    expect(screen.getByTestId("overflow-start-process")).toBeInTheDocument();
+  });
 });

@@ -23,6 +23,7 @@ const {
   suggestedQueue,
   defaultQueue,
   screenDynamicFields,
+  fieldOptionsFetch,
 } = vi.hoisted(() => ({
   navigate: vi.fn(),
   listQueues: vi.fn(),
@@ -40,7 +41,10 @@ const {
   suggestedQueue: vi.fn(),
   defaultQueue: vi.fn(),
   screenDynamicFields: vi.fn(),
+  fieldOptionsFetch: vi.fn(),
 }));
+
+vi.mock("@/lib/fieldOptionsApi", () => ({ fieldOptionsApi: { fetch: fieldOptionsFetch } }));
 
 vi.mock("@/lib/newTicketApi", () => ({
   newTicketApi: { suggestedQueue, defaultQueue },
@@ -108,10 +112,6 @@ vi.mock("@/lib/api", async () => {
       createTicket,
       createArticle,
       getCustomer,
-      listReferenceAgents: vi.fn().mockResolvedValue([
-        { id: 5, login: "agent1", full_name: "Agent One" },
-        { id: 7, login: "jwolff", full_name: "Jana Wolff" },
-      ]),
       listReferenceTypes: vi.fn().mockResolvedValue([]),
       listReferenceServices: vi.fn().mockResolvedValue([]),
       listReferenceSlas: vi.fn().mockResolvedValue([]),
@@ -173,6 +173,22 @@ async function pickCustomer() {
   );
   fireEvent.click(result);
 }
+
+beforeEach(() => {
+    // The server scopes owner/responsible to the queue; without one the list is empty.
+    fieldOptionsFetch.mockReset().mockImplementation(
+      async (body: { fields: string[]; context?: { queue_id?: number } }) => ({
+        options: {
+          [body.fields[0]]: body.context?.queue_id
+            ? [
+                { value: "5", label: "Agent One" },
+                { value: "7", label: "Jana Wolff" },
+              ]
+            : [],
+        },
+      }),
+    );
+});
 
 describe("NewTicketPage", () => {
   beforeEach(() => {
@@ -707,6 +723,38 @@ describe("NewTicketPage compact phone ticket", () => {
     refineAvailability.mockReset().mockResolvedValue({ available: false });
     searchParams.current = {};
     window.localStorage.clear();
+  });
+
+  it("phone mode offers owner and responsible scoped to the chosen queue", async () => {
+    searchParams.current = { type: "phone" };
+    wrap(<NewTicketPage />);
+    await waitFor(() =>
+      expect(fieldOptionsFetch).toHaveBeenCalledWith(
+        { fields: ["owner"], context: { action: "AgentTicketPhone", queue_id: 1 } },
+        expect.anything(),
+      ),
+    );
+    fireEvent.click(await screen.findByTestId("new-ticket-more-toggle"));
+    await waitFor(() =>
+      expect(fieldOptionsFetch).toHaveBeenCalledWith(
+        { fields: ["responsible"], context: { action: "AgentTicketPhone", queue_id: 1 } },
+        expect.anything(),
+      ),
+    );
+    fireEvent.click(await screen.findByTestId("new-ticket-responsible"));
+    expect(await screen.findByTestId("new-ticket-responsible-panel")).toHaveTextContent("Jana Wolff");
+  });
+
+  it("phone mode has no owner choices before a queue is known", async () => {
+    defaultQueue.mockReset().mockReturnValue(new Promise(() => {}));
+    suggestedQueue.mockReset().mockReturnValue(new Promise(() => {}));
+    searchParams.current = { type: "phone" };
+    wrap(<NewTicketPage />);
+    await screen.findByTestId("new-ticket-owner");
+    expect(fieldOptionsFetch).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("new-ticket-owner"));
+    expect(screen.queryByTestId("new-ticket-owner-panel-option-5")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("new-ticket-owner-panel-option-7")).not.toBeInTheDocument();
   });
 
   it("from the call popup: direction badge, owner who answered, closed-successful status, timer in the strip", async () => {

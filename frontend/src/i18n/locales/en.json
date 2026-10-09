@@ -2703,7 +2703,13 @@
       "activities": "Activities",
       "dialogs": "Dialogs",
       "noDialogs": "—",
-      "loadError": "Could not load process."
+      "loadError": "Could not load process.",
+      "stateLabel": "State",
+      "states": {
+        "Active": "Active",
+        "Inactive": "Inactive",
+        "FadeAway": "Fading out"
+      }
     },
     "mailOutbound": {
       "title": "Outbound email (SMTP)",
@@ -3795,6 +3801,23 @@
           }
         }
       }
+    },
+    "deploy": {
+      "title": "Deployment",
+      "deployedAt": "Deployed on {{date}}",
+      "source": {
+        "initial": "at startup",
+        "znuny": "from Znuny",
+        "tiqora": "by Tiqora"
+      },
+      "pending_one": "{{count}} change has not been deployed yet. It only applies after “Deploy” in Znuny.",
+      "pending_other": "{{count}} changes have not been deployed yet. They only apply after “Deploy” in Znuny.",
+      "pendingHere_one": "{{count}} change has not been deployed yet. It only applies after “Deploy”.",
+      "pendingHere_other": "{{count}} changes have not been deployed yet. They only apply after “Deploy”.",
+      "runningLive": "No deployed revision yet – Tiqora runs the draft state.",
+      "ownership": "Tiqora deploys changes itself (Znuny is switched off).",
+      "deployNow": "Deploy",
+      "deployFailed": "Deployment failed."
     }
   },
   "kb": {

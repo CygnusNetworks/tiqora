@@ -17,9 +17,9 @@ vi.mock("@tanstack/react-router", () => ({
   ),
 }));
 
-vi.mock("@/lib/api", () => ({
-  api: {
-    getProcess: (...args: unknown[]) => getProcess(...args),
+vi.mock("@/lib/processApi", () => ({
+  processApi: {
+    detail: (...args: unknown[]) => getProcess(...args),
   },
 }));
 

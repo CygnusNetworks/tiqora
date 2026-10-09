@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Menu, MenuItem, MenuLabel } from "@/components/ui/Menu";
+import { actionAllowed, type AllowedActions } from "@/lib/aclActions";
 
 export type TicketZoomOverflowMenuProps = {
   tab: "articles" | "history";
@@ -13,6 +14,8 @@ export type TicketZoomOverflowMenuProps = {
   /** Whether "Start process" is available (ticket not already in a process). */
   canStartProcess: boolean;
   onStartProcess: () => void;
+  /** Action ACL result (`null` = unknown: show everything). */
+  allowedActions?: AllowedActions;
 };
 
 /**
@@ -29,6 +32,7 @@ export function TicketZoomOverflowItems({
   canNote = true,
   canStartProcess,
   onStartProcess,
+  allowedActions = null,
 }: TicketZoomOverflowMenuProps) {
   const { t } = useTranslation();
   return (
@@ -51,7 +55,7 @@ export function TicketZoomOverflowItems({
       <MenuItem testId="overflow-sort" onSelect={onToggleSort}>
         {t("ticket.overflow.sort")}: {sortLabel}
       </MenuItem>
-      {canNote ? (
+      {!actionAllowed(allowedActions, "AgentTicketNote") ? null : canNote ? (
         <MenuItem testId="overflow-internal-note" onSelect={onInternalNote}>
           {t("ticket.overflow.internalNote")}
         </MenuItem>
@@ -66,7 +70,7 @@ export function TicketZoomOverflowItems({
           {t("ticket.overflow.internalNote")}
         </div>
       )}
-      {canStartProcess && (
+      {canStartProcess && actionAllowed(allowedActions, "AgentTicketProcess") && (
         <MenuItem testId="overflow-start-process" onSelect={onStartProcess}>
           {t("ticket.overflow.startProcess")}
         </MenuItem>

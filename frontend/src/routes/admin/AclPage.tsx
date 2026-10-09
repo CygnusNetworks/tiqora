@@ -5,6 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { api, ApiError, type AclOut, type AclCreate } from "@/lib/api";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { CrudDrawer, type FieldDef, type FieldValues } from "@/components/admin/CrudDrawer";
+import { DeployStatusCard } from "@/components/process/DeployStatusCard";
 import { Button } from "@/components/ui/Button";
 import { PlusIcon } from "@/components/ui/icons";
 
@@ -107,6 +108,7 @@ export function AclPage() {
           {t("admin.acl.new")}
         </Button>
       </div>
+      <DeployStatusCard kind="acl" />
       <DataTable
         columns={columns}
         rows={listQ.data ?? []}

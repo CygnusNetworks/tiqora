@@ -1558,6 +1558,33 @@ const demoExportJob = {
   finished_at: "2026-10-08T09:00:02Z",
 };
 
+const demoZoomActions = [
+  "AgentTicketCompose", "AgentTicketForward", "AgentTicketNote", "AgentTicketPhoneOutbound",
+  "AgentTicketPhoneInbound", "AgentTicketClose", "AgentTicketPending", "AgentTicketPriority",
+  "AgentTicketMove", "AgentTicketOwner", "AgentTicketResponsible", "AgentTicketCustomer",
+  "AgentTicketLock", "AgentTicketWatcher", "AgentLinkObject", "AgentTicketMerge",
+  "AgentTicketPrint", "AgentTicketFreeText", "AgentTicketProcess",
+];
+
+const demoDeployRevision = {
+  id: 3,
+  source: "znuny",
+  entity_count: 3,
+  deployed_at: "2026-10-07T14:30:00Z",
+  deployed_by: null,
+};
+const demoDeployStatus = {
+  process: { revision: demoDeployRevision, pending_changes: 2, running_live: false },
+  acl: { revision: { ...demoDeployRevision, id: 5, source: "initial" }, pending_changes: 0, running_live: false },
+  ownership_active: false,
+  can_deploy_from_tiqora: true,
+};
+const demoAdminProcesses = [
+  { entity_id: "Process-demo", name: "Bestellung", state_entity_id: "S1", state_name: "Active", activity_count: 4, start_interfaces: ["AgentInterface", "CustomerInterface"] },
+  { entity_id: "Process-onb", name: "Onboarding", state_entity_id: "S2", state_name: "Inactive", activity_count: 6, start_interfaces: ["AgentInterface"] },
+  { entity_id: "Process-old", name: "Altprozess Beschaffung", state_entity_id: "S3", state_name: "FadeAway", activity_count: 3, start_interfaces: [] },
+];
+
 export function resolveData(path: string, method: string): unknown | undefined {
   const p = path;
   // Auth
@@ -1590,7 +1617,19 @@ export function resolveData(path: string, method: string): unknown | undefined {
   // Zoom edit: Znuny's AgentTicketFreeText dynamic-field config (Category has a value, Due is empty)
   // (the resolver sees no query/body: every screen gets the same config, options stay the static ones)
   if (p.endsWith("/api/v1/reference/dynamic-fields")) return demoFreeTextFields;
-  if (p.endsWith("/api/v1/reference/field-options") && method === "POST") return { options: {} };
+  // The resolver cannot read the request, so the scoped owner/responsible lists are the same for
+  // every ticket and queue; the other fields are left out (the pickers keep their static lists).
+  if (p.endsWith("/api/v1/reference/field-options") && method === "POST") {
+    const agents = OWNERS.map((o) => ({ value: String(o.owner_id), label: o.owner_name }));
+    return { options: { owner: agents, responsible: agents } };
+  }
+  // Zoom menu: no Action ACL in the demo, everything is allowed.
+  if (p.match(/\/api\/v1\/tickets\/\d+\/acl-actions$/)) return { allowed: demoZoomActions };
+  // Admin: deployed process / ACL revisions (Tiqora may deploy itself, two process edits are pending).
+  if (p.endsWith("/api/v1/admin/deploy-status")) return demoDeployStatus;
+  if (p.endsWith("/api/v1/admin/deploy") && method === "POST")
+    return { action: "recorded", checksum: "demo", kind: "process", revision_id: 4 };
+  if (p.endsWith("/api/v1/admin/processes")) return demoAdminProcesses;
   if (p.endsWith("/api/v1/phone/calls/active")) return [];
   if (p.endsWith("/api/v1/reference/caller")) return demoCallerLookup;
   // Background jobs: the ticket CSV export finishes at once in the demo.

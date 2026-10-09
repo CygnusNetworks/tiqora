@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
@@ -39,12 +39,12 @@ const DEFS = [
   { name: "Due", label: "Fällig", field_type: "Date", required: false, possible_values: null },
 ];
 
-function renderIt(ticket: TicketDetail) {
+function renderIt(ticket: TicketDetail, allowedActions?: ReadonlySet<string> | null) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const ui = (tk: TicketDetail) => (
     <QueryClientProvider client={qc}>
       <I18nextProvider i18n={i18n}>
-        <TicketDynamicFields ticket={tk} />
+        <TicketDynamicFields ticket={tk} allowedActions={allowedActions} />
       </I18nextProvider>
     </QueryClientProvider>
   );
@@ -74,6 +74,22 @@ describe("TicketDynamicFields", () => {
     expect(await screen.findByText("Netz")).toBeInTheDocument();
     expect(screen.getByText("Bereich")).toBeInTheDocument();
     expect(screen.queryByTestId("ticket-df-edit")).not.toBeInTheDocument();
+  });
+
+  it("hides Bearbeiten when the Action ACL removes AgentTicketFreeText, shows it while unknown", async () => {
+    screenDynamicFields.mockResolvedValue(DEFS);
+    const ticket = makeTicket({
+      dynamic_fields: [{ name: "Area", label: "Bereich", field_type: "Dropdown", values: ["net"] }],
+    });
+    renderIt(ticket, new Set(["AgentTicketNote"]));
+    expect(await screen.findByText("Netz")).toBeInTheDocument();
+    expect(screen.queryByTestId("ticket-df-edit")).not.toBeInTheDocument();
+    cleanup();
+    renderIt(ticket, new Set(["AgentTicketFreeText"]));
+    expect(await screen.findByTestId("ticket-df-edit")).toBeInTheDocument();
+    cleanup();
+    renderIt(ticket, null);
+    expect(await screen.findByTestId("ticket-df-edit")).toBeInTheDocument();
   });
 
   it("shows the raw value of a dropdown whose config is unknown", async () => {

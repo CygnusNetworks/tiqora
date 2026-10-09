@@ -2703,7 +2703,13 @@
       "activities": "Aktivitäten",
       "dialogs": "Dialoge",
       "noDialogs": "—",
-      "loadError": "Prozess konnte nicht geladen werden."
+      "loadError": "Prozess konnte nicht geladen werden.",
+      "stateLabel": "Status",
+      "states": {
+        "Active": "Aktiv",
+        "Inactive": "Inaktiv",
+        "FadeAway": "Auslaufend"
+      }
     },
     "mailOutbound": {
       "title": "Ausgehende E-Mail (SMTP)",
@@ -3795,6 +3801,23 @@
           }
         }
       }
+    },
+    "deploy": {
+      "title": "Bereitstellung",
+      "deployedAt": "Bereitgestellt am {{date}}",
+      "source": {
+        "initial": "beim Start",
+        "znuny": "aus Znuny",
+        "tiqora": "von Tiqora"
+      },
+      "pending_one": "{{count}} Änderung ist noch nicht bereitgestellt. Sie gilt erst nach „Bereitstellen“ in Znuny.",
+      "pending_other": "{{count}} Änderungen sind noch nicht bereitgestellt. Sie gelten erst nach „Bereitstellen“ in Znuny.",
+      "pendingHere_one": "{{count}} Änderung ist noch nicht bereitgestellt. Sie gilt erst nach „Bereitstellen“.",
+      "pendingHere_other": "{{count}} Änderungen sind noch nicht bereitgestellt. Sie gelten erst nach „Bereitstellen“.",
+      "runningLive": "Noch keine bereitgestellte Fassung – Tiqora nutzt den Entwurfsstand.",
+      "ownership": "Tiqora stellt Änderungen selbst bereit (Znuny ist abgeschaltet).",
+      "deployNow": "Bereitstellen",
+      "deployFailed": "Bereitstellen fehlgeschlagen."
     }
   },
   "kb": {
