@@ -21,6 +21,13 @@ import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
 import { useComposerLock } from "@/lib/composerLock";
 import { ComposerLockBanner } from "./ComposerLock";
 import { ComposerTimeChip } from "./ComposerTimeChip";
+import { AttachmentChips } from "./telegram/ComposerChips";
+import {
+  MAX_ATTACHMENTS,
+  MAX_ATTACHMENT_BYTES,
+  formatBytes,
+  useChatAttachments,
+} from "./telegram/useChatAttachments";
 import { EmailSecurityControl } from "./EmailSecurityControl";
 import { useEmailSecurity } from "./useEmailSecurity";
 import { MentionTextarea } from "./MentionTextarea";
@@ -61,7 +68,8 @@ type Field = "to" | "cc" | "bcc";
  * sending leaves a visible, restorable draft rather than silently stashing
  * the text in component state: the article views render a placeholder for it
  * and the reply buttons switch to "continue draft". Sending clears it;
- * discarding is explicit and confirmed.
+ * discarding is explicit and confirmed. Attached files are not part of that
+ * draft — they live in this (still mounted) component until sent or discarded.
  */
 export function ReplyDialog({
   ticketId,
@@ -112,6 +120,9 @@ export function ReplyDialog({
   // Collected while writing, recorded after the article is created.
   const [mentions, setMentions] = useState<PickedMention[]>([]);
   const [timeUnits, setTimeUnits] = useState("");
+  const attachments = useChatAttachments();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
   /** What happens to the ticket once the reply is sent (see `NEXT_STATES`). */
   const [nextState, setNextState] = useState<NextState>("keep");
   /** Reminder date (local, `YYYY-MM-DD`) for "Wartend". */
@@ -330,6 +341,7 @@ export function ReplyDialog({
     setShowBcc(false);
     setShowReplyTo(false);
     setTemplateId("");
+    attachments.removeMany(attachments.items.map((a) => a.id));
   };
 
   /** Everything recorded — reset the composer to the server-seeded reply and
@@ -396,6 +408,7 @@ export function ReplyDialog({
         references: isTelegram ? null : (draftQ.data?.references ?? null),
         ai_draft_id: aiDraftId,
         email_security: isTelegram ? null : security.payload,
+        ...(attachments.payload.length > 0 ? { attachments: attachments.payload } : {}),
         ...nextStatePayload(nextState, pendingDate),
       });
       // The reply is out; mentions and the booking follow and may fail on
@@ -498,6 +511,7 @@ export function ReplyDialog({
     body.trim().length > 0 &&
     (isTelegram || to.length > 0) &&
     !sendMutation.isPending &&
+    !attachments.encoding &&
     ticketLock.lockedBy === null &&
     (isTelegram || !security.blocked);
 
@@ -777,8 +791,25 @@ export function ReplyDialog({
           {/* One framed editor: the text, the signature that will be appended,
               and a toolbar (refine, time) along its bottom edge. */}
           <div
-            className="overflow-hidden rounded-lg border border-hairline bg-surface-subtle/40 focus-within:border-accent/60"
+            className={cn(
+              "overflow-hidden rounded-lg border border-hairline bg-surface-subtle/40 focus-within:border-accent/60",
+              dragOver && "border-accent ring-1 ring-accent",
+            )}
             data-testid="reply-editor"
+            onDragOver={(e) => {
+              if (extrasFailed.length > 0 || !e.dataTransfer.types.includes("Files")) return;
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false);
+            }}
+            onDrop={(e) => {
+              if (extrasFailed.length > 0 || e.dataTransfer.files.length === 0) return;
+              e.preventDefault();
+              setDragOver(false);
+              attachments.add(e.dataTransfer.files);
+            }}
           >
             {refineReview.review ? (
               <RefineDiffView
@@ -834,6 +865,17 @@ export function ReplyDialog({
                 )}
               </div>
             )}
+            {attachments.items.length > 0 && (
+              <div
+                className="flex flex-wrap gap-1.5 border-t border-hairline px-3 py-2"
+                data-testid="reply-attachments"
+              >
+                <AttachmentChips
+                  items={attachments.items}
+                  onRemove={extrasFailed.length > 0 ? () => undefined : attachments.remove}
+                />
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-2 border-t border-hairline bg-surface px-2 py-1.5">
               {/* Rewrites only the agent's own text; the quoted original below
                   it is re-assembled from the untouched original (see replyQuote).
@@ -853,19 +895,52 @@ export function ReplyDialog({
                   reviewOpen={refineReview.review !== null}
                 />
               )}
+              <Button
+                variant="ghost"
+                size="sm"
+                data-testid="reply-attach"
+                disabled={extrasFailed.length > 0}
+                title={t("ticket.telegram.composer.attach")}
+                onClick={() => fileRef.current?.click()}
+              >
+                <span aria-hidden>📎</span> {t("newTicket.attachFile")}
+              </Button>
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                className="hidden"
+                data-testid="reply-attach-input"
+                onChange={(e) => {
+                  if (e.target.files) attachments.add(e.target.files);
+                  // Same file again must fire onChange after a removal.
+                  e.target.value = "";
+                }}
+              />
               <span className="ml-auto">
                 <ComposerTimeChip value={timeUnits} onChange={setTimeUnits} testId="reply-time" />
               </span>
             </div>
           </div>
+          {attachments.error && (
+            <p className="text-xs text-danger" data-testid="reply-attach-error">
+              {attachments.error === "tooLarge"
+                ? t("ticket.telegram.composer.attachTooLarge", { max: formatBytes(MAX_ATTACHMENT_BYTES) })
+                : attachments.error === "tooMany"
+                  ? t("ticket.telegram.composer.attachTooMany", { max: MAX_ATTACHMENTS })
+                  : t("ticket.telegram.composer.attachReadFailed")}
+            </p>
+          )}
           {!isTelegram && <EmailSecurityControl security={security} testId="reply-security" />}
           {sendMutation.isError && (
             <p className="text-xs text-danger" data-testid="reply-send-error">
-              {sendMutation.error instanceof ApiError &&
-              sendMutation.error.message &&
-              !sendMutation.error.message.startsWith("HTTP ")
-                ? sendMutation.error.message
-                : t("ticket.replyError")}
+              {sendMutation.error instanceof ApiError && sendMutation.error.status === 413
+                ? t("ticket.telegram.composer.attachTooLargeServer")
+                : sendMutation.error instanceof ApiError &&
+                    sendMutation.error.message &&
+                    !sendMutation.error.message.startsWith("HTTP ")
+                  ? sendMutation.error.message
+                  : t("ticket.replyError")}
             </p>
           )}
           {extrasFailed.length > 0 && (

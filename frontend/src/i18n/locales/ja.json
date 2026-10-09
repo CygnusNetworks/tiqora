@@ -539,6 +539,7 @@
     "senderSystem": "システム",
     "reply": "返信",
     "replyAll": "全員に返信",
+    "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
     "forward": "進む",
     "bounce": "バウンス",
     "splitAction": "分割",

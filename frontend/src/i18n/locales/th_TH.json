@@ -539,6 +539,7 @@
     "senderSystem": "ระบบ",
     "reply": "ตอบกลับ",
     "replyAll": "ตอบกลับทั้งหมด",
+    "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
     "forward": "ไปข้างหน้า",
     "bounce": "เด้ง",
     "splitAction": "แยก",

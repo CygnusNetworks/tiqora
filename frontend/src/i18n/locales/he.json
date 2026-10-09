@@ -539,6 +539,7 @@
     "senderSystem": "מערכת",
     "reply": "השב",
     "replyAll": "השב לכולם",
+    "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
     "forward": "קדימה",
     "bounce": "להקפיץ",
     "splitAction": "פיצול",

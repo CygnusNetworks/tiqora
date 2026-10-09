@@ -6961,7 +6961,8 @@ export interface paths {
          *
          *     Telegram replies may carry ``attachments``, ``telegram_buttons`` and
          *     ``telegram_reply_to_article_id`` (422 on any other channel); a failed
-         *     Telegram send returns 409 with nothing stored.
+         *     Telegram send returns 409 with nothing stored. Outgoing agent email may
+         *     carry ``attachments`` as well (413 over the upload limit).
          *
          *     With ``state_id`` the ticket's state is changed after the article, in the
          *     same transaction (PATCH semantics). The state change is validated before
@@ -9760,6 +9761,8 @@ export interface components {
             incoming_time?: number | null;
             /** Is Visible For Customer */
             is_visible_for_customer: boolean;
+            /** Reply All Available */
+            reply_all_available?: boolean | null;
             security?: components["schemas"]["ArticleSecurity"] | null;
             /** Sender Type */
             sender_type?: string | null;

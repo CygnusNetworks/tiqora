@@ -343,6 +343,11 @@ async def test_ticket_zoom(url_fixture: str, request: pytest.FixtureRequest) -> 
         assert "dave@example.com" not in own_all.cc
         assert "zoomqueue@example.com" not in own_all.cc
 
+        # The article list flags both as worth a reply-all (extra recipients).
+        listed = {a.id: a for a in await ts.list_articles(ids["agent"], ids["ticket"])}
+        assert listed[ids["article"]].reply_all_available is True
+        assert listed[ids["agent_article"]].reply_all_available is True
+
         # Templates: only the Answer template for this queue.
         tpls = await ts.list_templates(ids["agent"], ids["ticket"])
         assert [t.name for t in tpls] == ["Greeting"]
@@ -585,3 +590,39 @@ async def test_reply_draft_telegram_article_skips_quote(
         assert "wrote:" in draft_email.body
         assert "> First line" in draft_email.body
     await engine.dispose()
+
+
+def test_reply_all_extras_empty_when_only_our_own_address_is_left() -> None:
+    from tiqora.domain.ticket_service import _reply_all_extras
+
+    system = {"netadmin@example.com"}
+    # Customer wrote to us alone: reply-all would equal reply.
+    assert (
+        _reply_all_extras(
+            outgoing=False,
+            from_addr="Vanessa <vanessa@example.org>",
+            art_to="Netadmin <netadmin@example.com>",
+            art_cc=None,
+            system_addresses=system,
+        )
+        == []
+    )
+    # Our own reply to one customer, Cc'd to ourselves: nobody else either.
+    assert (
+        _reply_all_extras(
+            outgoing=True,
+            from_addr="Netadmin <netadmin@example.com>",
+            art_to="vanessa@example.org",
+            art_cc="NETADMIN@example.com",
+            system_addresses=system,
+        )
+        == []
+    )
+    # A colleague in Cc makes it worthwhile — once, despite the duplicate.
+    assert _reply_all_extras(
+        outgoing=False,
+        from_addr="vanessa@example.org",
+        art_to="netadmin@example.com, Kai <kai@example.org>",
+        art_cc="kai@example.org",
+        system_addresses=system,
+    ) == ["Kai <kai@example.org>"]

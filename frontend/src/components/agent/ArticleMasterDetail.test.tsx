@@ -286,6 +286,25 @@ describe("ArticleMasterDetail", () => {
     expect(await screen.findByTestId("reply-dialog")).toBeInTheDocument();
     await waitFor(() => expect(getReplyDraft).toHaveBeenCalledWith(7, 2, false));
   });
+
+  it("greys out reply-all when the backend says nobody else would be reached", async () => {
+    listArticles.mockImplementation(() =>
+      Promise.resolve([
+        { ...ENTITY_ARTICLES[0], id: 30, ticket_id: 7, reply_all_available: false },
+        { ...ENTITY_ARTICLES[0], id: 31, ticket_id: 7, reply_all_available: true },
+      ]),
+    );
+    wrap(<ArticleMasterDetail ticketId={7} />);
+    await screen.findByTestId("article-list-item-30");
+
+    fireEvent.click(screen.getByTestId("article-list-item-30"));
+    const lone = await screen.findByTestId("article-reply-all-30");
+    expect(lone).toBeDisabled();
+    expect(lone.parentElement).toHaveAttribute("title", i18n.t("ticket.replyAllNoOthers"));
+
+    fireEvent.click(screen.getByTestId("article-list-item-31"));
+    expect(await screen.findByTestId("article-reply-all-31")).toBeEnabled();
+  });
 });
 
 describe("ArticleMasterDetail view switching (split vs. conversation)", () => {

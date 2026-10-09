@@ -218,8 +218,10 @@ function ArticleActions({
   const [dialog, setDialog] = useState<
     "reply" | "replyAll" | "forward" | "bounce" | "split" | null
   >(null);
-  const hasMultipleRecipients =
-    (article.to_address ?? "").includes(",") || Boolean(article.to_address && article.from_address);
+  const isTelegram = channelNameOf(article) === "Telegram";
+  // false = reply-all would reach nobody beyond the plain reply (backend
+  // strips our own system addresses) — offered greyed out.
+  const replyAllUseful = article.reply_all_available !== false;
   const noPerm = t("ticket.toolbar.noPermission");
 
   return (
@@ -237,12 +239,15 @@ function ArticleActions({
           {t("ticket.reply")}
         </Button>
       </span>
-      {hasMultipleRecipients && (
-        <span title={!canNote ? noPerm : undefined} className="inline-flex">
+      {!isTelegram && (
+        <span
+          title={!canNote ? noPerm : !replyAllUseful ? t("ticket.replyAllNoOthers") : undefined}
+          className="inline-flex"
+        >
           <Button
             size="sm"
             variant="secondary"
-            disabled={!canNote}
+            disabled={!canNote || !replyAllUseful}
             onClick={() => setDialog("replyAll")}
           >
             {t("ticket.replyAll")}

@@ -539,6 +539,7 @@
     "senderSystem": "Sistema",
     "reply": "Rispondi",
     "replyAll": "Rispondi a tutti",
+    "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
     "forward": "Avanti",
     "bounce": "Rimbalza",
     "splitAction": "Dividi",

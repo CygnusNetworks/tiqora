@@ -8,7 +8,7 @@ protocol so tests can inject a capturing fake.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from email import policy as email_policy
 from email.message import EmailMessage
 from email.utils import formatdate, getaddresses, make_msgid
@@ -245,6 +245,7 @@ def build_message(
     loop_hint: bool = True,
     extra_headers: Mapping[str, str] | None = None,
     auto_submitted: str | None = None,
+    attachments: Sequence[tuple[str, str, bytes]] = (),
 ) -> EmailMessage:
     """Build an :class:`EmailMessage` for SMTP delivery.
 
@@ -275,6 +276,9 @@ def build_message(
     clients fall back to the delivery time and spam filters score the omission;
     without a Message-ID a reply cannot be threaded onto this mail. Pass
     *message_id* to reuse the id stored on an article.
+
+    *attachments* are ``(filename, content_type, content)`` triples; any
+    turn the message into ``multipart/mixed`` with the body first.
     """
     msg = EmailMessage(policy=_OUTBOUND_POLICY)
     msg["From"] = from_addr
@@ -313,4 +317,10 @@ def build_message(
         msg["Auto-Submitted"] = auto_submitted
     subtype = "html" if "html" in content_type.lower() else "plain"
     msg.set_content(body, subtype=subtype, charset="utf-8")
+    for filename, content_type, content in attachments:
+        maintype, _, sub = (content_type or "").partition(";")[0].strip().lower().partition("/")
+        # multipart/* and message/* need a structured payload, not bytes.
+        if not maintype or not sub or maintype in {"multipart", "message"}:
+            maintype, sub = "application", "octet-stream"
+        msg.add_attachment(content, maintype=maintype, subtype=sub, filename=filename)
     return msg

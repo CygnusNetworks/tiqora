@@ -539,6 +539,7 @@
     "senderSystem": "Järjestelmä",
     "reply": "Vastaa",
     "replyAll": "Vastaa kaikkiin",
+    "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
     "forward": "Eteenpäin",
     "bounce": "Pomppia",
     "splitAction": "Jaa",

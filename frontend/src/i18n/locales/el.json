@@ -539,6 +539,7 @@
     "senderSystem": "Σύστημα",
     "reply": "Απάντηση",
     "replyAll": "Απαντήστε σε όλους",
+    "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
     "forward": "Εμπρός",
     "bounce": "Αναπήδηση",
     "splitAction": "Διαχωρισμός",

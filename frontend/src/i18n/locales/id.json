@@ -539,6 +539,7 @@
     "senderSystem": "Sistem",
     "reply": "Membalas",
     "replyAll": "Balas semuanya",
+    "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
     "forward": "Maju",
     "bounce": "Bangkit",
     "splitAction": "Pisahkan",

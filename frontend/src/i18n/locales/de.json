@@ -539,6 +539,7 @@
     "senderSystem": "System",
     "reply": "Antworten",
     "replyAll": "Allen antworten",
+    "replyAllNoOthers": "Keine weiteren Empfänger – „Antworten“ erreicht bereits alle.",
     "forward": "Weiterleiten",
     "bounce": "Umleiten",
     "splitAction": "Ticket teilen",

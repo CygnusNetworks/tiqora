@@ -539,6 +539,7 @@
     "senderSystem": "Sistema",
     "reply": "Atsakyti",
     "replyAll": "Atsakyti visiems",
+    "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
     "forward": "Pirmyn",
     "bounce": "Atšokti",
     "splitAction": "Skaidyti",

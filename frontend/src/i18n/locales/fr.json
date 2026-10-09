@@ -539,6 +539,7 @@
     "senderSystem": "Système",
     "reply": "Répondre",
     "replyAll": "Répondre à tous",
+    "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
     "forward": "Avant",
     "bounce": "Rebond",
     "splitAction": "Diviser",

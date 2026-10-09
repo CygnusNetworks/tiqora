@@ -539,6 +539,7 @@
     "senderSystem": "Systeem",
     "reply": "Antwoord",
     "replyAll": "Allen beantwoorden",
+    "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
     "forward": "Doorsturen",
     "bounce": "Doorsturen",
     "splitAction": "Splitsen",
