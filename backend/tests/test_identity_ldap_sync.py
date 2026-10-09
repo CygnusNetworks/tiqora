@@ -545,11 +545,24 @@ async def test_group_search_error_skips_role_sync(
         assert await env.rows("SELECT role_id FROM role_user WHERE user_id = :u", u=uid) == [
             (ROLE,)
         ]
-        # The group's search now ERRORS (noSuchObject): membership unknown -> no strip.
-        directory.delete(HOST, SUPPORT_DN)
+        # The group's search now ERRORS (server busy): membership unknown -> no strip.
+        directory.search_results[SUPPORT_DN] = {"result": 51, "description": "busy"}
         resp = await _login(client, "idpldap.gina", "gina-secret")
         assert resp.status_code == 200, resp.text
-    assert await env.rows("SELECT role_id FROM role_user WHERE user_id = :u", u=uid) == [(ROLE,)]
+        assert await env.rows("SELECT role_id FROM role_user WHERE user_id = :u", u=uid) == [
+            (ROLE,)
+        ]
+        # The group is deleted (noSuchObject): definitively not a member -> stripped,
+        # and the stale rule's group is named in a warning (Znuny parity).
+        del directory.search_results[SUPPORT_DN]
+        directory.delete(HOST, SUPPORT_DN)
+        with capture_logs() as logs:
+            resp = await _login(client, "idpldap.gina", "gina-secret")
+        assert resp.status_code == 200, resp.text
+    assert await env.rows("SELECT role_id FROM role_user WHERE user_id = :u", u=uid) == []
+    assert any(
+        e["event"] == "ldap_rule_group_missing" and e["group_dn"] == SUPPORT_DN for e in logs
+    )
     assert limiter.failures == []
 
 

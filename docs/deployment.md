@@ -179,9 +179,20 @@ first login the account is linked to the directory entry's stable id
 (`objectGUID` / `entryUUID`), so a later rename of the local login keeps
 working.
 
+The stored link id for Active Directory is the lowercase hex of the
+**raw** 16 `objectGUID` bytes as the directory sends them (the first three
+GUID fields little-endian) — not the canonical GUID string that AD tools
+show. Example: `{01020304-0506-0708-090a-0b0c0d0e0f10}` is stored as
+`0403020106050807090a0b0c0d0e0f10` (Python: `uuid.UUID(...).bytes_le.hex()`).
+Keep this in mind when comparing links in the admin list with AD.
+
 Connections use a 5 s connect and 10 s receive timeout, never follow
 referrals, and one password login spends at most 20 s across all
-directories. StartTLS is negotiated before any password is sent.
+directories (no LDAP operation starts after that, and socket timeouts are
+capped at the time left). StartTLS is negotiated before any password is
+sent. The S/MIME certificate fetch from the customer directory
+(`TIQORA_CUSTOMER_LDAP_*`) uses the same connection settings, including
+`TIQORA_CUSTOMER_LDAP_TLS_VERIFY`.
 
 Agent auth (`TIQORA_LDAP_*`) — customer portal uses the identical shape
 under `TIQORA_CUSTOMER_LDAP_*`:

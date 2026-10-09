@@ -46,6 +46,12 @@ from tiqora.crypto.config import CryptoConfig
 from tiqora.crypto.customer_keys import convert_cert_format
 from tiqora.crypto.smime_store import SmimeStore
 from tiqora.db.legacy.customer import CustomerUser
+from tiqora.domain._ldap_core import (
+    LdapConfig,
+    LdapDirectoryError,
+    open_search_connection,
+    search_entries,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -110,28 +116,30 @@ async def _column_values(session: AsyncSession, column: str, email: str) -> list
     return out
 
 
-def _ldap_connection(settings: Settings) -> Any:
-    """Bound ldap3 connection to the customer directory (tests patch this)."""
-    import ldap3
-
-    server = ldap3.Server(
-        settings.customer_ldap_host,
+def _customer_ldap_config(settings: Settings) -> LdapConfig:
+    return LdapConfig(
+        host=settings.customer_ldap_host,
         port=settings.customer_ldap_port,
         use_ssl=settings.customer_ldap_use_ssl,
-        get_info=ldap3.NONE,
+        use_starttls=settings.customer_ldap_use_starttls,
+        base_dn=settings.customer_ldap_base_dn,
+        bind_dn=settings.customer_ldap_bind_dn,
+        bind_password=settings.customer_ldap_bind_password,
+        always_filter=settings.customer_ldap_always_filter,
+        tls_verify=settings.customer_ldap_tls_verify,
     )
-    conn = ldap3.Connection(
-        server,
-        user=settings.customer_ldap_bind_dn or None,
-        password=settings.customer_ldap_bind_password or None,
-        auto_bind=False,
-    )
-    if settings.customer_ldap_use_starttls:
-        conn.open()
-        conn.start_tls()
-    if not conn.bind():
-        raise CryptoError(f"customer LDAP bind failed: {conn.result}")
-    return conn
+
+
+def _ldap_connection(settings: Settings) -> Any:
+    """Bound connection to the customer directory (tests patch this).
+
+    Same connection rules as the LDAP login (``domain._ldap_core``): StartTLS before the
+    bind, ``TIQORA_CUSTOMER_LDAP_TLS_VERIFY``, connect/receive timeouts, no referrals.
+    """
+    try:
+        return open_search_connection(_customer_ldap_config(settings))
+    except LdapDirectoryError as exc:
+        raise CryptoError(f"customer LDAP: {exc}") from exc
 
 
 def _ldap_values_sync(settings: Settings, email: str) -> list[bytes]:
@@ -143,14 +151,12 @@ def _ldap_values_sync(settings: Settings, email: str) -> list[bytes]:
         filt = f"(&{filt}{settings.customer_ldap_always_filter})"
     conn = _ldap_connection(settings)
     try:
-        if not conn.search(
-            search_base=settings.customer_ldap_base_dn,
-            search_filter=filt,
-            attributes=[attr],
-        ):
-            return []
+        try:
+            entries = search_entries(conn, settings.customer_ldap_base_dn, filt, [attr])
+        except LdapDirectoryError as exc:
+            raise CryptoError(f"customer LDAP: {exc}") from exc
         out: list[bytes] = []
-        for entry in conn.response or []:
+        for entry in entries:
             attrs = entry.get("raw_attributes") or {}
             for key, values in attrs.items():
                 if key.split(";", 1)[0].lower() != attr.lower():

@@ -319,16 +319,43 @@ async def test_entry_returns_attributes_and_group_membership(anna_dir: Directory
 
 
 @pytest.mark.asyncio
+async def test_missing_rule_group_is_not_a_member_and_warns(anna_dir: Directory) -> None:
+    gone = "cn=gone,ou=groups,dc=example,dc=org"
+    with capture_logs() as logs:
+        entry = await ldap_authenticate_entry(
+            _anna_config(), "anna", "anna-secret", member_of_group_dns=[gone, SUPPORT_DN]
+        )
+    assert entry is not None
+    assert entry.member_group_dns == (SUPPORT_DN,)
+    assert entry.group_search_failed is False  # noSuchObject is definitive: sync still runs
+    warned = [e for e in logs if e["event"] == "ldap_rule_group_missing"]
+    assert warned and warned[0]["group_dn"] == gone and warned[0]["log_level"] == "warning"
+    ident = identity_from_entry(_record(LdapProviderConfig(host="dir.example.org")), entry)
+    assert ident.attributes["ldap:group_dn"] == (SUPPORT_DN,)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "bad_group",
+    "failure",
     [
-        "cn=gone,ou=groups,dc=example,dc=org",  # noSuchObject: non-success result
-        "not a dn",  # LDAPInvalidDnError raised by ldap3 before the request
+        "malformed_dn",  # LDAPInvalidDnError raised by ldap3 before the request
+        "referral",  # result 10: never chased, a failed search
+        "busy",  # result 51 (busy): any other non-success code
+        "timeout",  # socket receive timeout during the search
     ],
 )
 async def test_group_search_error_marks_entry_and_still_logs_in(
-    anna_dir: Directory, bad_group: str
+    anna_dir: Directory, failure: str
 ) -> None:
+    from ldap3.core.exceptions import LDAPSocketReceiveError
+
+    bad_group = "not a dn" if failure == "malformed_dn" else SALES_DN
+    if failure == "referral":
+        anna_dir.search_results[SALES_DN] = {"result": 10, "description": "referral"}
+    elif failure == "busy":
+        anna_dir.search_results[SALES_DN] = {"result": 51, "description": "busy"}
+    elif failure == "timeout":
+        anna_dir.search_raises[SALES_DN] = LDAPSocketReceiveError("timed out")
     entry = await ldap_authenticate_entry(
         _anna_config(),
         "anna",
@@ -345,8 +372,14 @@ async def test_group_search_error_marks_entry_and_still_logs_in(
 
 @pytest.mark.asyncio
 async def test_access_gate_search_error_denies(anna_dir: Directory) -> None:
+    # The access gate denies on ANY error, noSuchObject included.
     cfg = _anna_config(group_dn="cn=gone,ou=groups,dc=example,dc=org")
     assert await ldap_authenticate_entry(cfg, "anna", "anna-secret") is None
+    anna_dir.search_results[SUPPORT_DN] = {"result": 10, "description": "referral"}
+    assert (
+        await ldap_authenticate_entry(_anna_config(group_dn=SUPPORT_DN), "anna", "anna-secret")
+        is None
+    )
 
 
 @pytest.mark.asyncio
@@ -622,3 +655,127 @@ async def test_env_user_attr_dn_compares_the_dn(mock_ldap3: Directory) -> None:
     assert env_ldap_config(settings, "agent").user_attr == "DN"
     assert await _env_auth(settings, "alice", "alice-secret") is None  # helpdesk lists memberUid
     assert "(member=uid=alice,ou=people,dc=example,dc=com)" in mock_ldap3.filters
+
+
+# --------------------------------------------------------------------------- fix round 2
+
+
+@pytest.mark.asyncio
+async def test_worker_stops_at_the_login_deadline(mock_ldap3: Directory) -> None:
+    import time
+
+    mock_ldap3.bind_delay["mock-directory"] = 0.5  # the search bind stalls
+    with capture_logs() as logs:
+        entry = await ldap_authenticate_entry(
+            _env_config(_settings()), "alice", "alice-secret", deadline=time.monotonic() + 0.2
+        )
+    assert entry is None
+    assert "bind" in mock_ldap3.events
+    assert "search" not in mock_ldap3.events and "rebind" not in mock_ldap3.events
+    assert any(e["event"] == "ldap_login_deadline_exceeded" for e in logs)
+
+
+@pytest.mark.asyncio
+async def test_receive_timeout_capped_by_remaining_time(mock_ldap3: Directory) -> None:
+    import time
+
+    assert (
+        await ldap_authenticate_entry(
+            _env_config(_settings()), "alice", "alice-secret", deadline=time.monotonic() + 2
+        )
+        is not None
+    )
+    capped = [t for t in mock_ldap3.receive_timeouts if t is not None]
+    assert capped and all(0 < t <= 2 for t in capped)
+    mock_ldap3.receive_timeouts.clear()
+    assert await _env_auth(_settings(), "alice", "alice-secret") == "alice"  # default budget
+    assert all(t is not None and 0 < t <= 10 for t in mock_ldap3.receive_timeouts)
+
+
+@pytest.mark.asyncio
+async def test_chain_passes_its_deadline_to_the_worker(monkeypatch: pytest.MonkeyPatch) -> None:
+    import time
+
+    from tiqora.identity import ldap_login
+
+    rec = _record(LdapProviderConfig(host="dir.example.org"))
+    seen: dict[str, Any] = {}
+
+    async def providers(*args: Any, **kwargs: Any) -> list[ProviderRecord]:
+        return [rec]
+
+    async def fake_entry(*args: Any, **kwargs: Any) -> None:
+        seen.update(kwargs)
+
+    monkeypatch.setattr(ldap_login, "ldap_providers", providers)
+    monkeypatch.setattr(ldap_login, "ldap_authenticate_entry", fake_entry)
+    start = time.monotonic()
+    found = await ldap_password_login(
+        None,  # type: ignore[arg-type]
+        _settings(),
+        login="anna",
+        password="x",
+        user_kind="agent",
+    )
+    assert found is None
+    assert start < seen["deadline"] <= time.monotonic() + ldap_login.CHAIN_BUDGET_SECONDS
+
+
+def test_object_guid_subject_is_raw_little_endian_hex() -> None:
+    import uuid
+
+    guid = uuid.UUID("01020304-0506-0708-090a-0b0c0d0e0f10")
+    raw = _ldap_core._entry_attributes({"objectGUID": [guid.bytes_le]}, ["objectGUID"])
+    cfg = LdapProviderConfig(host="dir.example.org", subject_attr="objectGUID")
+    entry = LdapEntry(uid="anna", dn=ANNA_DN, attributes=raw, member_group_dns=())
+    subject = identity_from_entry(_record(cfg), entry).subject
+    assert subject == "0403020106050807090a0b0c0d0e0f10" == guid.bytes_le.hex()
+    assert subject != guid.hex  # not the canonical GUID
+
+
+@pytest.mark.asyncio
+async def test_smime_customer_ldap_uses_shared_connection_rules(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import asyncio
+    import ssl
+
+    from tiqora.crypto import CryptoError
+    from tiqora.crypto import customer_fetch as cf
+
+    directory = install_directory(monkeypatch)
+    srv = directory.server("cldap.example.org")
+    directory.add(
+        srv,
+        "cn=carla,ou=people,dc=example,dc=org",
+        objectClass="inetOrgPerson",
+        mail="carla@example.test",
+        userSMIMECertificate=b"\x30\x82\x01\x00",
+    )
+    settings = Settings(
+        customer_ldap_enabled=True,
+        customer_ldap_host=" cldap.example.org ",
+        customer_ldap_base_dn="ou=people,dc=example,dc=org",
+        customer_ldap_bind_dn=BIND_DN,
+        customer_ldap_bind_password=BIND_PW,
+        customer_ldap_use_starttls=True,
+        customer_ldap_tls_verify=True,
+    )
+    values = await asyncio.to_thread(cf._ldap_values_sync, settings, "carla@example.test")
+    assert values == [b"\x30\x82\x01\x00"]
+    server_kwargs = directory.server_kwargs["cldap.example.org"]
+    assert server_kwargs["tls"].validate == ssl.CERT_REQUIRED
+    assert 0 < server_kwargs["connect_timeout"] <= 5
+    conn_kwargs = directory.connection_kwargs[-1]
+    assert conn_kwargs["auto_referrals"] is False
+    assert 0 < conn_kwargs["receive_timeout"] <= 10
+    assert directory.events.index("start_tls") < directory.events.index("bind")
+    assert directory.bind_users == [BIND_DN]
+
+    # A referral (or any non-success answer) is an error, never a hop to another host.
+    directory.search_results["ou=people,dc=example,dc=org"] = {
+        "result": 10,
+        "description": "referral",
+    }
+    with pytest.raises(CryptoError):
+        cf._ldap_values_sync(settings, "carla@example.test")

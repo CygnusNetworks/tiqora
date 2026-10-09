@@ -14,8 +14,11 @@ connection data comes from Settings, the login is the directory UID matched agai
 existing valid account, no JIT, no rules (``require_sso_opt_in`` never applies to LDAP).
 
 The subject (link key) of an LDAP identity is a stable entry id: the configured
-``subject_attr``, else ``objectGUID`` (AD, hex), else ``entryUUID`` (OpenLDAP); the entry DN
+``subject_attr``, else ``objectGUID`` (AD), else ``entryUUID`` (OpenLDAP); the entry DN
 only when the directory has none of them (logged — a DN changes on rename/move).
+``objectGUID`` is stored as the lowercase hex of its RAW 16 bytes in wire order (the
+first three GUID fields little-endian), NOT the canonical GUID string AD tools show:
+``{01020304-0506-0708-090a-0b0c0d0e0f10}`` is subject ``0403020106050807090a0b0c0d0e0f10``.
 
 A rule-group search that ERRORS omits ``ldap:group_dn`` from the identity, so the login's
 role/group sync is skipped (absent-claim rule, fail safe). The whole provider chain has a
@@ -279,6 +282,7 @@ async def ldap_password_login(
                     password,
                     attributes=requested_attributes(record),
                     member_of_group_dns=rule_group_dns(record),
+                    deadline=deadline,  # bounds the executor thread, not only this await
                 ),
                 timeout=remaining,
             )

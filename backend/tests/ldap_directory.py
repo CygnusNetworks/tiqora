@@ -35,6 +35,10 @@ class Directory:
         self.server_kwargs: dict[str, dict[str, Any]] = {}  # host -> Server(...) kwargs
         self.connection_kwargs: list[dict[str, Any]] = []
         self.bind_delay: dict[str, float] = {}  # host -> seconds (slow directory)
+        self.receive_timeouts: list[float | None] = []  # conn.receive_timeout at each search
+        # base DN -> forced search outcome: a result dict (non-success code) or an exception
+        self.search_results: dict[str, dict[str, Any]] = {}
+        self.search_raises: dict[str, Exception] = {}
 
     def server(self, host: str) -> ldap3.Server:
         srv = ldap3.Server(host, get_info=ldap3.NONE)
@@ -106,6 +110,13 @@ def install_directory(monkeypatch: pytest.MonkeyPatch) -> Directory:
         def search(self, search_base: str, search_filter: str, *args: Any, **kwargs: Any) -> Any:
             directory.events.append("search")
             directory.filters.append(search_filter)
+            directory.receive_timeouts.append(self.receive_timeout)
+            if search_base in directory.search_raises:
+                raise directory.search_raises[search_base]
+            if search_base in directory.search_results:
+                self.result = {"type": "searchResDone", **directory.search_results[search_base]}
+                self.response = []
+                return False
             return super().search(search_base, search_filter, *args, **kwargs)
 
     class Shim:
