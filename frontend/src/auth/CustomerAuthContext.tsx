@@ -8,7 +8,13 @@ import {
   type ReactNode,
 } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  startAuthentication,
+  type PublicKeyCredentialRequestOptionsJSON,
+} from "@simplewebauthn/browser";
 import { portalApi, ApiError, type CustomerMe } from "@/lib/portalApi";
+import { customerSecurityApi, type CustomerLoginResponse } from "@/lib/portalSecurityApi";
+import { submitSsoLogout } from "@/lib/ssoLogout";
 import { setAppLanguage } from "@/i18n";
 
 /** Znuny applies the customer's UserLanguage at login. */
@@ -25,7 +31,16 @@ type CustomerAuthContextValue = {
   customer: CustomerMe | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (login: string, password: string) => Promise<void>;
+  /** True after login() when the password was accepted but a second factor is still required. */
+  pending2fa: boolean;
+  /** Which second factors the customer mid-login has enrolled; `null` outside a pending step. */
+  pendingFactors: { totp: boolean; passkey: boolean } | null;
+  login: (login: string, password: string) => Promise<CustomerLoginResponse>;
+  verifyTotp: (code: string) => Promise<void>;
+  /** Finish the pending step with a passkey (begin, browser ceremony, finish). */
+  verifyPasskey: () => Promise<void>;
+  /** Abandon a pending second-factor step and return to the password form. */
+  cancelPending: () => void;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -40,6 +55,11 @@ const CustomerAuthContext = createContext<CustomerAuthContextValue | null>(null)
 export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [bootstrapped, setBootstrapped] = useState(false);
+  const [pending2fa, setPending2fa] = useState(false);
+  const [pendingFactors, setPendingFactors] = useState<{
+    totp: boolean;
+    passkey: boolean;
+  } | null>(null);
 
   const meQuery = useQuery({
     queryKey: ["portal-auth", "me"],
@@ -61,9 +81,10 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     if (!meQuery.isLoading) setBootstrapped(true);
   }, [meQuery.isLoading]);
 
-  const login = useCallback(
-    async (loginName: string, password: string) => {
-      const res = await portalApi.portalLogin({ login: loginName, password });
+  const finishLogin = useCallback(
+    async (res: CustomerLoginResponse) => {
+      setPending2fa(false);
+      setPendingFactors(null);
       queryClient.setQueryData(["portal-auth", "me"], res.customer);
       await queryClient.invalidateQueries({ queryKey: ["portal-auth", "me"] });
       await applyStoredLanguage();
@@ -71,7 +92,61 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     [queryClient],
   );
 
+  const login = useCallback(
+    async (loginName: string, password: string) => {
+      const res = await portalApi.portalLogin({ login: loginName, password });
+      if (res.pending_2fa) {
+        // Password accepted; no usable session until the second factor is verified.
+        setPending2fa(true);
+        setPendingFactors({
+          totp: Boolean(res.totp_enrolled),
+          passkey: Boolean(res.passkey_enrolled),
+        });
+        return res;
+      }
+      await finishLogin(res);
+      return res;
+    },
+    [finishLogin],
+  );
+
+  const verifyTotp = useCallback(
+    async (code: string) => {
+      await finishLogin(await customerSecurityApi.totpVerify(code));
+    },
+    [finishLogin],
+  );
+
+  const verifyPasskey = useCallback(async () => {
+    const options = await customerSecurityApi.passkeyAuthenticateBegin();
+    const credential = await startAuthentication({
+      optionsJSON: options as unknown as PublicKeyCredentialRequestOptionsJSON,
+    });
+    await finishLogin(
+      await customerSecurityApi.passkeyAuthenticateFinish(
+        credential as unknown as Record<string, unknown>,
+      ),
+    );
+  }, [finishLogin]);
+
+  const cancelPending = useCallback(() => {
+    setPending2fa(false);
+    setPendingFactors(null);
+  }, []);
+
+  const ssoLogout = meQuery.data?.sso_logout === true;
+
   const logout = useCallback(async () => {
+    setPending2fa(false);
+    setPendingFactors(null);
+    if (ssoLogout) {
+      // The SSO logout endpoint ends the portal session and may continue at the
+      // identity provider, so it is a real form POST instead of a fetch.
+      queryClient.setQueryData(["portal-auth", "me"], null);
+      queryClient.clear();
+      submitSsoLogout("/api/portal/auth/sso/logout");
+      return;
+    }
     try {
       await portalApi.portalLogout();
     } catch {
@@ -79,7 +154,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     }
     queryClient.setQueryData(["portal-auth", "me"], null);
     queryClient.clear();
-  }, [queryClient]);
+  }, [queryClient, ssoLogout]);
 
   const refresh = useCallback(async () => {
     await meQuery.refetch();
@@ -90,11 +165,28 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
       customer: meQuery.data ?? null,
       isLoading: !bootstrapped || meQuery.isLoading,
       isAuthenticated: Boolean(meQuery.data),
+      pending2fa,
+      pendingFactors,
       login,
+      verifyTotp,
+      verifyPasskey,
+      cancelPending,
       logout,
       refresh,
     }),
-    [meQuery.data, meQuery.isLoading, bootstrapped, login, logout, refresh],
+    [
+      meQuery.data,
+      meQuery.isLoading,
+      bootstrapped,
+      pending2fa,
+      pendingFactors,
+      login,
+      verifyTotp,
+      verifyPasskey,
+      cancelPending,
+      logout,
+      refresh,
+    ],
   );
 
   return (

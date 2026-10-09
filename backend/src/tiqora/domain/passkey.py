@@ -35,13 +35,17 @@ from webauthn.helpers.structs import (
 )
 
 from tiqora.config import Settings
-from tiqora.db.tiqora.models import TiqoraUserPasskey
+from tiqora.db.tiqora.models import TiqoraCustomerPasskey, TiqoraUserPasskey
 from tiqora.domain.totp import TOTPService
+from tiqora.domain.two_factor_subject import AGENT_2FA, TwoFactorSubject, webauthn_user_handle
 
 logger = structlog.get_logger(__name__)
 
-_CHALLENGE_PREFIX_REG = "tiqora:webauthn:reg:"
-_CHALLENGE_PREFIX_AUTH = "tiqora:webauthn:auth:"
+# Agent keys: "tiqora:webauthn:reg:<token>"; customers insert "customer:" after
+# "webauthn:" ("tiqora:webauthn:customer:reg:<token>").
+_CHALLENGE_PREFIX_REG = "reg:"
+_CHALLENGE_PREFIX_AUTH = "auth:"
+_CHALLENGE_KEY_ROOT = "tiqora:webauthn:"
 _DEFAULT_CHALLENGE_TTL = 300
 _DEFAULT_PASSKEY_NAME = "Passkey"
 
@@ -66,7 +70,10 @@ class WebAuthnService:
         session: AsyncSession,
         redis_client: redis.Redis,
         settings: Settings,
+        *,
+        subject: TwoFactorSubject = AGENT_2FA,
     ) -> None:
+        self._subject = subject
         self._session = session
         self._redis = redis_client
         self._settings = settings
@@ -79,7 +86,7 @@ class WebAuthnService:
         return self._settings.totp_pending_ttl_seconds or _DEFAULT_CHALLENGE_TTL
 
     async def _store_challenge(self, prefix: str, session_token: str, challenge: bytes) -> None:
-        key = f"{prefix}{session_token}"
+        key = f"{_CHALLENGE_KEY_ROOT}{self._subject.redis_ns}{prefix}{session_token}"
         await self._redis.set(
             key,
             bytes_to_base64url(challenge),
@@ -88,7 +95,7 @@ class WebAuthnService:
 
     async def _pop_challenge(self, prefix: str, session_token: str) -> bytes | None:
         """Fetch and delete the challenge (single-use)."""
-        key = f"{prefix}{session_token}"
+        key = f"{_CHALLENGE_KEY_ROOT}{self._subject.redis_ns}{prefix}{session_token}"
         raw = await self._redis.get(key)
         if raw is None:
             return None
@@ -97,37 +104,43 @@ class WebAuthnService:
             raw = raw.decode("ascii")
         return base64url_to_bytes(raw)
 
-    async def list(self, user_id: int) -> list[TiqoraUserPasskey]:
+    async def list(self, user_id: int) -> list[TiqoraUserPasskey | TiqoraCustomerPasskey]:
         result = await self._session.execute(
-            select(TiqoraUserPasskey)
-            .where(TiqoraUserPasskey.user_id == user_id)
-            .order_by(TiqoraUserPasskey.created.desc())
+            select(self._subject.passkey_model)
+            .where(self._subject.passkey_model.user_id == user_id)
+            .order_by(self._subject.passkey_model.created.desc())
         )
         return list(result.scalars().all())
 
     async def count(self, user_id: int) -> int:
         result = await self._session.execute(
             select(func.count())
-            .select_from(TiqoraUserPasskey)
-            .where(TiqoraUserPasskey.user_id == user_id)
+            .select_from(self._subject.passkey_model)
+            .where(self._subject.passkey_model.user_id == user_id)
         )
         return int(result.scalar_one() or 0)
 
     async def has_passkey(self, user_id: int) -> bool:
         return (await self.count(user_id)) > 0
 
-    async def get_by_id(self, user_id: int, passkey_id: int) -> TiqoraUserPasskey | None:
+    async def get_by_id(
+        self, user_id: int, passkey_id: int
+    ) -> TiqoraUserPasskey | TiqoraCustomerPasskey | None:
         result = await self._session.execute(
-            select(TiqoraUserPasskey).where(
-                TiqoraUserPasskey.id == passkey_id,
-                TiqoraUserPasskey.user_id == user_id,
+            select(self._subject.passkey_model).where(
+                self._subject.passkey_model.id == passkey_id,
+                self._subject.passkey_model.user_id == user_id,
             )
         )
         return result.scalar_one_or_none()
 
-    async def get_by_credential_id(self, credential_id_b64: str) -> TiqoraUserPasskey | None:
+    async def get_by_credential_id(
+        self, credential_id_b64: str
+    ) -> TiqoraUserPasskey | TiqoraCustomerPasskey | None:
         result = await self._session.execute(
-            select(TiqoraUserPasskey).where(TiqoraUserPasskey.credential_id == credential_id_b64)
+            select(self._subject.passkey_model).where(
+                self._subject.passkey_model.credential_id == credential_id_b64
+            )
         )
         return result.scalar_one_or_none()
 
@@ -144,7 +157,9 @@ class WebAuthnService:
         count = await self.count(user_id)
         if count:
             await self._session.execute(
-                delete(TiqoraUserPasskey).where(TiqoraUserPasskey.user_id == user_id)
+                delete(self._subject.passkey_model).where(
+                    self._subject.passkey_model.user_id == user_id
+                )
             )
             await self._session.commit()
         return count
@@ -167,7 +182,7 @@ class WebAuthnService:
             rp_id=self._settings.webauthn_rp_id,
             rp_name=self._settings.webauthn_rp_name or "Tiqora",
             user_name=login,
-            user_id=user_id.to_bytes(8, "big"),
+            user_id=webauthn_user_handle(self._subject, user_id),
             user_display_name=login,
             challenge=challenge,
             exclude_credentials=exclude or None,
@@ -187,7 +202,7 @@ class WebAuthnService:
         session_token: str,
         credential: dict[str, Any] | str,
         name: str | None = None,
-    ) -> TiqoraUserPasskey | None:
+    ) -> TiqoraUserPasskey | TiqoraCustomerPasskey | None:
         """Verify attestation against the Redis challenge and store the credential."""
         expected = await self._pop_challenge(_CHALLENGE_PREFIX_REG, session_token)
         if expected is None:
@@ -219,7 +234,7 @@ class WebAuthnService:
         if len(label) > 120:
             label = label[:120]
 
-        row = TiqoraUserPasskey(
+        row: TiqoraUserPasskey | TiqoraCustomerPasskey = self._subject.passkey_model(
             user_id=user_id,
             credential_id=cred_id_b64,
             public_key=verified.credential_public_key,
@@ -267,7 +282,7 @@ class WebAuthnService:
         user_id: int,
         session_token: str,
         credential: dict[str, Any] | str,
-    ) -> TiqoraUserPasskey | None:
+    ) -> TiqoraUserPasskey | TiqoraCustomerPasskey | None:
         """Verify assertion, bump sign_count + last_used_at. Returns the row on success."""
         expected = await self._pop_challenge(_CHALLENGE_PREFIX_AUTH, session_token)
         if expected is None:

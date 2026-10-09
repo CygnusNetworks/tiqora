@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import re
+from typing import Annotated
 
+import redis.asyncio as redis
 import structlog
-from fastapi import APIRouter, HTTPException, Request, status
-from sqlalchemy import func, or_, select
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import delete, func, or_, select
 
 from tiqora.api.deps import AppSettings, DbSession, get_redis
 from tiqora.api.v1.admin.common import (
@@ -40,13 +42,16 @@ from tiqora.api.v1.admin.schemas import (
 from tiqora.api.v1.customer_sort import order_customer_users
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser, CustomerUserCustomer
 from tiqora.db.legacy.user import GroupCustomerUser, PermissionGroups
-from tiqora.domain.customer_auth import revoke_customer_redis_sessions
+from tiqora.db.tiqora.models import TiqoraCustomerPasskey
+from tiqora.domain import user_provisioning as provisioning
+from tiqora.domain.customer_auth import CustomerSessionStore, revoke_customer_redis_sessions
+from tiqora.domain.totp import TOTPService
+from tiqora.domain.two_factor_subject import CUSTOMER_2FA
 from tiqora.znuny.password import hash_password
 from tiqora.znuny.sessions import delete_customer_sessions
 
-logger = structlog.get_logger(__name__)
-
 router = APIRouter(tags=["admin:customers"])
+logger = structlog.get_logger(__name__)
 
 # Columns searched by both the plain substring search and the regex search.
 CUSTOMER_USER_SEARCH_COLUMNS = (
@@ -218,18 +223,36 @@ async def get_customer_user(
 async def create_customer_user(
     body: CustomerUserAdminCreate, admin: AdminUser, session: DbSession
 ) -> CustomerUser:
-    ts = now()
-    data = body.model_dump(exclude={"password"})
-    cu = CustomerUser(
-        **data,
-        pw=hash_password(body.password) if body.password else None,
-        create_time=ts,
-        create_by=admin.id,
-        change_time=ts,
-        change_by=admin.id,
-    )
-    session.add(cu)
-    await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
+    try:
+        cu = await provisioning.create_customer_user(
+            session,
+            login=body.login,
+            email=body.email,
+            customer_id=body.customer_id,
+            first_name=body.first_name,
+            last_name=body.last_name,
+            pw_hash=hash_password(body.password) if body.password else None,
+            actor_id=admin.id,
+            valid_id=body.valid_id,
+            title=body.title,
+            phone=body.phone,
+            fax=body.fax,
+            mobile=body.mobile,
+            street=body.street,
+            zip=body.zip,
+            city=body.city,
+            country=body.country,
+            comments=body.comments,
+        )
+    except provisioning.ProvisioningError as exc:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_409_CONFLICT
+                if exc.code == "email_in_use"
+                else status.HTTP_422_UNPROCESSABLE_ENTITY
+            ),
+            detail=str(exc),
+        ) from exc
     await session.commit()
     await session.refresh(cu)
     return cu
@@ -313,6 +336,37 @@ async def deactivate_customer_user(
     await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
     await session.commit()
     await _revoke_customer_sessions(session, request, settings, [cu], reason="account_disabled")
+
+
+@router.post("/customer-users/{customer_user_id}/reset-2fa", status_code=status.HTTP_204_NO_CONTENT)
+async def reset_customer_user_2fa(
+    customer_user_id: int,
+    admin: AdminUser,
+    session: DbSession,
+    settings: AppSettings,
+    redis_client: Annotated[redis.Redis, Depends(get_redis)],
+) -> None:
+    """Admin recovery for a lost authenticator: drop the customer's TOTP and all passkeys.
+
+    Also clears a pending TOTP enrollment and revokes every session of the customer
+    (pending ones included): with no factor left, a surviving session could attach
+    one of its own without a step-up.
+
+    Mirrors the agent-side ``POST /auth-config/{user_id}/reset-2fa`` (idempotent,
+    no code needed); the log line is the audit trail.
+    """
+    cu = await session.get(CustomerUser, customer_user_id)
+    if cu is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer user not found")
+    await TOTPService(session, settings, redis_client, subject=CUSTOMER_2FA).force_disable(
+        customer_user_id
+    )
+    await session.execute(
+        delete(TiqoraCustomerPasskey).where(TiqoraCustomerPasskey.user_id == customer_user_id)
+    )
+    await session.commit()
+    await CustomerSessionStore(redis_client, settings).revoke_customer_sessions(customer_user_id)
+    logger.info("customer_2fa_reset", customer_user_id=customer_user_id, admin_id=admin.id)
 
 
 @router.get("/customer-companies", response_model=Page[CustomerCompanyOut])

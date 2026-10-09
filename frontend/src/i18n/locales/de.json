@@ -237,7 +237,33 @@
       "hint": "2FA ist für dieses Konto erforderlich — bitte jetzt einrichten.",
       "startError": "2FA-Einrichtung konnte nicht gestartet werden. Bitte erneut versuchen oder einen Admin kontaktieren.",
       "confirmError": "Ungültiger Code — bitte erneut versuchen."
-    }
+    },
+    "providers": {
+      "defaultLabel": "Mit SSO anmelden",
+      "or": "oder"
+    },
+    "ssoErrors": {
+      "no_subject": "Der Anmeldedienst hat keine eindeutige Kennung übermittelt. Bitte wenden Sie sich an die Administration.",
+      "no_match": "Zu diesem Konto gibt es hier keinen Zugang. Bitte wenden Sie sich an die Administration.",
+      "user_invalid": "Das verknüpfte Benutzerkonto ist deaktiviert oder gelöscht.",
+      "sso_not_enabled": "Für Ihr Konto ist die Anmeldung über den Anmeldedienst nicht freigeschaltet.",
+      "email_unverified": "Der Anmeldedienst hat Ihre E-Mail-Adresse nicht als bestätigt gemeldet.",
+      "ambiguous_email": "Ihre E-Mail-Adresse gehört zu mehreren Benutzerkonten. Bitte wenden Sie sich an die Administration.",
+      "login_taken": "Der Anmeldename ist bereits für ein anderes Benutzerkonto vergeben.",
+      "jit_missing_fields": "Für die automatische Anlage Ihres Kontos fehlen Angaben vom Anmeldedienst.",
+      "email_invalid": "Die vom Anmeldedienst übermittelte E-Mail-Adresse ist für ein neues Konto nicht zulässig. Bitte wenden Sie sich an Ihre Administration.",
+      "email_in_use": "Die E-Mail-Adresse wird bereits von einem anderen Kundenkonto verwendet. Bitte wenden Sie sich an Ihre Administration.",
+      "jit_domain_not_allowed": "Für Ihre E-Mail-Domain werden Konten nicht automatisch angelegt. Bitte wenden Sie sich an Ihre Administration.",
+      "provider_disabled": "Dieser Anmeldedienst ist deaktiviert.",
+      "unknown_provider": "Dieser Anmeldedienst ist nicht bekannt.",
+      "config": "Die Anmeldung über diesen Anmeldedienst ist noch nicht vollständig eingerichtet.",
+      "saml_unavailable": "Die Anmeldung über SAML ist auf diesem Server nicht verfügbar.",
+      "state": "Die Anmeldung hat zu lange gedauert oder wurde in einem anderen Fenster begonnen. Bitte erneut versuchen.",
+      "saml_invalid": "Die Antwort des Anmeldedienstes war ungültig. Bitte erneut versuchen.",
+      "oidc_failed": "Die Anmeldung beim Anmeldedienst ist fehlgeschlagen. Bitte erneut versuchen.",
+      "idp_error": "Der Anmeldedienst hat die Anmeldung abgelehnt."
+    },
+    "loggedOut": "Sie wurden abgemeldet."
   },
   "security": {
     "title": "Sicherheit",
@@ -274,7 +300,10 @@
     "passkeyDeleteError": "Passkey konnte nicht entfernt werden.",
     "passkeyReauthRequired": "Aus Sicherheitsgründen bitte erneut anmelden, bevor Passkeys geändert werden.",
     "passkeyDeleteLastError": "Der letzte 2FA-Faktor kann nicht entfernt werden, solange 2FA erzwungen ist.",
-    "passkeyUnsupported": "Dieser Browser unterstützt keine Passkeys (WebAuthn)."
+    "passkeyUnsupported": "Dieser Browser unterstützt keine Passkeys (WebAuthn).",
+    "totpReauthRequired": "Aus Sicherheitsgründen bitte erneut anmelden, bevor die Authenticator-App eingerichtet wird.",
+    "enrollError": "Die Authenticator-App konnte nicht eingerichtet werden. Bitte erneut versuchen.",
+    "totpQrAlt": "QR-Code für die Authenticator-App"
   },
   "dashboard": {
     "greeting": {
@@ -1299,7 +1328,22 @@
     },
     "login": {
       "subtitle": "Bei Ihrem Support-Konto anmelden",
-      "email": "E-Mail oder Benutzername"
+      "email": "E-Mail oder Benutzername",
+      "ssoDivider": "oder",
+      "twoFactorTitle": "Zwei-Faktor-Anmeldung",
+      "twoFactorHint": "Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein.",
+      "passkeyOnlyHint": "Bestätigen Sie die Anmeldung mit Ihrem Passkey.",
+      "totpLabel": "Bestätigungscode",
+      "passkeyButton": "Mit Passkey bestätigen",
+      "verify": "Bestätigen",
+      "totpInvalid": "Ungültiger oder abgelaufener Code.",
+      "passkeyInvalid": "Der Passkey konnte nicht bestätigt werden.",
+      "passkeyFailed": "Die Passkey-Bestätigung ist fehlgeschlagen. Bitte erneut versuchen.",
+      "passkeyUnsupported": "Dieser Browser unterstützt keine Passkeys.",
+      "cancel": "Abbrechen",
+      "rateLimited": "Zu viele Fehlversuche. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
+      "twoFactorExpired": "Die Anmeldung ist abgelaufen. Bitte erneut anmelden.",
+      "backToLogin": "Zurück zur Anmeldung"
     },
     "tickets": {
       "title": "Meine Tickets",
@@ -1360,6 +1404,11 @@
       "save": "Speichern",
       "keys": "Verschlüsselung",
       "keysDesc": "Laden Sie Ihren PGP-Schlüssel oder Ihr S/MIME-Zertifikat hoch, damit wir Ihnen verschlüsselte E-Mails senden können. Er muss Ihre E-Mail-Adresse {{email}} enthalten."
+    },
+    "security": {
+      "title": "Sicherheit",
+      "nav": "Sicherheit",
+      "intro": "Schützen Sie Ihr Konto zusätzlich mit einem zweiten Faktor bei der Anmeldung."
     }
   },
   "admin": {
@@ -2100,7 +2149,8 @@
       "ticketAttributeRelations": "Attribut­beziehungen",
       "pgp": "PGP",
       "smime": "S/MIME",
-      "aiModels": "Modelle"
+      "aiModels": "Modelle",
+      "identityProviders": "Identitätsanbieter"
     },
     "table": {
       "id": "ID",
@@ -2423,7 +2473,12 @@
       "accessGroupsHint": "Alle Mitglieder dieser Gruppen, egal mit welchem Recht.",
       "accessRoles": "Rollen",
       "accessRolesHint": "Alle Agenten mit einer dieser Rollen.",
-      "accessLoadError": "Die aktuelle Zugriffsliste konnte nicht geladen werden."
+      "accessLoadError": "Die aktuelle Zugriffsliste konnte nicht geladen werden.",
+      "reset2fa": "Zwei-Faktor-Anmeldung zurücksetzen",
+      "reset2faConfirmTitle": "Zwei-Faktor-Anmeldung zurücksetzen?",
+      "reset2faConfirmBody": "Die Authenticator-App und alle Passkeys von {{login}} werden entfernt. Danach genügt das Passwort zur Anmeldung, bis eine neue Zwei-Faktor-Anmeldung eingerichtet ist.",
+      "reset2faDone": "Zwei-Faktor-Anmeldung von {{login}} wurde zurückgesetzt.",
+      "reset2faFailed": "Die Zwei-Faktor-Anmeldung konnte nicht zurückgesetzt werden."
     },
     "customerCompanies": {
       "title_plural": "Kundenunternehmen",
@@ -3001,21 +3056,25 @@
           "name": "KI-Audit-Bereinigung",
           "description": "Löscht LLM-Audit-Log-Einträge nach Ablauf der konfigurierten Aufbewahrungsfrist täglich."
         },
-        "znuny_session_purge": {
-          "name": "Znuny-Sitzungen aufräumen",
-          "description": "Löscht abgelaufene Sitzungen der Znuny-Schnittstelle (GenericInterface) alle paar Minuten."
-        },
         "smime_customer_renew": {
           "name": "S/MIME-Kundenzertifikate erneuern",
           "description": "Übernimmt erneuerte Kundenzertifikate täglich aus dem Kunden-Backend (Znuny RenewCustomerSMIMECertificates; braucht SMIME::FetchFromCustomer)."
         },
-        "report_facts": {
-          "name": "Berichtsdaten aktuell halten",
-          "description": "Hält die Auswertungsdaten für Berichte (Ticketdaten und tägliche Bestände offener Tickets) laufend aktuell."
+        "identity_metadata": {
+          "name": "Aktualisierung der Anmeldedienst-Metadaten",
+          "description": "Lädt die SAML-Metadaten der Anmeldedienste (Zertifikate, Adressen) einmal täglich neu; schlägt der Abruf fehl, bleibt die letzte funktionierende Fassung erhalten und es erscheint eine Warnung."
         },
         "jobs": {
           "name": "Hintergrundaufgaben",
           "description": "Führt lange Aufgaben wie Exporte im Hintergrund aus, damit die Oberfläche nicht wartet."
+        },
+        "znuny_session_purge": {
+          "name": "Znuny-Sitzungen aufräumen",
+          "description": "Löscht abgelaufene Sitzungen der Znuny-Schnittstelle (GenericInterface) alle paar Minuten."
+        },
+        "report_facts": {
+          "name": "Berichtsdaten aktuell halten",
+          "description": "Hält die Auswertungsdaten für Berichte (Ticketdaten und tägliche Bestände offener Tickets) laufend aktuell."
         }
       },
       "takeoverBadge": "Übernahme",
@@ -3186,7 +3245,8 @@
       "reset2fa": "2FA zurücksetzen",
       "resetConfirmTitle": "Zwei-Faktor-Authentifizierung zurücksetzen?",
       "resetConfirmBody": "Dies deaktiviert 2FA für {{login}}. Bei weiterhin geltender Erzwingung muss erneut eingerichtet werden.",
-      "empty": "Keine Agenten gefunden."
+      "empty": "Keine Agenten gefunden.",
+      "identityLink": "Anmeldung über Microsoft, Google, SAML oder LDAP einrichten"
     },
     "gdpr": {
       "title": "Datenschutz / DSGVO",
@@ -3387,7 +3447,8 @@
       "pgp": "PGP ein- und ausschalten, Schlüssel und Passphrasen verwalten, Signatur und Speicherort einstellen.",
       "smime": "S/MIME ein- und ausschalten, Zertifikate, private Schlüssel und Signer-Beziehungen verwalten, Speicherorte einstellen.",
       "aiModels": "Modelle bei den Providern, Profile mit Ausweichmodellen und welches Profil welche Aufgabe übernimmt.",
-      "settingsJobs": "Hintergrundaufgaben wie Exporte: wie viele gleichzeitig laufen und wie lange Ergebnisse bleiben."
+      "settingsJobs": "Hintergrundaufgaben wie Exporte: wie viele gleichzeitig laufen und wie lange Ergebnisse bleiben.",
+      "identityProviders": "Anmeldung über Microsoft, Google, SAML oder LDAP einrichten."
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -3778,6 +3839,411 @@
             "label": "Website-Icons",
             "help": "Icon der Website zur Mail-Domain bzw. Firmen-URL. Nie für Freemail-Domains wie gmail.com."
           }
+        }
+      }
+    },
+    "identity": {
+      "title": "Identitätsanbieter",
+      "description": "Hier richten Sie ein, über welche Anmeldedienste (Microsoft, Google, SAML, LDAP …) sich Agenten und Kunden anmelden dürfen.",
+      "add": "Hinzufügen",
+      "empty": "Noch kein Identitätsanbieter eingerichtet. Mit „Hinzufügen“ legen Sie den ersten an.",
+      "loadError": "Die Identitätsanbieter konnten nicht geladen werden.",
+      "deleteTitle": "Identitätsanbieter löschen?",
+      "deleteBody": "„{{name}}“ wird gelöscht, ebenso {{count}} Verknüpfung(en) von Benutzern mit diesem Anmeldedienst. Die Benutzerkonten selbst bleiben erhalten.",
+      "deleteError": "Der Identitätsanbieter konnte nicht gelöscht werden.",
+      "deleteAria": "{{name}} löschen",
+      "envBadge": "aus Umgebungsvariablen, hier nicht änderbar",
+      "copy": "Kopieren",
+      "copied": "Kopiert",
+      "saveError": "Die Änderungen konnten nicht gespeichert werden.",
+      "placeholder": "Dieser Bereich wird in einem späteren Schritt ergänzt.",
+      "columns": {
+        "name": "Name",
+        "kind": "Art",
+        "audience": "Gilt für",
+        "state": "Zustand"
+      },
+      "kind": {
+        "oidc": "OpenID Connect",
+        "saml": "SAML",
+        "ldap": "LDAP / Active Directory"
+      },
+      "audience": {
+        "agent": "Nur Agenten",
+        "customer": "Nur Kunden",
+        "both": "Agenten und Kunden"
+      },
+      "state": {
+        "enabled": "Aktiv",
+        "disabled": "Deaktiviert",
+        "metadataError": "Metadaten fehlerhaft"
+      },
+      "preset": {
+        "entra_id": "Microsoft Entra ID",
+        "google_workspace": "Google Workspace",
+        "keycloak": "Keycloak",
+        "authentik": "authentik",
+        "adfs": "AD FS (Active Directory Federation Services)",
+        "generic_saml": "SAML (allgemein)",
+        "generic_oidc": "OpenID Connect (allgemein)",
+        "ldap": "LDAP-Verzeichnis",
+        "active_directory": "Active Directory (LDAP)"
+      },
+      "presetDialog": {
+        "title": "Identitätsanbieter hinzufügen",
+        "description": "Wählen Sie eine Vorlage. Die Verbindungsdaten tragen Sie im nächsten Schritt ein.",
+        "choose": "Vorlage wählen",
+        "create": "Anlegen",
+        "createError": "Der Identitätsanbieter konnte nicht angelegt werden."
+      },
+      "tabs": {
+        "connection": "Verbindung",
+        "mapping": "Zuordnung",
+        "roles": "Rollen aus dem Anmeldedienst",
+        "test": "Testanmeldung",
+        "links": "Verknüpfungen"
+      },
+      "sections": {
+        "general": "Allgemein",
+        "connection": "Verbindung"
+      },
+      "common": {
+        "name": "Name",
+        "slug": "Kurzname",
+        "slugHelp": "Kommt in die Anmeldeadresse; nur Kleinbuchstaben, Ziffern und Bindestrich.",
+        "audience": "Gilt für",
+        "enabled": "Aktiv",
+        "enabledHelp": "Nur aktive Anmeldedienste erscheinen auf der Anmeldeseite.",
+        "buttonLabel": "Beschriftung der Anmeldetaste",
+        "buttonLabelHelp": "Leer lassen, dann wird der Name verwendet.",
+        "buttonIcon": "Symbol der Anmeldetaste",
+        "sort": "Reihenfolge",
+        "sortHelp": "Kleinere Zahlen stehen weiter oben."
+      },
+      "icons": {
+        "microsoft": "Microsoft",
+        "google": "Google",
+        "key": "Schlüssel",
+        "shield": "Schild",
+        "building": "Gebäude",
+        "directory": "Verzeichnis"
+      },
+      "saml": {
+        "unavailable": {
+          "package": "SAML ist auf diesem Server nicht eingerichtet: Das Python-Paket „pysaml2“ fehlt. Anmeldungen über SAML sind erst nach der Installation möglich.",
+          "xmlsec1": "SAML ist auf diesem Server nicht eingerichtet: Das Programm „xmlsec1“ fehlt. Anmeldungen über SAML sind erst nach der Installation möglich."
+        },
+        "sha1Warning": "Achtung: SHA-1-Signaturen gelten als gebrochen. Aktivieren Sie die Annahme nur für ältere Anmeldedienste, die nichts anderes können.",
+        "copyCertificate": "Zertifikat kopieren",
+        "refresh": "Metadaten neu laden",
+        "refreshError": "Die Metadaten konnten nicht geladen werden.",
+        "fetchedAt": "Zuletzt geladen: {{when}}"
+      },
+      "endpoints": {
+        "title": "Adressen für den Anmeldedienst",
+        "hint": "Diese Adressen tragen Sie in der Verwaltung des Anmeldedienstes ein.",
+        "baseUrlMissing": "Die öffentliche Adresse dieses Servers ist nicht eingestellt, deshalb fehlen die Adressen. Bitte zuerst die öffentliche Adresse (TIQORA_PUBLIC_BASE_URL) setzen.",
+        "labels": {
+          "agent_redirect_uri": "Rücksprung-Adresse für Agenten",
+          "customer_redirect_uri": "Rücksprung-Adresse für Kunden",
+          "backchannel_logout_url": "Adresse für Abmeldung durch den Anmeldedienst",
+          "sp_entity_id": "Entity-ID dieses Servers",
+          "agent_acs_url": "Antwort-Adresse (ACS) für Agenten",
+          "customer_acs_url": "Antwort-Adresse (ACS) für Kunden",
+          "sp_metadata_url": "Metadaten dieses Servers",
+          "slo_url": "Abmelde-Adresse"
+        }
+      },
+      "test": {
+        "intro": "Mit einer Testanmeldung sehen Sie, welche Werte der Anmeldedienst übermittelt und was bei einer echten Anmeldung passieren würde. Es wird nichts angelegt und niemand angemeldet.",
+        "ldapHint": "Für LDAP gibt es keine Testanmeldung über den Browser. Prüfen Sie die Verbindung, indem Sie sich auf der Anmeldeseite mit einem Verzeichniskonto anmelden.",
+        "audience": "Testen als",
+        "audiences": {
+          "agent": "Agent",
+          "customer": "Kunde"
+        },
+        "draftHint": "Ungespeicherte Änderungen der Verbindung werden für diesen Test verwendet.",
+        "start": "Testanmeldung starten",
+        "startError": "Die Testanmeldung konnte nicht gestartet werden.",
+        "resultHeading": "Ergebnis der Testanmeldung",
+        "loadError": "Das Ergebnis konnte nicht geladen werden.",
+        "waiting": "Warte auf die Anmeldung …",
+        "timeout": "Das Ergebnis ist nach zwei Minuten nicht eingetroffen. Bitte die Testanmeldung erneut starten.",
+        "subject": "Kennung",
+        "attributesHeading": "Vom Anmeldedienst übermittelte Werte",
+        "useForPreview": "Werte für die Vorschau übernehmen"
+      },
+      "plan": {
+        "rejected": "Die Anmeldung würde abgelehnt:",
+        "create": "Wird beim ersten Anmelden angelegt",
+        "newLogin": "Neuer Anmeldename: {{login}}",
+        "loginAs": "Anmeldung als {{login}}",
+        "matchedBy": {
+          "link": "Gefunden über eine bestehende Verknüpfung",
+          "login": "Gefunden über den Anmeldenamen",
+          "email": "Gefunden über die E-Mail-Adresse",
+          "jit": "Wird automatisch angelegt"
+        },
+        "profileChanges": "Änderungen am Profil",
+        "rolesAdd": "Rollen, die hinzukommen",
+        "rolesRemove": "Rollen, die entfallen",
+        "groupsAdd": "Gruppenrechte, die hinzukommen",
+        "groupsRemove": "Gruppenrechte, die entfallen"
+      },
+      "config": {
+        "oidc": {
+          "fields": {
+            "issuer": {
+              "label": "Adresse des Anmeldedienstes (Issuer)",
+              "help": "z. B. https://login.example.org/realms/firma. „/.well-known/openid-configuration“ wird automatisch ergänzt."
+            },
+            "client_id": {
+              "label": "Client-ID"
+            },
+            "client_secret": {
+              "label": "Client-Geheimnis"
+            },
+            "scopes": {
+              "label": "Angeforderte Bereiche",
+              "help": "Durch Leerzeichen getrennt."
+            },
+            "redirect_uri": {
+              "label": "Rücksprung-Adresse",
+              "help": "Leer lassen, dann wird sie aus der öffentlichen Adresse berechnet."
+            },
+            "pkce": {
+              "label": "PKCE",
+              "options": {
+                "auto": "Automatisch",
+                "always": "Immer",
+                "never": "Nie"
+              }
+            },
+            "email_must_be_verified": {
+              "label": "E-Mail-Adresse muss bestätigt sein",
+              "help": "Nötig, wenn Benutzer über ihre E-Mail-Adresse gefunden oder angelegt werden."
+            },
+            "allow_private_network": {
+              "label": "Interne Netzwerke erlauben",
+              "help": "Nur für Anmeldedienste im eigenen Netz (z. B. selbst betriebenes Keycloak)."
+            },
+            "backchannel_logout": {
+              "label": "Abmeldung durch den Anmeldedienst annehmen"
+            },
+            "allowed_tenant_ids": {
+              "label": "Erlaubte Microsoft-Mandanten-IDs",
+              "help": "Nur für Microsoft Entra mit der mandantenübergreifenden Adresse (common/organizations): nur Anmeldungen aus diesen Mandanten. Leer = jede Organisation (Mandant). Bei Zuordnung über den Anmeldenamen die eigene Mandanten-ID eintragen."
+            }
+          }
+        },
+        "saml": {
+          "fields": {
+            "idp_metadata_url": {
+              "label": "Metadaten-Adresse des Anmeldedienstes",
+              "help": "Wird täglich neu geladen."
+            },
+            "idp_metadata_xml": {
+              "label": "Metadaten als XML",
+              "help": "Alternative zur Adresse: Metadaten hier einfügen."
+            },
+            "idp_entity_id": {
+              "label": "Entity-ID des Anmeldedienstes",
+              "help": "Nur nötig, wenn die Metadaten mehrere Anmeldedienste enthalten."
+            },
+            "name_id_format": {
+              "label": "Format der Benutzerkennung",
+              "options": {
+                "unspecified": "Nicht festgelegt",
+                "emailAddress": "E-Mail-Adresse",
+                "persistent": "Dauerhaft",
+                "transient": "Einmalig"
+              }
+            },
+            "sign_requests": {
+              "label": "Anmeldeanfragen signieren"
+            },
+            "want_response_signed": {
+              "label": "Gesamte Antwort muss signiert sein",
+              "help": "Die Zusicherung des Anmeldedienstes muss immer signiert sein."
+            },
+            "allow_idp_initiated": {
+              "label": "Anmeldung direkt vom Anmeldedienst aus erlauben"
+            },
+            "allow_sha1_signatures": {
+              "label": "Unsichere SHA-1-Signaturen akzeptieren",
+              "help": "Nur für ältere Anmeldedienste. SHA-1 gilt als gebrochen."
+            },
+            "clock_skew_seconds": {
+              "label": "Erlaubte Zeitabweichung (Sekunden)"
+            },
+            "allow_private_network": {
+              "label": "Interne Netzwerke erlauben",
+              "help": "Nur für Metadaten-Adressen im eigenen Netz."
+            },
+            "sp_certificate": {
+              "label": "Zertifikat dieses Servers",
+              "help": "Wird automatisch erzeugt. Im Anmeldedienst hinterlegen, wenn Anfragen signiert werden."
+            },
+            "sp_private_key": {
+              "label": "Privater Schlüssel dieses Servers"
+            }
+          }
+        },
+        "ldap": {
+          "fields": {
+            "host": {
+              "label": "Server"
+            },
+            "port": {
+              "label": "Port"
+            },
+            "use_ssl": {
+              "label": "Verschlüsselt verbinden (LDAPS)"
+            },
+            "use_starttls": {
+              "label": "Verschlüsselung mit StartTLS"
+            },
+            "base_dn": {
+              "label": "Suchbasis (Base DN)"
+            },
+            "bind_dn": {
+              "label": "Benutzer für die Suche (Bind DN)"
+            },
+            "bind_password": {
+              "label": "Passwort für die Suche"
+            },
+            "uid_attr": {
+              "label": "Attribut des Anmeldenamens"
+            },
+            "always_filter": {
+              "label": "Zusätzlicher Suchfilter"
+            },
+            "group_dn": {
+              "label": "Gruppe, die anmelden darf (Group DN)",
+              "help": "Leer lassen, dann dürfen alle gefundenen Benutzer sich anmelden."
+            },
+            "access_attr": {
+              "label": "Mitglieds-Attribut der Gruppe"
+            },
+            "user_attr": {
+              "label": "Benutzer in der Gruppe als",
+              "options": {
+                "DN": "DN",
+                "UID": "Anmeldename"
+              }
+            },
+            "subject_attr": {
+              "label": "Eindeutige Kennung",
+              "help": "Dauerhafte Kennung des Verzeichniseintrags. Leer: objectGUID (Active Directory) oder entryUUID."
+            },
+            "tls_verify": {
+              "label": "Zertifikat des Servers prüfen",
+              "help": "Empfohlen. Nur für ein Testverzeichnis mit selbst ausgestelltem Zertifikat ausschalten."
+            },
+            "ca_certs_pem": {
+              "label": "Eigenes CA-Zertifikat (PEM)",
+              "help": "Nur nötig, wenn das Zertifikat des Verzeichnisses von Ihrer eigenen Zertifizierungsstelle stammt."
+            }
+          }
+        }
+      },
+      "ldap": {
+        "tlsWarning": "Achtung: Das Zertifikat des Verzeichnisservers wird nicht geprüft. Ein Angreifer im Netz könnte Anmeldedaten mitlesen oder sich als Verzeichnis ausgeben. Schalten Sie die Prüfung nur für ein Testverzeichnis aus.",
+        "tlsWarningEnv": "Achtung: Das Zertifikat des Verzeichnisservers wird nicht geprüft. Ein Angreifer im Netz könnte Anmeldedaten mitlesen oder sich als Verzeichnis ausgeben. Die Einstellung kommt aus der Umgebung: TIQORA_LDAP_TLS_VERIFY=true setzen (beim Kundenverzeichnis TIQORA_CUSTOMER_LDAP_TLS_VERIFY=true)."
+      },
+      "mapping": {
+        "fieldsHeading": "Welche Werte füllen welches Feld?",
+        "fieldsHelp": "Tragen Sie ein, aus welchen Angaben des Anmeldedienstes das Feld gefüllt wird. Der erste Wert mit Inhalt gilt. Mit einem Unterstrich davor (_Beispiel) setzen Sie einen festen Text.",
+        "sourcePlaceholder": "Angabe des Anmeldedienstes",
+        "field": {
+          "login": "Anmeldename",
+          "email": "E-Mail",
+          "first_name": "Vorname",
+          "last_name": "Nachname",
+          "customer_id": "Kundennummer",
+          "mobile": "Mobilnummer"
+        },
+        "matchBy": "Anmeldung zuordnen über",
+        "matchByOption": {
+          "login": "Anmeldename",
+          "email": "E-Mail"
+        },
+        "matchByHelp": "Damit wird das passende Benutzerkonto gefunden, wenn noch keine Verknüpfung besteht.",
+        "emailUntrustedWarning": "Achtung: Die E-Mail-Adresse muss beim Anmeldedienst nicht bestätigt sein. Wer dort fremde Adressen eintragen kann, könnte sich in fremde Konten anmelden. Schalten Sie auf dem Reiter „Verbindung“ „E-Mail-Adresse muss bestätigt sein“ ein oder ordnen Sie über den Anmeldenamen zu.",
+        "entraEmailWarning": "Hinweis: Bei Microsoft Entra kann die E-Mail-Adresse eines Kontos geändert werden und gilt nicht als sichere Kennung. Besser über den Anmeldenamen zuordnen und die erlaubten Mandanten-IDs eintragen.",
+        "jit": "Beim ersten Anmelden automatisch anlegen",
+        "jitHelp": "Ist ein Benutzer noch nicht bekannt, wird beim ersten Anmelden ein Konto angelegt. Sonst werden unbekannte Benutzer abgewiesen.",
+        "allowedDomains": "Erlaubte E-Mail-Domains",
+        "allowedDomainsHelp": "Nur Benutzer mit einer E-Mail-Adresse aus diesen Domains (z. B. example.org) erhalten automatisch ein Konto.",
+        "noDomainWarning": "Achtung: Ohne Domain-Einschränkung kann sich jeder, der sich bei diesem Anmeldedienst anmelden kann, ein Konto anlegen lassen, egal mit welcher E-Mail-Domain. Tragen Sie die Domains Ihrer Organisation ein.",
+        "initialRoles": "Rollen für neue Konten (Agenten)",
+        "initialGroups": "Gruppenrechte für neue Konten (Agenten)",
+        "fixedCustomerId": "Feste Kundennummer für neue Kunden",
+        "fixedCustomerIdHelp": "Wird verwendet, wenn der Anmeldedienst keine Kundennummer übermittelt.",
+        "updateProfile": "Namen und E-Mail bei jeder Anmeldung aktualisieren",
+        "previewHeading": "Vorschau",
+        "previewEmpty": "Starten Sie eine Testanmeldung und wählen Sie „Werte für die Vorschau übernehmen“. Dann sehen Sie hier sofort, was bei einer Anmeldung mit diesen Werten passieren würde, auch für ungespeicherte Änderungen.",
+        "previewHelp": "So würde eine Anmeldung mit den Werten der letzten Testanmeldung ablaufen, einschließlich Ihrer ungespeicherten Änderungen auf dem Reiter „Zuordnung“. Ungespeicherte Änderungen der Rollenregeln sind nicht enthalten.",
+        "previewError": "Die Vorschau konnte nicht berechnet werden.",
+        "previewAudience": "Vorschau als",
+        "samlEmailWarning": "Hinweis: Der Anmeldedienst entscheidet, welche E-Mail-Adresse ein Benutzer hat. Nutzen Sie die Zuordnung über E-Mail nur, wenn Benutzer ihre Adresse dort nicht selbst ändern können; sonst ordnen Sie über den Anmeldenamen zu."
+      },
+      "roles": {
+        "rulesHeading": "Regeln",
+        "rulesHelp": "Wenn ein Wert des Anmeldedienstes passt, erhält der Benutzer die gewählten Rollen und Gruppenrechte.",
+        "rulesEmpty": "Noch keine Regel angelegt.",
+        "attribute": "Angabe des Anmeldedienstes",
+        "value": "Wert",
+        "roles": "Rollen",
+        "groups": "Gruppen",
+        "addGroup": "Gruppe hinzufügen",
+        "removeGroup": "{{name}} entfernen",
+        "removeRule": "Regel entfernen",
+        "addRule": "Regel hinzufügen",
+        "perm": {
+          "ro": "Lesen (ro)",
+          "move_into": "Verschieben in (move_into)",
+          "create": "Anlegen (create)",
+          "note": "Notiz (note)",
+          "owner": "Besitzer (owner)",
+          "priority": "Priorität (priority)",
+          "rw": "Alle Rechte (rw)"
+        },
+        "rwHint": "rw enthält alle Rechte.",
+        "ldapGroupDn": "Mitglied der LDAP-Gruppe (DN)",
+        "syncHeading": "Wie werden Rollen und Gruppen abgeglichen?",
+        "sync": {
+          "managed": "Nur selbst vergebene Zuordnungen pflegen (empfohlen)",
+          "managedHelp": "Es werden nur Zuordnungen entfernt, die eine Regel hier selbst vergeben hat. Von Hand vergebene Rollen und Gruppen bleiben.",
+          "authoritative": "Wie Znuny: alle Rollen und Gruppen ersetzen",
+          "authoritativeHelp": "Bei jeder Anmeldung gelten genau die Rollen und Gruppen aus den Regeln. Alles andere, auch von Hand Vergebenes, wird entfernt."
+        },
+        "managedHeading": "Verwaltete Zuordnungen",
+        "managedHelp": "Rollen und Gruppenrechte, die durch eine Regel vergeben wurden.",
+        "managedEmpty": "Noch keine Zuordnung durch eine Regel vergeben.",
+        "managedError": "Die verwalteten Zuordnungen konnten nicht geladen werden.",
+        "managedAccount": "Konto",
+        "managedAssignment": "Zuordnung",
+        "managedSince": "Seit",
+        "managedRole": "Rolle {{name}}",
+        "managedGroup": "Gruppe {{name}} ({{permission}})"
+      },
+      "links": {
+        "intro": "Diese Konten haben sich über diesen Anmeldedienst angemeldet. Wird eine Verknüpfung gelöst, wird bei der nächsten Anmeldung neu zugeordnet, sofern das Konto wieder gefunden wird oder automatisches Anlegen aktiv ist. Sonst wird die Anmeldung abgewiesen.",
+        "empty": "Noch hat sich niemand über diesen Anmeldedienst angemeldet.",
+        "loadError": "Die Verknüpfungen konnten nicht geladen werden.",
+        "removeTitle": "Verknüpfung lösen?",
+        "removeBody": "Die Verknüpfung von „{{login}}“ mit diesem Anmeldedienst wird gelöst. Das Benutzerkonto bleibt erhalten. Bei der nächsten Anmeldung wird neu zugeordnet, sofern das Konto wieder gefunden wird oder automatisches Anlegen aktiv ist; sonst wird die Anmeldung abgewiesen.",
+        "remove": "Verknüpfung lösen",
+        "removeError": "Die Verknüpfung konnte nicht gelöst werden.",
+        "account": "Konto",
+        "kind": "Art",
+        "subject": "Kennung beim Anmeldedienst",
+        "firstSeen": "Zuerst gesehen",
+        "lastSeen": "Zuletzt gesehen",
+        "kinds": {
+          "agent": "Agent",
+          "customer": "Kunde"
         }
       }
     }

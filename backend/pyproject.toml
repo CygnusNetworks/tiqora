@@ -30,7 +30,7 @@ dependencies = [
     "bcrypt>=5.0.0",
     "nh3>=0.3.6",
     "fastmcp>=3.4.4",
-    "authlib>=1.3.2",
+    "authlib>=1.3.2,<2",
     "pyotp>=2.9.0",
     "cryptography>=43.0.0",
     "aiosmtplib>=3.0.2",
@@ -83,6 +83,9 @@ kerberos = [
 ]
 crypto = [
     "python-gnupg>=0.5.2",
+]
+saml = [
+    "pysaml2>=7.5.5,<8",
 ]
 dev = [
     "pytest>=8.3.0",
@@ -169,6 +172,8 @@ module = [
     "docker.*",
     "psutil",
     "psutil.*",
+    "saml2",
+    "saml2.*",
     "lxml",
     "lxml.*",
     "regex",
@@ -178,6 +183,10 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+filterwarnings = [
+    # pysaml2 7.5 still imports CFB from the old cryptography location
+    "ignore:CFB has been moved:cryptography.utils.CryptographyDeprecationWarning",
+]
 testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [
@@ -185,6 +194,8 @@ markers = [
     "search: integration tests that require Meilisearch (testcontainers)",
     "golden: golden-master tests comparing real Znuny vs Tiqora (GOLDEN=1, needs Docker, see tests/golden/)",
     "schema_matrix: multi-version OTRS/Znuny DDL Layer A (release anchors × MariaDB/Postgres)",
+    "saml: SAML tests that need pysaml2 + the xmlsec1 binary",
+    "keycloak: optional Keycloak integration tests (TIQORA_KEYCLOAK_TESTS=1, needs Docker)",
 ]
 
 [dependency-groups]

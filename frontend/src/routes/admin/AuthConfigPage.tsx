@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import {
   api,
@@ -215,6 +216,14 @@ export function AuthConfigPage() {
         </h1>
         <p className="mt-1 text-sm text-muted">{t("admin.authConfig.description")}</p>
       </div>
+
+      <Link
+        to="/admin/identity-providers"
+        data-testid="auth-config-identity-link"
+        className="block rounded-lg border border-hairline bg-surface p-4 text-sm font-medium text-accent hover:border-accent/50"
+      >
+        {t("admin.authConfig.identityLink")} →
+      </Link>
 
       <section
         className="space-y-4 rounded-lg border border-hairline bg-surface p-4"

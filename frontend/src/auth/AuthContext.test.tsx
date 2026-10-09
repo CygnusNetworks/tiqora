@@ -18,6 +18,7 @@ const {
   startRegistrationMock,
   rememberLoginMethodMock,
   clearLoginMethodMock,
+  submitSsoLogoutMock,
 } = vi.hoisted(() => ({
   meMock: vi.fn(),
   loginMock: vi.fn(),
@@ -32,6 +33,7 @@ const {
   startRegistrationMock: vi.fn(),
   rememberLoginMethodMock: vi.fn(),
   clearLoginMethodMock: vi.fn(),
+  submitSsoLogoutMock: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -51,6 +53,10 @@ vi.mock("@/lib/api", async (importOriginal) => {
     },
   };
 });
+
+vi.mock("@/lib/ssoLogout", () => ({
+  submitSsoLogout: submitSsoLogoutMock,
+}));
 
 vi.mock("@/lib/loginMethod", () => ({
   rememberLoginMethod: rememberLoginMethodMock,
@@ -314,6 +320,32 @@ describe("AuthContext", () => {
     expect(clearLoginMethodMock).toHaveBeenCalled();
     expect(result.current.isAuthenticated).toBe(false);
     expect(result.current.user).toBeNull();
+  });
+
+  it("logout() posts to the SSO logout endpoint when /me says sso_logout", async () => {
+    meMock.mockResolvedValue({ ...authedUser, sso_logout: true });
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+
+    await act(async () => {
+      await result.current.logout();
+    });
+
+    expect(submitSsoLogoutMock).toHaveBeenCalledWith("/api/v1/auth/sso/logout");
+    expect(logoutMock).not.toHaveBeenCalled();
+    expect(clearLoginMethodMock).toHaveBeenCalled();
+  });
+
+  it("logout() uses the plain API logout without sso_logout", async () => {
+    meMock.mockResolvedValue({ ...authedUser, sso_logout: false });
+    logoutMock.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+    await act(async () => {
+      await result.current.logout();
+    });
+    expect(logoutMock).toHaveBeenCalled();
+    expect(submitSsoLogoutMock).not.toHaveBeenCalled();
   });
 
   it("refresh() re-fetches /me", async () => {

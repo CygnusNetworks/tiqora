@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.config import Settings
 from tiqora.db.legacy.user import UserPreferences, Users
 from tiqora.db.tiqora.models import TiqoraApiKey
+from tiqora.identity.sso_sessions import SsoSessionInfo, drop_sso, load_sso, store_sso
 from tiqora.znuny.password import hash_password, is_weak_scheme, needs_rehash, verify_password
 
 logger = structlog.get_logger(__name__)
@@ -187,7 +188,14 @@ class SessionStore:
     def _user_index_key(self, user_id: int) -> str:
         return f"{self._user_index_prefix}{user_id}"
 
-    async def create(self, user_id: int, login: str, *, avatar_url: str | None = None) -> str:
+    async def create(
+        self,
+        user_id: int,
+        login: str,
+        *,
+        avatar_url: str | None = None,
+        sso: SsoSessionInfo | None = None,
+    ) -> str:
         token = secrets.token_urlsafe(32)
         payload = f"{user_id}:{login}"
         await self._client.set(self._key(token), payload, ex=self._ttl)
@@ -206,7 +214,12 @@ class SessionStore:
             await self._client.expire(index_key, self._absolute_ttl)
         if avatar_url:
             await self._client.set(self._avatar_key(token), avatar_url, ex=self._ttl)
+        if sso is not None:
+            await store_sso(self._client, "a", token, sso, self._absolute_ttl)
         return token
+
+    async def get_sso(self, token: str) -> SsoSessionInfo | None:
+        return await load_sso(self._client, "a", token)
 
     async def seconds_since_auth(self, token: str) -> int | None:
         """Age of the authentication event behind *token*, or ``None`` if unknown.
@@ -317,6 +330,7 @@ class SessionStore:
             self._born_key(token),
             self._auth_at_key(token),
         )
+        await drop_sso(self._client, "a", token)
 
     async def create_pending(self, user_id: int, login: str, ttl_seconds: int) -> str:
         """Create a short-lived 'pending 2FA' session (not resolvable by :meth:`get`).
@@ -329,6 +343,12 @@ class SessionStore:
         token = secrets.token_urlsafe(32)
         payload = f"PENDING:{user_id}:{login}"
         await self._client.set(self._key(token), payload, ex=ttl_seconds)
+        # Indexed like full sessions so revoke_user_sessions() (admin 2FA reset,
+        # password change) also removes a pending token.
+        with contextlib.suppress(Exception):
+            index_key = self._user_index_key(user_id)
+            await self._client.sadd(index_key, token)
+            await self._client.expire(index_key, self._absolute_ttl)
         return token
 
     async def get_pending(self, token: str) -> tuple[int, str] | None:
@@ -351,6 +371,10 @@ class SessionStore:
         if data is None:
             return None
         user_id, login = data
+        # DEL's reply is the atomic claim: of two parallel promotions only one
+        # sees the key (a fake returning None counts as "removed").
+        if await self._client.delete(self._key(token)) == 0:
+            return None
         await self.delete(token)
         return await self.create(user_id, login, avatar_url=avatar_url)
 
@@ -365,6 +389,12 @@ class SessionStore:
         token = secrets.token_urlsafe(32)
         payload = f"ENROLL:{user_id}:{login}"
         await self._client.set(self._key(token), payload, ex=ttl_seconds)
+        # Indexed like pending tokens: a password change or an admin 2FA reset
+        # (revoke_user_sessions) must not leave a token that can still enroll a factor.
+        with contextlib.suppress(Exception):
+            index_key = self._user_index_key(user_id)
+            await self._client.sadd(index_key, token)
+            await self._client.expire(index_key, self._absolute_ttl)
         return token
 
     async def get_enroll(self, token: str) -> tuple[int, str] | None:
@@ -387,7 +417,12 @@ class SessionStore:
         if data is None:
             return None
         user_id, login = data
+        # Atomic claim, as in promote_pending: only one of two parallel promotions wins.
+        if await self._client.delete(self._key(token)) == 0:
+            return None
         await self.delete(token)
+        with contextlib.suppress(Exception):
+            await self._client.srem(self._user_index_key(user_id), token)
         return await self.create(user_id, login, avatar_url=avatar_url)
 
 
@@ -581,13 +616,17 @@ class AuthService:
         return await self._user_from_row(user, auth_method="session")
 
     async def create_session(
-        self, user: AuthenticatedUser, *, avatar_url: str | None = None
+        self,
+        user: AuthenticatedUser,
+        *,
+        avatar_url: str | None = None,
+        sso: SsoSessionInfo | None = None,
     ) -> str:
         # Prefer an explicit avatar_url (OIDC picture); fall back to whatever
         # was already attached to the AuthenticatedUser (usually None).
         resolved = avatar_url if avatar_url is not None else user.avatar_url
         await self._stamp_last_login(user.id)
-        return await self._sessions.create(user.id, user.login, avatar_url=resolved)
+        return await self._sessions.create(user.id, user.login, avatar_url=resolved, sso=sso)
 
     async def resolve_session(self, token: str) -> AuthenticatedUser | None:
         data = await self._sessions.get(token)

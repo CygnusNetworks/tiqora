@@ -237,7 +237,33 @@
       "hint": "이 계정에는 2FA가 필요합니다. 지금 설정하세요.",
       "startError": "2FA 설정을 시작할 수 없습니다. 다시 시도하거나 관리자에게 문의하세요.",
       "confirmError": "잘못된 코드입니다. 다시 시도해 주세요."
-    }
+    },
+    "providers": {
+      "defaultLabel": "Sign in with SSO",
+      "or": "or"
+    },
+    "ssoErrors": {
+      "no_subject": "The sign-in service did not send a unique identifier. Please contact your administrator.",
+      "no_match": "There is no access for this account here. Please contact your administrator.",
+      "user_invalid": "The linked user account is disabled or deleted.",
+      "sso_not_enabled": "Sign-in through the sign-in service is not enabled for your account.",
+      "email_unverified": "The sign-in service did not report your e-mail address as verified.",
+      "ambiguous_email": "Your e-mail address belongs to several user accounts. Please contact your administrator.",
+      "login_taken": "The username is already taken by another user account.",
+      "jit_missing_fields": "The sign-in service did not send the details needed to create your account.",
+      "email_invalid": "The e-mail address sent by the sign-in service is not accepted for a new account. Please contact your administrator.",
+      "email_in_use": "The e-mail address is already used by another customer account. Please contact your administrator.",
+      "jit_domain_not_allowed": "Accounts cannot be created automatically for your e-mail domain. Please contact your administrator.",
+      "provider_disabled": "This sign-in service is disabled.",
+      "unknown_provider": "This sign-in service is not known.",
+      "config": "Sign-in through this service is not fully set up yet.",
+      "saml_unavailable": "SAML sign-in is not available on this server.",
+      "state": "The sign-in took too long or was started in another window. Please try again.",
+      "saml_invalid": "The response of the sign-in service was invalid. Please try again.",
+      "oidc_failed": "Signing in with the sign-in service failed. Please try again.",
+      "idp_error": "The sign-in service rejected the sign-in."
+    },
+    "loggedOut": "You have been signed out."
   },
   "security": {
     "title": "보안",
@@ -274,7 +300,10 @@
     "passkeyDeleteError": "암호키를 제거할 수 없습니다.",
     "passkeyReauthRequired": "보안을 위해 패스키를 변경하기 전에 다시 로그인해 주세요.",
     "passkeyDeleteLastError": "2FA가 시행되는 동안에는 마지막 2FA 요소를 제거할 수 없습니다.",
-    "passkeyUnsupported": "이 브라우저는 암호키(WebAuthn)를 지원하지 않습니다."
+    "passkeyUnsupported": "이 브라우저는 암호키(WebAuthn)를 지원하지 않습니다.",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {
@@ -1299,7 +1328,22 @@
     },
     "login": {
       "subtitle": "지원 계정에 로그인하세요.",
-      "email": "이메일 또는 사용자 이름"
+      "email": "이메일 또는 사용자 이름",
+      "ssoDivider": "or",
+      "twoFactorTitle": "Two-factor sign-in",
+      "twoFactorHint": "Enter the 6-digit code from your authenticator app.",
+      "passkeyOnlyHint": "Confirm the sign-in with your passkey.",
+      "totpLabel": "Verification code",
+      "passkeyButton": "Confirm with passkey",
+      "verify": "Confirm",
+      "totpInvalid": "Invalid or expired code.",
+      "passkeyInvalid": "The passkey could not be verified.",
+      "passkeyFailed": "Passkey confirmation failed. Please try again.",
+      "passkeyUnsupported": "This browser does not support passkeys.",
+      "cancel": "Cancel",
+      "rateLimited": "Too many failed attempts. Please wait a moment and try again.",
+      "twoFactorExpired": "The sign-in has expired. Please sign in again.",
+      "backToLogin": "Back to sign-in"
     },
     "tickets": {
       "title": "내 티켓",
@@ -1360,6 +1404,11 @@
       "save": "저장",
       "keys": "암호화",
       "keysDesc": "암호화된 이메일을 보낼 수 있도록 PGP 키 또는 S/MIME 인증서를 업로드하세요. 이메일 주소 {{email}}이(가) 포함되어야 합니다."
+    },
+    "security": {
+      "title": "Security",
+      "nav": "Security",
+      "intro": "Protect your account with a second factor when you sign in."
     }
   },
   "admin": {
@@ -2100,7 +2149,8 @@
       "ticketAttributeRelations": "속성 관계",
       "pgp": "PGP",
       "smime": "S/MIME",
-      "aiModels": "모델"
+      "aiModels": "모델",
+      "identityProviders": "Identity providers"
     },
     "table": {
       "id": "ID",
@@ -2423,7 +2473,12 @@
       "accessGroupsHint": "Every member of these groups, whatever their permission there.",
       "accessRoles": "Roles",
       "accessRolesHint": "Every agent holding one of these roles.",
-      "accessLoadError": "Could not load the current access list."
+      "accessLoadError": "Could not load the current access list.",
+      "reset2fa": "Reset two-factor sign-in",
+      "reset2faConfirmTitle": "Reset two-factor sign-in?",
+      "reset2faConfirmBody": "The authenticator app and all passkeys of {{login}} will be removed. Until a new two-factor sign-in is set up, the password alone is enough to sign in.",
+      "reset2faDone": "Two-factor sign-in of {{login}} was reset.",
+      "reset2faFailed": "Could not reset the two-factor sign-in."
     },
     "customerCompanies": {
       "title_plural": "고객사",
@@ -2993,21 +3048,25 @@
           "name": "AI 감사 정리",
           "description": "하루에 한 번 구성된 보존 기간을 지난 LLM 감사 로그 행을 삭제합니다."
         },
-        "znuny_session_purge": {
-          "name": "Znuny session cleanup",
-          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
-        },
         "smime_customer_renew": {
           "name": "S/MIME 고객 인증서 갱신",
           "description": "갱신된 고객 인증서를 고객 백엔드에서 하루에 한 번 가져옵니다(Znuny RenewCustomerSMIMECertificates, SMIME::FetchFromCustomer 필요)."
         },
-        "report_facts": {
-          "name": "Report data upkeep",
-          "description": "Keeps the report data (ticket facts and daily open-ticket snapshots) up to date continuously."
+        "identity_metadata": {
+          "name": "Identity provider metadata refresh",
+          "description": "Re-downloads SAML identity provider metadata (certificates, endpoints) once a day; a failed download keeps the last working copy and shows a warning."
         },
         "jobs": {
           "name": "Background tasks",
           "description": "Runs long tasks such as exports in the background so the interface does not have to wait."
+        },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
+        "report_facts": {
+          "name": "Report data upkeep",
+          "description": "Keeps the report data (ticket facts and daily open-ticket snapshots) up to date continuously."
         }
       },
       "takeoverBadge": "인수",
@@ -3178,7 +3237,8 @@
       "reset2fa": "2FA 재설정",
       "resetConfirmTitle": "이중 인증을 재설정하시겠습니까?",
       "resetConfirmBody": "이렇게 하면 {{login}}에 대한 2FA가 비활성화됩니다. 집행이 여전히 적용되는 경우 다시 등록해야 합니다.",
-      "empty": "에이전트를 찾을 수 없습니다."
+      "empty": "에이전트를 찾을 수 없습니다.",
+      "identityLink": "Set up sign-in through Microsoft, Google, SAML or LDAP"
     },
     "gdpr": {
       "title": "개인정보 보호/GDPR",
@@ -3379,7 +3439,8 @@
       "pgp": "PGP를 켜고 끄고, 키와 패스프레이즈를 관리하고, 서명과 저장 옵션을 설정합니다.",
       "smime": "S/MIME을 켜고 끄고, 인증서와 개인 키, 서명자 관계를 관리하고, 저장 위치를 설정합니다.",
       "aiModels": "제공자의 모델, 대체 모델이 있는 프로필, 그리고 어떤 프로필이 어떤 작업을 맡는지입니다.",
-      "settingsJobs": "Background tasks such as exports: how many run at once and how long results are kept."
+      "settingsJobs": "Background tasks such as exports: how many run at once and how long results are kept.",
+      "identityProviders": "Set up sign-in through Microsoft, Google, SAML or LDAP."
     },
     "types": {
       "title_plural": "티켓 유형",
@@ -3770,6 +3831,411 @@
             "label": "Website icons",
             "help": "Icon of the website of the mail domain or company URL. Never for freemail domains such as gmail.com."
           }
+        }
+      }
+    },
+    "identity": {
+      "title": "Identity providers",
+      "description": "Set up which sign-in services (Microsoft, Google, SAML, LDAP …) agents and customers may use to sign in.",
+      "add": "Add",
+      "empty": "No identity provider set up yet. Use “Add” to create the first one.",
+      "loadError": "The identity providers could not be loaded.",
+      "deleteTitle": "Delete identity provider?",
+      "deleteBody": "“{{name}}” will be deleted, along with {{count}} link(s) between users and this sign-in service. The user accounts themselves are kept.",
+      "deleteError": "The identity provider could not be deleted.",
+      "deleteAria": "Delete {{name}}",
+      "envBadge": "from environment variables, cannot be changed here",
+      "copy": "Copy",
+      "copied": "Copied",
+      "saveError": "The changes could not be saved.",
+      "placeholder": "This area will be added in a later step.",
+      "columns": {
+        "name": "Name",
+        "kind": "Type",
+        "audience": "Applies to",
+        "state": "State"
+      },
+      "kind": {
+        "oidc": "OpenID Connect",
+        "saml": "SAML",
+        "ldap": "LDAP / Active Directory"
+      },
+      "audience": {
+        "agent": "Agents only",
+        "customer": "Customers only",
+        "both": "Agents and customers"
+      },
+      "state": {
+        "enabled": "Active",
+        "disabled": "Disabled",
+        "metadataError": "Metadata faulty"
+      },
+      "preset": {
+        "entra_id": "Microsoft Entra ID",
+        "google_workspace": "Google Workspace",
+        "keycloak": "Keycloak",
+        "authentik": "authentik",
+        "adfs": "AD FS (Active Directory Federation Services)",
+        "generic_saml": "SAML (generic)",
+        "generic_oidc": "OpenID Connect (generic)",
+        "ldap": "LDAP directory",
+        "active_directory": "Active Directory (LDAP)"
+      },
+      "presetDialog": {
+        "title": "Add identity provider",
+        "description": "Pick a template. You enter the connection details in the next step.",
+        "choose": "Choose a template",
+        "create": "Create",
+        "createError": "The identity provider could not be created."
+      },
+      "tabs": {
+        "connection": "Connection",
+        "mapping": "Mapping",
+        "roles": "Roles from the sign-in service",
+        "test": "Test sign-in",
+        "links": "Links"
+      },
+      "sections": {
+        "general": "General",
+        "connection": "Connection"
+      },
+      "common": {
+        "name": "Name",
+        "slug": "Short name",
+        "slugHelp": "Part of the sign-in address; lowercase letters, digits and hyphen only.",
+        "audience": "Applies to",
+        "enabled": "Active",
+        "enabledHelp": "Only active providers appear on the sign-in page.",
+        "buttonLabel": "Sign-in button label",
+        "buttonLabelHelp": "Leave empty to use the name.",
+        "buttonIcon": "Sign-in button icon",
+        "sort": "Order",
+        "sortHelp": "Smaller numbers come first."
+      },
+      "icons": {
+        "microsoft": "Microsoft",
+        "google": "Google",
+        "key": "Key",
+        "shield": "Shield",
+        "building": "Building",
+        "directory": "Directory"
+      },
+      "saml": {
+        "unavailable": {
+          "package": "SAML is not set up on this server: the Python package “pysaml2” is missing. SAML sign-ins are only possible after it is installed.",
+          "xmlsec1": "SAML is not set up on this server: the program “xmlsec1” is missing. SAML sign-ins are only possible after it is installed."
+        },
+        "sha1Warning": "Warning: SHA-1 signatures are considered broken. Only accept them for legacy sign-in services that cannot do anything else.",
+        "copyCertificate": "Copy certificate",
+        "refresh": "Reload metadata",
+        "refreshError": "The metadata could not be loaded.",
+        "fetchedAt": "Last loaded: {{when}}"
+      },
+      "endpoints": {
+        "title": "Addresses for the sign-in service",
+        "hint": "Enter these addresses in the sign-in service's administration.",
+        "baseUrlMissing": "This server's public address is not set, so the addresses are missing. Please set the public address (TIQORA_PUBLIC_BASE_URL) first.",
+        "labels": {
+          "agent_redirect_uri": "Redirect address for agents",
+          "customer_redirect_uri": "Redirect address for customers",
+          "backchannel_logout_url": "Address for sign-out by the sign-in service",
+          "sp_entity_id": "Entity ID of this server",
+          "agent_acs_url": "Response address (ACS) for agents",
+          "customer_acs_url": "Response address (ACS) for customers",
+          "sp_metadata_url": "Metadata of this server",
+          "slo_url": "Sign-out address"
+        }
+      },
+      "test": {
+        "intro": "A test sign-in shows which values the sign-in service sends and what a real sign-in would do. Nothing is created and nobody is signed in.",
+        "ldapHint": "There is no browser test sign-in for LDAP. Check the connection by signing in on the login page with a directory account.",
+        "audience": "Test as",
+        "audiences": {
+          "agent": "Agent",
+          "customer": "Customer"
+        },
+        "draftHint": "Unsaved connection changes are used for this test.",
+        "start": "Start test sign-in",
+        "startError": "The test sign-in could not be started.",
+        "resultHeading": "Result of the test sign-in",
+        "loadError": "The result could not be loaded.",
+        "waiting": "Waiting for the sign-in …",
+        "timeout": "No result arrived within two minutes. Please start the test sign-in again.",
+        "subject": "Identifier",
+        "attributesHeading": "Values sent by the sign-in service",
+        "useForPreview": "Use these values for the preview"
+      },
+      "plan": {
+        "rejected": "The sign-in would be rejected:",
+        "create": "Will be created on first sign-in",
+        "newLogin": "New login name: {{login}}",
+        "loginAs": "Sign-in as {{login}}",
+        "matchedBy": {
+          "link": "Found through an existing link",
+          "login": "Found by login name",
+          "email": "Found by e-mail address",
+          "jit": "Will be created automatically"
+        },
+        "profileChanges": "Profile changes",
+        "rolesAdd": "Roles to be added",
+        "rolesRemove": "Roles to be removed",
+        "groupsAdd": "Group permissions to be added",
+        "groupsRemove": "Group permissions to be removed"
+      },
+      "config": {
+        "oidc": {
+          "fields": {
+            "issuer": {
+              "label": "Sign-in service address (issuer)",
+              "help": "e.g. https://login.example.org/realms/company. “/.well-known/openid-configuration” is appended automatically."
+            },
+            "client_id": {
+              "label": "Client ID"
+            },
+            "client_secret": {
+              "label": "Client secret"
+            },
+            "scopes": {
+              "label": "Requested scopes",
+              "help": "Separated by spaces."
+            },
+            "redirect_uri": {
+              "label": "Redirect address",
+              "help": "Leave empty to compute it from the public address."
+            },
+            "pkce": {
+              "label": "PKCE",
+              "options": {
+                "auto": "Automatic",
+                "always": "Always",
+                "never": "Never"
+              }
+            },
+            "email_must_be_verified": {
+              "label": "E-mail address must be verified",
+              "help": "Needed when users are found or created by e-mail address."
+            },
+            "allow_private_network": {
+              "label": "Allow internal networks",
+              "help": "Only for sign-in services on your own network (e.g. self-hosted Keycloak)."
+            },
+            "backchannel_logout": {
+              "label": "Accept sign-out by the sign-in service"
+            },
+            "allowed_tenant_ids": {
+              "label": "Allowed Microsoft tenant IDs",
+              "help": "Only for Microsoft Entra with the multi-tenant address (common/organizations): sign-ins from these tenants only. Empty = every tenant."
+            }
+          }
+        },
+        "saml": {
+          "fields": {
+            "idp_metadata_url": {
+              "label": "Metadata address of the sign-in service",
+              "help": "Reloaded daily."
+            },
+            "idp_metadata_xml": {
+              "label": "Metadata as XML",
+              "help": "Alternative to the address: paste the metadata here."
+            },
+            "idp_entity_id": {
+              "label": "Entity ID of the sign-in service",
+              "help": "Only needed if the metadata contains several sign-in services."
+            },
+            "name_id_format": {
+              "label": "User identifier format",
+              "options": {
+                "unspecified": "Unspecified",
+                "emailAddress": "E-mail address",
+                "persistent": "Persistent",
+                "transient": "Transient"
+              }
+            },
+            "sign_requests": {
+              "label": "Sign sign-in requests"
+            },
+            "want_response_signed": {
+              "label": "Whole response must be signed",
+              "help": "The sign-in service's assertion must always be signed."
+            },
+            "allow_idp_initiated": {
+              "label": "Allow sign-in started at the sign-in service"
+            },
+            "allow_sha1_signatures": {
+              "label": "Accept insecure SHA-1 signatures",
+              "help": "Only for legacy sign-in services. SHA-1 is considered broken."
+            },
+            "clock_skew_seconds": {
+              "label": "Allowed clock difference (seconds)"
+            },
+            "allow_private_network": {
+              "label": "Allow internal networks",
+              "help": "Only for metadata addresses on your own network."
+            },
+            "sp_certificate": {
+              "label": "Certificate of this server",
+              "help": "Generated automatically. Store it at the sign-in service if requests are signed."
+            },
+            "sp_private_key": {
+              "label": "Private key of this server"
+            }
+          }
+        },
+        "ldap": {
+          "fields": {
+            "host": {
+              "label": "Server"
+            },
+            "port": {
+              "label": "Port"
+            },
+            "use_ssl": {
+              "label": "Connect encrypted (LDAPS)"
+            },
+            "use_starttls": {
+              "label": "Encrypt with StartTLS"
+            },
+            "base_dn": {
+              "label": "Search base (base DN)"
+            },
+            "bind_dn": {
+              "label": "User for the search (bind DN)"
+            },
+            "bind_password": {
+              "label": "Password for the search"
+            },
+            "uid_attr": {
+              "label": "Login name attribute"
+            },
+            "always_filter": {
+              "label": "Additional search filter"
+            },
+            "group_dn": {
+              "label": "Group that may sign in (group DN)",
+              "help": "Leave empty to let every user found sign in."
+            },
+            "access_attr": {
+              "label": "Group membership attribute"
+            },
+            "user_attr": {
+              "label": "Users in the group as",
+              "options": {
+                "DN": "DN",
+                "UID": "Login name"
+              }
+            },
+            "subject_attr": {
+              "label": "Unique identifier",
+              "help": "For Active Directory: objectGUID."
+            },
+            "tls_verify": {
+              "label": "Check the server certificate",
+              "help": "Recommended. Turn off only for a test directory with a self-signed certificate."
+            },
+            "ca_certs_pem": {
+              "label": "Own CA certificate (PEM)",
+              "help": "Only needed when the directory's certificate comes from your own certification authority."
+            }
+          }
+        }
+      },
+      "ldap": {
+        "tlsWarning": "Warning: the directory server's certificate is not checked. An attacker on the network could read sign-in data or pose as the directory. Only turn the check off for a test directory.",
+        "tlsWarningEnv": "Warning: the directory server's certificate is not checked. An attacker on the network could read sign-in data or pose as the directory. The setting comes from the environment: set TIQORA_LDAP_TLS_VERIFY=true (customer directory: TIQORA_CUSTOMER_LDAP_TLS_VERIFY=true)."
+      },
+      "mapping": {
+        "fieldsHeading": "Which values fill which field?",
+        "fieldsHelp": "Enter which details from the sign-in service fill the field. The first value with content wins. Prefix with an underscore (_example) to set a fixed text.",
+        "sourcePlaceholder": "Detail from the sign-in service",
+        "field": {
+          "login": "Login name",
+          "email": "Email",
+          "first_name": "First name",
+          "last_name": "Last name",
+          "customer_id": "Customer number",
+          "mobile": "Mobile number"
+        },
+        "matchBy": "Match sign-in by",
+        "matchByOption": {
+          "login": "Login name",
+          "email": "Email"
+        },
+        "matchByHelp": "Used to find the matching user account when no link exists yet.",
+        "emailUntrustedWarning": "Warning: the email address does not have to be confirmed at the sign-in service. Anyone who can enter other people's addresses there could sign in to their accounts. Turn on \"Email address must be confirmed\" on the Connection tab, or match by login name.",
+        "entraEmailWarning": "Note: with Microsoft Entra the email address of an account can be changed and is not a safe identifier. Better match by login name and enter the allowed tenant IDs.",
+        "jit": "Create accounts automatically on first sign-in",
+        "jitHelp": "If a user is not known yet, an account is created on first sign-in. Otherwise unknown users are turned away.",
+        "allowedDomains": "Allowed email domains",
+        "allowedDomainsHelp": "Only users with an email address from these domains (e.g. example.org) automatically get an account.",
+        "noDomainWarning": "Warning: without a domain restriction anyone who can sign in at this sign-in service can have an account created, whatever their email domain. Enter your organisation's domains.",
+        "initialRoles": "Roles for new accounts (agents)",
+        "initialGroups": "Group permissions for new accounts (agents)",
+        "fixedCustomerId": "Fixed customer number for new customers",
+        "fixedCustomerIdHelp": "Used when the sign-in service does not send a customer number.",
+        "updateProfile": "Update name and email on every sign-in",
+        "previewHeading": "Preview",
+        "previewEmpty": "Start a test sign-in and choose \"Use these values for the preview\". You then see here at once what a sign-in with these values would do, including unsaved changes.",
+        "previewHelp": "This is what a sign-in with the values of the last test sign-in would do, including your unsaved changes.",
+        "previewError": "The preview could not be calculated.",
+        "previewAudience": "Preview as",
+        "samlEmailWarning": "Note: the sign-in service decides which e-mail address a user has. Only match by e-mail if users cannot change their address there themselves; otherwise match by login name."
+      },
+      "roles": {
+        "rulesHeading": "Rules",
+        "rulesHelp": "When a value from the sign-in service matches, the user gets the chosen roles and group permissions.",
+        "rulesEmpty": "No rule yet.",
+        "attribute": "Detail from the sign-in service",
+        "value": "Value",
+        "roles": "Roles",
+        "groups": "Groups",
+        "addGroup": "Add group",
+        "removeGroup": "Remove {{name}}",
+        "removeRule": "Remove rule",
+        "addRule": "Add rule",
+        "perm": {
+          "ro": "Read (ro)",
+          "move_into": "Move into (move_into)",
+          "create": "Create (create)",
+          "note": "Note (note)",
+          "owner": "Owner (owner)",
+          "priority": "Priority (priority)",
+          "rw": "All permissions (rw)"
+        },
+        "rwHint": "rw includes all permissions.",
+        "ldapGroupDn": "Member of LDAP group (DN)",
+        "syncHeading": "How are roles and groups reconciled?",
+        "sync": {
+          "managed": "Only maintain assignments made by these rules (recommended)",
+          "managedHelp": "Only assignments that a rule here created are removed. Roles and groups assigned by hand stay.",
+          "authoritative": "Like Znuny: replace all roles and groups",
+          "authoritativeHelp": "On every sign-in exactly the roles and groups from the rules apply. Everything else, including what was assigned by hand, is removed."
+        },
+        "managedHeading": "Managed assignments",
+        "managedHelp": "Roles and group permissions that were assigned by a rule.",
+        "managedEmpty": "No assignment made by a rule yet.",
+        "managedError": "The managed assignments could not be loaded.",
+        "managedAccount": "Account",
+        "managedAssignment": "Assignment",
+        "managedSince": "Since",
+        "managedRole": "Role {{name}}",
+        "managedGroup": "Group {{name}} ({{permission}})"
+      },
+      "links": {
+        "intro": "These accounts signed in through this sign-in service. When a link is removed, the account is matched again on its next sign-in.",
+        "empty": "Nobody has signed in through this sign-in service yet.",
+        "loadError": "The links could not be loaded.",
+        "removeTitle": "Remove link?",
+        "removeBody": "The link between \"{{login}}\" and this sign-in service is removed. The user account stays and is matched again on the next sign-in.",
+        "remove": "Remove link",
+        "removeError": "The link could not be removed.",
+        "account": "Account",
+        "kind": "Type",
+        "subject": "ID at the sign-in service",
+        "firstSeen": "First seen",
+        "lastSeen": "Last seen",
+        "kinds": {
+          "agent": "Agent",
+          "customer": "Customer"
         }
       }
     }

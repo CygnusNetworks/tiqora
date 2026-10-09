@@ -148,9 +148,11 @@ Key endpoints: `/auth/login|me|logout`, `/queues`, `/tickets`,
   provider's authorization endpoint (state stored in Redis, short TTL);
   `/callback` exchanges the code, fetches `userinfo`, and maps a configurable
   claim (`TIQORA_OIDC_CLAIM`, default `preferred_username`) to `users.login`.
-  **No auto-provisioning in v1** — the claim must match an existing,
-  `valid_id = 1` user or the login is rejected (403). Same Redis session as
-  password login is created on success.
+  This is the read-only `env-oidc` provider; it does not create accounts —
+  the claim must match an existing, `valid_id = 1`, SSO-eligible user or the
+  login is rejected. Same Redis session as password login is created on
+  success. More OIDC and SAML providers: see
+  [Identity and SSO](#identity-and-sso-tiqoraidentity).
 - **Kerberos/SPNEGO** (optional `kerberos` extra / `gssapi`):
   `/api/v1/auth/spnego` implements the Negotiate challenge/response
   (`401 WWW-Authenticate: Negotiate` → `Authorization: Negotiate <token>`).
@@ -178,19 +180,88 @@ Key endpoints: `/auth/login|me|logout`, `/queues`, `/tickets`,
   page (`/agent/security`) consumes it as a plain cookie-authenticated
   `<img src>`. 404 with no pending enrollment.
 - **LDAP/AD** (`ldap3`, bind-search-bind): ports
-  `Kernel::System::Auth::LDAP` / `CustomerAuth::LDAP`
-  (`domain/auth_ldap.py` + `domain/customer_auth_ldap.py`, sharing the
-  bind-search-bind core in `domain/_ldap_core.py`). Tried as a **fallback**
-  when local password auth fails and `TIQORA_LDAP_ENABLED` /
-  `TIQORA_CUSTOMER_LDAP_ENABLED` is set. All `ldap3` calls run in an
-  executor (sync library, same rule as `gssapi`). **No auto-provisioning in
-  v1** — the LDAP UID resolved by the search must match an existing,
-  `valid_id = 1` `users.login` / `customer_user.login` row, or the login is
-  rejected. Optional group-membership gate (`GroupDN`/`AccessAttr`, mirrors
-  the Perl module). Simplified vs. Znuny: no `Die`/`UserSuffix`/
-  `UserLowerCase`/per-directory charset knobs.
+  `Kernel::System::Auth::LDAP` / `CustomerAuth::LDAP` and the directory
+  side of `Auth::Sync::LDAP`. LDAP directories are identity providers
+  (`identity/ldap_login.py` on top of the bind-search-bind core in
+  `domain/_ldap_core.py`); `TIQORA_LDAP_*` / `TIQORA_CUSTOMER_LDAP_*` are the
+  read-only `env-ldap` / `env-customer-ldap` rows. Tried after local password
+  auth fails, in provider sort order (first bind wins); the identity then runs
+  through the same login chain as OIDC/SAML (link on the stable entry id,
+  login match, JIT, profile and `ldap:group_dn` role/group sync). Env
+  directories keep the old rule: no auto-provisioning, the UID must match an
+  existing valid login. All `ldap3` calls run in an executor (sync library,
+  same rule as `gssapi`), with connect/receive timeouts, no referral chasing
+  and a 20 s budget per login. Optional group-membership gate
+  (`GroupDN`/`AccessAttr`, mirrors the Perl module). Simplified vs. Znuny:
+  no `Die`/`UserSuffix`/`UserLowerCase`/`NestedGroupSearch`/per-directory
+  charset knobs; a failing group search skips the sync instead of stripping.
 - GenericInterface SessionIDs are validated against Znuny `sessions` (see
   [GenericInterface compat layer](#genericinterface-compat-layer)).
+
+#### Identity and SSO (`tiqora.identity`)
+
+All external sign-in (OIDC, SAML, LDAP; agents and portal customers) runs through the
+`identity` package. Providers are rows, not code paths.
+
+**Tables** (Tiqora Alembic chain, never Znuny tables):
+
+| Table | Purpose |
+|---|---|
+| `tiqora_identity_provider` | One row per provider: `slug` (unique), `kind` (`oidc`/`saml`/`ldap`), `source` (`env` or `db`), `audience` (`agent`/`customer`/`both`), `enabled`, `sort`, JSON `config` (non-secret fields of the kind's config model) and Fernet-encrypted `secrets_enc`, `match_by` (`login`/`email`), `require_sso_opt_in`, `attribute_map`, `jit_enabled` + `jit_defaults`, `role_rules`, `sync_mode` (`managed`/`authoritative`), cached SAML IdP metadata (`metadata_xml`, `metadata_fetched_at`, `metadata_error`). |
+| `tiqora_identity_link` | IdP subject to local account, unique on `(provider_id, user_kind, subject_hash)`; compared by SHA-256 of the subject, never the collated text column; `user_id` is a soft reference. |
+| `tiqora_identity_managed_assignment` | Roles/groups a provider rule created (agents only), so `managed` sync may remove exactly those again. |
+| `tiqora_customer_totp`, `tiqora_customer_passkey` | Customer 2FA factors (see Customer portal). |
+
+`TIQORA_OIDC_*`, `TIQORA_LDAP_*` and `TIQORA_CUSTOMER_LDAP_*` are mirrored into read-only
+`source = env` rows (`env-oidc`, `env-ldap`, `env-customer-ldap`) by `ensure_env_providers`
+(startup, retried lazily by the OIDC start/callback; keyed by a fingerprint of the
+env settings). `/auth/methods` synthesises `env-oidc` from the settings when the row or the DB is
+unavailable, so env SSO never depends on a DB row.
+
+**Login orchestration** (`identity/login.py`, `sso_routes.py`):
+
+```mermaid
+flowchart TD
+  A["Browser opens /api/v1/auth/sso/slug/login"] --> B{"kind"}
+  B -->|OIDC| C["state, nonce and PKCE in Redis; redirect to the IdP"]
+  B -->|SAML| D["AuthnRequest; request id in Redis; state cookie"]
+  C --> E["callback: code exchange; id_token checked against discovery issuer and JWKS"]
+  D --> F["ACS: signature, Recipient, InResponseTo, replay checks"]
+  E --> G["ExternalIdentity: subject, attributes, SSO session draft"]
+  F --> G
+  L["Login form: local password fails"] --> M["LDAP providers in sort order: bind-search-bind"]
+  M --> G
+  G --> H["plan_login: link, then login or e-mail match, then JIT, profile diff, role/group diff"]
+  H -->|reject| R["redirect to /login?sso_error=code"]
+  H -->|ok| I["apply_login: link upsert, profile, managed assignments, cache invalidation"]
+  I --> J["session + SSO session info + logout index; no 2FA step"]
+```
+
+`plan_login` only reads and returns a `LoginPlan`; `apply_login` writes. Admin test runs
+(`/api/v1/admin/identity-providers/{id}/tests`) execute the same plan against a draft config without
+`apply_login`. Role/group planning is agent-only and never touches user id 1; a rule attribute the IdP
+did not release skips the sync (fail-safe), whereas a present but empty claim means "no groups".
+
+**SSO session index** (`sso_sessions.py`): each SSO session stores `SsoSessionInfo`
+(`tiqora:session:sso:<token>` / `tiqora:csession:sso:<token>`) and is added to Redis index sets
+`tiqora:sso:idx:<a|c>:<provider_id>:sub:<subject_hash>` (plus `:sid:<sha>` for OIDC `sid` and
+`:si:<sha>` for the SAML SessionIndex). SAML LogoutRequests and OIDC back-channel logout tokens find
+and revoke every live session of a subject through these sets.
+
+**Flow-state keys** (`flow_state.py`, all short-lived): `tiqora:oidc:state:<state>` (5 min),
+`tiqora:saml:req:<request id>` (10 min; read, verified, then deleted atomically),
+`tiqora:saml:seen:*` (assertion replay), `tiqora:saml:logout:<id>` / `tiqora:saml:logout-seen:*`,
+`tiqora:oidc:jti:*` (back-channel replay), `tiqora:idp:test:<id>` (15 min; draft secrets Fernet-encrypted),
+`tiqora:rl:oidc-bcl:*` (back-channel rate limit). Post-login redirects go through `safe_next` /
+`safe_portal_next` (same-site paths only); error codes are the fixed list `SSO_ERROR_CODES` in
+`identity/http.py`, mirrored by the frontend.
+
+**SAML** (`saml_sp.py`, pysaml2 + `xmlsec1`): the SP signs with RSA-SHA256 and SHA-256 digests;
+assertions must be signed; SHA-1 is rejected unless the provider opts in (`allow_sha1_signatures`);
+redirect `SigAlg` is limited to `rsa-sha256/384/512`; solicited responses are bound to the browser
+cookie. IdP metadata comes from a URL (daily worker tick, 04:30 UTC, last good copy kept on error) or
+upload. **Per-process cache**: the OIDC JWKS is cached in each API process.
+
 
 ### AI subsystem (`tiqora.ai.*`)
 
@@ -262,6 +333,12 @@ to `/api/v1`:
   (`valid_id = 1`) with the same `znuny.password` module used for agents, but
   keeps its own Redis key prefix (`tiqora:csession:`) and cookie
   (`tiqora_customer_session`) so agent and customer sessions never collide.
+  Customers can also sign in through customer-audience identity providers
+  (OIDC/SAML/LDAP; `/api/portal/auth/sso/{slug}/login`, own callback/ACS URLs; same
+  [login orchestration](#identity-and-sso-tiqoraidentity), never role/group-synced). Customer
+  TOTP and passkeys (`/api/portal/auth/totp/*`, `/passkey/*`; tables `tiqora_customer_totp` /
+  `tiqora_customer_passkey`) put a password login into a pending-2FA session; SSO logins skip 2FA.
+  Admin reset: `POST /api/v1/admin/customer-users/{id}/reset-2fa` (revokes the sessions).
 - **Scope:** a dedicated filter in `domain/portal_ticket_service.py` — not the
   agent `PermissionEngine` — restricts a customer to tickets where
   `ticket.customer_user_id == login`, plus (if the `tiqora_settings` flag for

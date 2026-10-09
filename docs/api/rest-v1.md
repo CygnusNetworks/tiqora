@@ -471,6 +471,8 @@ daemons, system info) are `GET`/`PUT` or read-only:
 | PGP / S/MIME keys | `/api/v1/admin/crypto-keys` (`/status`, `/pgp`, `/smime/…`, `/sign-key-options`; see [`../crypto.md`](../crypto.md#admin-ui-and-api)) |
 | PGP / S/MIME settings (+ PGP passphrases) | `/api/v1/admin/crypto-settings` (`GET`/`PUT`, `/pgp-passphrases/{key}`) |
 | Agent SSO eligibility / 2FA | `/api/v1/admin/auth-config` (+ `/global`, `/{user_id}`, `/{user_id}/reset-2fa`) |
+| Identity providers (OIDC/SAML/LDAP) | `/api/v1/admin/identity-providers` (`GET`/`POST`, `/{id}` `GET`/`PATCH`/`DELETE`; `/kinds`, `/presets`, `/capabilities`; `/{id}/refresh-metadata`; `/{id}/tests` + `/{id}/tests/{test_id}`; `/{id}/preview`; `/{id}/links` (+ `DELETE /{link_id}`); `/{id}/managed-assignments`; see [identity guide](../guide/identity-providers.md)) |
+| Customer 2FA reset | `POST /api/v1/admin/customer-users/{id}/reset-2fa` (TOTP + passkeys, revokes the customer's sessions) |
 | API keys | `/api/v1/admin/api-keys` |
 | Webhooks | `/api/v1/admin/webhooks` |
 | Channels (SMS/WhatsApp/Telegram/phone config) | `/api/v1/admin/channels` |
@@ -559,6 +561,30 @@ curl -H "Authorization: Bearer $KEY" \
 Per ticket: number, title (+ a conservative `title_pii_free` flag), queue,
 state, e-mail and message counts, first channel, stored AI summary. Details:
 [`../architecture.md`](../architecture.md#customer-ticket-history-for-external-tools-netadmin).
+
+## SSO endpoints (browser flows)
+
+These are navigation endpoints (redirects and form posts), not JSON APIs. `<slug>` is the provider's
+slug; configuration lives in the admin API above and the
+[identity guide](../guide/identity-providers.md).
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/v1/auth/methods` | login discovery: `password`, `oidc`, `spnego`, `ldap`, `webauthn`, `saml` (SAML usable), `providers` (enabled OIDC/SAML providers for agents: `slug`, `kind`, `label`, `icon`) |
+| `GET /api/v1/auth/sso/<slug>/login?next=/path` | start OIDC or SAML login (302 to the IdP); `?test=<id>` is an admin test run |
+| `GET /api/v1/auth/oidc/<slug>/callback` | OIDC redirect URI (env provider also `GET /api/v1/auth/oidc/callback`) |
+| `POST /api/v1/auth/saml/<slug>/acs` | SAML assertion consumer service (form post) |
+| `GET /api/v1/auth/saml/<slug>/metadata` | SP metadata (also the entity ID) |
+| `GET`/`POST /api/v1/auth/saml/<slug>/sls` | SAML single logout (requests and responses) |
+| `POST /api/v1/auth/oidc/<slug>/backchannel-logout` | OIDC back-channel logout (logout token) |
+| `POST /api/v1/auth/sso/logout` | logout that continues at the IdP when the session came from SSO |
+
+Failed logins redirect to `/login?sso_error=<code>&next=<path>`; the codes are listed in the
+identity guide. Customer portal equivalents live under `/api/portal/auth`:
+`GET /methods`, `GET /sso/<slug>/login`, `GET /oidc/<slug>/callback`,
+`POST /saml/<slug>/acs`, `POST /sso/logout`, and the second-factor routes
+`/totp/*` and `/passkey/*` (TOTP enroll/confirm/verify/delete, passkey
+register/authenticate); a password login with 2FA answers `pending_2fa: true`.
 
 ## Customer portal API (`/api/portal`)
 

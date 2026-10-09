@@ -6,11 +6,18 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
-from tiqora.api.deps import get_redis
-from tiqora.api.portal.deps import AppSettings, CurrentCustomer, get_customer_auth_service
+from tiqora.api.deps import DbSession, get_redis
+from tiqora.api.portal.deps import (
+    AppSettings,
+    CurrentCustomer,
+    CustomerTOTPServiceDep,
+    CustomerWebAuthnServiceDep,
+    get_customer_auth_service,
+)
 from tiqora.domain.customer_auth import CustomerAuthService, customer_to_dict
-from tiqora.domain.customer_auth_ldap import CustomerLdapAuthService
 from tiqora.domain.schemas import CustomerLoginResponse, CustomerMe, LoginRequest
+from tiqora.identity.ldap_login import LdapSignInUnavailable, ldap_sign_in
+from tiqora.identity.sso_routes import session_sso_state
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
 
 router = APIRouter(prefix="/auth", tags=["portal-auth"])
@@ -27,13 +34,39 @@ def _clear_customer_session_cookie(response: Response, settings: AppSettings) ->
     )
 
 
+def set_customer_session_cookie(
+    response: Response, settings: AppSettings, token: str, *, max_age: int | None = None
+) -> None:
+    response.set_cookie(
+        key=settings.customer_session_cookie_name,
+        value=token,
+        httponly=True,
+        secure=settings.session_cookie_secure,
+        samesite=settings.session_cookie_samesite,  # type: ignore[arg-type]
+        max_age=max_age if max_age is not None else settings.session_ttl_seconds,
+        path="/",
+    )
+
+
+def _too_many(retry_after: int | None) -> HTTPException:
+    headers = {"Retry-After": str(max(1, retry_after))} if retry_after else None
+    return HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail="Too many failed login attempts; try again later",
+        headers=headers,
+    )
+
+
 @router.post("/login", response_model=CustomerLoginResponse)
 async def login(
     body: LoginRequest,
     request: Request,
     response: Response,
     auth: Annotated[CustomerAuthService, Depends(get_customer_auth_service)],
+    totp: CustomerTOTPServiceDep,
+    webauthn: CustomerWebAuthnServiceDep,
     settings: AppSettings,
+    session: DbSession,
 ) -> CustomerLoginResponse:
     redis_client = await get_redis(request)
     limiter = AuthRateLimiter(redis_client, settings)
@@ -48,46 +81,68 @@ async def login(
         )
 
     customer = await auth.authenticate_password(body.login, body.password)
-    if customer is None and settings.customer_ldap_enabled:
-        # LDAP fallback, mirroring Kernel::System::CustomerAuth::LDAP. No
-        # auto-provisioning in v1: the resolved LDAP UID must match an
-        # existing, valid `customer_user.login` row.
-        ldap_service = CustomerLdapAuthService(settings)
-        ldap_uid = await ldap_service.authenticate(body.login, body.password)
-        if ldap_uid is not None:
-            customer = await auth.get_customer_by_login(ldap_uid)
+    if customer is None:
+        # Then the LDAP directories (Znuny's chained AuthModules), first bind wins.
+        try:
+            account_login = await ldap_sign_in(
+                session, settings, login=body.login, password=body.password, user_kind="customer"
+            )
+        except LdapSignInUnavailable as exc:
+            # Counted like a failure (no free retries), but honest: try again later.
+            locked = await limiter.record_failure(login=body.login, ip=ip)
+            if locked is not None:
+                raise _too_many(locked.retry_after) from exc
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=exc.message
+            ) from exc
+        if account_login is not None:
+            customer = await auth.get_customer_by_login(account_login)
     if customer is None:
         locked = await limiter.record_failure(login=body.login, ip=ip)
         if locked is not None:
-            headers = (
-                {"Retry-After": str(max(1, locked.retry_after))} if locked.retry_after else None
-            )
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many failed login attempts; try again later",
-                headers=headers,
-            )
+            raise _too_many(locked.retry_after)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
     await limiter.reset(login=body.login, ip=ip)
+    # Customer 2FA is opt-in: only an enrolled factor changes the flow. The
+    # lookup runs after the password check, so the response never reveals
+    # whether an unknown login "has" a second factor.
+    totp_enrolled = await totp.is_enabled(customer.id)
+    passkey_enrolled = await webauthn.has_passkey(customer.id)
+    if totp_enrolled or passkey_enrolled:
+        pending_token = await auth.create_pending_session(customer)
+        set_customer_session_cookie(
+            response, settings, pending_token, max_age=settings.totp_pending_ttl_seconds
+        )
+        return CustomerLoginResponse(
+            customer=None,
+            pending_2fa=True,
+            totp_enrolled=totp_enrolled,
+            passkey_enrolled=passkey_enrolled,
+        )
     token = await auth.create_session(customer)
-    response.set_cookie(
-        key=settings.customer_session_cookie_name,
-        value=token,
-        httponly=True,
-        secure=settings.session_cookie_secure,
-        samesite=settings.session_cookie_samesite,  # type: ignore[arg-type]
-        max_age=settings.session_ttl_seconds,
-        path="/",
-    )
+    set_customer_session_cookie(response, settings, token)
     return CustomerLoginResponse(customer=CustomerMe(**customer_to_dict(customer)))
 
 
 @router.get("/me", response_model=CustomerMe)
-async def me(customer: CurrentCustomer) -> CustomerMe:
-    return CustomerMe(**customer_to_dict(customer))
+async def me(
+    request: Request, customer: CurrentCustomer, settings: AppSettings, session: DbSession
+) -> CustomerMe:
+    token = getattr(request.state, "customer_session_token", None)
+    sso_logout = False
+    if token:
+        try:
+            redis_client = await get_redis(request)
+        except Exception:  # noqa: BLE001 - never fail /me for the logout hint
+            redis_client = None
+        if redis_client is not None:
+            sso_logout = await session_sso_state(
+                redis_client, session, settings, token, user_kind="customer"
+            )
+    return CustomerMe(**customer_to_dict(customer), sso_logout=sso_logout)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

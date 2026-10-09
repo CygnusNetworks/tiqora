@@ -10,6 +10,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from tests._identity_helpers import FakeRedis
 from tiqora.api.v1.admin import auth_config as admin_auth_config
 from tiqora.api.v1.admin.pagination import ListParams
 from tiqora.api.v1.admin.schemas import AuthConfigGlobalUpdate, AuthConfigUpdate
@@ -106,7 +107,7 @@ async def test_list_put_reset_global(url_fixture: str, request: pytest.FixtureRe
         assert cfg.sso_eligible is True
         assert cfg.enforce_2fa is True
 
-        await admin_auth_config.reset_2fa(user_id, admin, session, settings)
+        await admin_auth_config.reset_2fa(user_id, admin, session, settings, FakeRedis())  # type: ignore[arg-type]
         assert await totp.is_enabled(user_id) is False
 
         # Global toggle

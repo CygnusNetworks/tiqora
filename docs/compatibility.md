@@ -356,8 +356,48 @@ Both forms are supported in Tiqora for convenience.
    SessionID that has no row there is looked up in Tiqora's Redis token store
    (tokens issued while `TIQORA_COMPAT_SESSION_WRITE_ZNUNY=false`).
 3. **API keys** — preferred for MCP and modern automation (same permission engine).
-4. **OIDC / Kerberos** — UI and `/api/v1`; not required for basic
-   GenericInterface parity.
+4. **OIDC / SAML / LDAP / Kerberos** — UI and `/api/v1` (agents) and
+   `/api/portal` (customers); not required for basic GenericInterface parity.
+   Details: [Identity providers and Znuny parity](#identity-providers-and-znuny-parity).
+
+## Identity providers and Znuny parity
+
+Tiqora's SSO covers what Znuny 7.3 offers through `Auth::SAML`, `CustomerAuth::SAML` and
+`AuthSyncModule` (`Auth::Sync::LDAP`), and goes beyond it. Setup guide:
+[guide/identity-providers.md](guide/identity-providers.md).
+
+| Capability | Znuny 7.3 | Tiqora |
+|---|---|---|
+| SAML agents and customers | configured in SysConfig / `Config.pm` | any number of SAML and OIDC providers, each for agents, customers or both; SP- and IdP-initiated login, single logout (SP- and IdP-initiated) |
+| Several IdPs | no | yes (login-page buttons per provider, sort order) |
+| Env/`Config.pm` OIDC and LDAP | n/a | `TIQORA_OIDC_*` / `TIQORA_LDAP_*` stay supported, shown read-only as `env-oidc`, `env-ldap`, `env-customer-ldap` |
+| Account creation on first login | `AuthSyncModule` creates / updates the user | JIT per provider, optional e-mail domain allow-list, e-mail validated like `CheckEmail`, `CustomerUserEmailUniqCheck` honoured |
+| Attribute mapping | `UserSyncMap` | ordered source attributes per profile field (`login`, `email`, `first_name`, `last_name`, `customer_id`, `mobile`) |
+| Initial groups on creation | `UserSyncInitialGroups` | "Gruppenrechte/Rollen für neue Konten" (first login only) |
+| Role/group sync from LDAP groups | `UserSyncGroupsDefinition`, `UserSyncRolesDefinition` | rule attribute `ldap:group_dn` |
+| Role/group sync from attributes | `UserSyncAttribute{Groups,Roles}Definition` | rules on any OIDC claim, SAML attribute or LDAP attribute |
+| Permission write semantics | replaces the full permission key set per (user, group) | same per-group replacement; in managed mode the result is "wanted + manual keys", collapsed to `rw` when present |
+
+Differences (deliberate):
+
+- **Sync mode.** Default is `managed`: Tiqora removes only assignments that a rule created
+  itself (tracked in `tiqora_identity_managed_assignment`) and never downgrades or removes
+  manual ones. Znuny's replace-everything behaviour is available per provider as
+  `authoritative` ("Wie Znuny"). Both skip the sync when the IdP did not release a rule's attribute.
+- **No `NestedGroupSearch`**: nested AD groups are not resolved.
+- **No customer group sync**: role/group sync is agent-only; customers are matched/created
+  but never granted groups.
+- **Group search errors** (timeouts, referrals, any non-success code other than `noSuchObject`)
+  skip the sync for that login instead of stripping rights; `noSuchObject` counts as "not a member"
+  (as in Znuny).
+- **SAML SHA-1** XML signatures are rejected unless a provider opts in; **LDAP TLS** is verified by
+  default for UI-configured directories (env directories: `TIQORA_LDAP_TLS_VERIFY`, default off, with
+  a startup warning).
+- **OIDC** id_tokens are always verified (discovery issuer, JWKS, audience, nonce); Entra's
+  `{tenantid}` multi-tenant issuer is supported with an optional tenant allow-list.
+- SSO logins skip TOTP/passkey 2FA (the IdP is the strong factor); customers can enroll TOTP
+  and passkeys for password logins.
+- Customer 2FA tables are removed only by the GDPR erasure, not when a customer user is deleted.
 
 ## What is not emulated (and why)
 

@@ -60,6 +60,7 @@ jobs:
       MEILI_MASTER_KEY: tiqora-dev-master-key
       TIQORA_ENV: test
       TIQORA_STRICT_DB_LEAKS: "1"
+      TIQORA_REQUIRE_SAML_TESTS: "1"
     steps:
       - name: Harden runner
         # Ueberwacht ausgehende Verbindungen des Jobs. Bewusst "audit":
@@ -77,9 +78,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install crypto tooling (gpg for PGP tests; openssl is preinstalled)
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gnupg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gnupg xmlsec1
       - name: Install dependencies
-        run: uv sync --extra dev --extra crypto
+        run: uv sync --extra dev --extra crypto --extra saml
       # The seed defaults to the run id: different every night, and printed in
       # the log so a failure can be replayed exactly.
       - name: Pytest (shuffled module order)

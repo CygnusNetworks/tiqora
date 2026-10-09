@@ -12,8 +12,6 @@ from sqlalchemy import select
 from tiqora.api.deps import AppSettings, DbSession, get_redis
 from tiqora.api.v1.admin.common import (
     USER_CACHE_TYPES,
-    USER_GROUP_CACHE_TYPES,
-    USER_ROLE_CACHE_TYPES,
     invalidate_znuny_cache_types,
     now,
 )
@@ -44,6 +42,7 @@ from tiqora.api.v1.admin.schemas import (
 from tiqora.channels.phone.cti import PHONE_EXTENSION_PREF
 from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.user import GroupRole, GroupUser, PermissionGroups, Roles, RoleUser, Users
+from tiqora.domain import user_provisioning as provisioning
 from tiqora.domain.auth import SessionStore, normalize_language_code
 from tiqora.domain.password_setup import (
     InviteStatus,
@@ -67,6 +66,15 @@ router = APIRouter(prefix="/users", tags=["admin:users"])
 # admin/schemas.py — narrows the DB-returned `str` once it's been checked
 # against PERMISSION_KEYS, instead of re-declaring the literal per call site.
 PermissionKey = Literal["ro", "move_into", "create", "note", "owner", "priority", "rw"]
+
+
+def _provisioning_http_error(exc: provisioning.ProvisioningError) -> HTTPException:
+    code = (
+        status.HTTP_409_CONFLICT
+        if exc.code in ("login_exists", "email_in_use")
+        else status.HTTP_422_UNPROCESSABLE_ENTITY
+    )
+    return HTTPException(status_code=code, detail=str(exc))
 
 
 def _parse_last_login(raw: str | None) -> datetime | None:
@@ -172,34 +180,26 @@ async def get_user(user_id: int, admin: AdminUser, session: DbSession) -> UserOu
 async def create_user(
     body: UserCreate, admin: AdminUser, session: DbSession, settings: AppSettings
 ) -> UserOut:
-    ts = now()
     # No password supplied means "invite": the account gets a hash of a secret
     # nobody holds, and the agent chooses their own password through a
     # one-time link. UserCreate enforces that email is set in that case.
     invite = not body.password
-    user = Users(
-        login=body.login,
-        pw=unusable_password_hash() if invite else hash_password(body.password or ""),
-        title=body.title,
-        first_name=body.first_name,
-        last_name=body.last_name,
-        valid_id=body.valid_id,
-        create_time=ts,
-        create_by=admin.id,
-        change_time=ts,
-        change_by=admin.id,
-    )
-    session.add(user)
-    await session.flush()  # assigns user.id for the preference rows below
-
-    if body.email:
-        await set_preference(session, user.id, "UserEmail", body.email)
-    if body.mobile:
-        await set_preference(session, user.id, "UserMobile", body.mobile)
-    if body.phone_extension:
-        await set_preference(session, user.id, PHONE_EXTENSION_PREF, body.phone_extension)
-
-    await invalidate_znuny_cache_types(session, USER_CACHE_TYPES)
+    try:
+        user = await provisioning.create_agent(
+            session,
+            login=body.login,
+            first_name=body.first_name,
+            last_name=body.last_name,
+            email=body.email,
+            mobile=body.mobile,
+            title=body.title,
+            pw_hash=unusable_password_hash() if invite else hash_password(body.password or ""),
+            valid_id=body.valid_id,
+            actor_id=admin.id,
+            phone_extension=body.phone_extension,
+        )
+    except provisioning.ProvisioningError as exc:
+        raise _provisioning_http_error(exc) from exc
     await session.commit()
     await session.refresh(user)
 
@@ -268,19 +268,31 @@ async def update_user(
         if password:
             user.pw = hash_password(password)
             password_changed = True
+    first_name = data.pop("first_name", None)
+    last_name = data.pop("last_name", None)
     for field, value in data.items():
         setattr(user, field, value)
+    try:
+        profile_changed = await provisioning.update_agent_profile(
+            session,
+            user,
+            first_name=first_name,
+            last_name=last_name,
+            # None would mean "leave alone" there; an explicit null from the API clears.
+            email=(email or "") if email_set else None,
+            mobile=(mobile or "") if mobile_set else None,
+            actor_id=admin.id,
+        )
+    except provisioning.ProvisioningError as exc:
+        raise _provisioning_http_error(exc) from exc
     user.change_time = now()
     user.change_by = admin.id
 
-    if email_set:
-        await set_preference(session, user_id, "UserEmail", email)
-    if mobile_set:
-        await set_preference(session, user_id, "UserMobile", mobile)
     if extension_set:
         await set_preference(session, user_id, PHONE_EXTENSION_PREF, extension)
 
-    await invalidate_znuny_cache_types(session, USER_CACHE_TYPES)
+    if not profile_changed:
+        await invalidate_znuny_cache_types(session, USER_CACHE_TYPES)
     await session.commit()
     await session.refresh(user)
 
@@ -369,21 +381,13 @@ async def assign_group(
     user = await session.get(Users, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    existing = await session.get(GroupUser, (user_id, body.group_id, body.permission_key))
-    ts = now()
-    if existing is None:
-        session.add(
-            GroupUser(
-                user_id=user_id,
-                group_id=body.group_id,
-                permission_key=body.permission_key,
-                create_time=ts,
-                create_by=admin.id,
-                change_time=ts,
-                change_by=admin.id,
-            )
-        )
-    await invalidate_znuny_cache_types(session, USER_GROUP_CACHE_TYPES)
+    await provisioning.grant_group_permission(
+        session,
+        user_id=user_id,
+        group_id=body.group_id,
+        permission_key=body.permission_key,
+        actor_id=admin.id,
+    )
     await session.commit()
 
 
@@ -398,11 +402,18 @@ async def revoke_group(
     session: DbSession,
 ) -> None:
     _ = admin
-    existing = await session.get(GroupUser, (user_id, group_id, permission_key))
-    if existing is not None:
-        await session.delete(existing)
-        await invalidate_znuny_cache_types(session, USER_GROUP_CACHE_TYPES)
-        await session.commit()
+    await provisioning.revoke_group_permission(
+        session, user_id=user_id, group_id=group_id, permission_key=permission_key
+    )
+    # A hand-removed assignment is manual from now on (a rule may re-add it at next login).
+    await provisioning.drop_managed_assignments(
+        session,
+        user_id=user_id,
+        kind="group",
+        target_id=group_id,
+        permission_key=permission_key,
+    )
+    await session.commit()
 
 
 @router.get("/{user_id}/roles", response_model=list[RoleOut])
@@ -424,31 +435,18 @@ async def assign_role(
     user = await session.get(Users, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    existing = await session.get(RoleUser, (user_id, body.role_id))
-    ts = now()
-    if existing is None:
-        session.add(
-            RoleUser(
-                user_id=user_id,
-                role_id=body.role_id,
-                create_time=ts,
-                create_by=admin.id,
-                change_time=ts,
-                change_by=admin.id,
-            )
-        )
-    await invalidate_znuny_cache_types(session, USER_ROLE_CACHE_TYPES)
+    await provisioning.grant_role(session, user_id=user_id, role_id=body.role_id, actor_id=admin.id)
     await session.commit()
 
 
 @router.delete("/{user_id}/roles/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_role(user_id: int, role_id: int, admin: AdminUser, session: DbSession) -> None:
     _ = admin
-    existing = await session.get(RoleUser, (user_id, role_id))
-    if existing is not None:
-        await session.delete(existing)
-        await invalidate_znuny_cache_types(session, USER_ROLE_CACHE_TYPES)
-        await session.commit()
+    await provisioning.revoke_role(session, user_id=user_id, role_id=role_id)
+    await provisioning.drop_managed_assignments(
+        session, user_id=user_id, kind="role", target_id=role_id
+    )
+    await session.commit()
 
 
 @router.post("/{user_id}/setup-link", status_code=status.HTTP_204_NO_CONTENT)

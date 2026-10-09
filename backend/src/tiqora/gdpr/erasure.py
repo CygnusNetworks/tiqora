@@ -1509,6 +1509,30 @@ async def run_erasure(
                     {"u": old_login},
                 )
 
+        # SSO subject links hold the IdP subject and the old login (PII) and can no
+        # longer match anything once the customer is anonymized or gone: purge them
+        # in both modes (tiqora-owned, rebuilt on the next SSO login, no backup).
+        if await _table_exists(session, "tiqora_identity_link"):
+            await session.execute(
+                text(
+                    "DELETE FROM tiqora_identity_link"
+                    " WHERE user_kind = 'customer' AND user_id IN :ids"
+                ).bindparams(bindparam("ids", expanding=True)),
+                {"ids": [int(c.id) for c in ordered]},
+            )
+
+        # Portal second factors (TOTP secret, passkeys) belong to the person: purge
+        # in both modes (tiqora-owned, no backup; an anonymized account must not
+        # keep a working authenticator). Keyed by customer_user.id, not by login.
+        for table in ("tiqora_customer_totp", "tiqora_customer_passkey"):
+            if await _table_exists(session, table):
+                await session.execute(
+                    text(f"DELETE FROM {table} WHERE customer_user_id IN :ids").bindparams(  # noqa: S608
+                        bindparam("ids", expanding=True)
+                    ),
+                    {"ids": [int(c.id) for c in ordered]},
+                )
+
         # ---- tickets: rewrite refs ----
         # Report facts copy customer_id / customer_user: every ticket whose refs are
         # rewritten (or that is hard-deleted) loses its facts now and is rebuilt later.

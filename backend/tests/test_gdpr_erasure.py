@@ -2190,6 +2190,74 @@ async def test_run_erasure_customer_favorites(mariadb_znuny_url: str, mode: str)
 
 @pytest.mark.db
 @pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["anonymize", "delete"])
+async def test_run_erasure_purges_customer_second_factors(
+    mariadb_znuny_url: str, mode: str
+) -> None:
+    from sqlalchemy import create_engine
+
+    from tiqora.db.tiqora.base import TiqoraBase
+
+    engine = create_engine(mariadb_znuny_url)
+    TiqoraBase.metadata.create_all(engine)
+    engine.dispose()
+    aengine, factory = await _factory(mariadb_znuny_url)
+    login = f"idp.2fa.erase.{mode}@example.org"
+    company = f"IDP-2FA-ERASE-{mode.upper()}"
+    async with factory() as session:
+        await _seed_tiqora_tables(session, mysql=True)
+        await _insert_company(session, customer_id=company, name="Erase 2FA")
+        cuid = await _insert_customer(session, login=login, customer_id=company)
+        other = await _insert_customer(session, login=f"keep.{login}", customer_id=company)
+        for uid in (cuid, other):
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_customer_totp (customer_user_id, secret, enabled)"
+                    " VALUES (:c, 'x', 1)"
+                ),
+                {"c": uid},
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_customer_passkey (customer_user_id, credential_id,"
+                    " public_key, sign_count, name) VALUES (:c, :cred, :pk, 0, 'Key')"
+                ),
+                {"c": uid, "cred": f"erase-{uid}", "pk": b"k"},
+            )
+        await session.commit()
+    try:
+        await run_erasure(
+            factory,
+            Settings(),
+            customer_user_ids=[cuid],
+            mode=mode,  # type: ignore[arg-type]
+            seed=7,
+            force_parallel=True,
+            actor="test",
+        )
+        async with factory() as session:
+            for table in ("tiqora_customer_totp", "tiqora_customer_passkey"):
+                rows = (
+                    await session.execute(
+                        text(
+                            f"SELECT customer_user_id FROM {table}"  # noqa: S608
+                            " WHERE customer_user_id IN (:a, :b)"
+                        ),
+                        {"a": cuid, "b": other},
+                    )
+                ).all()
+                assert [int(r[0]) for r in rows] == [other], table  # only the erased one is gone
+    finally:
+        async with factory() as session:
+            for table in ("tiqora_customer_totp", "tiqora_customer_passkey"):
+                await session.execute(
+                    text(f"DELETE FROM {table} WHERE customer_user_id IN (:a, :b)"),  # noqa: S608
+                    {"a": cuid, "b": other},
+                )
+            await session.commit()
+        await aengine.dispose()
+
+
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
 @pytest.mark.parametrize("variant", ["anonymize", "delete", "delete_tickets"])
 async def test_erasure_removes_report_facts_and_marks_dirty(

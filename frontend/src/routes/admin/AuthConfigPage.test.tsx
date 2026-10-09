@@ -3,6 +3,14 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
+
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ to, children, ...rest }: { to: string; children: React.ReactNode } & Record<string, unknown>) => (
+    <a href={to} {...rest}>
+      {children}
+    </a>
+  ),
+}));
 import { AuthConfigPage } from "./AuthConfigPage";
 
 const list = vi.fn();
@@ -202,5 +210,18 @@ describe("AuthConfigPage", () => {
     expect(putGlobal).toHaveBeenCalledWith(
       expect.not.objectContaining({ portal_enabled: expect.anything() }),
     );
+  });
+});
+
+describe("AuthConfigPage identity link", () => {
+  it("points to the identity providers page", async () => {
+    await i18n.changeLanguage("de");
+    list.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 500 });
+    getGlobal.mockResolvedValue({ enforce_all: false, enforce_group_ids: [], portal_enabled: true, portal_locked_by_env: false });
+    groupsList.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 500 });
+    renderPage();
+    const link = await screen.findByTestId("auth-config-identity-link");
+    expect(link).toHaveAttribute("href", "/admin/identity-providers");
+    expect(link).toHaveTextContent("Anmeldung über Microsoft, Google, SAML oder LDAP einrichten");
   });
 });

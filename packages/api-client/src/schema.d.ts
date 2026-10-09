@@ -72,6 +72,319 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portal/auth/methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Portal sign-in options
+         * @description Discovery endpoint of the portal login page (customer-audience providers only).
+         */
+        get: operations["portal_auth_methods_api_portal_auth_methods_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/oidc/{slug}/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** OIDC callback of a portal provider */
+        get: operations["portal_oidc_callback_api_portal_auth_oidc__slug__callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/passkey": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Passkey List */
+        get: operations["passkey_list_api_portal_auth_passkey_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/passkey/authenticate/begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Passkey Authenticate Begin
+         * @description Start a passkey assertion; the challenge is bound to the pending token.
+         */
+        post: operations["passkey_authenticate_begin_api_portal_auth_passkey_authenticate_begin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/passkey/authenticate/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Passkey Authenticate Finish */
+        post: operations["passkey_authenticate_finish_api_portal_auth_passkey_authenticate_finish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/passkey/register/begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Passkey Register Begin */
+        post: operations["passkey_register_begin_api_portal_auth_passkey_register_begin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/passkey/register/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Passkey Register Finish */
+        post: operations["passkey_register_finish_api_portal_auth_passkey_register_finish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/passkey/{passkey_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Passkey Delete */
+        delete: operations["passkey_delete_api_portal_auth_passkey__passkey_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/saml/{slug}/acs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SAML assertion consumer service (portal)
+         * @description The IdP's browser POST; CSRF-exempt by design. Failures redirect to ``/portal/login``.
+         */
+        post: operations["portal_saml_acs_api_portal_auth_saml__slug__acs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/sso/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Log out of the portal and, where supported, of the identity provider */
+        post: operations["portal_sso_logout_api_portal_auth_sso_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/sso/{slug}/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Start a portal SSO login
+         * @description Starts a customer login, or (``test=``) an admin's test run of a customer provider.
+         *
+         *     A test run needs the admin's AGENT session cookie; without one the answer is 403 and
+         *     never a real login. The run itself never creates a session (see ``finish_*``).
+         */
+        get: operations["portal_sso_login_api_portal_auth_sso__slug__login_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Totp Disable */
+        delete: operations["totp_disable_api_portal_auth_totp_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/totp/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Totp Confirm */
+        post: operations["totp_confirm_api_portal_auth_totp_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/totp/enroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Totp Enroll
+         * @description Start (or replace) a TOTP enrollment; replacing a live factor needs its code.
+         *
+         *     Adding TOTP to a passkey-only account needs a recent sign-in (the passkey
+         *     gate), or a stolen session could attach an authenticator it controls.
+         */
+        post: operations["totp_enroll_api_portal_auth_totp_enroll_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/totp/enroll/qr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Totp Enroll Qr */
+        get: operations["totp_enroll_qr_api_portal_auth_totp_enroll_qr_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/totp/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Totp Status */
+        get: operations["totp_status_api_portal_auth_totp_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/totp/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Totp Verify
+         * @description Promote a pending-2FA session to a full session after a valid TOTP code.
+         */
+        post: operations["totp_verify_api_portal_auth_totp_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portal/kb/articles/{slug_or_id}": {
         parameters: {
             query?: never;
@@ -152,6 +465,9 @@ export interface paths {
         /**
          * Change Password
          * @description Znuny ``Preferences::Password`` (customer): verify the current one, store the new one.
+         *
+         *     Afterwards every other session of the customer ends: Znuny/GI sessions and the
+         *     portal's Redis sessions, pending 2FA logins included. The calling session stays.
          */
         post: operations["change_password_api_portal_preferences_password_post"];
         delete?: never;
@@ -1323,6 +1639,10 @@ export interface paths {
         /**
          * Reset 2Fa
          * @description Admin force-disable: delete TOTP enrollment and all passkeys for the agent.
+         *
+         *     Also clears a pending TOTP enrollment and revokes every session of the agent
+         *     (pending ones included): with no factor left, a surviving session could
+         *     attach one of its own without a step-up.
          */
         post: operations["reset_2fa_api_v1_admin_auth_config__user_id__reset_2fa_post"];
         delete?: never;
@@ -1953,6 +2273,33 @@ export interface paths {
         patch: operations["update_customer_user_api_v1_admin_customer_users__customer_user_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/customer-users/{customer_user_id}/reset-2fa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Customer User 2Fa
+         * @description Admin recovery for a lost authenticator: drop the customer's TOTP and all passkeys.
+         *
+         *     Also clears a pending TOTP enrollment and revokes every session of the customer
+         *     (pending ones included): with no factor left, a surviving session could attach
+         *     one of its own without a step-up.
+         *
+         *     Mirrors the agent-side ``POST /auth-config/{user_id}/reset-2fa`` (idempotent,
+         *     no code needed); the log line is the audit trail.
+         */
+        post: operations["reset_customer_user_2fa_api_v1_admin_customer_users__customer_user_id__reset_2fa_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/customer-users/{customer_user_login}/companies": {
         parameters: {
             query?: never;
@@ -2490,6 +2837,213 @@ export interface paths {
          * @description Agents with full (``rw``) access to *group_id* — reverse of user↔groups.
          */
         get: operations["get_group_users_api_v1_admin_groups__group_id__users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Identity Providers */
+        get: operations["list_identity_providers_api_v1_admin_identity_providers_get"];
+        put?: never;
+        /** Create Identity Provider */
+        post: operations["create_identity_provider_api_v1_admin_identity_providers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Identity Capabilities */
+        get: operations["identity_capabilities_api_v1_admin_identity_providers_capabilities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/kinds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Identity Kinds */
+        get: operations["list_identity_kinds_api_v1_admin_identity_providers_kinds_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Identity Presets */
+        get: operations["list_identity_presets_api_v1_admin_identity_providers_presets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Identity Provider */
+        get: operations["get_identity_provider_api_v1_admin_identity_providers__provider_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Identity Provider */
+        delete: operations["delete_identity_provider_api_v1_admin_identity_providers__provider_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Identity Provider */
+        patch: operations["update_identity_provider_api_v1_admin_identity_providers__provider_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Identity Links */
+        get: operations["list_identity_links_api_v1_admin_identity_providers__provider_id__links_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/links/{link_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Identity Link */
+        delete: operations["delete_identity_link_api_v1_admin_identity_providers__provider_id__links__link_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/managed-assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Managed Assignments */
+        get: operations["list_managed_assignments_api_v1_admin_identity_providers__provider_id__managed_assignments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Identity Mapping */
+        post: operations["preview_identity_mapping_api_v1_admin_identity_providers__provider_id__preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/refresh-metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Identity Provider Metadata */
+        post: operations["refresh_identity_provider_metadata_api_v1_admin_identity_providers__provider_id__refresh_metadata_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/tests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Identity Test */
+        post: operations["start_identity_test_api_v1_admin_identity_providers__provider_id__tests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/tests/{test_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Identity Test */
+        get: operations["get_identity_test_api_v1_admin_identity_providers__provider_id__tests__test_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4250,7 +4804,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Oidc Callback */
+        /**
+         * Oidc Callback
+         * @description Alias of ``/auth/oidc/env-oidc/callback`` (browsers: 302 to ``next``; API clients: JSON).
+         */
         get: operations["oidc_callback_api_v1_auth_oidc_callback_get"];
         put?: never;
         post?: never;
@@ -4267,8 +4824,50 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Oidc Login */
+        /**
+         * Oidc Login
+         * @description Alias of ``/auth/sso/env-oidc/login`` (production env OIDC keeps its URLs).
+         */
         get: operations["oidc_login_api_v1_auth_oidc_login_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/oidc/{slug}/backchannel-logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * OIDC back-channel logout (called by the identity provider)
+         * @description Server-to-server POST of a signed logout token (form field ``logout_token``).
+         *
+         *     Ends every matching agent and customer session; answers with ``Cache-Control: no-store``.
+         */
+        post: operations["oidc_backchannel_logout_api_v1_auth_oidc__slug__backchannel_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/oidc/{slug}/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** OIDC callback of a provider */
+        get: operations["oidc_provider_callback_api_v1_auth_oidc__slug__callback_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4442,6 +5041,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/saml/{slug}/acs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SAML assertion consumer service
+         * @description Receives the IdP's browser POST; CSRF-exempt by design. Failures redirect to ``/login``.
+         */
+        post: operations["saml_acs_api_v1_auth_saml__slug__acs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/saml/{slug}/metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** SAML service provider metadata */
+        get: operations["saml_metadata_api_v1_auth_saml__slug__metadata_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/saml/{slug}/sls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SAML single logout service (redirect binding)
+         * @description The IdP's LogoutResponse; bound to a stored request id, always ends on the login page.
+         */
+        get: operations["saml_sls_get_api_v1_auth_saml__slug__sls_get"];
+        put?: never;
+        /**
+         * SAML single logout service (POST binding)
+         * @description Same as the GET form; CSRF-exempt because the IdP posts cross-site.
+         */
+        post: operations["saml_sls_post_api_v1_auth_saml__slug__sls_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/spnego": {
         parameters: {
             query?: never;
@@ -4461,6 +5121,43 @@ export interface paths {
          *     bare 401, so the browser never shows a native Negotiate popup.
          */
         get: operations["spnego_api_v1_auth_spnego_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sso/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log out of Tiqora and, where supported, of the identity provider
+         * @description Ends the local session first, then redirects to the IdP logout or the login page.
+         */
+        post: operations["sso_logout_route_api_v1_auth_sso_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sso/{slug}/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Start an SSO login */
+        get: operations["sso_login_api_v1_auth_sso__slug__login_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10296,6 +10993,26 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * AttributeMap
+         * @description Ordered source attribute names per profile field; first non-empty wins.
+         *
+         *     ``"_text"`` = fixed value ``"text"`` (Znuny UserSyncMap convention).
+         */
+        AttributeMap: {
+            /** Customer Id */
+            customer_id?: string[];
+            /** Email */
+            email?: string[];
+            /** First Name */
+            first_name?: string[];
+            /** Last Name */
+            last_name?: string[];
+            /** Login */
+            login?: string[];
+            /** Mobile */
+            mobile?: string[];
+        };
         /** AuditLogDetailOut */
         AuditLogDetailOut: {
             /** Acting User Id */
@@ -10505,6 +11222,13 @@ export interface components {
              * @default true
              */
             portal_enabled: boolean;
+            /** Providers */
+            providers?: components["schemas"]["LoginProviderOut"][];
+            /**
+             * Saml
+             * @default false
+             */
+            saml: boolean;
             /**
              * Spnego
              * @default false
@@ -11371,7 +12095,22 @@ export interface components {
         };
         /** CustomerLoginResponse */
         CustomerLoginResponse: {
-            customer: components["schemas"]["CustomerMe"];
+            customer?: components["schemas"]["CustomerMe"] | null;
+            /**
+             * Passkey Enrolled
+             * @default false
+             */
+            passkey_enrolled: boolean;
+            /**
+             * Pending 2Fa
+             * @default false
+             */
+            pending_2fa: boolean;
+            /**
+             * Totp Enrolled
+             * @default false
+             */
+            totp_enrolled: boolean;
         };
         /** CustomerMe */
         CustomerMe: {
@@ -11387,6 +12126,11 @@ export interface components {
             last_name: string;
             /** Login */
             login: string;
+            /**
+             * Sso Logout
+             * @default false
+             */
+            sso_logout: boolean;
         };
         /** CustomerPgpKeyIn */
         CustomerPgpKeyIn: {
@@ -12664,6 +13408,13 @@ export interface components {
              */
             valid_id: number;
         };
+        /** GroupGrant */
+        GroupGrant: {
+            /** Group Id */
+            group_id: number;
+            /** Permissions */
+            permissions?: ("ro" | "move_into" | "create" | "note" | "owner" | "priority" | "rw")[];
+        };
         /** GroupOut */
         GroupOut: {
             /** Change Time */
@@ -12678,6 +13429,15 @@ export interface components {
             name: string;
             /** Valid Id */
             valid_id: number;
+        };
+        /** GroupPermRefOut */
+        GroupPermRefOut: {
+            /** Group Id */
+            group_id: number;
+            /** Group Name */
+            group_name: string;
+            /** Permission Key */
+            permission_key: string;
         };
         /** GroupRoleAssignment */
         GroupRoleAssignment: {
@@ -12771,6 +13531,257 @@ export interface components {
             memory_used_bytes?: number | null;
             /** Reason */
             reason?: string | null;
+        };
+        /** IdentityCapabilitiesOut */
+        IdentityCapabilitiesOut: {
+            /** Public Base Url Set */
+            public_base_url_set: boolean;
+            /** Saml Available */
+            saml_available: boolean;
+            /** Saml Missing */
+            saml_missing: ("package" | "xmlsec1") | null;
+            /** Webauthn */
+            webauthn: boolean;
+        };
+        /** IdentityKindOut */
+        IdentityKindOut: {
+            /** Hidden Fields */
+            hidden_fields: string[];
+            /** I18N Prefix */
+            i18n_prefix: string;
+            /** Json Schema */
+            json_schema: {
+                [key: string]: unknown;
+            };
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "oidc" | "saml" | "ldap";
+            /** Read Only Fields */
+            read_only_fields: string[];
+        };
+        /** IdentityLinkOut */
+        IdentityLinkOut: {
+            /**
+             * First Seen
+             * Format: date-time
+             */
+            first_seen: string;
+            /** Id */
+            id: number;
+            /**
+             * Last Seen
+             * Format: date-time
+             */
+            last_seen: string;
+            /** Subject */
+            subject: string;
+            /** User Id */
+            user_id: number;
+            /**
+             * User Kind
+             * @enum {string}
+             */
+            user_kind: "agent" | "customer";
+            /** User Login */
+            user_login: string;
+        };
+        /** IdentityPresetOut */
+        IdentityPresetOut: {
+            /**
+             * Audience Default
+             * @enum {string}
+             */
+            audience_default: "agent" | "customer" | "both";
+            /** Button Icon */
+            button_icon: string | null;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "oidc" | "saml" | "ldap";
+            /** Name Key */
+            name_key: string;
+        };
+        /** IdentityProviderCreate */
+        IdentityProviderCreate: {
+            /**
+             * Audience
+             * @default agent
+             * @enum {string}
+             */
+            audience: "agent" | "customer" | "both";
+            /** Name */
+            name: string;
+            /** Preset */
+            preset: string;
+            /** Slug */
+            slug: string;
+        };
+        /** IdentityProviderOut */
+        IdentityProviderOut: {
+            attribute_map: components["schemas"]["AttributeMap"];
+            /**
+             * Audience
+             * @enum {string}
+             */
+            audience: "agent" | "customer" | "both";
+            /** Button Icon */
+            button_icon: string | null;
+            /** Button Label */
+            button_label: string | null;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /** Enabled */
+            enabled: boolean;
+            endpoints: components["schemas"]["ProviderEndpointsOut"];
+            /** Id */
+            id: number;
+            jit_defaults: components["schemas"]["JitDefaults"];
+            /** Jit Enabled */
+            jit_enabled: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "oidc" | "saml" | "ldap";
+            /** Link Count */
+            link_count: number;
+            /**
+             * Match By
+             * @enum {string}
+             */
+            match_by: "login" | "email";
+            /** Metadata Error */
+            metadata_error: string | null;
+            /** Metadata Fetched At */
+            metadata_fetched_at: string | null;
+            /** Name */
+            name: string;
+            /** Preset */
+            preset: string | null;
+            /** Read Only */
+            read_only: boolean;
+            /** Require Sso Opt In */
+            require_sso_opt_in: boolean;
+            /** Role Rules */
+            role_rules: components["schemas"]["RoleRule"][];
+            /** Secrets Set */
+            secrets_set: string[];
+            /** Slug */
+            slug: string;
+            /** Sort */
+            sort: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "db" | "env";
+            /**
+             * Sync Mode
+             * @enum {string}
+             */
+            sync_mode: "managed" | "authoritative";
+        };
+        /** IdentityProviderSummaryOut */
+        IdentityProviderSummaryOut: {
+            /**
+             * Audience
+             * @enum {string}
+             */
+            audience: "agent" | "customer" | "both";
+            /** Button Icon */
+            button_icon: string | null;
+            /** Button Label */
+            button_label: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Id */
+            id: number;
+            /** Jit Enabled */
+            jit_enabled: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "oidc" | "saml" | "ldap";
+            /** Link Count */
+            link_count: number;
+            /** Metadata Error */
+            metadata_error: string | null;
+            /** Name */
+            name: string;
+            /** Preset */
+            preset: string | null;
+            /** Read Only */
+            read_only: boolean;
+            /** Slug */
+            slug: string;
+            /** Sort */
+            sort: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "db" | "env";
+        };
+        /** IdentityTestResultOut */
+        IdentityTestResultOut: {
+            /** Attributes */
+            attributes: {
+                [key: string]: string[];
+            };
+            /** Error */
+            error: string | null;
+            plan: components["schemas"]["LoginPlanOut"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "started" | "done" | "failed";
+            /** Subject */
+            subject: string | null;
+        };
+        /** IdentityTestStartIn */
+        IdentityTestStartIn: {
+            /**
+             * Audience
+             * @default agent
+             * @enum {string}
+             */
+            audience: "agent" | "customer";
+            draft?: components["schemas"]["ProviderChanges"] | null;
+        };
+        /** IdentityTestStartOut */
+        IdentityTestStartOut: {
+            /** Login Url */
+            login_url: string;
+            /** Test Id */
+            test_id: string;
+        };
+        /** JitDefaults */
+        JitDefaults: {
+            /** Allowed Email Domains */
+            allowed_email_domains?: string[];
+            /**
+             * Customer Id
+             * @default
+             */
+            customer_id: string;
+            /** Initial Groups */
+            initial_groups?: components["schemas"]["GroupGrant"][];
+            /** Initial Role Ids */
+            initial_role_ids?: number[];
+            /**
+             * Update Profile On Login
+             * @default true
+             */
+            update_profile_on_login: boolean;
         };
         /**
          * JobAccepted
@@ -13217,6 +14228,59 @@ export interface components {
             /** Valid Id */
             valid_id?: number | null;
         };
+        /** LoginPlanOut */
+        LoginPlanOut: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "login" | "create" | "reject";
+            /** Groups Add */
+            groups_add: components["schemas"]["GroupPermRefOut"][];
+            /** Groups Remove */
+            groups_remove: components["schemas"]["GroupPermRefOut"][];
+            /** Login */
+            login: string | null;
+            /** Matched By */
+            matched_by: ("link" | "login" | "email" | "jit") | null;
+            /** Profile */
+            profile: {
+                [key: string]: string | null;
+            };
+            /** Profile Changes */
+            profile_changes: {
+                [key: string]: (string | null)[];
+            };
+            /** Reject Code */
+            reject_code: string | null;
+            /** Reject Message */
+            reject_message: string | null;
+            /** Roles Add */
+            roles_add: components["schemas"]["NamedRefOut"][];
+            /** Roles Remove */
+            roles_remove: components["schemas"]["NamedRefOut"][];
+            /** User Id */
+            user_id: number | null;
+            /**
+             * User Kind
+             * @enum {string}
+             */
+            user_kind: "agent" | "customer";
+        };
+        /** LoginProviderOut */
+        LoginProviderOut: {
+            /** Icon */
+            icon?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "oidc" | "saml";
+            /** Label */
+            label: string;
+            /** Slug */
+            slug: string;
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Login */
@@ -13464,6 +14528,48 @@ export interface components {
             /** Timeout Seconds */
             timeout_seconds?: number | null;
         };
+        /** ManagedAssignmentOut */
+        ManagedAssignmentOut: {
+            /**
+             * Created
+             * Format: date-time
+             */
+            created: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "role" | "group";
+            /** Login */
+            login: string;
+            /** Permission Key */
+            permission_key: string;
+            /** Target Id */
+            target_id: number;
+            /** Target Name */
+            target_name: string;
+            /** User Id */
+            user_id: number;
+        };
+        /** MappingPreviewIn */
+        MappingPreviewIn: {
+            /** Attributes */
+            attributes: {
+                [key: string]: string[];
+            };
+            /**
+             * Audience
+             * @default agent
+             * @enum {string}
+             */
+            audience: "agent" | "customer";
+            draft?: components["schemas"]["ProviderChanges"] | null;
+            /**
+             * Subject
+             * @default preview
+             */
+            subject: string;
+        };
         /** McpClientCreate */
         McpClientCreate: {
             /** Auth Token */
@@ -13650,6 +14756,13 @@ export interface components {
             new: number;
             /** Open */
             open: number;
+        };
+        /** NamedRefOut */
+        NamedRefOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
         };
         /**
          * NewTicketPhoneCallIn
@@ -14556,6 +15669,24 @@ export interface components {
             /** Attachment Ids */
             attachment_ids: number[];
         };
+        /**
+         * PortalAuthMethodsOut
+         * @description Sign-in options of the customer portal login page.
+         */
+        PortalAuthMethodsOut: {
+            /**
+             * Password
+             * @default true
+             */
+            password: boolean;
+            /** Providers */
+            providers?: components["schemas"]["LoginProviderOut"][];
+            /**
+             * Webauthn
+             * @default false
+             */
+            webauthn: boolean;
+        };
         /** PortalLanguageIn */
         PortalLanguageIn: {
             /** Language */
@@ -14792,6 +15923,63 @@ export interface components {
             name: string;
             /** State Entity Id */
             state_entity_id: string;
+        };
+        /**
+         * ProviderChanges
+         * @description Admin PATCH body (also the "draft" of a test login).
+         */
+        ProviderChanges: {
+            attribute_map?: components["schemas"]["AttributeMap"] | null;
+            /** Audience */
+            audience?: ("agent" | "customer" | "both") | null;
+            /** Button Icon */
+            button_icon?: string | null;
+            /** Button Label */
+            button_label?: string | null;
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            } | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            jit_defaults?: components["schemas"]["JitDefaults"] | null;
+            /** Jit Enabled */
+            jit_enabled?: boolean | null;
+            /** Match By */
+            match_by?: ("login" | "email") | null;
+            /** Name */
+            name?: string | null;
+            /** Require Sso Opt In */
+            require_sso_opt_in?: boolean | null;
+            /** Role Rules */
+            role_rules?: components["schemas"]["RoleRule"][] | null;
+            /** Slug */
+            slug?: string | null;
+            /** Sort */
+            sort?: number | null;
+            /** Sync Mode */
+            sync_mode?: ("managed" | "authoritative") | null;
+        };
+        /** ProviderEndpointsOut */
+        ProviderEndpointsOut: {
+            /** Agent Acs Url */
+            agent_acs_url: string | null;
+            /** Agent Redirect Uri */
+            agent_redirect_uri: string | null;
+            /** Backchannel Logout Url */
+            backchannel_logout_url: string | null;
+            /** Base Url Missing */
+            base_url_missing: boolean;
+            /** Customer Acs Url */
+            customer_acs_url: string | null;
+            /** Customer Redirect Uri */
+            customer_redirect_uri: string | null;
+            /** Slo Url */
+            slo_url: string | null;
+            /** Sp Entity Id */
+            sp_entity_id: string | null;
+            /** Sp Metadata Url */
+            sp_metadata_url: string | null;
         };
         /** ProviderTemplateOut */
         ProviderTemplateOut: {
@@ -15549,6 +16737,17 @@ export interface components {
             name: string;
             /** Valid Id */
             valid_id: number;
+        };
+        /** RoleRule */
+        RoleRule: {
+            /** Attribute */
+            attribute: string;
+            /** Groups */
+            groups?: components["schemas"]["GroupGrant"][];
+            /** Role Ids */
+            role_ids?: number[];
+            /** Value */
+            value: string;
         };
         /** RoleUpdate */
         RoleUpdate: {
@@ -17606,6 +18805,11 @@ export interface components {
             last_name: string;
             /** Login */
             login: string;
+            /**
+             * Sso Logout
+             * @default false
+             */
+            sso_logout: boolean;
             /** Time Zone */
             time_zone?: string | null;
         };
@@ -17952,6 +19156,530 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerMe"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portal_auth_methods_api_portal_auth_methods_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalAuthMethodsOut"];
+                };
+            };
+        };
+    };
+    portal_oidc_callback_api_portal_auth_oidc__slug__callback_get: {
+        parameters: {
+            query?: {
+                code?: string | null;
+                state?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    passkey_list_api_portal_auth_passkey_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeyOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    passkey_authenticate_begin_api_portal_auth_passkey_authenticate_begin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    passkey_authenticate_finish_api_portal_auth_passkey_authenticate_finish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasskeyAuthenticateFinishIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerLoginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    passkey_register_begin_api_portal_auth_passkey_register_begin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    passkey_register_finish_api_portal_auth_passkey_register_finish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasskeyRegisterFinishIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeyStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    passkey_delete_api_portal_auth_passkey__passkey_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                passkey_id: number;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portal_saml_acs_api_portal_auth_saml__slug__acs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portal_sso_logout_api_portal_auth_sso_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    portal_sso_login_api_portal_auth_sso__slug__login_get: {
+        parameters: {
+            query?: {
+                next?: string | null;
+                test?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    totp_disable_api_portal_auth_totp_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TOTPCodeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TOTPStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    totp_confirm_api_portal_auth_totp_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TOTPCodeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TOTPStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    totp_enroll_api_portal_auth_totp_enroll_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["TOTPEnrollIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TOTPEnrollOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    totp_enroll_qr_api_portal_auth_totp_enroll_qr_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    totp_status_api_portal_auth_totp_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TOTPStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    totp_verify_api_portal_auth_totp_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TOTPCodeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerLoginResponse"];
                 };
             };
             /** @description Validation Error */
@@ -23190,6 +24918,39 @@ export interface operations {
             };
         };
     };
+    reset_customer_user_2fa_api_v1_admin_customer_users__customer_user_id__reset_2fa_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_customer_user_companies_api_v1_admin_customer_users__customer_user_login__companies_get: {
         parameters: {
             query?: never;
@@ -24616,6 +26377,539 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_identity_providers_api_v1_admin_identity_providers_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityProviderSummaryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_identity_provider_api_v1_admin_identity_providers_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdentityProviderCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    identity_capabilities_api_v1_admin_identity_providers_capabilities_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityCapabilitiesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_identity_kinds_api_v1_admin_identity_providers_kinds_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityKindOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_identity_presets_api_v1_admin_identity_providers_presets_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityPresetOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_identity_provider_api_v1_admin_identity_providers__provider_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_identity_provider_api_v1_admin_identity_providers__provider_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_identity_provider_api_v1_admin_identity_providers__provider_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderChanges"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_identity_links_api_v1_admin_identity_providers__provider_id__links_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityLinkOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_identity_link_api_v1_admin_identity_providers__provider_id__links__link_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+                link_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_managed_assignments_api_v1_admin_identity_providers__provider_id__managed_assignments_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedAssignmentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_identity_mapping_api_v1_admin_identity_providers__provider_id__preview_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MappingPreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_identity_provider_metadata_api_v1_admin_identity_providers__provider_id__refresh_metadata_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_identity_test_api_v1_admin_identity_providers__provider_id__tests_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdentityTestStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityTestStartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_identity_test_api_v1_admin_identity_providers__provider_id__tests__test_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+                test_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityTestResultOut"];
                 };
             };
             /** @description Validation Error */
@@ -30334,7 +32628,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description API clients: the session as JSON */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -30356,7 +32650,9 @@ export interface operations {
     };
     oidc_login_api_v1_auth_oidc_login_get: {
         parameters: {
-            query?: never;
+            query?: {
+                next?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -30370,6 +32666,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    oidc_backchannel_logout_api_v1_auth_oidc__slug__backchannel_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": {
+                    logout_token: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Sessions of the logout token ended */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Invalid logout token or the logout failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No OIDC provider with back-channel logout under this slug */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    oidc_provider_callback_api_v1_auth_oidc__slug__callback_get: {
+        parameters: {
+            query?: {
+                code?: string | null;
+                state?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -30629,6 +33026,131 @@ export interface operations {
             };
         };
     };
+    saml_acs_api_v1_auth_saml__slug__acs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    saml_metadata_api_v1_auth_saml__slug__metadata_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "application/samlmetadata+xml": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    saml_sls_get_api_v1_auth_saml__slug__sls_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    saml_sls_post_api_v1_auth_saml__slug__sls_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     spnego_api_v1_auth_spnego_get: {
         parameters: {
             query?: {
@@ -30638,6 +33160,60 @@ export interface operations {
                 authorization?: string | null;
             };
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sso_logout_route_api_v1_auth_sso_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    sso_login_api_v1_auth_sso__slug__login_get: {
+        parameters: {
+            query?: {
+                next?: string | null;
+                test?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
             cookie?: never;
         };
         requestBody?: never;

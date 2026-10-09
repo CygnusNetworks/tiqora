@@ -113,8 +113,19 @@ policies, ACL/limits and the operation-mode gate are all managed in admin
 | `TIQORA_OIDC_CLIENT_ID` | *(empty)* | |
 | `TIQORA_OIDC_CLIENT_SECRET` | *(empty)* | |
 | `TIQORA_OIDC_SCOPES` | `openid profile email` | |
-| `TIQORA_OIDC_CLAIM` | `preferred_username` | Claim mapped to `users.login`. No auto-provisioning — the claim value must match an existing, valid user. |
+| `TIQORA_OIDC_CLAIM` | `preferred_username` | Claim mapped to `users.login`. The env provider (`env-oidc`, shown read-only in the admin UI) does not create accounts — the claim value must match an existing, valid user. |
 | `TIQORA_OIDC_REDIRECT_URI` | *(empty)* | e.g. `https://tickets.example.com/api/v1/auth/oidc/callback` |
+| `TIQORA_OIDC_BACKCHANNEL_LOGOUT` | `false` | `true` enables back-channel logout at `/api/v1/auth/oidc/env-oidc/backchannel-logout` |
+
+These variables are still supported; the env provider appears read-only under
+`/admin/identity-providers`. More OIDC/SAML/LDAP providers (with just-in-time
+accounts and role/group sync) are configured there; see
+[`../guide/identity-providers.md`](../guide/identity-providers.md). The id_token
+is verified against the discovery issuer and JWKS — check that both are reachable
+from the containers before upgrading. SAML and UI-configured OIDC need
+`TIQORA_PUBLIC_BASE_URL` (API and worker); the image contains `xmlsec1`. Reverse
+proxy requirements (ACS POST size, IdP-reachable logout URLs): see
+[`../deployment.md`](../deployment.md#reverse-proxy-for-sso).
 
 ### Kerberos / SPNEGO
 
@@ -172,8 +183,12 @@ The SPN follows `HTTP/<api-hostname>@<REALM>`, e.g.
 | `TIQORA_LDAP_ACCESS_ATTR` | `memberUid` |
 | `TIQORA_LDAP_USER_ATTR` | `DN` |
 
-Same no-auto-provisioning rule as OIDC: the resolved LDAP UID must match an
-existing, valid `users.login` row.
+Same rule as the env OIDC provider: the resolved LDAP UID must match an
+existing, valid `users.login` row (additional directories created in the admin UI
+can create accounts and sync roles). Set `TIQORA_LDAP_TLS_VERIFY=true` (customer
+portal: `TIQORA_CUSTOMER_LDAP_TLS_VERIFY`) to verify the directory's certificate;
+the default is `false` for compatibility and a warning is logged at startup while
+it is off.
 
 ### LDAP/AD — customer portal auth
 
@@ -379,6 +394,17 @@ server {
     # "/" proxies to the api, which serves BOTH the web UI (SPA) and the API —
     # no separate static web root to deploy.
     location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # SAML: the ACS endpoint receives the IdP's signed response as a POST body
+    # (up to ~1 MB); nginx's default client_max_body_size of 1m is too tight.
+    location /api/ {
+        client_max_body_size 2m;
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

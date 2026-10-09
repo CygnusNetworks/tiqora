@@ -41,6 +41,7 @@ async function renderShell() {
     "/portal/kb",
     "/portal/login",
     "/portal/preferences",
+    "/portal/security",
   ];
   const childRoutes = childPaths.map((path) =>
     createRoute({ getParentRoute: () => rootRoute, path, component: () => null }),
@@ -107,6 +108,11 @@ describe("PortalShell", () => {
       "href",
       "/portal/preferences",
     );
+  });
+
+  it("links to the security page", async () => {
+    await renderShell();
+    expect(screen.getByTestId("portal-nav-security")).toHaveAttribute("href", "/portal/security");
   });
 
   it("logs out and navigates to the portal login page", async () => {

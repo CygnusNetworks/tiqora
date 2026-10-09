@@ -60,6 +60,7 @@ import { TicketDetailPage } from "@/routes/portal/TicketDetailPage";
 import { KbSearchPage, type PortalKbSearch } from "@/routes/portal/KbSearchPage";
 import { KbArticlePage } from "@/routes/portal/KbArticlePage";
 import { PreferencesPage as PortalPreferencesPage } from "@/routes/portal/PreferencesPage";
+import { SecurityPage as PortalSecurityPage } from "@/routes/portal/SecurityPage";
 import { AdminShell } from "@/components/layout/AdminShell";
 import { RequireAdmin } from "@/auth/RequireAdmin";
 import { AdminHomePage } from "@/routes/admin/AdminHomePage";
@@ -115,6 +116,11 @@ import { QueueCustomerLinksPage } from "@/routes/admin/QueueCustomerLinksPage";
 import { CustomerFieldsPage } from "@/routes/admin/CustomerFieldsPage";
 import { ApiKeysPage } from "@/routes/admin/ApiKeysPage";
 import { AuthConfigPage } from "@/routes/admin/AuthConfigPage";
+import { IdentityProvidersPage } from "@/routes/admin/IdentityProvidersPage";
+import {
+  IdentityProviderPage,
+  type IdentityProviderSearch,
+} from "@/routes/admin/IdentityProviderPage";
 import { GdprPage, type GdprSearch } from "@/routes/admin/GdprPage";
 import { AiSettingsPage } from "@/routes/admin/AiSettingsPage";
 import { AiProvidersPage } from "@/routes/admin/AiProvidersPage";
@@ -138,14 +144,23 @@ const indexRoute = createRoute({
   component: HomeRedirect,
 });
 
+function searchFlag(v: unknown): string | undefined {
+  return typeof v === "string" || typeof v === "number" || typeof v === "boolean"
+    ? String(v)
+    : undefined;
+}
+
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
   validateSearch: (
     s: Record<string, unknown>,
-  ): { next?: string; sso_error?: string } => ({
+  ): { next?: string; sso_error?: string; logged_out?: string } => ({
     next: typeof s.next === "string" ? s.next : undefined,
-    sso_error: typeof s.sso_error === "string" ? s.sso_error : undefined,
+    // The router JSON-parses search values: `?sso_error=1` arrives as a number.
+    sso_error: searchFlag(s.sso_error),
+    // Only the backend's "1" marks a sign-out; "0"/"false" must not show the note.
+    logged_out: searchFlag(s.logged_out) === "1" ? "1" : undefined,
   }),
   component: LoginPage,
 });
@@ -538,8 +553,14 @@ const agentDialRoute = createRoute({
 const portalLoginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/portal/login",
-  validateSearch: (s: Record<string, unknown>): { next?: string } => ({
+  validateSearch: (
+    s: Record<string, unknown>,
+  ): { next?: string; sso_error?: string; logged_out?: string } => ({
     next: typeof s.next === "string" ? s.next : undefined,
+    // The router JSON-parses search values: `?sso_error=1` arrives as a number.
+    sso_error: searchFlag(s.sso_error),
+    // Only the backend's "1" marks a sign-out; "0"/"false" must not show the note.
+    logged_out: searchFlag(s.logged_out) === "1" ? "1" : undefined,
   }),
   component: () => (
     <RequirePortalEnabled>
@@ -616,6 +637,12 @@ const portalPreferencesRoute = createRoute({
   component: PortalPreferencesPage,
 });
 
+const portalSecurityRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/security",
+  component: PortalSecurityPage,
+});
+
 // /admin: agent session (RequireAuth) + is_admin from /me (RequireAdmin)
 // gated shell with a grouped left sidebar nav (see AdminShell).
 const adminLayoutRoute = createRoute({
@@ -646,6 +673,29 @@ const adminAuthConfigRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/auth-config",
   component: AuthConfigPage,
+});
+
+const adminIdentityProvidersRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/identity-providers",
+  component: IdentityProvidersPage,
+});
+
+const adminIdentityProviderRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/identity-providers/$providerId",
+  validateSearch: (s: Record<string, unknown>): IdentityProviderSearch => ({
+    tab:
+      s.tab === "connection" ||
+      s.tab === "mapping" ||
+      s.tab === "roles" ||
+      s.tab === "test" ||
+      s.tab === "links"
+        ? s.tab
+        : undefined,
+    test: typeof s.test === "string" && s.test ? s.test : undefined,
+  }),
+  component: IdentityProviderPage,
 });
 
 const adminGroupsRoute = createRoute({
@@ -1060,11 +1110,14 @@ const routeTree = rootRoute.addChildren([
     portalKbRoute,
     portalKbArticleRoute,
     portalPreferencesRoute,
+    portalSecurityRoute,
   ]),
   adminLayoutRoute.addChildren([
     adminIndexRoute,
     adminUsersRoute,
     adminAuthConfigRoute,
+    adminIdentityProvidersRoute,
+    adminIdentityProviderRoute,
     adminGroupsRoute,
     adminRolesRoute,
     adminAgentRolesRoute,

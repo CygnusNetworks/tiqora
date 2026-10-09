@@ -65,7 +65,9 @@ async def set_preference(session: AsyncSession, user_id: int, key: str, value: s
             {"uid": user_id, "k": key},
         )
     ).first()
-    raw = value.encode("utf-8")
+    # PostgreSQL's TEXT column rejects bytes (asyncpg); MySQL/MariaDB take the BLOB.
+    dialect = session.bind.dialect.name if session.bind is not None else ""
+    raw: str | bytes = value if dialect.startswith("postgres") else value.encode("utf-8")
     if existing:
         await session.execute(
             text(

@@ -33,6 +33,7 @@ export const demoUser = {
   email: "alex.turner@example.com",
   time_zone: null,
   default_time_zone: "Europe/Berlin",
+  sso_logout: false,
 };
 
 // ── Queues (agent tree with counts) ─────────────────────────────────────────
@@ -1589,10 +1590,147 @@ const demoBackfillJob = {
   files: [],
 };
 
+// ── Admin: identity providers (SSO) ──────────────────────────────────────────
+const identityKinds = [
+  {
+    kind: "oidc",
+    i18n_prefix: "admin.identity.config.oidc",
+    read_only_fields: [],
+    hidden_fields: [],
+    json_schema: {
+      type: "object",
+      properties: {
+        issuer: { type: "string", default: "", title: "Issuer" },
+        client_id: { type: "string", default: "", title: "Client Id" },
+        client_secret: { anyOf: [{ type: "string", format: "password" }, { type: "null" }], default: null, title: "Client Secret" },
+        scopes: { type: "string", default: "openid profile email", title: "Scopes" },
+        email_must_be_verified: { type: "boolean", default: true, title: "Email Must Be Verified" },
+        allow_private_network: { type: "boolean", default: false, title: "Allow Private Network" },
+      },
+    },
+  },
+  {
+    kind: "saml",
+    i18n_prefix: "admin.identity.config.saml",
+    read_only_fields: ["sp_certificate", "sp_private_key"],
+    hidden_fields: ["sp_private_key"],
+    json_schema: {
+      type: "object",
+      properties: {
+        idp_metadata_url: { type: "string", default: "", title: "Idp Metadata Url" },
+        sign_requests: { type: "boolean", default: true, title: "Sign Requests" },
+        allow_sha1_signatures: { type: "boolean", default: false, title: "Allow Sha1 Signatures" },
+        sp_certificate: { type: "string", default: "", title: "Sp Certificate", "x-widget": "textarea" },
+        sp_private_key: { anyOf: [{ type: "string", format: "password" }, { type: "null" }], default: null, title: "Sp Private Key" },
+      },
+    },
+  },
+  {
+    kind: "ldap",
+    i18n_prefix: "admin.identity.config.ldap",
+    read_only_fields: [],
+    hidden_fields: [],
+    json_schema: {
+      type: "object",
+      properties: {
+        host: { type: "string", default: "", title: "Host" },
+        port: { type: "integer", default: 389, minimum: 1, maximum: 65535, title: "Port" },
+        base_dn: { type: "string", default: "", title: "Base Dn" },
+      },
+    },
+  },
+];
+
+const identityPresets = [
+  { key: "entra_id", kind: "oidc", name_key: "admin.identity.preset.entra_id", button_icon: "microsoft", audience_default: "agent" },
+  { key: "google_workspace", kind: "oidc", name_key: "admin.identity.preset.google_workspace", button_icon: "google", audience_default: "agent" },
+  { key: "keycloak", kind: "oidc", name_key: "admin.identity.preset.keycloak", button_icon: "key", audience_default: "agent" },
+  { key: "adfs", kind: "saml", name_key: "admin.identity.preset.adfs", button_icon: "building", audience_default: "agent" },
+  { key: "generic_saml", kind: "saml", name_key: "admin.identity.preset.generic_saml", button_icon: "shield", audience_default: "agent" },
+  { key: "active_directory", kind: "ldap", name_key: "admin.identity.preset.active_directory", button_icon: "directory", audience_default: "agent" },
+];
+
+const identityBase = "https://tickets.example.com";
+const identitySummaries = [
+  { id: 1, slug: "microsoft", kind: "oidc", source: "db", name: "Microsoft", audience: "both", enabled: true, sort: 0, button_label: null, button_icon: "microsoft", preset: "entra_id", jit_enabled: false, read_only: false, metadata_error: null, link_count: 12 },
+  { id: 2, slug: "sso", kind: "oidc", source: "env", name: "Company SSO", audience: "agent", enabled: true, sort: 1, button_label: null, button_icon: "key", preset: null, jit_enabled: false, read_only: true, metadata_error: null, link_count: 4 },
+  { id: 3, slug: "adfs", kind: "saml", source: "db", name: "AD FS", audience: "agent", enabled: false, sort: 2, button_label: null, button_icon: "building", preset: "adfs", jit_enabled: false, read_only: false, metadata_error: null, link_count: 0 },
+];
+
+function identityDetail(id: number) {
+  const row = identitySummaries.find((r) => r.id === id) ?? identitySummaries[0];
+  const config =
+    row.kind === "saml"
+      ? { idp_metadata_url: "https://adfs.example.com/FederationMetadata/2007-06/FederationMetadata.xml", sign_requests: true, allow_sha1_signatures: false, sp_certificate: "-----BEGIN CERTIFICATE-----\nMIIDemoCertificateOnly\n-----END CERTIFICATE-----" }
+      : { issuer: "https://login.example.com/tenant/v2.0", client_id: "demo-client-id", scopes: "openid profile email", email_must_be_verified: true, allow_private_network: false };
+  return {
+    ...row,
+    config,
+    secrets_set: row.kind === "oidc" ? ["client_secret"] : [],
+    match_by: "login",
+    require_sso_opt_in: true,
+    attribute_map: { login: ["preferred_username"], email: ["email"], first_name: ["given_name"], last_name: ["family_name"], customer_id: [], mobile: [] },
+    jit_defaults: { customer_id: "", initial_groups: [], initial_role_ids: [], update_profile_on_login: true, allowed_email_domains: [] },
+    role_rules: [{ attribute: "groups", value: "support", role_ids: [1], groups: [{ group_id: 3, permissions: ["ro", "create"] }] }],
+    sync_mode: "managed",
+    metadata_fetched_at: row.kind === "saml" ? t0 : null,
+    // Same shapes as backend identity/urls.py provider_urls().
+    endpoints: {
+      agent_redirect_uri: `${identityBase}/api/v1/auth/oidc/${row.slug}/callback`,
+      customer_redirect_uri: row.audience === "agent" ? null : `${identityBase}/api/portal/auth/oidc/${row.slug}/callback`,
+      agent_acs_url: `${identityBase}/api/v1/auth/saml/${row.slug}/acs`,
+      customer_acs_url: row.audience === "agent" ? null : `${identityBase}/api/portal/auth/saml/${row.slug}/acs`,
+      sp_entity_id: `${identityBase}/api/v1/auth/saml/${row.slug}/metadata`,
+      sp_metadata_url: `${identityBase}/api/v1/auth/saml/${row.slug}/metadata`,
+      slo_url: `${identityBase}/api/v1/auth/saml/${row.slug}/sls`,
+      backchannel_logout_url: `${identityBase}/api/v1/auth/oidc/${row.slug}/backchannel-logout`,
+      base_url_missing: false,
+    },
+  };
+}
+
+const identityTestResult = {
+  status: "done",
+  error: null,
+  subject: "7f3b9c1e-0d52-4c1a-9a6e-3f1d2b8a4c10",
+  attributes: { preferred_username: "anna.example", email: "anna@example.com", given_name: "Anna", family_name: "Example" },
+  plan: {
+    user_kind: "agent",
+    decision: "create",
+    matched_by: "jit",
+    user_id: null,
+    login: "anna.example",
+    reject_code: null,
+    reject_message: null,
+    profile: {},
+    profile_changes: {},
+    roles_add: [{ id: 3, name: "Support" }],
+    roles_remove: [],
+    groups_add: [{ group_id: 2, group_name: "users", permission_key: "rw" }],
+    groups_remove: [],
+  },
+};
+
+const identityManaged = [
+  { user_id: 2, login: "anna.example", kind: "role", target_id: 1, target_name: "Agent", permission_key: "", created: "2026-10-01T08:30:00Z" },
+  { user_id: 2, login: "anna.example", kind: "group", target_id: 3, target_name: "support", permission_key: "ro", created: "2026-10-01T08:30:00Z" },
+];
+const identityLinks = [
+  { id: 1, user_kind: "agent", subject: "7f3b9c1e-0d52-4c1a-9a6e-3f1d2b8a4c10", user_id: 2, user_login: "anna.example", first_seen: "2026-09-20T07:15:00Z", last_seen: "2026-10-08T06:45:00Z" },
+  { id: 2, user_kind: "customer", subject: "a1c2e3f4-5b6d-4e7f-8a9b-0c1d2e3f4a5b", user_id: 14, user_login: "kunde@example.org", first_seen: "2026-10-02T12:00:00Z", last_seen: "2026-10-07T16:20:00Z" },
+];
+
 export function resolveData(path: string, method: string): unknown | undefined {
   const p = path;
   // Auth
-  if (p.endsWith("/auth/methods")) return { password: true, oidc: false, spnego: false, webauthn: true, ldap: false };
+  if (p.endsWith("/auth/methods")) return {
+    password: true, oidc: false, spnego: false, webauthn: true, ldap: false, saml: true,
+    providers: [
+      { slug: "demo-entra", kind: "oidc", label: "Mit Microsoft anmelden", icon: "microsoft" },
+      { slug: "demo-keycloak", kind: "oidc", label: "Mit Keycloak anmelden", icon: "key" },
+      { slug: "demo-adfs", kind: "saml", label: "Firmenkonto (SAML)", icon: "building" },
+    ],
+  };
   if (p.endsWith("/auth/me")) return demoUser;
   // The demo cannot read the body; saving keeps the browser-zone default.
   if (p.endsWith("/auth/me/time-zone") && method === "PUT") return demoUser;
@@ -1784,6 +1922,26 @@ export function resolveData(path: string, method: string): unknown | undefined {
       values: { gravatar_enabled: true, favicon_enabled: true },
       secrets_set: [],
     };
+  // Admin — identity providers (the demo cannot read request bodies; writes echo the stored row).
+  if (p.endsWith("/admin/identity-providers/kinds")) return identityKinds;
+  if (p.endsWith("/admin/identity-providers/presets")) return identityPresets;
+  if (p.endsWith("/admin/identity-providers/capabilities"))
+    return { saml_available: true, saml_missing: null, public_base_url_set: true, webauthn: true };
+  if (p.endsWith("/admin/identity-providers") && method === "GET") return identitySummaries;
+  if (p.endsWith("/admin/identity-providers") && method === "POST") return identityDetail(1);
+  if (p.match(/\/admin\/identity-providers\/\d+\/preview$/)) return identityTestResult.plan;
+  if (p.match(/\/admin\/identity-providers\/\d+\/managed-assignments$/)) return identityManaged;
+  if (p.match(/\/admin\/identity-providers\/\d+\/links$/)) return identityLinks;
+  if (p.match(/\/admin\/identity-providers\/\d+\/links\/\d+$/)) return {};
+  if (p.match(/\/admin\/identity-providers\/\d+\/tests$/) && method === "POST")
+    return { test_id: "demo-test", login_url: "/admin/identity-providers/1?test=demo-test" };
+  if (p.match(/\/admin\/identity-providers\/\d+\/tests\/[^/]+$/)) return identityTestResult;
+  if (p.match(/\/admin\/identity-providers\/\d+\/refresh-metadata$/))
+    return identityDetail(Number(p.split("/").slice(-2)[0]));
+  if (p.match(/\/admin\/identity-providers\/\d+$/)) {
+    if (method === "DELETE") return {};
+    return identityDetail(Number(p.split("/").pop()));
+  }
   // Avatar sources (the demo cannot read the PUT body; saving echoes the defaults).
   if (p.endsWith("/admin/avatars")) return { gravatar_enabled: true, favicon_enabled: true };
   if (p.endsWith("/customers/vcard-import/preview")) return { cards: [], truncated: false };

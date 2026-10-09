@@ -6125,6 +6125,55 @@
         "title": "AttachmentRefOut",
         "type": "object"
       },
+      "AttributeMap": {
+        "description": "Ordered source attribute names per profile field; first non-empty wins.\n\n``\"_text\"`` = fixed value ``\"text\"`` (Znuny UserSyncMap convention).",
+        "properties": {
+          "customer_id": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Customer Id",
+            "type": "array"
+          },
+          "email": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Email",
+            "type": "array"
+          },
+          "first_name": {
+            "items": {
+              "type": "string"
+            },
+            "title": "First Name",
+            "type": "array"
+          },
+          "last_name": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Last Name",
+            "type": "array"
+          },
+          "login": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Login",
+            "type": "array"
+          },
+          "mobile": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Mobile",
+            "type": "array"
+          }
+        },
+        "title": "AttributeMap",
+        "type": "object"
+      },
       "AuditLogDetailOut": {
         "properties": {
           "acting_user_id": {
@@ -6797,6 +6846,18 @@
           "portal_enabled": {
             "default": true,
             "title": "Portal Enabled",
+            "type": "boolean"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/LoginProviderOut"
+            },
+            "title": "Providers",
+            "type": "array"
+          },
+          "saml": {
+            "default": false,
+            "title": "Saml",
             "type": "boolean"
           },
           "spnego": {
@@ -9461,12 +9522,31 @@
       "CustomerLoginResponse": {
         "properties": {
           "customer": {
-            "$ref": "#/components/schemas/CustomerMe"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CustomerMe"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "passkey_enrolled": {
+            "default": false,
+            "title": "Passkey Enrolled",
+            "type": "boolean"
+          },
+          "pending_2fa": {
+            "default": false,
+            "title": "Pending 2Fa",
+            "type": "boolean"
+          },
+          "totp_enrolled": {
+            "default": false,
+            "title": "Totp Enrolled",
+            "type": "boolean"
           }
         },
-        "required": [
-          "customer"
-        ],
         "title": "CustomerLoginResponse",
         "type": "object"
       },
@@ -9495,6 +9575,11 @@
           "login": {
             "title": "Login",
             "type": "string"
+          },
+          "sso_logout": {
+            "default": false,
+            "title": "Sso Logout",
+            "type": "boolean"
           }
         },
         "required": [
@@ -13281,6 +13366,37 @@
         "title": "GroupCreate",
         "type": "object"
       },
+      "GroupGrant": {
+        "properties": {
+          "group_id": {
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
+            "title": "Group Id",
+            "type": "integer"
+          },
+          "permissions": {
+            "items": {
+              "enum": [
+                "ro",
+                "move_into",
+                "create",
+                "note",
+                "owner",
+                "priority",
+                "rw"
+              ],
+              "type": "string"
+            },
+            "title": "Permissions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "group_id"
+        ],
+        "title": "GroupGrant",
+        "type": "object"
+      },
       "GroupOut": {
         "properties": {
           "change_time": {
@@ -13340,6 +13456,29 @@
           "change_time"
         ],
         "title": "GroupOut",
+        "type": "object"
+      },
+      "GroupPermRefOut": {
+        "properties": {
+          "group_id": {
+            "title": "Group Id",
+            "type": "integer"
+          },
+          "group_name": {
+            "title": "Group Name",
+            "type": "string"
+          },
+          "permission_key": {
+            "title": "Permission Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id",
+          "group_name",
+          "permission_key"
+        ],
+        "title": "GroupPermRefOut",
         "type": "object"
       },
       "GroupRoleAssignment": {
@@ -13649,6 +13788,690 @@
           "available"
         ],
         "title": "HostOut",
+        "type": "object"
+      },
+      "IdentityCapabilitiesOut": {
+        "properties": {
+          "public_base_url_set": {
+            "title": "Public Base Url Set",
+            "type": "boolean"
+          },
+          "saml_available": {
+            "title": "Saml Available",
+            "type": "boolean"
+          },
+          "saml_missing": {
+            "anyOf": [
+              {
+                "enum": [
+                  "package",
+                  "xmlsec1"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saml Missing"
+          },
+          "webauthn": {
+            "title": "Webauthn",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "saml_available",
+          "saml_missing",
+          "public_base_url_set",
+          "webauthn"
+        ],
+        "title": "IdentityCapabilitiesOut",
+        "type": "object"
+      },
+      "IdentityKindOut": {
+        "properties": {
+          "hidden_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Hidden Fields",
+            "type": "array"
+          },
+          "i18n_prefix": {
+            "title": "I18N Prefix",
+            "type": "string"
+          },
+          "json_schema": {
+            "additionalProperties": true,
+            "title": "Json Schema",
+            "type": "object"
+          },
+          "kind": {
+            "enum": [
+              "oidc",
+              "saml",
+              "ldap"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "read_only_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Read Only Fields",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "json_schema",
+          "i18n_prefix",
+          "read_only_fields",
+          "hidden_fields"
+        ],
+        "title": "IdentityKindOut",
+        "type": "object"
+      },
+      "IdentityLinkOut": {
+        "properties": {
+          "first_seen": {
+            "format": "date-time",
+            "title": "First Seen",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "last_seen": {
+            "format": "date-time",
+            "title": "Last Seen",
+            "type": "string"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          },
+          "user_kind": {
+            "enum": [
+              "agent",
+              "customer"
+            ],
+            "title": "User Kind",
+            "type": "string"
+          },
+          "user_login": {
+            "title": "User Login",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "user_kind",
+          "subject",
+          "user_id",
+          "user_login",
+          "first_seen",
+          "last_seen"
+        ],
+        "title": "IdentityLinkOut",
+        "type": "object"
+      },
+      "IdentityPresetOut": {
+        "properties": {
+          "audience_default": {
+            "enum": [
+              "agent",
+              "customer",
+              "both"
+            ],
+            "title": "Audience Default",
+            "type": "string"
+          },
+          "button_icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Button Icon"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "oidc",
+              "saml",
+              "ldap"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name_key": {
+            "title": "Name Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "name_key",
+          "button_icon",
+          "audience_default"
+        ],
+        "title": "IdentityPresetOut",
+        "type": "object"
+      },
+      "IdentityProviderCreate": {
+        "properties": {
+          "audience": {
+            "default": "agent",
+            "enum": [
+              "agent",
+              "customer",
+              "both"
+            ],
+            "title": "Audience",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "preset": {
+            "title": "Preset",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "preset",
+          "name",
+          "slug"
+        ],
+        "title": "IdentityProviderCreate",
+        "type": "object"
+      },
+      "IdentityProviderOut": {
+        "properties": {
+          "attribute_map": {
+            "$ref": "#/components/schemas/AttributeMap"
+          },
+          "audience": {
+            "enum": [
+              "agent",
+              "customer",
+              "both"
+            ],
+            "title": "Audience",
+            "type": "string"
+          },
+          "button_icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Button Icon"
+          },
+          "button_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Button Label"
+          },
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "endpoints": {
+            "$ref": "#/components/schemas/ProviderEndpointsOut"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "jit_defaults": {
+            "$ref": "#/components/schemas/JitDefaults"
+          },
+          "jit_enabled": {
+            "title": "Jit Enabled",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "oidc",
+              "saml",
+              "ldap"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "link_count": {
+            "title": "Link Count",
+            "type": "integer"
+          },
+          "match_by": {
+            "enum": [
+              "login",
+              "email"
+            ],
+            "title": "Match By",
+            "type": "string"
+          },
+          "metadata_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Error"
+          },
+          "metadata_fetched_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Fetched At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset"
+          },
+          "read_only": {
+            "title": "Read Only",
+            "type": "boolean"
+          },
+          "require_sso_opt_in": {
+            "title": "Require Sso Opt In",
+            "type": "boolean"
+          },
+          "role_rules": {
+            "items": {
+              "$ref": "#/components/schemas/RoleRule"
+            },
+            "title": "Role Rules",
+            "type": "array"
+          },
+          "secrets_set": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Secrets Set",
+            "type": "array"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "sort": {
+            "title": "Sort",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "db",
+              "env"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "sync_mode": {
+            "enum": [
+              "managed",
+              "authoritative"
+            ],
+            "title": "Sync Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "kind",
+          "source",
+          "name",
+          "audience",
+          "enabled",
+          "sort",
+          "button_label",
+          "button_icon",
+          "preset",
+          "jit_enabled",
+          "read_only",
+          "metadata_error",
+          "link_count",
+          "config",
+          "secrets_set",
+          "match_by",
+          "require_sso_opt_in",
+          "attribute_map",
+          "jit_defaults",
+          "role_rules",
+          "sync_mode",
+          "metadata_fetched_at",
+          "endpoints"
+        ],
+        "title": "IdentityProviderOut",
+        "type": "object"
+      },
+      "IdentityProviderSummaryOut": {
+        "properties": {
+          "audience": {
+            "enum": [
+              "agent",
+              "customer",
+              "both"
+            ],
+            "title": "Audience",
+            "type": "string"
+          },
+          "button_icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Button Icon"
+          },
+          "button_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Button Label"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "jit_enabled": {
+            "title": "Jit Enabled",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "oidc",
+              "saml",
+              "ldap"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "link_count": {
+            "title": "Link Count",
+            "type": "integer"
+          },
+          "metadata_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Error"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset"
+          },
+          "read_only": {
+            "title": "Read Only",
+            "type": "boolean"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "sort": {
+            "title": "Sort",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "db",
+              "env"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "kind",
+          "source",
+          "name",
+          "audience",
+          "enabled",
+          "sort",
+          "button_label",
+          "button_icon",
+          "preset",
+          "jit_enabled",
+          "read_only",
+          "metadata_error",
+          "link_count"
+        ],
+        "title": "IdentityProviderSummaryOut",
+        "type": "object"
+      },
+      "IdentityTestResultOut": {
+        "properties": {
+          "attributes": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Attributes",
+            "type": "object"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoginPlanOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "started",
+              "done",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          }
+        },
+        "required": [
+          "status",
+          "error",
+          "subject",
+          "attributes",
+          "plan"
+        ],
+        "title": "IdentityTestResultOut",
+        "type": "object"
+      },
+      "IdentityTestStartIn": {
+        "properties": {
+          "audience": {
+            "default": "agent",
+            "enum": [
+              "agent",
+              "customer"
+            ],
+            "title": "Audience",
+            "type": "string"
+          },
+          "draft": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProviderChanges"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "IdentityTestStartIn",
+        "type": "object"
+      },
+      "IdentityTestStartOut": {
+        "properties": {
+          "login_url": {
+            "title": "Login Url",
+            "type": "string"
+          },
+          "test_id": {
+            "title": "Test Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "test_id",
+          "login_url"
+        ],
+        "title": "IdentityTestStartOut",
+        "type": "object"
+      },
+      "JitDefaults": {
+        "properties": {
+          "allowed_email_domains": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Email Domains",
+            "type": "array"
+          },
+          "customer_id": {
+            "default": "",
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "initial_groups": {
+            "items": {
+              "$ref": "#/components/schemas/GroupGrant"
+            },
+            "title": "Initial Groups",
+            "type": "array"
+          },
+          "initial_role_ids": {
+            "items": {
+              "maximum": 2147483647.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            "title": "Initial Role Ids",
+            "type": "array"
+          },
+          "update_profile_on_login": {
+            "default": true,
+            "title": "Update Profile On Login",
+            "type": "boolean"
+          }
+        },
+        "title": "JitDefaults",
         "type": "object"
       },
       "JobAccepted": {
@@ -14981,6 +15804,202 @@
         "title": "LlmProviderUpdate",
         "type": "object"
       },
+      "LoginPlanOut": {
+        "properties": {
+          "decision": {
+            "enum": [
+              "login",
+              "create",
+              "reject"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "groups_add": {
+            "items": {
+              "$ref": "#/components/schemas/GroupPermRefOut"
+            },
+            "title": "Groups Add",
+            "type": "array"
+          },
+          "groups_remove": {
+            "items": {
+              "$ref": "#/components/schemas/GroupPermRefOut"
+            },
+            "title": "Groups Remove",
+            "type": "array"
+          },
+          "login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Login"
+          },
+          "matched_by": {
+            "anyOf": [
+              {
+                "enum": [
+                  "link",
+                  "login",
+                  "email",
+                  "jit"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched By"
+          },
+          "profile": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Profile",
+            "type": "object"
+          },
+          "profile_changes": {
+            "additionalProperties": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Profile Changes",
+            "type": "object"
+          },
+          "reject_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reject Code"
+          },
+          "reject_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reject Message"
+          },
+          "roles_add": {
+            "items": {
+              "$ref": "#/components/schemas/NamedRefOut"
+            },
+            "title": "Roles Add",
+            "type": "array"
+          },
+          "roles_remove": {
+            "items": {
+              "$ref": "#/components/schemas/NamedRefOut"
+            },
+            "title": "Roles Remove",
+            "type": "array"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "user_kind": {
+            "enum": [
+              "agent",
+              "customer"
+            ],
+            "title": "User Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_kind",
+          "decision",
+          "matched_by",
+          "user_id",
+          "login",
+          "reject_code",
+          "reject_message",
+          "profile",
+          "profile_changes",
+          "roles_add",
+          "roles_remove",
+          "groups_add",
+          "groups_remove"
+        ],
+        "title": "LoginPlanOut",
+        "type": "object"
+      },
+      "LoginProviderOut": {
+        "properties": {
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
+          },
+          "kind": {
+            "enum": [
+              "oidc",
+              "saml"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "kind",
+          "label"
+        ],
+        "title": "LoginProviderOut",
+        "type": "object"
+      },
       "LoginRequest": {
         "properties": {
           "login": {
@@ -15792,6 +16811,97 @@
         "title": "MailOutboundUpdate",
         "type": "object"
       },
+      "ManagedAssignmentOut": {
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "role",
+              "group"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          },
+          "permission_key": {
+            "title": "Permission Key",
+            "type": "string"
+          },
+          "target_id": {
+            "title": "Target Id",
+            "type": "integer"
+          },
+          "target_name": {
+            "title": "Target Name",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user_id",
+          "login",
+          "kind",
+          "target_id",
+          "target_name",
+          "permission_key",
+          "created"
+        ],
+        "title": "ManagedAssignmentOut",
+        "type": "object"
+      },
+      "MappingPreviewIn": {
+        "properties": {
+          "attributes": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Attributes",
+            "type": "object"
+          },
+          "audience": {
+            "default": "agent",
+            "enum": [
+              "agent",
+              "customer"
+            ],
+            "title": "Audience",
+            "type": "string"
+          },
+          "draft": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProviderChanges"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subject": {
+            "default": "preview",
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attributes"
+        ],
+        "title": "MappingPreviewIn",
+        "type": "object"
+      },
       "McpClientCreate": {
         "properties": {
           "auth_token": {
@@ -16465,6 +17575,24 @@
           "new"
         ],
         "title": "MyTicketCounts",
+        "type": "object"
+      },
+      "NamedRefOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "NamedRefOut",
         "type": "object"
       },
       "NewTicketPhoneCallIn": {
@@ -18975,6 +20103,30 @@
         "title": "PortalAttachmentUploadResponse",
         "type": "object"
       },
+      "PortalAuthMethodsOut": {
+        "description": "Sign-in options of the customer portal login page.",
+        "properties": {
+          "password": {
+            "default": true,
+            "title": "Password",
+            "type": "boolean"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/LoginProviderOut"
+            },
+            "title": "Providers",
+            "type": "array"
+          },
+          "webauthn": {
+            "default": false,
+            "title": "Webauthn",
+            "type": "boolean"
+          }
+        },
+        "title": "PortalAuthMethodsOut",
+        "type": "object"
+      },
       "PortalLanguageIn": {
         "properties": {
           "language": {
@@ -19571,6 +20723,302 @@
           "state_entity_id"
         ],
         "title": "ProcessSummaryOut",
+        "type": "object"
+      },
+      "ProviderChanges": {
+        "description": "Admin PATCH body (also the \"draft\" of a test login).",
+        "properties": {
+          "attribute_map": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AttributeMap"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "audience": {
+            "anyOf": [
+              {
+                "enum": [
+                  "agent",
+                  "customer",
+                  "both"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audience"
+          },
+          "button_icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Button Icon"
+          },
+          "button_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Button Label"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "jit_defaults": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JitDefaults"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "jit_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jit Enabled"
+          },
+          "match_by": {
+            "anyOf": [
+              {
+                "enum": [
+                  "login",
+                  "email"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match By"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "require_sso_opt_in": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Require Sso Opt In"
+          },
+          "role_rules": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RoleRule"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role Rules"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          },
+          "sort": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort"
+          },
+          "sync_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "managed",
+                  "authoritative"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sync Mode"
+          }
+        },
+        "title": "ProviderChanges",
+        "type": "object"
+      },
+      "ProviderEndpointsOut": {
+        "properties": {
+          "agent_acs_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Acs Url"
+          },
+          "agent_redirect_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Redirect Uri"
+          },
+          "backchannel_logout_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backchannel Logout Url"
+          },
+          "base_url_missing": {
+            "title": "Base Url Missing",
+            "type": "boolean"
+          },
+          "customer_acs_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Acs Url"
+          },
+          "customer_redirect_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Redirect Uri"
+          },
+          "slo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slo Url"
+          },
+          "sp_entity_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sp Entity Id"
+          },
+          "sp_metadata_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sp Metadata Url"
+          }
+        },
+        "required": [
+          "agent_redirect_uri",
+          "customer_redirect_uri",
+          "agent_acs_url",
+          "customer_acs_url",
+          "sp_entity_id",
+          "sp_metadata_url",
+          "slo_url",
+          "backchannel_logout_url",
+          "base_url_missing"
+        ],
+        "title": "ProviderEndpointsOut",
         "type": "object"
       },
       "ProviderTemplateOut": {
@@ -22211,6 +23659,44 @@
           "change_time"
         ],
         "title": "RoleOut",
+        "type": "object"
+      },
+      "RoleRule": {
+        "properties": {
+          "attribute": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Attribute",
+            "type": "string"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/GroupGrant"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "role_ids": {
+            "items": {
+              "maximum": 2147483647.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            "title": "Role Ids",
+            "type": "array"
+          },
+          "value": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attribute",
+          "value"
+        ],
+        "title": "RoleRule",
         "type": "object"
       },
       "RoleUpdate": {
@@ -28243,6 +29729,11 @@
             "title": "Login",
             "type": "string"
           },
+          "sso_logout": {
+            "default": false,
+            "title": "Sso Logout",
+            "type": "boolean"
+          },
           "time_zone": {
             "anyOf": [
               {
@@ -29251,6 +30742,835 @@
         ]
       }
     },
+    "/api/portal/auth/methods": {
+      "get": {
+        "description": "Discovery endpoint of the portal login page (customer-audience providers only).",
+        "operationId": "portal_auth_methods_api_portal_auth_methods_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalAuthMethodsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Portal sign-in options",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/oidc/{slug}/callback": {
+      "get": {
+        "operationId": "portal_oidc_callback_api_portal_auth_oidc__slug__callback_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "OIDC callback of a portal provider",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/passkey": {
+      "get": {
+        "operationId": "passkey_list_api_portal_auth_passkey_get",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PasskeyOut"
+                  },
+                  "title": "Response Passkey List Api Portal Auth Passkey Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Passkey List",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/passkey/authenticate/begin": {
+      "post": {
+        "description": "Start a passkey assertion; the challenge is bound to the pending token.",
+        "operationId": "passkey_authenticate_begin_api_portal_auth_passkey_authenticate_begin_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Passkey Authenticate Begin Api Portal Auth Passkey Authenticate Begin Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Passkey Authenticate Begin",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/passkey/authenticate/finish": {
+      "post": {
+        "operationId": "passkey_authenticate_finish_api_portal_auth_passkey_authenticate_finish_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyAuthenticateFinishIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerLoginResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Passkey Authenticate Finish",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/passkey/register/begin": {
+      "post": {
+        "operationId": "passkey_register_begin_api_portal_auth_passkey_register_begin_post",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Passkey Register Begin Api Portal Auth Passkey Register Begin Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Passkey Register Begin",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/passkey/register/finish": {
+      "post": {
+        "operationId": "passkey_register_finish_api_portal_auth_passkey_register_finish_post",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyRegisterFinishIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Passkey Register Finish",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/passkey/{passkey_id}": {
+      "delete": {
+        "operationId": "passkey_delete_api_portal_auth_passkey__passkey_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "passkey_id",
+            "required": true,
+            "schema": {
+              "title": "Passkey Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Passkey Delete",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/saml/{slug}/acs": {
+      "post": {
+        "description": "The IdP's browser POST; CSRF-exempt by design. Failures redirect to ``/portal/login``.",
+        "operationId": "portal_saml_acs_api_portal_auth_saml__slug__acs_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "SAML assertion consumer service (portal)",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/sso/logout": {
+      "post": {
+        "operationId": "portal_sso_logout_api_portal_auth_sso_logout_post",
+        "responses": {
+          "303": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Log out of the portal and, where supported, of the identity provider",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/sso/{slug}/login": {
+      "get": {
+        "description": "Starts a customer login, or (``test=``) an admin's test run of a customer provider.\n\nA test run needs the admin's AGENT session cookie; without one the answer is 403 and\nnever a real login. The run itself never creates a session (see ``finish_*``).",
+        "operationId": "portal_sso_login_api_portal_auth_sso__slug__login_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "next",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Next"
+            }
+          },
+          {
+            "in": "query",
+            "name": "test",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Test"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start a portal SSO login",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/totp": {
+      "delete": {
+        "operationId": "totp_disable_api_portal_auth_totp_delete",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TOTPCodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TOTPStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Totp Disable",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/totp/confirm": {
+      "post": {
+        "operationId": "totp_confirm_api_portal_auth_totp_confirm_post",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TOTPCodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TOTPStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Totp Confirm",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/totp/enroll": {
+      "post": {
+        "description": "Start (or replace) a TOTP enrollment; replacing a live factor needs its code.\n\nAdding TOTP to a passkey-only account needs a recent sign-in (the passkey\ngate), or a stolen session could attach an authenticator it controls.",
+        "operationId": "totp_enroll_api_portal_auth_totp_enroll_post",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/TOTPEnrollIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TOTPEnrollOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Totp Enroll",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/totp/enroll/qr": {
+      "get": {
+        "operationId": "totp_enroll_qr_api_portal_auth_totp_enroll_qr_get",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Totp Enroll Qr",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/totp/status": {
+      "get": {
+        "operationId": "totp_status_api_portal_auth_totp_status_get",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TOTPStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Totp Status",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/totp/verify": {
+      "post": {
+        "description": "Promote a pending-2FA session to a full session after a valid TOTP code.",
+        "operationId": "totp_verify_api_portal_auth_totp_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TOTPCodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerLoginResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Totp Verify",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
     "/api/portal/kb/articles/{slug_or_id}": {
       "get": {
         "operationId": "get_article_api_portal_kb_articles__slug_or_id__get",
@@ -29501,7 +31821,7 @@
     },
     "/api/portal/preferences/password": {
       "post": {
-        "description": "Znuny ``Preferences::Password`` (customer): verify the current one, store the new one.",
+        "description": "Znuny ``Preferences::Password`` (customer): verify the current one, store the new one.\n\nAfterwards every other session of the customer ends: Znuny/GI sessions and the\nportal's Redis sessions, pending 2FA logins included. The calling session stays.",
         "operationId": "change_password_api_portal_preferences_password_post",
         "parameters": [
           {
@@ -36495,7 +38815,7 @@
     },
     "/api/v1/admin/auth-config/{user_id}/reset-2fa": {
       "post": {
-        "description": "Admin force-disable: delete TOTP enrollment and all passkeys for the agent.",
+        "description": "Admin force-disable: delete TOTP enrollment and all passkeys for the agent.\n\nAlso clears a pending TOTP enrollment and revokes every session of the agent\n(pending ones included): with no factor left, a surviving session could\nattach one of its own without a step-up.",
         "operationId": "reset_2fa_api_v1_admin_auth_config__user_id__reset_2fa_post",
         "parameters": [
           {
@@ -40671,6 +42991,74 @@
         ]
       }
     },
+    "/api/v1/admin/customer-users/{customer_user_id}/reset-2fa": {
+      "post": {
+        "description": "Admin recovery for a lost authenticator: drop the customer's TOTP and all passkeys.\n\nAlso clears a pending TOTP enrollment and revokes every session of the customer\n(pending ones included): with no factor left, a surviving session could attach\none of its own without a step-up.\n\nMirrors the agent-side ``POST /auth-config/{user_id}/reset-2fa`` (idempotent,\nno code needed); the log line is the audit trail.",
+        "operationId": "reset_customer_user_2fa_api_v1_admin_customer_users__customer_user_id__reset_2fa_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customer_user_id",
+            "required": true,
+            "schema": {
+              "title": "Customer User Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset Customer User 2Fa",
+        "tags": [
+          "admin:customers"
+        ]
+      }
+    },
     "/api/v1/admin/customer-users/{customer_user_login}/companies": {
       "get": {
         "description": "Companies *customer_user_login* has additional ticket visibility into \u2014\nthe Customer-User\u2194Customers editor's read side.\n\nThis is the Znuny ``customer_user_customer`` M2M (extra visibility), keyed\nby the customer-user *login*. It is distinct from the user's single primary\n``customer_user.customer_id`` (their home company), which is edited on the\nCustomer Users page instead.",
@@ -43897,6 +46285,1153 @@
         "summary": "Get Group Users",
         "tags": [
           "admin:groups"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-providers": {
+      "get": {
+        "operationId": "list_identity_providers_api_v1_admin_identity_providers_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IdentityProviderSummaryOut"
+                  },
+                  "title": "Response List Identity Providers Api V1 Admin Identity Providers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Identity Providers",
+        "tags": [
+          "admin:identity"
+        ]
+      },
+      "post": {
+        "operationId": "create_identity_provider_api_v1_admin_identity_providers_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityProviderCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityProviderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Identity Provider",
+        "tags": [
+          "admin:identity"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-providers/capabilities": {
+      "get": {
+        "operationId": "identity_capabilities_api_v1_admin_identity_providers_capabilities_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityCapabilitiesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Identity Capabilities",
+        "tags": [
+          "admin:identity"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-providers/kinds": {
+      "get": {
+        "operationId": "list_identity_kinds_api_v1_admin_identity_providers_kinds_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IdentityKindOut"
+                  },
+                  "title": "Response List Identity Kinds Api V1 Admin Identity Providers Kinds Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Identity Kinds",
+        "tags": [
+          "admin:identity"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-providers/presets": {
+      "get": {
+        "operationId": "list_identity_presets_api_v1_admin_identity_providers_presets_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IdentityPresetOut"
+                  },
+                  "title": "Response List Identity Presets Api V1 Admin Identity Providers Presets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Identity Presets",
+        "tags": [
+          "admin:identity"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-providers/{provider_id}": {
+      "delete": {
+        "operationId": "delete_identity_provider_api_v1_admin_identity_providers__provider_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Identity Provider",
+        "tags": [
+          "admin:identity"
+        ]
+      },
+      "get": {
+        "operationId": "get_identity_provider_api_v1_admin_identity_providers__provider_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityProviderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Identity Provider",
+        "tags": [
+          "admin:identity"
+        ]
+      },
+      "patch": {
+        "operationId": "update_identity_provider_api_v1_admin_identity_providers__provider_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderChanges"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityProviderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Identity Provider",
+        "tags": [
+          "admin:identity"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-providers/{provider_id}/links": {
+      "get": {
+        "operationId": "list_identity_links_api_v1_admin_identity_providers__provider_id__links_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IdentityLinkOut"
+                  },
+                  "title": "Response List Identity Links Api V1 Admin Identity Providers  Provider Id  Links Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Identity Links",
+        "tags": [
+          "admin:identity"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-providers/{provider_id}/links/{link_id}": {
+      "delete": {
+        "operationId": "delete_identity_link_api_v1_admin_identity_providers__provider_id__links__link_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "title": "Link Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Identity Link",
+        "tags": [
+          "admin:identity"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-providers/{provider_id}/managed-assignments": {
+      "get": {
+        "operationId": "list_managed_assignments_api_v1_admin_identity_providers__provider_id__managed_assignments_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 1000,
+              "maximum": 2000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ManagedAssignmentOut"
+                  },
+                  "title": "Response List Managed Assignments Api V1 Admin Identity Providers  Provider Id  Managed Assignments Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Managed Assignments",
+        "tags": [
+          "admin:identity"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-providers/{provider_id}/preview": {
+      "post": {
+        "operationId": "preview_identity_mapping_api_v1_admin_identity_providers__provider_id__preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MappingPreviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginPlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Identity Mapping",
+        "tags": [
+          "admin:identity"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-providers/{provider_id}/refresh-metadata": {
+      "post": {
+        "operationId": "refresh_identity_provider_metadata_api_v1_admin_identity_providers__provider_id__refresh_metadata_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityProviderOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refresh Identity Provider Metadata",
+        "tags": [
+          "admin:identity"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-providers/{provider_id}/tests": {
+      "post": {
+        "operationId": "start_identity_test_api_v1_admin_identity_providers__provider_id__tests_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityTestStartIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityTestStartOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Identity Test",
+        "tags": [
+          "admin:identity"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-providers/{provider_id}/tests/{test_id}": {
+      "get": {
+        "operationId": "get_identity_test_api_v1_admin_identity_providers__provider_id__tests__test_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "test_id",
+            "required": true,
+            "schema": {
+              "title": "Test Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityTestResultOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Identity Test",
+        "tags": [
+          "admin:identity"
         ]
       }
     },
@@ -56638,6 +60173,7 @@
     },
     "/api/v1/auth/oidc/callback": {
       "get": {
+        "description": "Alias of ``/auth/oidc/env-oidc/callback`` (browsers: 302 to ``next``; API clients: JSON).",
         "operationId": "oidc_callback_api_v1_auth_oidc_callback_get",
         "parameters": [
           {
@@ -56682,7 +60218,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "API clients: the session as JSON"
           },
           "422": {
             "content": {
@@ -56703,7 +60239,26 @@
     },
     "/api/v1/auth/oidc/login": {
       "get": {
+        "description": "Alias of ``/auth/sso/env-oidc/login`` (production env OIDC keeps its URLs).",
         "operationId": "oidc_login_api_v1_auth_oidc_login_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "next",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Next"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -56712,9 +60267,159 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Oidc Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/oidc/{slug}/backchannel-logout": {
+      "post": {
+        "description": "Server-to-server POST of a signed logout token (form field ``logout_token``).\n\nEnds every matching agent and customer session; answers with ``Cache-Control: no-store``.",
+        "operationId": "oidc_backchannel_logout_api_v1_auth_oidc__slug__backchannel_logout_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "properties": {
+                  "logout_token": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "logout_token"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Sessions of the logout token ended"
+          },
+          "400": {
+            "description": "Invalid logout token or the logout failed"
+          },
+          "404": {
+            "description": "No OIDC provider with back-channel logout under this slug"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests"
+          }
+        },
+        "summary": "OIDC back-channel logout (called by the identity provider)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/oidc/{slug}/callback": {
+      "get": {
+        "operationId": "oidc_provider_callback_api_v1_auth_oidc__slug__callback_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "OIDC callback of a provider",
         "tags": [
           "auth"
         ]
@@ -57145,6 +60850,168 @@
         ]
       }
     },
+    "/api/v1/auth/saml/{slug}/acs": {
+      "post": {
+        "description": "Receives the IdP's browser POST; CSRF-exempt by design. Failures redirect to ``/login``.",
+        "operationId": "saml_acs_api_v1_auth_saml__slug__acs_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "SAML assertion consumer service",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/saml/{slug}/metadata": {
+      "get": {
+        "operationId": "saml_metadata_api_v1_auth_saml__slug__metadata_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/samlmetadata+xml": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "SAML service provider metadata",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/saml/{slug}/sls": {
+      "get": {
+        "description": "The IdP's LogoutResponse; bound to a stored request id, always ends on the login page.",
+        "operationId": "saml_sls_get_api_v1_auth_saml__slug__sls_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "SAML single logout service (redirect binding)",
+        "tags": [
+          "auth"
+        ]
+      },
+      "post": {
+        "description": "Same as the GET form; CSRF-exempt because the IdP posts cross-site.",
+        "operationId": "saml_sls_post_api_v1_auth_saml__slug__sls_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "SAML single logout service (POST binding)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/auth/spnego": {
       "get": {
         "description": "Kerberos/SPNEGO handshake. On success, 302 back to ``next`` (a same-site\npath, default ``/``) with a full session \u2014 this lets an expired-session\nagent re-auth transparently and land back on the page they were on.\n\nPer-agent ``sso_eligible`` must be true. SSO is the strong factor \u2014 2FA\nis skipped even when the agent has TOTP enrolled. A failed handshake\n(expired/absent ticket) redirects to the login page instead of returning a\nbare 401, so the browser never shows a native Negotiate popup.",
@@ -57204,6 +61071,98 @@
           }
         },
         "summary": "Spnego",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/sso/logout": {
+      "post": {
+        "description": "Ends the local session first, then redirects to the IdP logout or the login page.",
+        "operationId": "sso_logout_route_api_v1_auth_sso_logout_post",
+        "responses": {
+          "303": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Log out of Tiqora and, where supported, of the identity provider",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/sso/{slug}/login": {
+      "get": {
+        "operationId": "sso_login_api_v1_auth_sso__slug__login_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "next",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Next"
+            }
+          },
+          {
+            "in": "query",
+            "name": "test",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Test"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start an SSO login",
         "tags": [
           "auth"
         ]

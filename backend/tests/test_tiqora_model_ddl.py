@@ -116,3 +116,20 @@ def test_report_dirty_queued_at_has_microseconds_on_mariadb() -> None:
     table = TiqoraReportDirtyTicket.__table__
     assert "DATETIME(6)" in _column_ddl(table, "queued_at", mysql.dialect())
     assert "DATETIME(6)" not in _column_ddl(table, "queued_at", postgresql.dialect())
+
+
+def test_identity_metadata_xml_fits_large_documents_on_mariadb() -> None:
+    """SAML IdP metadata can exceed 64 KiB: ``MEDIUMTEXT`` on MariaDB, plain
+    ``TEXT`` on PostgreSQL (same as migration ``20261009_0064``)."""
+    from tiqora.db.tiqora.models import TiqoraIdentityProvider
+
+    table = TiqoraIdentityProvider.__table__
+    assert "MEDIUMTEXT" in _column_ddl(table, "metadata_xml", mysql.dialect())
+    assert "MEDIUMTEXT" not in _column_ddl(table, "metadata_xml", postgresql.dialect())
+    # ``config`` carries pasted ``idp_metadata_xml`` (parser accepts up to 5 MB).
+    assert "MEDIUMTEXT" in _column_ddl(table, "config", mysql.dialect())
+    assert "MEDIUMTEXT" not in _column_ddl(table, "config", postgresql.dialect())
+    migration = (
+        Path(__file__).parent.parent / "alembic/versions_tiqora/20261009_0064_identity_providers.py"
+    ).read_text()
+    assert migration.count('with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb")') == 2

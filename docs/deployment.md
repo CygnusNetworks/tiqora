@@ -87,10 +87,51 @@ Optional; the agent login page shows a "Sign in with SSO" button once
 | `TIQORA_OIDC_SCOPES` | `openid profile email` | |
 | `TIQORA_OIDC_CLAIM` | `preferred_username` | Claim mapped to `users.login` |
 | `TIQORA_OIDC_REDIRECT_URI` | `https://helpdesk.example.com/api/v1/auth/oidc/callback` | Must be registered with the provider |
+| `TIQORA_OIDC_BACKCHANNEL_LOGOUT` | `false` | `true` accepts OIDC back-channel logout at `/api/v1/auth/oidc/env-oidc/backchannel-logout` (register that URL with the provider) |
 
-**No auto-provisioning in v1**: the claim value must match an existing
-`users.login` with `valid_id = 1`, or the callback returns `403`. Provision
-agents in Znuny/Tiqora admin first, then point them at SSO.
+These variables still work unchanged. They are turned into the read-only
+identity provider `env-oidc`, shown in the admin UI at
+`/admin/identity-providers` (it cannot be edited there). Further OIDC and SAML
+providers, per-provider matching, just-in-time accounts and role/group sync
+are configured in that UI; see [guide/identity-providers.md](guide/identity-providers.md).
+
+**No auto-provisioning for `env-oidc`**: the claim value must match an
+existing `users.login` with `valid_id = 1`, or the login is rejected. Provision
+agents in Znuny/Tiqora admin first, then point them at SSO. The agent must be
+flagged SSO-eligible, as before.
+
+**The id_token is verified.** Since the identity update every OIDC login
+(env and UI-configured) checks the id_token signature against the provider's
+JWKS, `iss` against the issuer of the discovery document, `aud`, `exp` and
+`nonce`. **Before upgrading, check that the issuer in the discovery document
+(`<issuer>/.well-known/openid-configuration`) equals the issuer you configured
+and that the `jwks_uri` is reachable from the Tiqora containers** (through the
+outbound SSRF guard: private/loopback targets are refused unless the provider
+allows internal networks). The JWKS cache is per process.
+
+### Reverse proxy for SSO
+
+Public URL and SAML:
+
+* `TIQORA_PUBLIC_BASE_URL` (API **and** worker) is **required** for SAML and for
+  every OIDC provider configured in the UI: redirect URIs, the SAML ACS /
+  metadata / logout URLs and the post-logout redirect are derived from it. The
+  env OIDC provider keeps working without it as long as
+  `TIQORA_OIDC_REDIRECT_URI` is set.
+* The image ships `xmlsec1` and the `saml` extra (pysaml2). A custom image
+  without them answers SAML logins with `sso_error=saml_unavailable`.
+* The reverse proxy must pass SAML ACS POST bodies of up to 1 MB (Tiqora's cap
+  is 2 MB per response): nginx `client_max_body_size 2m;` on the `/api/`
+  location (the nginx default of 1 MB rejects large signed responses with
+  `413`). Do not buffer-reject large headers either (IdP redirects can carry
+  long query strings; raise `large_client_header_buffers` if needed).
+* The OIDC back-channel logout URL
+  (`/api/v1/auth/oidc/<slug>/backchannel-logout`, for `env-oidc`:
+  `TIQORA_OIDC_BACKCHANNEL_LOGOUT=true` first) and the SAML single-logout URL
+  (`/api/v1/auth/saml/<slug>/sls`) are called **by the IdP**; they must be
+  reachable from the IdP without a login wall or IP allow-list that excludes it.
+* The worker refreshes SAML IdP metadata URLs daily (04:30 UTC) and keeps the
+  last good metadata when a fetch fails.
 
 ## Kerberos / SPNEGO configuration
 
@@ -163,17 +204,38 @@ password login path.
 
 ## LDAP / Active Directory configuration
 
-Optional bind-search-bind auth against an LDAP/AD directory, tried as a
-fallback when local password auth fails (mirrors Znuny's chained
+Optional bind-search-bind auth against an LDAP/AD directory, tried
+after local password auth fails (mirrors Znuny's chained
 `AuthModule::LDAP`/`CustomerAuth::LDAP`). Separate on/off switches and
 settings exist for agent login (`users`) and the customer portal
-(`customer_user`) — see `tiqora.domain.auth_ldap` /
-`tiqora.domain.customer_auth_ldap` / `tiqora.domain._ldap_core`.
+(`customer_user`). They appear as the read-only identity providers
+`env-ldap` / `env-customer-ldap` — see `tiqora.identity.ldap_login` and
+`tiqora.domain._ldap_core`. Further directories with just-in-time
+accounts and role/group sync (Znuny AuthSync) are configured as identity
+providers in the admin UI and are tried in their sort order; the first
+directory that accepts the password wins.
 
-**No auto-provisioning in v1**: the LDAP UID resolved by the search must
-match an existing, valid local `users.login` (agent) or
-`customer_user.login` (portal) row, or the login is rejected. Provision the
-account locally first, then point it at LDAP.
+**No auto-provisioning for the env directories**: the LDAP UID resolved by
+the search must match an existing, valid local `users.login` (agent) or
+`customer_user.login` (portal) row, or the login is rejected. After the
+first login the account is linked to the directory entry's stable id
+(`objectGUID` / `entryUUID`), so a later rename of the local login keeps
+working.
+
+The stored link id for Active Directory is the lowercase hex of the
+**raw** 16 `objectGUID` bytes as the directory sends them (the first three
+GUID fields little-endian) — not the canonical GUID string that AD tools
+show. Example: `{01020304-0506-0708-090a-0b0c0d0e0f10}` is stored as
+`0403020106050807090a0b0c0d0e0f10` (Python: `uuid.UUID(...).bytes_le.hex()`).
+Keep this in mind when comparing links in the admin list with AD.
+
+Connections use a 5 s connect and 10 s receive timeout, never follow
+referrals, and one password login spends at most 20 s across all
+directories (no LDAP operation starts after that, and socket timeouts are
+capped at the time left). StartTLS is negotiated before any password is
+sent. The S/MIME certificate fetch from the customer directory
+(`TIQORA_CUSTOMER_LDAP_*`) uses the same connection settings, including
+`TIQORA_CUSTOMER_LDAP_TLS_VERIFY`.
 
 Agent auth (`TIQORA_LDAP_*`) — customer portal uses the identical shape
 under `TIQORA_CUSTOMER_LDAP_*`:
@@ -193,6 +255,8 @@ under `TIQORA_CUSTOMER_LDAP_*`:
 | `TIQORA_LDAP_GROUP_DN` | `cn=helpdesk,ou=groups,dc=example,dc=com` | Optional group-membership gate |
 | `TIQORA_LDAP_ACCESS_ATTR` | `memberUid` | Attribute checked under `GROUP_DN` |
 | `TIQORA_LDAP_USER_ATTR` | `DN` | `DN` compares the user's full DN; anything else compares the login |
+| `TIQORA_LDAP_TLS_VERIFY` | `false` (default) | Verify the directory's certificate (system CAs, host name) for LDAPS/StartTLS. **Defaults to `false` only for compatibility with existing installs; a warning is logged at startup while it is off.** Set it to `true`. |
+| `TIQORA_CUSTOMER_LDAP_TLS_VERIFY` | `false` (default) | The same for the customer-portal directory (`TIQORA_CUSTOMER_LDAP_*`); same startup warning while it is off. |
 
 Simplifications vs. `Kernel::System::Auth::LDAP`: no `Die` (hard-crash on
 connect failure), `UserSuffix`, `UserLowerCase`, or per-directory charset

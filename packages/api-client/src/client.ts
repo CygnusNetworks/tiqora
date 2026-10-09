@@ -2325,6 +2325,15 @@ export class ApiClient {
     );
   }
 
+  /** Admin recovery for a lost authenticator: drops the customer's TOTP and all passkeys. */
+  resetCustomerUser2fa(customerUserId: number, signal?: AbortSignal) {
+    return this.request<void>(
+      "POST",
+      `/api/v1/admin/customer-users/${customerUserId}/reset-2fa`,
+      { signal },
+    );
+  }
+
   bulkUpdateCustomerUsers(body: CustomerUserBulkUpdate, signal?: AbortSignal) {
     return this.request<CustomerUserBulkUpdateResult>(
       "PATCH",

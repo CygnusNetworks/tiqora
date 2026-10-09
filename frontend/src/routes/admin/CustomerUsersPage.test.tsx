@@ -14,6 +14,7 @@ const bulkUpdateCustomerUsers = vi.fn();
 const companyList = vi.fn();
 const navigate = vi.fn();
 const keysList = vi.fn();
+const resetCustomerUser2fa = vi.fn();
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
@@ -43,6 +44,7 @@ vi.mock("@/lib/api", () => ({
       list: (...args: unknown[]) => companyList(...args),
     },
     bulkUpdateCustomerUsers: (...args: unknown[]) => bulkUpdateCustomerUsers(...args),
+    resetCustomerUser2fa: (...args: unknown[]) => resetCustomerUser2fa(...args),
     customerCryptoKeys: {
       list: (...args: unknown[]) => keysList(...args),
     },
@@ -92,6 +94,7 @@ describe("CustomerUsersPage", () => {
     bulkUpdateCustomerUsers.mockReset();
     companyList.mockReset();
     navigate.mockReset();
+    resetCustomerUser2fa.mockReset();
 
     list.mockResolvedValue({
       items: [sampleRow, { ...sampleRow, id: 43, login: "bob@example.com" }],
@@ -389,5 +392,37 @@ describe("CustomerUsersPage", () => {
     expect(await screen.findByTestId("customer-keys-pgp")).toBeInTheDocument();
     expect(screen.getByTestId("customer-keys-pgp-upload-file")).toBeInTheDocument();
     expect(screen.queryByTestId("customer-keys-smime")).toBeNull();
+  });
+
+  it("resets the customer's two-factor sign-in only after confirming", async () => {
+    resetCustomerUser2fa.mockResolvedValue(undefined);
+    renderPage();
+    fireEvent.click(await screen.findByTestId("admin-row-menu-trigger-42"));
+    fireEvent.click(await screen.findByTestId("admin-customer-user-reset2fa-42"));
+
+    // Cancelling must not touch the account.
+    await screen.findByTestId("confirm-dialog");
+    fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
+    await waitFor(() => expect(screen.queryByTestId("confirm-dialog")).toBeNull());
+    expect(resetCustomerUser2fa).not.toHaveBeenCalled();
+
+    fireEvent.click(await screen.findByTestId("admin-row-menu-trigger-42"));
+    fireEvent.click(await screen.findByTestId("admin-customer-user-reset2fa-42"));
+    fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+    await waitFor(() => expect(resetCustomerUser2fa).toHaveBeenCalledWith(42));
+    expect(await screen.findByTestId("admin-customer-reset2fa-notice")).toHaveTextContent(
+      "alice@example.com",
+    );
+  });
+
+  it("shows an error notice when the two-factor reset fails", async () => {
+    resetCustomerUser2fa.mockRejectedValue(new Error("boom"));
+    renderPage();
+    fireEvent.click(await screen.findByTestId("admin-row-menu-trigger-42"));
+    fireEvent.click(await screen.findByTestId("admin-customer-user-reset2fa-42"));
+    fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+    expect(await screen.findByTestId("admin-customer-reset2fa-notice")).toHaveTextContent(
+      i18n.t("admin.customerUsers.reset2faFailed"),
+    );
   });
 });
