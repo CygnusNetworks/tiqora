@@ -81,7 +81,7 @@ def _text(value: str) -> str:
     return _ILLEGAL_XML.sub("", value)
 
 
-def _to_date(value: object) -> date | datetime | None:
+def _to_date(value: object) -> datetime | None:
     parsed: datetime
     if isinstance(value, datetime):
         parsed = value

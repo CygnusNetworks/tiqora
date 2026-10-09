@@ -265,10 +265,10 @@ def test_nan_and_inf_are_empty() -> None:
 
 def test_sheet_names_trim_and_avoid_history() -> None:
     cols = [XlsxColumn("a", "string")]
-    names = ["a" * 30 + " b", "History", "x" * 29 + "'y"]
+    names = ["a" * 30 + " b", "History", "x" * 30 + "'y"]
     data = write_xlsx_workbook([XlsxSheet(name=n, columns=cols, rows=[]) for n in names])
     out = openpyxl.load_workbook(io.BytesIO(data)).sheetnames
-    assert out[0] == "a" * 30 and out[1] == "History_" and out[2] == "x" * 29
+    assert out[0] == "a" * 30 and out[1] == "History_" and out[2] == "x" * 30
     assert all(not n.endswith((" ", "'")) for n in out)
 
 
