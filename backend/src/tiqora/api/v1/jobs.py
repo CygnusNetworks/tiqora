@@ -51,14 +51,14 @@ async def list_my_jobs(
     jobs = await list_jobs(session, created_by=None if all else user.id, limit=limit)
     files = await list_job_files(session, [j.id for j in jobs])
     registry = get_registry()
-    return [job_out(j, files.get(j.id, []), registry) for j in jobs]
+    return [job_out(j, files.get(j.id, []), registry, viewer_id=user.id) for j in jobs]
 
 
 @router.get("/{job_id}", response_model=JobOut)
 async def read_job(job_id: int, user: CurrentUser, session: DbSession) -> JobOut:
     job = await _visible_job(session, user, job_id)
     files = await list_job_files(session, [job.id])
-    return job_out(job, files.get(job.id, []), get_registry())
+    return job_out(job, files.get(job.id, []), get_registry(), viewer_id=user.id)
 
 
 @router.post("/{job_id}/cancel", response_model=JobOut)
@@ -73,7 +73,7 @@ async def cancel_job(job_id: int, user: CurrentUser, session: DbSession) -> JobO
         ) from None
     await session.commit()
     files = await list_job_files(session, [job.id])
-    return job_out(job, files.get(job.id, []), get_registry())
+    return job_out(job, files.get(job.id, []), get_registry(), viewer_id=user.id)
 
 
 @router.get("/{job_id}/files/{file_id}")

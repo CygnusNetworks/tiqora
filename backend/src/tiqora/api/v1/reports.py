@@ -8,7 +8,9 @@ Inline runs (``POST /reports/run``) share one time budget of at most 75 s over
 all their queries (row estimate included), below nginx's 90 s ``/api/``
 timeout; a used-up budget answers 504 with a JSON message. Large reports
 (row estimate above ``inline_row_threshold``, ``ticket_events`` over more than
-366 days, or ``force_job``) run as background jobs (202).
+366 days, or ``force_job``) run as background jobs (202); a user may have at most
+:data:`MAX_ACTIVE_REPORT_JOBS_PER_USER` report runs and exports queued or running
+(429 beyond that). Job results are private to their creator (``result_private``).
 """
 
 from __future__ import annotations
@@ -24,7 +26,7 @@ from tiqora.domain.auth import AuthenticatedUser
 from tiqora.extensions.core import get_registry
 from tiqora.filters import FilterError
 from tiqora.jobs.schemas import JobAccepted
-from tiqora.jobs.service import enqueue_job
+from tiqora.jobs.service import count_active_jobs, enqueue_job
 from tiqora.reporting.access import require_report_access
 from tiqora.reporting.cache import CacheBackend, ReportCache
 from tiqora.reporting.catalogue import BUILTIN_REPORTS, BuiltinReport
@@ -61,6 +63,8 @@ sources_router = APIRouter(prefix="/reporting", tags=["reports"])
 
 #: ``ticket_events`` windows longer than this always run as a job
 EVENTS_INLINE_MAX_DAYS: Final = 366
+#: queued or running report runs + exports one user may have at once (inline runs not counted)
+MAX_ACTIVE_REPORT_JOBS_PER_USER: Final = 3
 
 
 async def get_report_cache(redis_client: Annotated[Any, Depends(get_redis)]) -> CacheBackend:
@@ -141,6 +145,23 @@ def _source_out(src: ReportSource) -> ReportSourceOut:
     )
 
 
+async def _check_job_limit(session: AsyncSession, user_id: int) -> None:
+    """429 when the user already has the maximum of report jobs queued or running."""
+    active = 0
+    for kind in (REPORT_RUN_JOB.kind, REPORT_EXPORT_JOB.kind):
+        active += await count_active_jobs(session, kind=kind, created_by=user_id)
+    if active >= MAX_ACTIVE_REPORT_JOBS_PER_USER:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "message": (
+                    f"Es laufen bereits {MAX_ACTIVE_REPORT_JOBS_PER_USER} Berichte im "
+                    "Hintergrund. Bitte warte, bis einer fertig ist."
+                )
+            },
+        )
+
+
 def _accepted(job_id: int, job_status: str) -> JobAccepted:
     return JobAccepted(job_id=job_id, status="running" if job_status == "running" else "queued")
 
@@ -207,6 +228,7 @@ async def run_report_endpoint(
             # PostgreSQL: the estimate's SET LOCAL statement_timeout (possibly ~1 s near
             # the deadline) lives until the transaction ends; never let it hit the enqueue
             await session.rollback()
+            await _check_job_limit(session, user.id)
             job = await enqueue_job(
                 session,
                 kind=REPORT_RUN_JOB.kind,
@@ -265,6 +287,7 @@ async def export_report(
     except (DefinitionError, FilterError) as exc:
         _unprocessable(exc.message, exc.path)
     await session.rollback()
+    await _check_job_limit(session, user.id)
     job = await enqueue_job(
         session,
         kind=REPORT_EXPORT_JOB.kind,

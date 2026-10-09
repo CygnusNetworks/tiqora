@@ -57,6 +57,10 @@ XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 USER = AuthenticatedUser(
     id=AGENT, login="rep47.api", first_name="Rhea", last_name="Reports", auth_method="session"
 )
+#: Znuny seed admin (group "admin" rw)
+ADMIN = AuthenticatedUser(
+    id=1, login="root@localhost", first_name="Admin", last_name="OTRS", auth_method="session"
+)
 _BAND = {"lo": LO, "hi": HI}
 _JOBS = "kind IN ('core.report_run', 'core.report_export')"
 _RESET = (
@@ -238,6 +242,8 @@ class Env:
         self.sync_url = sync_url
         self.factory = factory
         self.client = client
+        #: the user every request is made as (``get_current_user`` override)
+        self.user = USER
 
     @property
     def dialect(self) -> str:
@@ -298,12 +304,14 @@ async def env(
             yield session
 
     app = create_app(Settings(environment="test"))
-    app.dependency_overrides[get_current_user] = lambda: USER
+    holder: list[Env] = []
+    app.dependency_overrides[get_current_user] = lambda: holder[0].user
     app.dependency_overrides[get_db] = _db
     app.dependency_overrides[get_report_cache] = lambda: cache
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
-            yield Env(sync_url, factory, c)
+            holder.append(Env(sync_url, factory, c))
+            yield holder[0]
     finally:
         await engine.dispose()
         _run_sql(sync_url, _RESET)
@@ -660,6 +668,67 @@ def test_export_slug() -> None:
     assert report_jobs.export_slug("Zeit") == "zeit"
     assert report_jobs.export_slug("Größe & Übersicht 2024") == "groesse-uebersicht-2024"
     assert report_jobs.export_slug("¿?") == "bericht"
+
+
+# ---------------------------------------------------------------- privacy and limits
+
+
+async def test_report_job_results_are_private_to_the_creator(env: Env) -> None:
+    run = await _run(
+        env, {"report_key": "builtin.channel_mix", "time_range": JUNE, "force_job": True}
+    )
+    run_id = run.json()["job"]["job_id"]
+    export = await env.client.post(
+        "/api/v1/reports/export",
+        json={"report_key": "builtin.time_by_customer", "format": "csv", "time_range": JUNE},
+    )
+    export_id = export.json()["job_id"]
+    await env.run_jobs()
+    own = await env.job(run_id)
+    assert own["result"]["rows"] == [["email", 2]]
+    assert (await env.job(export_id))["result"] == {"rows": 1}
+    own_list = (await env.client.get("/api/v1/jobs")).json()
+    assert next(j for j in own_list if j["id"] == run_id)["result"] is not None
+
+    env.user = ADMIN
+    for job_id in (run_id, export_id):
+        seen = await env.job(job_id)  # admins see every job ...
+        assert seen["status"] == "succeeded" and seen["created_by"] == AGENT
+        assert seen["result"] is None  # ... but not another user's report data
+    listed = {j["id"]: j for j in (await env.client.get("/api/v1/jobs?all=true")).json()}
+    assert listed[run_id]["result"] is None and listed[export_id]["result"] is None
+    file_id = (await env.job(export_id))["files"][0]["id"]
+    download = await env.client.get(f"/api/v1/jobs/{export_id}/files/{file_id}")
+    assert download.status_code == 404
+
+
+async def test_report_jobs_are_capped_per_user(env: Env) -> None:
+    limit = reports_api.MAX_ACTIVE_REPORT_JOBS_PER_USER
+    assert limit == 3
+    body = {"report_key": "builtin.channel_mix", "time_range": JUNE, "force_job": True,
+            "no_cache": True}  # fmt: skip
+    for _ in range(limit - 1):
+        assert (await _run(env, body)).status_code == 202
+    export_body = {"report_key": "builtin.time_by_customer", "time_range": JUNE}
+    assert (await env.client.post("/api/v1/reports/export", json=export_body)).status_code == 202
+    over = await _run(env, body)
+    assert over.status_code == 429
+    assert over.json()["detail"]["message"] == (
+        "Es laufen bereits 3 Berichte im Hintergrund. Bitte warte, bis einer fertig ist."
+    )
+    over_export = await env.client.post("/api/v1/reports/export", json=export_body)
+    assert over_export.status_code == 429
+    # inline runs are not limited
+    inline = await _run(env, {"report_key": "builtin.channel_mix", "time_range": JUNE})
+    assert inline.status_code == 200
+    # another user has their own allowance
+    env.user = ADMIN
+    assert (await _run(env, body)).status_code == 202
+    env.user = USER
+    # finished jobs free the slots
+    await env.run_jobs()
+    await env.run_jobs()
+    assert (await _run(env, body)).status_code == 202
 
 
 # ---------------------------------------------------------------- access

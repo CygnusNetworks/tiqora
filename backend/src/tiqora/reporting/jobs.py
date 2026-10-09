@@ -258,6 +258,7 @@ REPORT_RUN_JOB = JobHandler(
     run=run_report_job,
     title_key="jobs.kinds.core.report_run",
     timeout_seconds=1800,
+    result_private=True,
 )
 REPORT_EXPORT_JOB = JobHandler(
     kind="core.report_export",
@@ -265,4 +266,5 @@ REPORT_EXPORT_JOB = JobHandler(
     run=run_export_job,
     title_key="jobs.kinds.core.report_export",
     timeout_seconds=3600,
+    result_private=True,
 )

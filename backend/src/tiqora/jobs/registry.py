@@ -22,6 +22,11 @@ A handler declares, besides ``kind`` / ``payload_model`` / ``run``:
   handler can record the failure in its own domain (e.g. a mail's transmission error).
   Errors in the hook are logged and ignored.
 
+* ``result_private`` - the job result holds data selected with the creator's permissions
+  (e.g. a report computed in the creator's queue scope): ``GET /jobs`` and ``GET /jobs/{id}``
+  show it to the creator only; anyone else (admins included) gets status and progress
+  without ``result``. Job files are creator-only for every kind anyway.
+
 Retries: a handler raises :class:`~tiqora.jobs.context.JobRetry` to put its job back into
 the queue with a delay (``due_at``); ``ctx.attempt`` tells the handler which claim this is,
 so it decides itself when to stop retrying (and records the final failure); a
@@ -69,6 +74,7 @@ class JobHandler:
     max_attempts: int = 1
     requeue_if_interrupted: bool = False
     on_interrupted: InterruptHook | None = None
+    result_private: bool = False
 
 
 JOB_HANDLERS: ExtensionPoint[JobHandler] = ExtensionPoint(
