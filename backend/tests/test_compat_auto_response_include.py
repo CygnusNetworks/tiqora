@@ -423,6 +423,39 @@ async def test_article_send_never_triggers_auto_response(
 
 
 @pytest.mark.db
+async def test_article_send_mail_carries_the_attachments(
+    sync_url: str, relay: CapturingMailSender
+) -> None:
+    """The worker rebuilds the stored ArticleSend mail with the article's attachments."""
+    content = base64.b64encode(b"hallo anhang").decode()
+    result = await _call(
+        sync_url,
+        "create",
+        {
+            "Ticket": _ticket(),
+            "Article": {
+                "Subject": "Mit Datei",
+                "Body": "Hallo",
+                "From": "Agent <agent@example.org>",
+                "To": CUSTOMER_MAIL,
+                "ArticleSend": 1,
+                "Attachment": {
+                    "Filename": "notiz.txt",
+                    "ContentType": "text/plain",
+                    "Content": content,
+                },
+            },
+        },
+    )
+    assert "Error" not in result, result
+    assert len(relay.sent) == 1
+    mail = relay.sent[0]
+    assert mail.get_content_type() == "multipart/mixed"
+    parts = [(p.get_filename(), p.get_payload(decode=True)) for p in mail.iter_attachments()]
+    assert parts == [("notiz.txt", b"hallo anhang")]
+
+
+@pytest.mark.db
 async def test_update_sends_auto_follow_up(sync_url: str, relay: CapturingMailSender) -> None:
     created = await _call(
         sync_url, "create", {"Ticket": _ticket(), "Article": _customer_article("Erstkontakt")}

@@ -728,6 +728,27 @@ async def store_agent_email_for_dispatch(
     )
 
 
+async def _stored_attachments(
+    session: AsyncSession, article_id: int
+) -> list[tuple[str, str, bytes]]:
+    """The article's stored attachments as ``(filename, content_type, content)`` triples."""
+    from tiqora.storage.backend import DbMimeStorage
+
+    storage = DbMimeStorage(session)
+    out: list[tuple[str, str, bytes]] = []
+    for meta in await storage.list_attachments(article_id):
+        att = await storage.get_attachment(meta.id)
+        if att is not None:
+            out.append(
+                (
+                    meta.filename or "attachment",
+                    meta.content_type or "application/octet-stream",
+                    att.content,
+                )
+            )
+    return out
+
+
 async def load_pending_agent_email(
     session: AsyncSession, sysconfig: SysConfig, *, article_id: int
 ) -> PendingAgentEmail | None:
@@ -735,9 +756,9 @@ async def load_pending_agent_email(
 
     The request stored the fully prepared article (:func:`store_agent_email_for_dispatch`)
     and, for a signed/encrypted mail, the secured bytes in ``article_data_mime_plain``. The
-    mail is rebuilt from exactly that: the plain message from the article columns, the
-    secured one from its stored bytes (sent unchanged), plus today's banner headers. ``None``
-    when the article no longer exists.
+    mail is rebuilt from exactly that: the plain message from the article columns and its
+    stored attachments, the secured one from its stored bytes (sent unchanged), plus today's
+    banner headers. ``None`` when the article no longer exists.
     """
     from tiqora.crypto.article_view import load_raw_mail
     from tiqora.crypto.mime_build import secured_message_from_raw
@@ -778,6 +799,7 @@ async def load_pending_agent_email(
         in_reply_to=row["a_in_reply_to"] or None,
         references=row["a_references"] or None,
         channel="email",
+        attachments=await _stored_attachments(session, article_id),
     )
     raw = await load_raw_mail(session, article_id)
     message = secured_message_from_raw(raw, prepared.bcc) if raw else None
