@@ -15,7 +15,7 @@ Layer A covers all profile fixtures under
 `backend/tests/fixtures/legacy-schema/`. Layer B runs a **real** OTRS/Znuny
 container from a release tree listed in `peers.yaml`.
 
-`test_process_deploy.py` proves Tiqora's process/ACL dumps equal Znuny's `ProcessDump`/deployed ACL file, the deploy watcher snapshots Znuny deploys, and a new process ticket writes Znuny's history and dynamic field values (run on `znuny-6.5`; 7.3 pending).
+`test_process_deploy.py` proves Tiqora's process/ACL dumps equal Znuny's `ProcessDump`/deployed ACL file, the deploy watcher snapshots Znuny deploys, and a new process ticket writes Znuny's history and dynamic field values (znuny-6.5: passed; 7.3: passed (cached peer image `tiqora-golden-peer-znuny-7.3`, built 2026-07-27, Znuny 7.3.5), 2026-10-09).
 
 ## Peers
 

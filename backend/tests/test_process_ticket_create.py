@@ -815,6 +815,110 @@ async def test_agent_customer_user_brings_its_customer_id(
     assert (customer_id, customer_user_id) == (CUSTOMER_COMPANY, CUSTOMER_LOGIN)
 
 
+# --- dialog article history (golden run, Task 20 follow-up) -----------------------------------
+
+ARTICLE_VALUES: dict[str, Any] = {"Subject": "Hello", "Body": "Body text"}
+
+
+def _article_process(channel: str, interfaces: list[str]) -> Callable[[Any], None]:
+    return lambda c: _add_process(
+        c,
+        2,
+        {"Article": f"{{Display: '2', Config: {{CommunicationChannel: {channel}}}}}"},
+        interfaces=interfaces,
+        action_state=None,
+    )
+
+
+def _article_history(url: str, ticket_id: int) -> list[tuple[str, str]]:
+    article_types = {
+        "AddNote",
+        "PhoneCallAgent",
+        "PhoneCallCustomer",
+        "WebRequestCustomer",
+        "FollowUp",
+        "EmailAgent",
+        "EmailCustomer",
+    }
+    return [h for h in _history(url, ticket_id) if h[0] in article_types]
+
+
+@pytest.mark.db
+@pytest.mark.parametrize(
+    ("channel", "expected"),
+    [
+        # CustomerTicketProcess.pm:3955-3962: a new ticket's article is a web request, Phone a
+        # customer phone call; the history text is "%%" either way.
+        ("Internal", ("WebRequestCustomer", "%%")),
+        ("Phone", ("PhoneCallCustomer", "%%")),
+    ],
+)
+async def test_customer_new_ticket_article_history(
+    engine: AsyncEngine, sync_url: str, channel: str, expected: tuple[str, str]
+) -> None:
+    _build(sync_url, _article_process(channel, ["CustomerInterface"]))
+    actor = ProcessActor.customer(login=CUSTOMER_LOGIN, customer_id=CUSTOMER_COMPANY)
+    ticket_id = await _create_as(engine, sync_url, actor, dict(ARTICLE_VALUES), 2)
+    assert _article_history(sync_url, ticket_id) == [expected]
+
+
+@pytest.mark.db
+@pytest.mark.parametrize(
+    ("channel", "expected"),
+    [
+        # CustomerTicketProcess.pm:3958-3962: on an existing ticket the article is a FollowUp,
+        # unless the channel is Phone.
+        ("Internal", ("FollowUp", "%%")),
+        ("Phone", ("PhoneCallCustomer", "%%")),
+    ],
+)
+async def test_customer_dialog_on_existing_ticket_article_history(
+    engine: AsyncEngine, sync_url: str, channel: str, expected: tuple[str, str]
+) -> None:
+    from tiqora.process.config import ActivityDialogConfig
+    from tiqora.process.engine import apply_activity_dialog
+
+    dialog = ActivityDialogConfig.from_dict(
+        {
+            "Interface": ["CustomerInterface"],
+            "FieldOrder": ["Article"],
+            "Fields": {"Article": {"Display": "2", "Config": {"CommunicationChannel": channel}}},
+        }
+    )
+    actor = ProcessActor.customer(login=CUSTOMER_LOGIN, customer_id=CUSTOMER_COMPANY)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as session, session.begin():
+        await apply_activity_dialog(
+            session,
+            ticket_id=TICKET_1,
+            dialog=dialog,
+            field_values=dict(ARTICLE_VALUES),
+            actor=actor,
+            sysconfig=SysConfig(session),
+        )
+    assert _article_history(sync_url, TICKET_1) == [expected]
+
+
+@pytest.mark.db
+@pytest.mark.parametrize(
+    ("channel", "expected"),
+    [
+        # AgentTicketProcess.pm:5650-5654: AddNote "%%Note" for every channel but Phone --
+        # Email included -- and PhoneCallAgent "%%" for Phone.
+        ("Email", ("AddNote", "%%Note")),
+        ("Phone", ("PhoneCallAgent", "%%")),
+    ],
+)
+async def test_agent_dialog_article_history_by_channel(
+    engine: AsyncEngine, sync_url: str, channel: str, expected: tuple[str, str]
+) -> None:
+    _build(sync_url, _article_process(channel, ["AgentInterface"]))
+    ticket_id = await _create_as(
+        engine, sync_url, ProcessActor.agent(AGENT1), dict(ARTICLE_VALUES), 2
+    )
+    assert _article_history(sync_url, ticket_id) == [expected]
+
+
 # --- review round: same-state guard, FieldOrder, rollback --------------------------------------
 
 

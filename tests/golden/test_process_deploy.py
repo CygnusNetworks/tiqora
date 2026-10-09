@@ -15,7 +15,7 @@ Proves on the shared golden DB:
   values as Znuny's ``AgentTicketProcess`` new-ticket path (:5104-5290, :5463ff,
   :5967) plus the ``TicketProcessTransitions`` event.
 
-Run on ``znuny-6.5`` (rulings F9: 7.3 pending, its source tree is not on disk).
+Passed on ``znuny-6.5`` and ``znuny-7.3`` (cached peer image, 2026-10-09).
 The two revision tables are created by a module fixture if the golden DB lacks them
 and dropped again at teardown; rows this module adds to existing tables are deleted.
 """

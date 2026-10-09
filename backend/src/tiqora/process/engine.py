@@ -134,7 +134,14 @@ from tiqora.process.ticket_state import (
     get_ticket_process_state,
 )
 from tiqora.znuny.cache_invalidation import invalidate_ticket_cache
-from tiqora.znuny.history import add_pending_time
+from tiqora.znuny.history import (
+    TYPE_ADD_NOTE,
+    TYPE_FOLLOW_UP,
+    TYPE_PHONE_CALL_AGENT,
+    TYPE_PHONE_CALL_CUSTOMER,
+    TYPE_WEB_REQUEST_CUSTOMER,
+    add_pending_time,
+)
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = logging.getLogger(__name__)
@@ -1198,7 +1205,7 @@ async def _apply_dialog_field_changes(
     user_id: int,
     sysconfig: SysConfig,
     sender_type: str = "agent",
-    dynamic_fields_first: bool = False,
+    new_ticket: bool = False,
 ) -> None:
     """Apply submitted field_values to the ticket, per the field names the
     dialog config declares. Only fields actually present (and non-blank) in
@@ -1364,7 +1371,7 @@ async def _apply_dialog_field_changes(
     dynamic.sort(key=lambda k: order.index(k) if k in order else len(order))
     steps = [n for n in order if n in ("Article", "Owner") or n in dynamic]
     steps += [k for k in dynamic if k not in steps]
-    if dynamic_fields_first:
+    if new_ticket:
         steps = dynamic + [n for n in steps if n not in dynamic]
     for step in steps:
         if step == "Owner":
@@ -1397,6 +1404,7 @@ async def _apply_dialog_field_changes(
                 user_id=user_id,
                 sysconfig=sysconfig,
                 sender_type=sender_type,
+                new_ticket=new_ticket,
             )
             continue
         value = field_values[step]
@@ -1419,6 +1427,7 @@ async def _store_dialog_article(
     user_id: int,
     sysconfig: SysConfig,
     sender_type: str,
+    new_ticket: bool = False,
 ) -> None:
     """Article (AgentTicketProcess.pm:5576, 5686-5687): stored only when Subject AND Body are
     set; sender, visibility and channel come from the dialog config, never from the request."""
@@ -1433,17 +1442,27 @@ async def _store_dialog_article(
         return
     cfg = article_cfg.config
     channel_raw = str(cfg.get("CommunicationChannel") or cfg.get("ArticleType") or "note").lower()
-    # AgentTicketProcess.pm:5650-5654: the agent dialog article's history text is "%%Note"
-    # ("%%" for the Phone channel), not the usual "%% <subject>".
-    history_comment = (
-        ("%%" if channel_raw == "phone" else "%%Note") if sender_type == "agent" else None
-    )
+    # The history row is the dialog's, not add_article's channel-derived default:
+    # agent AgentTicketProcess.pm:5650-5654 (AddNote "%%Note" for every channel but Phone,
+    # PhoneCallAgent "%%"); customer CustomerTicketProcess.pm:3955-3962 (PhoneCallCustomer for
+    # Phone, else WebRequestCustomer on a new ticket and FollowUp on an existing one, "%%").
+    phone = channel_raw == "phone"
+    if sender_type == "agent":
+        history_type = TYPE_PHONE_CALL_AGENT if phone else TYPE_ADD_NOTE
+        history_comment = "%%" if phone else "%%Note"
+    else:
+        if phone:
+            history_type = TYPE_PHONE_CALL_CUSTOMER
+        else:
+            history_type = TYPE_WEB_REQUEST_CUSTOMER if new_ticket else TYPE_FOLLOW_UP
+        history_comment = "%%"
     article = ArticleIn(
         sender_type=sender_type,
         is_visible_for_customer=str(cfg.get("IsVisibleForCustomer", "0")) == "1",
         subject=str(field_values["Subject"]),
         body=str(field_values["Body"]),
         channel=_ARTICLE_CHANNEL_MAP.get(channel_raw, "note"),
+        history_type_override=history_type,
         history_comment_override=history_comment,
     )
     await add_article(
@@ -1589,14 +1608,15 @@ async def apply_activity_dialog(
     sysconfig: SysConfig,
     skip_fields: frozenset[str] = frozenset(),
     apply_required_lock: bool = True,
-    dynamic_fields_first: bool = False,
+    new_ticket: bool = False,
 ) -> None:
     """Validate and store one activity dialog submission with Znuny's field semantics.
 
     ``skip_fields`` (canonical names) are validated but not written again — used when a field
     was already consumed by ``create_ticket``. ``apply_required_lock=False`` and
-    ``dynamic_fields_first=True`` for new tickets (Znuny never runs RequiredLock on create and
-    stores the dynamic fields right after creating the ticket).
+    ``new_ticket=True`` for new tickets (Znuny never runs RequiredLock on create, stores the
+    dynamic fields right after creating the ticket, and a customer's article is a web request
+    instead of a follow-up).
     """
     values, missing = dialog_values_and_missing(dialog, field_values, actor)
     customer_filled = actor.interface == "CustomerInterface"
@@ -1628,7 +1648,7 @@ async def apply_activity_dialog(
         user_id=actor.user_id,
         sysconfig=sysconfig,
         sender_type="customer" if actor.interface == "CustomerInterface" else "agent",
-        dynamic_fields_first=dynamic_fields_first,
+        new_ticket=new_ticket,
     )
     if pending_time is not None:
         # AgentTicketProcess.pm:5554-5575: TicketPendingTimeSet after the other fields.

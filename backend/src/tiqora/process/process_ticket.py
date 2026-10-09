@@ -365,7 +365,7 @@ async def create_process_ticket(
         sysconfig=sysconfig,
         skip_fields=_CREATE_CONSUMED,
         apply_required_lock=False,
-        dynamic_fields_first=True,
+        new_ticket=True,
     )
     if actor.interface == "AgentInterface" and owner_id is not None and owner_id != 1:
         await assign_owner(
