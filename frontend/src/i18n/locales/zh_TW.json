@@ -1361,6 +1361,14 @@
       "save": "儲存",
       "keys": "加密",
       "keysDesc": "上傳您的 PGP 金鑰或 S/MIME 憑證，以便我們向您發送加密電子郵件。其中必須包含您的電子郵件地址 {{email}}。"
+    },
+    "process": {
+      "start": "Start a process",
+      "title": "Start a process",
+      "empty": "There is no process you can start.",
+      "chooseProcess": "Choose a process",
+      "loadError": "Processes could not be loaded.",
+      "submitError": "The request could not be sent."
     }
   },
   "admin": {
@@ -4007,7 +4015,8 @@
       "empty": "沒有可用的流程。",
       "next": "Next",
       "forbidden": "You are not allowed to start this process here.",
-      "conflict": "This process cannot be started for this ticket right now."
+      "conflict": "This process cannot be started for this ticket right now.",
+      "notFound": "This process or ticket no longer exists."
     },
     "dialog": {
       "requiredMark": "*",

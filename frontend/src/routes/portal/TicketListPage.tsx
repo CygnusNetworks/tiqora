@@ -4,6 +4,7 @@ import { useNavigate, useSearch, Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { toBcp47 } from "@/i18n";
 import { portalApi, type TicketListItem } from "@/lib/portalApi";
+import { portalProcessApi } from "@/lib/portalProcessApi";
 import { stateColorVar } from "@/lib/status";
 import { formatDateTime } from "@/lib/format";
 import { Tabs } from "@/components/ui/Tabs";
@@ -30,6 +31,14 @@ export function TicketListPage() {
     queryFn: () => portalApi.portalListTickets({ limit: 100 }),
   });
 
+  // Failing or empty means: no link (the processes are optional).
+  const startableQ = useQuery({
+    queryKey: ["portal", "process", "startable"],
+    queryFn: ({ signal }) => portalProcessApi.listStartable(undefined, signal),
+    retry: false,
+  });
+  const hasStartable = (startableQ.data?.length ?? 0) > 0;
+
   const items = ticketsQ.data?.items;
   const filtered = useMemo(() => {
     const all = items ?? [];
@@ -47,11 +56,20 @@ export function TicketListPage() {
         <h1 className="font-display text-xl font-semibold text-ink">
           {t("portal.tickets.title")}
         </h1>
-        <Link to="/portal/tickets/new">
-          <Button variant="primary" size="sm" data-testid="portal-new-ticket-link">
-            {t("portal.nav.newTicket")}
-          </Button>
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          {hasStartable && (
+            <Link to="/portal/process/new">
+              <Button variant="secondary" size="sm" data-testid="portal-new-process">
+                {t("portal.process.start")}
+              </Button>
+            </Link>
+          )}
+          <Link to="/portal/tickets/new">
+            <Button variant="primary" size="sm" data-testid="portal-new-ticket-link">
+              {t("portal.nav.newTicket")}
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <Tabs

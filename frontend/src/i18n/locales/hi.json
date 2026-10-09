@@ -1361,6 +1361,14 @@
       "save": "सहेजें",
       "keys": "एन्क्रिप्शन",
       "keysDesc": "अपनी PGP कुंजी या S/MIME प्रमाणपत्र अपलोड करें, ताकि हम आपको एन्क्रिप्टेड ईमेल भेज सकें। इसमें आपका ईमेल पता {{email}} होना चाहिए।"
+    },
+    "process": {
+      "start": "Start a process",
+      "title": "Start a process",
+      "empty": "There is no process you can start.",
+      "chooseProcess": "Choose a process",
+      "loadError": "Processes could not be loaded.",
+      "submitError": "The request could not be sent."
     }
   },
   "admin": {
@@ -4007,7 +4015,8 @@
       "empty": "कोई प्रक्रिया उपलब्ध नहीं है.",
       "next": "Next",
       "forbidden": "You are not allowed to start this process here.",
-      "conflict": "This process cannot be started for this ticket right now."
+      "conflict": "This process cannot be started for this ticket right now.",
+      "notFound": "This process or ticket no longer exists."
     },
     "dialog": {
       "requiredMark": "*",

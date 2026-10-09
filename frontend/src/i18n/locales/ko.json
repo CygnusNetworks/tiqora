@@ -1361,6 +1361,14 @@
       "save": "저장",
       "keys": "암호화",
       "keysDesc": "암호화된 이메일을 보낼 수 있도록 PGP 키 또는 S/MIME 인증서를 업로드하세요. 이메일 주소 {{email}}이(가) 포함되어야 합니다."
+    },
+    "process": {
+      "start": "Start a process",
+      "title": "Start a process",
+      "empty": "There is no process you can start.",
+      "chooseProcess": "Choose a process",
+      "loadError": "Processes could not be loaded.",
+      "submitError": "The request could not be sent."
     }
   },
   "admin": {
@@ -4007,7 +4015,8 @@
       "empty": "사용 가능한 프로세스가 없습니다.",
       "next": "Next",
       "forbidden": "You are not allowed to start this process here.",
-      "conflict": "This process cannot be started for this ticket right now."
+      "conflict": "This process cannot be started for this ticket right now.",
+      "notFound": "This process or ticket no longer exists."
     },
     "dialog": {
       "requiredMark": "*",

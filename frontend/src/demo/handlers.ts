@@ -12,6 +12,11 @@ function respond(pathname: string, method: string): unknown {
   if (pathname.endsWith("/api/portal/auth/methods")) return { password: true };
   if (pathname.endsWith("/api/portal/auth/me")) return demoPortalUser;
   if (pathname.endsWith("/api/portal/tickets")) return demoPortalTickets;
+  // Process plane: same payloads as the agent API, so reuse its mocks.
+  if (pathname.startsWith("/api/portal/process")) {
+    const data = resolveData(pathname.replace("/api/portal/process", "/api/v1/process"), method);
+    if (data !== undefined) return data;
+  }
   if (pathname.startsWith("/api/portal/")) return method === "GET" ? [] : {};
 
   const data = resolveData(pathname, method);

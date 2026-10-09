@@ -1361,6 +1361,14 @@
       "save": "Speichern",
       "keys": "Verschlüsselung",
       "keysDesc": "Laden Sie Ihren PGP-Schlüssel oder Ihr S/MIME-Zertifikat hoch, damit wir Ihnen verschlüsselte E-Mails senden können. Er muss Ihre E-Mail-Adresse {{email}} enthalten."
+    },
+    "process": {
+      "start": "Prozess starten",
+      "title": "Prozess starten",
+      "empty": "Es gibt keinen Prozess, den Sie starten können.",
+      "chooseProcess": "Prozess wählen",
+      "loadError": "Prozesse konnten nicht geladen werden.",
+      "submitError": "Die Anfrage konnte nicht gesendet werden."
     }
   },
   "admin": {
@@ -4015,7 +4023,8 @@
       "empty": "Keine Prozesse verfügbar.",
       "next": "Weiter",
       "forbidden": "Sie dürfen diesen Prozess hier nicht starten.",
-      "conflict": "Dieser Prozess kann für dieses Ticket im Moment nicht gestartet werden."
+      "conflict": "Dieser Prozess kann für dieses Ticket im Moment nicht gestartet werden.",
+      "notFound": "Dieser Prozess oder dieses Ticket existiert nicht mehr."
     },
     "dialog": {
       "requiredMark": "*",

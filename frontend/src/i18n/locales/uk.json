@@ -1361,6 +1361,14 @@
       "save": "Зберегти",
       "keys": "Шифрування",
       "keysDesc": "Завантажте свій ключ PGP або сертифікат S/MIME, щоб ми могли надсилати вам зашифровані листи. Він має містити вашу адресу електронної пошти {{email}}."
+    },
+    "process": {
+      "start": "Start a process",
+      "title": "Start a process",
+      "empty": "There is no process you can start.",
+      "chooseProcess": "Choose a process",
+      "loadError": "Processes could not be loaded.",
+      "submitError": "The request could not be sent."
     }
   },
   "admin": {
@@ -4007,7 +4015,8 @@
       "empty": "Немає доступних процесів.",
       "next": "Next",
       "forbidden": "You are not allowed to start this process here.",
-      "conflict": "This process cannot be started for this ticket right now."
+      "conflict": "This process cannot be started for this ticket right now.",
+      "notFound": "This process or ticket no longer exists."
     },
     "dialog": {
       "requiredMark": "*",

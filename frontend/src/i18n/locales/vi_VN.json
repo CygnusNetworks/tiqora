@@ -1361,6 +1361,14 @@
       "save": "Lưu",
       "keys": "Mã hóa",
       "keysDesc": "Tải lên khóa PGP hoặc chứng chỉ S/MIME của bạn để chúng tôi có thể gửi email mã hóa cho bạn. Khóa phải chứa địa chỉ email {{email}} của bạn."
+    },
+    "process": {
+      "start": "Start a process",
+      "title": "Start a process",
+      "empty": "There is no process you can start.",
+      "chooseProcess": "Choose a process",
+      "loadError": "Processes could not be loaded.",
+      "submitError": "The request could not be sent."
     }
   },
   "admin": {
@@ -4007,7 +4015,8 @@
       "empty": "Không có quy trình nào có sẵn.",
       "next": "Next",
       "forbidden": "You are not allowed to start this process here.",
-      "conflict": "This process cannot be started for this ticket right now."
+      "conflict": "This process cannot be started for this ticket right now.",
+      "notFound": "This process or ticket no longer exists."
     },
     "dialog": {
       "requiredMark": "*",

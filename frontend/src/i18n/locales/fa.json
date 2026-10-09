@@ -1361,6 +1361,14 @@
       "save": "ذخیره",
       "keys": "رمزنگاری",
       "keysDesc": "کلید PGP یا گواهی S/MIME خود را بارگذاری کنید تا بتوانیم برای شما ایمیل رمزنگاری‌شده بفرستیم. باید نشانی ایمیل {{email}} را در بر داشته باشد."
+    },
+    "process": {
+      "start": "Start a process",
+      "title": "Start a process",
+      "empty": "There is no process you can start.",
+      "chooseProcess": "Choose a process",
+      "loadError": "Processes could not be loaded.",
+      "submitError": "The request could not be sent."
     }
   },
   "admin": {
@@ -4007,7 +4015,8 @@
       "empty": "هیچ فرآیندی در دسترس نیست.",
       "next": "Next",
       "forbidden": "You are not allowed to start this process here.",
-      "conflict": "This process cannot be started for this ticket right now."
+      "conflict": "This process cannot be started for this ticket right now.",
+      "notFound": "This process or ticket no longer exists."
     },
     "dialog": {
       "requiredMark": "*",

@@ -24,6 +24,7 @@ export function ProcessStartForm({
   error,
   onCancel,
   testIdPrefix,
+  api = processApi,
 }: {
   processEntityId: string;
   ticketId?: number;
@@ -33,14 +34,16 @@ export function ProcessStartForm({
   error?: string | null;
   onCancel?: () => void;
   testIdPrefix: string;
+  /** Agent (`processApi`, default) or customer portal (`portalProcessApi`) start-form source. */
+  api?: Pick<typeof processApi, "startForm">;
 }) {
   const { t } = useTranslation();
   const [values, setValues] = useState<FieldValues>({});
   const [errors, setErrors] = useState<FieldErrors>({});
 
   const formQ = useQuery({
-    queryKey: ["process", "start-form", processEntityId, ticketId ?? null],
-    queryFn: ({ signal }) => processApi.startForm(processEntityId, { ticketId }, signal),
+    queryKey: [api === processApi ? "process" : "portal-process", "start-form", processEntityId, ticketId ?? null],
+    queryFn: ({ signal }) => api.startForm(processEntityId, { ticketId }, signal),
     // options are ACL-filtered per open; never show a stale form
     gcTime: 0,
     retry: false,

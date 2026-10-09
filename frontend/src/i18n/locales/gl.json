@@ -1361,6 +1361,14 @@
       "save": "Gardar",
       "keys": "Cifrado",
       "keysDesc": "Carga a túa chave PGP ou o teu certificado S/MIME para que che poidamos enviar correo electrónico cifrado. Debe conter o teu enderezo de correo electrónico {{email}}."
+    },
+    "process": {
+      "start": "Start a process",
+      "title": "Start a process",
+      "empty": "There is no process you can start.",
+      "chooseProcess": "Choose a process",
+      "loadError": "Processes could not be loaded.",
+      "submitError": "The request could not be sent."
     }
   },
   "admin": {
@@ -4007,7 +4015,8 @@
       "empty": "Non hai procesos dispoñibles.",
       "next": "Next",
       "forbidden": "You are not allowed to start this process here.",
-      "conflict": "This process cannot be started for this ticket right now."
+      "conflict": "This process cannot be started for this ticket right now.",
+      "notFound": "This process or ticket no longer exists."
     },
     "dialog": {
       "requiredMark": "*",

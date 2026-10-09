@@ -1361,6 +1361,14 @@
       "save": "บันทึก",
       "keys": "การเข้ารหัส",
       "keysDesc": "อัปโหลดคีย์ PGP หรือใบรับรอง S/MIME ของคุณ เพื่อให้เราส่งอีเมลที่เข้ารหัสถึงคุณได้ โดยต้องมีที่อยู่อีเมลของคุณ {{email}} อยู่ด้วย"
+    },
+    "process": {
+      "start": "Start a process",
+      "title": "Start a process",
+      "empty": "There is no process you can start.",
+      "chooseProcess": "Choose a process",
+      "loadError": "Processes could not be loaded.",
+      "submitError": "The request could not be sent."
     }
   },
   "admin": {
@@ -4007,7 +4015,8 @@
       "empty": "ไม่มีกระบวนการที่พร้อมใช้งาน",
       "next": "Next",
       "forbidden": "You are not allowed to start this process here.",
-      "conflict": "This process cannot be started for this ticket right now."
+      "conflict": "This process cannot be started for this ticket right now.",
+      "notFound": "This process or ticket no longer exists."
     },
     "dialog": {
       "requiredMark": "*",

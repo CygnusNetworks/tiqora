@@ -57,6 +57,10 @@ import {
   type PortalTicketListSearch,
 } from "@/routes/portal/TicketListPage";
 import { NewTicketPage } from "@/routes/portal/NewTicketPage";
+import {
+  NewProcessTicketPage as PortalNewProcessTicketPage,
+  type PortalNewProcessTicketSearch,
+} from "@/routes/portal/NewProcessTicketPage";
 import { TicketDetailPage } from "@/routes/portal/TicketDetailPage";
 import { KbSearchPage, type PortalKbSearch } from "@/routes/portal/KbSearchPage";
 import { KbArticlePage } from "@/routes/portal/KbArticlePage";
@@ -600,6 +604,16 @@ const portalNewTicketRoute = createRoute({
   component: NewTicketPage,
 });
 
+// Literal path; /portal/tickets/$ticketId cannot capture it.
+const portalNewProcessTicketRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/process/new",
+  validateSearch: (s: Record<string, unknown>): PortalNewProcessTicketSearch => ({
+    process: typeof s.process === "string" && s.process !== "" ? s.process : undefined,
+  }),
+  component: PortalNewProcessTicketPage,
+});
+
 const portalTicketRoute = createRoute({
   getParentRoute: () => portalLayoutRoute,
   path: "/tickets/$ticketId",
@@ -1068,6 +1082,7 @@ const routeTree = rootRoute.addChildren([
   portalLayoutRoute.addChildren([
     portalIndexRoute,
     portalNewTicketRoute,
+    portalNewProcessTicketRoute,
     portalTicketRoute,
     portalKbRoute,
     portalKbArticleRoute,

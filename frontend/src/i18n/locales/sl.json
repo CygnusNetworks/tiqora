@@ -1361,6 +1361,14 @@
       "save": "Shrani",
       "keys": "Šifriranje",
       "keysDesc": "Naložite svoj ključ PGP ali potrdilo S/MIME, da vam lahko pošiljamo šifrirano e-pošto. Vsebovati mora vaš e-poštni naslov {{email}}."
+    },
+    "process": {
+      "start": "Start a process",
+      "title": "Start a process",
+      "empty": "There is no process you can start.",
+      "chooseProcess": "Choose a process",
+      "loadError": "Processes could not be loaded.",
+      "submitError": "The request could not be sent."
     }
   },
   "admin": {
@@ -4007,7 +4015,8 @@
       "empty": "Na voljo ni noben proces.",
       "next": "Next",
       "forbidden": "You are not allowed to start this process here.",
-      "conflict": "This process cannot be started for this ticket right now."
+      "conflict": "This process cannot be started for this ticket right now.",
+      "notFound": "This process or ticket no longer exists."
     },
     "dialog": {
       "requiredMark": "*",
