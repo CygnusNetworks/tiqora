@@ -269,6 +269,15 @@ def scopes_allow(
     return any(expanded.get(area) in wanted for area in areas)
 
 
+def area_allows(scopes: frozenset[str] | None, area: str, *, method: str) -> bool:
+    """True when ``scopes`` hold ``area`` at the level ``method`` needs (None = unrestricted)."""
+    expanded = expand_scopes(scopes)
+    if expanded is None:
+        return True
+    wanted = ("rw",) if method_needs_rw(method) else ("ro", "rw")
+    return expanded.get(area) in wanted
+
+
 def assert_scope_allows(
     scopes: frozenset[str] | None,
     *,
@@ -308,6 +317,7 @@ __all__ = [
     "InvalidApiKeyScopeError",
     "ScopeLevel",
     "all_areas_read_only_scopes",
+    "area_allows",
     "assert_scope_allows",
     "expand_scopes",
     "mcp_scopes_allow_connect",

@@ -1,7 +1,8 @@
 """Jobs polling API: visibility, progress, cancel and file download.
 
 Seed band: agent id 8601 (no users row needed: jobs.created_by is a soft reference),
-job kind prefix ``test.api``. Root (id 1) is the admin.
+job kind prefix ``test.api``; agent 8603 owns real-kind jobs (ticket export, report run)
+for the API-key kind gate. Root (id 1) is the admin.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ pytestmark = pytest.mark.db
 
 AGENT = 8601
 OTHER_AGENT = 8602
+KEY_AGENT = 8603  # owns core.* jobs: cleaned up by created_by
 ROOT = 1
 
 _URLS: list[str] = []
@@ -46,7 +48,8 @@ def _clean(url: str) -> None:
         ids = [
             r[0]
             for r in conn.execute(
-                text("SELECT id FROM tiqora_job WHERE kind LIKE 'test.api%'")
+                text("SELECT id FROM tiqora_job WHERE kind LIKE 'test.api%' OR created_by = :k"),
+                {"k": KEY_AGENT},
             ).fetchall()
         ]
         if ids:
@@ -80,7 +83,11 @@ async def env(
     await engine.dispose()
 
 
-def _client(factory: async_sessionmaker[AsyncSession], user_id: int) -> AsyncClient:
+def _client(
+    factory: async_sessionmaker[AsyncSession],
+    user_id: int,
+    scopes: frozenset[str] | None = None,
+) -> AsyncClient:
     async def _db() -> Any:
         async with factory() as session:
             yield session
@@ -91,7 +98,8 @@ def _client(factory: async_sessionmaker[AsyncSession], user_id: int) -> AsyncCli
         login=f"jobs.api.{user_id}",
         first_name="J",
         last_name="A",
-        auth_method="session",
+        auth_method="session" if scopes is None else "api_key",
+        api_key_scopes=scopes,
     )
     app.dependency_overrides[get_db] = _db
     return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
@@ -107,7 +115,7 @@ async def _make_job(
 ) -> tuple[int, list[int]]:
     async with factory() as s:
         job = TiqoraJob(
-            kind="test.api",
+            kind=extra.pop("kind", "test.api"),
             status=status,
             payload="{}",
             progress_done=extra.pop("progress_done", 0),
@@ -286,3 +294,69 @@ async def test_list_all_requires_admin(env: tuple[str, async_sessionmaker[AsyncS
     assert everything.status_code == 200
     all_ids = {j["id"] for j in everything.json()}
     assert {mine, theirs} <= all_ids
+
+
+def test_stats_job_kinds_are_the_report_handlers() -> None:
+    from tiqora.api.v1.jobs import STATS_JOB_KINDS
+    from tiqora.reporting.backfill import REPORT_BACKFILL_JOB
+    from tiqora.reporting.jobs import REPORT_EXPORT_JOB, REPORT_RUN_JOB
+
+    assert {REPORT_RUN_JOB.kind, REPORT_EXPORT_JOB.kind, REPORT_BACKFILL_JOB.kind} == (
+        STATS_JOB_KINDS
+    )
+
+
+async def test_stats_only_key_reaches_report_jobs_only(
+    env: tuple[str, async_sessionmaker[AsyncSession]],
+) -> None:
+    """F1: a stats key polls/downloads its report jobs, never its ticket exports."""
+    _, factory = env
+    csv = (("tickets.csv", "text/csv", b"tn;title"),)
+    export, (export_file,) = await _make_job(
+        factory, created_by=KEY_AGENT, kind="core.ticket_export", status="running", files=csv
+    )
+    xlsx = (("bericht.csv", "text/csv", b"a;b"),)
+    report, (report_file,) = await _make_job(
+        factory, created_by=KEY_AGENT, kind="core.report_export", status="running", files=xlsx
+    )
+    stats_rw = frozenset({"stats:rw"})
+    async with _client(factory, KEY_AGENT, stats_rw) as c:
+        denied = [
+            await c.get(f"/api/v1/jobs/{export}"),
+            await c.get(f"/api/v1/jobs/{export}/files/{export_file}"),
+            await c.post(f"/api/v1/jobs/{export}/cancel"),
+        ]
+        listed = await c.get("/api/v1/jobs")
+        allowed = [
+            await c.get(f"/api/v1/jobs/{report}"),
+            await c.get(f"/api/v1/jobs/{report}/files/{report_file}"),
+        ]
+        cancel = await c.post(f"/api/v1/jobs/{report}/cancel")
+    assert [r.status_code for r in denied] == [403, 403, 403]
+    assert "stats" in denied[0].json()["detail"]
+    assert [r.status_code for r in allowed] == [200, 200] and allowed[1].content == b"a;b"
+    assert cancel.status_code == 200
+    assert {j["id"] for j in listed.json()} == {report}  # the ticket export is not listed
+    # a tickets key (alone or next to stats) keeps reaching the ticket export
+    for scopes in ({"tickets:ro"}, {"tickets:ro", "stats:ro"}):
+        async with _client(factory, KEY_AGENT, frozenset(scopes)) as c:
+            assert (await c.get(f"/api/v1/jobs/{export}")).status_code == 200
+            got = await c.get(f"/api/v1/jobs/{export}/files/{export_file}")
+            assert got.status_code == 200 and got.content == b"tn;title"
+            ids = {j["id"] for j in (await c.get("/api/v1/jobs")).json()}
+            assert {export, report} <= ids
+    # stats:ro + tickets:ro may read the ticket export but not cancel it (POST needs rw)
+    async with _client(factory, KEY_AGENT, frozenset({"tickets:ro", "stats:rw"})) as c:
+        assert (await c.post(f"/api/v1/jobs/{export}/cancel")).status_code == 403
+
+
+async def test_stats_only_key_of_an_admin_cannot_list_all_jobs(
+    env: tuple[str, async_sessionmaker[AsyncSession]],
+) -> None:
+    _, factory = env
+    async with _client(factory, ROOT, frozenset({"stats:rw"})) as c:
+        refused = await c.get("/api/v1/jobs", params={"all": "true"})
+    async with _client(factory, ROOT, frozenset({"tickets:ro"})) as c:
+        tickets_key = await c.get("/api/v1/jobs", params={"all": "true"})
+    assert refused.status_code == 403
+    assert tickets_key.status_code == 200

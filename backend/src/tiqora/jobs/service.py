@@ -153,11 +153,18 @@ async def get_job(session: AsyncSession, job_id: int) -> TiqoraJob | None:
 
 
 async def list_jobs(
-    session: AsyncSession, *, created_by: int | None, limit: int = 50
+    session: AsyncSession,
+    *,
+    created_by: int | None,
+    limit: int = 50,
+    kinds: Sequence[str] | None = None,
 ) -> list[TiqoraJob]:
+    """Newest first; ``kinds`` (None = every kind) narrows the list to those kinds."""
     stmt = select(TiqoraJob).order_by(TiqoraJob.id.desc()).limit(limit)
     if created_by is not None:
         stmt = stmt.where(TiqoraJob.created_by == created_by)
+    if kinds is not None:
+        stmt = stmt.where(TiqoraJob.kind.in_(list(kinds)))
     return list((await session.execute(stmt)).scalars().all())
 
 
