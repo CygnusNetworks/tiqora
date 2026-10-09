@@ -6,12 +6,13 @@ import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { TicketZoomPage } from "./TicketZoomPage";
 
-const { getTicket, postPresence, aclActions, ticketState, header } = vi.hoisted(() => ({
+const { getTicket, postPresence, aclActions, ticketState, header, overflow } = vi.hoisted(() => ({
   getTicket: vi.fn(),
   postPresence: vi.fn(),
   aclActions: vi.fn(),
   ticketState: vi.fn(),
   header: vi.fn(),
+  overflow: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({ api: { getTicket, postPresence } }));
@@ -25,9 +26,9 @@ vi.mock("@/lib/lastViews", () => ({ recordTicketView: vi.fn() }));
 
 // Heavy children: only what they receive from the page matters here.
 vi.mock("@/components/agent/TicketHeader", () => ({
-  TicketHeader: (props: { allowedActions: ReadonlySet<string> | null }) => {
+  TicketHeader: (props: { allowedActions: ReadonlySet<string> | null; overflowItems?: ReactNode }) => {
     header(props.allowedActions);
-    return <div data-testid="header-stub" />;
+    return <div data-testid="header-stub">{props.overflowItems}</div>;
   },
 }));
 vi.mock("@/components/agent/AiPanel", () => ({
@@ -37,7 +38,12 @@ vi.mock("@/components/agent/ArticleMasterDetail", () => ({ ArticleMasterDetail: 
 vi.mock("@/components/agent/HistoryTable", () => ({ HistoryTable: () => null }));
 vi.mock("@/components/agent/PresenceBar", () => ({ PresenceBar: () => null }));
 vi.mock("@/components/agent/SimilarTicketsChip", () => ({ SimilarTicketsChip: () => null }));
-vi.mock("@/components/agent/TicketZoomOverflowMenu", () => ({ TicketZoomOverflowItems: () => null }));
+vi.mock("@/components/agent/TicketZoomOverflowMenu", () => ({
+  TicketZoomOverflowItems: (props: { canStartProcess: boolean }) => {
+    overflow(props.canStartProcess);
+    return null;
+  },
+}));
 vi.mock("@/components/agent/process/ProcessWidget", () => ({
   ProcessWidget: (props: { allowedActions: ReadonlySet<string> | null }) => (
     <div data-testid="process-widget-stub" data-allowed={props.allowedActions ? "set" : "null"} />
@@ -60,6 +66,7 @@ const lastAllowed = () => header.mock.calls[header.mock.calls.length - 1][0] as 
 describe("TicketZoomPage Action ACL", () => {
   beforeEach(() => {
     header.mockReset();
+    overflow.mockReset();
     getTicket.mockReset().mockResolvedValue({ id: 7, tn: "1", title: "T", permissions: { ro: true } });
     postPresence.mockReset().mockResolvedValue({});
     ticketState.mockReset().mockResolvedValue({ process_entity_id: null });
@@ -91,5 +98,16 @@ describe("TicketZoomPage Action ACL", () => {
     await screen.findByTestId("header-stub");
     await waitFor(() => expect(aclActions).toHaveBeenCalled());
     expect(lastAllowed()).toBeNull();
+  });
+
+  it.each([
+    [true, true],
+    [false, false],
+  ])("offers the overflow 'start process' only when can_start is true (%s)", async (canStart, expected) => {
+    aclActions.mockResolvedValue({ allowed: [] });
+    ticketState.mockResolvedValue({ process_entity_id: null, can_start: canStart });
+    renderPage();
+    await waitFor(() => expect(overflow).toHaveBeenCalledWith(expected));
+    if (!expected) expect(overflow).not.toHaveBeenCalledWith(true);
   });
 });

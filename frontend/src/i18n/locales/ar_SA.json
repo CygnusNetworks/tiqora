@@ -4053,7 +4053,8 @@
       "articleSubject": "الموضوع",
       "articleBody": "الجسم",
       "fieldFallbackNote": "إدخال نص عادي (لا توجد أداة مخصصة لهذا النوع من الحقول).",
-      "conflict": "This step is not possible right now."
+      "conflict": "This step is not possible right now.",
+      "forbidden": "You are not allowed to carry out this step here."
     },
     "field": {
       "Title": "Title",
@@ -4070,7 +4071,8 @@
       "CustomerID": "Customer ID",
       "PendingTime": "Remind on",
       "ArticleSubject": "Subject",
-      "ArticleBody": "Text"
+      "ArticleBody": "Text",
+      "Attachments": "Attachments"
     },
     "form": {
       "unsupported": "This field cannot be filled in here yet.",
@@ -4078,7 +4080,8 @@
       "submit": "Submit",
       "cancel": "Cancel",
       "loadError": "Could not load the form.",
-      "submitError": "Sending failed."
+      "submitError": "Sending failed.",
+      "invalid": "Please check your input. A required field is missing or a value is invalid."
     },
     "lock": {
       "lock": "locked",

@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import { dfToFieldValue, fieldValueToDf } from "@/components/fields/dynamicFields";
 import type { FieldDef, FieldKind, FieldValue, FieldValues } from "@/components/fields/types";
 import { isEmptyFieldValue } from "@/components/fields/validate";
-import { fromZonedInputValue } from "@/lib/timeZone";
+import { fromZonedInputValue, toZonedInputValue } from "@/lib/timeZone";
 import type { ProcessDialogFieldData, ProcessDialogFormData } from "@/lib/processApi";
 
 export const ARTICLE_SUBJECT_KEY = "Article.Subject";
@@ -58,7 +58,15 @@ export function processFieldDefs(form: ProcessDialogFormData, t: TFunction): Fie
       });
     } else {
       const kind = ENGINE_KIND[field.kind] ?? "text";
-      const def: FieldDef = { key: field.name, kind, label: processLabel(field, t), required, help };
+      // PendingTime: Display 2 means "required" only for a pending target state, which the form cannot know here
+      // (the server checks it). Znuny prefills the field, so the client never blocks on it.
+      const def: FieldDef = {
+        key: field.name,
+        kind,
+        label: processLabel(field, t),
+        required: field.kind === "pending_time" ? false : required,
+        help,
+      };
       if (kind === "select" || kind === "multiselect") {
         def.options = (field.options ?? []).map((o) => ({
           value: o.value,
@@ -74,6 +82,21 @@ export function processFieldDefs(form: ProcessDialogFormData, t: TFunction): Fie
 
 function asText(v: unknown): string {
   return typeof v === "string" || typeof v === "number" ? String(v) : "";
+}
+
+/** Znuny's fallback when neither the dialog nor Ticket::Frontend::PendingDiffTime gives an offset (one day). */
+const DEFAULT_PENDING_OFFSET_SECONDS = 86400;
+
+/**
+ * Start value of a PendingTime field. The server sends the dialog's `DefaultValue`, a time offset in seconds
+ * (Znuny `BuildDateSelection(DiffTime => DefaultValue || PendingDiffTime || 86400)`): now + offset in the display
+ * zone. A UTC timestamp default is taken as the date itself.
+ */
+export function initialPendingTime(d: unknown, now: Date = new Date(), zone?: string): string {
+  const text = asText(d).trim();
+  if (text && !/^\d+$/.test(text)) return String(dfToFieldValue("datetime", [text], zone) ?? "");
+  const offset = Number(text) > 0 ? Number(text) : DEFAULT_PENDING_OFFSET_SECONDS;
+  return toZonedInputValue(new Date(now.getTime() + offset * 1000), zone);
 }
 
 export function initialProcessValues(form: ProcessDialogFormData): FieldValues {
@@ -102,8 +125,10 @@ export function initialProcessValues(form: ProcessDialogFormData): FieldValues {
       case "date":
         out[field.name] = asText(d).slice(0, 10);
         break;
-      case "datetime":
       case "pending_time":
+        out[field.name] = initialPendingTime(d);
+        break;
+      case "datetime":
         out[field.name] = d === null || d === undefined || d === "" ? "" : dfToFieldValue("datetime", [d]);
         break;
       default:

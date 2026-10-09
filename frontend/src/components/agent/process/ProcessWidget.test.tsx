@@ -118,11 +118,41 @@ describe("ProcessWidget", () => {
 
     fireEvent.click(screen.getByTestId("process-dialog-submit"));
 
-    await waitFor(() =>
-      expect(screen.getByTestId("process-dialog-required-error")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("process-field-Title-error")).toBeInTheDocument());
     expect(submit).not.toHaveBeenCalled();
-    expect(screen.getByTestId("process-field-Title-error")).toBeInTheDocument();
+  });
+
+  it.each([
+    [400, "Please check your input. A required field is missing or a value is invalid."],
+    [403, "You are not allowed to carry out this step here."],
+    [404, "This process or ticket no longer exists."],
+    [409, "This step is not possible right now."],
+  ])("shows plain German text, never the server detail, when the dialog submit fails with %i", async (status, text) => {
+    ticketState.mockResolvedValue(activeState);
+    dialogForm.mockResolvedValue(dialogDetail);
+    submit.mockRejectedValue(new ApiError(status, { detail: "process 'P' is not running" }, "/x"));
+    wrap(<ProcessWidget ticketId={42} />);
+
+    fireEvent.click(await screen.findByTestId("process-dialog-button-ActivityDialog-1"));
+    fireEvent.change(await screen.findByTestId("process-field-Title"), { target: { value: "New title" } });
+    fireEvent.click(screen.getByTestId("process-dialog-submit"));
+
+    const err = await screen.findByTestId("process-dialog-error");
+    expect(err).toHaveTextContent(text);
+    expect(err).not.toHaveTextContent("not running");
+  });
+
+  it("does not title the dialog 'could not load' while the form is loading, and does not retry a 403", async () => {
+    ticketState.mockResolvedValue(activeState);
+    dialogForm.mockRejectedValue(new ApiError(403, null, "/x"));
+    wrap(<ProcessWidget ticketId={42} />);
+
+    fireEvent.click(await screen.findByTestId("process-dialog-button-ActivityDialog-1"));
+    expect(screen.queryByText("Could not load the form.")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("process-dialog-load-error")).toHaveTextContent(
+      "You are not allowed to carry out this step here.",
+    );
+    expect(dialogForm).toHaveBeenCalledTimes(1);
   });
 
   it("submits successfully and refreshes the ticket state", async () => {

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import i18n from "@/i18n";
+import { validateFieldValues } from "@/components/fields";
+import { fromZonedInputValue } from "@/lib/timeZone";
 import type { ProcessDialogFieldData, ProcessDialogFormData } from "@/lib/processApi";
 import {
   ARTICLE_BODY_KEY,
   ARTICLE_SUBJECT_KEY,
+  initialPendingTime,
   initialProcessValues,
   processFieldDefs,
   processLabel,
@@ -151,5 +154,37 @@ describe("processForm", () => {
       [ARTICLE_SUBJECT_KEY]: "",
       [ARTICLE_BODY_KEY]: "",
     });
+  });
+
+  it("prefills PendingTime with now + the configured offset, like Znuny", () => {
+    const now = new Date("2026-10-09T10:00:00Z");
+    expect(initialPendingTime("3600", now, "Europe/Berlin")).toBe("2026-10-09T13:00");
+    expect(initialPendingTime(7200, now, "Europe/Berlin")).toBe("2026-10-09T14:00");
+    // no / zero default: one day
+    expect(initialPendingTime(null, now, "Europe/Berlin")).toBe("2026-10-10T12:00");
+    expect(initialPendingTime("0", now, "Europe/Berlin")).toBe("2026-10-10T12:00");
+    // a timestamp default is the date itself
+    expect(initialPendingTime("2026-12-01 08:30:00", now, "Europe/Berlin")).toBe("2026-12-01T09:30");
+
+    const f: ProcessDialogFormData = {
+      ...form,
+      fields: [{ ...base, name: "PendingTime", kind: "pending_time", label: "PendingTime", required: true, default: "3600" }],
+    };
+    const start = Date.now();
+    const v = initialProcessValues(f).PendingTime as string;
+    expect(v).not.toBe("");
+    const ahead = fromZonedInputValue(v)!.getTime() - start;
+    expect(ahead).toBeGreaterThan(3500 * 1000 - 60_000);
+    expect(ahead).toBeLessThan(3600 * 1000 + 60_000);
+  });
+
+  it("does not require PendingTime on the client for Display 2 (only a pending target needs it)", () => {
+    const f: ProcessDialogFormData = {
+      ...form,
+      fields: [{ ...base, name: "PendingTime", kind: "pending_time", label: "PendingTime", required: true }],
+    };
+    const [def] = processFieldDefs(f, t);
+    expect(def.required).toBe(false);
+    expect(validateFieldValues([def], { PendingTime: "" }, t)).toEqual({});
   });
 });

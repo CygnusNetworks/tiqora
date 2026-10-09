@@ -58,6 +58,8 @@ export function PortalProcessWidget({ ticketId }: { ticketId: number }) {
 
   const state = stateQ.data;
   const inProcess = Boolean(state.process_entity_id);
+  // Not in a process and nothing startable (permission / customer ACL / no process): show nothing.
+  if (!inProcess && !state.can_start) return null;
 
   return (
     <div
@@ -198,7 +200,7 @@ function PortalActivityDialog({
         </div>
       ) : formQ.isError || !form ? (
         <p className="text-sm text-danger" role="alert" data-testid="portal-process-dialog-load-error">
-          {processStartErrorMessage(formQ.error, t, "process.form.loadError")}
+          {processStartErrorMessage(formQ.error, t, "process.form.loadError", "process.dialog.conflict", "process.dialog.forbidden")}
         </p>
       ) : (
         <div className="max-h-[70vh] overflow-y-auto">
@@ -207,7 +209,13 @@ function PortalActivityDialog({
             pending={submitM.isPending}
             error={
               submitM.isError
-                ? processStartErrorMessage(submitM.error, t, "process.form.submitError", "process.dialog.conflict")
+                ? processStartErrorMessage(
+                    submitM.error,
+                    t,
+                    "process.form.submitError",
+                    "process.dialog.conflict",
+                    "process.dialog.forbidden",
+                  )
                 : null
             }
             onSubmit={(fv) => submitM.mutate(fv)}

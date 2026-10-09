@@ -110,7 +110,8 @@ export function TicketZoomPage() {
   const canStartProcess =
     !processStateQ.isLoading &&
     !processStateQ.isError &&
-    !processStateQ.data?.process_entity_id;
+    !processStateQ.data?.process_entity_id &&
+    Boolean(processStateQ.data?.can_start);
 
   const sortLabel =
     tab === "articles"

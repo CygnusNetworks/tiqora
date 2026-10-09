@@ -20,6 +20,7 @@ export function ProcessFormBody({
   error,
   onCancel,
   testIdPrefix,
+  fieldTestId,
 }: {
   form: ProcessDialogFormData;
   onSubmit: (fieldValues: Record<string, unknown>) => void;
@@ -28,6 +29,8 @@ export function ProcessFormBody({
   error?: string | null;
   onCancel?: () => void;
   testIdPrefix: string;
+  /** Test id prefix of the fields; defaults to `<testIdPrefix>-field`. */
+  fieldTestId?: string;
 }) {
   const { t } = useTranslation();
   const [values, setValues] = useState<FieldValues>(() => initialProcessValues(form));
@@ -60,7 +63,7 @@ export function ProcessFormBody({
         onChange={setValue}
         errors={errors}
         disabled={pending}
-        testId={`${testIdPrefix}-field`}
+        testId={fieldTestId ?? `${testIdPrefix}-field`}
       />
       {error && (
         <p className="text-sm text-danger" role="alert" data-testid={`${testIdPrefix}-error`}>

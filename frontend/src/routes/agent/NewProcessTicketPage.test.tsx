@@ -110,16 +110,18 @@ describe("NewProcessTicketPage", () => {
     );
   });
 
-  it("shows the server message of a 400 in new-process-error", async () => {
+  it("shows a plain German text, not the English server detail, for a 400", async () => {
     searchParams.current = { process: "P" };
     listStartable.mockResolvedValue(summaries);
     startForm.mockResolvedValue(startFormData);
-    createTicket.mockRejectedValue(new ApiError(400, { detail: "Queue nicht erlaubt" }, "/x"));
+    createTicket.mockRejectedValue(new ApiError(400, { detail: "activity dialog field 'Queue': could not resolve '7' to a queue" }, "/x"));
     wrap(<NewProcessTicketPage />);
 
     await fillTitleAndSubmit();
 
-    expect(await screen.findByTestId("new-process-error")).toHaveTextContent("Queue nicht erlaubt");
+    expect(await screen.findByTestId("new-process-error")).toHaveTextContent(
+      "Bitte prüfen Sie die Eingaben. Ein Pflichtfeld fehlt oder ein Wert ist ungültig.",
+    );
     expect(navigate).not.toHaveBeenCalled();
   });
 

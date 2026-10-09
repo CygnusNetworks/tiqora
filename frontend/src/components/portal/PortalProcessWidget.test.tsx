@@ -88,6 +88,14 @@ beforeEach(() => {
 });
 
 describe("PortalProcessWidget", () => {
+  it("hides the start button when the server says the ticket cannot be enrolled (can_start false)", async () => {
+    api.ticketState.mockResolvedValue({ ...notInProcess, can_start: false });
+    wrap(<PortalProcessWidget ticketId={5} />);
+    await waitFor(() => expect(api.ticketState).toHaveBeenCalled());
+    expect(screen.queryByTestId("portal-process-start")).toBeNull();
+    expect(screen.queryByTestId("portal-process-widget")).toBeNull();
+  });
+
   it("opens a dialog through the portal dialog form and renders its article fields", async () => {
     api.ticketState.mockResolvedValue(inProcess);
     api.dialogForm.mockResolvedValue(dialogForm);
@@ -120,13 +128,14 @@ describe("PortalProcessWidget", () => {
   });
 
   it.each([
-    [403, "Sie dürfen diesen Prozess hier nicht starten."],
+    [403, "Diesen Schritt dürfen Sie hier nicht ausführen."],
     [404, "Dieser Prozess oder dieses Ticket existiert nicht mehr."],
     [409, "Dieser Schritt ist im Moment nicht möglich."],
+    [400, "Bitte prüfen Sie die Eingaben. Ein Pflichtfeld fehlt oder ein Wert ist ungültig."],
   ])("shows a plain German message when the dialog submit fails with %i", async (status, text) => {
     api.ticketState.mockResolvedValue(inProcess);
     api.dialogForm.mockResolvedValue(dialogForm);
-    api.submit.mockRejectedValue(new ApiError(status, null, "/x"));
+    api.submit.mockRejectedValue(new ApiError(status, { detail: "required activity dialog field missing: PendingTime" }, "/x"));
     wrap(<PortalProcessWidget ticketId={5} />);
 
     fireEvent.click(await screen.findByTestId("portal-process-dialog-AD-1"));
@@ -134,11 +143,13 @@ describe("PortalProcessWidget", () => {
     fireEvent.change(screen.getByLabelText(/Text/), { target: { value: "Danke" } });
     fireEvent.click(screen.getByTestId("portal-process-dialog-submit"));
 
-    expect(await screen.findByTestId("portal-process-dialog-error")).toHaveTextContent(text);
+    const err = await screen.findByTestId("portal-process-dialog-error");
+    expect(err).toHaveTextContent(text);
+    expect(err).not.toHaveTextContent("PendingTime");
   });
 
   it.each([
-    [403, "Sie dürfen diesen Prozess hier nicht starten."],
+    [403, "Diesen Schritt dürfen Sie hier nicht ausführen."],
     [404, "Dieser Prozess oder dieses Ticket existiert nicht mehr."],
     [500, "Formular konnte nicht geladen werden."],
   ])("shows a message when the dialog form fails to load with %i", async (status, text) => {

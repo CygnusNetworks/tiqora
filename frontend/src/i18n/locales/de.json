@@ -4028,7 +4028,7 @@
   "process": {
     "widget": {
       "title": "Prozess",
-      "activity": "Activity",
+      "activity": "Aktivität",
       "notInProcess": "Dieses Ticket ist Teil keines Prozesses.",
       "startButton": "Prozess starten",
       "actions": "Verfügbare Aktionen",
@@ -4061,7 +4061,8 @@
       "articleSubject": "Betreff",
       "articleBody": "Text",
       "fieldFallbackNote": "Texteingabe (kein spezielles Widget für diesen Feldtyp).",
-      "conflict": "Dieser Schritt ist im Moment nicht möglich."
+      "conflict": "Dieser Schritt ist im Moment nicht möglich.",
+      "forbidden": "Diesen Schritt dürfen Sie hier nicht ausführen."
     },
     "field": {
       "Title": "Titel",
@@ -4078,7 +4079,8 @@
       "CustomerID": "Kundennummer",
       "PendingTime": "Erinnerung am",
       "ArticleSubject": "Betreff",
-      "ArticleBody": "Text"
+      "ArticleBody": "Text",
+      "Attachments": "Anhänge"
     },
     "form": {
       "unsupported": "Dieses Feld kann hier noch nicht ausgefüllt werden.",
@@ -4086,7 +4088,8 @@
       "submit": "Absenden",
       "cancel": "Abbrechen",
       "loadError": "Formular konnte nicht geladen werden.",
-      "submitError": "Senden fehlgeschlagen."
+      "submitError": "Senden fehlgeschlagen.",
+      "invalid": "Bitte prüfen Sie die Eingaben. Ein Pflichtfeld fehlt oder ein Wert ist ungültig."
     },
     "lock": {
       "lock": "gesperrt",
