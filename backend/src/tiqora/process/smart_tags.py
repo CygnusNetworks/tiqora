@@ -159,6 +159,7 @@ async def build_tag_context(
     user_id: int,
     sysconfig: SysConfig,
     data: ConditionData | None = None,
+    for_condition: bool = False,
 ) -> PlaceholderContext:
     """The placeholder context Znuny's ``_ReplaceAdditionalAttributes`` hands to ``_Replace``.
 
@@ -167,6 +168,10 @@ async def build_tag_context(
     (Base.pm:664-690), exposed through ``<OTRS_CUSTOMER_SUBJECT|BODY|EMAIL|<column>>`` and
     ``<OTRS_AGENT_SUBJECT|BODY|<column>>`` (TemplateGenerator.pm:1456-1470, 1500-1525).
     ``data`` may carry an already loaded :func:`get_condition_data` result.
+
+    ``for_condition`` is the transition-condition variant: ``_Replace`` gets ``Data`` = the
+    ticket data and no ``DataAgent`` (TransitionValidation/Base.pm:171-178), so ``CUSTOMER_*``
+    reads the ticket hash and no article is loaded.
     """
     ctx = await load_placeholder_context(session, ticket_id=ticket_id, user_id=user_id)
     ctx.znuny_dash = True
@@ -178,6 +183,9 @@ async def build_tag_context(
     ctx.ticket["id"] = _s(data.get("TicketID"))
     ctx.ticket["number"] = _s(data.get("TicketNumber"))
 
+    if for_condition:
+        ctx.customer_article = {k.lower(): v for k, v in data.items() if isinstance(v, str)}
+        return ctx
     customer = await _load_article(session, ticket_id, sender_type="customer")
     if customer is not None:
         ctx.customer_subject = await _clean_subject(sysconfig, customer["Subject"])

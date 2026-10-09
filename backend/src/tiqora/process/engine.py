@@ -1488,7 +1488,12 @@ async def run_transitions(
         if not tag_ctx:
             tag_ctx.append(
                 await build_tag_context(
-                    session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig, data=data
+                    session,
+                    ticket_id=ticket_id,
+                    user_id=user_id,
+                    sysconfig=sysconfig,
+                    data=data,
+                    for_condition=True,
                 )
             )
         return await render_tags(text_, ctx=tag_ctx[0], sysconfig=sysconfig)

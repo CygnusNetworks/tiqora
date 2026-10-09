@@ -707,17 +707,81 @@ async def test_action_path_masks_two_pass_customer_subject_attack(
 
 
 @pytest.mark.db
-async def test_article_maps_stay_out_of_customer_and_current_user_maps(
+async def test_article_data_merges_into_customer_and_agent_hashes_with_aliases(
     factory: async_sessionmaker[AsyncSession],
 ) -> None:
+    """TemplateGenerator.pm:1484/1529: AGENT = CurrentUser + DataAgent, CUSTOMER = CustomerUser +
+    Data; CURRENT and CUSTOMER_DATA are aliases (:1687-1688) incl. the subject/body specials."""
+    cfg = await _replace(
+        factory,
+        {
+            "A": "<OTRS_CUSTOMER_From>|<OTRS_CUSTOMER_DATA_From>",
+            "B": "<OTRS_AGENT_From>|<OTRS_CURRENT_From>|<OTRS_CURRENT_UserLogin>",
+            "C": "<OTRS_CURRENT_SUBJECT>|<OTRS_CURRENT_BODY>",
+            "D": "<OTRS_CUSTOMER_DATA_SUBJECT>|<OTRS_CUSTOMER_DATA_BODY>",
+        },
+    )
+    assert cfg == {
+        "A": "customer@example.org|customer@example.org",
+        "B": "agent@example.org|agent@example.org|agent-8875",
+        "C": "Hilfe|Wir kuemmern uns",
+        "D": "Hilfe|Drucker kaputt",
+    }
     async with factory() as session:
         ctx = await build_tag_context(
             session, ticket_id=TICKET_MAIN, user_id=AGENT, sysconfig=_sysconfig()
         )
     assert ctx.customer_article["from"] == "customer@example.org"
     assert ctx.agent_article["subject"] == "Re: Hilfe"
-    assert "from" not in ctx.customer
-    assert "subject" not in ctx.current_user
+
+
+async def test_merged_article_elements_are_masked() -> None:
+    ctx = PlaceholderContext(
+        customer_article={"authtoken": "t0k", "from": "a@example.org"},
+        agent_article={"secretnote": "s"},
+    )
+    out = await expand_placeholders(
+        None,
+        _sysconfig(),
+        "<OTRS_CUSTOMER_DATA_AuthToken>|<OTRS_CUSTOMER_From>|<OTRS_CURRENT_SecretNote>",
+        context=ctx,
+    )
+    assert out == "xxx|a@example.org|xxx"
+
+
+@pytest.mark.db
+async def test_condition_context_uses_ticket_data_as_data(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """TransitionValidation/Base.pm:171-178: Data = the ticket hash, no articles, no DataAgent."""
+    async with factory() as session:
+        ctx = await build_tag_context(
+            session,
+            ticket_id=TICKET_MAIN,
+            user_id=AGENT,
+            sysconfig=_sysconfig(),
+            for_condition=True,
+        )
+        out = await render_tags(
+            "<OTRS_CUSTOMER_Title>|<OTRS_CUSTOMER_DATA_Queue>|<OTRS_CUSTOMER_SUBJECT>|"
+            "<OTRS_AGENT_Body>",
+            ctx=ctx,
+            sysconfig=_sysconfig(),
+        )
+    assert out == "Printer|Postmaster|-|-"
+
+
+async def test_dash_mode_keeps_zero_in_dynamic_field_tags_only() -> None:
+    ctx = PlaceholderContext(
+        znuny_dash=True, ticket={"dynamicfield_count": "0", "title": "0", "dynamicfield_none": ""}
+    )
+    out = await expand_placeholders(
+        None,
+        _sysconfig(),
+        "<OTRS_TICKET_DynamicField_Count>|<OTRS_TICKET_Title>|<OTRS_TICKET_DynamicField_None>",
+        context=ctx,
+    )
+    assert out == "0|-|-"
 
 
 @pytest.mark.db

@@ -583,23 +583,29 @@ async def _resolve_tag_raw(
         found = _lookup(ctx.ticket, field)
         return "" if found is None else found
 
-    if tag_u.startswith("CUSTOMER_DATA_"):
-        field = tag[len("CUSTOMER_DATA_") :]
-        # Optional allow-list: when set, only registered+enabled tags resolve.
-        if ctx.customer_allowlist is not None and field.lower() not in ctx.customer_allowlist:
-            return ""
-        found = _lookup(ctx.customer, field)
-        return "" if found is None else found
-
-    if tag_u.startswith("CUSTOMER_"):
-        rest = tag[len("CUSTOMER_") :]
+    # OTRS_CUSTOMER_DATA aliases OTRS_CUSTOMER (TemplateGenerator.pm:1687): one hash,
+    # CustomerUser plus the article ``Data`` (:1529), and the same subject / body specials.
+    is_customer_data = tag_u.startswith("CUSTOMER_DATA_")
+    if is_customer_data or tag_u.startswith("CUSTOMER_"):
+        rest = tag[len("CUSTOMER_DATA_" if is_customer_data else "CUSTOMER_") :]
         rest_u = rest.upper()
+        # Optional allow-list (CUSTOMER_DATA_ only): registered+enabled tags resolve.
+        if (
+            is_customer_data
+            and ctx.customer_allowlist is not None
+            and rest.lower() not in ctx.customer_allowlist
+        ):
+            return ""
         if rest_u == "SUBJECT" or rest_u.startswith("SUBJECT"):
             # CUSTOMER_SUBJECT[n] → first n chars of subject
             subj = ctx.customer_subject or ""
             if bracket and bracket.isdigit():
                 return subj[: int(bracket)]
             return subj
+        if is_customer_data and rest_u == "EMAIL" and "email" in ctx.customer:
+            # The raw customer_user.email column used by existing templates; Znuny's quoted-body
+            # special of that name is only reachable through ``<OTRS_CUSTOMER_EMAIL>``.
+            return ctx.customer["email"]
         if rest_u == "EMAIL" or rest_u.startswith("EMAIL"):
             lines = ctx.customer_email_lines
             count = int(bracket) if bracket and bracket.isdigit() else len(lines)
@@ -632,13 +638,10 @@ async def _resolve_tag_raw(
         found = _lookup(ctx.responsible, field)
         return "" if found is None else found
 
-    if tag_u.startswith("CURRENT_"):
-        field = tag[len("CURRENT_") :]
-        found = _lookup(ctx.current_user, field)
-        return "" if found is None else found
-
-    if tag_u.startswith("AGENT_"):
-        field = tag[len("AGENT_") :]
+    # OTRS_CURRENT aliases OTRS_AGENT (TemplateGenerator.pm:1687): CurrentUser plus DataAgent
+    # (:1484), with the same subject / body specials.
+    if tag_u.startswith(("CURRENT_", "AGENT_")):
+        field = tag[len("CURRENT_" if tag_u.startswith("CURRENT_") else "AGENT_") :]
         field_u = field.upper()
         # Agent article subject/body need article context — empty when absent.
         if field_u.startswith("SUBJECT") and ctx.agent_subject is not None:
@@ -834,7 +837,13 @@ async def _expand_placeholders_inner(
         if ctx.znuny_dash and tag_u.startswith("TA_"):
             continue  # process-management marker, kept verbatim (TemplateGenerator.pm:1592-1600)
         replacement = await _resolve_tag(tag, bracket, ctx=ctx, sysconfig=sysconfig)
-        if ctx.znuny_dash and replacement in ("", "0") and not tag_u.startswith("CONFIG_"):
+        if (
+            ctx.znuny_dash
+            and not tag_u.startswith("CONFIG_")
+            and (replacement == "" or (replacement == "0" and "DYNAMICFIELD_" not in tag_u))
+        ):
+            # DF tags keep "0" (_ReplaceDynamicField, TemplateGenerator.pm:1340-1346); only hash
+            # elements turn a falsy value into "-".
             # An empty hash value falls through to the "-" catch-all (TemplateGenerator.pm:2050,
             # 1682); OTRS_CONFIG_ is replaced earlier, ``Get($Key) // ''``, and stays empty (:1799).
             replacement = "-"
