@@ -140,7 +140,11 @@ def is_present(value: Any) -> bool:
         return False
     if isinstance(value, str):
         return value.strip() != ""
-    if isinstance(value, list | tuple | dict):
+    if isinstance(value, list | tuple):
+        # [""] is an empty dynamic field value (BaseSelect/Text EditFieldValueValidate: '' fails
+        # Mandatory), not a value.
+        return any(is_present(v) for v in value)
+    if isinstance(value, dict):
         return len(value) > 0
     return True
 

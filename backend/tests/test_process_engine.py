@@ -2067,3 +2067,131 @@ async def test_customer_interface_never_applies_pending_time(mariadb_znuny_url: 
     assert row.ticket_state_id == 6
     assert row.until_time == 0  # CustomerTicketProcess.pm:75 skips PendingTime
     assert await _pending_history(factory, ticket_id) == []
+
+
+# ---------------------------------------------------------------------------
+# Task 16b: clearing dynamic fields, required checks for empties, untouched current values.
+# ---------------------------------------------------------------------------
+
+_CLEAR_DF = "DlgClearField"
+_CLEAR_DIALOG = (
+    "FieldOrder: [Queue, Priority, Responsible, DynamicField_DlgClearField]\n"
+    "Fields:\n  Queue: {Display: '1'}\n  Priority: {Display: '1'}\n  Responsible: {Display: '1'}\n"
+    "  DynamicField_DlgClearField: {Display: '%s'}\n"
+)
+
+
+async def _seed_clear_field(session: AsyncSession) -> None:
+    await _seed_dialog_refs(session)
+    await session.execute(
+        text(
+            "INSERT IGNORE INTO dynamic_field (id, internal_field, name, label, field_order,"
+            " field_type, object_type, config, valid_id, create_time, create_by, change_time,"
+            " change_by) VALUES (9302, 0, :n, 'Clear me', 500, 'Text', 'Ticket', '---\n', 1,"
+            " current_timestamp, 1, current_timestamp, 1)"
+        ),
+        {"n": _CLEAR_DF},
+    )
+    await session.commit()
+
+
+async def _df_rows(factory: async_sessionmaker[AsyncSession], ticket_id: int) -> list[str]:
+    async with factory() as session:
+        return list(
+            (
+                await session.execute(
+                    text(
+                        "SELECT value_text FROM dynamic_field_value"
+                        " WHERE field_id = 9302 AND object_id = :t"
+                    ),
+                    {"t": ticket_id},
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+
+@pytest.mark.db
+async def test_explicit_empty_list_clears_a_dynamic_field(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_clear_field(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+    dialog = ActivityDialogConfig.from_yaml(_CLEAR_DIALOG % "1")
+    actor = ProcessActor.agent(_DLG_USER_ID)
+
+    async def submit(values: dict[str, Any]) -> None:
+        async with factory() as session, session.begin():
+            await apply_activity_dialog(
+                session,
+                ticket_id=ticket_id,
+                dialog=dialog,
+                field_values=values,
+                actor=actor,
+                sysconfig=sysconfig,
+            )
+
+    await submit({f"DynamicField_{_CLEAR_DF}": ["kept?"]})
+    assert await _df_rows(factory, ticket_id) == ["kept?"]
+    await submit({})  # key absent: the field is untouched (the old frontend behaviour)
+    assert await _df_rows(factory, ticket_id) == ["kept?"]
+    await submit({f"DynamicField_{_CLEAR_DF}": []})  # explicit empty: cleared like Znuny
+    assert await _df_rows(factory, ticket_id) == []
+
+
+@pytest.mark.db
+async def test_required_dynamic_field_still_rejects_empty_list(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_clear_field(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+    dialog = ActivityDialogConfig.from_yaml(_CLEAR_DIALOG % "2")
+    for value in ([], [""]):
+        async with factory() as session, session.begin():
+            with pytest.raises(RequiredFieldMissing, match=_CLEAR_DF):
+                await apply_activity_dialog(
+                    session,
+                    ticket_id=ticket_id,
+                    dialog=dialog,
+                    field_values={f"DynamicField_{_CLEAR_DF}": value},
+                    actor=ProcessActor.agent(_DLG_USER_ID),
+                    sysconfig=sysconfig,
+                )
+    assert await _df_rows(factory, ticket_id) == []
+
+
+@pytest.mark.db
+async def test_unchanged_queue_priority_responsible_write_nothing(mariadb_znuny_url: str) -> None:
+    """The dialog preselects the ticket's current values, so they come back unchanged
+    (Znuny's TicketQueueSet/PrioritySet/ResponsibleSet return early for the same value)."""
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_clear_field(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+    async with factory() as session:
+        queue_id, prio_id, resp_id = (
+            await session.execute(
+                text(
+                    "SELECT queue_id, ticket_priority_id, responsible_user_id FROM ticket"
+                    " WHERE id = :t"
+                ),
+                {"t": ticket_id},
+            )
+        ).one()
+    before = await _history_types(factory, ticket_id)
+    dialog = ActivityDialogConfig.from_yaml(_CLEAR_DIALOG % "1")
+    async with factory() as session, session.begin():
+        await apply_activity_dialog(
+            session,
+            ticket_id=ticket_id,
+            dialog=dialog,
+            field_values={
+                "Queue": str(queue_id),
+                "Priority": str(prio_id),
+                "Responsible": str(resp_id),
+            },
+            actor=ProcessActor.agent(_DLG_USER_ID),
+            sysconfig=sysconfig,
+        )
+    assert await _history_types(factory, ticket_id) == before

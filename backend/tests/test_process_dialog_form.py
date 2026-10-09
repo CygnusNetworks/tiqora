@@ -1078,3 +1078,157 @@ def _query_login(url: str, user_id: int) -> str:
             )
     finally:
         engine.dispose()
+
+
+# --- existing tickets: current values are preselected (task 16b) ---------------------------------
+
+
+def _store_df(url: str, field_id: int, ticket_id: int, *values: str) -> None:
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        for v in values:
+            conn.execute(
+                text(
+                    "INSERT INTO dynamic_field_value (field_id, object_id, value_text)"
+                    " VALUES (:f, :o, :v)"
+                ),
+                {"f": field_id, "o": ticket_id, "v": v},
+            )
+    engine.dispose()
+
+
+def _current_value_dialogs(conn: Any) -> None:
+    _add_dialog(conn, 1, {"Title": "Display: '1'"})
+    _add_dialog(
+        conn,
+        2,
+        {
+            "Title": "{Display: '1', DefaultValue: Dialog title}",
+            "Queue": f"{{Display: '1', DefaultValue: {Q_JUNK}}}",
+            "Priority": "{Display: '1', DefaultValue: 5 very high}",
+            "State": "{Display: '1', DefaultValue: closed successful}",
+            "Service": "{Display: '1', DefaultValue: Nowhere}",
+            "Lock": "{Display: '1', DefaultValue: lock}",
+            "Owner": f"{{Display: '1', DefaultValue: {AGENT_B}}}",
+            "Responsible": f"{{Display: '1', DefaultValue: {AGENT_A}}}",
+            "CustomerUserID": "{Display: '1', DefaultValue: nobody}",
+            "DynamicField_Region889": "{Display: '1', DefaultValue: as}",
+            "DynamicField_Tags889": "Display: '1'",
+            "DynamicField_Note889": "{Display: '1', DefaultValue: dialog note}",
+        },
+    )
+    _add_process(conn, 1, start_dialog=1, dialogs=[1, 2])
+
+
+@pytest.mark.db
+async def test_agent_dialog_on_existing_ticket_shows_current_values(
+    client: AsyncClient, sync_url: str
+) -> None:
+    _build(sync_url, _current_value_dialogs)
+    _store_df(sync_url, DF_REGION, TICKET_1, "us")
+    _store_df(sync_url, DF_MULTI, TICKET_1, "a", "b")
+    await _enroll(client, AGENT, TICKET_1)
+    form = (await client.get(f"{AGENT}/ticket/{TICKET_1}/dialog/{dialog_eid(2)}/form")).json()
+    defaults = {f["name"]: f["default"] for f in form["fields"]}
+    assert defaults == {
+        # the ticket's value beats the dialog DefaultValue (_Render*: GetParam before default)
+        "Title": "T889",
+        "Queue": str(QUEUE_SUPPORT),
+        "Priority": "3",
+        "State": "4",
+        "Lock": "unlock",
+        "CustomerUserID": CUSTOMER_LOGIN,
+        "DynamicField_Region889": "us",
+        "DynamicField_Tags889": ["a", "b"],
+        # the ticket has none: the dialog default applies
+        "Service": "Nowhere",
+        "DynamicField_Note889": "dialog note",
+        # AgentTicketProcess.pm:3354-3405: a default differing from the ticket shows,
+        # one equal to the current responsible means "no change" (empty)
+        "Owner": AGENT_B,  # the configured value as YAML read it (a number)
+        "Responsible": None,
+    }
+
+
+@pytest.mark.db
+async def test_owner_default_and_mandatory_owner_without_default(
+    client: AsyncClient, sync_url: str
+) -> None:
+    def setup(conn: Any) -> None:
+        _add_dialog(conn, 1, {"Title": "Display: '1'"})
+        _add_dialog(
+            conn,
+            2,
+            {
+                "Owner": "Display: '2'",  # mandatory, no default: the current owner
+                "Responsible": "Display: '1'",  # optional, no default: nothing selected
+            },
+        )
+        _add_process(conn, 1, start_dialog=1, dialogs=[1, 2])
+
+    _build(sync_url, setup)
+    await _enroll(client, AGENT, TICKET_1)
+    form = (await client.get(f"{AGENT}/ticket/{TICKET_1}/dialog/{dialog_eid(2)}/form")).json()
+    assert {f["name"]: f["default"] for f in form["fields"]} == {
+        "Owner": str(AGENT_A),
+        "Responsible": None,
+    }
+
+
+@pytest.mark.db
+async def test_cleared_dynamic_field_shows_the_default_again(
+    client: AsyncClient, sync_url: str
+) -> None:
+    """No stored value (never set, or cleared): the ticket gives nothing, the default applies."""
+    _build(sync_url, _current_value_dialogs)
+    await _enroll(client, AGENT, TICKET_1)
+    form = (await client.get(f"{AGENT}/ticket/{TICKET_1}/dialog/{dialog_eid(2)}/form")).json()
+    defaults = {f["name"]: f["default"] for f in form["fields"]}
+    assert defaults["DynamicField_Region889"] == "as"
+    assert defaults["DynamicField_Tags889"] is None
+
+
+@pytest.mark.db
+async def test_start_form_for_a_new_ticket_keeps_the_dialog_defaults(
+    client: AsyncClient, sync_url: str
+) -> None:
+    _build(sync_url, _current_value_dialogs)
+    form = (await _start_form(client, AGENT, 1)).json()
+    assert _by_name(form)["Title"]["default"] is None  # dialog 1 has no Title default
+
+
+@pytest.mark.db
+async def test_customer_dialog_on_existing_ticket_shows_current_values(
+    client: AsyncClient, portal_client: AsyncClient, sync_url: str
+) -> None:
+    def setup(conn: Any) -> None:
+        _add_dialog(conn, 1, {"Title": "Display: '1'"})
+        _add_dialog(
+            conn,
+            2,
+            {
+                "Title": "{Display: '1', DefaultValue: Dialog title}",
+                "Queue": f"{{Display: '1', DefaultValue: {Q_JUNK}}}",
+                "State": "{Display: '1', DefaultValue: closed successful}",
+                "Service": "{Display: '1', DefaultValue: Nowhere}",
+                "DynamicField_Region889": "{Display: '1', DefaultValue: as}",
+                "DynamicField_Note889": "{Display: '1', DefaultValue: dialog note}",
+                "Owner": "Display: '1'",  # skipped for customers
+            },
+        )
+        _add_process(conn, 1, start_dialog=1, dialogs=[1, 2])
+
+    _build(sync_url, setup)
+    _store_df(sync_url, DF_REGION, TICKET_1, "us")
+    await _enroll(client, AGENT, TICKET_1)
+    form = (
+        await portal_client.get(f"{PORTAL}/ticket/{TICKET_1}/dialog/{dialog_eid(2)}/form")
+    ).json()
+    assert {f["name"]: f["default"] for f in form["fields"]} == {
+        "Title": "T889",
+        "Queue": str(QUEUE_SUPPORT),
+        "State": "4",
+        "Service": "Nowhere",
+        "DynamicField_Region889": "us",
+        "DynamicField_Note889": "dialog note",
+    }

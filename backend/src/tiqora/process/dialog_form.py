@@ -27,15 +27,18 @@ queues (Postmaster/Raw/Junk) hidden on top of Znuny's create-group rule (Tiqora 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from dataclasses import field as dc_field
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import select
+from sqlalchemy import bindparam, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.legacy.dynamic_field import DynamicField
 from tiqora.db.legacy.queue import Queue, Service, ServiceCustomerUser, ServiceSla, Sla
 from tiqora.db.legacy.ticket import Ticket
 from tiqora.domain.dynamic_field_config import config_from_yaml
+from tiqora.domain.dynamic_field_values import get_df_values, load_ticket_dynamic_field
 from tiqora.domain.field_options import (
     AGENT_OPTION_FIELDS,
     ATTRIBUTE_OPTION_FIELDS,
@@ -423,6 +426,115 @@ def _default_value(name: str, cfg: ActivityDialogFieldConfig, df: DynamicField |
     return None
 
 
+@dataclass(frozen=True)
+class _TicketNow:
+    """The existing ticket's values in the shape a dialog field's ``default`` takes: option ids
+    as strings, ``lock``/``unlock``, the title, the customer user login, dynamic field value
+    lists. Missing attributes (no service, no type, ...) are absent."""
+
+    values: dict[str, Any] = dc_field(default_factory=dict)
+    # Owner/Responsible logins by user id, for the DefaultValue-equals-current comparison.
+    logins: dict[str, str] = dc_field(default_factory=dict)
+
+
+# Ticket column -> dialog field name (AgentTicketProcess.pm: %GetParam = %Ticket on an
+# existing ticket; the Render* subs read GetParam{QueueID}, {StateID}, ... before DefaultValue).
+_TICKET_COLUMN_FIELDS = {
+    "queue_id": "Queue",
+    "ticket_state_id": "State",
+    "ticket_priority_id": "Priority",
+    "type_id": "Type",
+    "service_id": "Service",
+    "sla_id": "SLA",
+    "user_id": "Owner",
+    "responsible_user_id": "Responsible",
+}
+_LOCK_NAMES = {1: "unlock", 2: "lock", 3: "lock"}  # tmp_lock counts as locked
+
+
+async def _load_ticket_now(
+    session: AsyncSession, ticket_id: int | None, names: Sequence[str]
+) -> _TicketNow | None:
+    """Current values of the dialog's fields on an existing ticket (``None`` for new tickets)."""
+    if ticket_id is None:
+        return None
+    ticket = (
+        await session.execute(select(Ticket).where(Ticket.id == ticket_id))
+    ).scalar_one_or_none()
+    if ticket is None:
+        return None
+    values: dict[str, Any] = {}
+    for column, name in _TICKET_COLUMN_FIELDS.items():
+        raw = getattr(ticket, column)
+        if raw:  # NULL / 0 = unset (Znuny skips falsy IDs)
+            values[name] = str(int(raw))
+    if ticket.title is not None:
+        values["Title"] = ticket.title
+    if ticket.ticket_lock_id in _LOCK_NAMES:
+        values["Lock"] = _LOCK_NAMES[int(ticket.ticket_lock_id)]
+    if ticket.customer_user_id:
+        values["CustomerUserID"] = ticket.customer_user_id
+    logins: dict[str, str] = {}
+    user_ids = {values[n] for n in ("Owner", "Responsible") if n in values}
+    if user_ids:
+        rows = await session.execute(
+            text("SELECT id, login FROM users WHERE id IN :ids").bindparams(
+                bindparam("ids", expanding=True)
+            ),
+            {"ids": [int(i) for i in user_ids]},
+        )
+        logins = {str(r[0]): str(r[1]) for r in rows}
+    for name in names:
+        if not name.startswith(DF_OPTION_PREFIX):
+            continue
+        config = await load_ticket_dynamic_field(session, name[len(DF_OPTION_PREFIX) :])
+        if config is None:
+            continue
+        stored = await get_df_values(session, config, ticket_id)
+        if stored:
+            values[name] = stored
+    return _TicketNow(values=values, logins=logins)
+
+
+def _initial_value(
+    name: str,
+    cfg: ActivityDialogFieldConfig,
+    df: DynamicField | None,
+    kind: FieldKind,
+    required: bool,
+    now: _TicketNow | None,
+) -> Any:
+    """The dialog field's ``default`` -- what Znuny preselects.
+
+    New ticket: the dialog ``DefaultValue``, else the dynamic field's own default. Existing
+    ticket (``now`` given), per ``AgentTicketProcess.pm``/``CustomerTicketProcess.pm``:
+
+    * Queue/State/Priority/Type/Service/SLA/Lock (``_Render*``: ``GetParam{QueueID}`` -- the
+      ticket's value -- is read before ``DefaultValue``) and Title/customer: the ticket's
+      value, the dialog default only when the ticket has none.
+    * Dynamic fields (``_GetParam`` :1157-1200): the stored value, then the dialog default,
+      then the field's own default.
+    * Owner/Responsible (:3354-3405, :3527-3580): the dialog default; one that equals the
+      current user on an optional field means "no change" (empty); a mandatory field without
+      default shows the current user.
+    * PendingTime: no ticket value exists; ``DefaultValue`` is a time offset.
+    """
+    configured = _default_value(name, cfg, df)
+    if now is None or name == "PendingTime":
+        return configured
+    current = now.values.get(name)
+    if name in ("Owner", "Responsible"):
+        if configured is not None:
+            same = str(configured) in (current, now.logins.get(current or ""))
+            return None if same and not required else configured
+        return current if required else None
+    if isinstance(current, list):  # dynamic field: stored values
+        return current if kind == "multiselect" else current[0]
+    if current is not None and current != "":
+        return current
+    return configured
+
+
 async def build_dialog_form(
     session: AsyncSession,
     *,
@@ -487,6 +599,7 @@ async def build_dialog_form(
             if name in _ATTRIBUTE_KEY or _field_kind(name, dynamic_fields) in _DF_OPTION_KINDS
         }
 
+    now = await _load_ticket_now(session, ticket_id, names)
     fields: list[ProcessDialogFieldOut] = []
     for name in names:
         cfg = dialog_fields[name]
@@ -512,7 +625,7 @@ async def build_dialog_form(
                 required=required,
                 description_short=cfg.description_short,
                 description_long=cfg.description_long,
-                default=_default_value(name, cfg, df),
+                default=_initial_value(name, cfg, df, kind, required, now),
                 options=field_options,
             )
         )

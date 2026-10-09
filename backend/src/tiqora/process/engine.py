@@ -309,6 +309,16 @@ async def _resolve_sla_id(session: AsyncSession, name: str | None, id_: int | No
     ).scalar_one_or_none()
 
 
+async def _ticket_column_unchanged(
+    session: AsyncSession, ticket_id: int, column: str, new_id: int
+) -> bool:
+    """Same queue/priority/responsible: Znuny's ``TicketQueueSet`` (Ticket.pm:2157),
+    ``TicketPrioritySet`` (:5380) and ``TicketResponsibleSet`` (:5094) write nothing. The
+    dialog now preselects the ticket's current values, so an untouched field is submitted."""
+    t = await _ticket_must_exist(session, ticket_id)
+    return int(t[column]) == new_id
+
+
 async def _state_unchanged(session: AsyncSession, ticket_id: int, state_id: int) -> bool:
     """Same state: Znuny writes nothing (TicketStateSet.pm:163, Ticket.pm:4531-4539)."""
     t = await _ticket_must_exist(session, ticket_id)
@@ -1203,7 +1213,9 @@ async def _apply_dialog_field_changes(
             raw=field_values["Queue"],
             resolver=_resolve_queue_id,
         )
-        if queue_id is not None:
+        if queue_id is not None and not await _ticket_column_unchanged(
+            session, ticket_id, "queue_id", queue_id
+        ):
             await move_queue(
                 session,
                 ticket_id=ticket_id,
@@ -1237,7 +1249,9 @@ async def _apply_dialog_field_changes(
             raw=field_values["Priority"],
             resolver=_resolve_priority_id,
         )
-        if priority_id is not None:
+        if priority_id is not None and not await _ticket_column_unchanged(
+            session, ticket_id, "ticket_priority_id", priority_id
+        ):
             await change_priority(
                 session,
                 ticket_id=ticket_id,
@@ -1310,7 +1324,9 @@ async def _apply_dialog_field_changes(
             raw=field_values["Responsible"],
             resolver=_resolve_user_id,
         )
-        if responsible_id is not None:
+        if responsible_id is not None and not await _ticket_column_unchanged(
+            session, ticket_id, "responsible_user_id", responsible_id
+        ):
             await assign_responsible(
                 session, ticket_id=ticket_id, new_responsible_id=responsible_id, user_id=user_id
             )

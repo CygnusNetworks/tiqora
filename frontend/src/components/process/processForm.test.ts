@@ -88,8 +88,50 @@ describe("processForm", () => {
     expect(v).toEqual({ Queue: "3", Subject: "S", Body: "B", PendingTime: "2026-10-12T08:00:00.000Z", DynamicField_Tags: ["a", "b"] });
   });
 
-  it("leaves empty values out", () => {
-    expect(toSubmitValues(form, { Queue: "", [ARTICLE_SUBJECT_KEY]: "", [ARTICLE_BODY_KEY]: "", PendingTime: "", DynamicField_Tags: [] })).toEqual({});
+  it("leaves empty ticket attributes out but sends [] for an emptied dynamic field", () => {
+    expect(toSubmitValues(form, { Queue: "", [ARTICLE_SUBJECT_KEY]: "", [ARTICLE_BODY_KEY]: "", PendingTime: "", DynamicField_Tags: [] })).toEqual({
+      DynamicField_Tags: [],
+    });
+  });
+
+  it("clears every kind of editable dynamic field with an explicit empty list", () => {
+    const dfs: ProcessDialogFormData = {
+      ...form,
+      fields: [
+        { ...base, name: "Title", kind: "text", label: "Title", required: false },
+        { ...base, name: "DynamicField_Txt", kind: "text", label: "Txt", required: false },
+        { ...base, name: "DynamicField_Sel", kind: "select", label: "Sel", required: false },
+        { ...base, name: "DynamicField_Day", kind: "date", label: "Day", required: false },
+        { ...base, name: "DynamicField_At", kind: "datetime", label: "At", required: false },
+        { ...base, name: "DynamicField_Reg", kind: "unsupported", label: "Reg", required: false },
+      ],
+    };
+    // The user emptied the prefilled fields (initial values come from the ticket's values).
+    const values = { Title: "", DynamicField_Txt: "", DynamicField_Sel: "", DynamicField_Day: "", DynamicField_At: "" };
+    expect(toSubmitValues(dfs, values, "Europe/Berlin")).toEqual({
+      DynamicField_Txt: [],
+      DynamicField_Sel: [],
+      DynamicField_Day: [],
+      DynamicField_At: [],
+    });
+    // A value still goes out as a one-element list.
+    expect(toSubmitValues(dfs, { ...values, DynamicField_Txt: "x" })).toMatchObject({ DynamicField_Txt: ["x"] });
+  });
+
+  it("round-trips a prefilled current value untouched", () => {
+    const f: ProcessDialogFormData = {
+      ...form,
+      fields: [
+        { ...base, name: "Queue", kind: "select", label: "Queue", required: false, default: "3", options: [{ value: "3", label: "Support" }] },
+        { ...base, name: "DynamicField_Txt", kind: "text", label: "Txt", required: false, default: "stored" },
+        { ...base, name: "DynamicField_Tags", kind: "multiselect", label: "T", required: false, default: ["a", "b"] },
+      ],
+    };
+    expect(toSubmitValues(f, initialProcessValues(f))).toEqual({
+      Queue: "3",
+      DynamicField_Txt: ["stored"],
+      DynamicField_Tags: ["a", "b"],
+    });
   });
 
   it("seeds initial values from the defaults", () => {

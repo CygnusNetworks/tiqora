@@ -113,7 +113,7 @@ export function initialProcessValues(form: ProcessDialogFormData): FieldValues {
   return out;
 }
 
-/** Engine values -> `field_values` of the API (article split, UTC ISO instants, DF lists). Empty values are left out. */
+/** Engine values -> `field_values` of the API (article split, UTC ISO instants, DF lists). Empty ticket attributes are left out (Znuny skips them); an empty dynamic field is sent as `[]` and clears it. */
 export function toSubmitValues(form: ProcessDialogFormData, values: FieldValues, zone?: string): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const put = (key: string, value: FieldValue | undefined) => {
@@ -139,8 +139,9 @@ export function toSubmitValues(form: ProcessDialogFormData, values: FieldValues,
       }
       default: {
         if (field.name.startsWith(DF_PREFIX)) {
-          const list = fieldValueToDf(ENGINE_KIND[field.kind] ?? "text", v ?? null, zone);
-          if (list.length > 0) out[field.name] = list;
+          // An empty list is sent on purpose: Znuny's ValueSet with an empty value clears the field
+          // (the form shows the stored value, so empty means the user cleared it).
+          out[field.name] = fieldValueToDf(ENGINE_KIND[field.kind] ?? "text", v ?? null, zone);
         } else if (field.kind === "datetime") {
           const d = typeof v === "string" ? fromZonedInputValue(v, zone) : null;
           if (d) out[field.name] = d.toISOString();
