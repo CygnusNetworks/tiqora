@@ -7,12 +7,12 @@ selects from the table it deletes from, and the tables mix collations in prod.
 
 from __future__ import annotations
 
-import re
 from collections.abc import Sequence
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.znuny.perl_format import perl_num
 from tiqora.znuny.sysconfig import SysConfig
 
 _CHUNK = 500
@@ -53,15 +53,11 @@ async def delete_customer_sessions(session: AsyncSession, login: str) -> int:
     return len(ids)
 
 
-_NUM_PREFIX = re.compile(r"^\s*([+-]?\d+(?:\.\d+)?)")
-
-
 def _perl_epoch(raw: str | None, now: int) -> float:
     """``$value || $TimeNow`` then Perl numification (leading number, else 0)."""
     if raw is None or raw == "" or raw == "0":
         return now
-    m = _NUM_PREFIX.match(str(raw))
-    return float(m.group(1)) if m else 0.0
+    return float(perl_num(str(raw)))
 
 
 async def purge_expired_sessions(session: AsyncSession, *, now: int, sysconfig: SysConfig) -> int:

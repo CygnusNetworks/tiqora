@@ -28,7 +28,7 @@ from tiqora.api.compat.article_input import (
     parse_gi_dynamic_fields,
     send_gi_auto_response,
 )
-from tiqora.api.compat.history_at import queue_at
+from tiqora.api.compat.history_at import queues_at
 from tiqora.api.compat.mapping import MappingError
 from tiqora.api.compat.mapping.out_of_office import OutOfOfficeMapper
 from tiqora.api.compat.mapping.perl import perl_str, perl_truthy
@@ -118,6 +118,7 @@ from tiqora.znuny.password import (
     needs_rehash,
     verify_password,
 )
+from tiqora.znuny.perl_format import perl_int
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -2551,10 +2552,10 @@ async def op_ticket_search(
         _add_join("JOIN article a_ct ON a_ct.ticket_id = t.id", "article_ct")
         if m := data.get("ArticleCreateTimeNewerMinutes"):
             conditions.append("a_ct.create_time >= :act_nm")
-            params["act_nm"] = now_naive - timedelta(minutes=_perl_int(m))
+            params["act_nm"] = now_naive - timedelta(minutes=perl_int(m))
         if m := data.get("ArticleCreateTimeOlderMinutes"):
             conditions.append("a_ct.create_time <= :act_om")
-            params["act_om"] = now_naive - timedelta(minutes=_perl_int(m))
+            params["act_om"] = now_naive - timedelta(minutes=perl_int(m))
         if m := data.get("ArticleCreateTimeNewerDate"):
             conditions.append("a_ct.create_time >= :act_nd")
             params["act_nd"] = m
@@ -2697,12 +2698,6 @@ async def op_ticket_search(
     if not ticket_ids:
         return {}
     return {"TicketID": ticket_ids}
-
-
-def _perl_int(value: Any) -> int:
-    """Perl numeric context: the leading integer of a string, else 0 (never raises)."""
-    match = re.match(r"\s*[+-]?\d+", str(value))
-    return int(match.group()) if match else 0
 
 
 def _to_list(val: Any) -> list[Any]:
@@ -2900,6 +2895,11 @@ async def op_time_accounting_get(
     )
 
     # Znuny reports the queue the ticket was in when the time was booked (no TicketID key).
+    # The history of each ticket is read once, not once per accounting row.
+    moments: dict[int, list[datetime]] = {}
+    for r in rows:
+        moments.setdefault(int(r["ticket_id"]), []).append(r["create_time"])
+    queues = {tid: await queues_at(session, tid, at) for tid, at in moments.items()}
     entries = [
         {
             "TicketNumber": r["tn"],
@@ -2907,7 +2907,7 @@ async def op_time_accounting_get(
             "TicketTitle": r["title"],
             "TimeUnit": perl_str(znuny_num(r["time_unit"])),
             "Created": znuny_ts(r["create_time"]),
-            "Queue": await queue_at(session, int(r["ticket_id"]), r["create_time"]),
+            "Queue": queues[int(r["ticket_id"])][r["create_time"]],
         }
         for r in rows
     ]

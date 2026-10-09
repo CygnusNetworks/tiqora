@@ -143,7 +143,7 @@ def test_escalation_excludes_zero_and_uses_epoch() -> None:
     assert params == {"tw1": 1773144000}  # 2026-03-10 12:00:00 UTC
 
 
-def test_change_bounds_get_their_own_history_join() -> None:
+def test_change_bounds_share_one_history_row() -> None:
     conditions: list[str] = []
     joins: list[str] = []
     assert time_filters(
@@ -156,19 +156,40 @@ def test_change_bounds_get_their_own_history_join() -> None:
         joins,
         now=NOW,
     )
-    assert len(joins) == 2
-    assert joins[0] != joins[1]
-    assert conditions == ["thw1.create_time <= :tw1", "thw2.create_time >= :tw2"]
+    # one EXISTS per family, both bounds on the same row; no join (no N^2 rows)
+    assert joins == []
+    assert conditions == [
+        "EXISTS (SELECT 1 FROM ticket_history thw1 WHERE thw1.ticket_id = t.id"
+        " AND thw1.create_time <= :tw1 AND thw1.create_time >= :tw2)"
+    ]
+
+
+def test_change_and_close_are_separate_families() -> None:
+    conditions: list[str] = []
+    joins: list[str] = []
+    assert time_filters(
+        {"TicketChangeTimeNewerMinutes": "60", "TicketCloseTimeNewerMinutes": "30"},
+        conditions,
+        {},
+        joins,
+        now=NOW,
+    )
+    assert joins == []
+    assert len(conditions) == 2
+    assert "thw1" in conditions[0] and "closed" not in conditions[0]
+    assert "thw2" in conditions[1] and "tst.name = 'closed'" in conditions[1]
 
 
 def test_close_uses_new_ticket_and_state_update_with_closed_states() -> None:
     conditions: list[str] = []
     joins: list[str] = []
     assert time_filters({"TicketCloseTimeNewerMinutes": "30"}, conditions, {}, joins, now=NOW)
-    assert len(joins) == 1
+    assert joins == []
+    assert len(conditions) == 1
+    assert conditions[0].startswith("EXISTS (SELECT 1 FROM ticket_history thw1 WHERE")
     assert "'NewTicket', 'StateUpdate'" in conditions[0]
     assert "tst.name = 'closed'" in conditions[0]
-    assert conditions[1] == "thw1.create_time >= :tw1"
+    assert conditions[0].endswith("AND thw1.create_time >= :tw1)")
 
 
 def test_pending_is_restricted_to_pending_state_types() -> None:

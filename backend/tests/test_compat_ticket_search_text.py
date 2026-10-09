@@ -316,7 +316,37 @@ async def test_title_stays_exact_with_wildcards(sync_url: str) -> None:
 
 async def test_non_integer_in_id_filter_empties_whole_search(sync_url: str) -> None:
     assert await _search(sync_url, {"TicketID": [T_INV, "abc"]}) == {}
-    assert await _ids(sync_url, {"TicketID": [T_INV, 2**70]}) == [T_INV]
+    # Znuny Quote(..., 'Integer') allows 1-16 digits: a 17-digit element empties the search
+    assert await _search(sync_url, {"TicketID": [T_INV, 10**16]}) == {}
+    assert await _ids(sync_url, {"TicketID": [T_INV, 10**15]}) == [T_INV]
+
+
+async def test_underscore_is_a_literal_not_a_wildcard(sync_url: str) -> None:
+    # Znuny quotes the word with Quote(..., 'Like'): '_' -> '\_'
+    assert await _ids(sync_url, {"MIMEBase_Subject": "Ihre_Rechnung"}) == []
+    assert await _ids(sync_url, {"MIMEBase_Subject": "Ihre Rechnung"}) == [T_INV]
+    assert await _ids(sync_url, {"Fulltext": "Ihre_Rechnung"}) == []
+
+
+async def test_wildcard_only_fulltext_still_forces_or(sync_url: str) -> None:
+    # GI: `if ($GetParam{Fulltext}) { ContentSearch = 'OR' }` - also for '*'
+    both = {"MIMEBase_From": "erika", "MIMEBase_Subject": "Rechnung"}
+    assert await _ids(sync_url, both) == []
+    assert await _ids(sync_url, {**both, "Fulltext": "*"}) == [T_INV, T_OFFER]
+    assert await _ids(sync_url, {**both, "Fulltext": "0"}) == []
+
+
+async def test_fulltext_with_mimebase_is_or_and_finds_attachment_names(sync_url: str) -> None:
+    await _set_sysconfig(sync_url, 1)
+    # Fulltext forces OR: the subject match and the fulltext match both count
+    assert await _ids(sync_url, {"Fulltext": "Vertrag-2024", "MIMEBase_Subject": "Rechnung"}) == [
+        T_INV,
+        T_OFFER,
+    ]
+    # the attachment name is only searched while IndexAttachmentNames is on
+    assert await _ids(sync_url, {"Fulltext": "Vertrag-2024"}) == [T_OFFER]
+    await _set_sysconfig(sync_url, 0)
+    assert await _ids(sync_url, {"Fulltext": "Vertrag-2024"}) == []
 
 
 async def test_article_text_filters_appends_condition_only_when_needed() -> None:

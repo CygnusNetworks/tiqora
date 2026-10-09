@@ -287,3 +287,36 @@ async def test_unparsable_date_bound_gives_empty_result(sync_url: str) -> None:
     finally:
         await engine.dispose()
     assert res == {}
+
+
+async def test_history_is_read_once_per_ticket_not_per_entry(sync_url: str) -> None:
+    from sqlalchemy import event
+
+    engine = create_async_engine(_async_url(sync_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    store = SessionStore(_FakeRedis(), _FakeSettings())  # type: ignore[arg-type]
+    statements: list[str] = []
+
+    def _record(conn: Any, cursor: Any, statement: str, *args: Any) -> None:
+        statements.append(statement)
+
+    event.listen(engine.sync_engine, "before_cursor_execute", _record)
+    try:
+        async with factory() as session:
+            res = await op_time_accounting_get(
+                {
+                    "SessionID": SESSION,
+                    "TimeAccountingUserLogin": "gi8980.agent",
+                    "TimeAccountingStart": "2024-06-01 00:00:00",
+                    "TimeAccountingEnd": "2024-06-01 23:59:59",
+                },
+                session,
+                store,
+            )
+    finally:
+        await engine.dispose()
+    entries = res["TimeAccountingResult"]
+    tickets = {e["TicketNumber"] for e in entries}
+    assert len(entries) > len(tickets)  # T_MOVED has two entries
+    history_reads = [s for s in statements if "FROM ticket_history th" in s]
+    assert len(history_reads) == len(tickets)

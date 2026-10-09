@@ -23,6 +23,7 @@ Q_A, Q_B = 7670, 7671
 T_A, T_B, T_C, T_D = 7670, 7671, 7672, 7673
 T_X = 7674  # in a queue the agent has no ro permission for
 Q_X = 7672
+T_E, Q_E = 7675, 7673  # history only outside a change window, in its own queue
 ALL_QUEUES = [Q_A, Q_B]
 
 _SEEDED: list[str] = []
@@ -168,6 +169,9 @@ def _seed(sync_url: str) -> None:
             "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
             " signature_id, follow_up_id, follow_up_lock, valid_id, create_time, create_by,"
             " change_time, change_by) VALUES (7671, 'Q7671', 7670, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1)",
+            "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
+            " signature_id, follow_up_id, follow_up_lock, valid_id, create_time, create_by,"
+            " change_time, change_by) VALUES (7673, 'Q7673', 7670, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1)",
         ):
             conn.execute(text(stmt), {"t": t0})
         for key, val in {
@@ -222,6 +226,10 @@ def _seed(sync_url: str) -> None:
             until=_epoch(_NOW + timedelta(hours=2)),
         )
         _ticket(conn, T_X, queue=Q_X, state="new", created=_ago(days=1), changed=_ago(days=1))
+        # E: history 10 days and 1 day ago, nothing in between (only searched via Q_E)
+        _ticket(conn, T_E, queue=Q_E, state="new", created=_ago(days=10), changed=_ago(days=1))
+        _history(conn, T_E, "NewTicket", _ago(days=10), queue=Q_E, state="new")
+        _history(conn, T_E, "Move", _ago(days=1), queue=Q_E, state="new")
         # articles: A has two matching ones (duplicate rows through the MIME join), B one
         _article(conn, 7670, T_A, "needle one", _ago(days=9))
         _article(conn, 7671, T_A, "needle two", _ago(days=8))
@@ -282,14 +290,19 @@ async def test_created_unknown_name_gives_empty_result(sync_url: str) -> None:
     assert await _search(sync_url, {"CreatedQueues": ["NoSuchQueue7670"]}) == {}
 
 
-async def test_change_windows_use_one_history_join_per_bound(sync_url: str) -> None:
+async def test_change_window_bounds_apply_to_the_same_history_row(sync_url: str) -> None:
     day = 24 * 60
     # any history row within 7 days: A (Move), B
     assert await _ids(sync_url, {"TicketChangeTimeNewerMinutes": 7 * day}) == [T_A, T_B]
-    # any history row older than 3 days, newer than 7: A's NewTicket + Move satisfy
-    # the bounds through different rows (a shared join would find none)
+    # "changed between 7 and 3 days ago": A's Move (5 days) lies inside the window
     both = {"TicketChangeTimeNewerMinutes": 7 * day, "TicketChangeTimeOlderMinutes": 3 * day}
     assert await _ids(sync_url, both) == [T_A]
+    # E has rows 10 days and 1 day ago only: each bound is met by a different row, but no
+    # single row lies in the window (Znuny: both bounds on the one alias th1)
+    assert await _ids(sync_url, {**both, "QueueIDs": [Q_E]}) == []
+    assert await _ids(sync_url, {"TicketChangeTimeNewerMinutes": 7 * day, "QueueIDs": [Q_E]}) == [
+        T_E
+    ]
     assert await _ids(
         sync_url,
         {
@@ -379,7 +392,11 @@ async def test_out_of_range_ids_match_nothing_and_are_not_bound(sync_url: str) -
     assert await _search(sync_url, {"LockIDs": ["x"]}) == {}
     assert await _search(sync_url, {"CreatedQueueIDs": 2**33}) == {}
     # valid ids next to invalid ones still match
-    assert await _ids(sync_url, {"TicketID": [T_A, 2**70]}) == [T_A]
+    # an id longer than 16 digits is no integer for Znuny (Quote 'Integer'): empty search
+    assert await _search(sync_url, {"TicketID": [T_A, 2**70]}) == {}
+    assert await _search(sync_url, {"TicketID": [T_A, 10**16]}) == {}
+    assert await _search(sync_url, {"QueueIDs": [Q_A, "12345678901234567"]}) == {}
+    assert await _ids(sync_url, {"TicketID": [T_A, 10**15]}) == [T_A]
     assert await _ids(sync_url, {"StateIDs": [40000], "States": ["new"]}) == [T_A]
 
 

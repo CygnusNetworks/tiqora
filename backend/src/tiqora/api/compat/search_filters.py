@@ -27,8 +27,11 @@ TicketPendingTime*                             ``ticket.until_time`` (epoch), re
 
 Deviations / decisions:
 
-* Every Newer/Older bound of the history families gets its OWN history join (controller
-  ruling); Znuny shares one alias per family, so both bounds must hit the same row there.
+* The history families are one ``EXISTS`` subquery each (``TicketChangeTime*`` and
+  ``TicketCloseTime*`` separately): every Newer/Older bound of a family applies to the SAME
+  ``ticket_history`` row, exactly like Znuny's single alias per family (``th1`` / ``th2`` in
+  ``_TicketHistoryReferenceForSearchArgument``). "Changed between 7 and 3 days ago" therefore
+  needs one history row inside the window, and no history row is joined (no N^2 rows).
 * ``TimePoint`` / ``TimeSlot`` forms exist in Znuny's GI operation only for
   ``ChangeTimeSearchType``, ``LastChangeTimeSearchType`` and ``CloseTimeSearchType``;
   there is no create-time form (``TimeSearchType`` is read and ignored), so none is added.
@@ -48,10 +51,13 @@ Deviations / decisions:
   ``*``, so every value is wrapped (``Rech*`` is also a substring match), ``*`` -> ``%``,
   ``%%`` collapses to ``%``; a value of only wildcards (any length) is skipped.
   ``ContentSearch`` ``OR`` joins the conditions with OR (default AND; ``Fulltext`` forces OR
-  like the GI operation). ``MIMEBase_AttachmentName`` exists only when SysConfig
+  like the GI operation, also when the ``Fulltext`` value itself is wildcard-only and
+  skipped). ``_`` is a literal, not a LIKE wildcard (Znuny ``Quote($Value, 'Like')``).
+  ``MIMEBase_AttachmentName`` exists only when SysConfig
   ``Ticket::Article::Backend::MIMEBase::IndexAttachmentNames`` is truthy.
 * A non-integer element in any id filter makes the whole search empty (Znuny logs
-  "The given param ... is invalid!" and returns nothing).
+  "The given param ... is invalid!" and returns nothing); an element of more than 16 digits
+  is not an integer for Znuny (``Quote($Element, 'Integer')``) and empties it too.
 * Pure SQL, no string JOINs between ``tiqora_*`` and Znuny tables.
 """
 
@@ -65,6 +71,8 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.api.compat.mapping.perl import perl_truthy
+from tiqora.znuny.perl_format import perl_int, perl_num
 from tiqora.znuny.sysconfig import SysConfig
 
 _DATE_RE = re.compile(r"\A(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})\Z")
@@ -79,15 +87,6 @@ _POINT_MINUTES = {
 }
 
 
-def _perl_true(value: Any) -> bool:
-    """Perl truthiness of a scalar (``""``, ``"0"``, ``0`` and undef are false)."""
-    if value is None:
-        return False
-    if isinstance(value, (dict, list, tuple)):
-        return bool(value)
-    return str(value) not in ("", "0")
-
-
 def _scalar(data: Mapping[str, Any], key: str) -> str | None:
     """``IsStringWithData``: a non-empty scalar, whitespace stripped (as ``_GetParams``)."""
     value = data.get(key)
@@ -99,8 +98,7 @@ def _scalar(data: Mapping[str, Any], key: str) -> str | None:
 
 def _number(value: str) -> float:
     """Perl numification: a leading number, otherwise 0."""
-    match = re.match(r"\s*[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?", value)
-    return float(match.group(0)) if match else 0.0
+    return float(perl_num(value))
 
 
 def _int_or_float(value: float) -> int | float:
@@ -109,7 +107,7 @@ def _int_or_float(value: float) -> int | float:
 
 def _two_digits(value: Any) -> str:
     """``sprintf("%02d", $v)`` for undef / numeric strings."""
-    return f"{int(_number(str(value))) if value is not None else 0:02d}"
+    return f"{perl_int(str(value)) if value is not None else 0:02d}"
 
 
 def create_time_settings(data: Mapping[str, Any], *, now: datetime) -> dict[str, Any]:
@@ -127,7 +125,7 @@ def create_time_settings(data: Mapping[str, Any], *, now: datetime) -> dict[str,
         ("CloseTimeSearchType", "TicketCloseTime"),
     ):
         search_type = out.get(search_type_key)
-        if not _perl_true(search_type):
+        if not perl_truthy(search_type):
             continue
         if search_type == "TimeSlot":
             for edge in ("Start", "Stop"):
@@ -138,9 +136,9 @@ def create_time_settings(data: Mapping[str, Any], *, now: datetime) -> dict[str,
                 ("Stop", "OlderDate", "23:59:59"),
             ):
                 if (
-                    _perl_true(out.get(f"{prefix}{edge}Day"))
-                    and _perl_true(out.get(f"{prefix}{edge}Month"))
-                    and _perl_true(out.get(f"{prefix}{edge}Year"))
+                    perl_truthy(out.get(f"{prefix}{edge}Day"))
+                    and perl_truthy(out.get(f"{prefix}{edge}Month"))
+                    and perl_truthy(out.get(f"{prefix}{edge}Year"))
                 ):
                     out[f"{prefix}{key}"] = (
                         f"{out[f'{prefix}{edge}Year']}-{out[f'{prefix}{edge}Month']}"
@@ -150,7 +148,7 @@ def create_time_settings(data: Mapping[str, Any], *, now: datetime) -> dict[str,
             point = out.get(f"{prefix}Point")
             start = out.get(f"{prefix}PointStart")
             fmt = out.get(f"{prefix}PointFormat")
-            if _perl_true(point) and _perl_true(start) and _perl_true(fmt):
+            if perl_truthy(point) and perl_truthy(start) and perl_truthy(fmt):
                 minutes = _int_or_float(_number(str(point)) * _POINT_MINUTES.get(str(fmt), 0))
                 key = "OlderMinutes" if start == "Before" else "NewerMinutes"
                 out[f"{prefix}{key}"] = minutes
@@ -207,8 +205,10 @@ def time_filters(
 ) -> bool:
     """Add the ticket time-window filters; ``False`` means "answer with an empty result".
 
-    ``now`` is a naive UTC datetime (the DB stores naive UTC).
+    ``now`` is a naive UTC datetime (the DB stores naive UTC). ``joins`` is kept for the
+    interface: the history families are ``EXISTS`` subqueries now, so nothing is joined.
     """
+    del joins
     counter = 0
 
     def bind(value: Any) -> str:
@@ -230,12 +230,12 @@ def time_filters(
                 continue
             if escalation:
                 conditions.append(f"{column} != 0")
-            moment = now - timedelta(minutes=int(_number(raw)))
+            moment = now - timedelta(minutes=perl_int(raw))
             conditions.append(f"{column} {op} {bind(target(moment))}")
 
         older_date: datetime | None = None
         raw = _scalar(data, f"{prefix}OlderDate")
-        if _perl_true(raw):
+        if perl_truthy(raw):
             assert raw is not None
             older_date = _parse_date(raw)
             if older_date is None:
@@ -244,7 +244,7 @@ def time_filters(
                 conditions.append(f"{column} != 0")
             conditions.append(f"{column} <= {bind(target(older_date))}")
         raw = _scalar(data, f"{prefix}NewerDate")
-        if _perl_true(raw):
+        if perl_truthy(raw):
             assert raw is not None
             newer_date = _parse_date(raw)
             if newer_date is None or newer_date > now:
@@ -258,13 +258,6 @@ def time_filters(
     # --- change / last change / close / pending: minutes become dates first -------
     history_alias = 0
 
-    def history_join() -> str:
-        nonlocal history_alias
-        history_alias += 1
-        alias = f"thw{history_alias}"
-        joins.append(f"JOIN ticket_history {alias} ON {alias}.ticket_id = t.id")
-        return alias
-
     for prefix, kind in (
         ("TicketChangeTime", "change"),
         ("TicketLastChangeTime", "last_change"),
@@ -275,7 +268,7 @@ def time_filters(
         for bound in ("Older", "Newer"):
             minutes = _scalar(data, f"{prefix}{bound}Minutes")
             if minutes is not None:
-                dates[bound] = (now - timedelta(minutes=int(_number(minutes)))).strftime(
+                dates[bound] = (now - timedelta(minutes=perl_int(minutes))).strftime(
                     "%Y-%m-%d %H:%M:%S"
                 )
             else:
@@ -284,30 +277,37 @@ def time_filters(
         if kind == "pending" and (
             _scalar(data, f"{prefix}OlderMinutes") is not None
             or _scalar(data, f"{prefix}NewerMinutes") is not None
-            or _perl_true(dates["Older"])
-            or _perl_true(dates["Newer"])
+            or perl_truthy(dates["Older"])
+            or perl_truthy(dates["Newer"])
         ):
             conditions.append(_PENDING_STATES)
 
-        def emit(moment: datetime, op: str, kind: str = kind) -> None:
+        # Change / Close: every bound constrains the SAME history row (Znuny maps all
+        # TicketChangeTime* to alias th1 and all TicketCloseTime* to th2), collected here and
+        # emitted as one EXISTS per family below.
+        history_bounds: list[tuple[datetime, str]] = []
+
+        def emit(
+            moment: datetime,
+            op: str,
+            kind: str = kind,
+            history_bounds: list[tuple[datetime, str]] = history_bounds,
+        ) -> None:
             if kind == "last_change":
                 conditions.append(f"t.change_time {op} {bind(moment)}")
             elif kind == "pending":
                 conditions.append(f"t.until_time {op} {bind(_epoch(moment))}")
             else:
-                alias = history_join()
-                if kind == "close":
-                    conditions.append(_CLOSE_HISTORY.format(a=alias))
-                conditions.append(f"{alias}.create_time {op} {bind(moment)}")
+                history_bounds.append((moment, op))
 
         older: datetime | None = None
-        if _perl_true(dates["Older"]):
+        if perl_truthy(dates["Older"]):
             assert dates["Older"] is not None
             older = _parse_date(dates["Older"])
             if older is None:
                 return False
             emit(older, "<=")
-        if _perl_true(dates["Newer"]):
+        if perl_truthy(dates["Newer"]):
             assert dates["Newer"] is not None
             newer = _parse_date(dates["Newer"])
             if newer is None:
@@ -318,6 +318,19 @@ def time_filters(
             if older is not None and newer > older:
                 return False
             emit(newer, ">=")
+
+        if history_bounds:
+            history_alias += 1
+            alias = f"thw{history_alias}"
+            parts = [f"{alias}.ticket_id = t.id"]
+            if kind == "close":
+                parts.append(_CLOSE_HISTORY.format(a=alias))
+            parts.extend(
+                f"{alias}.create_time {op} {bind(moment)}" for moment, op in history_bounds
+            )
+            conditions.append(
+                f"EXISTS (SELECT 1 FROM ticket_history {alias} WHERE {' AND '.join(parts)})"
+            )
     return True
 
 
@@ -407,7 +420,8 @@ _ID_FILTERS: dict[str, tuple[int, str | None]] = {
 }
 
 
-_INTEGER_RE = re.compile(r"[+-]?\d+")
+# Znuny ``Quote($Element, 'Integer')``: ``\A [+-]? \d{1,16} \z`` - a longer id is invalid
+_INTEGER_RE = re.compile(r"[+-]?\d{1,16}")
 
 
 def bounded_ids(raw: Any, max_value: int) -> list[int]:
@@ -479,7 +493,9 @@ def content_like_pattern(value: Any) -> str | None:
     text_value = str(value).strip().replace("*", "%")
     if not text_value or re.fullmatch(r"%+", text_value):
         return None
-    return ("%" + text_value + "%").replace("%%", "%").lower()
+    pattern = ("%" + text_value + "%").replace("%%", "%").lower()
+    # Quote($Value, 'Like'): '_' is a literal (backslash is the LIKE escape on both dialects)
+    return pattern.replace("\\", "\\\\").replace("_", "\\_")
 
 
 async def article_text_filters(
@@ -501,11 +517,14 @@ async def article_text_filters(
     for field, col in _MIME_COLUMNS:
         if (pat := content_like_pattern(data.get(field))) is not None:
             wanted.append((col, pat))
-    index_names = _perl_true(await sysconfig.get(_INDEX_ATTACHMENT_NAMES, 0))
+    index_names = perl_truthy(await sysconfig.get(_INDEX_ATTACHMENT_NAMES, 0))
     if index_names and (pat := content_like_pattern(data.get("MIMEBase_AttachmentName"))):
         wanted.append(("__attachment__", pat))
     fulltext = data.get("Fulltext")
-    fulltext_pat = content_like_pattern(fulltext) if _perl_true(fulltext) else None
+    # GI TicketSearch.pm: `if ($GetParam{Fulltext}) { ContentSearch = 'OR' }` - also when the
+    # value itself is wildcard-only and skipped
+    fulltext_or = perl_truthy(fulltext)
+    fulltext_pat = content_like_pattern(fulltext) if fulltext_or else None
     if fulltext_pat is not None:
         wanted.append(("__fulltext__", fulltext_pat))
     if not wanted:
@@ -534,7 +553,7 @@ async def article_text_filters(
         params[f"mf{i}"] = pat
     joiner = (
         " OR "
-        if fulltext_pat is not None or str(data.get("ContentSearch", "")).strip().upper() == "OR"
+        if fulltext_or or str(data.get("ContentSearch", "")).strip().upper() == "OR"
         else " AND "
     )
     conditions.append("(" + joiner.join(parts) + ")")

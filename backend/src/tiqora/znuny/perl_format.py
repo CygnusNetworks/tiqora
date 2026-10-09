@@ -43,6 +43,16 @@ def perl_num(value: Decimal | float | int | str | None) -> int | float:
     return _normalise(float(match.group(1)))
 
 
+def perl_int(value: Decimal | float | int | str | None) -> int:
+    """Perl ``int()`` of :func:`perl_num` (truncates toward 0); never raises (inf/nan -> 0)."""
+    number = perl_num(value)
+    if isinstance(number, int):
+        return number
+    if number != number or number in (float("inf"), float("-inf")):
+        return 0
+    return int(number)
+
+
 def perl_num_str(value: Decimal | float | int | str | None) -> str:
     """Perl stringification of :func:`perl_num` (``%.15g``): 3 -> "3", 1.5 -> "1.5"."""
     number = perl_num(value)
