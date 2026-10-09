@@ -1940,6 +1940,49 @@ Fields:
 
 
 @pytest.mark.db
+async def test_pending_time_falls_back_to_dialog_state_id_default(
+    mariadb_znuny_url: str,
+) -> None:
+    # Fallback 2 (AgentTicketProcess.pm:1279-1284): the StateID field's DefaultValue is an id.
+    cfg = """
+FieldOrder: [StateID, PendingTime]
+Fields:
+  StateID: {Display: '1', DefaultValue: '6'}
+  PendingTime: {Display: '1'}
+"""
+    factory, ticket_id = await _submit_pending(
+        mariadb_znuny_url, cfg, {"StateID": "", "PendingTime": _PT_VALUE}
+    )
+    assert (await _pending_state(factory, ticket_id)).until_time == _PT_EPOCH
+    assert await _pending_history(factory, ticket_id) == [(_PT_HISTORY, 1)]
+
+
+@pytest.mark.db
+async def test_target_state_ignores_unknown_numeric_state_and_uses_state_id_default(
+    mariadb_znuny_url: str,
+) -> None:
+    from tiqora.process.engine import _dialog_target_state_id  # noqa: PLC2701
+
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+    dialog = ActivityDialogConfig.from_yaml(
+        "FieldOrder: [StateID]\nFields:\n  StateID: {Display: '1', DefaultValue: '6'}\n"
+    )
+    async with factory() as session:
+        # 999999 is no state: StateGet ID finds nothing, so fallback 2 (the id default) wins.
+        unknown = await _dialog_target_state_id(
+            session, ticket_id=ticket_id, dialog=dialog, values={"State": "999999"}
+        )
+        known = await _dialog_target_state_id(
+            session, ticket_id=ticket_id, dialog=dialog, values={"State": "4"}
+        )
+    assert unknown == 6
+    assert known == 4
+
+
+@pytest.mark.db
 async def test_pending_time_uses_current_ticket_state_without_state_value(
     mariadb_znuny_url: str,
 ) -> None:

@@ -116,7 +116,6 @@ from tiqora.process.exceptions import (
 from tiqora.process.fields import (
     canonical_field_name,
     effective_field_values,
-    field_config,
     is_present,
     missing_required_fields,
 )
@@ -1406,6 +1405,19 @@ async def _ensure_required_lock(
         )
 
 
+async def _existing_state_id(session: AsyncSession, id_: int) -> int | None:
+    return (
+        await session.execute(select(TicketState.id).where(TicketState.id == id_))
+    ).scalar_one_or_none()
+
+
+def _dialog_default(dialog: ActivityDialogConfig, field_name: str) -> str:
+    """DefaultValue of the field spelled exactly *field_name* (``State`` is not ``StateID``)."""
+    cfg = dialog.fields.get(field_name)
+    raw = cfg.default_value if cfg is not None else None
+    return str(raw).strip() if raw is not None else ""
+
+
 async def _dialog_target_state_id(
     session: AsyncSession,
     *,
@@ -1415,17 +1427,26 @@ async def _dialog_target_state_id(
 ) -> int | None:
     """State the ticket ends in, for deciding about PendingTime (AgentTicketProcess.pm:1262-1297).
 
-    Submitted ``State`` (a hidden field's DefaultValue is already in *values*), else the
-    dialog State/StateID DefaultValue, else the ticket's current state.
+    Znuny's order: the submitted state (``StateGet ID``; a number counts only when that state
+    exists), fallback 1 the ``State`` field's DefaultValue (by name), fallback 2 the ``StateID``
+    field's DefaultValue (as an id, :1279-1284), fallback 3 the ticket's current state.
     """
-    candidates = [values.get("State"), field_config(dialog, "State").default_value]
-    for raw in candidates:
-        text_value = str(raw).strip() if raw is not None else ""
-        if not text_value:
-            continue
+    submitted = values.get("State")
+    text_value = str(submitted).strip() if submitted is not None else ""
+    if text_value:
         resolved = await _resolve_state_id(session, text_value, None)
         if resolved is None and text_value.isdigit():
-            resolved = int(text_value)
+            resolved = await _existing_state_id(session, int(text_value))
+        if resolved is not None:
+            return resolved
+    default_name = _dialog_default(dialog, "State")
+    if default_name:
+        resolved = await _resolve_state_id(session, default_name, None)
+        if resolved is not None:
+            return resolved
+    default_id = _dialog_default(dialog, "StateID")
+    if default_id.isdigit():
+        resolved = await _existing_state_id(session, int(default_id))
         if resolved is not None:
             return resolved
     ticket = await _ticket_must_exist(session, ticket_id)
@@ -1445,9 +1466,9 @@ async def _resolve_dialog_pending_time(
     (AgentTicketProcess.pm:1299-1303, case-insensitive) and stores it with
     ``TicketPendingTimeSet`` from Year..Minute — seconds are dropped and ``:00`` is used
     (Ticket.pm:4033-4040). The value is an ISO 8601 string (naive = UTC), the same contract as
-    ``PATCH /tickets/{id}``. Returns :data:`_PENDING_TARGET_NO_VALUE` for a pending target
-    without a value (``(True, None)``), so the caller can enforce ``Display: 2``; a
-    non-pending target is ``(False, None)`` and the value is ignored.
+    ``PATCH /tickets/{id}``. A pending target without a value returns ``(True, None)``, so the
+    caller can enforce ``Display: 2``; a non-pending target is ``(False, None)`` and the value
+    is ignored.
     """
     state_id = await _dialog_target_state_id(
         session, ticket_id=ticket_id, dialog=dialog, values=values
