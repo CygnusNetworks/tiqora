@@ -1,43 +1,152 @@
-"""The single ``tiqora_report_state`` row."""
+"""The single ``tiqora_report_state`` row and the status derived from it."""
 
 from __future__ import annotations
 
-from typing import Final
+import json
+from typing import Any, Final
 
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func, select
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.db.tiqora.models import TiqoraReportState
+from tiqora.db.legacy.ticket import TicketHistory
+from tiqora.db.tiqora.models import (
+    TiqoraReportDirtyTicket,
+    TiqoraReportState,
+    TiqoraReportTicketEvent,
+    TiqoraReportTicketFact,
+)
 from tiqora.jobs.service import utc_now
+from tiqora.reporting.schemas import FactsStatusOut, ReportingStatusOut
 
 STATE_NAME: Final = "facts"
+_MARIADB_DEADLOCK: Final = 1213
+_MARIADB_NO_SAVEPOINT: Final = 1305
+_PG_DEADLOCK: Final = "40P01"
+
+
+def _error_code(exc: DBAPIError) -> tuple[object, object]:
+    """``(sqlstate, first arg)`` of the driver error behind *exc*."""
+    orig = exc.orig
+    state = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None)
+    args = getattr(orig, "args", ())
+    return state, args[0] if args else None
+
+
+def is_deadlock(exc: DBAPIError) -> bool:
+    """MariaDB/MySQL error 1213 or PostgreSQL SQLSTATE 40P01."""
+    state, code = _error_code(exc)
+    return state == _PG_DEADLOCK or code == _MARIADB_DEADLOCK
+
+
+def _lost_savepoint(exc: DBAPIError) -> bool:
+    """MariaDB 1305: the savepoint is gone because InnoDB aborted the whole transaction."""
+    return _error_code(exc)[1] == _MARIADB_NO_SAVEPOINT
+
+
+def _deadlock_behind(exc: DBAPIError) -> bool:
+    """*exc* is a deadlock, or the failed ``ROLLBACK TO SAVEPOINT`` that followed one."""
+    if is_deadlock(exc):
+        return True
+    cause = exc.__context__
+    return _lost_savepoint(exc) and isinstance(cause, DBAPIError) and is_deadlock(cause)
 
 
 async def load_state(session: AsyncSession, *, for_update: bool = False) -> TiqoraReportState:
     """Return the state row, creating it on first use.
 
     The insert runs in a SAVEPOINT so losing the first-start race rolls back only
-    the insert, never the caller's pending work.
+    the insert, never the caller's pending work. Two first starts that both take a
+    locking read of the missing row can deadlock on the insert (MariaDB gap locks,
+    error 1213; PostgreSQL 40P01): the loser rolls back to its savepoint and the whole
+    sequence runs once more, which then finds the winner's committed row. A second
+    deadlock is raised. InnoDB aborts the victim's whole transaction on a deadlock
+    (``ROLLBACK TO SAVEPOINT`` then fails with 1305), so on MariaDB the session is
+    rolled back and the caller's pending work is gone in that case; the first call of
+    a unit of work, which is how tick and backfill use it, loses nothing.
     """
     stmt = select(TiqoraReportState).where(TiqoraReportState.name == STATE_NAME)
     if for_update:
         stmt = stmt.with_for_update()
-    row = (await session.execute(stmt)).scalar_one_or_none()
-    if row is not None:
-        return row
-    try:
-        async with session.begin_nested():
-            session.add(
-                TiqoraReportState(
-                    name=STATE_NAME,
-                    last_history_id=0,
-                    backfill_status="pending",
-                    updated_at=utc_now(),
+    attempt = 1
+    while True:
+        row = (await session.execute(stmt)).scalar_one_or_none()
+        if row is not None:
+            return row
+        try:
+            async with session.begin_nested():
+                session.add(
+                    TiqoraReportState(
+                        name=STATE_NAME,
+                        last_history_id=0,
+                        backfill_status="pending",
+                        updated_at=utc_now(),
+                    )
                 )
-            )
-    except IntegrityError:  # another process created it concurrently
-        # A locking read sees the rival's committed row even under MariaDB's
-        # REPEATABLE READ snapshot, which a plain re-select would not.
-        stmt = stmt.with_for_update()
-    return (await session.execute(stmt)).scalar_one()
+        except IntegrityError:  # another process created it concurrently
+            # A locking read sees the rival's committed row even under MariaDB's
+            # REPEATABLE READ snapshot, which a plain re-select would not.
+            return (await session.execute(stmt.with_for_update())).scalar_one()
+        except DBAPIError as exc:
+            if attempt >= 2 or not _deadlock_behind(exc):
+                raise
+            if _lost_savepoint(exc):
+                # MariaDB aborted the whole transaction: the session must start a new one
+                await session.rollback()
+            attempt += 1
+            continue
+        return (await session.execute(stmt)).scalar_one()
+
+
+def _progress(state: TiqoraReportState) -> float | None:
+    if state.backfill_status != "running":
+        return None
+    start = state.backfill_start_ticket_id
+    cursor = state.backfill_cursor_ticket_id
+    target = state.backfill_target_ticket_id
+    if start is None or cursor is None or target is None or target <= start:
+        return 0.0
+    return min(1.0, max(0.0, (cursor - start) / (target - start)))
+
+
+def _status_fields(state: TiqoraReportState) -> dict[str, Any]:
+    status = state.backfill_status if state.backfill_status in ("running", "done") else "pending"
+    return {
+        "ready": status == "done",
+        "as_of": state.last_tick_at or state.backfill_finished_at,
+        "backfill_status": status,
+        "backfill_job_id": state.backfill_job_id,
+        "backfill_progress": _progress(state),
+    }
+
+
+async def facts_status(session: AsyncSession) -> FactsStatusOut:
+    """Readiness of the report data (creates the state row when missing)."""
+    return FactsStatusOut.model_validate(_status_fields(await load_state(session)))
+
+
+async def reporting_status(session: AsyncSession) -> ReportingStatusOut:
+    """Admin status: :func:`facts_status` plus watermark, lag, queue and row counts."""
+    state = await load_state(session)
+    max_history = (await session.execute(select(func.max(TicketHistory.id)))).scalar_one()
+    try:
+        gaps = json.loads(state.gap_ids) if state.gap_ids else []
+    except ValueError:
+        gaps = []
+
+    async def count(model: Any) -> int:
+        return int((await session.execute(select(func.count()).select_from(model))).scalar_one())
+
+    return ReportingStatusOut.model_validate(
+        {
+            **_status_fields(state),
+            "last_history_id": state.last_history_id,
+            "history_lag": max(0, int(max_history or 0) - state.last_history_id),
+            "gap_count": len(gaps) if isinstance(gaps, list) else 0,
+            "dirty_count": await count(TiqoraReportDirtyTicket),
+            "last_snapshot_date": state.last_snapshot_date,
+            "snapshot_time_zone": state.snapshot_time_zone,
+            "fact_rows": await count(TiqoraReportTicketFact),
+            "event_rows": await count(TiqoraReportTicketEvent),
+        }
+    )

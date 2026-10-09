@@ -41,6 +41,7 @@ from tiqora.api.v1.admin import (
     priorities,
     queues,
     readonly,
+    reporting,
     roles,
     services,
     settings_sections,
@@ -102,5 +103,6 @@ admin_router.include_router(ai_audit.router)
 admin_router.include_router(avatars.router)
 admin_router.include_router(extensions.router)
 admin_router.include_router(settings_sections.router)
+admin_router.include_router(reporting.router)
 
 __all__ = ["admin_router"]

@@ -106,6 +106,7 @@ def inputs(
     accounted: Decimal = Decimal("0"),
     ai: AiFlags | None = None,
     process: str | None = None,
+    storage_tz: str = "UTC",
 ) -> FactInputs:
     tk = ticket if ticket is not None else t()
     return FactInputs(
@@ -117,7 +118,7 @@ def inputs(
         accounted_time=accounted,
         targets=targets,
         calendar=calendar,
-        storage_tz="UTC",
+        storage_tz=storage_tz,
         ai=ai if ai is not None else AiFlags(),
         process_entity_id=process,
         now=NOW,
@@ -317,3 +318,55 @@ def test_as_insert_dict_has_every_column() -> None:
 
     cols = {c.name for c in TiqoraReportTicketFact.__table__.columns}
     assert set(compute_fact(inputs([h(1, "NewTicket", 0)], [])).as_insert_dict()) == cols
+
+
+def test_non_utc_storage_zone_reads_stored_times_as_local_times() -> None:
+    # Stored naive values are Berlin wall-clock times here (Znuny OTRSTimeZone = Europe/Berlin).
+    created = datetime(2024, 6, 3, 16, 0)  # Mon 16:00 Berlin, one hour before closing
+    closed = datetime(2024, 6, 4, 9, 0)  # Tue 09:00 Berlin
+    hist = [h(1, "NewTicket", 0, at=created), h(2, "StateUpdate", 0, state=2, at=closed)]
+    arts = [
+        ArticleRow(
+            id=1,
+            sender_type="agent",
+            visible=True,
+            channel="Email",
+            create_time=datetime(2024, 6, 4, 8, 30),
+            create_by=2,
+        )
+    ]
+    f = compute_fact(inputs(hist, arts, ticket=t(create_time=created), storage_tz="Europe/Berlin"))
+    # Mon 16-17 (60) + Tue 08:00-09:00 (60) -> 120; read as UTC the ticket would start at
+    # 18:00 Berlin, outside the hours, and give 60.
+    assert f.solution_working_minutes == 120
+    assert f.solution_minutes == 17 * 60
+    assert f.first_response_working_minutes == 90  # 60 + 30
+    assert f.first_response_breached is True  # 90 > 60
+    # due dates come back in the storage zone, not shifted to UTC
+    assert f.first_response_due_at == datetime(2024, 6, 3, 17, 0)
+    assert f.solution_due_at == datetime(2024, 6, 4, 15, 0)  # 60 left on Mon + 420 on Tue
+
+
+def test_first_response_across_off_hours_counts_working_minutes() -> None:
+    created = T0 + timedelta(minutes=420)  # Mon 16:00 Berlin
+    reply_early = T0 + timedelta(minutes=1410)  # Tue 08:30 Berlin
+    reply_late = T0 + timedelta(minutes=1470)  # Tue 09:30 Berlin
+    for reply, working, update_breaches in ((reply_early, 90, 0), (reply_late, 150, 1)):
+        arts = [
+            ArticleRow(1, "customer", True, "Email", created, 2),
+            ArticleRow(2, "agent", True, "Email", reply, 3),
+        ]
+        f = compute_fact(
+            inputs([h(1, "NewTicket", 0, at=created)], arts, ticket=t(create_time=created))
+        )
+        assert f.first_response_working_minutes == working
+        assert f.first_response_minutes == int((reply - created).total_seconds() // 60)
+        assert f.first_response_breached is True  # 90 and 150 are both over the 60 target
+        # the update target (120) is measured in working minutes too, not wall minutes
+        assert f.update_breach_count == update_breaches
+
+
+def test_unknown_state_id_gives_unknown_state_type() -> None:
+    f = compute_fact(inputs([h(1, "NewTicket", 0)], [], ticket=t(state_id=999)))
+    assert f.state_type == "unknown"
+    assert f.state_id == 999 and f.merged is False

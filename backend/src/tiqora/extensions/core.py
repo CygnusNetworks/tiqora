@@ -29,9 +29,11 @@ def register_core(registry: Registry) -> None:
     from tiqora.jobs.handlers.gi_mail import GI_MAIL_JOB
     from tiqora.jobs.handlers.ticket_export import TICKET_EXPORT_JOB
     from tiqora.jobs.registry import JOB_HANDLERS
+    from tiqora.reporting.backfill import REPORT_BACKFILL_JOB
 
     registry.add(JOB_HANDLERS, TICKET_EXPORT_JOB)
     registry.add(JOB_HANDLERS, GI_MAIL_JOB)
+    registry.add(JOB_HANDLERS, REPORT_BACKFILL_JOB)
 
 
 def get_registry() -> Registry:

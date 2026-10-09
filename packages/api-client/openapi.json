@@ -20724,6 +20724,150 @@
         "title": "ReplyDraftOut",
         "type": "object"
       },
+      "ReportBackfillIn": {
+        "properties": {
+          "restart": {
+            "default": true,
+            "title": "Restart",
+            "type": "boolean"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          },
+          "snapshots": {
+            "default": true,
+            "title": "Snapshots",
+            "type": "boolean"
+          }
+        },
+        "title": "ReportBackfillIn",
+        "type": "object"
+      },
+      "ReportingStatusOut": {
+        "description": "Admin view: the status plus the bookkeeping behind it.",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "backfill_job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backfill Job Id"
+          },
+          "backfill_progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backfill Progress"
+          },
+          "backfill_status": {
+            "enum": [
+              "pending",
+              "running",
+              "done"
+            ],
+            "title": "Backfill Status",
+            "type": "string"
+          },
+          "dirty_count": {
+            "title": "Dirty Count",
+            "type": "integer"
+          },
+          "event_rows": {
+            "title": "Event Rows",
+            "type": "integer"
+          },
+          "fact_rows": {
+            "title": "Fact Rows",
+            "type": "integer"
+          },
+          "gap_count": {
+            "title": "Gap Count",
+            "type": "integer"
+          },
+          "history_lag": {
+            "title": "History Lag",
+            "type": "integer"
+          },
+          "last_history_id": {
+            "title": "Last History Id",
+            "type": "integer"
+          },
+          "last_snapshot_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Snapshot Date"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "snapshot_time_zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Time Zone"
+          }
+        },
+        "required": [
+          "ready",
+          "as_of",
+          "backfill_status",
+          "backfill_job_id",
+          "backfill_progress",
+          "last_history_id",
+          "history_lag",
+          "gap_count",
+          "dirty_count",
+          "last_snapshot_date",
+          "snapshot_time_zone",
+          "fact_rows",
+          "event_rows"
+        ],
+        "title": "ReportingStatusOut",
+        "type": "object"
+      },
       "ResolvedCustomerLink": {
         "properties": {
           "label": {
@@ -46879,6 +47023,147 @@
         "summary": "Revoke Queue Template",
         "tags": [
           "admin:templates"
+        ]
+      }
+    },
+    "/api/v1/admin/reporting/backfill": {
+      "post": {
+        "description": "Queue the (re)build of the report data; a second request joins the pending job.\n\nWith ``restart`` the data counts as \"not ready\" again, unless a job is already\nactive: that job owns the state and is joined as it is.",
+        "operationId": "start_backfill_api_v1_admin_reporting_backfill_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportBackfillIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Backfill",
+        "tags": [
+          "admin:reporting"
+        ]
+      }
+    },
+    "/api/v1/admin/reporting/status": {
+      "get": {
+        "operationId": "get_reporting_status_api_v1_admin_reporting_status_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportingStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Reporting Status",
+        "tags": [
+          "admin:reporting"
         ]
       }
     },
