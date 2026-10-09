@@ -22,7 +22,8 @@ from tiqora.reporting.working_time import (
     working_minutes,
 )
 
-FACT_VERSION: Final = 1
+#: 2: rows a ticket merge moved in no longer drive the event diff
+FACT_VERSION: Final = 2
 CHANNEL_KEYS: Final[dict[str, str]] = {
     "Email": "email",
     "Phone": "phone",

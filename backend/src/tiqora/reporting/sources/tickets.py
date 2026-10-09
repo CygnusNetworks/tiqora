@@ -32,14 +32,25 @@ def _gt0(name: str) -> BoolFn:
 
 
 def _breach(prefix: str) -> BoolFn:
-    """Breached, or still undecided with a due date in the past (``ctx.now``)."""
+    """Breached, or still undecided with a due date in the past (``ctx.now``).
+
+    "Undecided but past due" counts only for open tickets: Znuny stops every
+    escalation of a merged, removed or closed ticket (``TicketEscalationIndexBuild``),
+    so such a ticket without a decision (e.g. merged before its first response) is
+    no breach.
+    """
 
     def cond(ctx: CompileContext) -> ColumnElement[bool]:
         breached = _c(f"{prefix}_breached")
         due = _c(f"{prefix}_due_at")
         return or_(
             breached.is_(true()),
-            and_(breached.is_(None), due.is_not(None), due < ctx.now),
+            and_(
+                breached.is_(None),
+                due.is_not(None),
+                due < ctx.now,
+                _c("state_type").in_(OPEN_TYPES),
+            ),
         )
 
     return cond

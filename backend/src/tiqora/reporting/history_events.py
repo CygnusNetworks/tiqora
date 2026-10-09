@@ -10,6 +10,14 @@ Unknown state ids (deleted or unmapped) keep their ``state`` event with a
 ``None`` type value but never produce ``close``/``reopen``. Name-parsed events
 come from every history row including the first; only the column diff starts at
 the second row. Garbled or empty names emit no event.
+
+Rows moved here by a merge are skipped entirely (:func:`moved_by_merge`): Znuny's
+``TicketMerge`` (and Tiqora's ``merge_tickets``) re-point every article-linked
+history row of the merged ticket to the main ticket and stamp ``change_time``.
+Those rows still carry the MERGED ticket's queue/state/owner/priority/type
+snapshot, so diffing them would invent queue moves, closes and reopens on the
+main ticket. The moved articles themselves stay (Znuny counts them for the main
+ticket, e.g. ``_TicketGetFirstResponse``).
 """
 
 from __future__ import annotations
@@ -91,6 +99,22 @@ class HistoryRow:
     type_id: int
     create_time: datetime
     create_by: int
+    #: ``ticket_history.change_time``; later than ``create_time`` only on rows a merge moved
+    change_time: datetime | None = None
+
+
+def moved_by_merge(row: HistoryRow) -> bool:
+    """True for a row a ticket merge moved over from the merged ticket.
+
+    ``HistoryAdd`` (Znuny and Tiqora) writes ``create_time`` and ``change_time`` in one
+    statement (equal); only the merge's ``UPDATE ticket_history SET ticket_id = <main>,
+    change_time = current_timestamp ... WHERE article_id IS NOT NULL`` makes them differ.
+    A merge within the same second as the row's creation cannot be told apart
+    (DATETIME has whole seconds) and is treated as the ticket's own row.
+    """
+    return (
+        bool(row.article_id) and row.change_time is not None and row.change_time > row.create_time
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,7 +158,8 @@ def derive_events(
     articles: Sequence[ArticleRow],
     state_types: Mapping[int, str],
 ) -> list[EventRow]:
-    rows = sorted(history, key=lambda r: r.id)
+    # the merged ticket's rows describe the merged ticket, not this one
+    rows = sorted((r for r in history if not moved_by_merge(r)), key=lambda r: r.id)
     if rows:
         first = rows[0]
         base_queue, base_state = first.queue_id, first.state_id

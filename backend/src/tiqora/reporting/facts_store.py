@@ -163,6 +163,7 @@ async def load_fact_inputs(
                     type_id=h.type_id,
                     create_time=h.create_time,
                     create_by=h.create_by,
+                    change_time=h.change_time,
                 )
             )
 

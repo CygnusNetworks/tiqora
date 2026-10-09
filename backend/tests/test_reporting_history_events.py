@@ -281,3 +281,59 @@ def test_merged_to_closed_counts_as_close() -> None:
     assert "close" not in kinds(
         derive_events(t(), [h(1, "NewTicket", 0, state=9)], [], STATE_TYPES)
     )
+
+
+def _moved(
+    id: int, type: str, minutes: int, *, merged_at: int, article: int, **snap: int
+) -> HistoryRow:
+    """A row TicketMerge moved over: article-linked, change_time stamped at the merge."""
+    from dataclasses import replace
+
+    row = h(id, type, minutes, **snap)  # type: ignore[arg-type]
+    return replace(row, article_id=article, change_time=T0 + timedelta(minutes=merged_at))
+
+
+def test_merge_moved_rows_drive_no_attribute_events() -> None:
+    """C1: rows of a merged ticket carry ITS snapshot; they must not fake moves/closes."""
+    hist = [
+        h(1, "NewTicket", 0, queue=10, state=1, owner=5),
+        # the merged ticket's note (queue 20, closed, owner 7), moved at minute 30
+        _moved(2, "AddNote", 10, merged_at=30, article=900, queue=20, state=2, owner=7),
+        # the merged ticket's close-with-note: a StateUpdate WITH an article id
+        _moved(3, "StateUpdate", 12, merged_at=30, article=901, queue=20, state=2, owner=7),
+        h(4, "Merged", 30, queue=10, state=1, owner=5, name="%%2024060300002%%2%%T%%1"),
+        h(5, "StateUpdate", 40, queue=10, state=4, owner=5),
+    ]
+    articles = [ArticleRow(900, "agent", False, "Internal", T0 + timedelta(minutes=10), 7)]
+    ev = derive_events(t(queue_id=10, user_id=5), hist, articles, STATE_TYPES)
+    assert kinds(ev) == ["create", "note", "merge", "state"]
+    state = next(e for e in ev if e.kind == "state")
+    assert (state.from_value, state.to_value, state.history_id) == ("new", "open", 5)
+    # the moved article is attributed to this ticket's queue, not the merged one's
+    note = next(e for e in ev if e.kind == "note")
+    assert note.queue_id == 10
+
+
+def test_merge_moved_row_as_oldest_row_is_no_baseline() -> None:
+    """A merged ticket older than the main one: its rows never become the baseline."""
+    hist = [
+        _moved(1, "AddNote", -60, merged_at=30, article=900, queue=20, state=2),
+        h(2, "NewTicket", 0, queue=10, state=1),
+        h(3, "Move", 5, queue=11, state=1),
+    ]
+    ev = derive_events(t(queue_id=10), hist, [], STATE_TYPES)
+    assert kinds(ev) == ["create", "queue"]
+    create, queue = ev
+    assert create.to_id == 10 and create.to_value == "new"
+    assert (queue.from_id, queue.to_id) == (10, 11)
+
+
+def test_state_update_with_article_still_closes() -> None:
+    """Own rows with an article id (TicketStateSet passes ArticleID) keep driving the diff."""
+    from dataclasses import replace
+
+    close = replace(
+        h(2, "StateUpdate", 10, state=2), article_id=55, change_time=T0 + timedelta(minutes=10)
+    )
+    ev = derive_events(t(), [h(1, "NewTicket", 0), close], [], STATE_TYPES)
+    assert kinds(ev) == ["create", "state", "close"]

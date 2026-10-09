@@ -966,3 +966,66 @@ async def test_results_respect_scope_archive_and_hidden_queues(
         assert o["m0"] == 1  # T_OUT outside scope, T_ARCH archived (always for live tickets)
     finally:
         await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_undecided_breach_counts_only_open_tickets(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """I1: merged/removed tickets past their due date are no SLA breach (Znuny stops escalation)."""
+    sync_url = request.getfixturevalue(url_fixture)
+    _seed(sync_url)
+    created = datetime(2023, 1, 10, 8, 0)  # outside every other test's window
+    sla = {
+        "first_response_target_minutes": 60,
+        "first_response_due_at": datetime(2023, 1, 10, 9, 0),
+        "solution_target_minutes": 480,
+        "solution_due_at": datetime(2023, 1, 10, 16, 0),
+    }
+    facts = (
+        _fact(47724, Q_IN, created, state_type="merged", merged=True, **sla),
+        _fact(47725, Q_IN, created, state_type="removed", **sla),
+        _fact(47726, Q_IN, created, state_type="open", **sla),  # undecided and open: breached
+        _fact(
+            47727,
+            Q_IN,
+            created,
+            state_type="closed",
+            first_response_breached=True,
+            solution_breached=False,
+            **sla,
+        ),
+    )
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with factory() as s:
+            for fact in facts:
+                await s.execute(insert(TiqoraReportTicketFact.__table__), fact)
+            await s.commit()
+        c = comp(
+            {
+                "source": "tickets",
+                "time_range": {"kind": "absolute", "start": "2023-01-01", "end": "2023-01-31"},
+                "measures": [
+                    {"key": "tickets"},
+                    {"key": "response_breaches"},
+                    {"key": "solution_breaches"},
+                    {"key": "sla_met_rate"},
+                ],
+            }
+        )
+        (row,) = await _run(factory, c.stmt)
+        assert (int(row["m0"]), int(row["m1"]), int(row["m2"])) == (4, 2, 1)
+        # met = has a target and no breach: the merged and the removed ticket
+        assert (int(row["m3_num"]), int(row["m3_den"])) == (2, 4)
+    finally:
+        async with factory() as s:
+            await s.execute(
+                text(
+                    "DELETE FROM tiqora_report_ticket_fact WHERE ticket_id BETWEEN 47724 AND 47727"
+                )
+            )
+            await s.commit()
+        await engine.dispose()

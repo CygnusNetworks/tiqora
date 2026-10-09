@@ -746,3 +746,137 @@ async def test_fact_write_lock_is_per_loop() -> None:
         other = await asyncio.to_thread(asyncio.run, other_loop())
     assert other is not lock
     assert fact_write_lock() is lock
+
+
+T_MAIN, T_SRC = 47545, 47546
+
+
+def _seed_merge(sync_url: str, ids: dict[str, int]) -> None:
+    """T_SRC (queue Q2, owner 1, closed with a note) is merged into T_MAIN (Q1, new).
+
+    The merge runs the exact statements of Znuny ``TicketMerge`` / Tiqora
+    ``merge_tickets``: articles and article-linked history rows move to the main
+    ticket, ``change_time = current_timestamp`` marks the moved history rows.
+    """
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        h_note = _one(conn, "SELECT id FROM ticket_history_type WHERE name = 'AddNote'")
+        for tid, queue, state, owner, tn in (
+            (T_MAIN, Q1, ids["st_new"], AGENT, "2024060347545"),
+            (T_SRC, Q2, ids["st_merged"], 1, "2024060347546"),
+        ):
+            conn.execute(
+                text(
+                    "INSERT INTO ticket (id, tn, title, queue_id, ticket_lock_id, type_id,"
+                    " user_id, responsible_user_id, ticket_priority_id, ticket_state_id,"
+                    " customer_id, customer_user_id, timeout, until_time, escalation_time,"
+                    " escalation_update_time, escalation_response_time,"
+                    " escalation_solution_time, archive_flag,"
+                    " create_time, create_by, change_time, change_by)"
+                    " VALUES (:id, :tn, 'rep47 merge', :q, 1, 1, :u, 1, 3, :s,"
+                    " 'rep47-cust', 'rep47.cust@example.org', 0, 0, 0, 0, 0, 0, 0,"
+                    " :t, 1, :t, 1)"
+                ),
+                {"id": tid, "tn": tn, "q": queue, "s": state, "u": owner, "t": T0},
+            )
+        for aid, sender in ((47545, "customer"), (47546, "agent")):
+            conn.execute(
+                text(
+                    "INSERT INTO article (id, ticket_id, article_sender_type_id,"
+                    " communication_channel_id, is_visible_for_customer,"
+                    " create_time, create_by, change_time, change_by)"
+                    " VALUES (:id, :tid, :s, :c, 0, :t, 1, :t, 1)"
+                ),
+                {
+                    "id": aid,
+                    "tid": T_SRC,
+                    "s": ids[f"s_{sender}"],
+                    "c": ids["c_email"],
+                    "t": T0 - timedelta(minutes=30),
+                },
+            )
+        rows = (
+            # (id, ticket, type, article, queue, owner, state, minutes after T0)
+            (47545, T_SRC, ids["h_NewTicket"], 47545, Q2, 1, ids["st_new"], -30),
+            (47546, T_MAIN, ids["h_NewTicket"], None, Q1, AGENT, ids["st_new"], 0),
+            # the merged ticket's close WITH its note: StateUpdate rows can carry an article
+            (47547, T_SRC, h_note, 47546, Q2, 1, ids["st_closed"], 10),
+            (47548, T_SRC, ids["h_StateUpdate"], 47546, Q2, 1, ids["st_closed"], 10),
+        )
+        for hid, tid, htype, aid, queue, owner, state, minutes in rows:
+            at = T0 + timedelta(minutes=minutes)
+            conn.execute(
+                text(
+                    "INSERT INTO ticket_history (id, name, history_type_id, ticket_id,"
+                    " article_id, type_id, queue_id, owner_id, priority_id, state_id,"
+                    " create_time, create_by, change_time, change_by)"
+                    " VALUES (:id, '%%', :ht, :tid, :a, 1, :q, :o, 3, :s, :t, 1, :t, 1)"
+                ),
+                {"id": hid, "ht": htype, "tid": tid, "a": aid, "q": queue, "o": owner,
+                 "s": state, "t": at},
+            )  # fmt: skip
+        # the merge (Ticket.pm TicketMerge / ticket_write_service.merge_tickets)
+        conn.execute(
+            text("UPDATE article SET ticket_id = :main WHERE ticket_id = :merge"),
+            {"main": T_MAIN, "merge": T_SRC},
+        )
+        conn.execute(
+            text(
+                "UPDATE ticket_history SET ticket_id = :main, change_time = current_timestamp,"
+                " change_by = 1 WHERE ticket_id = :merge AND article_id IS NOT NULL"
+            ),
+            {"main": T_MAIN, "merge": T_SRC},
+        )
+        merged_name = f"%%2024060347546%%{T_SRC}%%2024060347545%%{T_MAIN}"
+        for hid, tid, queue, owner, state in ((47549, T_MAIN, Q1, AGENT, ids["st_new"]),):
+            conn.execute(
+                text(
+                    "INSERT INTO ticket_history (id, name, history_type_id, ticket_id,"
+                    " article_id, type_id, queue_id, owner_id, priority_id, state_id,"
+                    " create_time, create_by, change_time, change_by)"
+                    " VALUES (:id, :n, :ht, :tid, NULL, 1, :q, :o, 3, :s, :t, 1, :t, 1)"
+                ),
+                {"id": hid, "n": merged_name, "ht": ids["h_Merged"], "tid": tid, "q": queue,
+                 "o": owner, "s": state, "t": T0 + timedelta(minutes=20)},
+            )  # fmt: skip
+    engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_merge_moved_history_fakes_no_events_on_main_ticket(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """C1: the main ticket keeps its own queue/state/owner history after a merge."""
+    sync_url = request.getfixturevalue(url_fixture)
+    ids = _seed(sync_url)
+    _seed_merge(sync_url, ids)
+    engine, factory = _factory(sync_url)
+    try:
+        async with factory() as s:
+            await rebuild_ticket_facts(s, [T_MAIN], now=BUILT)
+            await s.commit()
+        async with factory() as s:
+            main = await _fact(s, T_MAIN)
+            assert main is not None
+            assert (main.queue_id_at_create, main.state_type) == (Q1, "new")
+            assert (main.close_count, main.reopen_count, main.closed_at) == (0, 0, None)
+            assert (main.queue_move_count, main.owner_change_count) == (0, 0)
+            assert main.queue_pingpong is False
+            # the moved articles count for the main ticket (Znuny parity)
+            assert (main.article_in_count, main.note_count) == (1, 1)
+            kinds = await _kinds(s, T_MAIN)
+            assert sorted(kinds) == ["create", "customer_message", "merge", "note"]
+            queues = set(
+                (
+                    await s.execute(
+                        select(TiqoraReportTicketEvent.queue_id).where(
+                            TiqoraReportTicketEvent.ticket_id == T_MAIN
+                        )
+                    )
+                ).scalars()
+            )
+            assert queues == {Q1}  # moved articles are attributed to the main ticket's queue
+    finally:
+        await engine.dispose()
+    _clean(sync_url)
