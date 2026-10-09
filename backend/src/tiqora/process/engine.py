@@ -47,8 +47,7 @@ Deferred/unsupported scope (documented, not silently missing)
   ``Appointment*`` (Create/Update/Remove), ``ConfigItemUpdate``.
   Unsupported modules are logged and no-op'd, and collected into
   ``ActivityDialogSubmitResult.unsupported_actions``.
-- Activity Dialog ``PendingTime``/``PendingTimeDiff`` submission fields are
-  not applied from ``field_values`` (only a transition action's own
+- Activity Dialog ``PendingTimeDiff`` is not a dialog field (a transition action's own
   ``PendingTimeDiff`` on ``TicketStateSet`` is honoured).
 """
 
@@ -72,6 +71,7 @@ from tiqora.domain.dynamic_field_values import load_ticket_dynamic_field
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
     TicketIn,
+    _state_type_name,  # noqa: PLC2701
     _ticket_must_exist,  # noqa: PLC2701
     add_article,
     assign_owner,
@@ -116,6 +116,7 @@ from tiqora.process.exceptions import (
 from tiqora.process.fields import (
     canonical_field_name,
     effective_field_values,
+    field_config,
     is_present,
     missing_required_fields,
 )
@@ -1405,6 +1406,72 @@ async def _ensure_required_lock(
         )
 
 
+async def _dialog_target_state_id(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    dialog: ActivityDialogConfig,
+    values: dict[str, Any],
+) -> int | None:
+    """State the ticket ends in, for deciding about PendingTime (AgentTicketProcess.pm:1262-1297).
+
+    Submitted ``State`` (a hidden field's DefaultValue is already in *values*), else the
+    dialog State/StateID DefaultValue, else the ticket's current state.
+    """
+    candidates = [values.get("State"), field_config(dialog, "State").default_value]
+    for raw in candidates:
+        text_value = str(raw).strip() if raw is not None else ""
+        if not text_value:
+            continue
+        resolved = await _resolve_state_id(session, text_value, None)
+        if resolved is None and text_value.isdigit():
+            resolved = int(text_value)
+        if resolved is not None:
+            return resolved
+    ticket = await _ticket_must_exist(session, ticket_id)
+    return int(ticket["ticket_state_id"])
+
+
+async def _resolve_dialog_pending_time(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    dialog: ActivityDialogConfig,
+    values: dict[str, Any],
+) -> tuple[bool, datetime | None]:
+    """Dialog ``PendingTime`` (D8): ``(target_is_pending, UTC minute to store)``.
+
+    Znuny reads the field only when the target state's type starts with ``pending``
+    (AgentTicketProcess.pm:1299-1303, case-insensitive) and stores it with
+    ``TicketPendingTimeSet`` from Year..Minute — seconds are dropped and ``:00`` is used
+    (Ticket.pm:4033-4040). The value is an ISO 8601 string (naive = UTC), the same contract as
+    ``PATCH /tickets/{id}``. Returns :data:`_PENDING_TARGET_NO_VALUE` for a pending target
+    without a value (``(True, None)``), so the caller can enforce ``Display: 2``; a
+    non-pending target is ``(False, None)`` and the value is ignored.
+    """
+    state_id = await _dialog_target_state_id(
+        session, ticket_id=ticket_id, dialog=dialog, values=values
+    )
+    if state_id is None or not (await _state_type_name(session, state_id)).lower().startswith(
+        "pending"
+    ):
+        return False, None
+    raw = values.get("PendingTime")
+    if not is_present(raw):
+        return True, None
+    try:
+        if not isinstance(raw, str):
+            raise ValueError("not a string")
+        parsed = datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise UnresolvedFieldValue(
+            f"activity dialog field 'PendingTime': could not parse {raw!r} as an ISO 8601 datetime"
+        ) from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return True, parsed.astimezone(UTC).replace(second=0, microsecond=0)
+
+
 async def apply_activity_dialog(
     session: AsyncSession,
     *,
@@ -1424,6 +1491,16 @@ async def apply_activity_dialog(
     """
     values = effective_field_values(dialog, field_values, actor.interface)
     missing = missing_required_fields(dialog, values, actor.interface)
+    # PendingTime is only required (and only read) when the target state is a pending one.
+    pending_required = "PendingTime" in missing
+    missing = [name for name in missing if name != "PendingTime"]
+    pending_time: datetime | None = None
+    if "PendingTime" in values or pending_required:
+        target_is_pending, pending_time = await _resolve_dialog_pending_time(
+            session, ticket_id=ticket_id, dialog=dialog, values=values
+        )
+        if target_is_pending and pending_time is None and pending_required:
+            missing.append("PendingTime")
     if missing:
         raise RequiredFieldMissing(f"required activity dialog field missing: {', '.join(missing)}")
     if apply_required_lock and dialog.required_lock == "1" and actor.interface == "AgentInterface":
@@ -1439,6 +1516,11 @@ async def apply_activity_dialog(
         sysconfig=sysconfig,
         sender_type="customer" if actor.interface == "CustomerInterface" else "agent",
     )
+    if pending_time is not None:
+        # AgentTicketProcess.pm:5554-5575: TicketPendingTimeSet after the other fields.
+        await _set_ticket_pending_time(
+            session, ticket_id=ticket_id, pending_time=pending_time, user_id=actor.user_id
+        )
 
 
 @dataclass(frozen=True)

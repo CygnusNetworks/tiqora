@@ -1777,3 +1777,250 @@ async def test_skip_fields_and_no_required_lock_on_create(mariadb_znuny_url: str
                 skip_fields=frozenset({"Title"}),
                 apply_required_lock=False,
             )
+
+
+# ---------------------------------------------------------------------------
+# Dialog PendingTime (AgentTicketProcess.pm:1253-1330, 5016-5036, 5554-5575;
+# Ticket.pm:3954-4095 TicketPendingTimeSet). Uses only Znuny's stock states
+# ("new" 1, "open" 4, "pending reminder" 6) — no extra seed rows.
+# ---------------------------------------------------------------------------
+
+_PT_VALUE = "2026-10-12T08:00:00Z"
+_PT_EPOCH = 1791792000  # 2026-10-12 08:00:00 UTC
+_PT_HISTORY = "%%2026-10-12 08:00"
+
+_PT_DIALOG = """
+FieldOrder: [State, PendingTime]
+Fields:
+  State: {Display: '2'}
+  PendingTime: {Display: '1'}
+"""
+
+
+async def _pending_state(factory: async_sessionmaker[AsyncSession], ticket_id: int) -> Any:
+    async with factory() as session:
+        return (
+            await session.execute(
+                text(
+                    "SELECT t.until_time, t.ticket_state_id, t.change_by FROM ticket t"
+                    " WHERE t.id = :t"
+                ),
+                {"t": ticket_id},
+            )
+        ).one()
+
+
+async def _pending_history(
+    factory: async_sessionmaker[AsyncSession], ticket_id: int
+) -> list[tuple[str, int]]:
+    async with factory() as session:
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT th.name, th.create_by FROM ticket_history th"
+                    " JOIN ticket_history_type ht ON ht.id = th.history_type_id"
+                    " WHERE th.ticket_id = :t AND ht.name = 'SetPendingTime' ORDER BY th.id"
+                ),
+                {"t": ticket_id},
+            )
+        ).all()
+    return [(str(r[0]), int(r[1])) for r in rows]
+
+
+async def _submit_pending(
+    mariadb_znuny_url: str,
+    yaml_cfg: str,
+    values: dict[str, Any],
+    *,
+    agent_id: int = 1,
+) -> tuple[async_sessionmaker[AsyncSession], int]:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+    async with factory() as session, session.begin():
+        await apply_activity_dialog(
+            session,
+            ticket_id=ticket_id,
+            dialog=ActivityDialogConfig.from_yaml(yaml_cfg),
+            field_values=values,
+            actor=ProcessActor.agent(agent_id),
+            sysconfig=sysconfig,
+        )
+    return factory, ticket_id
+
+
+@pytest.mark.db
+async def test_pending_time_applied_when_target_state_is_pending(mariadb_znuny_url: str) -> None:
+    factory, ticket_id = await _submit_pending(
+        mariadb_znuny_url, _PT_DIALOG, {"State": "pending reminder", "PendingTime": _PT_VALUE}
+    )
+    row = await _pending_state(factory, ticket_id)
+    assert row.until_time == _PT_EPOCH
+    assert row.ticket_state_id == 6
+    assert await _pending_history(factory, ticket_id) == [(_PT_HISTORY, 1)]
+
+
+@pytest.mark.db
+async def test_pending_time_offset_is_converted_to_utc_and_seconds_dropped(
+    mariadb_znuny_url: str,
+) -> None:
+    # 10:00:42+02:00 == 08:00 UTC; Znuny stores minutes only (seconds ":00", Ticket.pm:4034).
+    factory, ticket_id = await _submit_pending(
+        mariadb_znuny_url,
+        _PT_DIALOG,
+        {"State": "pending reminder", "PendingTime": "2026-10-12T10:00:42+02:00"},
+    )
+    assert (await _pending_state(factory, ticket_id)).until_time == _PT_EPOCH
+    assert await _pending_history(factory, ticket_id) == [(_PT_HISTORY, 1)]
+
+
+@pytest.mark.db
+async def test_naive_pending_time_is_utc(mariadb_znuny_url: str) -> None:
+    factory, ticket_id = await _submit_pending(
+        mariadb_znuny_url,
+        _PT_DIALOG,
+        {"State": "pending reminder", "PendingTime": "2026-10-12T08:00:00"},
+    )
+    assert (await _pending_state(factory, ticket_id)).until_time == _PT_EPOCH
+
+
+@pytest.mark.db
+async def test_pending_time_ignored_for_open_state(mariadb_znuny_url: str) -> None:
+    factory, ticket_id = await _submit_pending(
+        mariadb_znuny_url, _PT_DIALOG, {"State": "open", "PendingTime": _PT_VALUE}
+    )
+    row = await _pending_state(factory, ticket_id)
+    assert row.until_time == 0
+    assert row.ticket_state_id == 4
+    # Only the reset row of the state change to a non-pending state (golden-validated in
+    # change_state); the dialog PendingTime itself wrote nothing.
+    assert await _pending_history(factory, ticket_id) == [("%%00-00-00 00:00", 1)]
+    # An invalid value is not even read for a non-pending target (AgentTicketProcess.pm:1303).
+    factory2, ticket_id2 = await _submit_pending(
+        mariadb_znuny_url, _PT_DIALOG, {"State": "open", "PendingTime": "garbage"}
+    )
+    assert (await _pending_state(factory2, ticket_id2)).until_time == 0
+
+
+@pytest.mark.db
+async def test_pending_time_uses_dialog_state_default_when_state_hidden(
+    mariadb_znuny_url: str,
+) -> None:
+    hidden = """
+FieldOrder: [State, PendingTime]
+Fields:
+  State: {Display: '0', DefaultValue: pending reminder}
+  PendingTime: {Display: '1'}
+"""
+    factory, ticket_id = await _submit_pending(
+        mariadb_znuny_url, hidden, {"State": "open", "PendingTime": _PT_VALUE}
+    )
+    row = await _pending_state(factory, ticket_id)
+    assert row.ticket_state_id == 6  # the hidden default wins over the request
+    assert row.until_time == _PT_EPOCH
+    assert await _pending_history(factory, ticket_id) == [(_PT_HISTORY, 1)]
+
+
+@pytest.mark.db
+async def test_pending_time_falls_back_to_default_for_visible_empty_state(
+    mariadb_znuny_url: str,
+) -> None:
+    # Fallback 1 (AgentTicketProcess.pm:1273): no submitted State -> the field's DefaultValue.
+    visible = """
+FieldOrder: [State, PendingTime]
+Fields:
+  State: {Display: '1', DefaultValue: pending reminder}
+  PendingTime: {Display: '1'}
+"""
+    factory, ticket_id = await _submit_pending(
+        mariadb_znuny_url, visible, {"State": "", "PendingTime": _PT_VALUE}
+    )
+    assert (await _pending_state(factory, ticket_id)).until_time == _PT_EPOCH
+
+
+@pytest.mark.db
+async def test_pending_time_uses_current_ticket_state_without_state_value(
+    mariadb_znuny_url: str,
+) -> None:
+    # Fallback 3 (:1291): no State submitted/default -> the ticket's own state, here "new".
+    factory, ticket_id = await _submit_pending(
+        mariadb_znuny_url, _PT_DIALOG.replace("'2'", "'1'", 1), {"PendingTime": _PT_VALUE}
+    )
+    assert (await _pending_state(factory, ticket_id)).until_time == 0  # "new" is not pending
+    assert await _pending_history(factory, ticket_id) == []
+
+
+@pytest.mark.db
+async def test_invalid_pending_time_is_400(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+    for bad in ("not-a-date", "2026-13-45T99:00:00Z", 12345):
+        async with factory() as session, session.begin():
+            with pytest.raises(UnresolvedFieldValue, match="PendingTime"):
+                await apply_activity_dialog(
+                    session,
+                    ticket_id=ticket_id,
+                    dialog=ActivityDialogConfig.from_yaml(_PT_DIALOG),
+                    field_values={"State": "pending reminder", "PendingTime": bad},
+                    actor=ProcessActor.agent(1),
+                    sysconfig=sysconfig,
+                )
+    row = await _pending_state(factory, ticket_id)
+    assert (row.until_time, row.ticket_state_id) == (0, 1)  # nothing written
+
+
+@pytest.mark.db
+async def test_required_pending_time_missing(mariadb_znuny_url: str) -> None:
+    required = _PT_DIALOG.replace("PendingTime: {Display: '1'}", "PendingTime: {Display: '2'}")
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+    async with factory() as session, session.begin():
+        with pytest.raises(RequiredFieldMissing, match="PendingTime"):
+            await apply_activity_dialog(
+                session,
+                ticket_id=ticket_id,
+                dialog=ActivityDialogConfig.from_yaml(required),
+                field_values={"State": "pending reminder", "PendingTime": ""},
+                actor=ProcessActor.agent(1),
+                sysconfig=sysconfig,
+            )
+    assert (await _pending_state(factory, ticket_id)).ticket_state_id == 1
+
+    # Required only matters for a pending target: with "open" the dialog goes through.
+    async with factory() as session, session.begin():
+        await apply_activity_dialog(
+            session,
+            ticket_id=ticket_id,
+            dialog=ActivityDialogConfig.from_yaml(required),
+            field_values={"State": "open"},
+            actor=ProcessActor.agent(1),
+            sysconfig=sysconfig,
+        )
+    assert (await _pending_state(factory, ticket_id)).ticket_state_id == 4
+
+
+@pytest.mark.db
+async def test_customer_interface_never_applies_pending_time(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+    required = _PT_DIALOG.replace("PendingTime: {Display: '1'}", "PendingTime: {Display: '2'}")
+    async with factory() as session, session.begin():
+        await apply_activity_dialog(
+            session,
+            ticket_id=ticket_id,
+            dialog=ActivityDialogConfig.from_yaml(required),
+            field_values={"State": "pending reminder", "PendingTime": _PT_VALUE},
+            actor=ProcessActor.customer(login="customer@example.org", customer_id="EX-1"),
+            sysconfig=sysconfig,
+        )
+    row = await _pending_state(factory, ticket_id)
+    assert row.ticket_state_id == 6
+    assert row.until_time == 0  # CustomerTicketProcess.pm:75 skips PendingTime
+    assert await _pending_history(factory, ticket_id) == []
