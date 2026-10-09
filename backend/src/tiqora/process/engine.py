@@ -47,8 +47,6 @@ Deferred/unsupported scope (documented, not silently missing)
   ``Appointment*`` (Create/Update/Remove), ``ConfigItemUpdate``.
   Unsupported modules are logged and no-op'd, and collected into
   ``ActivityDialogSubmitResult.unsupported_actions``.
-- Smart tags in TransitionAction ``Config`` values (``TransitionAction::Base``) are not
-  yet substituted (Task 10); in Base-type transition conditions they are (``conditions.py``).
 - Activity Dialog ``PendingTime``/``PendingTimeDiff`` submission fields are
   not applied from ``field_values`` (only a transition action's own
   ``PendingTimeDiff`` on ``TicketStateSet`` is honoured).
@@ -66,10 +64,11 @@ from typing import Any
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.channels.email.placeholder import expand_placeholders
+from tiqora.channels.email.placeholder import PlaceholderContext
 from tiqora.db.legacy.queue import Queue, Service, Sla
 from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketType
 from tiqora.db.legacy.user import Users
+from tiqora.domain.dynamic_field_values import load_ticket_dynamic_field
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
     TicketIn,
@@ -121,6 +120,12 @@ from tiqora.process.fields import (
     missing_required_fields,
 )
 from tiqora.process.graph import ProcessRepository
+from tiqora.process.smart_tags import (
+    build_tag_context,
+    render_tags,
+    replace_action_config,
+    split_scalar_list,
+)
 from tiqora.process.ticket_state import (
     ACTIVITY_ID_DF_NAME,
     PROCESS_ID_DF_NAME,
@@ -485,6 +490,12 @@ async def _action_dynamic_field_set(
         field_name = key.removeprefix("DynamicField_")
         values = value if isinstance(value, list) else [value]
         str_values = [str(v) for v in values]
+        if isinstance(value, str) and value:
+            # DynamicFieldSet.pm:132-143 (bug#14900): a Multiselect value written as one
+            # string ("a, b" -- also what a dynamic-field smart tag yields) is a comma list.
+            field = await load_ticket_dynamic_field(session, field_name)
+            if field is not None and field.field_type == "Multiselect":
+                str_values = split_scalar_list(value)
         await update_dynamic_field(
             session, ticket_id=ticket_id, field_name=field_name, values=str_values, user_id=user_id
         )
@@ -1091,9 +1102,12 @@ async def execute_transition_action(
     ``process_entity_id``/``activity_entity_id``/``transition_entity_id`` are
     accepted for parity with Znuny's ``TransitionAction::Run()`` signature
     (which passes them to every action module) but are not currently
-    consulted by any of the implemented handlers — kept for forward
-    compatibility (logging, future placeholder substitution) and because
-    the subtask spec mandates this exact signature.
+    consulted by any of the implemented handlers.
+
+    The handler receives a copy of ``action.config`` with the smart tags replaced
+    (:func:`tiqora.process.smart_tags.replace_action_config`, Znuny's
+    ``_ReplaceTicketAttributes`` + ``_ReplaceAdditionalAttributes``); ``action`` itself is never
+    mutated.
     """
     del process_entity_id, activity_entity_id, transition_entity_id  # see docstring
     module_name = _module_short_name(action.module)
@@ -1101,7 +1115,10 @@ async def execute_transition_action(
     if handler is None:
         logger.warning("unsupported ProcessManagement TransitionAction module: %s", action.module)
         return module_name
-    await handler(session, action.config, ticket_id, user_id, sysconfig)
+    config = await replace_action_config(
+        action.config, session=session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig
+    )
+    await handler(session, config, ticket_id, user_id, sysconfig)
     return None
 
 
@@ -1464,12 +1481,18 @@ async def run_transitions(
     if activity is None:
         return _NO_TRANSITION
 
-    async def _render(text_: str) -> str:
-        return await expand_placeholders(
-            session, sysconfig, text_, ticket_id=ticket_id, user_id=user_id
-        )
-
     data: ConditionData = await get_condition_data(session, ticket_id)
+    tag_ctx: list[PlaceholderContext] = []  # built on the first tag only
+
+    async def _render(text_: str) -> str:
+        if not tag_ctx:
+            tag_ctx.append(
+                await build_tag_context(
+                    session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig, data=data
+                )
+            )
+        return await render_tags(text_, ctx=tag_ctx[0], sysconfig=sysconfig)
+
     tags = await resolve_transition_tags(
         TransitionConfig(
             conditions=[b for t in activity.outgoing_transitions for b in t.config.conditions]

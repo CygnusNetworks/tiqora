@@ -23,6 +23,12 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.domain.dynamic_field_config import config_from_yaml
+from tiqora.domain.dynamic_field_values import (
+    DynamicFieldConfig,
+    df_display_value,
+    get_df_values_bulk,
+)
 from tiqora.domain.settings_store import get_setting_bool
 from tiqora.domain.timezones import format_in_zone, resolve_user_time_zone
 from tiqora.znuny.sysconfig import SysConfig
@@ -113,6 +119,10 @@ class PlaceholderContext:
     # the text is written for. Datetimes are stringified at load time, so a
     # context is only valid for the zone it was loaded with.
     time_zone: str = "UTC"
+    # Znuny's TemplateGenerator::_Replace answers an unknown or empty tag with "-" and leaves
+    # <OTRS_TA_*> alone (TemplateGenerator.pm:1592-1600, 1682, 2050-2068). Off for e-mail
+    # templates and notifications, which keep rendering an empty string; on for process smart tags.
+    znuny_dash: bool = False
 
 
 def _as_str(value: Any, zone: str = "UTC") -> str:
@@ -357,6 +367,33 @@ async def _fetch_customer_allowlist(session: AsyncSession) -> set[str] | None:
         return None
 
 
+async def _fetch_ticket_df_entries(session: AsyncSession, ticket_id: int) -> dict[str, str]:
+    """``dynamicfield_<name>`` (stored) and ``dynamicfield_<name>_value`` (display) per valid
+    ticket dynamic field that has a value; multiple values are joined with ``", "``."""
+    rows = (
+        await session.execute(
+            text(
+                "SELECT id, name, field_type, config FROM dynamic_field"
+                " WHERE object_type = 'Ticket' AND valid_id = 1 ORDER BY id"
+            )
+        )
+    ).fetchall()
+    fields = {
+        int(r[0]): (DynamicFieldConfig(id=int(r[0]), name=str(r[1]), field_type=str(r[2])), r[3])
+        for r in rows
+    }
+    values = await get_df_values_bulk(session, [f for f, _ in fields.values()], [ticket_id])
+    out: dict[str, str] = {}
+    for field_id, (df, raw_config) in fields.items():
+        stored = [v for v in values.get((field_id, ticket_id), []) if v != ""]
+        if not stored:
+            continue
+        key = f"dynamicfield_{df.name.lower()}"
+        out[key] = ", ".join(stored)
+        out[f"{key}_value"] = df_display_value(df.field_type, config_from_yaml(raw_config), stored)
+    return out
+
+
 async def load_agent_maps(session: AsyncSession, user_id: int | None) -> dict[str, str]:
     """Placeholder maps (``UserFirstname``/``UserFullname``/…) for one agent.
 
@@ -500,6 +537,8 @@ async def load_placeholder_context(
     ):
         if col in row:
             ticket_map[col] = _as_str(row.get(col))
+
+    ticket_map.update(await _fetch_ticket_df_entries(session, int(ticket_id)))
 
     # Caller-supplied ticket vars win for explicit keys (autoresponse overrides).
     if ticket:
@@ -646,7 +685,8 @@ async def _resolve_tag(
     if tag_u == "LAST_NAME":
         return ctx.current_user.get("userlastname") or ""
 
-    # Completely unknown tag prefix/name → empty (do not leave raw markup).
+    # Completely unknown tag prefix/name → empty (do not leave raw markup); in Znuny mode the
+    # caller turns the empty result into "-" (TemplateGenerator.pm:1682, the OTRS_ catch-all).
     logger.debug("placeholder_unknown_tag", tag=tag)
     return ""
 
@@ -748,7 +788,14 @@ async def _expand_placeholders_inner(
     for match in list(_TAG_RE.finditer(text)):
         tag = match.group(1)
         bracket = match.group(2)
+        tag_u = tag.upper()
+        if ctx.znuny_dash and tag_u.startswith("TA_"):
+            continue  # process-management marker, kept verbatim (TemplateGenerator.pm:1592-1600)
         replacement = await _resolve_tag(tag, bracket, ctx=ctx, sysconfig=sysconfig)
+        if ctx.znuny_dash and replacement == "" and not tag_u.startswith("CONFIG_"):
+            # An empty hash value falls through to the "-" catch-all (TemplateGenerator.pm:2050,
+            # 1682); OTRS_CONFIG_ is replaced earlier, ``Get($Key) // ''``, and stays empty (:1799).
+            replacement = "-"
         if ctx.escape_html:
             # Values reach an HTML template as plain text (a quoted article, a
             # name): escape them, and keep their line breaks visible.

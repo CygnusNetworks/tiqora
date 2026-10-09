@@ -840,3 +840,66 @@ async def test_datetime_tags_render_in_the_current_agents_time_zone(
                 {"uid": ids["agent"]},
             )
         sync_engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_dynamic_field_tags_resolve_in_templates(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """``<OTRS_TICKET_DynamicField_X>`` (key) and ``..._X_Value`` (label) used to render empty."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed(sync_url, ns=10)
+    field_ids = {"region": 929010, "tags": 929011, "flag": 929012, "unset": 929013}
+    sync_engine = create_engine(sync_url)
+    with sync_engine.begin() as conn:
+        for name, fid, ftype, cfg in (
+            ("RegionPh", field_ids["region"], "Dropdown", "---\nPossibleValues:\n  eu: Europa\n"),
+            ("TagsPh", field_ids["tags"], "Multiselect", "---\nPossibleValues:\n  a: Alpha\n"),
+            ("FlagPh", field_ids["flag"], "Checkbox", "---"),
+            ("UnsetPh", field_ids["unset"], "Text", "---"),
+        ):
+            conn.execute(
+                text(
+                    "INSERT INTO dynamic_field (id, internal_field, name, label, field_order,"
+                    " field_type, object_type, config, valid_id, create_time, create_by,"
+                    " change_time, change_by)"
+                    " VALUES (:id, 0, :n, :n, :id, :ft, 'Ticket', :cfg, 1, :t, 1, :t, 1)"
+                ),
+                {"id": fid, "n": name, "ft": ftype, "cfg": cfg, "t": NOW},
+            )
+        for fid, vt, vi in (
+            (field_ids["region"], "eu", None),
+            (field_ids["tags"], "a", None),
+            (field_ids["tags"], "z", None),
+            (field_ids["flag"], None, 1),
+        ):
+            conn.execute(
+                text(
+                    "INSERT INTO dynamic_field_value (field_id, object_id, value_text, value_int)"
+                    " VALUES (:f, :o, :vt, :vi)"
+                ),
+                {"f": fid, "o": ids["ticket"], "vt": vt, "vi": vi},
+            )
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            rendered = await expand_placeholders(
+                session,
+                _make_sysconfig(),
+                "<OTRS_TICKET_DynamicField_RegionPh>|<OTRS_TICKET_DynamicField_RegionPh_Value>|"
+                "<OTRS_TICKET_DynamicField_TagsPh>|<OTRS_TICKET_DynamicField_TagsPh_Value>|"
+                "<OTRS_TICKET_DynamicField_FlagPh_Value>|[<OTRS_TICKET_DynamicField_UnsetPh>]",
+                ticket_id=ids["ticket"],
+                user_id=ids["agent"],
+            )
+        assert rendered == "eu|Europa|a, z|Alpha, z|Checked|[]"
+    finally:
+        await engine.dispose()
+        with sync_engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM dynamic_field_value WHERE object_id = :o"), {"o": ids["ticket"]}
+            )
+            conn.execute(text("DELETE FROM dynamic_field WHERE id BETWEEN 929010 AND 929013"))
+        sync_engine.dispose()
