@@ -5,6 +5,11 @@ priority and type changes are found by diffing the snapshot columns every
 history row carries (values AFTER the action), which is identical for Znuny
 and Tiqora writers. Service, SLA, responsible user, merges and process
 activities have no snapshot column and are parsed from the ``%%`` names.
+
+Unknown state ids (deleted or unmapped) keep their ``state`` event with a
+``None`` type value but never produce ``close``/``reopen``. Name-parsed events
+come from every history row including the first; only the column diff starts at
+the second row. Garbled or empty names emit no event.
 """
 
 from __future__ import annotations
@@ -140,7 +145,6 @@ def derive_events(
             first.priority_id,
             first.type_id,
         )
-        later = rows[1:]
     else:
         base_queue, base_state = ticket.queue_id, ticket.state_id
         snapshot = (
@@ -150,7 +154,6 @@ def derive_events(
             ticket.priority_id,
             ticket.type_id if ticket.type_id is not None else 0,
         )
-        later = []
 
     events: list[EventRow] = []
     base_state_type = state_types.get(base_state)
@@ -180,10 +183,11 @@ def derive_events(
 
     prev = snapshot
     last_responsible: int | None = None
-    for r in later:
+    for pos, r in enumerate(rows):
         cur = (r.queue_id, r.state_id, r.owner_id, r.priority_id, r.type_id)
         for idx, kind in enumerate(("queue", "state", "owner", "priority", "type")):
-            if cur[idx] == prev[idx]:
+            # The first row is the baseline: its columns only start the diff.
+            if pos == 0 or cur[idx] == prev[idx]:
                 continue
             ev = EventRow(
                 ticket_id=ticket.id,
@@ -199,7 +203,9 @@ def derive_events(
                 old_t, new_t = state_types.get(prev[1]), state_types.get(cur[1])
                 ev = replace(ev, from_value=old_t, to_value=new_t)
                 events.append(ev)
-                if new_t == CLOSED_STATE_TYPE and old_t != CLOSED_STATE_TYPE:
+                if old_t is None or new_t is None:
+                    pass  # unknown state id: state event only, never close/reopen
+                elif new_t == CLOSED_STATE_TYPE and old_t != CLOSED_STATE_TYPE:
                     events.append(replace(ev, kind="close"))
                 elif old_t == CLOSED_STATE_TYPE and new_t != CLOSED_STATE_TYPE:
                     events.append(replace(ev, kind="reopen"))
@@ -207,7 +213,8 @@ def derive_events(
                 events.append(ev)
         prev = cur
 
-        values = split_history_name(r.name)
+        raw_name = r.name or ""
+        values = split_history_name(raw_name)
         common: dict[str, Any] = {
             "ticket_id": ticket.id,
             "occurred_at": r.create_time,
@@ -217,13 +224,14 @@ def derive_events(
         }
         htype = r.history_type
         if htype in ("ServiceUpdate", "SLAUpdate"):
-            if len(values) < 2:
-                continue
+            new_id, old_id = _int(_at(values, 1)), _int(_at(values, 3))
+            if new_id is None and old_id is None:
+                continue  # garbled or empty -> no event
             events.append(
                 EventRow(
                     kind="service" if htype == "ServiceUpdate" else "sla",
-                    from_id=_int(_at(values, 3)),
-                    to_id=_int(values[1]),
+                    from_id=old_id,
+                    to_id=new_id,
                     **common,
                 )
             )
@@ -236,23 +244,20 @@ def derive_events(
             )
             last_responsible = new_id
         elif htype == "Merged":
-            events.append(
-                EventRow(kind="merge", to_value=r.name.removeprefix("%%")[:100], **common)
-            )
+            merged = raw_name.removeprefix("%%")[:100]
+            if merged.strip("%"):
+                events.append(EventRow(kind="merge", to_value=merged, **common))
         elif htype == "TicketDynamicFieldUpdate":
             if (
                 len(values) >= 4
                 and values[0] == "FieldName"
                 and values[1] == PROCESS_ACTIVITY_FIELD
             ):
-                old = _at(values, 5)
+                new_v, old_v = _at(values, 3) or None, _at(values, 5) or None
+                if new_v is None and old_v is None:
+                    continue
                 events.append(
-                    EventRow(
-                        kind="process_activity",
-                        from_value=old or None,
-                        to_value=values[3],
-                        **common,
-                    )
+                    EventRow(kind="process_activity", from_value=old_v, to_value=new_v, **common)
                 )
 
     qrows = sorted(rows, key=lambda r: (r.create_time, r.id))

@@ -192,3 +192,92 @@ def test_output_is_time_ordered() -> None:
         "reply",
     ]
     assert all(e.kind in EVENT_KINDS for e in ev)
+
+
+def test_first_row_not_newticket_still_parses_names() -> None:
+    hist = [
+        h(1, "ServiceUpdate", 0, name="%%IT%%12%%%%"),
+        h(2, "Merged", 1, name="%%T100%%100%%T200%%200"),
+        h(3, "Move", 2, queue=2),
+    ]
+    ev = derive_events(t(), hist, [], STATE_TYPES)
+    assert kinds(ev) == ["create", "service", "merge", "queue"]
+    svc = next(e for e in ev if e.kind == "service")
+    assert (svc.from_id, svc.to_id, svc.history_id) == (None, 12, 1)
+    # the first row's own columns are the baseline, not a diff
+    assert [e.kind for e in ev if e.kind in ("queue", "state")] == ["queue"]
+
+
+def test_same_create_time_ordered_by_history_id() -> None:
+    hist = [
+        h(3, "Move", 5, queue=3),
+        h(1, "NewTicket", 0, queue=1),
+        h(2, "Move", 5, queue=2),
+    ]
+    q = [e for e in derive_events(t(), hist, [], STATE_TYPES) if e.kind == "queue"]
+    assert [(e.history_id, e.from_id, e.to_id) for e in q] == [(2, 1, 2), (3, 2, 3)]
+
+
+def test_empty_old_process_activity_value_is_none() -> None:
+    name = "%%FieldName%%ProcessManagementActivityID%%Value%%A1%%OldValue%%"
+    ev = derive_events(
+        t(), [h(1, "NewTicket", 0), h(2, "TicketDynamicFieldUpdate", 1, name=name)], [], STATE_TYPES
+    )
+    pa = [e for e in ev if e.kind == "process_activity"]
+    assert [(e.from_value, e.to_value) for e in pa] == [(None, "A1")]
+    empty_new = "%%FieldName%%ProcessManagementActivityID%%Value%%%%OldValue%%A1"
+    ev = derive_events(
+        t(),
+        [h(1, "NewTicket", 0), h(2, "TicketDynamicFieldUpdate", 1, name=empty_new)],
+        [],
+        STATE_TYPES,
+    )
+    assert [(e.from_value, e.to_value) for e in ev if e.kind == "process_activity"] == [
+        ("A1", None)
+    ]
+
+
+def test_garbled_names_emit_no_event() -> None:
+    hist = [
+        h(1, "NewTicket", 0),
+        h(2, "ServiceUpdate", 1, name="%%a%%b"),
+        h(3, "SLAUpdate", 2, name="%%x%%y%%z%%w"),
+        h(4, "ResponsibleUpdate", 3, name="%%anna%%notanumber"),
+        h(5, "Merged", 4, name="%%"),
+        h(6, "TicketDynamicFieldUpdate", 5, name="%%FieldName%%ProcessManagementActivityID"),
+        h(7, "ServiceUpdate", 6, name=""),
+    ]
+    assert kinds(derive_events(t(), hist, [], STATE_TYPES)) == ["create"]
+
+
+def test_service_removal_keeps_old_id() -> None:
+    hist = [h(1, "NewTicket", 0), h(2, "ServiceUpdate", 1, name="%%%%%%IT%%12")]
+    svc = [e for e in derive_events(t(), hist, [], STATE_TYPES) if e.kind == "service"]
+    assert [(e.from_id, e.to_id) for e in svc] == [(12, None)]
+
+
+def test_none_name_is_treated_as_empty() -> None:
+    bad = HistoryRow(2, "Merged", None, None, 1, 1, 3, 1, 1, T0 + timedelta(minutes=1), 2)  # type: ignore[arg-type]
+    assert kinds(derive_events(t(), [h(1, "NewTicket", 0), bad], [], STATE_TYPES)) == ["create"]
+
+
+def test_unknown_state_id_keeps_state_event_without_close_or_reopen() -> None:
+    hist = [
+        h(1, "NewTicket", 0, state=1),
+        h(2, "StateUpdate", 1, state=99),
+        h(3, "StateUpdate", 2, state=2),
+        h(4, "StateUpdate", 3, state=99),
+    ]
+    ev = derive_events(t(), hist, [], STATE_TYPES)
+    st = [(e.from_value, e.to_value) for e in ev if e.kind == "state"]
+    assert st == [("new", None), (None, "closed"), ("closed", None)]
+    assert "close" not in kinds(ev) and "reopen" not in kinds(ev)
+
+
+def test_merged_to_closed_counts_as_close() -> None:
+    hist = [h(1, "NewTicket", 0, state=9), h(2, "StateUpdate", 1, state=2)]
+    ev = derive_events(t(), hist, [], STATE_TYPES)
+    assert kinds(ev) == ["create", "state", "close"]
+    assert "close" not in kinds(
+        derive_events(t(), [h(1, "NewTicket", 0, state=9)], [], STATE_TYPES)
+    )
