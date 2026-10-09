@@ -75,6 +75,7 @@ const authedUser = {
   last_name: "Doe",
   email: "jane@example.com",
   is_admin: false,
+  can_view_reports: true,
 };
 
 function wrapper({ children }: { children: React.ReactNode }) {

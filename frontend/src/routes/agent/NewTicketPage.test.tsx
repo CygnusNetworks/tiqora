@@ -95,6 +95,7 @@ vi.mock("@/auth/AuthContext", () => ({
       last_name: "One",
       email: "agent1@example.com",
       is_admin: false,
+      can_view_reports: true,
     },
   }),
 }));

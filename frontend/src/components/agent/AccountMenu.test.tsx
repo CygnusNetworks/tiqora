@@ -17,6 +17,7 @@ const { logout, navigate, setTheme, authUser } = vi.hoisted(() => ({
     last_name: "Doe",
     email: "jane@example.com",
     is_admin: false as boolean,
+    can_view_reports: true,
   },
 }));
 

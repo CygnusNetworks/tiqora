@@ -18,6 +18,7 @@ test.describe("admin access guard", () => {
           last_name: "Agent",
           auth_method: "password",
           is_admin: false,
+          can_view_reports: true,
         }),
       });
     });
@@ -37,6 +38,7 @@ test.describe("admin access guard", () => {
             last_name: "Agent",
             auth_method: "password",
             is_admin: false,
+            can_view_reports: true,
           },
         }),
       });
