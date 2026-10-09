@@ -7,13 +7,22 @@ job runs in job mode (``query_timeout_seconds`` per statement) and writes the
 result cache with the same key builder as the API, so the same request asked
 again afterwards is answered inline. The export job never uses the cache and
 caps the rows at ``reporting.export_row_limit``.
+
+Cancelling: while a job computes, :func:`_until_cancelled` polls
+``cancel_requested`` every :data:`CANCEL_POLL_SECONDS`; a cancel cancels the
+computation. A statement in flight is cut off client-side and its connection is
+invalidated (``engine._fetch``), the next statement never starts, and the job ends
+``cancelled`` — so a cancelled job really frees its slot of the per-user cap.
+(The server may finish the cut-off statement up to its statement timeout.)
 """
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 import re
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager
 from typing import Any, Final
 
@@ -25,7 +34,7 @@ from tiqora.config import Settings
 from tiqora.domain.timezones import resolve_user_time_zone, valid_time_zone
 from tiqora.extensions.core import get_registry
 from tiqora.filters import FilterError
-from tiqora.jobs.context import JobContext, JobFailed
+from tiqora.jobs.context import JobCancelled, JobContext, JobFailed
 from tiqora.jobs.registry import JobHandler
 from tiqora.jobs.service import MAX_RESULT_CHARS
 from tiqora.reporting.access import has_report_access
@@ -58,6 +67,8 @@ RESULT_TOO_LARGE_MESSAGE: Final = (
 XLSX_CONTENT_TYPE: Final = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 CSV_CONTENT_TYPE: Final = "text/csv; charset=utf-8"
 _UMLAUTS: Final = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"})
+#: seconds between two looks at ``cancel_requested`` while a report computes
+CANCEL_POLL_SECONDS: float = 1.0
 
 
 class ReportRunPayload(BaseModel):
@@ -160,8 +171,32 @@ async def _checked(
     return reporting, definition, params, key
 
 
+async def _until_cancelled[R](ctx: JobContext, work: Awaitable[R]) -> R:
+    """Run ``work``; when the job's cancel is requested meanwhile, cancel it and raise
+    :class:`JobCancelled` (the engine invalidates a connection cut off mid-statement)."""
+    task = asyncio.ensure_future(work)
+    try:
+        while True:
+            done, _pending = await asyncio.wait({task}, timeout=CANCEL_POLL_SECONDS)
+            if done:
+                return task.result()
+            try:
+                await ctx.check_cancelled()
+            except JobCancelled:
+                task.cancel()
+                with contextlib.suppress(BaseException):
+                    await task
+                raise
+    finally:
+        if not task.done():  # the job itself was cancelled (runner timeout, shutdown)
+            task.cancel()
+            with contextlib.suppress(BaseException):
+                await task
+
+
 async def _run(
     session: AsyncSession,
+    ctx: JobContext,
     *,
     user_id: int,
     definition: ReportDefinition,
@@ -172,14 +207,17 @@ async def _run(
     **kwargs: Any,
 ) -> ReportResultOut:
     try:
-        return await run_report(
-            session,
-            defn=definition,
-            params=params,
-            user_id=user_id,
-            report_key=key,
-            reporting=reporting,
-            **kwargs,
+        return await _until_cancelled(
+            ctx,
+            run_report(
+                session,
+                defn=definition,
+                params=params,
+                user_id=user_id,
+                report_key=key,
+                reporting=reporting,
+                **kwargs,
+            ),
         )
     except (DefinitionError, FilterError) as exc:
         raise JobFailed(f"Der Bericht ist nicht mehr gültig: {exc.message}") from exc
@@ -199,6 +237,7 @@ async def run_report_job(ctx: JobContext, payload: ReportRunPayload) -> dict[str
             cache = ReportCache(backend, reporting.cache_seconds, generation=generation)
             result = await _run(
                 session,
+                ctx,
                 user_id=payload.user_id,
                 definition=definition,
                 params=params,
@@ -223,6 +262,7 @@ async def run_export_job(ctx: JobContext, payload: ReportExportPayload) -> dict[
         reporting, definition, params, key = await _checked(session, ctx, payload.user_id, body)
         result = await _run(
             session,
+            ctx,
             user_id=payload.user_id,
             definition=definition,
             params=params,

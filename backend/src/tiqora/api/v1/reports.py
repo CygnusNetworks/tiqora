@@ -154,7 +154,10 @@ async def _check_job_limit(session: AsyncSession, user_id: int) -> None:
     await lock_user_job_quota(session, user_id)
     active = 0
     for kind in (REPORT_RUN_JOB.kind, REPORT_EXPORT_JOB.kind):
-        active += await count_active_jobs(session, kind=kind, created_by=user_id)
+        # a cancelled report job stops within about a second: it no longer counts
+        active += await count_active_jobs(
+            session, kind=kind, created_by=user_id, include_cancelling=False
+        )
     if active >= MAX_ACTIVE_REPORT_JOBS_PER_USER:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

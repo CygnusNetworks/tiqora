@@ -127,9 +127,13 @@ def _make_cell(
     return cell
 
 
-def _display_len(value: object) -> int:
+def _display_len(value: object, col_type: ColumnType) -> int:
+    """Characters the cell shows (as :func:`_make_cell` formats it)."""
     if value is None:
         return 0
+    if col_type == "date" and (parsed := _to_date(value)) is not None:
+        # "yyyy-mm-dd hh:mm" with a time of day, "yyyy-mm-dd" without
+        return 16 if parsed.time() != datetime.min.time() else 10
     if isinstance(value, datetime | date):
         return 10
     return len(str(value))
@@ -151,7 +155,10 @@ def write_xlsx_workbook(sheets: Sequence[XlsxSheet]) -> bytes:
                 width = col.width
             else:
                 longest = max(
-                    [len(col.header), *(_display_len(r[idx]) for r in scan if idx < len(r))]
+                    [
+                        len(col.header),
+                        *(_display_len(r[idx], col.type) for r in scan if idx < len(r)),
+                    ]
                 )
                 width = min(60.0, max(10.0, longest + 2.0))
             ws.column_dimensions[get_column_letter(idx + 1)].width = width

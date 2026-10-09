@@ -94,23 +94,36 @@ async def lock_user_job_quota(session: AsyncSession, user_id: int) -> None:
     overshoot the cap. Only a row lock — nothing is written to the Znuny table. It must
     come first because MariaDB's REPEATABLE READ snapshot starts at the first plain read:
     a snapshot taken before the lock would not see the other request's committed job.
+
+    PostgreSQL takes ``FOR NO KEY UPDATE`` (``key_share=True``): it still conflicts
+    with itself (the cap stays serialised) but not with the ``FOR KEY SHARE`` locks
+    foreign-key checks take, so inserts referencing the user (tickets, articles,
+    history rows of that agent) are not blocked while a request holds the lock.
+    MariaDB renders a plain ``FOR UPDATE`` (InnoDB has no weaker exclusive mode).
     """
-    await session.execute(select(Users.id).where(Users.id == user_id).with_for_update())
+    await session.execute(
+        select(Users.id).where(Users.id == user_id).with_for_update(key_share=True)
+    )
 
 
-async def count_active_jobs(session: AsyncSession, *, kind: str, created_by: int) -> int:
-    """Queued or running jobs of ``kind`` started by ``created_by``."""
+async def count_active_jobs(
+    session: AsyncSession, *, kind: str, created_by: int, include_cancelling: bool = True
+) -> int:
+    """Queued or running jobs of ``kind`` started by ``created_by``.
+
+    ``include_cancelling=False`` leaves out running jobs whose cancel was requested —
+    only for kinds whose handler really stops on a cancel (report runs and exports).
+    """
+    conditions = [
+        TiqoraJob.kind == kind,
+        TiqoraJob.created_by == created_by,
+        TiqoraJob.status.in_(ACTIVE_STATUSES),
+    ]
+    if not include_cancelling:
+        conditions.append(TiqoraJob.cancel_requested.is_(False))
     return int(
         (
-            await session.execute(
-                select(func.count())
-                .select_from(TiqoraJob)
-                .where(
-                    TiqoraJob.kind == kind,
-                    TiqoraJob.created_by == created_by,
-                    TiqoraJob.status.in_(ACTIVE_STATUSES),
-                )
-            )
+            await session.execute(select(func.count()).select_from(TiqoraJob).where(*conditions))
         ).scalar_one()
     )
 

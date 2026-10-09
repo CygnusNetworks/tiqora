@@ -160,6 +160,26 @@ def test_widths_and_streamed_rows_beyond_scan() -> None:
     assert ws.column_dimensions["A"].width == 60 and ws.column_dimensions["B"].width == 33
 
 
+def test_date_column_width_follows_the_shown_format() -> None:
+    """T15: "yyyy-mm-dd hh:mm" is 16 characters wide, a plain date 10 (+2 padding)."""
+    cols = [
+        XlsxColumn("at", "date"),  # ISO strings with a time (report rows)
+        XlsxColumn("day", "date"),  # ISO dates
+        XlsxColumn("obj", "date"),  # datetime objects with a time
+        XlsxColumn("text", "string"),  # a datetime-like text is just text
+    ]
+    rows = [
+        ["2024-06-01T10:30:00", "2024-06-01", datetime(2024, 6, 1, 10, 30), "2024-06-01T10:30:00"],
+        ["2024-06-02T00:00:00", "2024-06-02", datetime(2024, 6, 2), "x"],
+    ]
+    ws = openpyxl.load_workbook(
+        io.BytesIO(write_xlsx_workbook([XlsxSheet(name="D", columns=cols, rows=rows)]))
+    )["D"]
+    widths = [ws.column_dimensions[c].width for c in "ABCD"]
+    assert widths == [18, 12, 18, 21]
+    assert ws["A2"].number_format == "yyyy-mm-dd hh:mm" and ws["B2"].number_format != "General"
+
+
 def test_csv_has_bom_semicolons_and_labels() -> None:
     data = write_report_csv(
         RESULT, column_labels={"customer": "Kunde"}, value_labels={}, totals_label="Summe"

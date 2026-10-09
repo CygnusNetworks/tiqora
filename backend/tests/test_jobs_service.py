@@ -388,3 +388,68 @@ async def test_request_cancel_after_concurrent_claim_sets_cancel_requested(
         row = await get_job(s, job_id)
         assert row is not None
         assert (row.status, row.cancel_requested) == ("running", True)
+
+
+async def test_user_job_quota_lock_serialises_but_lets_fk_checks_through(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """T16: the cap lock conflicts with itself; on PostgreSQL it is FOR NO KEY UPDATE, so
+    the FOR KEY SHARE lock of a foreign-key check on that user is not blocked."""
+    from sqlalchemy import event
+
+    from tiqora.jobs.service import lock_user_job_quota
+
+    engine = factory.kw["bind"]
+    seen: list[str] = []
+
+    def record(conn: Any, cursor: Any, statement: str, *args: Any) -> None:
+        seen.append(statement)
+
+    event.listen(engine.sync_engine, "before_cursor_execute", record)
+    try:
+        async with factory() as holder:
+            await lock_user_job_quota(holder, 1)  # Znuny seed admin
+            lock_sql = next(st for st in seen if "FROM users" in st)
+            if engine.dialect.name != "postgresql":
+                assert lock_sql.rstrip().endswith("FOR UPDATE")
+                return
+            assert lock_sql.rstrip().endswith("FOR NO KEY UPDATE")
+            async with factory() as other:
+                await other.execute(text("SET LOCAL lock_timeout = '2s'"))
+                # what PostgreSQL's FK trigger takes on users(id) for an insert
+                await other.execute(text("SELECT id FROM users WHERE id = 1 FOR KEY SHARE"))
+                await other.rollback()
+            async with factory() as other:
+                await other.execute(text("SET LOCAL lock_timeout = '1s'"))
+                with pytest.raises(Exception, match="lock timeout"):
+                    await lock_user_job_quota(other, 1)  # a second cap check waits
+                await other.rollback()
+            await holder.rollback()
+    finally:
+        event.remove(engine.sync_engine, "before_cursor_execute", record)
+
+
+async def test_count_active_jobs_can_leave_out_cancelling_jobs(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    from tiqora.jobs.service import count_active_jobs
+
+    reg = _registry()
+    async with factory() as s:
+        ids = [
+            (
+                await enqueue_job(s, kind="test.noop", payload={"n": i}, created_by=1, registry=reg)
+            ).id
+            for i in range(3)
+        ]
+        await s.execute(
+            update(TiqoraJob)
+            .where(TiqoraJob.id == ids[0])
+            .values(status="running", cancel_requested=True)
+        )
+        await s.commit()
+        assert await count_active_jobs(s, kind="test.noop", created_by=1) == 3
+        assert (
+            await count_active_jobs(s, kind="test.noop", created_by=1, include_cancelling=False)
+            == 2
+        )

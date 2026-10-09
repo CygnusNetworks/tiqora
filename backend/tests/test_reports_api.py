@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import time
 from collections.abc import AsyncIterator, Generator
 from datetime import datetime
 from decimal import Decimal
@@ -766,6 +767,62 @@ async def test_report_jobs_are_capped_per_user(env: Env) -> None:
     await env.run_jobs()
     await env.run_jobs()
     assert (await _run(env, body)).status_code == 202
+
+
+async def test_cancelled_report_job_stops_its_statement_and_ends_cancelled(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Frontend-I1 (backend): a cancel stops a running report job within the poll interval;
+    the statement in flight is cut off and its connection invalidated."""
+    from sqlalchemy import func, select
+
+    import tiqora.reporting.engine as engine_mod
+
+    monkeypatch.setattr(report_jobs, "CANCEL_POLL_SECONDS", 0.1)
+    started = asyncio.Event()
+    invalidated: list[bool] = []
+    real_invalidate = engine_mod.invalidate_quietly
+
+    async def spy_invalidate(session: AsyncSession) -> None:
+        invalidated.append(True)
+        await real_invalidate(session)
+
+    async def slow_report(session: AsyncSession, **kwargs: Any) -> Any:
+        sleep = func.sleep(30) if env.dialect == "mysql" else func.pg_sleep(30)
+        started.set()
+        await engine_mod._fetch(session, select(sleep), QueryBudget(per_query_seconds=60))
+        raise AssertionError("the statement was not cut off")
+
+    monkeypatch.setattr(engine_mod, "invalidate_quietly", spy_invalidate)
+    monkeypatch.setattr(report_jobs, "run_report", slow_report)
+    resp = await _run(env, {"report_key": "builtin.channel_mix", "time_range": JUNE,
+                            "force_job": True, "no_cache": True})  # fmt: skip
+    job_id = resp.json()["job"]["job_id"]
+    runner = asyncio.create_task(env.run_jobs())
+    await asyncio.wait_for(started.wait(), 15)
+    await asyncio.sleep(0.3)  # the statement is now running on the server
+    cancelled_at = time.monotonic()
+    assert (await env.client.post(f"/api/v1/jobs/{job_id}/cancel")).status_code == 200
+    await asyncio.wait_for(runner, 15)
+    assert time.monotonic() - cancelled_at < 10  # not the statement's 30 s
+    assert (await env.job(job_id))["status"] == "cancelled"
+    assert invalidated  # cut off mid-statement: the connection never returns to the pool
+
+
+async def test_cancel_requested_report_jobs_do_not_count_for_the_cap(env: Env) -> None:
+    body = {"report_key": "builtin.channel_mix", "time_range": JUNE, "force_job": True,
+            "no_cache": True}  # fmt: skip
+    ids = [(await _run(env, body)).json()["job"]["job_id"] for _ in range(3)]
+    assert (await _run(env, body)).status_code == 429
+    async with env.factory() as s:
+        # running and asked to stop: the job ends within a second (see the test above)
+        await s.execute(
+            text("UPDATE tiqora_job SET status = 'running', cancel_requested = :t WHERE id = :i"),
+            {"t": True, "i": ids[0]},
+        )
+        await s.commit()
+    assert (await _run(env, body)).status_code == 202
+    assert (await _run(env, body)).status_code == 429
 
 
 async def test_concurrent_report_jobs_cannot_overshoot_the_cap(
