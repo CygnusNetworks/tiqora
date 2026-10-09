@@ -97,12 +97,12 @@ from tiqora.process.availability import RUNNING_STATES, assert_can_submit
 from tiqora.process.conditions import (
     ConditionConfigError,
     ConditionData,
-    _as_integer,  # noqa: PLC2701 -- shared Base.pm helpers
-    _value_validate,  # noqa: PLC2701
+    as_integer,
     check_transition,
     evaluate_transition,
     get_condition_data,
     resolve_transition_tags,
+    value_validate,
 )
 from tiqora.process.config import ActivityDialogConfig, TransitionActionConfig, TransitionConfig
 from tiqora.process.exceptions import (
@@ -790,10 +790,10 @@ async def _action_dynamic_field_pending_time_set(
     raw = attrs.get(f"DynamicField_{field}", "") or attrs.get(str(field), "")
     if not raw:
         return
-    validated = _value_validate(str(raw).strip())
+    validated = value_validate(str(raw).strip())
     # After ValueValidate, datetimes are epoch ints; plain strings that are
     # already epoch also work via _as_integer.
-    epoch = _as_integer(validated)
+    epoch = as_integer(validated)
     if epoch is None:
         # Try a final parse for values ValueValidate did not rewrite.
         try:
@@ -1000,8 +1000,8 @@ async def _action_ticket_create(
     # Optional pending time on the *new* ticket (Znuny PendingTime / PendingTimeDiff).
     pending_time: datetime | None = None
     if config.get("PendingTime"):
-        validated = _value_validate(str(config["PendingTime"]).strip())
-        epoch = _as_integer(validated)
+        validated = value_validate(str(config["PendingTime"]).strip())
+        epoch = as_integer(validated)
         if epoch is not None:
             pending_time = datetime.fromtimestamp(epoch, tz=UTC)
     elif config.get("PendingTimeDiff") is not None:
@@ -1485,6 +1485,15 @@ async def run_transitions(
             # Znuny's bare ``return`` leaves TransitionCheck: nothing fires (Transition.pm:322).
             logger.error("transition %s: %s; no transition runs", transition.entity_id, exc)
             return _NO_TRANSITION
+        # The new activity is stored BEFORE the actions run (Process.pm:501, actions from :558),
+        # so the history shows the activity update first.
+        await update_dynamic_field(
+            session,
+            ticket_id=ticket_id,
+            field_name=ACTIVITY_ID_DF_NAME,
+            values=[transition.target_activity_entity_id],
+            user_id=user_id,
+        )
         unsupported: list[str] = []
         for action_node in transition.actions:
             skipped = await execute_transition_action(
@@ -1499,13 +1508,6 @@ async def run_transitions(
             )
             if skipped is not None:
                 unsupported.append(skipped)
-        await update_dynamic_field(
-            session,
-            ticket_id=ticket_id,
-            field_name=ACTIVITY_ID_DF_NAME,
-            values=[transition.target_activity_entity_id],
-            user_id=user_id,
-        )
         return TransitionOutcome(
             activity_changed=True,
             new_activity_entity_id=transition.target_activity_entity_id,

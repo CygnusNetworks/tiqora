@@ -1,9 +1,8 @@
-"""Pure unit tests for ``evaluate_transition`` (no DB) — subtask 2.
+"""Pure unit tests for ``evaluate_transition`` (no DB) and the TicketCreate action.
 
-Builds ``TransitionConfig``/``TransitionConditionBlock``/
-``TransitionConditionField`` objects directly (as subtask 1's
-``test_process_config.py`` does via YAML parsing) and feeds them straight to
-``evaluate_transition`` with a hand-built ``ticket_attrs`` dict.
+Builds ``TransitionConfig``/``TransitionConditionBlock``/``TransitionConditionField`` objects
+directly and feeds them to ``evaluate_transition`` with a hand-built condition-data dict
+(Znuny semantics: ``conditions.py``; the full matrix is in ``test_process_conditions.py``).
 
 Also hosts a mocked ``TicketCreate`` transition-action unit test (no DB).
 """
@@ -191,9 +190,10 @@ def test_greater_than_or_equal() -> None:
     assert evaluate_transition(config, {**ATTRS, "Score": "4"}) is False
 
 
-def test_greater_than_equals_alias() -> None:
+def test_greater_than_equals_is_not_a_znuny_type() -> None:
+    # TransitionValidation/ only ships GreaterThanOrEqual; an unknown Type is a config error.
     config = _config({"Score": ("5", "GreaterThanEquals")})
-    assert evaluate_transition(config, {**ATTRS, "Score": "5"}) is True
+    assert evaluate_transition(config, {**ATTRS, "Score": "5"}) is False
 
 
 def test_less_than_numeric() -> None:
@@ -210,9 +210,9 @@ def test_less_than_or_equal() -> None:
     assert evaluate_transition(config, {**ATTRS, "Score": "6"}) is False
 
 
-def test_less_than_equals_alias() -> None:
+def test_less_than_equals_is_not_a_znuny_type() -> None:
     config = _config({"Score": ("5", "LessThanEquals")})
-    assert evaluate_transition(config, {**ATTRS, "Score": "5"}) is True
+    assert evaluate_transition(config, {**ATTRS, "Score": "5"}) is False
 
 
 def test_greater_than_datetime_compares_as_epoch() -> None:

@@ -1,6 +1,8 @@
 """Condition data (Znuny ``TicketGet`` + dynamic fields) and ``run_transitions`` on a real DB.
 
-Seed ids live in the 887100-887499 band (rulings F8). Znuny references: ``Ticket.pm:1240-1360``
+Seed ids live in the 887100-887499 band (rulings F8); ``ticket_type.id`` is a SMALLINT, so the
+type uses id 30887 (``test_process_engine.py`` uses 30501 for its own type).
+Znuny references: ``Ticket.pm:1240-1360``
 (TicketGet keys), ``Process.pm:395-445`` (transition check on Active/FadeAway processes only),
 ``TransitionValidation/Base.pm:154-285`` (smart tags in Base-type conditions).
 """
@@ -31,8 +33,8 @@ T0 = datetime(2026, 3, 4, 5, 6, 7)
 AGENT = 887110
 DF_MULTI, DF_TEXT, DF_UNSET, DF_DATE = 887120, 887121, 887122, 887123
 TICKET_DATA, TICKET_TYPE, TICKET_TAG, TICKET_INACTIVE = 887140, 887141, 887142, 887143
-TICKET_BROKEN = 887144
-TYPE_ID = 30887  # ticket_type.id is a SMALLINT; outside the band, unique by value
+TICKET_BROKEN, TICKET_ORDER = 887144, 887145
+TYPE_ID = 30887  # SMALLINT column, outside the band; see the module docstring
 SERVICE_ID = 887160
 SLA_ID = 887170
 PROC_BASE = 887100  # process n: pm_process 887100+n, activity 887300+2n/+1, transition 887400+n
@@ -60,7 +62,8 @@ def _cleanup(conn: Any) -> None:
         "DELETE FROM pm_process WHERE id BETWEEN 887100 AND 887199",
         "DELETE FROM pm_activity_dialog WHERE id BETWEEN 887200 AND 887299",
         "DELETE FROM pm_activity WHERE id BETWEEN 887300 AND 887399",
-        "DELETE FROM pm_transition WHERE id BETWEEN 887400 AND 887449",
+        "DELETE FROM pm_transition WHERE id BETWEEN 887400 AND 887419",
+        "DELETE FROM pm_transition_action WHERE id BETWEEN 887420 AND 887449",
     ):
         conn.execute(text(stmt))
 
@@ -95,11 +98,18 @@ def _cond(fields_yaml: str) -> str:
 
 
 def _add_process(
-    conn: Any, n: int, condition: str, *, state: str = "S1", second_condition: str | None = None
+    conn: Any,
+    n: int,
+    condition: str,
+    *,
+    state: str = "S1",
+    second_condition: str | None = None,
+    set_title: str | None = None,
 ) -> None:
     """Process ``n``: activity A (one dialog setting Type) -> activity B via one transition.
 
-    ``second_condition`` adds a second transition (entity id sorts after the first).
+    ``second_condition`` adds a second transition (entity id sorts after the first);
+    ``set_title`` gives the first transition a TicketTitleSet action.
     """
     act_a, act_b = _eid("Activity", n, n), _eid("Activity", n, n + 1)
     dialog, trans = _eid("ActivityDialog", n), _eid("T", n)
@@ -117,6 +127,7 @@ def _add_process(
             "cfg": (
                 f"StartActivity: {act_a}\nStartActivityDialog: {dialog}\n"
                 f"Path:\n  {act_a}:\n    {trans}:\n      ActivityEntityID: {act_b}\n"
+                + (f"      TransitionAction:\n      - TA-{n}\n" if set_title else "")
                 + (
                     f"    {trans}b:\n      ActivityEntityID: {act_b}\n"
                     if second_condition is not None
@@ -155,6 +166,19 @@ def _add_process(
         text(_PM_INSERT.format(table="pm_transition")),
         {"id": 887400 + n, "eid": trans, "name": f"T{n}", "cfg": condition},
     )
+    if set_title:
+        conn.execute(
+            text(_PM_INSERT.format(table="pm_transition_action")),
+            {
+                "id": 887420 + n,
+                "eid": f"TA-{n}",
+                "name": f"TA{n}",
+                "cfg": (
+                    f"Config:\n  Title: {set_title}\n"
+                    "Module: Kernel::System::ProcessManagement::TransitionAction::TicketTitleSet\n"
+                ),
+            },
+        )
     if second_condition is not None:
         conn.execute(
             text(_PM_INSERT.format(table="pm_transition")),
@@ -253,6 +277,7 @@ def _seed(conn: Any) -> None:
     _add_ticket(conn, TICKET_TAG, title="Postmaster")
     _add_ticket(conn, TICKET_INACTIVE, title="Inactive ticket", type_id=TYPE_ID)
     _add_ticket(conn, TICKET_BROKEN, title="Broken ticket", type_id=TYPE_ID)
+    _add_ticket(conn, TICKET_ORDER, title="Order ticket", type_id=TYPE_ID)
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -292,6 +317,12 @@ def sync_url(mariadb_znuny_url: str) -> str:
             3,
             _cond("      Type:\n        Match: Incident-887\n        Type: String\n"),
             state="S2",
+        )
+        _add_process(
+            conn,
+            5,
+            _cond("      Type:\n        Match: Incident-887\n        Type: String\n"),
+            set_title="Renamed by action",
         )
         # First transition has no Condition (a config error), the second would match.
         _add_process(
@@ -378,7 +409,8 @@ async def test_condition_data_has_znuny_ticketget_keys(
         flat = await get_ticket_attrs(session, TICKET_DATA)
     # Znuny: ServiceID/SLAID are '' for tickets without them, TypeID falls back to 1
     assert plain["Service"] is None
-    assert plain["ServiceID"] is None
+    assert plain["ServiceID"] == ""  # Ticket.pm:1271
+    assert plain["SLAID"] == ""  # Ticket.pm:1272
     assert plain["Type"] == "Unclassified"
     # get_ticket_attrs is the flat view of the same data (list joined, unset empty)
     assert flat["DynamicField_Multi887"] == "a, b"
@@ -485,3 +517,31 @@ async def test_broken_transition_config_stops_all_transitions(
         state = await get_ticket_process_state(session, TICKET_BROKEN)
     assert state is not None
     assert state.activity_entity_id == _eid("Activity", 4, 4)
+
+
+@pytest.mark.db
+async def test_activity_is_stored_before_the_transition_actions_run(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Process.pm:501 sets the activity, the actions follow from :558: history order shows it."""
+    await _put_in_process(factory, TICKET_ORDER, 5, _eid("Activity", 5, 5))
+    async with factory() as session, session.begin():
+        outcome = await run_transitions(
+            session, ticket_id=TICKET_ORDER, user_id=AGENT, sysconfig=_sysconfig()
+        )
+    assert outcome.activity_changed is True
+    async with factory() as session:
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT ht.name, h.name FROM ticket_history h"
+                    " JOIN ticket_history_type ht ON ht.id = h.history_type_id"
+                    " WHERE h.ticket_id = :t ORDER BY h.id"
+                ),
+                {"t": TICKET_ORDER},
+            )
+        ).all()
+    kinds = [r[0] for r in rows]
+    activity_row = next(i for i, r in enumerate(rows) if "ProcessManagementActivityID" in r[1])
+    assert kinds[activity_row] == "TicketDynamicFieldUpdate"
+    assert kinds.index("TitleUpdate") > activity_row

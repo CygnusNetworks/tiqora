@@ -23,13 +23,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.compat.mapping import DataInclude, Mapper, MappingError, build_mapper
 from tiqora.api.compat.mapping.perl import (
-    REGEX_TIMEOUT_SECONDS,
     compile_perl_regex,
     perl_str,
     perl_truthy,
 )
 from tiqora.api.compat.soap import DEFAULT_NAMESPACE
 from tiqora.db.legacy.config import GiWebserviceConfig
+from tiqora.util.perl_regex import REGEX_TIMEOUT_SECONDS
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)

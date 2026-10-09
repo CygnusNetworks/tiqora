@@ -325,10 +325,12 @@ class TransitionConditionField(BaseModel):
         """Accept the full ``{Type, Match}`` form and Znuny's shorthands.
 
         A plain scalar means ``String`` and a list means ``Array``
-        (Transition.pm:418-428). The evaluator is Task 9.
+        (Transition.pm:418-440).
         """
         if isinstance(data, Mapping):
-            return cls(match=data.get("Match"), type_=data.get("Type") or "String")
+            # A hash without Type is a configuration error in Znuny (Transition.pm:436-460: no
+            # branch handles it and the Module lookup fails), so keep the type empty.
+            return cls(match=data.get("Match"), type_=data.get("Type") or "")
         if isinstance(data, list | tuple):
             return cls(match=list(data), type_="Array")
         return cls(match=data, type_="String")
@@ -348,9 +350,7 @@ class TransitionConditionBlock(BaseModel):
         return cls(
             type_=data.get("Type") or "and",
             fields={
-                name: TransitionConditionField.from_dict(
-                    field_data if field_data not in (None, "") else {}
-                )
+                name: TransitionConditionField.from_dict(field_data)
                 for name, field_data in raw_fields.items()
             },
         )
@@ -359,16 +359,21 @@ class TransitionConditionBlock(BaseModel):
 class TransitionConfig(BaseModel):
     """Parsed ``pm_transition.config``.
 
-    A transition with no ``Condition`` key (or an empty one) has an empty
-    ``conditions`` list here — callers (subtask 2's condition evaluator)
-    must treat an empty list as "matches unconditionally", per Znuny
-    semantics.
+    A missing or empty ``Condition`` is a configuration error in Znuny and never matches
+    (Transition.pm:321). ``condition_present`` is True when a non-empty ``Condition`` hash exists,
+    also without numbered blocks: with linking ``and`` that matches (Transition.pm:365-370,
+    952-963). Hand-built configs with blocks count as present.
     """
 
     model_config = ConfigDict(frozen=True)
 
     condition_linking: str = "and"
     conditions: list[TransitionConditionBlock] = Field(default_factory=list)
+    condition_present: bool = False
+
+    @property
+    def has_condition(self) -> bool:
+        return self.condition_present or bool(self.conditions)
 
     @classmethod
     def from_yaml(cls, raw: str | bytes | None) -> TransitionConfig:
@@ -389,6 +394,7 @@ class TransitionConfig(BaseModel):
         linking = data.get("ConditionLinking") or condition.get("Type") or "and"
         return cls(
             condition_linking=str(linking),
+            condition_present=bool(condition),
             conditions=[
                 TransitionConditionBlock.from_dict(_mapping(block)) for _, block in ordered
             ],

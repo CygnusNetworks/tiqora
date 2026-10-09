@@ -29,6 +29,7 @@ from tiqora.domain.dynamic_field_values import (
 )
 from tiqora.domain.ticket_write_service import TicketNotFound
 from tiqora.process.config import TransitionConditionField, TransitionConfig
+from tiqora.util.perl_regex import REGEX_TIMEOUT_SECONDS, PerlRegexError, compile_perl_regex
 
 logger = logging.getLogger(__name__)
 
@@ -39,18 +40,14 @@ ConditionData = dict[str, ConditionValue]
 # (CheckValueGet / MatchValueGet). String and Regexp compare raw (String.pm, Regexp.pm).
 BASE_CONDITION_TYPES = frozenset(
     {
-        "equal",
-        "notequal",
-        "contains",
-        "notcontains",
-        "greaterthan",
-        "greaterthanorequal",
-        "greaterthanequals",
-        "greaterthanequal",
-        "lessthan",
-        "lessthanorequal",
-        "lessthanequals",
-        "lessthanequal",
+        "Equal",
+        "NotEqual",
+        "Contains",
+        "NotContains",
+        "GreaterThan",
+        "GreaterThanOrEqual",
+        "LessThan",
+        "LessThanOrEqual",
     }
 )
 
@@ -60,10 +57,12 @@ __all__ = [
     "ConditionData",
     "ConditionValue",
     "check_transition",
+    "as_integer",
     "evaluate_condition_field",
     "evaluate_transition",
     "get_condition_data",
     "resolve_transition_tags",
+    "value_validate",
 ]
 
 _TAG_MARKER = "<otrs_"
@@ -77,9 +76,10 @@ async def get_condition_data(session: AsyncSession, ticket_id: int) -> Condition
     """``TicketGet(DynamicFields => 1)`` as Znuny's ``Process.pm`` feeds it to ``TransitionCheck``.
 
     Ticket.pm:1240-1290 (columns), 1320-1360 (dynamic fields), 1362-1420 (names). IDs are
-    strings; unset optional attributes are ``None`` (Znuny: ``ServiceID``/``SLAID`` are ``''``,
-    ``TypeID``/``ResponsibleID`` fall back to ``1``); every valid ticket dynamic field is
-    ``DynamicField_<Name>``: ``None`` when unset, a list for Multiselect, else a string.
+    strings; unset optional attributes are ``None``, except ``ServiceID``/``SLAID`` (``''``,
+    Ticket.pm:1271-1272); ``TypeID``/``ResponsibleID`` fall back to ``1``. Every valid ticket
+    dynamic field is ``DynamicField_<Name>``: ``None`` when unset, a list for Multiselect,
+    else a string.
     """
     row = (
         (
@@ -137,9 +137,9 @@ async def get_condition_data(session: AsyncSession, ticket_id: int) -> Condition
         "Type": await _name("SELECT name FROM ticket_type WHERE id = :k", type_id),
         "TypeID": str(type_id),
         "Service": await _name("SELECT name FROM service WHERE id = :k", row["service_id"]),
-        "ServiceID": str(row["service_id"]) if row["service_id"] else None,
+        "ServiceID": str(row["service_id"]) if row["service_id"] else "",  # Ticket.pm:1271
         "SLA": await _name("SELECT name FROM sla WHERE id = :k", row["sla_id"]),
-        "SLAID": str(row["sla_id"]) if row["sla_id"] else None,
+        "SLAID": str(row["sla_id"]) if row["sla_id"] else "",  # Ticket.pm:1272
         "Owner": await _name("SELECT login FROM users WHERE id = :k", row["user_id"]),
         "OwnerID": str(row["user_id"]),
         "Responsible": await _name("SELECT login FROM users WHERE id = :k", responsible_id),
@@ -186,10 +186,10 @@ def _fmt_time(value: Any) -> str | None:
 _DATETIME_RE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})\s(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$")
 _DATE_RE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})$")
 # Znuny VariableCheck::IsInteger: optional leading '-', no leading zeros.
-_INTEGER_RE = re.compile(r"^(-)?(?:0|[1-9]\d*)$")
+_INTEGER_RE = re.compile(r"-?(?:0|[1-9][0-9]*)")
 
 
-def _value_validate(raw: str) -> str | int:
+def value_validate(raw: str) -> str | int:
     """``Base.pm:ValueValidate`` -- DateTime/Date strings become epoch seconds (UTC)."""
     m = _DATETIME_RE.match(raw)
     if m:
@@ -206,14 +206,14 @@ def _value_validate(raw: str) -> str | int:
     return raw
 
 
-def _as_integer(value: Any) -> int | None:
+def as_integer(value: Any) -> int | None:
     """Znuny ``IsInteger`` after ValueValidate (ints or integer strings)."""
     if isinstance(value, bool):
         return None
     if isinstance(value, int):
         return value
-    s = str(value).strip()
-    if _INTEGER_RE.match(s):
+    s = str(value)
+    if _INTEGER_RE.fullmatch(s):  # IsInteger: anchored, no surrounding whitespace
         return int(s)
     return None
 
@@ -284,8 +284,8 @@ def _ordered(check: Any, match: Any, op: str) -> bool:
     """GreaterThan & co (Base.pm:480-540): both sides must be integers (``IsInteger``)."""
     if isinstance(check, list) or isinstance(match, list):
         return False
-    check_i = _as_integer(check)
-    match_i = _as_integer(match)
+    check_i = as_integer(check)
+    match_i = as_integer(match)
     if check_i is None or match_i is None:
         return False
     return {
@@ -296,16 +296,31 @@ def _ordered(check: Any, match: Any, op: str) -> bool:
     }[op]
 
 
-def _regex(pattern: str, value: str, flags: int = 0) -> bool | None:
+def _regex(pattern: str, value: str) -> bool | None:
+    """Perl-flavoured search with a time budget; ``None`` = invalid pattern or timeout.
+
+    Customer text reaches patterns through smart tags, so a catastrophic pattern must not
+    stall the worker: a timeout is logged and counts as "no match", it never aborts.
+    """
     try:
-        return re.search(pattern, value, flags) is not None
-    except re.error:
+        return (
+            compile_perl_regex(pattern, verbose=False).search(value, timeout=REGEX_TIMEOUT_SECONDS)
+            is not None
+        )
+    except PerlRegexError:
         logger.warning("invalid condition regular expression %r", pattern)
-        return None
+    except TimeoutError:
+        logger.error("condition regular expression %r timed out", pattern)
+    return None
 
 
 def _contains(check: str | list[str], match: Any) -> bool:
-    """``Base.pm:Contains`` -- the lower-cased match is used as a regular expression."""
+    """``Base.pm:Contains`` -- the lower-cased match is used as a regular expression.
+
+    A list Match stringifies to ``ARRAY(0x...)`` in Perl and never matches.
+    """
+    if isinstance(match, list):
+        return False
     pattern = str(match).lower()
     if isinstance(check, list):
         return any(_regex(pattern, c.lower()) is True for c in check)
@@ -313,7 +328,12 @@ def _contains(check: str | list[str], match: Any) -> bool:
 
 
 def _not_contains(check: str | list[str], match: Any) -> bool:
-    """``Base.pm:NotContains`` -- list: exact element compare; string: regex non-match."""
+    """``Base.pm:NotContains`` -- list: exact element compare; string: regex non-match.
+
+    A list Match never matches (see :func:`_contains`); a timeout or invalid pattern is no match.
+    """
+    if isinstance(match, list):
+        return False
     pattern = str(match).lower()
     if isinstance(check, list):
         return not any(pattern == c.lower() for c in check)
@@ -347,7 +367,7 @@ def _check_value_get(
     check = str(check)
     if not _perl_true(check):
         return check
-    return str(_value_validate(_sub(check, tags)))
+    return str(value_validate(_sub(check, tags)))
 
 
 def _match_value_get(match: Any, tags: Mapping[str, str] | None) -> str | list[str] | None:
@@ -358,7 +378,7 @@ def _match_value_get(match: Any, tags: Mapping[str, str] | None) -> str | list[s
         return [str(m) for m in match]
     if isinstance(match, dict):
         return None
-    return str(_value_validate(_sub(str(match), tags)))
+    return str(value_validate(_sub(str(match), tags)))
 
 
 def _evaluate_field(
@@ -367,10 +387,10 @@ def _evaluate_field(
     data: Mapping[str, Any],
     tags: Mapping[str, str] | None,
 ) -> str:
-    type_ = cond.type_.lower()
+    type_ = cond.type_
     value = data.get(field_name)
 
-    if type_ == "string":  # String.pm:99-170
+    if type_ == "String":  # String.pm:99-170
         match = _scalar(cond.match)
         if match is None or match == "":  # ``!Match && Match ne '0'`` -> error, no match
             return _NO_MATCH
@@ -380,23 +400,18 @@ def _evaluate_field(
             return _MATCH if any(match == str(i) for i in value) else _NO_MATCH
         return _MATCH if match == str(value) else _NO_MATCH
 
-    if type_ == "regexp":  # Regexp.pm:99-175
+    if type_ == "Regexp":  # Regexp.pm:99-175
         pattern = _scalar(cond.match)
         if not _perl_true(pattern):
             return _NO_MATCH
         assert pattern is not None
-        try:
-            compiled = re.compile(pattern)
-        except re.error:
-            logger.warning("invalid Regexp condition pattern %r", pattern)
-            return _NO_MATCH
         if isinstance(value, list):
-            return _MATCH if any(compiled.search(str(i)) for i in value) else _NO_MATCH
+            return _MATCH if any(_regex(pattern, str(i)) is True for i in value) else _NO_MATCH
         if _perl_true(None if value is None else str(value)):
-            return _MATCH if compiled.search(str(value)) else _NO_MATCH
+            return _MATCH if _regex(pattern, str(value)) is True else _NO_MATCH
         return _NO_MATCH
 
-    if type_ == "array":  # Transition.pm:543-607
+    if type_ == "Array":  # Transition.pm:543-607
         if not isinstance(cond.match, list | tuple):
             return _ERROR
         if isinstance(value, list):
@@ -408,7 +423,7 @@ def _evaluate_field(
         found = sum(have.count(str(m)) for m in cond.match)
         return _MATCH if found == len(cond.match) else _NO_MATCH
 
-    if type_ == "hash":  # Transition.pm:608-690
+    if type_ == "Hash":  # Transition.pm:608-690
         if not isinstance(cond.match, dict):
             return _ERROR
         if not value or not isinstance(value, Mapping):
@@ -416,7 +431,7 @@ def _evaluate_field(
         equal = sum(1 for k, v in cond.match.items() if str(value.get(k, "")) == str(v))
         return _MATCH if equal == len(cond.match) else _NO_MATCH
 
-    if type_ == "module":
+    if type_ == "Module":
         logger.warning("transition condition Type Module is not supported")
         return _NO_MATCH
 
@@ -431,26 +446,24 @@ def _evaluate_field(
     return _ERROR
 
 
+_ORDERED_OPS = {
+    "GreaterThan": "gt",
+    "GreaterThanOrEqual": "gte",
+    "LessThan": "lt",
+    "LessThanOrEqual": "lte",
+}
+
+
 def _base_compare(type_: str, check: str | list[str], match: str | list[str]) -> bool:
-    if type_ == "equal":
+    if type_ == "Equal":
         return _equal(check, match)
-    if type_ == "notequal":
+    if type_ == "NotEqual":
         return _not_equal(check, match)
-    if type_ == "contains":
+    if type_ == "Contains":
         return _contains(check, match)
-    if type_ == "notcontains":
+    if type_ == "NotContains":
         return _not_contains(check, match)
-    op = {
-        "greaterthan": "gt",
-        "greaterthanorequal": "gte",
-        "greaterthanequals": "gte",
-        "greaterthanequal": "gte",
-        "lessthan": "lt",
-        "lessthanorequal": "lte",
-        "lessthanequals": "lte",
-        "lessthanequal": "lte",
-    }[type_]
-    return _ordered(check, match, op)
+    return _ordered(check, match, _ORDERED_OPS[type_])
 
 
 def evaluate_condition_field(
@@ -505,9 +518,9 @@ def check_transition(
     without fields, an unknown linking / block / field type or a malformed ``Match`` is a
     configuration error and raises :class:`ConditionConfigError`.
     """
-    if not transition_config.conditions:
+    if not transition_config.has_condition:  # Transition.pm:321
         raise ConditionConfigError("no conditions")
-    linking = transition_config.condition_linking.lower()
+    linking = transition_config.condition_linking
     if linking not in _LINKINGS:
         raise ConditionConfigError(
             f"invalid ConditionLinking {transition_config.condition_linking!r}"
@@ -517,7 +530,7 @@ def check_transition(
     for block in transition_config.conditions:
         if not block.fields:
             raise ConditionConfigError("condition block without Fields")
-        cond_type = (block.type_ or "and").lower()
+        cond_type = block.type_ or "and"
         if cond_type not in _LINKINGS:
             raise ConditionConfigError(f"invalid condition block Type {block.type_!r}")
 
@@ -600,7 +613,7 @@ async def resolve_transition_tags(
 
     for block in transition_config.conditions:
         for name, cond in block.fields.items():
-            if cond.type_.lower() not in BASE_CONDITION_TYPES:
+            if cond.type_ not in BASE_CONDITION_TYPES:
                 continue
             field_name = name
             if _has_tag(name):

@@ -8,9 +8,11 @@ import pytest
 
 from tiqora.process.conditions import (
     ConditionConfigError,
+    as_integer,
     check_transition,
     evaluate_transition,
     resolve_transition_tags,
+    value_validate,
 )
 from tiqora.process.conditions import (
     evaluate_condition_field as ev,
@@ -245,18 +247,6 @@ def test_condition_linking_xor_needs_exactly_one_block() -> None:
     assert not evaluate_transition(cfg("open"), data)
 
 
-def test_unknown_linking_and_missing_conditions_never_match() -> None:
-    # Transition.pm:322-327 (no Condition), 345-355 (invalid linking), 359-366 (no Fields)
-    assert not evaluate_transition(_transition({}), {"Queue": "Raw"})
-    assert not evaluate_transition(
-        _transition({"ConditionLinking": "nand", "Condition": {"1": _fields(Queue="Raw")}}),
-        {"Queue": "Raw"},
-    )
-    assert not evaluate_transition(
-        _transition({"Condition": {"1": {"Type": "and", "Fields": {}}}}), {"Queue": "Raw"}
-    )
-
-
 def test_and_linking_with_or_block_and_or_linking_with_and_block() -> None:
     # Transition.pm:515 / 893-921: block results combine per ConditionLinking
     data = {"Queue": "Raw", "State": "open"}
@@ -293,3 +283,71 @@ def test_config_errors_raise_from_check_transition() -> None:
         with pytest.raises(ConditionConfigError):
             check_transition(cfg, {"Queue": "Raw"})
         assert evaluate_transition(cfg, {"Queue": "Raw"}) is False
+
+
+def test_names_are_case_sensitive_and_aliases_do_not_exist() -> None:
+    # Transition.pm:345-355/372-381/460: names compare with ``eq``; only Znuny's own types exist.
+    data = {"Queue": "Raw"}
+    for raw in (
+        {"ConditionLinking": "AND", "Condition": {"1": _fields(Queue="Raw")}},
+        {"Condition": {"1": {"Type": "OR", "Fields": {"Queue": "Raw"}}}},
+        {"Condition": {"1": _fields(Queue={"Type": "string", "Match": "Raw"})}},
+        {"Condition": {"1": _fields(Queue={"Type": "GreaterThanEquals", "Match": "1"})}},
+    ):
+        with pytest.raises(ConditionConfigError):
+            check_transition(_transition(raw), data)
+
+
+def test_hash_field_entry_without_type_is_a_config_error() -> None:
+    cfg = _transition({"Condition": {"1": _fields(Queue={"Match": "Raw"})}})
+    assert cfg.conditions[0].fields["Queue"].type_ == ""
+    with pytest.raises(ConditionConfigError):
+        check_transition(cfg, {"Queue": "Raw"})
+    # a null/empty entry is a plain String with an empty Match: no match, not an error
+    empty = _transition({"Condition": {"1": _fields(Queue=None)}})
+    assert check_transition(empty, {"Queue": "Raw"}) is False
+
+
+def test_blockless_condition_matches_with_and_linking_only() -> None:
+    # Transition.pm:321 (present), 365-370 (no blocks), 952-963 (and: no failures; or/xor: none)
+    only_and = _transition({"Condition": {"Type": "and"}})
+    assert only_and.conditions == [] and only_and.has_condition
+    assert check_transition(only_and, {}) is True
+    assert check_transition(_transition({"Condition": {"Type": "or"}}), {}) is False
+    assert check_transition(_transition({"Condition": {"Type": "xor"}}), {}) is False
+    with pytest.raises(ConditionConfigError):
+        check_transition(_transition({"Condition": {}}), {})
+
+
+def test_regexp_timeout_is_no_match_never_abort(caplog: pytest.LogCaptureFixture) -> None:
+    # Catastrophic pattern against hostile text must not stall: logged, counted as no match.
+    evil = "a" * 40 + "!"
+    with caplog.at_level("ERROR"):
+        assert not ev("Title", C(match="(a|aa)+$", type_="Regexp"), {"Title": evil})
+        assert not ev("Title", C(match="(a|aa)+$", type_="Contains"), {"Title": evil})
+        assert not ev("Title", C(match="(a|aa)+$", type_="NotContains"), {"Title": evil})
+    assert "timed out" in caplog.text
+    cfg = _transition(
+        {
+            "ConditionLinking": "or",
+            "Condition": {
+                "1": _fields(Title={"Type": "Regexp", "Match": "(a|aa)+$"}),
+                "2": _fields(Queue="Raw"),
+            },
+        }
+    )
+    assert check_transition(cfg, {"Title": evil, "Queue": "Raw"}) is True
+
+
+def test_list_match_never_matches_contains_or_not_contains() -> None:
+    # Perl stringifies an array Match to ARRAY(0x...)
+    assert not ev("T", C(match=["a"], type_="Contains"), {"T": "a"})
+    assert not ev("T", C(match=["a"], type_="NotContains"), {"T": "b"})
+
+
+def test_integer_check_is_anchored_without_trimming() -> None:
+    # IsInteger: no whitespace, no trailing newline, no leading zeros
+    assert as_integer("5") == 5 and as_integer("-12") == -12 and as_integer(7) == 7
+    assert as_integer(" 5") is None and as_integer("5\n") is None and as_integer("05") is None
+    assert not ev("N", C(match="5", type_="GreaterThanOrEqual"), {"N": "5\n"})
+    assert value_validate("2026-01-01") == 1767225600

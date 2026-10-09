@@ -24,13 +24,13 @@ from lxml import etree
 from tiqora.api.compat.mapping import DataInclude, MappingConfigError, MappingError
 from tiqora.api.compat.mapping.otrs_functions import OTRS_FUNCTIONS_XSL
 from tiqora.api.compat.mapping.perl import (
-    REGEX_TIMEOUT_SECONDS,
     compile_perl_regex,
     perl_replacement,
     perl_str,
     perl_truthy,
 )
 from tiqora.api.compat.mapping.xml_simple import xml_in, xml_out
+from tiqora.util.perl_regex import REGEX_TIMEOUT_SECONDS
 
 MAX_OUTPUT_BYTES = 256 * 1024 * 1024
 _OTRS_FUNCTIONS_FILE = "OTRSFunctions.xsl"
