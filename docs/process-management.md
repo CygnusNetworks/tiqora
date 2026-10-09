@@ -36,8 +36,9 @@ Tiqora reads and writes the **same** Znuny tables Znuny itself uses:
 - `pm_transition` — one transition (`config` holds its `Condition` block(s))
 - `pm_transition_action` — one action attached to a transition (`config.Module` + `config.Config`)
 - `pm_entity_sync` — Znuny's dirty-flag bookkeeping table (one row per
-  undeployed process edit). Tiqora only reads it, and clears it after cutover
-  (see "Deployed revisions" below)
+  undeployed process edit). Tiqora reads it, and clears it when it deploys
+  itself (after cutover, or with "Bereitstellen" in Tiqora; see "Deployed
+  revisions" below)
 - `pm_process_preferences` — Znuny 7.2+ only; carried in the snapshot when the table exists
 
 The process definitions themselves have no Tiqora-specific schema: a process
@@ -57,26 +58,45 @@ admin presses **"Bereitstellen"** (Znuny writes the deployed file and empties
   `tiqora_acl_revision`: canonical JSON of Znuny's `ProcessDump` / `ACLDump`
   plus checksum, source and time). A draft edit in Znuny is not visible to
   agents until it is deployed.
-- The worker loop `deploy_watch` (service "Deploy-Wächter" on the
+- The worker loop `deploy_watch` (service "Bereitstellung beobachten" on the
   "Dienste" page, every `TIQORA_DEPLOY_WATCH_INTERVAL_SECONDS`, default 30)
-  decides per kind (process, ACL):
+  decides per kind (process, ACL); the tick result names the action:
 
-  | Situation | Result |
-  |---|---|
-  | No revision yet, sync table empty | records revision `initial` ("beim Start") |
-  | No revision yet, drafts pending | keeps reading the live rows (warning on "Dienste"); one "Bereitstellen" in Znuny fixes it |
-  | Revision exists, drafts pending | waits; the old revision keeps running |
-  | Sync table empty, dump differs from the newest revision | records revision `znuny` ("aus Znuny") |
-  | Sync table empty, dump equal | nothing |
-  | Tiqora owns the schema (after cutover) | records revision `tiqora` ("von Tiqora") whenever the dump differs and clears the sync tables: Tiqora deploys on its own |
+  | Situation | Action | Result |
+  |---|---|---|
+  | No revision yet, sync table empty | `snapshot` | records revision `initial` ("beim Start") |
+  | No revision yet, drafts pending | `running_live` | keeps reading the live rows (warning on "Dienste"); one "Bereitstellen" fixes it |
+  | Revision exists, drafts pending | `waiting_for_deploy` | waits; the old revision keeps running |
+  | Sync table empty, dump differs from the newest revision, first tick | `confirming` | notes the new checksum only (a designer edit may have started meanwhile) |
+  | Same changed dump on the next tick | `snapshot` | records revision `znuny` ("aus Znuny") |
+  | Sync table empty, dump equal | `unchanged` | nothing |
+  | Tiqora owns the schema (after cutover) | `snapshot` | records revision `tiqora` ("von Tiqora") whenever the dump differs and clears the sync tables: Tiqora deploys on its own, without the two-tick confirmation |
 
-- Every engine call reads the newest revision id (one indexed `SELECT`) and
-  reuses an in-process parsed copy keyed by that id. This works across API
-  replicas and worker processes without pub/sub (no Redis).
+- **"Bereitstellen" in Tiqora.** `POST /api/v1/admin/deploy` (`{"kind":
+  "process" | "acl"}`, admins only) does Znuny's deploy DB effect: it records
+  the current `pm_*` / `acl` rows (drafts included) as revision `tiqora` and
+  clears `pm_entity_sync` / `acl_sync`. When nothing changed it records no
+  revision and only clears the sync rows (`"action": "unchanged"`). It is
+  allowed only when Tiqora owns the schema **or** the setting
+  `process.deploy_from_tiqora` is on ("Einstellungen", section "Prozesse und
+  ACLs": "Prozesse und ACLs in Tiqora bereitstellen (Znuny läuft nicht mehr)");
+  otherwise it answers 409. It answers 503 when another deploy holds the
+  revision lock. The "Bereitstellung" card shows the button "Bereitstellen"
+  when that gate is open and changes are pending. Only switch the setting on
+  when Znuny no longer runs: Znuny keeps its own deployed file
+  (`ZZZProcessManagement.pm` / `ZZZACL.pm`) and would go on showing the old
+  state. After cutover the watcher deploys within one tick anyway, so the
+  button rarely matters there.
+- Every engine call reads the newest revision id and checksum (one indexed
+  `SELECT`); the stored JSON is read again only when that pair changed. Each
+  caller gets its own parsed copy, so a caller cannot change the deployed state
+  for others. This works across API replicas and worker processes without
+  pub/sub (no Redis).
 - The admin pages for processes and ACLs show a card "Bereitstellung"
   ("Bereitgestellt am ..."), the number of undeployed changes and a warning
   when Tiqora still runs the draft state. `GET /api/v1/admin/deploy-status`
-  and `GET /api/v1/admin/processes` back them.
+  (including `can_deploy_from_tiqora`) and `GET /api/v1/admin/processes` back
+  them.
 
 ## Ticket <-> process linkage
 
@@ -116,10 +136,15 @@ summary:
   per-field `Config`), `Interface` (`AgentInterface`/`CustomerInterface`),
   and `Permission`.
 - `TransitionConfig` (`pm_transition.config`): `ConditionLinking`
-  (`and`/`or` across blocks) and `Condition` — a map of condition blocks,
-  each with its own `Type` (`and`/`or` across that block's fields) and a
-  `Fields` map of `{field_name: {Match, Type}}`. No `Condition` key at all
-  means the transition is unconditional.
+  (`and`/`or`/`xor` across blocks; falls back to `Condition.Type`, then `and`)
+  and `Condition` — a map of numbered condition blocks, each with its own
+  `Type` (`and`/`or`/`xor` across that block's fields) and a `Fields` map.
+  A field entry is `{Type, Match}`, a plain scalar (a `String` compare) or a
+  list (an `Array` check: every listed value must be present). A missing or
+  empty `Condition` is a configuration error, as in Znuny
+  (`Transition.pm:321`): it is logged and **no** transition of that activity
+  fires. A `Condition` that holds only `Type`/`ConditionLinking` and no
+  blocks matches when the linking is `and`.
 - `TransitionActionConfig` (`pm_transition_action.config`): `Module` (a
   Perl-style `Kernel::System::ProcessManagement::TransitionAction::Foo`
   path — only the last `::`-segment is used to dispatch) and `Config`
@@ -132,32 +157,36 @@ summary:
 2. **Submit activity dialog** (`submit_activity_dialog`):
    a. Look up the ticket's current activity and confirm the submitted
       dialog is one of its `ActivityDialog`s.
-   b. If the dialog has a `Permission` set, gate on it via
-      `PermissionEngine.check` against the ticket's queue. The state gate,
-      the dialog's `Interface` and the ACLs (below) are checked first.
-   c. Validate required fields (`Display: 2`) are present in `field_values`.
+   b. Check the state gate, the dialog's `Interface`, the `Action` and
+      `ActivityDialog` ACLs and the dialog `Permission`
+      (`availability.assert_can_submit`): agents need the dialog's
+      `Permission` on the ticket's queue when the dialog sets one; customers
+      need it (default `rw`) through Znuny's GroupCheck.
+   c. Validate required fields (`Display: 2`) are present in `field_values`;
+      with `RequiredLock` (agents) lock the ticket first.
    d. Apply the submitted field changes to the ticket (title, queue,
       state, priority, type, service, SLA, lock, owner, responsible,
       customer, pending time, article, dynamic fields — reusing `ticket_write_service` functions, so each change
       writes its normal Znuny history row).
-   e. Evaluate the current activity's outgoing transitions **in
-      declared (YAML/dict insertion) order**; the **first** whose
-      `Condition` matches the (freshly re-read) ticket attributes wins —
-      no further transitions are tried.
-   f. Run the matched transition's `TransitionAction`s in order (smart tags
-      in their `Config` are substituted first).
-   g. Set `ProcessManagementActivityID` to the transition's target
-      activity.
+   e. Evaluate the current activity's outgoing transitions in the order of
+      their entity ids (`Process.pm:442-445`) against freshly read ticket
+      data; the **first** whose `Condition` matches wins. A configuration
+      error in any of them (see "Config YAML shapes") stops the check: no
+      transition fires.
+   f. Set `ProcessManagementActivityID` to the transition's target
+      activity (`Process.pm:501`), so this history row comes first.
+   g. Run the matched transition's `TransitionAction`s in order (smart tags
+      in their `Config` are substituted first; `Process.pm:558ff`).
    h. If no transition matches, the submission still succeeds — the
       ticket simply stays on its current activity
       (`activity_changed=False`).
 
-Condition evaluation (`evaluate_transition`/`_evaluate_field`) and action
-dispatch (`execute_transition_action`) are pure/isolated enough to have
-dedicated unit and DB-integration test coverage — see `backend/tests/
-test_process_engine_conditions.py` (25 pure-logic cases) and `backend/
-tests/test_process_engine.py` (DB-integration cases, including a
-condition-matching-vs-non-matching pair and an unsupported-action case).
+Condition evaluation lives in `process/conditions.py` (`check_transition`,
+`_evaluate_field`); action dispatch is `execute_transition_action` in
+`engine.py`. Tests: `backend/tests/test_process_conditions.py` and
+`test_process_engine_conditions.py` (pure logic), `test_process_engine.py`
+(DB integration, including matching vs non-matching conditions and an
+unsupported action).
 
 ## State gate
 
@@ -220,8 +249,10 @@ that were filled with that rule now behave like in Znuny.)
 - Hidden fields apply their `DefaultValue` server-side, even when a client sends
   another value; a hidden dynamic field without default is cleared.
 - Shown fields start with the **ticket's current value** (dialog default only if
-  the ticket has none); unchanged Queue, Priority and Responsible write no
-  history. Dynamic fields can be cleared by sending an empty list.
+  the ticket has none). An unchanged Queue, State, Priority, Type, Service, SLA,
+  Title, Lock, Owner, Responsible, customer or dynamic field writes no history
+  and does not touch `change_time`, as in Znuny. Dynamic fields can be cleared
+  by sending an empty list.
 - `Queue`, `State`, `Lock`, `Priority` with `Display: 1` are a Znuny config
   error; on a new ticket they fall back to `Process::DefaultQueue/State/Lock/Priority`.
 - Field names may be given as `QueueID`, `StateID`, ... (aliases).
@@ -229,11 +260,20 @@ that were filled with that rule now behave like in Znuny.)
   `PendingTime`, `CustomerID`; it writes as the customer panel user, forces the
   acting customer's `CustomerID`/`CustomerUser` and the article sender type
   `customer`.
+- `State` offers only the state types of
+  `Ticket::Frontend::AgentTicketProcess###StateType` (default new, open,
+  pending auto, pending reminder, closed) resp.
+  `Ticket::Frontend::CustomerTicketProcess###StateType` (default new, open),
+  like Znuny's `TicketStateList(Action => ...)`.
 - `Article`: needs Subject and Body; channel from `Config.CommunicationChannel`
   (`Internal`, `Email`, `Phone`), visibility from `Config.IsVisibleForCustomer`
-  (default 0).
-- `RequiredLock: 1` (agents): a ticket locked by someone else is refused; an
-  unlocked one is locked and taken over before the fields are applied.
+  (Perl truthiness: `'0'` is internal; default 0), never from the request.
+  History type like Znuny: agents `AddNote` (`PhoneCallAgent` for Phone),
+  customers `WebRequestCustomer` on a new ticket and `FollowUp` otherwise
+  (`PhoneCallCustomer` for Phone).
+- `RequiredLock` (agents, Perl truthiness): a ticket locked by someone else is
+  refused; an unlocked one is locked and taken over before the fields are
+  applied.
 - The form is built by the server (`GET .../start-form`, `GET
   .../ticket/{id}/dialog/{eid}/form`) with options already filtered by ACLs
   and queue permissions, and rendered by the shared form component in the
@@ -276,7 +316,8 @@ starten" on the ticket list (`/portal/process/new`). Both call `POST
 The ticket is created like Znuny's `AgentTicketProcess`: hidden Queue/State/
 Priority/Lock take the `Process::Default*` values, the owner is set after the
 create, both process dynamic fields are set, the title defaults to
-`<Process name> - <time>` (or the submitted subject) with smart tags, and the first
+`<Process name> - <time>` (or the submitted subject; agents get smart tags
+rendered in it, customers do not, as in `CustomerTicketProcess`), and the first
 matching transition runs immediately. Customer tickets are created in a queue
 the customer may create tickets in (`CustomerGroupSupport`), and Service/SLA lists
 are narrowed to the customer user's services.
@@ -296,15 +337,17 @@ All endpoints live under `/api/v1/process` (`backend/src/tiqora/api/v1/process.p
 | GET | `/api/v1/process/{process_entity_id}/start-form` | Server-built start dialog form |
 | GET | `/api/v1/process/ticket/{ticket_id}/dialog/{activity_dialog_entity_id}/form` | Server-built form of a dialog on a ticket |
 | POST | `/api/v1/process/tickets` | Create a new process ticket |
-| GET | `/api/v1/process/{process_entity_id}` | Process detail: activities, their dialogs, outgoing transitions |
+| GET | `/api/v1/process/{process_entity_id}` | Process detail: activities and their dialogs (no transitions) |
 | GET | `/api/v1/process/activity-dialog/{activity_dialog_entity_id}` | One activity dialog's fields/order/permission |
 | GET | `/api/v1/process/ticket/{ticket_id}/state` | A ticket's current process/activity + available dialogs |
 | POST | `/api/v1/process/ticket/{ticket_id}/start` | Enroll a ticket in a process (start dialog `field_values`) |
 | POST | `/api/v1/process/ticket/{ticket_id}/submit` | Submit an activity dialog (advance the ticket) |
 
-The portal has the same set under `/api/portal/process/*` (customer
-interface dialogs only). Admin: `GET /api/v1/admin/processes` (all processes of
-the deployed revision) and `GET /api/v1/admin/deploy-status`.
+The portal has the same endpoints except the process detail under
+`/api/portal/process/*` (customer interface dialogs only). Admin: `GET
+/api/v1/admin/processes` (all processes of the deployed revision), `GET
+/api/v1/admin/deploy-status` and `POST /api/v1/admin/deploy` (see "Deployed
+revisions").
 
 All ticket-scoped endpoints apply the same coarse queue `ro`/`rw`
 permission gate as the rest of the ticket REST API (see the module
@@ -315,13 +358,14 @@ docstring in `api/v1/process.py`).
 - **Ticket zoom**: `ProcessWidget` (`frontend/src/components/agent/process/ProcessWidget.tsx`)
   shows a ticket's current process/activity and available next dialogs;
   `StartProcessDialog` lets an agent attach a process to a ticket not yet
-  in one; `ActivityDialogModal` renders a dynamic form from an activity
-  dialog's `Fields`/`FieldOrder` and submits it.
+  in one; `ActivityDialogModal` renders the server-built dialog form
+  (`GET .../ticket/{id}/dialog/{eid}/form`) and submits it.
 - **New process ticket**: pages `NewProcessTicketPage` (agent and portal);
   zoom dialogs render the shared `ProcessDialogForm`.
 - **Admin**: read-only `/admin/processes` list (`routes/admin/ProcessesPage.tsx`)
-  and detail view (`routes/admin/ProcessDetailPage.tsx`) — browse processes,
-  activities, dialogs, and transitions.
+  with the "Bereitstellung" card, and detail view
+  (`routes/admin/ProcessDetailPage.tsx`) — browse processes, activities and
+  dialogs.
 - **Customer portal**: `PortalProcessWidget` + `/api/portal/process/*`
   expose start/submit for dialogs whose YAML ``Interface`` includes
   ``CustomerInterface`` (Znuny parity). Writes use system user id 1 (same
@@ -334,22 +378,29 @@ docstring in `api/v1/process.py`).
 
 ### Condition types (`Fields.*.Type`)
 
-| Supported | Deferred (treated as non-matching) |
+| Supported | Deferred |
 |---|---|
-| `String` (case-sensitive `eq`) | `Module`-based custom conditions |
+| `String` (case-sensitive `eq`; also a plain scalar entry) | `Module` (custom Perl module): logged, never matches |
 | `Regexp` | |
-| `Contains` / `NotContains` (case-insensitive regex) | |
-| `Equal` / `NotEqual` (case-insensitive) | |
-| `GreaterThan` / `GreaterThanOrEqual` (also `GreaterThanEquals`) | |
-| `LessThan` / `LessThanOrEqual` (also `LessThanEquals`) | |
+| `Array` (list entry: every value present) | |
+| `Hash` (`Match` is a hash: every key equal) | |
+| `Contains` / `NotContains` (case-insensitive regular expression) | |
+| `Equal` / `NotEqual` (case-insensitive strings) | |
+| `GreaterThan` / `GreaterThanOrEqual` | |
+| `LessThan` / `LessThanOrEqual` | |
 
-Ordered compares follow Znuny `TransitionValidation::Base`: DateTime/Date
-values are converted to epoch seconds (`ValueValidate`), then both sides
-must be integers (`IsInteger`) or the condition does not match.
+Type names are case-sensitive, as in Znuny; there are no aliases. Linking and
+block types are `and`, `or` and `xor`. Ordered compares follow Znuny
+`TransitionValidation::Base`: DateTime/Date values are converted to epoch
+seconds (`ValueValidate`), then both sides must be integers (`IsInteger`) or
+the condition does not match. Regular expressions run with a timeout; a
+timeout counts as no match.
 
-An unsupported condition type logs a warning and evaluates to `False` — it
-never raises. See `_evaluate_field` in `engine.py` for the full semantics
-(each type's Znuny-source-verified matching rule).
+Any other condition type (and a field entry that is a hash without `Type`, a
+block without `Fields` or an unknown linking) is a configuration error: it is
+logged and **no** transition of the activity fires, as in Znuny's
+`TransitionCheck`. See `process/conditions.py` for each type's matching rule
+with its Znuny source lines.
 
 ### TransitionAction modules (`Module`'s last `::`-segment)
 
@@ -383,8 +434,6 @@ unsupported_actions` so callers/tests can assert on skip behaviour.
 
 ### Other simplifications (see `engine.py`'s module docstring for the authoritative list)
 
-- Transitions are evaluated in `Path`'s YAML/dict insertion order; Znuny
-  itself has no explicit tiebreak either.
 - `pm_process.state_entity_id` is exposed raw plus a `state_name`
   (Active / Inactive / FadeAway, see "State gate").
 - A ticket can only be in one process at a time (`TicketAlreadyInProcess`).
@@ -403,8 +452,9 @@ Deployment:
 - An edit made within one watch interval (default 30 s) after a Znuny deploy
   hides that deploy (the sync table is never seen empty); Tiqora catches up
   with the next deploy.
-- There is no deploy button and no process designer in Tiqora yet; after
-  cutover Tiqora deploys automatically.
+- There is no process designer in Tiqora. "Bereitstellen" in Tiqora exists but
+  is gated (see "Deployed revisions"); after cutover Tiqora deploys
+  automatically.
 
 Engine:
 
@@ -415,8 +465,10 @@ Engine:
 - `PendingTimeDiff` with an unchanged state: Znuny writes only
   `SetPendingTime` (when the state type is pending); Tiqora also writes a
   state-update history row.
-- Fixed field order in the engine (State, Queue, Title, Responsible,
-  PendingTime), not `FieldOrder`: only the history row order differs.
+- Fixed field order in the engine instead of `FieldOrder` for the ticket
+  attributes: Queue, State, Priority, Type, Service, SLA, Title, Responsible,
+  Lock, customer; then dynamic fields, Article and Owner in `FieldOrder`; then
+  PendingTime. Only the history row order differs.
 - Condition data lacks `UntilTime`, `Escalation*`, `GroupID`,
   `CreateBy`/`ChangeBy` and `Age`.
 - List values of dynamic fields are not available in the title smart-tag
@@ -424,10 +476,6 @@ Engine:
 - A nonexistent numeric Owner/Queue id in a forged request gives a 500 instead of a 400.
 - The start permission is checked as `rw` on the queue, not by the start
   dialog's own `Permission`.
-- Dialog articles: customer dialogs write history `AddNote` (Znuny:
-  `WebRequestCustomer` / `FollowUp` / `PhoneCallCustomer`); an agent dialog
-  article with `CommunicationChannel Email` is derived as `EmailAgent`
-  (Znuny writes `AddNote`).
 - Clearing Service or SLA in a dialog (the field empty) does not clear the
   ticket value (Znuny does); other empty ticket attributes are ignored in both.
 - The agent form keeps the ticket's `CustomerID` when only the customer user

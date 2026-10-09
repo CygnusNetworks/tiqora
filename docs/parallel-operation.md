@@ -876,13 +876,17 @@ While Znuny is still in use:
 
 - Process and ACL edits made in **either** system (Znuny's admin, or the ACL
   admin in Tiqora, which writes `acl_sync` like Znuny) are drafts. Admins must
-  press **"Bereitstellen"** in Znuny; Tiqora records the new state at the next
-  tick of the `deploy_watch` loop (default 30 s, "Dienste" page, service
-  "Deploy-Wächter").
+  press **"Bereitstellen"** in Znuny; Tiqora records the new state after two
+  ticks of the `deploy_watch` loop (default 30 s each, "Dienste" page, service
+  "Bereitstellung beobachten"; the first tick reports "confirming").
 - Until the first deploy has been seen, Tiqora runs the live (draft) rows and
   the "Dienste" page warns; one "Bereitstellen" in Znuny ends that state.
 - Znuny's process import writes no sync rows and is picked up by Tiqora
   without a deploy.
+- Leave the setting "Prozesse und ACLs in Tiqora bereitstellen (Znuny läuft
+  nicht mehr)" off. It enables "Bereitstellen" in Tiqora
+  (`POST /api/v1/admin/deploy`); while Znuny runs, Znuny's own deployed
+  configuration would then stay on the old state.
 
 After the schema cutover (see below) Tiqora is the only system and deploys
 automatically: each tick records a revision when something changed and clears

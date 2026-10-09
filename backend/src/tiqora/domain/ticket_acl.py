@@ -467,10 +467,10 @@ async def load_customer_user_checks(
     ``System::Customer::Permission`` from ``CustomerGroup::GroupMemberList``
     (``CustomerGroup.pm:266-281``): with ``CustomerGroupSupport`` off (the default) that is
     every valid group, with it on the valid groups of ``group_customer_user`` rows with
-    ``permission_value = 1`` and ``permission_key IN (perm, 'rw')``.
+    ``permission_value = 1`` and ``permission_key IN (perm, 'rw')``, plus
+    ``CustomerGroupAlwaysGroups`` (:func:`customer_group_ids`).
 
-    Known limitation (documented, not built): customer-company groups (``group_customer``) and
-    ``CustomerGroupAlwaysGroups`` that GroupMemberList adds on top when support is on.
+    Known limitation (documented, not built): customer-company groups (``group_customer``).
     An unknown login still gets the ``Group_*`` lists, like Znuny (empty user hash + groups).
     """
     cfg = sysconfig or SysConfig(session)

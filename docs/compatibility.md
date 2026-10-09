@@ -381,9 +381,11 @@ MariaDB and validated:
   same field-options chain. Queue *access* remains group/role.
 - ACL edits in Tiqora write `acl_sync` like Znuny's AdminACL (`not_sync` on
   create/update, `deleted` on delete) and are drafts until "Bereitstellen" in
-  Znuny. ACLs run from the deployed state (`tiqora_acl_revision`); before the
-  first revision they run from the live `acl` rows. After cutover Tiqora
-  deploys on its own.
+  Znuny (or in Tiqora, once Znuny no longer runs; see
+  [process-management.md](process-management.md#deployed-revisions-tiqora-runs-what-was-deployed)).
+  ACLs run from the deployed state (`tiqora_acl_revision`); before the first
+  revision they run from the live `acl` rows. After cutover Tiqora deploys on
+  its own.
 - Deferred relative to full Znuny admin breadth:
   `group_customer` (company-level) assignment endpoints
   (`group_customer_user` is implemented), SysConfig deploy UI, GI webservice
@@ -440,7 +442,7 @@ narrower than Znuny), **by design** (deliberate platform choice).
 | Znuny feature | Status | Note |
 |---|---|---|
 | Process designer | by design | Processes are imported and executed; admin UI is list/detail ([process-management.md](process-management.md)) |
-| Process deploy ("Bereitstellen") | yes | Engine and ACLs run from the deployed state only; Tiqora detects a Znuny deploy within one watch interval. Tiqora has no deploy button; after cutover it deploys by itself |
+| Process deploy ("Bereitstellen") | yes | Engine and ACLs run from the deployed state only; Tiqora detects a Znuny deploy within two watch intervals. "Bereitstellen" in Tiqora (`POST /api/v1/admin/deploy`) only after cutover or with the setting "Prozesse und ACLs in Tiqora bereitstellen (Znuny läuft nicht mehr)"; after cutover Tiqora deploys by itself |
 | Process state gate (Active / FadeAway / Inactive) | yes | Same rules as Znuny: only Active starts, FadeAway keeps running tickets, Inactive refuses dialogs and runs no transitions |
 | ACLs on process list, dialogs, action menu and bulk | yes | Agents as the agent, portal customers as the customer (never as root); Properties on `Process` entity ids work |
 | New process ticket (agent and portal), enroll via start dialog | yes | "Neues Prozessticket" / "Prozess starten"; Znuny's create order, `Process::Default*` for hidden fields, immediate first transition |

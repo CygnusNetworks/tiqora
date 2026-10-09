@@ -1811,9 +1811,10 @@ async def submit_activity_dialog(
     repository: ProcessRepository | None = None,
 ) -> ActivityDialogSubmitResult:
     """Submit an Activity Dialog for *ticket_id*: apply field changes, then
-    evaluate the current activity's outgoing transitions in listed (YAML
-    insertion) order and, for the first one that matches, run its
-    TransitionActions and move the ticket to its target activity.
+    evaluate the current activity's outgoing transitions in entity-id order
+    (:func:`run_transitions`, ``Process.pm:442-445``) and, for the first one that
+    matches, move the ticket to its target activity and then run its
+    TransitionActions (``Process.pm:501``, ``:558ff``).
 
     Structurally mirrors Znuny's ``AgentTicketProcess.pm`` submit flow
     (validate dialog -> apply fields -> ``_TransitionDo`` -> advance
