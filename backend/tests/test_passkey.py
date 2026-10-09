@@ -504,7 +504,7 @@ async def test_admin_reset_2fa_clears_passkeys(
         admin = AuthenticatedUser(
             id=1, login="root@localhost", first_name="A", last_name="B", auth_method="session"
         )
-        await admin_auth_config.reset_2fa(user_id, admin, session, settings)
+        await admin_auth_config.reset_2fa(user_id, admin, session, settings, _FakeRedis())  # type: ignore[arg-type]
         assert await svc.has_passkey(user_id) is False
         assert await svc.count(user_id) == 0
 

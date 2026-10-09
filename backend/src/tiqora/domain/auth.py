@@ -317,6 +317,12 @@ class SessionStore:
         token = secrets.token_urlsafe(32)
         payload = f"PENDING:{user_id}:{login}"
         await self._client.set(self._key(token), payload, ex=ttl_seconds)
+        # Indexed like full sessions so revoke_user_sessions() (admin 2FA reset,
+        # password change) also removes a pending token.
+        with contextlib.suppress(Exception):
+            index_key = self._user_index_key(user_id)
+            await self._client.sadd(index_key, token)
+            await self._client.expire(index_key, self._absolute_ttl)
         return token
 
     async def get_pending(self, token: str) -> tuple[int, str] | None:

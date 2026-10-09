@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import re
+from typing import Annotated
 
+import redis.asyncio as redis
 import structlog
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import delete, func, or_, select
 
-from tiqora.api.deps import AppSettings, DbSession
+from tiqora.api.deps import AppSettings, DbSession, get_redis
 from tiqora.api.v1.admin.common import (
     CUSTOMER_COMPANY_CACHE_TYPES,
     CUSTOMER_USER_CACHE_TYPES,
@@ -42,6 +44,7 @@ from tiqora.db.legacy.customer import CustomerCompany, CustomerUser, CustomerUse
 from tiqora.db.legacy.user import GroupCustomerUser, PermissionGroups
 from tiqora.db.tiqora.models import TiqoraCustomerPasskey
 from tiqora.domain import user_provisioning as provisioning
+from tiqora.domain.customer_auth import CustomerSessionStore
 from tiqora.domain.totp import TOTPService
 from tiqora.domain.two_factor_subject import CUSTOMER_2FA
 from tiqora.znuny.password import hash_password
@@ -287,9 +290,17 @@ async def deactivate_customer_user(
 
 @router.post("/customer-users/{customer_user_id}/reset-2fa", status_code=status.HTTP_204_NO_CONTENT)
 async def reset_customer_user_2fa(
-    customer_user_id: int, admin: AdminUser, session: DbSession, settings: AppSettings
+    customer_user_id: int,
+    admin: AdminUser,
+    session: DbSession,
+    settings: AppSettings,
+    redis_client: Annotated[redis.Redis, Depends(get_redis)],
 ) -> None:
     """Admin recovery for a lost authenticator: drop the customer's TOTP and all passkeys.
+
+    Also clears a pending TOTP enrollment and revokes every session of the customer
+    (pending ones included): with no factor left, a surviving session could attach
+    one of its own without a step-up.
 
     Mirrors the agent-side ``POST /auth-config/{user_id}/reset-2fa`` (idempotent,
     no code needed); the log line is the audit trail.
@@ -297,11 +308,14 @@ async def reset_customer_user_2fa(
     cu = await session.get(CustomerUser, customer_user_id)
     if cu is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer user not found")
-    await TOTPService(session, settings, subject=CUSTOMER_2FA).force_disable(customer_user_id)
+    await TOTPService(session, settings, redis_client, subject=CUSTOMER_2FA).force_disable(
+        customer_user_id
+    )
     await session.execute(
         delete(TiqoraCustomerPasskey).where(TiqoraCustomerPasskey.user_id == customer_user_id)
     )
     await session.commit()
+    await CustomerSessionStore(redis_client, settings).revoke_customer_sessions(customer_user_id)
     logger.info("customer_2fa_reset", customer_user_id=customer_user_id, admin_id=admin.id)
 
 

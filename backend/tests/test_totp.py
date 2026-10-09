@@ -8,6 +8,7 @@ against the mariadb/postgres testcontainer fixtures.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterator
 from datetime import datetime
 
 import pyotp
@@ -69,7 +70,37 @@ def _to_async_url(sync_url: str) -> str:
     return sync_url
 
 
+_URLS: set[str] = set()
+_OWN_USERS = "SELECT id FROM users WHERE login LIKE 'totp.agent.%'"
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _cleanup_rows() -> Iterator[None]:
+    """Delete what this module committed (strict leak gate), whatever a test left behind."""
+    yield
+    for url in _URLS:
+        engine = create_engine(url)
+        with engine.begin() as conn:
+            for table in (
+                "tiqora_user_totp",
+                "tiqora_user_passkey",
+                "tiqora_user_auth_config",
+                "group_user",
+                "user_preferences",
+            ):
+                conn.execute(text(f"DELETE FROM {table} WHERE user_id IN ({_OWN_USERS})"))  # noqa: S608
+            conn.execute(text("DELETE FROM permission_groups WHERE name LIKE 'totp-enforce-%'"))
+            key_col = conn.dialect.identifier_preparer.quote("key")  # reserved word on MySQL
+            conn.execute(
+                text(f"DELETE FROM tiqora_settings WHERE {key_col} LIKE 'auth.totp.%'")  # noqa: S608
+            )
+            conn.execute(text("DELETE FROM users WHERE login LIKE 'totp.agent.%'"))
+        engine.dispose()
+    _URLS.clear()
+
+
 def _seed_user(sync_url: str) -> tuple[int, str]:
+    _URLS.add(sync_url)
     ns = uuid.uuid4().hex[:8]
     user_id = int(ns, 16) % 1_000_000 + 500_000
     login = f"totp.agent.{ns}"

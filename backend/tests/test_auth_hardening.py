@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import time
 import uuid
+from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
 
@@ -26,6 +27,20 @@ from tiqora.security.ratelimit import AuthRateLimiter
 from tiqora.znuny.password import detect_scheme, hash_password, needs_rehash, verify_password
 
 NOW = datetime(2024, 6, 1, 12, 0, 0)
+
+
+_URLS: set[str] = set()
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _cleanup_rows() -> Iterator[None]:
+    yield
+    for url in _URLS:
+        engine = create_engine(url)
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM users WHERE login LIKE 'rehash.agent.%'"))
+        engine.dispose()
+    _URLS.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -239,6 +254,7 @@ async def test_login_rehashes_legacy_sha256_to_bcrypt(
 ) -> None:
     """H-06: successful password login upgrades weak hash to BCRYPT:."""
     sync_url: str = request.getfixturevalue(url_fixture)
+    _URLS.add(sync_url)
     ns = uuid.uuid4().hex[:8]
     user_id = int(ns, 16) % 1_000_000 + 600_000
     login = f"rehash.agent.{ns}"

@@ -785,8 +785,8 @@ async def test_admin_reset_clears_customer_second_factors(env: Env) -> None:
     admin = AuthenticatedUser(
         id=1, login="root@localhost", first_name="A", last_name="B", auth_method="session"
     )
-    await reset_customer_user_2fa(cid, admin, env.session, env.settings)
-    await reset_customer_user_2fa(cid, admin, env.session, env.settings)  # idempotent
+    await reset_customer_user_2fa(cid, admin, env.session, env.settings, env.redis)  # type: ignore[arg-type]
+    await reset_customer_user_2fa(cid, admin, env.session, env.settings, env.redis)  # type: ignore[arg-type]  # idempotent
     assert await env.totp().is_enabled(cid) is False
     assert await env.totp().is_enabled(other) is True  # neighbour untouched
     counts = {
@@ -802,7 +802,7 @@ async def test_admin_reset_clears_customer_second_factors(env: Env) -> None:
     # The customer can sign in with the password alone again.
     assert (await env.login(login=login)).json()["customer"] is not None
     with pytest.raises(HTTPException) as exc:
-        await reset_customer_user_2fa(47158, admin, env.session, env.settings)
+        await reset_customer_user_2fa(47158, admin, env.session, env.settings, env.redis)  # type: ignore[arg-type]
     assert exc.value.status_code == 404
 
 
@@ -839,3 +839,101 @@ async def test_agent_adding_totp_to_passkey_only_account_needs_recent_auth(env: 
         "/api/v1/auth/totp/enroll", json={}, headers=SAME, cookies=cookies
     )
     assert stale.status_code == 403 and stale.json()["detail"] == "reauthentication_required"
+
+
+# ------------------------------------------------------------------ admin reset over HTTP
+
+
+async def _admins(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Cookies of an admin (47161) and a plain agent (47162); only 47161 passes is_admin."""
+    from tiqora.permissions.engine import PermissionEngine
+
+    async def is_admin(self: Any, user_id: int) -> bool:
+        return user_id == 47161
+
+    monkeypatch.setattr(PermissionEngine, "is_admin", is_admin)
+    store = SessionStore(env.redis, env.settings)  # type: ignore[arg-type]
+    out = []
+    for uid in (47161, 47162):
+        await seed_agent(env.session, uid, f"idp.2fa.agent{uid}")
+        out.append({"tiqora_session": await store.create(uid, f"idp.2fa.agent{uid}")})
+    return out[0], out[1]
+
+
+async def test_customer_reset_http_auth_csrf_and_session_revocation(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    admin, plain = await _admins(env, monkeypatch)
+    cid = 47159
+    login, secret = await _full_session(env, cid, with_totp=True)
+    assert secret
+    full = env.client.cookies.get(COOKIE)
+    assert full
+    other = env.new_client()  # a second browser sitting at the 2FA prompt
+    assert (await env.login(other, login=login)).json()["pending_2fa"] is True
+    pending = other.cookies.get(COOKIE)
+    assert pending and await env.store.get_pending(pending) == (cid, login)
+    # A half-finished re-enrollment (pending secret in Redis).
+    await env.totp().enroll(cid, login, current_code=pyotp.TOTP(secret).at(time.time() + 30))
+    assert f"tiqora:totp:customer:pending:{cid}" in env.redis.store
+    url = f"/api/v1/admin/customer-users/{cid}/reset-2fa"
+
+    anon = env.new_client()
+    # Not an admin -> 403, nothing changes.
+    r = await anon.post(url, headers=SAME, cookies=plain)
+    assert r.status_code == 403
+    # Admin cookie without the same-origin header -> CSRF rejection.
+    r = await anon.post(url, cookies=admin)
+    assert r.status_code == 403 and "csrf" in r.text.lower()
+    assert await env.totp().is_enabled(cid) is True
+    assert await env.store.get(full) == (cid, login)
+
+    r = await anon.post(url, headers=SAME, cookies=admin)
+    assert r.status_code == 204, r.text
+    async with env.maker() as fresh:  # the test session still caches the deleted row
+        assert await TOTPService(fresh, env.settings, subject=CUSTOMER_2FA).is_enabled(cid) is False
+    assert f"tiqora:totp:customer:pending:{cid}" not in env.redis.store
+    assert await env.store.get(full) is None
+    assert await env.store.get_pending(pending) is None
+    assert (await env.client.get("/api/portal/auth/me")).status_code == 401
+    assert (
+        await other.post("/api/portal/auth/totp/verify", json={"code": "123456"}, headers=SAME)
+    ).status_code == 401
+    # The admin's own session is untouched, and the customer can sign in again.
+    assert await SessionStore(env.redis, env.settings).get(admin["tiqora_session"])  # type: ignore[arg-type]
+    assert (await env.login(login=login)).json()["customer"] is not None
+    await other.aclose()
+    await anon.aclose()
+
+
+async def test_agent_reset_http_revokes_sessions_and_pending_enrollment(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    admin, plain = await _admins(env, monkeypatch)
+    aid, alogin = 47163, "idp.2fa.agent47163"
+    await seed_agent(env.session, aid, alogin)
+    store = SessionStore(env.redis, env.settings)  # type: ignore[arg-type]
+    full = await store.create(aid, alogin)
+    pending = await store.create_pending(aid, alogin, 300)
+    svc = TOTPService(env.session, env.settings, env.redis)
+    secret, _ = await svc.enroll(aid, alogin)
+    assert await svc.confirm(aid, pyotp.TOTP(secret).now())
+    await svc.enroll(aid, alogin, current_code=pyotp.TOTP(secret).at(time.time() + 30))
+    assert f"tiqora:totp:pending:{aid}" in env.redis.store
+    url = f"/api/v1/admin/auth-config/{aid}/reset-2fa"
+
+    anon = env.new_client()
+    assert (await anon.post(url, headers=SAME, cookies=plain)).status_code == 403
+    assert (await anon.post(url, cookies=admin)).status_code == 403  # CSRF
+    assert await store.get(full) is not None
+
+    r = await anon.post(url, headers=SAME, cookies=admin)
+    assert r.status_code == 204, r.text
+    async with env.maker() as fresh:
+        assert await TOTPService(fresh, env.settings).is_enabled(aid) is False
+    assert f"tiqora:totp:pending:{aid}" not in env.redis.store
+    assert await store.get(full) is None
+    assert await store.get_pending(pending) is None
+    await anon.aclose()
