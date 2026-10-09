@@ -203,7 +203,8 @@ export interface paths {
         };
         /**
          * List Processes
-         * @description List processes a customer may start (all known processes; start is gated separately).
+         * @description Processes the customer may start (Active, start dialog for the customer interface, ACLs).
+         *     With ``ticket_id`` (enroll context) the ticket is access-checked and the Action ACL applies.
          */
         get: operations["list_processes_api_portal_process__get"];
         put?: never;
@@ -5863,7 +5864,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Processes */
+        /**
+         * List Processes
+         * @description Processes the agent may start (Active, start dialog for the agent interface, ACLs).
+         *     With ``ticket_id`` (enroll context) the ticket is access-checked and the Action ACL applies.
+         */
         get: operations["list_processes_api_v1_process__get"];
         put?: never;
         post?: never;
@@ -5945,8 +5950,8 @@ export interface paths {
          * @description Submit an activity dialog for *ticket_id*.
          *
          *     Requires ``rw`` on the ticket's queue as a coarse gate — the dialog's own
-         *     (finer-grained) ``Permission`` config, if set, is enforced again inside
-         *     ``engine.submit_activity_dialog`` itself.
+         *     (finer-grained) ``Permission`` config, the interface and the ACLs are enforced again
+         *     inside ``engine.submit_activity_dialog`` (``availability.assert_can_submit``).
          */
         post: operations["submit_ticket_activity_dialog_api_v1_process_ticket__ticket_id__submit_post"];
         delete?: never;
@@ -14661,6 +14666,11 @@ export interface components {
             name: string;
             /** State Entity Id */
             state_entity_id: string;
+            /**
+             * State Name
+             * @default
+             */
+            state_name: string;
         };
         /** ProviderTemplateOut */
         ProviderTemplateOut: {
@@ -16863,10 +16873,17 @@ export interface components {
              * @default 0
              */
             available_transitions_count: number;
+            /**
+             * Can Start
+             * @default false
+             */
+            can_start: boolean;
             /** Process Entity Id */
             process_entity_id?: string | null;
             /** Process Name */
             process_name?: string | null;
+            /** Process State */
+            process_state?: string | null;
         };
         /**
          * TicketSearchHitOut
@@ -17661,7 +17678,9 @@ export interface operations {
     };
     list_processes_api_portal_process__get: {
         parameters: {
-            query?: never;
+            query?: {
+                ticket_id?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: {
@@ -33341,7 +33360,9 @@ export interface operations {
     };
     list_processes_api_v1_process__get: {
         parameters: {
-            query?: never;
+            query?: {
+                ticket_id?: number | null;
+            };
             header?: {
                 authorization?: string | null;
             };

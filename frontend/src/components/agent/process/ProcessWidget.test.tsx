@@ -59,6 +59,8 @@ const notInProcessState: TicketProcessStateOut = {
   activity_name: null,
   available_dialogs: [],
   available_transitions_count: 0,
+  process_state: null,
+  can_start: true,
 };
 
 const activeState: TicketProcessStateOut = {
@@ -70,6 +72,8 @@ const activeState: TicketProcessStateOut = {
     { entity_id: "ActivityDialog-1", name: "Set Title", description_short: "Set the title" },
   ],
   available_transitions_count: 1,
+  process_state: "Active",
+  can_start: false,
 };
 
 const dialogDetail: ActivityDialogDetailOut = {
@@ -92,7 +96,7 @@ const dialogDetail: ActivityDialogDetailOut = {
 };
 
 const processSummaries: ProcessSummaryOut[] = [
-  { id: 1, entity_id: "Process-1", name: "Onboarding", state_entity_id: "S1" },
+  { id: 1, entity_id: "Process-1", name: "Onboarding", state_entity_id: "S1", state_name: "Active" },
 ];
 
 beforeEach(() => {

@@ -290,6 +290,8 @@ async def test_process_list_detail_and_ticket_lifecycle_via_rest(mariadb_znuny_u
         assert resp.status_code == 200
         entity_ids = {p["entity_id"] for p in resp.json()}
         assert ids["process_entity_id"] in entity_ids
+        mine = next(p for p in resp.json() if p["entity_id"] == ids["process_entity_id"])
+        assert mine["state_name"] == "Active"
 
         # 2. get process detail
         resp = await client.get(f"/api/v1/process/{ids['process_entity_id']}")
@@ -313,6 +315,8 @@ async def test_process_list_detail_and_ticket_lifecycle_via_rest(mariadb_znuny_u
         assert state["process_entity_id"] is None
         assert state["activity_entity_id"] is None
         assert state["available_dialogs"] == []
+        assert state["process_state"] is None
+        assert state["can_start"] is True
 
         # 5. unknown ticket -> 404
         resp = await client.get("/api/v1/process/ticket/999999999/state")
@@ -342,6 +346,8 @@ async def test_process_list_detail_and_ticket_lifecycle_via_rest(mariadb_znuny_u
         assert state["activity_entity_id"] == ids["activity_a"]
         assert [d["entity_id"] for d in state["available_dialogs"]] == [ids["dialog_entity_id"]]
         assert state["available_transitions_count"] == 1
+        assert state["process_state"] == "Active"
+        assert state["can_start"] is False
 
         # starting again -> 409 (already in process)
         resp = await client.post(

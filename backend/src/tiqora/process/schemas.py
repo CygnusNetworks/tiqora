@@ -22,6 +22,7 @@ class ProcessSummaryOut(BaseModel):
     entity_id: str
     name: str
     state_entity_id: str
+    state_name: str = ""
 
 
 class ActivityDialogSummaryOut(BaseModel):
@@ -117,6 +118,8 @@ class TicketProcessStateOut(BaseModel):
     activity_name: str | None = None
     available_dialogs: list[ActivityDialogSummaryOut] = Field(default_factory=list)
     available_transitions_count: int = 0
+    process_state: str | None = None  # "Active" | "Inactive" | "FadeAway"
+    can_start: bool = False  # not in a process, the Action ACL allows it, >= 1 startable process
 
 
 class ActivityDialogFieldOut(BaseModel):

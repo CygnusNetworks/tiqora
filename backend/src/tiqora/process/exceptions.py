@@ -55,3 +55,13 @@ class UnresolvedFieldValue(Exception):
     as a literal numeric id. Previously this was silently ignored (the field
     change was skipped with no error), which let a typo'd value fail to
     apply without any feedback to the caller."""
+
+
+class ProcessNotStartable(Exception):
+    """The process cannot be started here: it is not Active, its start dialog is not offered
+    on this interface, or an ACL (Process / Action) hides it (HTTP 409)."""
+
+
+class ProcessNotRunning(Exception):
+    """The ticket's process is Inactive, so none of its dialogs may be submitted (HTTP 409).
+    FadeAway processes keep running; only new starts are refused."""

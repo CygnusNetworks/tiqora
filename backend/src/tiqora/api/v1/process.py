@@ -39,12 +39,22 @@ from tiqora.domain.ticket_write_service import (
 )
 from tiqora.domain.ticket_write_service import TicketNotFound as WriteTicketNotFound
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.process.actor import ProcessActor
+from tiqora.process.availability import (
+    assert_can_start,
+    available_dialogs,
+    list_startable_processes,
+    process_action_allowed,
+)
 from tiqora.process.config import ActivityDialogFieldConfig
+from tiqora.process.dump import PROCESS_STATE_NAMES
 from tiqora.process.engine import start_process, submit_activity_dialog
 from tiqora.process.exceptions import (
     ActivityDialogNotAvailable,
     ActivityDialogNotFound,
     ProcessNotFound,
+    ProcessNotRunning,
+    ProcessNotStartable,
     ProcessPermissionDenied,
     RequiredFieldMissing,
     TicketAlreadyInProcess,
@@ -65,7 +75,7 @@ from tiqora.process.schemas import (
     ProcessSummaryOut,
     TicketProcessStateOut,
 )
-from tiqora.process.ticket_state import get_ticket_process_candidates
+from tiqora.process.ticket_state import get_ticket_process_candidates, get_ticket_process_state
 from tiqora.znuny.sysconfig import SysConfig
 
 router = APIRouter(prefix="/process", tags=["process"])
@@ -76,7 +86,16 @@ def _map_exc(exc: Exception) -> HTTPException:
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     if isinstance(exc, ProcessPermissionDenied):
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
-    if isinstance(exc, (TicketAlreadyInProcess, TicketNotInProcess, ActivityDialogNotAvailable)):
+    if isinstance(
+        exc,
+        (
+            TicketAlreadyInProcess,
+            TicketNotInProcess,
+            ActivityDialogNotAvailable,
+            ProcessNotStartable,
+            ProcessNotRunning,
+        ),
+    ):
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     if isinstance(exc, (RequiredFieldMissing, UnresolvedFieldValue, InvalidInput)):
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -92,6 +111,8 @@ _MAPPED_ERRORS: tuple[type[Exception], ...] = (
     ProcessNotFound,
     ActivityDialogNotFound,
     ActivityDialogNotAvailable,
+    ProcessNotStartable,
+    ProcessNotRunning,
     TicketAlreadyInProcess,
     TicketNotInProcess,
     RequiredFieldMissing,
@@ -125,16 +146,29 @@ def _dialog_field_out(field_cfg: ActivityDialogFieldConfig) -> ActivityDialogFie
     )
 
 
-async def _ticket_process_state_out(session: AsyncSession, ticket_id: int) -> TicketProcessStateOut:
+async def _ticket_process_state_out(
+    session: AsyncSession, ticket_id: int, actor: ProcessActor, repository: ProcessRepository
+) -> TicketProcessStateOut:
     """Re-fetch and shape a ticket's current process state — used by the
     ``GET .../state``, ``POST .../start``, and ``POST .../submit`` endpoints.
+    The dialogs and ``can_start`` honour state, interface and ACLs (availability.py).
     """
-    candidates = await get_ticket_process_candidates(session, ticket_id)
+    candidates = await get_ticket_process_candidates(session, ticket_id, repository=repository)
     if candidates is None:
-        return TicketProcessStateOut()
+        can_start = (
+            await get_ticket_process_state(session, ticket_id) is None
+            and await process_action_allowed(session, actor, ticket_id=ticket_id)
+            and bool(
+                await list_startable_processes(
+                    session, actor, ticket_id=ticket_id, repository=repository
+                )
+            )
+        )
+        return TicketProcessStateOut(can_start=can_start)
 
     activity = candidates.process.activities.get(candidates.activity_entity_id)
     activity_name = activity.name if activity is not None else candidates.activity_entity_id
+    dialogs = await available_dialogs(session, actor, ticket_id=ticket_id, candidates=candidates)
     return TicketProcessStateOut(
         process_entity_id=candidates.process.entity_id,
         process_name=candidates.process.name,
@@ -144,9 +178,10 @@ async def _ticket_process_state_out(session: AsyncSession, ticket_id: int) -> Ti
             ActivityDialogSummaryOut(
                 entity_id=d.entity_id, name=d.name, description_short=d.config.description_short
             )
-            for d in candidates.activity_dialogs
+            for d in dialogs
         ],
         available_transitions_count=len(candidates.outgoing_transitions),
+        process_state=PROCESS_STATE_NAMES.get(candidates.process.state_entity_id),
     )
 
 
@@ -154,10 +189,21 @@ async def _ticket_process_state_out(session: AsyncSession, ticket_id: int) -> Ti
 
 
 @router.get("/", response_model=list[ProcessSummaryOut])
-async def list_processes(user: CurrentUser, session: DbSession) -> list[ProcessSummaryOut]:
-    del user  # any authenticated agent may list processes
-    repository = ProcessRepository(session)
-    summaries = await repository.list_processes()
+async def list_processes(
+    user: CurrentUser, session: DbSession, ticket_id: int | None = None
+) -> list[ProcessSummaryOut]:
+    """Processes the agent may start (Active, start dialog for the agent interface, ACLs).
+    With ``ticket_id`` (enroll context) the ticket is access-checked and the Action ACL applies."""
+    if ticket_id is not None:
+        try:
+            await _assert_ticket_permission(
+                session, ticket_id=ticket_id, user_id=user.id, permission="ro"
+            )
+        except (WriteTicketNotFound, ProcessPermissionDenied) as exc:
+            raise _map_exc(exc) from exc
+    summaries = await list_startable_processes(
+        session, ProcessActor.agent(user.id), ticket_id=ticket_id
+    )
     return [ProcessSummaryOut.model_validate(s, from_attributes=True) for s in summaries]
 
 
@@ -235,7 +281,9 @@ async def get_ticket_state(
         )
     except (WriteTicketNotFound, ProcessPermissionDenied) as exc:
         raise _map_exc(exc) from exc
-    return await _ticket_process_state_out(session, ticket_id)
+    return await _ticket_process_state_out(
+        session, ticket_id, ProcessActor.agent(user.id), ProcessRepository(session)
+    )
 
 
 @router.post("/ticket/{ticket_id}/start", response_model=TicketProcessStateOut)
@@ -243,10 +291,19 @@ async def start_ticket_process(
     ticket_id: int, body: ProcessStartIn, user: CurrentUser, session: DbSession
 ) -> TicketProcessStateOut:
     sysconfig = SysConfig(session)
+    actor = ProcessActor.agent(user.id)
+    repository = ProcessRepository(session)  # one revision for the whole request
     try:
         async with session.begin():
             await _assert_ticket_permission(
                 session, ticket_id=ticket_id, user_id=user.id, permission="rw"
+            )
+            await assert_can_start(
+                session,
+                actor,
+                process_entity_id=body.process_entity_id,
+                ticket_id=ticket_id,
+                repository=repository,
             )
             await start_process(
                 session,
@@ -254,10 +311,11 @@ async def start_ticket_process(
                 process_entity_id=body.process_entity_id,
                 user_id=user.id,
                 sysconfig=sysconfig,
+                repository=repository,
             )
     except _MAPPED_ERRORS as exc:
         raise _map_exc(exc) from exc
-    return await _ticket_process_state_out(session, ticket_id)
+    return await _ticket_process_state_out(session, ticket_id, actor, repository)
 
 
 @router.post("/ticket/{ticket_id}/submit", response_model=ActivityDialogSubmitOut)
@@ -267,11 +325,13 @@ async def submit_ticket_activity_dialog(
     """Submit an activity dialog for *ticket_id*.
 
     Requires ``rw`` on the ticket's queue as a coarse gate — the dialog's own
-    (finer-grained) ``Permission`` config, if set, is enforced again inside
-    ``engine.submit_activity_dialog`` itself.
+    (finer-grained) ``Permission`` config, the interface and the ACLs are enforced again
+    inside ``engine.submit_activity_dialog`` (``availability.assert_can_submit``).
     """
     sysconfig = SysConfig(session)
     field_values: dict[str, Any] = body.field_values
+    actor = ProcessActor.agent(user.id)
+    repository = ProcessRepository(session)
     try:
         async with session.begin():
             await _assert_ticket_permission(
@@ -284,11 +344,13 @@ async def submit_ticket_activity_dialog(
                 field_values=field_values,
                 user_id=user.id,
                 sysconfig=sysconfig,
+                actor=actor,
+                repository=repository,
             )
     except _MAPPED_ERRORS as exc:
         raise _map_exc(exc) from exc
 
-    state = await _ticket_process_state_out(session, ticket_id)
+    state = await _ticket_process_state_out(session, ticket_id, actor, repository)
     return ActivityDialogSubmitOut(
         activity_changed=result.activity_changed,
         new_activity_entity_id=result.new_activity_entity_id,

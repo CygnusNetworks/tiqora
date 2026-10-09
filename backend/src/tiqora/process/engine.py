@@ -99,11 +99,10 @@ from tiqora.domain.ticket_write_service import (
     update_dynamic_field,
     watch_ticket,
 )
-from tiqora.permissions.engine import PermissionEngine
 from tiqora.process.actor import ProcessActor
+from tiqora.process.availability import assert_can_submit
 from tiqora.process.config import ActivityDialogConfig, TransitionActionConfig, TransitionConfig
 from tiqora.process.exceptions import (
-    ActivityDialogNotAvailable,
     ActivityDialogNotFound,
     ProcessNotFound,
     ProcessPermissionDenied,
@@ -122,6 +121,7 @@ from tiqora.process.graph import ProcessRepository
 from tiqora.process.ticket_state import (
     ACTIVITY_ID_DF_NAME,
     PROCESS_ID_DF_NAME,
+    TicketProcessCandidates,
     get_ticket_process_state,
 )
 from tiqora.znuny.cache_invalidation import invalidate_ticket_cache
@@ -153,6 +153,7 @@ async def start_process(
     process_entity_id: str,
     user_id: int,
     sysconfig: SysConfig,  # noqa: ARG001 -- kept for signature symmetry with the other engine entry points
+    repository: ProcessRepository | None = None,
 ) -> None:
     """Start *process_entity_id* on *ticket_id* at its ``StartActivity``.
 
@@ -169,7 +170,7 @@ async def start_process(
     Znuny instance for this port, but consistent with the single-process
     Dynamic Field pair modelling the ticket <-> process link).
     """
-    repository = ProcessRepository(session)
+    repository = repository or ProcessRepository(session)
     graph = await repository.get_process(process_entity_id)
     if graph is None or graph.config.start_activity is None:
         raise ProcessNotFound(process_entity_id)
@@ -1661,6 +1662,7 @@ async def submit_activity_dialog(
     user_id: int,
     sysconfig: SysConfig,
     actor: ProcessActor | None = None,
+    repository: ProcessRepository | None = None,
 ) -> ActivityDialogSubmitResult:
     """Submit an Activity Dialog for *ticket_id*: apply field changes, then
     evaluate the current activity's outgoing transitions in listed (YAML
@@ -1680,7 +1682,7 @@ async def submit_activity_dialog(
     if state is None:
         raise TicketNotInProcess(ticket_id)
 
-    repository = ProcessRepository(session)
+    repository = repository or ProcessRepository(session)
     graph = await repository.get_process(state.process_entity_id)
     if graph is None:
         raise ProcessNotFound(state.process_entity_id)
@@ -1689,31 +1691,34 @@ async def submit_activity_dialog(
     if activity is None:
         raise TicketNotInProcess(ticket_id)
 
-    dialog_node = next(
-        (d for d in activity.activity_dialogs if d.entity_id == activity_dialog_entity_id), None
+    if all(d.entity_id != activity_dialog_entity_id for d in activity.activity_dialogs) and (
+        await repository.get_activity_dialog(activity_dialog_entity_id) is None
+    ):
+        raise ActivityDialogNotFound(activity_dialog_entity_id)
+
+    actor = actor or ProcessActor.agent(user_id)
+    # Process state, dialog on the current activity, Interface, Permission (agents) and the
+    # Action / ActivityDialog ACLs (availability.py; AgentTicketProcess.pm:140-177).
+    dialog_node = await assert_can_submit(
+        session,
+        actor,
+        ticket_id=ticket_id,
+        candidates=TicketProcessCandidates(
+            process=graph,
+            activity_entity_id=activity.entity_id,
+            activity_dialogs=activity.activity_dialogs,
+            outgoing_transitions=activity.outgoing_transitions,
+        ),
+        activity_dialog_entity_id=activity_dialog_entity_id,
     )
-    if dialog_node is None:
-        if await repository.get_activity_dialog(activity_dialog_entity_id) is None:
-            raise ActivityDialogNotFound(activity_dialog_entity_id)
-        raise ActivityDialogNotAvailable(activity_dialog_entity_id)
-
     dialog_config = dialog_node.config
-
-    if dialog_config.permission:
-        t = await _ticket_must_exist(session, ticket_id)
-        perms = PermissionEngine(session)
-        if not await perms.check(user_id, int(t["queue_id"]), dialog_config.permission):
-            raise ProcessPermissionDenied(
-                f"user {user_id} lacks {dialog_config.permission!r} for activity dialog "
-                f"{activity_dialog_entity_id!r}"
-            )
 
     await apply_activity_dialog(
         session,
         ticket_id=ticket_id,
         dialog=dialog_config,
         field_values=field_values,
-        actor=actor or ProcessActor.agent(user_id),
+        actor=actor,
         sysconfig=sysconfig,
     )
 

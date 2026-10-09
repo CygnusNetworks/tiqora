@@ -19510,6 +19510,11 @@
           "state_entity_id": {
             "title": "State Entity Id",
             "type": "string"
+          },
+          "state_name": {
+            "default": "",
+            "title": "State Name",
+            "type": "string"
           }
         },
         "required": [
@@ -26261,6 +26266,11 @@
             "title": "Available Transitions Count",
             "type": "integer"
           },
+          "can_start": {
+            "default": false,
+            "title": "Can Start",
+            "type": "boolean"
+          },
           "process_entity_id": {
             "anyOf": [
               {
@@ -26282,6 +26292,17 @@
               }
             ],
             "title": "Process Name"
+          },
+          "process_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process State"
           }
         },
         "title": "TicketProcessStateOut",
@@ -28279,9 +28300,25 @@
     },
     "/api/portal/process/": {
       "get": {
-        "description": "List processes a customer may start (all known processes; start is gated separately).",
+        "description": "Processes the customer may start (Active, start dialog for the customer interface, ACLs).\nWith ``ticket_id`` (enroll context) the ticket is access-checked and the Action ACL applies.",
         "operationId": "list_processes_api_portal_process__get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "ticket_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticket Id"
+            }
+          },
           {
             "in": "cookie",
             "name": "tiqora_customer_session",
@@ -62814,8 +62851,25 @@
     },
     "/api/v1/process/": {
       "get": {
+        "description": "Processes the agent may start (Active, start dialog for the agent interface, ACLs).\nWith ``ticket_id`` (enroll context) the ticket is access-checked and the Action ACL applies.",
         "operationId": "list_processes_api_v1_process__get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "ticket_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticket Id"
+            }
+          },
           {
             "in": "header",
             "name": "authorization",
@@ -63116,7 +63170,7 @@
     },
     "/api/v1/process/ticket/{ticket_id}/submit": {
       "post": {
-        "description": "Submit an activity dialog for *ticket_id*.\n\nRequires ``rw`` on the ticket's queue as a coarse gate \u2014 the dialog's own\n(finer-grained) ``Permission`` config, if set, is enforced again inside\n``engine.submit_activity_dialog`` itself.",
+        "description": "Submit an activity dialog for *ticket_id*.\n\nRequires ``rw`` on the ticket's queue as a coarse gate \u2014 the dialog's own\n(finer-grained) ``Permission`` config, the interface and the ACLs are enforced again\ninside ``engine.submit_activity_dialog`` (``availability.assert_can_submit``).",
         "operationId": "submit_ticket_activity_dialog_api_v1_process_ticket__ticket_id__submit_post",
         "parameters": [
           {

@@ -814,6 +814,7 @@ export type ProcessSummaryOut = {
   entity_id: string;
   name: string;
   state_entity_id: string;
+  state_name: string;
 };
 
 export type ActivityDialogSummaryOut = {
@@ -849,6 +850,8 @@ export type TicketProcessStateOut = {
   activity_name: string | null;
   available_dialogs: ActivityDialogSummaryOut[];
   available_transitions_count: number;
+  process_state: string | null;
+  can_start: boolean;
 };
 
 export type ActivityDialogFieldOut = {

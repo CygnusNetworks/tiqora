@@ -24,12 +24,23 @@ from tiqora.domain.portal_ticket_service import (
 )
 from tiqora.domain.ticket_write_service import InvalidInput
 from tiqora.domain.ticket_write_service import TicketNotFound as WriteTicketNotFound
-from tiqora.process.config import ActivityDialogConfig, ActivityDialogFieldConfig
+from tiqora.process.actor import ProcessActor
+from tiqora.process.availability import (
+    assert_can_start,
+    available_dialogs,
+    dialog_allows,
+    list_startable_processes,
+    process_action_allowed,
+)
+from tiqora.process.config import ActivityDialogFieldConfig
+from tiqora.process.dump import PROCESS_STATE_NAMES
 from tiqora.process.engine import start_process, submit_activity_dialog
 from tiqora.process.exceptions import (
     ActivityDialogNotAvailable,
     ActivityDialogNotFound,
     ProcessNotFound,
+    ProcessNotRunning,
+    ProcessNotStartable,
     ProcessPermissionDenied,
     RequiredFieldMissing,
     TicketAlreadyInProcess,
@@ -47,12 +58,10 @@ from tiqora.process.schemas import (
     ProcessSummaryOut,
     TicketProcessStateOut,
 )
-from tiqora.process.ticket_state import get_ticket_process_candidates
+from tiqora.process.ticket_state import get_ticket_process_candidates, get_ticket_process_state
 from tiqora.znuny.sysconfig import SysConfig
 
 router = APIRouter(prefix="/process", tags=["portal-process"])
-
-_CUSTOMER_INTERFACE = "CustomerInterface"
 
 
 def _map_exc(exc: Exception) -> HTTPException:
@@ -62,7 +71,16 @@ def _map_exc(exc: Exception) -> HTTPException:
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc) or "Not found")
     if isinstance(exc, (ProcessPermissionDenied, PortalTicketAccessDenied)):
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-    if isinstance(exc, (TicketAlreadyInProcess, TicketNotInProcess, ActivityDialogNotAvailable)):
+    if isinstance(
+        exc,
+        (
+            TicketAlreadyInProcess,
+            TicketNotInProcess,
+            ActivityDialogNotAvailable,
+            ProcessNotStartable,
+            ProcessNotRunning,
+        ),
+    ):
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     if isinstance(exc, (RequiredFieldMissing, UnresolvedFieldValue, InvalidInput)):
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -77,6 +95,8 @@ _MAPPED = (
     ProcessNotFound,
     ActivityDialogNotFound,
     ActivityDialogNotAvailable,
+    ProcessNotStartable,
+    ProcessNotRunning,
     TicketAlreadyInProcess,
     TicketNotInProcess,
     RequiredFieldMissing,
@@ -85,14 +105,8 @@ _MAPPED = (
 )
 
 
-def _dialog_allows_customer(config: ActivityDialogConfig) -> bool:
-    """Znuny: dialog is customer-usable when Interface lists CustomerInterface.
-
-    Empty Interface is treated as agent-only (conservative; Znuny dialogs
-    always set Interface explicitly for customer flows).
-    """
-    interfaces = [str(i) for i in (config.interface or [])]
-    return _CUSTOMER_INTERFACE in interfaces
+def _actor(customer: CurrentCustomer) -> ProcessActor:
+    return ProcessActor.customer(login=customer.login, customer_id=customer.customer_id)
 
 
 def _field_out(field_cfg: ActivityDialogFieldConfig) -> ActivityDialogFieldOut:
@@ -129,42 +143,52 @@ async def _assert_customer_ticket(
 
 
 async def _ticket_process_state_out_customer(
-    session: AsyncSession, ticket_id: int
+    session: AsyncSession, ticket_id: int, actor: ProcessActor, repository: ProcessRepository
 ) -> TicketProcessStateOut:
-    candidates = await get_ticket_process_candidates(session, ticket_id)
+    candidates = await get_ticket_process_candidates(session, ticket_id, repository=repository)
     if candidates is None:
-        return TicketProcessStateOut()
+        can_start = (
+            await get_ticket_process_state(session, ticket_id) is None
+            and await process_action_allowed(session, actor, ticket_id=ticket_id)
+            and bool(
+                await list_startable_processes(
+                    session, actor, ticket_id=ticket_id, repository=repository
+                )
+            )
+        )
+        return TicketProcessStateOut(can_start=can_start)
 
     activity = candidates.process.activities.get(candidates.activity_entity_id)
     activity_name = activity.name if activity is not None else candidates.activity_entity_id
-
-    customer_dialogs: list[ActivityDialogSummaryOut] = []
-    for d in candidates.activity_dialogs:
-        if _dialog_allows_customer(d.config):
-            customer_dialogs.append(
-                ActivityDialogSummaryOut(
-                    entity_id=d.entity_id,
-                    name=d.name,
-                    description_short=d.config.description_short,
-                )
-            )
-
+    dialogs = await available_dialogs(session, actor, ticket_id=ticket_id, candidates=candidates)
     return TicketProcessStateOut(
         process_entity_id=candidates.process.entity_id,
         process_name=candidates.process.name,
         activity_entity_id=candidates.activity_entity_id,
         activity_name=activity_name,
-        available_dialogs=customer_dialogs,
+        available_dialogs=[
+            ActivityDialogSummaryOut(
+                entity_id=d.entity_id, name=d.name, description_short=d.config.description_short
+            )
+            for d in dialogs
+        ],
         available_transitions_count=len(candidates.outgoing_transitions),
+        process_state=PROCESS_STATE_NAMES.get(candidates.process.state_entity_id),
     )
 
 
 @router.get("/", response_model=list[ProcessSummaryOut])
-async def list_processes(customer: CurrentCustomer, session: DbSession) -> list[ProcessSummaryOut]:
-    """List processes a customer may start (all known processes; start is gated separately)."""
-    del customer
-    repository = ProcessRepository(session)
-    summaries = await repository.list_processes()
+async def list_processes(
+    customer: CurrentCustomer, session: DbSession, ticket_id: int | None = None
+) -> list[ProcessSummaryOut]:
+    """Processes the customer may start (Active, start dialog for the customer interface, ACLs).
+    With ``ticket_id`` (enroll context) the ticket is access-checked and the Action ACL applies."""
+    if ticket_id is not None:
+        try:
+            await _assert_customer_ticket(session, customer, ticket_id)
+        except (PortalTicketNotFound, PortalTicketAccessDenied) as exc:
+            raise _map_exc(exc) from exc
+    summaries = await list_startable_processes(session, _actor(customer), ticket_id=ticket_id)
     return [ProcessSummaryOut.model_validate(s, from_attributes=True) for s in summaries]
 
 
@@ -178,7 +202,7 @@ async def get_activity_dialog(
     if node is None:
         raise _map_exc(ActivityDialogNotFound(activity_dialog_entity_id))
     config = node.config
-    if not _dialog_allows_customer(config):
+    if not dialog_allows(config, "CustomerInterface"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Activity dialog is not available on the customer interface",
@@ -203,7 +227,9 @@ async def get_ticket_state(
         await _assert_customer_ticket(session, customer, ticket_id)
     except (PortalTicketNotFound, PortalTicketAccessDenied) as exc:
         raise _map_exc(exc) from exc
-    return await _ticket_process_state_out_customer(session, ticket_id)
+    return await _ticket_process_state_out_customer(
+        session, ticket_id, _actor(customer), ProcessRepository(session)
+    )
 
 
 @router.post("/ticket/{ticket_id}/start", response_model=TicketProcessStateOut)
@@ -211,19 +237,29 @@ async def start_ticket_process(
     ticket_id: int, body: ProcessStartIn, customer: CurrentCustomer, session: DbSession
 ) -> TicketProcessStateOut:
     sysconfig = SysConfig(session)
+    actor = _actor(customer)
+    repository = ProcessRepository(session)  # one revision for the whole request
     try:
         async with session.begin():
             await _assert_customer_ticket(session, customer, ticket_id)
+            await assert_can_start(
+                session,
+                actor,
+                process_entity_id=body.process_entity_id,
+                ticket_id=ticket_id,
+                repository=repository,
+            )
             await start_process(
                 session,
                 ticket_id=ticket_id,
                 process_entity_id=body.process_entity_id,
                 user_id=PORTAL_SYSTEM_USER_ID,
                 sysconfig=sysconfig,
+                repository=repository,
             )
     except _MAPPED as exc:
         raise _map_exc(exc) from exc
-    return await _ticket_process_state_out_customer(session, ticket_id)
+    return await _ticket_process_state_out_customer(session, ticket_id, actor, repository)
 
 
 @router.post("/ticket/{ticket_id}/submit", response_model=ActivityDialogSubmitOut)
@@ -232,17 +268,8 @@ async def submit_ticket_activity_dialog(
 ) -> ActivityDialogSubmitOut:
     sysconfig = SysConfig(session)
     field_values: dict[str, Any] = body.field_values
-    # Ensure dialog is customer-facing before engine runs.
+    actor = _actor(customer)
     repository = ProcessRepository(session)
-    node = await repository.get_activity_dialog(body.activity_dialog_entity_id)
-    if node is None:
-        raise _map_exc(ActivityDialogNotFound(body.activity_dialog_entity_id))
-    cfg = node.config
-    if not _dialog_allows_customer(cfg):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Activity dialog is not available on the customer interface",
-        )
     try:
         async with session.begin():
             await _assert_customer_ticket(session, customer, ticket_id)
@@ -253,11 +280,13 @@ async def submit_ticket_activity_dialog(
                 field_values=field_values,
                 user_id=PORTAL_SYSTEM_USER_ID,
                 sysconfig=sysconfig,
+                actor=actor,
+                repository=repository,
             )
     except _MAPPED as exc:
         raise _map_exc(exc) from exc
 
-    state = await _ticket_process_state_out_customer(session, ticket_id)
+    state = await _ticket_process_state_out_customer(session, ticket_id, actor, repository)
     return ActivityDialogSubmitOut(
         activity_changed=result.activity_changed,
         new_activity_entity_id=result.new_activity_entity_id,
