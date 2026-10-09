@@ -7,8 +7,9 @@ import io
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from itertools import chain, islice
+from math import isfinite
 from typing import Final
 
 from openpyxl import Workbook
@@ -55,17 +56,22 @@ class XlsxSheet:
     rows: Iterable[Sequence[Cell | date]]
     totals: Sequence[Cell] | None = None
     totals_label: str = "Summe"
+    #: column index that receives ``totals_label`` in the totals row
+    totals_label_column: int = 0
     #: written to an "Info" sheet when non-empty
     info_lines: Sequence[str] = ()
 
 
 def _sheet_name(raw: str, used: set[str]) -> str:
     base = _SHEET_FORBIDDEN.sub("", raw).strip().strip("'") or "Sheet"
-    name = base[:31]
+    name = base[:31].rstrip(" '") or "Sheet"
+    if name.lower() == "history":  # reserved by Excel
+        name = "History_"
+    base = name
     n = 2
     while name.lower() in used:
         suffix = f" ({n})"
-        name = base[: 31 - len(suffix)] + suffix
+        name = base[: 31 - len(suffix)].rstrip(" '") + suffix
         n += 1
     used.add(name.lower())
     return name
@@ -76,29 +82,37 @@ def _text(value: str) -> str:
 
 
 def _to_date(value: object) -> date | datetime | None:
-    if isinstance(value, datetime | date):
-        return value
-    if isinstance(value, str):
+    parsed: datetime
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, date):
+        parsed = datetime.combine(value, datetime.min.time())
+    elif isinstance(value, str):
         try:
-            return (
+            parsed = (
                 datetime.fromisoformat(value)
                 if len(value) > 10
                 else datetime.combine(date.fromisoformat(value), datetime.min.time())
             )
         except ValueError:
             return None
-    return None
+    else:
+        return None
+    if parsed.tzinfo is not None:  # openpyxl cannot store aware datetimes
+        parsed = parsed.astimezone(UTC).replace(tzinfo=None)
+    return parsed
 
 
 def _make_cell(
     ws: object, value: object, col_type: ColumnType, *, bold: bool = False
 ) -> WriteOnlyCell:
     cell = WriteOnlyCell(ws)
-    if value is None:
-        cell.value = None
+    if value is None or (isinstance(value, float) and not isfinite(value)):
+        cell.value = None  # NaN/inf have no spreadsheet representation
     elif col_type == "date" and (parsed := _to_date(value)) is not None:
         cell.value = parsed
-        cell.number_format = _NUMBER_FORMATS["date"]
+        has_time = parsed.time() != datetime.min.time()
+        cell.number_format = "yyyy-mm-dd hh:mm" if has_time else _NUMBER_FORMATS["date"]
     elif isinstance(value, bool):
         cell.value = value
     elif isinstance(value, int | float):
@@ -152,10 +166,8 @@ def write_xlsx_workbook(sheets: Sequence[XlsxSheet]) -> bytes:
             ws.append([_make_cell(ws, v, c.type) for v, c in zip(row, sheet.columns, strict=False)])
         if sheet.totals is not None:
             totals = list(sheet.totals)
-            for i, v in enumerate(totals):
-                if v is None:
-                    totals[i] = sheet.totals_label
-                    break
+            if 0 <= sheet.totals_label_column < len(totals):
+                totals[sheet.totals_label_column] = sheet.totals_label
             ws.append(
                 [
                     _make_cell(ws, v, c.type, bold=True)
@@ -200,12 +212,17 @@ def _labelled_rows(
             # date values stay ISO (real date cells) unless a label maps them
             keep = col.role != "dimension" or (
                 col.type == "date"
+                and str(v) != OTHER_KEY
                 and str(v)
                 not in {**result.labels.get(col.key, {}), **value_labels.get(col.key, {})}
             )
             cells.append(v if keep else _dimension_label(result, col.key, v, value_labels))
         out.append(cells)
     return out
+
+
+def _first_dimension(result: ReportResultOut) -> int | None:
+    return next((i for i, c in enumerate(result.columns) if c.role == "dimension"), None)
 
 
 def report_sheet(
@@ -220,20 +237,29 @@ def report_sheet(
     columns = [XlsxColumn(column_labels.get(c.key, c.key), c.type) for c in result.columns]
     rows = _labelled_rows(result, value_labels)
     totals = result.totals.grand if result.totals is not None else None
+    label_col = _first_dimension(result)
+    if label_col is None and totals is not None:
+        # measure-only report: a leading, empty-headed column carries the totals label
+        columns.insert(0, XlsxColumn("", "string"))
+        rows = [[None, *r] for r in rows]
+        totals = [None, *totals]
+        label_col = 0
     return XlsxSheet(
         name=title,
         columns=columns,
         rows=rows,
         totals=totals,
         totals_label=totals_label,
+        totals_label_column=label_col or 0,
         info_lines=info_lines,
     )
 
 
 def _csv_cell(value: Cell) -> str:
-    if value is None:
+    if value is None or (isinstance(value, float) and not isfinite(value)):
         return ""
     text = str(value)
+    # intentionally also prefixes numeric-looking strings ("-5", "+49 ..."): text stays text
     if isinstance(value, str) and text.startswith(_FORMULA_PREFIXES):
         return "'" + text
     return text
@@ -246,16 +272,22 @@ def write_report_csv(
     value_labels: Mapping[str, Mapping[str, str]],
     totals_label: str,
 ) -> bytes:
+    sheet = report_sheet(
+        result,
+        title="",
+        column_labels=column_labels,
+        value_labels=value_labels,
+        totals_label=totals_label,
+        info_lines=(),
+    )
     buf = io.StringIO()
     writer = csv.writer(buf, delimiter=";", lineterminator="\r\n")
-    writer.writerow([_csv_cell(column_labels.get(c.key, c.key)) for c in result.columns])
-    for row in _labelled_rows(result, value_labels):
-        writer.writerow([_csv_cell(v) for v in row])
-    if result.totals is not None and result.totals.grand is not None:
-        grand = list(result.totals.grand)
-        for i, v in enumerate(grand):
-            if v is None:
-                grand[i] = totals_label
-                break
+    writer.writerow([_csv_cell(c.header) for c in sheet.columns])
+    for row in sheet.rows:
+        writer.writerow([_csv_cell(v) for v in row])  # type: ignore[arg-type]
+    if sheet.totals is not None:
+        grand = list(sheet.totals)
+        if 0 <= sheet.totals_label_column < len(grand):
+            grand[sheet.totals_label_column] = totals_label
         writer.writerow([_csv_cell(v) for v in grand])
     return b"\xef\xbb\xbf" + buf.getvalue().encode("utf-8")

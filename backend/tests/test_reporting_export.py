@@ -178,3 +178,105 @@ def test_csv_none_empty_and_formula_text_neutralised() -> None:
         .splitlines()
     )
     assert lines[1] == "'=cmd;;0.5" and len(lines) == 2
+
+
+def _ws(res: ReportResultOut, title: str = "T"):  # type: ignore[no-untyped-def]
+    sheet = report_sheet(
+        res, title=title, column_labels={}, value_labels={}, totals_label="Summe", info_lines=[]
+    )
+    return openpyxl.load_workbook(io.BytesIO(write_xlsx_workbook([sheet])))[title]
+
+
+def _date_result(rows: list[list[object]], totals: object = None) -> ReportResultOut:
+    return _result(
+        columns=[
+            ResultColumnOut(key="day", role="dimension", type="date", label_key="d"),
+            ResultColumnOut(key="n", role="measure", type="count", label_key="n"),
+        ],
+        rows=rows,
+        labels={},
+        totals=totals,
+    )
+
+
+def test_tz_aware_dates_become_naive_utc() -> None:
+    ws = _ws(_date_result([["2024-06-03T10:00:00Z", 1], ["2024-06-03T12:30:00+02:00", 2]]), "D")
+    assert ws["A2"].value == datetime(2024, 6, 3, 10, 0)
+    assert ws["A3"].value == datetime(2024, 6, 3, 10, 30)
+
+
+def test_datetime_with_time_part_keeps_minutes_format() -> None:
+    ws = _ws(_date_result([["2024-06-03 10:15:00", 1], ["2024-06-04", 2]]), "D")
+    assert ws["A2"].number_format == "yyyy-mm-dd hh:mm" and ws["A2"].value == datetime(
+        2024, 6, 3, 10, 15
+    )
+    assert ws["A3"].number_format == "yyyy-mm-dd"
+
+
+def test_totals_label_goes_into_first_dimension_column() -> None:
+    res = _result(
+        columns=[
+            ResultColumnOut(key="n", role="measure", type="count", label_key="n"),
+            ResultColumnOut(key="customer", role="dimension", type="string", label_key="c"),
+        ],
+        rows=[[1, "ACME"]],
+        totals=ReportTotalsOut(grand=[None, None]),
+    )
+    ws = _ws(res)
+    assert [c.value for c in ws[3]] == [None, "Summe"]
+
+
+def test_totals_label_for_measure_only_report_adds_label_column() -> None:
+    res = _result(
+        columns=[ResultColumnOut(key="n", role="measure", type="count", label_key="n")],
+        rows=[[3]],
+        totals=ReportTotalsOut(grand=[3]),
+    )
+    ws = _ws(res)
+    assert [c.value for c in ws[3]] == ["Summe", 3] and ws["B2"].value == 3
+    lines = (
+        write_report_csv(res, column_labels={}, value_labels={}, totals_label="Summe")
+        .decode("utf-8-sig")
+        .splitlines()
+    )
+    assert lines == [";n", ";3", "Summe;3"]
+
+
+def test_other_in_date_dimension_is_weitere() -> None:
+    ws = _ws(_date_result([["2024-06-03", 1], ["__other__", 2]]), "D")
+    assert ws["A3"].value == "Weitere"
+    csv = write_report_csv(
+        _date_result([["__other__", 2]]), column_labels={}, value_labels={}, totals_label="S"
+    )
+    assert csv.decode("utf-8-sig").splitlines()[1] == "Weitere;2"
+
+
+def test_nan_and_inf_are_empty() -> None:
+    res = _result(rows=[["ACME", float("nan"), float("inf")]], totals=None)
+    ws = _ws(res)
+    assert [c.value for c in ws[2]] == ["Acme GmbH", None, None]
+    lines = (
+        write_report_csv(res, column_labels={}, value_labels={}, totals_label="S")
+        .decode("utf-8-sig")
+        .splitlines()
+    )
+    assert lines[1] == "Acme GmbH;;"
+
+
+def test_sheet_names_trim_and_avoid_history() -> None:
+    cols = [XlsxColumn("a", "string")]
+    names = ["a" * 30 + " b", "History", "x" * 29 + "'y"]
+    data = write_xlsx_workbook([XlsxSheet(name=n, columns=cols, rows=[]) for n in names])
+    out = openpyxl.load_workbook(io.BytesIO(data)).sheetnames
+    assert out[0] == "a" * 30 and out[1] == "History_" and out[2] == "x" * 29
+    assert all(not n.endswith((" ", "'")) for n in out)
+
+
+def test_csv_guard_prefixes_numeric_looking_strings_on_purpose() -> None:
+    res = _result(rows=[["-5", 1.0, 0.1], ["+49 123", 1.0, 0.1]], totals=None)
+    lines = (
+        write_report_csv(res, column_labels={}, value_labels={}, totals_label="S")
+        .decode("utf-8-sig")
+        .splitlines()
+    )
+    assert lines[1].startswith("'-5;") and lines[2].startswith("'+49 123;")
