@@ -738,8 +738,9 @@ async def test_lock_order_accept_end_visitor_no_deadlock(env: Env) -> None:
 @pytest.mark.asyncio
 @parametrize_db
 async def test_end_racing_the_capacity_read_does_not_deadlock(env: Env) -> None:
-    """An end holds one of the agent's active chats while an accept counts them; the end
-    then changes that row's status (index entry of the capacity read) and commits."""
+    """An end holds one of the agent's active chats (row lock) while the same agent accepts
+    another chat and counts its active chats; the end then moves that row out of
+    ``active`` and commits. The count takes no locks, so neither side waits on the other."""
     held = await _start(env, 100)
     target = await _start(env, 101)
     assert await _accept(env, held.id, AGENT_A) == "ok"
