@@ -15,6 +15,8 @@ const user = {
   is_admin: true,
   // The reports nav entry and routes need this (the server decides: reporting.access).
   can_view_reports: true,
+  can_create_reports: true,
+  can_share_reports: true,
 };
 
 const queues = [

@@ -26,6 +26,17 @@ STATS_GROUP_NAME: Final = "stats"
 NO_REPORT_ACCESS_MESSAGE: Final = "Für Berichte fehlt die Berechtigung (Gruppe „stats“)."
 
 
+async def stats_group_id(session: AsyncSession) -> int | None:
+    """Id of the valid permission group named ``stats`` (None when it does not exist)."""
+    return (
+        await session.execute(
+            select(PermissionGroups.id).where(
+                PermissionGroups.name == STATS_GROUP_NAME, PermissionGroups.valid_id == 1
+            )
+        )
+    ).scalar_one_or_none()
+
+
 async def has_report_access(
     session: AsyncSession, user_id: int, reporting: ReportingSettings
 ) -> bool:
@@ -34,13 +45,7 @@ async def has_report_access(
     engine = PermissionEngine(session)
     if await engine.is_admin(user_id):
         return True
-    stats_id = (
-        await session.execute(
-            select(PermissionGroups.id).where(
-                PermissionGroups.name == STATS_GROUP_NAME, PermissionGroups.valid_id == 1
-            )
-        )
-    ).scalar_one_or_none()
+    stats_id = await stats_group_id(session)
     if stats_id is None:
         return False
     return stats_id in await engine.groups_for_permission(user_id, "ro")

@@ -19298,6 +19298,11 @@ export interface components {
             /** Avatar Url */
             avatar_url?: string | null;
             /**
+             * Can Create Reports
+             * @default false
+             */
+            can_create_reports: boolean;
+            /**
              * Can Edit Customers
              * @default false
              */
@@ -19307,6 +19312,11 @@ export interface components {
              * @default false
              */
             can_edit_templates: boolean;
+            /**
+             * Can Share Reports
+             * @default false
+             */
+            can_share_reports: boolean;
             /**
              * Can Use Customer Directory
              * @default false

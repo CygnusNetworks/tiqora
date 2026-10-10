@@ -30316,6 +30316,11 @@
             ],
             "title": "Avatar Url"
           },
+          "can_create_reports": {
+            "default": false,
+            "title": "Can Create Reports",
+            "type": "boolean"
+          },
           "can_edit_customers": {
             "default": false,
             "title": "Can Edit Customers",
@@ -30324,6 +30329,11 @@
           "can_edit_templates": {
             "default": false,
             "title": "Can Edit Templates",
+            "type": "boolean"
+          },
+          "can_share_reports": {
+            "default": false,
+            "title": "Can Share Reports",
             "type": "boolean"
           },
           "can_use_customer_directory": {

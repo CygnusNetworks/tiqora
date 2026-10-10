@@ -77,7 +77,7 @@ from tiqora.identity.sso_routes import (
 )
 from tiqora.identity.types import ENV_OIDC_SLUG
 from tiqora.permissions.engine import PermissionEngine
-from tiqora.reporting.access import has_report_access
+from tiqora.reporting.rights import report_rights
 from tiqora.reporting.settings import load_reporting_settings
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
 from tiqora.znuny.sessions import delete_agent_sessions
@@ -156,11 +156,16 @@ async def _user_me(
     try:
         # Same rule as ``require_report_access`` (``reporting.access``): drives the
         # agent "Berichte" nav item and the time-accounting reports link.
-        data["can_view_reports"] = await has_report_access(
+        rights = await report_rights(
             session, user.id, await load_reporting_settings(session, settings)
         )
+        data["can_view_reports"] = rights.view
+        data["can_create_reports"] = rights.create
+        data["can_share_reports"] = rights.share
     except Exception:  # noqa: BLE001 — same guard as above
         data["can_view_reports"] = False
+        data["can_create_reports"] = False
+        data["can_share_reports"] = False
         with contextlib.suppress(Exception):
             await session.rollback()
     return UserMe(**data)

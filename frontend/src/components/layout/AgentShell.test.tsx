@@ -49,6 +49,8 @@ vi.mock("@/auth/AuthContext", () => ({
       can_edit_templates: false,
       can_use_customer_directory: authFlags.canUseDirectory,
       can_view_reports: authFlags.canViewReports,
+      can_create_reports: authFlags.canViewReports,
+      can_share_reports: false,
     },
   }),
 }));

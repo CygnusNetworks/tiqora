@@ -31,6 +31,8 @@ export const demoUser = {
   can_use_customer_directory: true,
   can_edit_customers: true,
   can_view_reports: true,
+  can_create_reports: true,
+  can_share_reports: true,
   email: "alex.turner@example.com",
   time_zone: null,
   default_time_zone: "Europe/Berlin",
