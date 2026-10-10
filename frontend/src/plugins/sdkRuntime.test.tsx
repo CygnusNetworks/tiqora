@@ -70,13 +70,44 @@ describe("usePluginApi", () => {
     });
   });
 
+  it("accepts ordinary paths with spaces and dots inside segments", async () => {
+    request.mockResolvedValue(null);
+    const { result } = renderHook(() => usePluginApi(), { wrapper });
+    await result.current.get("items/my item.v2/..x");
+    expect(request).toHaveBeenCalledWith("GET", "/api/plugins/org.example.hello/items/my item.v2/..x", {
+      query: undefined,
+      signal: undefined,
+    });
+  });
+
   it("returns what the host api resolves", async () => {
     request.mockResolvedValue({ count: 3 });
     const { result } = renderHook(() => usePluginApi(), { wrapper });
     await expect(result.current.get<{ count: number }>("count")).resolves.toEqual({ count: 3 });
   });
 
-  it.each(["../admin", "a/../../b", "", "a//b", "/", "./x", "a/%2e%2e/b", "a\\..\\b", "..?x=1"])(
+  it.each([
+    "../admin",
+    "a/../../b",
+    "",
+    "a//b",
+    "/",
+    "./x",
+    "a/%2e%2e/b",
+    "a\\..\\b",
+    "..?x=1",
+    // The URL parser drops tab/LF/CR anywhere and trims trailing spaces, so
+    // these would still resolve as ".." and leave /api/plugins/<id>/.
+    "..\t/..\t/v1/tickets",
+    "..\n/..\n/v1/admin/users",
+    "a/.\t./.\t./other.plugin/x",
+    "a/.\r./b",
+    ".. ",
+    " ../x",
+    "a/%00/b",
+    "a%2f..%2f..%2fv1",
+    "a%5c..%5cb",
+  ])(
     "rejects path %j",
     async (path) => {
       const { result } = renderHook(() => usePluginApi(), { wrapper });

@@ -54,15 +54,28 @@ export function usePluginContext(): PluginContextValue {
 
 const BAD_PATH = "Ungültiger Pfad für die Schnittstelle der Erweiterung";
 
+/** True for ASCII control characters (incl. tab, LF, CR, NUL and DEL). */
+function hasControlChar(value: string): boolean {
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    if (code < 0x20 || code === 0x7f) return true;
+  }
+  return false;
+}
+
 /**
  * Validate a plugin API path (relative to /api/plugins/<id>/) and return it
- * without its leading slash. Rejects empty paths, empty segments and `.`/`..`
- * segments — also in the spellings a browser would still resolve as such
- * (`%2e%2e`, `\` as separator), and `?`/`#` (query goes through opts.query).
+ * without its leading slash. Rejects empty paths and empty, `.` or `..`
+ * segments, plus the spellings we know a browser or proxy could still turn
+ * into those: `%2e%2e`, `\` or an encoded `/`/`\` as separator, ASCII
+ * control characters (the URL parser drops tab/LF/CR), leading/trailing
+ * whitespace, and `?`/`#` (the query goes through opts.query). This guards
+ * against mistakes — plugin code runs with full trust anyway, so encode
+ * untrusted text (encodeURIComponent) before putting it into a path.
  */
 function checkedPath(path: string): string {
   const rel = path.startsWith("/") ? path.slice(1) : path;
-  if (!rel || /[?#\\]/.test(rel)) throw new Error(BAD_PATH);
+  if (!rel || /[?#\\]/.test(rel) || hasControlChar(rel)) throw new Error(BAD_PATH);
   for (const segment of rel.split("/")) {
     let decoded: string;
     try {
@@ -70,15 +83,34 @@ function checkedPath(path: string): string {
     } catch {
       throw new Error(BAD_PATH);
     }
-    if (!segment || decoded === "." || decoded === "..") throw new Error(BAD_PATH);
+    if (
+      !segment ||
+      segment !== segment.trim() ||
+      decoded !== decoded.trim() ||
+      hasControlChar(decoded) ||
+      /[/\\]/.test(decoded) ||
+      decoded === "." ||
+      decoded === ".."
+    ) {
+      throw new Error(BAD_PATH);
+    }
   }
   return rel;
+}
+
+/** Full URL path for a plugin API call; asserts it stays below the plugin's prefix. */
+function pluginUrl(pluginId: string, path: string): string {
+  const prefix = `/api/plugins/${pluginId}/`;
+  const url = `${prefix}${checkedPath(path)}`;
+  // Second line of defence: what the browser's URL parser makes of it.
+  if (!new URL(url, "http://plugin.invalid").pathname.startsWith(prefix)) throw new Error(BAD_PATH);
+  return url;
 }
 
 export function usePluginApi(): PluginApi {
   const { pluginId } = usePluginInstance();
   return useMemo(() => {
-    const url = (path: string) => `/api/plugins/${pluginId}/${checkedPath(path)}`;
+    const url = (path: string) => pluginUrl(pluginId, path);
     return {
       async get<T>(path: string, opts?: PluginApiRequestOptions): Promise<T> {
         return api.request<T>("GET", url(path), { query: opts?.query, signal: opts?.signal });
