@@ -1401,22 +1401,12 @@ class TicketService:
             count_stmt = select(func.count()).select_from(stmt.subquery())
             return int((await self._session.execute(count_stmt)).scalar_one())
 
-        summary["my_open"] = await _count(
-            await self._filtered_ticket_stmt(
-                user_id, queue_id=None, state_id=None, state_type="open", owner_id=user_id
-            )
-        )
-        summary["my_new"] = await _count(
-            await self._filtered_ticket_stmt(
-                user_id, queue_id=None, state_id=None, state_type="new", owner_id=user_id
-            )
-        )
+        summary["my_open"] = await self.count_filtered(user_id, state_type="open", owner_id=user_id)
+        summary["my_new"] = await self.count_filtered(user_id, state_type="new", owner_id=user_id)
         # "unowned" = still assigned to root (owner_id=1); this is how Znuny
         # leaves freshly-arrived tickets until an agent takes ownership.
-        summary["unowned_new"] = await _count(
-            await self._filtered_ticket_stmt(
-                user_id, queue_id=None, state_id=None, state_type="new", owner_id=1
-            )
+        summary["unowned_new"] = await self.count_filtered(
+            user_id, state_type="new", owner_id=UNASSIGNED_OWNER_ID
         )
 
         esc_stmt = await self._filtered_ticket_stmt(
@@ -1438,17 +1428,29 @@ class TicketService:
             )
             summary["escalated"] = await _count(esc_stmt)
 
-        summary["ai_escalated"] = await _count(
-            await self._filtered_ticket_stmt(
-                user_id,
-                queue_id=None,
-                state_id=None,
-                state_type="open",
-                owner_id=None,
-                ai_escalated=True,
-            )
+        summary["ai_escalated"] = await self.count_filtered(
+            user_id, state_type="open", ai_escalated=True
         )
         return summary
+
+    async def count_filtered(self, user_id: int, **filter_kwargs: Any) -> int:
+        """``COUNT(*)`` of :meth:`_filtered_ticket_stmt` — the ticket list's total.
+
+        Same permission scoping and filters as :meth:`list_tickets` (the
+        filter keyword arguments are the same), without loading any rows.
+        """
+        kwargs: dict[str, Any] = {
+            "queue_id": None,
+            "state_id": None,
+            "state_type": None,
+            "owner_id": None,
+            **filter_kwargs,
+        }
+        stmt = await self._filtered_ticket_stmt(user_id, **kwargs)
+        if stmt is None:
+            return 0
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        return int((await self._session.execute(count_stmt)).scalar_one())
 
     async def get_ticket(self, user_id: int, ticket_id: int) -> TicketDetail:
         ticket = await self._assert_ticket_ro(user_id, ticket_id)

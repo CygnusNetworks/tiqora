@@ -546,6 +546,15 @@ are replaced by a catalogue of 25 built-in reports over typed sources.
   (stacked bar, area, donut, heatmap, KPI with sparkline/delta, pivot with sticky
   headers). `/agent/stats` redirects there.
 
+### Dashboards
+
+- **Widget data** (`dashboard/runner.py`): each widget's provider runs as the viewer in its own
+  session, but at most four per request at once, because one popular page with unbounded
+  fan-out would take the whole connection pool (default 5 + 10) and stall unrelated endpoints;
+  each provider gets a database statement timeout of its budget (5 s) with one extra second on
+  the client side, a cancelled connection is invalidated instead of pooled, and a batch ends
+  after 20 s with the unfinished widgets `pending`.
+
 ### Calendar / appointments
 
 `tiqora/calendar/` (`CalendarService`, `recurrence.py`, `ics.py`) plus

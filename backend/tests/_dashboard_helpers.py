@@ -19,7 +19,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tiqora.api.app import create_app
-from tiqora.api.deps import get_current_user, get_db
+from tiqora.api.deps import get_current_user, get_db, get_session_factory_dep
 from tiqora.config import Settings
 from tiqora.dashboard import start, store
 from tiqora.dashboard.schemas import (
@@ -428,7 +428,7 @@ class Env:
 
     async def sample_rows(self, user_id: int) -> list[tuple[str, str, int]]:
         rows = self._sql(
-            "SELECT counter_key, CAST(sample_day AS CHAR), value"
+            "SELECT counter_key, CAST(sample_day AS CHAR(10)), value"
             " FROM tiqora_dashboard_counter_sample WHERE user_id = :u"
             " ORDER BY counter_key, sample_day",
             u=user_id,
@@ -510,6 +510,8 @@ async def open_env(sync_url: str) -> AsyncIterator[Env]:
     admin_app = create_app(Settings(environment="test"))
     admin_app.dependency_overrides[get_db] = _db
     admin_app.dependency_overrides[get_current_user] = _admin_user
+    for a in (app, anon_app, admin_app):  # providers open their own sessions (Task 5)
+        a.dependency_overrides[get_session_factory_dep] = lambda: factory
     app.dependency_overrides[get_current_user] = lambda: current[0]
 
     def _client(a: Any) -> AsyncClient:

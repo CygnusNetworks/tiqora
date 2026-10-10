@@ -6293,6 +6293,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboard-widget-types/{key}/data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Widget Data
+         * @description Data for unsaved settings (settings drawer); runs as the viewer, writes no history.
+         */
+        post: operations["preview_widget_data_api_v1_dashboard_widget_types__key__data_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dashboards": {
         parameters: {
             query?: never;
@@ -6362,6 +6382,49 @@ export interface paths {
         post?: never;
         /** Delete Dashboard */
         delete: operations["delete_dashboard_api_v1_dashboards__dashboard_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/{dashboard_id}/data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dashboard Data
+         * @description Data of the dashboard's widgets (``widgets`` = comma list of ids; default all).
+         *
+         *     Providers run as the viewer, at most four at once, five seconds each; a widget that runs
+         *     out of time is ``pending``. Ids that are not on this dashboard are ignored.
+         */
+        get: operations["dashboard_data_api_v1_dashboards__dashboard_id__data_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/{dashboard_id}/widgets/{widget_id}/data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Widget Data
+         * @description One widget's data with the longer single-widget budget (25 s).
+         */
+        get: operations["widget_data_api_v1_dashboards__dashboard_id__widgets__widget_id__data_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -13004,6 +13067,18 @@ export interface components {
             icon?: string | null;
             /** Name */
             name: string;
+        };
+        /** DashboardDataOut */
+        DashboardDataOut: {
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Widgets */
+            widgets: {
+                [key: string]: components["schemas"]["WidgetDataOut"];
+            };
         };
         /** DashboardOrderIn */
         DashboardOrderIn: {
@@ -19825,6 +19900,20 @@ export interface components {
             /** Processed */
             processed: number;
         };
+        /** WidgetDataOut */
+        WidgetDataOut: {
+            /** Data */
+            data?: {
+                [key: string]: unknown;
+            } | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "pending" | "error" | "forbidden";
+        };
         /** WidgetIn */
         WidgetIn: {
             /** Id */
@@ -19870,6 +19959,13 @@ export interface components {
              * @default 1
              */
             type_version: number;
+        };
+        /** WidgetPreviewIn */
+        WidgetPreviewIn: {
+            /** Settings */
+            settings?: {
+                [key: string]: unknown;
+            };
         };
         /** WidgetSettingsPatchIn */
         WidgetSettingsPatchIn: {
@@ -36663,6 +36759,45 @@ export interface operations {
             };
         };
     };
+    preview_widget_data_api_v1_dashboard_widget_types__key__data_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WidgetPreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetDataOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_dashboards_api_v1_dashboards_get: {
         parameters: {
             query?: never;
@@ -36896,6 +37031,79 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dashboard_data_api_v1_dashboards__dashboard_id__data_get: {
+        parameters: {
+            query?: {
+                widgets?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                dashboard_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardDataOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    widget_data_api_v1_dashboards__dashboard_id__widgets__widget_id__data_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                dashboard_id: number;
+                widget_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetDataOut"];
+                };
             };
             /** @description Validation Error */
             422: {

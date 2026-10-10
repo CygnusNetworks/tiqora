@@ -9,35 +9,91 @@ cookie-authenticated writes is the global ``csrf_origin_middleware``.
 
 from __future__ import annotations
 
-from typing import Final, NoReturn
+from dataclasses import dataclass
+from typing import Annotated, Any, Final, NoReturn
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.api.deps import CurrentUser, DbSession
+from tiqora.api.deps import CurrentUser, DbSession, get_redis, get_session_factory_dep
 from tiqora.dashboard import start, store
+from tiqora.dashboard.providers import DASHBOARD_PROVIDERS
+from tiqora.dashboard.runner import run_batch, run_widget
 from tiqora.dashboard.schemas import (
+    MAX_WIDGETS_PER_DASHBOARD,
     DashboardCreateIn,
+    DashboardDataOut,
     DashboardOrderIn,
     DashboardOut,
     DashboardSaveIn,
     DashboardTabOut,
+    WidgetDataOut,
     WidgetOut,
+    WidgetPreviewIn,
     WidgetSettingsPatchIn,
     WidgetTypeOut,
 )
-from tiqora.dashboard.settings_models import CORE_WIDGET_SETTINGS
+from tiqora.dashboard.settings_models import (
+    CORE_WIDGET_SETTINGS,
+    SettingsError,
+    validate_widget_settings,
+)
+from tiqora.extensions import Registry, get_registry
+from tiqora.jobs.service import utc_now
 from tiqora.permissions.engine import PermissionEngine
 
 router = APIRouter(prefix="/dashboards", tags=["dashboards"])
 widget_types_router = APIRouter(prefix="/dashboard-widget-types", tags=["dashboards"])
 
 NOT_FOUND_MESSAGE: Final = "Dashboard nicht gefunden."
+NO_DATA_MESSAGE: Final = "Dieses Widget hat keine Daten."
 CORE_WIDGET_VERSION: Final = 1
 
 
-def provider_keys() -> frozenset[str]:
-    """Widget types with a data provider (Task 5/6 fill ``DASHBOARD_PROVIDERS``)."""
-    return frozenset()
+def get_dashboard_registry() -> Registry:
+    """The registry holding ``DASHBOARD_PROVIDERS`` (tests override it)."""
+    return get_registry()
+
+
+DashboardRegistry = Annotated[Registry, Depends(get_dashboard_registry)]
+SessionFactory = Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory_dep)]
+
+
+def provider_keys(registry: Registry) -> frozenset[str]:
+    """Widget types with a data provider."""
+    return frozenset(p.key for p in registry.items(DASHBOARD_PROVIDERS))
+
+
+async def _redis_or_none(request: Request) -> Redis | None:
+    """Redis for providers that read presence; ``None`` when it cannot be obtained."""
+    try:
+        return await get_redis(request)
+    except Exception:  # noqa: BLE001 - providers cope without Redis
+        return None
+
+
+@dataclass(frozen=True, slots=True)
+class _PreviewWidget:
+    id: str
+    type_key: str
+    type_version: int
+    settings: dict[str, Any]
+
+
+def _widget_ids(raw: str | None) -> set[str] | None:
+    if raw is None:
+        return None
+    ids = {part.strip() for part in raw.split(",") if part.strip()}
+    if len(ids) > MAX_WIDGETS_PER_DASHBOARD:
+        raise HTTPException(
+            422,
+            {
+                "message": f"Höchstens {MAX_WIDGETS_PER_DASHBOARD} Widgets auf einmal.",
+                "path": "widgets",
+            },
+        )
+    return ids
 
 
 def _raise_http(exc: Exception) -> NoReturn:
@@ -172,11 +228,101 @@ async def patch_widget_settings(
     return out
 
 
+async def _visible_widgets(
+    session: DbSession, user: CurrentUser, dashboard_id: int
+) -> list[WidgetOut]:
+    """The widgets of a dashboard the caller may see; frees the request's connection.
+
+    Providers open their own sessions, so the request session must not keep a pooled
+    connection while they run.
+    """
+    try:
+        out = await store.get_dashboard(
+            session, dashboard_id, user.id, admin=await _is_admin(session, user)
+        )
+    except _STORE_ERRORS as exc:
+        _raise_http(exc)
+    finally:
+        await session.rollback()
+    return out.widgets
+
+
+@router.get("/{dashboard_id}/data", response_model=DashboardDataOut)
+async def dashboard_data(
+    dashboard_id: int,
+    request: Request,
+    session: DbSession,
+    user: CurrentUser,
+    factory: SessionFactory,
+    registry: DashboardRegistry,
+    widgets: Annotated[str | None, Query(max_length=2000)] = None,
+) -> DashboardDataOut:
+    """Data of the dashboard's widgets (``widgets`` = comma list of ids; default all).
+
+    Providers run as the viewer, at most four at once, five seconds each; a widget that runs
+    out of time is ``pending``. Ids that are not on this dashboard are ignored.
+    """
+    wanted = _widget_ids(widgets)
+    rows = await _visible_widgets(session, user, dashboard_id)
+    if wanted is not None:
+        rows = [w for w in rows if w.id in wanted]
+    results = await run_batch(factory, registry, user.id, rows, redis=await _redis_or_none(request))
+    return DashboardDataOut(widgets=results, generated_at=utc_now())
+
+
+@router.get("/{dashboard_id}/widgets/{widget_id}/data", response_model=WidgetDataOut)
+async def widget_data(
+    dashboard_id: int,
+    widget_id: str,
+    request: Request,
+    session: DbSession,
+    user: CurrentUser,
+    factory: SessionFactory,
+    registry: DashboardRegistry,
+) -> WidgetDataOut:
+    """One widget's data with the longer single-widget budget (25 s)."""
+    rows = await _visible_widgets(session, user, dashboard_id)
+    widget = next((w for w in rows if w.id == widget_id), None)
+    if widget is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Widget nicht gefunden.")
+    out = await run_widget(factory, registry, user.id, widget, redis=await _redis_or_none(request))
+    if out is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, NO_DATA_MESSAGE)
+    return out
+
+
 @widget_types_router.get("", response_model=list[WidgetTypeOut])
-async def list_widget_types(_user: CurrentUser) -> list[WidgetTypeOut]:
+async def list_widget_types(_user: CurrentUser, registry: DashboardRegistry) -> list[WidgetTypeOut]:
     """The ten core widget types (plugin widgets have no server side in phase 1)."""
-    with_data = provider_keys()
+    with_data = provider_keys(registry)
     return [
         WidgetTypeOut(key=key, version=CORE_WIDGET_VERSION, has_data=key in with_data)
         for key in sorted(CORE_WIDGET_SETTINGS)
     ]
+
+
+@widget_types_router.post("/{key}/data", response_model=WidgetDataOut)
+async def preview_widget_data(
+    key: str,
+    body: WidgetPreviewIn,
+    request: Request,
+    user: CurrentUser,
+    factory: SessionFactory,
+    registry: DashboardRegistry,
+) -> WidgetDataOut:
+    """Data for unsaved settings (settings drawer); runs as the viewer, writes no history."""
+    provider = registry.get(DASHBOARD_PROVIDERS, key)
+    if provider is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, NO_DATA_MESSAGE)
+    try:
+        settings = validate_widget_settings(key, body.settings)
+    except SettingsError as exc:
+        raise HTTPException(422, {"message": exc.message, "path": exc.path}) from exc
+    widget = _PreviewWidget(
+        id="preview", type_key=key, type_version=provider.version, settings=settings
+    )
+    out = await run_widget(
+        factory, registry, user.id, widget, redis=await _redis_or_none(request), preview=True
+    )
+    assert out is not None  # the provider exists
+    return out

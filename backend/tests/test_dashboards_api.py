@@ -281,3 +281,116 @@ async def test_cookie_writes_need_a_same_origin_header(env: Env) -> None:
         headers={"Origin": "http://test"},
     )
     assert same.status_code == 200
+
+
+# --- data routes (Task 5) ------------------------------------------------------------------
+
+
+def _ids_of(d: dict[str, Any], type_key: str) -> list[str]:
+    return [w["id"] for w in d["widgets"] if w["type_key"] == type_key]
+
+
+async def test_data_batch_returns_only_widgets_with_providers(env: Env) -> None:
+    d = await _start(env)
+    r = await env.client.get(f"/api/v1/dashboards/{d['id']}/data")
+    assert r.status_code == 200
+    body = r.json()
+    counters = _ids_of(d, "core.counter")
+    assert len(counters) == 4 and set(body["widgets"]) >= set(counters)
+    for frontend_only in ("core.recent-views", "core.queue-overview"):
+        assert not set(_ids_of(d, frontend_only)) & set(body["widgets"])
+    first = body["widgets"][counters[0]]
+    assert first["status"] == "ok" and set(first["data"]) == {"value", "delta", "spark"}
+    assert first["error"] is None and body["generated_at"].endswith("+00:00")
+    assert (await env.anon.get(f"/api/v1/dashboards/{d['id']}/data")).status_code == 401
+
+
+async def test_data_widgets_filter(env: Env) -> None:
+    d = await _start(env)
+    a, b, *_ = _ids_of(d, "core.counter")
+    url = f"/api/v1/dashboards/{d['id']}/data"
+    r = await env.client.get(url, params={"widgets": f"{a},{b}"})
+    assert r.status_code == 200 and set(r.json()["widgets"]) == {a, b}
+    # unknown ids and ids of widgets without data are ignored
+    notes = _ids_of(d, "core.recent-views")[0]
+    r = await env.client.get(url, params={"widgets": f" {a} ,unknown-id,{notes},"})
+    assert set(r.json()["widgets"]) == {a}
+    too_many = ",".join(f"w{i:07d}" for i in range(41))
+    bad = await env.client.get(url, params={"widgets": too_many})
+    assert bad.status_code == 422 and bad.json()["detail"]["path"] == "widgets"
+
+
+async def test_data_widgets_of_another_dashboard_are_never_run(env: Env) -> None:
+    """``?widgets=`` is intersected with the requested dashboard's rows (R-DASH-WIDGETS-PARAM)."""
+    a = await _start(env)
+    env.as_user(USER_B)
+    b = await _start(env)
+    b_counter = _ids_of(b, "core.counter")[0]
+    env.as_user(USER_A)
+    r = await env.client.get(f"/api/v1/dashboards/{a['id']}/data", params={"widgets": b_counter})
+    assert r.status_code == 200 and r.json()["widgets"] == {}
+    single = await env.client.get(f"/api/v1/dashboards/{a['id']}/widgets/{b_counter}/data")
+    assert single.status_code == 404
+    # and B's dashboard itself is invisible to A
+    invisible = await env.client.get(f"/api/v1/dashboards/{b['id']}/data")
+    assert invisible.status_code == 404 and invisible.json() == NOT_FOUND
+
+
+async def test_single_widget_data(env: Env) -> None:
+    d = await _start(env)
+    wid = _ids_of(d, "core.counter")[0]
+    r = await env.client.get(f"/api/v1/dashboards/{d['id']}/widgets/{wid}/data")
+    assert r.status_code == 200 and r.json()["status"] == "ok"
+    assert isinstance(r.json()["data"]["value"], int)
+
+
+async def test_single_widget_404s(env: Env) -> None:
+    d = await _start(env)
+    base = f"/api/v1/dashboards/{d['id']}/widgets"
+    foreign = await env.client.get(f"{base}/zzzzzzzz/data")
+    assert foreign.status_code == 404
+    no_data = await env.client.get(f"{base}/{_ids_of(d, 'core.recent-views')[0]}/data")
+    assert no_data.status_code == 404 and no_data.json() == {
+        "detail": "Dieses Widget hat keine Daten."
+    }
+    env.as_user(USER_C)
+    hidden = await env.client.get(f"{base}/{_ids_of(d, 'core.counter')[0]}/data")
+    assert hidden.status_code == 404 and hidden.json() == NOT_FOUND
+
+
+async def test_preview_validates_settings(env: Env) -> None:
+    url = "/api/v1/dashboard-widget-types/core.counter/data"
+    bad = await env.client.post(
+        url, json={"settings": {"source": {"kind": "preset", "preset": "nope"}}}
+    )
+    assert bad.status_code == 422 and bad.json()["detail"]["path"] == "settings.source.preset"
+    assert isinstance(bad.json()["detail"]["message"], str)
+    unknown = await env.client.post("/api/v1/dashboard-widget-types/org.example.x/data", json={})
+    assert unknown.status_code == 404
+    no_data = await env.client.post("/api/v1/dashboard-widget-types/core.notes/data", json={})
+    assert no_data.status_code == 404
+    defaults = await env.client.post(url, json={})
+    assert defaults.status_code == 200 and defaults.json()["status"] == "ok"
+    assert (await env.anon.post(url, json={})).status_code == 401
+
+
+async def test_preview_runs_in_viewer_scope(env: Env) -> None:
+    url = "/api/v1/dashboard-widget-types/core.counter/data"
+    body = {"settings": {"source": {"kind": "preset", "preset": "mine_open"}}}
+    b = await env.as_user(USER_B).post(url, json=body)
+    c = await env.as_user(USER_C).post(url, json=body)
+    a = await env.as_user(USER_A).post(url, json=body)
+    assert b.json()["data"]["value"] == 1 and c.json()["data"]["value"] == 0
+    assert a.json()["data"]["value"] > 1
+    # previews are throwaway: no history row for anybody
+    for uid in (USER_A, USER_B, USER_C):
+        assert await env.sample_keys(uid) == set()
+
+
+async def test_widget_types_report_which_types_have_data(env: Env) -> None:
+    types = {
+        t["key"]: t["has_data"]
+        for t in (await env.client.get("/api/v1/dashboard-widget-types")).json()
+    }
+    assert types["core.counter"] is True
+    assert types["core.notes"] is False and types["core.recent-views"] is False
