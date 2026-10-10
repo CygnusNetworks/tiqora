@@ -7,9 +7,10 @@ import en from "@/i18n/locales/en.json";
 import type { ReportRunIn } from "@/lib/reportsApi";
 
 describe("report demo mocks", () => {
-  it("serves the 25 built-ins with ready facts", () => {
-    const cat = resolveData("/api/v1/reports", "GET") as { reports: unknown[]; facts: { ready: boolean } };
-    expect(cat.reports).toHaveLength(25);
+  it("serves the 25 built-ins plus the demo saved reports, with ready facts", () => {
+    const cat = resolveData("/api/v1/reports", "GET") as { reports: { kind?: string }[]; facts: { ready: boolean } };
+    expect(cat.reports.filter((r) => r.kind !== "saved")).toHaveLength(25);
+    expect(cat.reports.filter((r) => r.kind === "saved").length).toBeGreaterThanOrEqual(2);
     expect(cat.facts.ready).toBe(true);
     expect(resolveData("/api/v1/reports/builtin.volume", "GET")).toMatchObject({ key: "builtin.volume" });
   });

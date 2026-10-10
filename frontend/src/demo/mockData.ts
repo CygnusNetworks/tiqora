@@ -9,9 +9,11 @@
  * auto-authenticated).
  */
 
+import { resolveSavedRequest } from "./savedMock";
 import { demoCatalogue, demoFacts, demoReport, demoReportingStatus, demoReportJob, demoSources } from "./reportsMock";
 
 export { resolveReportRun } from "./reportsMock";
+export { resolveSavedRequest } from "./savedMock";
 
 function page<T>(items: T[]) {
   return { items, total: items.length, page: 1, page_size: 500 };
@@ -1833,6 +1835,12 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/tickets/export-jobs") && method === "POST") return { job_id: 9101, status: "queued" };
   if (p.endsWith("/api/v1/jobs/9101/cancel") && method === "POST") return { ...demoExportJob, status: "cancelled" };
   if (p.endsWith("/api/v1/jobs/9101")) return demoExportJob;
+  // Saved reports and searches: only GETs are answered here; the writes carry a body and go through
+  // the MSW handlers (handlers.ts), the only place that mutates the in-memory store.
+  if (method === "GET") {
+    const saved = resolveSavedRequest("GET", p, undefined);
+    if (saved !== undefined) return saved;
+  }
   // Reports: `POST /reports/run` needs the body, so the MSW handler answers it (resolveReportRun).
   if (p.endsWith("/api/v1/reports/export") && method === "POST") return { job_id: 9201, status: "queued" };
   if (p.endsWith("/api/v1/reports") && method === "GET") return demoCatalogue();

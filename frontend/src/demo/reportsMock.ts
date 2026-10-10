@@ -1,4 +1,5 @@
 import type {
+  ReportDefinition,
   ReportSource,
   BuiltinReport,
   FactsStatus,
@@ -544,6 +545,26 @@ function jobBase(id: number, kind: string) {
   };
 }
 
+type SavedLookup = (key: string) => ReportDefinition | undefined;
+let savedReportLookup: SavedLookup | null = null;
+/** savedMock.ts registers how a saved report key resolves to its definition (the store lives there). */
+export function setSavedReportLookup(fn: SavedLookup): void {
+  savedReportLookup = fn;
+}
+/** A saved definition shaped like a built-in, so the generic result builder can run it. */
+function savedAsReport(key: string, definition: ReportDefinition): BuiltinReport {
+  return {
+    key,
+    kind: "builtin",
+    category: "saved",
+    title_key: "",
+    description_key: "",
+    definition,
+    overview: false,
+    read_only: true,
+  } as BuiltinReport;
+}
+
 /**
  * Pure stand-in for `POST /api/v1/reports/run`: the built-in by `report_key`
  * (else by `definition.source`), built for the request's choices, grain,
@@ -551,7 +572,9 @@ function jobBase(id: number, kind: string) {
  * JOB_THRESHOLD_DAYS answers like a costly run: a background job.
  */
 export function resolveReportRun(body: ReportRunIn): ReportRunOut {
+  const saved = body.report_key ? savedReportLookup?.(body.report_key) : undefined;
   const report =
+    (saved ? savedAsReport(body.report_key as string, saved) : undefined) ??
     (body.report_key ? demoReport(body.report_key) : undefined) ??
     (body.definition ? demoReport(FALLBACK_BY_SOURCE[body.definition.source] ?? "") : undefined) ??
     (demoReport("builtin.ticket_kpis") as BuiltinReport);
