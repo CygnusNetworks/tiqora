@@ -388,7 +388,7 @@ def test_sanitize_message_keeps_newline_tab_and_normalises_cr() -> None:
         f"a{ZWSP}b",
         "a\N{BYTE ORDER MARK}b",
         "a\N{LINE SEPARATOR}b",
-        "a\N{ALM}b" if False else "a\N{ARABIC LETTER MARK}b",
+        "a\N{ARABIC LETTER MARK}b",
     ],
 )
 def test_sanitize_message_drops_hidden_characters(dirty: str) -> None:
@@ -416,9 +416,7 @@ def test_sanitize_message_rejects() -> None:
     assert e2.value.code == "too_long"
 
 
-@pytest.mark.parametrize(
-    "only_hidden", [ZWSP, RLO + PDI, "\x00\x07", " \u00a0 ".replace("\u00a0", "\n")]
-)
+@pytest.mark.parametrize("only_hidden", [ZWSP, RLO + PDI, "\x00\x07", " \n "])
 def test_sanitize_message_hidden_only_is_empty(only_hidden: str) -> None:
     with pytest.raises(MessageRejected) as e:
         sanitize_message(only_hidden)
@@ -859,3 +857,79 @@ def test_hash_ip_garbage_does_not_raise_and_does_not_collide_with_real_ips() -> 
     assert hash_ip("", "k") == hash_ip("   ", "k")
     assert hash_ip("999.1.1.1", "k") != hash_ip("192.0.2.1", "k")
     assert len(hash_ip("x" * 10000, "k")) == 32
+
+
+# --- IDNA 2008 / UTS-46 (browser behaviour), public_base_url with a path -------------------------
+
+SHARP_S = "\N{LATIN SMALL LETTER SHARP S}"
+CAPITAL_SHARP_S = "\N{LATIN CAPITAL LETTER SHARP S}"
+
+
+def test_origin_sharp_s_matches_browser_punycode_not_ss() -> None:
+    stored = normalize_origin(f"https://stra{SHARP_S}e.de")
+    assert stored == "https://xn--strae-oqa.de"
+    assert origin_allowed("https://xn--strae-oqa.de", [stored])
+    assert not origin_allowed("https://strasse.de", [stored])
+    assert normalize_origin(f"https://STRA{CAPITAL_SHARP_S}E.de") == "https://xn--strae-oqa.de"
+    assert normalize_origin("https://STRASSE.de") == "https://strasse.de"
+    assert normalize_origin("https://XN--STRAE-OQA.de") == "https://xn--strae-oqa.de"
+
+
+@pytest.mark.parametrize(
+    "host",
+    [
+        "a\N{ZERO WIDTH JOINER}b.example",
+        "xn--.example",
+        "xn--a-.example",
+    ],
+)
+def test_origin_refuses_invisible_or_malformed_idn_hosts(host: str) -> None:
+    with pytest.raises(OriginError):
+        normalize_origin(f"https://{host}")
+
+
+def test_email_sharp_s_domain_is_never_rewritten_to_ss() -> None:
+    assert normalize_email(f"kunde@stra{SHARP_S}e.de") == "kunde@xn--strae-oqa.de"
+    assert normalize_email(f"kunde@STRA{CAPITAL_SHARP_S}E.DE") == "kunde@xn--strae-oqa.de"
+    assert normalize_email("kunde@strasse.de") == "kunde@strasse.de"
+    assert normalize_email(f"kunde@stra{SHARP_S}e.de") != normalize_email("kunde@strasse.de")
+    assert normalize_email("a@a\N{ZERO WIDTH JOINER}b.org") is None
+
+
+def test_zero_width_space_is_mapped_away_like_a_browser_does() -> None:
+    # UTS-46 ignores U+200B; browsers then send the plain host, so the stored form matches it
+    assert normalize_origin("https://exa\N{ZERO WIDTH SPACE}mple.org") == "https://example.org"
+
+
+@pytest.mark.parametrize(
+    "pbu",
+    [
+        "https://helpdesk.example.org/sub",
+        "https://helpdesk.example.org/sub/",
+        "https://helpdesk.example.org/",
+    ],
+)
+def test_same_origin_public_base_url_with_path_and_rewritten_host(pbu: str) -> None:
+    # the proxy rewrote Host to the upstream name: only public_base_url can vouch for the origin
+    assert same_origin_ok("POST", [OWN], None, "tiqora-api:8000", pbu)
+    assert not same_origin_ok("POST", ["https://evil.example.org"], None, "tiqora-api:8000", pbu)
+    settings = Settings(public_base_url=pbu)
+    assert own_origin(_request(), settings) == OWN
+
+
+def test_same_origin_invalid_public_base_url_falls_back_to_host() -> None:
+    assert not same_origin_ok("POST", [OWN], None, "tiqora-api:8000", "not a url")
+    assert same_origin_ok("POST", [OWN], None, "helpdesk.example.org", "not a url")
+
+
+def test_control_chars_drop_unicode_tag_characters() -> None:
+    assert sanitize_message("hi\U000e0049\U000e0047 there") == "hi there"
+
+
+def test_token_matches_survives_lone_surrogate() -> None:
+    assert not token_matches("a" * 43, chr(0xD800) * 64)
+    assert not token_matches(chr(0xD800) * 43, "0" * 64)
+
+
+def test_safe_upload_filename_removed_control_leaves_single_space() -> None:
+    assert safe_upload_filename("a \x00 b.png", "image/png") == "a b.png"

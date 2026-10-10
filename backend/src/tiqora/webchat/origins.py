@@ -12,6 +12,7 @@ from collections.abc import Iterable, Sequence
 from typing import Final
 from urllib.parse import urlsplit
 
+import idna
 from starlette.requests import Request
 
 from tiqora.config import Settings
@@ -58,8 +59,8 @@ def _canon(raw: str, *, allow_plain_http: bool) -> str:
     if not host:
         raise OriginError("Die Website-Adresse hat keinen Host.")
     try:
-        ascii_host = host.encode("idna").decode("ascii").lower()
-    except UnicodeError as exc:
+        ascii_host = idna.encode(host, uts46=True, transitional=False).decode("ascii").lower()
+    except (idna.IDNAError, UnicodeError) as exc:
         raise OriginError("Der Host der Website-Adresse ist ungültig.") from exc
     if ascii_host.endswith(".") or ".." in ascii_host or ascii_host.startswith("."):
         raise OriginError("Der Host der Website-Adresse ist ungültig.")
@@ -109,16 +110,28 @@ def origin_allowed(origin: str | None, allowed: Sequence[str]) -> bool:
     return False
 
 
+def _base_origin(public_base_url: str) -> str | None:
+    """scheme://host[:port] of ``public_base_url`` (path ignored), ``None`` if unset or unusable."""
+    base = (public_base_url or "").strip()
+    if not base:
+        return None
+    try:
+        parts = urlsplit(base)
+        return _canon(f"{parts.scheme}://{parts.netloc}", allow_plain_http=True)
+    except (OriginError, ValueError):
+        return None
+
+
 def own_origin(request: Request, settings: Settings) -> str:
-    """Origin of ``public_base_url`` when set and sane, else scheme+netloc of the request."""
-    base = (settings.public_base_url or "").strip()
-    if base:
-        try:
-            parts = urlsplit(base)
-            return _canon(f"{parts.scheme}://{parts.netloc}", allow_plain_http=True)
-        except (OriginError, ValueError):
-            pass
-    return _canon(f"{request.url.scheme}://{request.url.netloc}", allow_plain_http=True)
+    """Origin of ``public_base_url`` when set and usable, else scheme+netloc of the request.
+
+    Raises ``OriginError`` when the fallback Host is not a clean origin (trailing dot, IPv6
+    literal, ...). The Host fallback is only trusted as far as the deployment sets no
+    ``public_base_url``; callers map the error to 403.
+    """
+    return _base_origin(settings.public_base_url) or _canon(
+        f"{request.url.scheme}://{request.url.netloc}", allow_plain_http=True
+    )
 
 
 def referer_origin(value: str | None) -> str | None:
@@ -195,14 +208,10 @@ def same_origin_ok(
     host = _host_netloc(host_header)
     if host:
         allowed.add(host)
-    if public_base_url.strip():
-        try:
-            base = _canon(public_base_url.strip(), allow_plain_http=True)
-        except OriginError:
-            base = ""
-        base_netloc = _origin_netloc(base) if base else None
-        if base_netloc:
-            allowed.add(base_netloc)
+    base = _base_origin(public_base_url)
+    base_netloc = _origin_netloc(base) if base else None
+    if base_netloc:
+        allowed.add(base_netloc)
     return netloc in allowed
 
 
@@ -234,7 +243,8 @@ def frame_csp(
 
     ``frame-ancestors`` is ``'self'`` plus ONLY the embedding ``origin`` which must be valid and
     in ``allowed`` (else ``OriginError``); ``preview_only`` or no origin gives ``'self'`` alone.
-    ``connect-src`` is restricted to the chat API path of ``own``.
+    ``connect-src`` is restricted to the chat API path of ``own``, which must be a bare origin
+    (pass ``own_origin()``, never ``settings.public_base_url``).
     """
     own_norm = _canon(own, allow_plain_http=True)
     ancestors = "'self'"

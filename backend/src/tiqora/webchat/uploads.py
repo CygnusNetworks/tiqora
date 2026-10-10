@@ -29,6 +29,7 @@ _EXT: Final = {
 _TEXT_EXTS: Final = frozenset({".txt", ".log", ".csv"})
 _FS_UNSAFE: Final = re.compile(r'[<>:"|?*]')
 _WS: Final = re.compile(r"\s+")
+_LINE_WS: Final = re.compile(r"[\t\n\r\x0b\x0c]")
 
 
 class UploadRejected(ValueError):
@@ -72,7 +73,9 @@ def sniff_upload_type(content: bytes, filename: str) -> str | None:
 def safe_upload_filename(name: str, content_type: str) -> str:
     """Safe stored name: basename, no controls/bidi, canonical extension, bounded length."""
     base = re.split(r"[/\\]", name or "")[-1]
-    base = unicodedata.normalize("NFC", CONTROL_CHARS.sub("", _WS.sub(" ", base)))
+    base = unicodedata.normalize(
+        "NFC", _WS.sub(" ", CONTROL_CHARS.sub("", _LINE_WS.sub(" ", base)))
+    )
     base = _FS_UNSAFE.sub("_", base).strip()
     dot = base.rfind(".")
     stem = base[:dot] if dot > 0 else base

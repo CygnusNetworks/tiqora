@@ -43,7 +43,10 @@ def token_matches(secret: str, token_hash: str) -> bool:
     """Constant-time comparison of ``sha256(secret)`` with the stored digest."""
     if not secret or not token_hash:
         return False
-    return hmac.compare_digest(_digest(secret).encode("ascii"), token_hash.encode("utf-8"))
+    try:
+        return hmac.compare_digest(_digest(secret).encode("ascii"), token_hash.encode("utf-8"))
+    except UnicodeEncodeError:  # lone surrogate: never a match
+        return False
 
 
 def _normalise_ip(ip: str) -> str:

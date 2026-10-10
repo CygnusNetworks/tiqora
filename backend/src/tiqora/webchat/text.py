@@ -6,6 +6,8 @@ import re
 from typing import Final, Literal
 from urllib.parse import urlsplit
 
+import idna
+
 from tiqora.domain.quoting import html_to_plaintext
 
 MAX_MESSAGE_LENGTH: Final = 2000
@@ -22,7 +24,9 @@ _DROP_RANGES: Final = (
     (0x200B, 0x200B),
     (0x200E, 0x200F),
     (0x2028, 0x202E),
-    (0x2060, 0x2060),
+    (0x2060, 0x2064),
+    (0xFFF9, 0xFFFB),
+    (0xE0000, 0xE007F),
     (0x2066, 0x2069),
     (0xFEFF, 0xFEFF),
     (0xD800, 0xDFFF),
@@ -78,8 +82,8 @@ def normalize_email(raw: str | None) -> str | None:
         return None
     local, _, domain = value.partition("@")
     try:
-        ascii_domain = domain.encode("idna").decode("ascii").lower()
-    except UnicodeError:
+        ascii_domain = idna.encode(domain, uts46=True, transitional=False).decode("ascii").lower()
+    except (idna.IDNAError, UnicodeError):
         return None
     out = f"{local}@{ascii_domain}"
     if len(out) > MAX_EMAIL_LENGTH or EMAIL_RE.fullmatch(out) is None:
