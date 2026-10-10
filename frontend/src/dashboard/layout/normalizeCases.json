@@ -1,0 +1,26 @@
+{
+  "_comment": "Cross-check fixture for normalizeRects (grid.ts) vs normalize_rects (backend/src/tiqora/dashboard/layout.py). Cases 1-7 mirror backend/tests/test_dashboard_layout.py one to one; the backend suite may load this file too. 'error' = SettingsError 'Das Layout ist zu hoch.' (tooTall).",
+  "cases": [
+    { "name": "clamp and overlap", "cols": 12,
+      "input": [["a", [10, 0, 6, 2]], ["b", [6, 0, 6, 2]], ["c", [0, 0, 3, 1]]],
+      "expected": { "a": [6, 0, 6, 2], "b": [6, 2, 6, 2], "c": [0, 0, 3, 1] } },
+    { "name": "equal rects: id order decides", "cols": 12,
+      "input": [["b", [0, 0, 4, 2]], ["a", [0, 0, 4, 2]]],
+      "expected": { "a": [0, 0, 4, 2], "b": [0, 2, 4, 2] } },
+    { "name": "touching edges do not collide", "cols": 12,
+      "input": [["a", [0, 0, 6, 2]], ["b", [6, 0, 6, 2]], ["c", [0, 2, 12, 1]]],
+      "expected": { "a": [0, 0, 6, 2], "b": [6, 0, 6, 2], "c": [0, 2, 12, 1] } },
+    { "name": "cols 8 clamps x and w", "cols": 8,
+      "input": [["a", [6, 0, 6, 1]], ["b", [0, 3, 12, 1]]],
+      "expected": { "a": [2, 0, 6, 1], "b": [0, 3, 8, 1] } },
+    { "name": "chain of full-width overlaps stacks without gaps", "cols": 12,
+      "input": [["a", [0, 0, 12, 2]], ["b", [0, 0, 12, 2]], ["c", [0, 0, 12, 2]]],
+      "expected": { "a": [0, 0, 12, 2], "b": [0, 2, 12, 2], "c": [0, 4, 12, 2] } },
+    { "name": "40 full-width rects at y=999 overflow the row limit", "cols": 12,
+      "input": "generated: w00..w39 = [0, 999, 12, 24]",
+      "error": "Das Layout ist zu hoch." },
+    { "name": "a single rect ending past row 1000 overflows", "cols": 12,
+      "input": [["a", [0, 990, 12, 24]]],
+      "error": "Das Layout ist zu hoch." }
+  ]
+}
