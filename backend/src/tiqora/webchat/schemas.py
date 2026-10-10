@@ -1,7 +1,7 @@
 """Visitor-facing API models (C8) — the ONLY shapes the public chat API returns.
 
 None of them carries a ticket id/number, queue, article id, user id, agent login or e-mail,
-or an internal note; ``public_api.message_out`` is the only serializer of a transcript line.
+or an internal note; ``serialize.message_out`` is the only serializer of a transcript line.
 """
 
 from __future__ import annotations

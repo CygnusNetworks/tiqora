@@ -206,6 +206,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chat/v1/sessions/{session_id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream Chat Session
+         * @description Live transcript (C7): lines after ``Last-Event-ID`` (else ``after``), then live events.
+         *
+         *     A read (R-DISABLED-SESSIONS): keeps working when the chat was switched off. The hub
+         *     subscription is the last check, so a full hub (per IP, process total) answers 503 with
+         *     ``Retry-After: 30`` instead of an empty 200. The pre-check DB session is committed and
+         *     closed before the response starts; the stream opens short sessions per read.
+         */
+        get: operations["stream_chat_session_api_chat_v1_sessions__session_id__stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chat/v1/sessions/{session_id}/typing": {
         parameters: {
             query?: never;
@@ -20659,6 +20684,67 @@ export interface operations {
                 };
                 content: {
                     "application/octet-stream": unknown;
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    stream_chat_session_api_chat_v1_sessions__session_id__stream_get: {
+        parameters: {
+            query?: {
+                after?: number;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server-sent events: message (with id = seq), session, typing, end */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": unknown;
                 };
             };
             /** @description Cross-origin request or website not allowed */

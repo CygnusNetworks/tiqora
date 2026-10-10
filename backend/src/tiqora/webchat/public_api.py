@@ -23,22 +23,21 @@ transaction and the service writes in the SAME transaction, which the handler co
 rolls back on a refusal); post-commit notifications are flushed afterwards.
 
 Raw client addresses are never stored or used as Redis keys — only ``hash_ip`` digests.
-Visitor responses are built only from :mod:`tiqora.webchat.schemas` (``message_out`` is the
-only transcript serializer).
+Visitor responses are built only from :mod:`tiqora.webchat.schemas` (``message_out`` in
+:mod:`tiqora.webchat.serialize` is the only transcript serializer, shared with the stream).
 """
 
 from __future__ import annotations
 
-import json
 import re
 from collections.abc import Awaitable, Callable
 from datetime import datetime
-from typing import Annotated, Any, Final, Literal, cast
+from typing import Annotated, Any, Final, cast
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from fastapi import UploadFile as FastAPIUploadFile
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.datastructures import UploadFile
@@ -50,13 +49,13 @@ from tiqora.api.uploads import MAX_ATTACHMENT_BYTES, read_upload_within_limit
 from tiqora.api.v1.events import RedisDep
 from tiqora.config import Settings
 from tiqora.db.engine import get_session_factory
-from tiqora.db.tiqora.models import TiqoraChatConfig, TiqoraChatMessage, TiqoraChatSession
+from tiqora.db.tiqora.models import TiqoraChatMessage, TiqoraChatSession
 from tiqora.jobs.service import utc_now
 from tiqora.security.ratelimit import client_ip
 from tiqora.storage.backend import DbMimeStorage
 from tiqora.webchat.availability import VISITOR_TYPING_PREFIX, config_availability
 from tiqora.webchat.config_cache import CachedConfig, public_config_cache
-from tiqora.webchat.hub import StreamLimitReached
+from tiqora.webchat.hub import ChatHub, StreamLimitReached, get_chat_hub
 from tiqora.webchat.models import ChatConfigValues
 from tiqora.webchat.notify import flush_chat_notifications, queue_agent_event
 from tiqora.webchat.origins import (
@@ -76,7 +75,6 @@ from tiqora.webchat.ratelimit import (
     check_public_backstop,
 )
 from tiqora.webchat.schemas import (
-    ChatAttachmentOut,
     ChatContactIn,
     ChatMessageIn,
     ChatMessageOut,
@@ -89,6 +87,12 @@ from tiqora.webchat.schemas import (
     ChatSessionCreatedOut,
     ChatSessionCreateIn,
     ChatSessionOut,
+)
+from tiqora.webchat.serialize import (
+    attachments_out,
+    fallback_config,
+    message_out,
+    session_agent_name,
 )
 from tiqora.webchat.sessions import (
     CONTACT_END_REASONS,
@@ -105,6 +109,12 @@ from tiqora.webchat.sessions import (
     touch_visitor_last_seen,
 )
 from tiqora.webchat.store import get_chat_session, load_messages_since
+from tiqora.webchat.stream import (
+    STREAM_CONNECTS_PER_MINUTE,
+    parse_last_event_id,
+    visitor_event_stream,
+    visitor_stream_response,
+)
 from tiqora.webchat.text import MAX_MESSAGE_LENGTH
 from tiqora.webchat.tokens import (
     CHAT_TOKEN_HEADER,
@@ -327,15 +337,6 @@ async def visitor_session(
     return chat
 
 
-def _fallback_config(chat: TiqoraChatSession) -> CachedConfig:
-    """Default values for READS of a session whose config row is gone (R-DISABLED-SESSIONS)."""
-    return CachedConfig(
-        config=TiqoraChatConfig(id=int(chat.config_id), valid=False),
-        # A config we no longer know hides agent names (the safe default).
-        values=ChatConfigValues.model_construct(topics=[], show_agent_names=False),
-    )
-
-
 async def authorised_session(
     session_id: str,
     request: Request,
@@ -363,7 +364,7 @@ async def authorised_session(
         or not await public_config_cache.channel_enabled(db)
     ):
         raise ChatError("disabled", 404)
-    return chat, cached if cached is not None else _fallback_config(chat)
+    return chat, cached if cached is not None else fallback_config(chat)
 
 
 async def _session_read_limit(limiter: ChatRateLimiter, session_id: str) -> None:
@@ -437,69 +438,6 @@ async def _spend_upload_budgets(
 # -- serializers -------------------------------------------------------------------------------
 
 
-def _json_obj(raw: str | None) -> Any:
-    if not raw:
-        return None
-    try:
-        return json.loads(raw)
-    except ValueError:
-        return None
-
-
-def _attachments_out(raw: str | None) -> list[ChatAttachmentOut]:
-    data = _json_obj(raw)
-    out: list[ChatAttachmentOut] = []
-    if not isinstance(data, list):
-        return out
-    for item in data:
-        if not isinstance(item, dict):
-            continue
-        try:
-            out.append(
-                ChatAttachmentOut(
-                    index=int(item["index"]),
-                    filename=str(item["filename"]),
-                    content_type=str(item["content_type"]),
-                    size=int(item["size"]),
-                )
-            )
-        except (KeyError, TypeError, ValueError):
-            continue
-    return out
-
-
-def message_out(m: TiqoraChatMessage) -> ChatMessageOut:
-    """The ONLY visitor serializer of a transcript line.
-
-    System lines carry their code (``body`` column) and params; agent lines the agent's
-    display name the agent side stored in ``meta`` (already ``None`` when the config hides
-    names); never a user id, article id or ticket data.
-    """
-    meta = _json_obj(m.meta)
-    meta = meta if isinstance(meta, dict) else {}
-    sender: Literal["visitor", "agent", "system"] = (
-        "visitor" if m.sender == "visitor" else "agent" if m.sender == "agent" else "system"
-    )
-    if sender == "system":
-        body: str | None = None
-        code: str | None = m.body if m.sender == "system" else None
-        params = {str(k): v for k, v in meta.items() if v is None or isinstance(v, (str, bool))}
-    else:
-        body, code, params = m.body, None, {}
-    agent_name = meta.get("agent_name") if sender == "agent" else None
-    return ChatMessageOut(
-        seq=int(m.seq),
-        sender=sender,
-        body=body,
-        code=code,
-        params=params,
-        agent_name=agent_name if isinstance(agent_name, str) and agent_name else None,
-        created=m.created,
-        attachments=_attachments_out(m.attachments),
-        client_id=m.client_id if sender == "visitor" else None,
-    )
-
-
 def _needs_contact(chat: TiqoraChatSession, now: datetime) -> bool:
     ended_at = chat.ended_at
     return (
@@ -509,22 +447,6 @@ def _needs_contact(chat: TiqoraChatSession, now: datetime) -> bool:
         and (now - ended_at).total_seconds() < CONTACT_WINDOW_SECONDS
         and not chat.visitor_email
     )
-
-
-async def session_agent_name(
-    db: AsyncSession, chat: TiqoraChatSession, values: ChatConfigValues
-) -> str | None:
-    """First name of the assigned agent, ``None`` when unassigned or names are hidden."""
-    if chat.assigned_user_id is None or not values.show_agent_names:
-        return None
-    row = (
-        await db.execute(
-            text("SELECT first_name FROM users WHERE id = :u"),
-            {"u": int(chat.assigned_user_id)},
-        )
-    ).first()
-    name = str(row[0]).strip() if row is not None and row[0] else ""
-    return name or None
 
 
 async def session_out(
@@ -741,6 +663,62 @@ async def list_chat_messages(
     return [message_out(m) for m in rows]
 
 
+@router.get(
+    "/sessions/{session_id}/stream",
+    response_class=StreamingResponse,
+    responses={
+        **_ERRORS,
+        200: {
+            "description": "Server-sent events: message (with id = seq), session, typing, end",
+            "content": {"text/event-stream": {}},
+        },
+    },
+)
+async def stream_chat_session(
+    session_id: SessionId,
+    request: Request,
+    redis_client: RedisDep,
+    settings: AppSettings,
+    hub: Annotated[ChatHub, Depends(get_chat_hub)],
+    after: Annotated[int, Query(ge=0)] = 0,
+) -> Response:
+    """Live transcript (C7): lines after ``Last-Event-ID`` (else ``after``), then live events.
+
+    A read (R-DISABLED-SESSIONS): keeps working when the chat was switched off. The hub
+    subscription is the last check, so a full hub (per IP, process total) answers 503 with
+    ``Retry-After: 30`` instead of an empty 200. The pre-check DB session is committed and
+    closed before the response starts; the stream opens short sessions per read.
+    """
+    limiter = ChatRateLimiter(redis_client)
+    factory = _session_factory(request)
+    try:
+        async with factory() as db:
+            chat, _cached = await authorised_session(
+                session_id, request, db, limiter, settings, write=False
+            )
+            await limiter.hit(
+                "stream_connect", chat.id, limit=STREAM_CONNECTS_PER_MINUTE, window_seconds=60
+            )
+            await touch_visitor_last_seen(db, chat, utc_now())
+            sid, last_seq = str(chat.id), int(chat.last_seq)
+            await db.commit()
+        queue = await hub.subscribe(sid, ip_hash=request_ip_hash(request, settings))
+    except (ChatError, RateLimited, ChatBackendUnavailable, StreamLimitReached) as exc:
+        return chat_error_response(exc)
+    resume = parse_last_event_id(request.headers.get("last-event-id"))
+    cursor = min(resume if resume is not None else after, last_seq)
+    stream = visitor_event_stream(
+        request,
+        hub=hub,
+        session_factory=factory,
+        redis_client=redis_client,
+        session_id=sid,
+        after_seq=cursor,
+        queue=queue,
+    )
+    return visitor_stream_response(stream, release=lambda: hub.unsubscribe(sid, queue))
+
+
 @router.post(
     "/sessions/{session_id}/messages",
     status_code=201,
@@ -952,7 +930,7 @@ async def get_chat_attachment(
                 )
             )
         ).scalar_one_or_none()
-        listing = _attachments_out(message.attachments) if message is not None else []
+        listing = attachments_out(message.attachments) if message is not None else []
         entry = next((a for a in listing if a.index == index), None)
         if message is None or entry is None or message.article_id is None:
             raise ChatError("not_found", 404)

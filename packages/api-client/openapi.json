@@ -32678,6 +32678,68 @@
         ]
       }
     },
+    "/api/chat/v1/sessions/{session_id}/stream": {
+      "get": {
+        "description": "Live transcript (C7): lines after ``Last-Event-ID`` (else ``after``), then live events.\n\nA read (R-DISABLED-SESSIONS): keeps working when the chat was switched off. The hub\nsubscription is the last check, so a full hub (per IP, process total) answers 503 with\n``Retry-After: 30`` instead of an empty 200. The pre-check DB session is committed and\nclosed before the response starts; the stream opens short sessions per read.",
+        "operationId": "stream_chat_session_api_chat_v1_sessions__session_id__stream_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "After",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {}
+            },
+            "description": "Server-sent events: message (with id = seq), session, typing, end"
+          },
+          "403": {
+            "description": "Cross-origin request or website not allowed"
+          },
+          "404": {
+            "description": "Unknown, switched off or not yours"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited (Retry-After)"
+          },
+          "503": {
+            "description": "Chat temporarily unavailable (Retry-After)"
+          }
+        },
+        "summary": "Stream Chat Session",
+        "tags": [
+          "webchat-public"
+        ]
+      }
+    },
     "/api/chat/v1/sessions/{session_id}/typing": {
       "post": {
         "description": "The visitor is typing; at most one signal per 2 s, the rest is dropped silently.",
