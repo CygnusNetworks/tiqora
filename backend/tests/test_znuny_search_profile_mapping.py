@@ -17,6 +17,7 @@ from tiqora.saved_searches.znuny_import import (
     INVALID_VALUE_REASON,
     NO_TIME_FIELD_REASON,
     OPERATOR_REASON,
+    SLOT_ORDER_REASON,
     UNKNOWN_DF_REASON,
     UNSUPPORTED_REASON,
     MappedProfile,
@@ -384,17 +385,6 @@ _TIME_PROBLEMS = [
     ),
     pytest.param(
         {
-            "TimeSearchType": "TimeSlot",
-            "TicketCreateTimeStartYear": "2026",
-            "TicketCreateTimeStartMonth": "7",
-            "TicketCreateTimeStartDay": "1",
-        },
-        "TimeSearchType",
-        INVALID_DATE_REASON,
-        id="slot-without-stop",
-    ),
-    pytest.param(
-        {
             "CloseTimeSearchType": "TimePoint",
             "TicketCloseTimePoint": "1",
             "TicketCloseTimePointStart": "Last",
@@ -692,3 +682,96 @@ def test_invalid_mapped_value_is_caught_by_validation_not_the_mapper() -> None:
     assert m.unmapped == ()
     with pytest.raises(FilterError):
         validate_filter(m.criteria, TICKET_FILTER_FIELDS.get)
+
+
+def _slot(prefix: str, **parts: str) -> dict[str, str]:
+    return {f"{prefix}{k}": v for k, v in parts.items()}
+
+
+def test_archive_reason_wording() -> None:
+    assert ARCHIVE_REASON == "Archivierte Tickets sehen nur Admins."
+
+
+def test_one_sided_time_slots_map_to_after_and_before() -> None:
+    start = _slot("TicketCreateTime", StartYear="2026", StartMonth="7", StartDay="1")
+    m = _map({"TimeSearchType": "TimeSlot", **start})
+    assert where(m) == {"field": "created", "op": "after", "value": "2026-06-30T22:00:00"}
+    assert m.unmapped == ()
+    stop = _slot("TicketCreateTime", StopYear="2026", StopMonth="7", StopDay="31")
+    m = _map({"TimeSearchType": "TimeSlot", **stop})
+    assert where(m) == {"field": "created", "op": "before", "value": "2026-07-31T21:59:59"}
+    assert m.unmapped == ()
+    validate_filter(m.criteria, TICKET_FILTER_FIELDS.get)
+
+
+def test_slot_with_partial_date_is_invalid_and_shows_the_values() -> None:
+    m = _map(
+        {
+            "TimeSearchType": "TimeSlot",
+            **_slot("TicketCreateTime", StartYear="2026", StartMonth="2", StartDay="30"),
+            **_slot("TicketCreateTime", StopYear="2026", StopMonth="3", StopDay="1"),
+        }
+    )
+    assert where(m) is None
+    assert [(u.key, u.value, u.reason) for u in m.unmapped] == [
+        ("TimeSearchType", "Beginn 2026-2-30; Ende 2026-3-1", INVALID_DATE_REASON)
+    ]
+    m = _map(
+        {"TimeSearchType": "TimeSlot", **_slot("TicketCreateTime", StartYear="2026", StartDay="3")}
+    )
+    assert m.unmapped[0].reason == INVALID_DATE_REASON
+    assert m.unmapped[0].value == "Beginn 2026-?-3"
+
+
+def test_slot_start_after_stop_has_its_own_reason() -> None:
+    m = _map(
+        {
+            "TimeSearchType": "TimeSlot",
+            **_slot("TicketCreateTime", StartYear="2026", StartMonth="8", StartDay="1"),
+            **_slot("TicketCreateTime", StopYear="2026", StopMonth="7", StopDay="1"),
+        }
+    )
+    assert where(m) is None
+    assert [(u.key, u.reason) for u in m.unmapped] == [("TimeSearchType", SLOT_ORDER_REASON)]
+    assert SLOT_ORDER_REASON != INVALID_DATE_REASON
+    assert "2026-8-1" in m.unmapped[0].value and "2026-7-1" in m.unmapped[0].value
+
+
+def test_dynamic_slot_one_sided_and_inverted() -> None:
+    p = "Search_DynamicField_DueTimeSlot"
+    m = _map({p: "1", **_slot(p, StartYear="2026", StartMonth="7", StartDay="1")})
+    assert where(m) == {"field": "df.Due", "op": "after", "value": "2026-06-30T22:00:00"}
+    m = _map(
+        {
+            p: "1",
+            **_slot(p, StartYear="2026", StartMonth="7", StartDay="2"),
+            **_slot(p, StopYear="2026", StopMonth="7", StopDay="1"),
+        }
+    )
+    assert _reported(m) == [(p, SLOT_ORDER_REASON)]
+
+
+def test_dynamic_slot_stop_blank_parts_are_zero_once_a_time_is_given() -> None:
+    p = "Search_DynamicField_DueTimeSlot"
+    base = {p: "1", **_slot(p, StopYear="2026", StopMonth="7", StopDay="1")}
+    # whole day when no time of day is given
+    m = _map(base)
+    assert where(m)["value"] == "2026-07-01T21:59:59"
+    # an explicit hour: blank minute/second are 00, not 59
+    m = _map({**base, f"{p}StopHour": "12"})
+    assert where(m)["value"] == "2026-07-01T10:00:00"
+    m = _map({**base, f"{p}StopHour": "12", f"{p}StopMinute": "30"})
+    assert where(m)["value"] == "2026-07-01T10:30:00"
+
+
+def test_invalid_time_zone_falls_back_to_utc() -> None:
+    lookups = ZnunyLookups({}, {}, {}, {}, time_zone="Mars/Olympus")
+    m = map_search_profile(
+        "P",
+        {
+            "TimeSearchType": "TimeSlot",
+            **_slot("TicketCreateTime", StartYear="2026", StartMonth="7", StartDay="1"),
+        },
+        lookups,
+    )
+    assert where(m) == {"field": "created", "op": "after", "value": "2026-07-01T00:00:00"}

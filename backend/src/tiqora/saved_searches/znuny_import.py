@@ -27,7 +27,7 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from tiqora.filters.model import AllOf, AnyOf, Condition, ConditionOp, Filter, FilterNode
-from tiqora.filters.tickets import _DF_TYPES  # the DF types the filter catalogue supports
+from tiqora.filters.tickets import SUPPORTED_DF_TYPES
 from tiqora.util.perl import perl_truthy
 
 FULLTEXT_REASON = (
@@ -43,7 +43,8 @@ INVALID_VALUE_REASON = "Kein gültiger Wert."
 INVALID_DATE_REASON = "Kein gültiges Datum."
 STATE_TYPE_REASON = "Statustyp unbekannt."
 LOCK_REASON = "Sperrstatus unbekannt."
-ARCHIVE_REASON = "Die Archivsuche ist nur für Administratoren möglich."
+ARCHIVE_REASON = "Archivierte Tickets sehen nur Admins."
+SLOT_ORDER_REASON = "Der Beginn liegt nach dem Ende."
 
 #: Keys of the search form that are not criteria; ignored silently.
 IGNORED_KEYS = frozenset(
@@ -98,11 +99,18 @@ _UNITS: dict[str, tuple[str, int]] = {
 }
 _OPERATOR_TOKENS = ("||", "&&", "!", "(", ")", '"', " + ", " - ")
 _SHOWN_LIMIT = 200
+_OPTION_DF_TYPES = frozenset({"Dropdown", "Multiselect"})  # value lists -> ``in``
 _NO_SEARCH = frozenset({"", "None"})
 _DF_SUFFIX = re.compile(
     r"TimePoint|TimePointValue|TimePointFormat|TimePointStart|TimeSlot"
     r"|TimeSlot(?:Start|Stop)(?:Year|Month|Day|Hour|Minute|Second)"
 )
+
+
+@dataclass(frozen=True, slots=True)
+class _Problem:
+    reason: str
+    shown: str  # the offending input, for the reported value
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,40 +183,77 @@ def _time_point(field: str, amount: str, start: str, unit: str) -> Condition | s
     return _cond(field, "within_last" if direction == "Last" else "older_than", value)
 
 
+def _slot_text(parts: Mapping[str, str]) -> str:
+    date = "-".join(parts.get(p, "") or "?" for p in _PARTS[:3])
+    clock = ":".join(parts.get(p, "") or "00" for p in _PARTS[3:])
+    return date if not any(parts.get(p) for p in _PARTS[3:]) else f"{date} {clock}"
+
+
+def _local_bound(
+    parts: Mapping[str, str], defaults: tuple[int, int, int], zone: ZoneInfo
+) -> str | None:
+    """Local date parts -> naive UTC ISO string; ``None`` when the date is not valid."""
+    if not all(_is_uint(parts.get(p, "")) for p in _PARTS[:3]):
+        return None
+    given = [parts.get(p, "") for p in _PARTS[3:]]
+    if not all(not raw or _is_uint(raw) for raw in given):
+        return None
+    # An explicit time of day wins: blanks next to a given hour/minute/second are 0, only a
+    # fully blank time takes the default (start 00:00:00, stop 23:59:59 = the whole day).
+    hms = [
+        int(raw) if raw else (0 if any(given) else d)
+        for raw, d in zip(given, defaults, strict=True)
+    ]
+    try:
+        local = datetime(
+            int(parts["Year"]),
+            int(parts["Month"]),
+            int(parts["Day"]),
+            hms[0],
+            hms[1],
+            hms[2],
+            tzinfo=zone,
+        )
+        return local.astimezone(UTC).replace(tzinfo=None).isoformat()
+    except (ValueError, OverflowError):
+        return None
+
+
 def _time_slot(
     field: str,
     start: Mapping[str, str],
     stop: Mapping[str, str],
     zone: ZoneInfo,
-) -> Condition | None | str:
-    """Local start/stop date parts -> ``between`` in naive UTC. ``None`` when both are blank."""
-    ymd = ("Year", "Month", "Day")
-    if not any(start.get(p) or stop.get(p) for p in ymd):
+) -> Condition | None | _Problem:
+    """Local start/stop date parts -> UTC condition.
+
+    Like Znuny, start and stop are independent: both -> ``between``, only the start ->
+    ``after``, only the stop -> ``before``, neither -> ``None``. A broken or inverted slot
+    is a :class:`_Problem` carrying the offending values.
+    """
+    sides = [(start, (0, 0, 0)), (stop, (23, 59, 59))]
+    present = [any(parts.get(p) for p in _PARTS[:3]) for parts, _ in sides]
+    if not any(present):
         return None
-    bounds: list[str] = []
-    for parts, defaults in ((start, (0, 0, 0)), (stop, (23, 59, 59))):
-        if not all(_is_uint(parts.get(p, "")) for p in ymd):
-            return INVALID_DATE_REASON
-        hms = []
-        for part, default in zip(_PARTS[3:], defaults, strict=True):
-            raw = parts.get(part, "")
-            if raw and not _is_uint(raw):
-                return INVALID_DATE_REASON
-            hms.append(int(raw) if raw else default)
-        try:
-            local = datetime(
-                int(parts["Year"]),
-                int(parts["Month"]),
-                int(parts["Day"]),
-                hms[0],
-                hms[1],
-                hms[2],
-                tzinfo=zone,
-            )
-            bounds.append(local.astimezone(UTC).replace(tzinfo=None).isoformat())
-        except (ValueError, OverflowError):
-            return INVALID_DATE_REASON
-    return _cond(field, "between", {"from": bounds[0], "to": bounds[1]})
+    shown = "; ".join(
+        f"{label} {_slot_text(parts)}"
+        for (parts, _), label, used in zip(sides, ("Beginn", "Ende"), present, strict=True)
+        if used
+    )
+    bounds = [
+        _local_bound(parts, defaults, zone) if used else None
+        for (parts, defaults), used in zip(sides, present, strict=True)
+    ]
+    if any(used and bound is None for used, bound in zip(present, bounds, strict=True)):
+        return _Problem(INVALID_DATE_REASON, shown)
+    lo, hi = bounds
+    if lo is not None and hi is not None:
+        if lo > hi:
+            return _Problem(SLOT_ORDER_REASON, shown)
+        return _cond(field, "between", {"from": lo, "to": hi})
+    if lo is not None:
+        return _cond(field, "after", lo)
+    return _cond(field, "before", hi)
 
 
 def _combine(conds: list[FilterNode], *, any_of: bool = False) -> FilterNode | None:
@@ -240,7 +285,7 @@ class _Mapper:
         self.include_archived = False
         try:
             self.zone = ZoneInfo(lookups.time_zone)
-        except (ZoneInfoNotFoundError, ValueError):
+        except (ZoneInfoNotFoundError, ValueError):  # unknown zone name: UTC
             self.zone = ZoneInfo("UTC")
 
     # -- value access ---------------------------------------------------------
@@ -441,8 +486,10 @@ class _Mapper:
         else:
             self.reject(type_key, UNSUPPORTED_REASON)
 
-    def add_or_reject(self, key: str, result: Condition | None | str) -> None:
-        if isinstance(result, str):
+    def add_or_reject(self, key: str, result: Condition | None | str | _Problem) -> None:
+        if isinstance(result, _Problem):
+            self.unmapped.append(UnmappedItem(key, _show(result.shown), result.reason))
+        elif isinstance(result, str):
             self.reject(key, result)
         elif result is not None:
             self.conds.append(result)
@@ -467,7 +514,7 @@ class _Mapper:
             if not rest.startswith(name):
                 continue
             suffix = rest[len(name) :]
-            suffixed = ftype not in _DF_TYPES or ftype in ("Date", "DateTime")
+            suffixed = ftype not in SUPPORTED_DF_TYPES or ftype in ("Date", "DateTime")
             if suffix and not (suffixed and _DF_SUFFIX.fullmatch(suffix)):
                 continue
             if best is None or len(name) > len(best):
@@ -488,7 +535,7 @@ class _Mapper:
         ftype = self.lookups.dynamic_fields[name]
         base = f"{_DF_KEY_PREFIX}{name}"
         field = f"df.{name}"
-        if ftype not in _DF_TYPES:
+        if ftype not in SUPPORTED_DF_TYPES:
             filled = [k for k in keys if self.take(k)]  # consumes all keys
             if filled:  # one item per field, not per sub-key
                 self.reject(filled[0], DF_TYPE_REASON)
@@ -509,8 +556,10 @@ class _Mapper:
                 self.conds.append(_cond(field, "is_true"))
             elif flags == {"-1"}:
                 self.conds.append(_cond(field, "is_false"))
-        else:  # Dropdown, Multiselect
+        elif ftype in _OPTION_DF_TYPES:  # Dropdown, Multiselect
             self.conds.append(_cond(field, "in", found))
+        else:  # a new supported type needs its own mapping
+            self.reject(base, UNSUPPORTED_REASON)
 
     def dynamic_date(self, name: str, base: str, field: str) -> None:
         # the plain key holds no value for date fields; consume it
