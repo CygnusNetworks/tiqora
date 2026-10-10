@@ -334,9 +334,13 @@ def run_worker() -> None:
         except NotImplementedError:
             signal.signal(sig, lambda *_: stop.set())
 
-    from tiqora.extensions import get_registry
+    from tiqora.plugins.bootstrap import init_registry
 
-    get_registry()  # fail at boot on a broken registration
+    # Build + freeze the registry (core + enabled plugins) before anything captures it;
+    # a broken core registration fails the boot, a broken plugin never does.
+    loop.run_until_complete(
+        init_registry(role="worker", settings=settings, session_factory=get_session_factory())
+    )
 
     logger.info("tiqora_worker_starting", redis_url=settings.redis_url)
     try:

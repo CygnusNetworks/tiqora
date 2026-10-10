@@ -2212,6 +2212,9 @@ async def _app_lifespan(app: Any) -> AsyncIterator[None]:
     global _mcp_state
     settings = get_settings()
     _mcp_state = McpState(settings)
+    from tiqora.plugins.bootstrap import init_registry
+
+    await init_registry(role="mcp", settings=settings, session_factory=_mcp_state.session_factory)
     logger.info("tiqora_mcp_started", database=settings.database_url[:30])
     try:
         yield

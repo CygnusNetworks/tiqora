@@ -22,6 +22,7 @@ from sqlalchemy import (
     UniqueConstraint,
     false,
     func,
+    text,
     true,
 )
 from sqlalchemy.dialects import mysql
@@ -1296,3 +1297,64 @@ class TiqoraReportDirtyTicket(TiqoraBase):
     queued_at: Mapped[datetime] = mapped_column(
         DateTime().with_variant(mysql.DATETIME(fsp=6), "mysql", "mariadb"), nullable=False
     )
+
+
+class TiqoraPlugin(TiqoraBase):
+    """One installed plugin (image-baked in phase 1): admin on/off switch and bookkeeping."""
+
+    __tablename__ = "tiqora_plugin"
+
+    id: Mapped[str] = mapped_column(String(190), primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    #: version last seen in the image
+    version: Mapped[str] = mapped_column(String(64), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    #: "image" (later phases: "upload", "repository")
+    source: Mapped[str] = mapped_column(String(20), nullable=False)
+    signature_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'unsigned'")
+    )
+    installed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    #: agent who last switched ``enabled`` (NULL = system)
+    changed_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class TiqoraPluginRuntime(TiqoraBase):
+    """Load state of a plugin per process role (``api`` / ``worker`` / ``mcp``)."""
+
+    __tablename__ = "tiqora_plugin_runtime"
+
+    plugin_id: Mapped[str] = mapped_column(String(190), primary_key=True)
+    role: Mapped[str] = mapped_column(String(20), primary_key=True)
+    state: Mapped[str] = mapped_column(String(20), nullable=False)
+    version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: German, at most 2000 characters, no traceback
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    boot_attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class TiqoraPluginHook(TiqoraBase):
+    """Cursor and circuit breaker of an event subscriber or scheduled task."""
+
+    __tablename__ = "tiqora_plugin_hook"
+
+    #: ``event:<plugin_id>:<name>`` or ``task:<plugin_id>:<name>``
+    hook_key: Mapped[str] = mapped_column(String(190), primary_key=True)
+    plugin_id: Mapped[str] = mapped_column(String(190), nullable=False)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    #: events: last delivered ``ticket_history.id``
+    cursor: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    consecutive_failures: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    total_failures: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_error_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_ok_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    #: tasks: start of the last run
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    #: circuit breaker; NULL = running
+    tripped_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (Index("ix_tiqora_plugin_hook_plugin_id", "plugin_id"),)

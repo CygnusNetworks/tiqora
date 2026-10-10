@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from tiqora.extensions.core import get_registry, register_core, set_registry_for_tests
+from tiqora.extensions.core import (
+    get_registry,
+    install_registry,
+    register_core,
+    set_registry_for_tests,
+)
 from tiqora.extensions.registry import (
     DuplicateExtensionError,
     ExtensionPoint,
@@ -18,6 +23,7 @@ __all__ = [
     "Registry",
     "RegistryFrozenError",
     "get_registry",
+    "install_registry",
     "register_core",
     "set_registry_for_tests",
 ]
