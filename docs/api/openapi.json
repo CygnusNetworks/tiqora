@@ -24866,6 +24866,365 @@
         "title": "SavedReportUpdateIn",
         "type": "object"
       },
+      "SavedSearchCountsOut": {
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Counts",
+            "type": "object"
+          }
+        },
+        "required": [
+          "counts"
+        ],
+        "title": "SavedSearchCountsOut",
+        "type": "object"
+      },
+      "SavedSearchIn": {
+        "additionalProperties": false,
+        "description": "Exactly one of ``criteria`` / ``list_params`` (\"Ansicht speichern\" sends the latter).",
+        "properties": {
+          "criteria": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Filter"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "group_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 50,
+            "title": "Group Ids",
+            "type": "array"
+          },
+          "include_archived": {
+            "default": false,
+            "title": "Include Archived",
+            "type": "boolean"
+          },
+          "list_params": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TicketListParams"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "show_count": {
+            "default": false,
+            "title": "Show Count",
+            "type": "boolean"
+          },
+          "show_in_sidebar": {
+            "default": true,
+            "title": "Show In Sidebar",
+            "type": "boolean"
+          },
+          "sort_by": {
+            "default": "age",
+            "enum": [
+              "age",
+              "created",
+              "changed",
+              "tn",
+              "title",
+              "priority",
+              "activity",
+              "deadline"
+            ],
+            "title": "Sort By",
+            "type": "string"
+          },
+          "sort_order": {
+            "default": "desc",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "title": "Sort Order",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "SavedSearchIn",
+        "type": "object"
+      },
+      "SavedSearchOut": {
+        "properties": {
+          "can_edit": {
+            "title": "Can Edit",
+            "type": "boolean"
+          },
+          "changed_at": {
+            "format": "date-time",
+            "title": "Changed At",
+            "type": "string"
+          },
+          "criteria": {},
+          "criteria_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criteria Error"
+          },
+          "group_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Group Ids",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "include_archived": {
+            "title": "Include Archived",
+            "type": "boolean"
+          },
+          "is_owner": {
+            "title": "Is Owner",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/ReportOwnerOut"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "show_count": {
+            "title": "Show Count",
+            "type": "boolean"
+          },
+          "show_in_sidebar": {
+            "title": "Show In Sidebar",
+            "type": "boolean"
+          },
+          "sort_by": {
+            "enum": [
+              "age",
+              "created",
+              "changed",
+              "tn",
+              "title",
+              "priority",
+              "activity",
+              "deadline"
+            ],
+            "title": "Sort By",
+            "type": "string"
+          },
+          "sort_order": {
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "title": "Sort Order",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "tiqora",
+              "znuny"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "source_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Name"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "criteria",
+          "criteria_error",
+          "include_archived",
+          "sort_by",
+          "sort_order",
+          "owner",
+          "is_owner",
+          "can_edit",
+          "group_ids",
+          "show_in_sidebar",
+          "show_count",
+          "position",
+          "source",
+          "source_name",
+          "version",
+          "changed_at"
+        ],
+        "title": "SavedSearchOut",
+        "type": "object"
+      },
+      "SavedSearchPrefsIn": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "anyOf": [
+              {
+                "maximum": 10000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "show_count": {
+            "title": "Show Count",
+            "type": "boolean"
+          },
+          "show_in_sidebar": {
+            "title": "Show In Sidebar",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "show_in_sidebar",
+          "show_count"
+        ],
+        "title": "SavedSearchPrefsIn",
+        "type": "object"
+      },
+      "SavedSearchUpdateIn": {
+        "additionalProperties": false,
+        "description": "PUT is a full replace of the search itself (name, criteria, sorting, sharing).\n\n``version`` is the optimistic lock. ``show_in_sidebar`` / ``show_count`` are ignored here;\nthe caller's own display settings are changed with ``PUT /saved-searches/{id}/prefs``.",
+        "properties": {
+          "criteria": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Filter"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "group_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 50,
+            "title": "Group Ids",
+            "type": "array"
+          },
+          "include_archived": {
+            "default": false,
+            "title": "Include Archived",
+            "type": "boolean"
+          },
+          "list_params": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TicketListParams"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "show_count": {
+            "default": false,
+            "title": "Show Count",
+            "type": "boolean"
+          },
+          "show_in_sidebar": {
+            "default": true,
+            "title": "Show In Sidebar",
+            "type": "boolean"
+          },
+          "sort_by": {
+            "default": "age",
+            "enum": [
+              "age",
+              "created",
+              "changed",
+              "tn",
+              "title",
+              "priority",
+              "activity",
+              "deadline"
+            ],
+            "title": "Sort By",
+            "type": "string"
+          },
+          "sort_order": {
+            "default": "desc",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "title": "Sort Order",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "version"
+        ],
+        "title": "SavedSearchUpdateIn",
+        "type": "object"
+      },
       "SearchHit": {
         "properties": {
           "archive_flag": {
@@ -73106,6 +73465,531 @@
         ]
       }
     },
+    "/api/v1/saved-searches": {
+      "get": {
+        "description": "Own searches and those shared with a group the caller holds ``ro`` on.",
+        "operationId": "list_saved_searches_api_v1_saved_searches_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SavedSearchOut"
+                  },
+                  "title": "Response List Saved Searches Api V1 Saved Searches Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Saved Searches",
+        "tags": [
+          "saved-searches"
+        ]
+      },
+      "post": {
+        "description": "Save a search from ``criteria`` or from the queue list's ``list_params``.\n\n``group_ids`` shares it with groups the caller holds ``ro`` on (admins: any valid group).",
+        "operationId": "create_saved_search_api_v1_saved_searches_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedSearchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedSearchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Saved Search",
+        "tags": [
+          "saved-searches"
+        ]
+      }
+    },
+    "/api/v1/saved-searches/counts": {
+      "get": {
+        "description": "Ticket counts for the caller's sidebar entries that show a count (viewer's scope).\n\nOnly entries with both settings on are counted, then the first\n``MAX_SIDEBAR_COUNTS`` by position. Cached 30 s per viewer; clients should not poll\nfaster than every 60 s.",
+        "operationId": "saved_search_counts_api_v1_saved_searches_counts_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedSearchCountsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Saved Search Counts",
+        "tags": [
+          "saved-searches"
+        ]
+      }
+    },
+    "/api/v1/saved-searches/{search_id}": {
+      "delete": {
+        "operationId": "delete_saved_search_api_v1_saved_searches__search_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "search_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Search Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Saved Search",
+        "tags": [
+          "saved-searches"
+        ]
+      },
+      "get": {
+        "operationId": "get_saved_search_api_v1_saved_searches__search_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "search_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Search Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedSearchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Saved Search",
+        "tags": [
+          "saved-searches"
+        ]
+      },
+      "put": {
+        "description": "Replace a search completely (owner or admin). ``version`` is the optimistic lock (409).\n\nSharing groups already stored may stay without being checked again; added ones must be\ngroups the caller may share with. The caller's sidebar settings are not part of this call.",
+        "operationId": "update_saved_search_api_v1_saved_searches__search_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "search_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Search Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedSearchUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedSearchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Saved Search",
+        "tags": [
+          "saved-searches"
+        ]
+      }
+    },
+    "/api/v1/saved-searches/{search_id}/prefs": {
+      "put": {
+        "description": "The caller's own sidebar entry, count badge and position for a search they can see.",
+        "operationId": "set_saved_search_prefs_api_v1_saved_searches__search_id__prefs_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "search_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Search Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedSearchPrefsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedSearchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Saved Search Prefs",
+        "tags": [
+          "saved-searches"
+        ]
+      }
+    },
     "/api/v1/search": {
       "get": {
         "operationId": "search_api_v1_search_get",
@@ -77428,14 +78312,10 @@
             "description": "Successful Response"
           },
           "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
+            "description": "Invalid filter (`detail.message`, `detail.path`)."
+          },
+          "504": {
+            "description": "The query took too long (`detail.message`); narrow the filter."
           }
         },
         "summary": "Query Tickets",

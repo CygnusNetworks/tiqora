@@ -262,3 +262,20 @@ def test_tickets_query_is_a_post_and_needs_tickets_rw() -> None:
     assert not scopes_allow(frozenset({"read"}), method="POST", path=path)
     assert scopes_allow(frozenset({"tickets:rw"}), method="POST", path=path)
     assert scopes_allow(frozenset({"tickets:ro"}), method="GET", path="/api/v1/tickets")
+
+
+def test_saved_searches_map_to_tickets_and_writes_need_rw() -> None:
+    # R-APIKEY: list/get/counts read, create/update/prefs/delete write (prefs is a PUT).
+    base = "/api/v1/saved-searches"
+    for path in (base, base + "/counts", base + "/5", base + "/5/prefs"):
+        assert path_to_area(path) == "tickets", path
+    assert scopes_allow(frozenset({"tickets:ro"}), method="GET", path=base + "/counts")
+    for method, path in (
+        ("POST", base),
+        ("PUT", base + "/5"),
+        ("PUT", base + "/5/prefs"),
+        ("DELETE", base + "/5"),
+    ):
+        assert not scopes_allow(frozenset({"tickets:ro"}), method=method, path=path), path
+        assert scopes_allow(frozenset({"tickets:rw"}), method=method, path=path), path
+    assert not scopes_allow(frozenset({"kb:rw"}), method="GET", path=base)

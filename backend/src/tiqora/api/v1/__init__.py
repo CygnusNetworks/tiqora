@@ -27,6 +27,7 @@ from tiqora.api.v1 import (
     queues,
     reference,
     reports,
+    saved_searches,
     search,
     stats,
     templates,
@@ -73,6 +74,7 @@ api_v1_router.include_router(channels_telegram.router)
 api_v1_router.include_router(channels_phone.router)
 api_v1_router.include_router(stats.router)
 api_v1_router.include_router(reports.router)
+api_v1_router.include_router(saved_searches.router)
 api_v1_router.include_router(reports.sources_router)
 api_v1_router.include_router(integrations.router)
 api_v1_router.include_router(jobs.router)

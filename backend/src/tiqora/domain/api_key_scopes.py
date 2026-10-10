@@ -62,6 +62,7 @@ _PATH_PREFIX_TO_AREA: tuple[tuple[str, str], ...] = (
     # to its creator (job endpoints check ``created_by``; report results creator-only).
     ("/api/v1/jobs", "tickets"),
     ("/api/v1/ticket-filters", "tickets"),
+    ("/api/v1/saved-searches", "tickets"),
     ("/api/v1/avatars", "tickets"),
     ("/api/v1/customers", "customers"),
     ("/api/v1/customer-directory", "customers"),

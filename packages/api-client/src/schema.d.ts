@@ -7456,6 +7456,101 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/saved-searches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Saved Searches
+         * @description Own searches and those shared with a group the caller holds ``ro`` on.
+         */
+        get: operations["list_saved_searches_api_v1_saved_searches_get"];
+        put?: never;
+        /**
+         * Create Saved Search
+         * @description Save a search from ``criteria`` or from the queue list's ``list_params``.
+         *
+         *     ``group_ids`` shares it with groups the caller holds ``ro`` on (admins: any valid group).
+         */
+        post: operations["create_saved_search_api_v1_saved_searches_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saved-searches/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Saved Search Counts
+         * @description Ticket counts for the caller's sidebar entries that show a count (viewer's scope).
+         *
+         *     Only entries with both settings on are counted, then the first
+         *     ``MAX_SIDEBAR_COUNTS`` by position. Cached 30 s per viewer; clients should not poll
+         *     faster than every 60 s.
+         */
+        get: operations["saved_search_counts_api_v1_saved_searches_counts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saved-searches/{search_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Saved Search */
+        get: operations["get_saved_search_api_v1_saved_searches__search_id__get"];
+        /**
+         * Update Saved Search
+         * @description Replace a search completely (owner or admin). ``version`` is the optimistic lock (409).
+         *
+         *     Sharing groups already stored may stay without being checked again; added ones must be
+         *     groups the caller may share with. The caller's sidebar settings are not part of this call.
+         */
+        put: operations["update_saved_search_api_v1_saved_searches__search_id__put"];
+        post?: never;
+        /** Delete Saved Search */
+        delete: operations["delete_saved_search_api_v1_saved_searches__search_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saved-searches/{search_id}/prefs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Saved Search Prefs
+         * @description The caller's own sidebar entry, count badge and position for a search they can see.
+         */
+        put: operations["set_saved_search_prefs_api_v1_saved_searches__search_id__prefs_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/search": {
         parameters: {
             query?: never;
@@ -17542,6 +17637,154 @@ export interface components {
              * @enum {string}
              */
             visibility: "private" | "groups" | "all";
+        };
+        /** SavedSearchCountsOut */
+        SavedSearchCountsOut: {
+            /** Counts */
+            counts: {
+                [key: string]: number | null;
+            };
+        };
+        /**
+         * SavedSearchIn
+         * @description Exactly one of ``criteria`` / ``list_params`` ("Ansicht speichern" sends the latter).
+         */
+        SavedSearchIn: {
+            criteria?: components["schemas"]["Filter"] | null;
+            /** Group Ids */
+            group_ids?: number[];
+            /**
+             * Include Archived
+             * @default false
+             */
+            include_archived: boolean;
+            list_params?: components["schemas"]["TicketListParams"] | null;
+            /** Name */
+            name: string;
+            /**
+             * Show Count
+             * @default false
+             */
+            show_count: boolean;
+            /**
+             * Show In Sidebar
+             * @default true
+             */
+            show_in_sidebar: boolean;
+            /**
+             * Sort By
+             * @default age
+             * @enum {string}
+             */
+            sort_by: "age" | "created" | "changed" | "tn" | "title" | "priority" | "activity" | "deadline";
+            /**
+             * Sort Order
+             * @default desc
+             * @enum {string}
+             */
+            sort_order: "asc" | "desc";
+        };
+        /** SavedSearchOut */
+        SavedSearchOut: {
+            /** Can Edit */
+            can_edit: boolean;
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            criteria: unknown;
+            /** Criteria Error */
+            criteria_error: string | null;
+            /** Group Ids */
+            group_ids: number[];
+            /** Id */
+            id: number;
+            /** Include Archived */
+            include_archived: boolean;
+            /** Is Owner */
+            is_owner: boolean;
+            /** Name */
+            name: string;
+            owner: components["schemas"]["ReportOwnerOut"];
+            /** Position */
+            position: number;
+            /** Show Count */
+            show_count: boolean;
+            /** Show In Sidebar */
+            show_in_sidebar: boolean;
+            /**
+             * Sort By
+             * @enum {string}
+             */
+            sort_by: "age" | "created" | "changed" | "tn" | "title" | "priority" | "activity" | "deadline";
+            /**
+             * Sort Order
+             * @enum {string}
+             */
+            sort_order: "asc" | "desc";
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "tiqora" | "znuny";
+            /** Source Name */
+            source_name: string | null;
+            /** Version */
+            version: number;
+        };
+        /** SavedSearchPrefsIn */
+        SavedSearchPrefsIn: {
+            /** Position */
+            position?: number | null;
+            /** Show Count */
+            show_count: boolean;
+            /** Show In Sidebar */
+            show_in_sidebar: boolean;
+        };
+        /**
+         * SavedSearchUpdateIn
+         * @description PUT is a full replace of the search itself (name, criteria, sorting, sharing).
+         *
+         *     ``version`` is the optimistic lock. ``show_in_sidebar`` / ``show_count`` are ignored here;
+         *     the caller's own display settings are changed with ``PUT /saved-searches/{id}/prefs``.
+         */
+        SavedSearchUpdateIn: {
+            criteria?: components["schemas"]["Filter"] | null;
+            /** Group Ids */
+            group_ids?: number[];
+            /**
+             * Include Archived
+             * @default false
+             */
+            include_archived: boolean;
+            list_params?: components["schemas"]["TicketListParams"] | null;
+            /** Name */
+            name: string;
+            /**
+             * Show Count
+             * @default false
+             */
+            show_count: boolean;
+            /**
+             * Show In Sidebar
+             * @default true
+             */
+            show_in_sidebar: boolean;
+            /**
+             * Sort By
+             * @default age
+             * @enum {string}
+             */
+            sort_by: "age" | "created" | "changed" | "tn" | "title" | "priority" | "activity" | "deadline";
+            /**
+             * Sort Order
+             * @default desc
+             * @enum {string}
+             */
+            sort_order: "asc" | "desc";
+            /** Version */
+            version: number;
         };
         /** SearchHit */
         SearchHit: {
@@ -39023,6 +39266,255 @@ export interface operations {
             };
         };
     };
+    list_saved_searches_api_v1_saved_searches_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSearchOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_saved_search_api_v1_saved_searches_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedSearchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    saved_search_counts_api_v1_saved_searches_counts_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSearchCountsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_saved_search_api_v1_saved_searches__search_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                search_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_saved_search_api_v1_saved_searches__search_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                search_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedSearchUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_saved_search_api_v1_saved_searches__search_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                search_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_saved_search_prefs_api_v1_saved_searches__search_id__prefs_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                search_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedSearchPrefsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     search_api_v1_search_get: {
         parameters: {
             query: {
@@ -40100,14 +40592,19 @@ export interface operations {
                     "application/json": components["schemas"]["PaginatedTickets"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Invalid filter (`detail.message`, `detail.path`). */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                content?: never;
+            };
+            /** @description The query took too long (`detail.message`); narrow the filter. */
+            504: {
+                headers: {
+                    [name: string]: unknown;
                 };
+                content?: never;
             };
         };
     };
