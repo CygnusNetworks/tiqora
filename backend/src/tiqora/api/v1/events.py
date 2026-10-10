@@ -39,7 +39,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncGenerator
+import time
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Annotated, Literal
 
 import redis.asyncio as redis
@@ -51,14 +52,21 @@ from pydantic import BaseModel
 from tiqora.api.deps import CurrentUser, DbSession, get_redis
 from tiqora.domain.queue_service import QueueService
 from tiqora.domain.ticket_service import TicketAccessDenied, TicketNotFound, TicketService
-from tiqora.events.pubsub import TIQORA_EVENTS_CHANNEL, publish_presence_changed
+from tiqora.events.pubsub import (
+    CHAT_EVENT_TYPES,
+    TIQORA_EVENTS_CHANNEL,
+    publish_presence_changed,
+)
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.webchat.availability import mark_agent_online
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["events"])
 
 HEARTBEAT_INTERVAL_SECONDS = 25
+#: Minimum gap between ``on_alive`` calls (agent online marker TTL is 60 s).
+ALIVE_INTERVAL_SECONDS = 20
 PRESENCE_TTL_SECONDS = 30
 PRESENCE_KEY_PREFIX = "tiqora:presence:"
 
@@ -78,7 +86,7 @@ def _presence_key(ticket_id: int, user_id: int) -> str:
 # delivered to agents who may read the ticket's queue. ``presence_changed`` is
 # scoped by its own endpoint (the payload deliberately carries no state and the
 # follow-up GET enforces `ro`), so it is not listed here.
-_QUEUE_SCOPED_EVENT_TYPES = frozenset({"ticket_new_in_queue", "ticket_changed"})
+_QUEUE_SCOPED_EVENT_TYPES = frozenset({"ticket_new_in_queue", "ticket_changed"}) | CHAT_EVENT_TYPES
 
 
 # Message types addressed to explicit agents (``user_ids``): the CTI popup's
@@ -139,13 +147,23 @@ async def _event_stream(
     allowed_queue_ids: set[int],
     user_id: int | None = None,
     is_admin: bool = False,
+    on_alive: Callable[[], Awaitable[None]] | None = None,
 ) -> AsyncGenerator[bytes, None]:
     pubsub = redis_client.pubsub()
     await pubsub.subscribe(TIQORA_EVENTS_CHANNEL)
+    last_alive: float | None = None
     try:
         while True:
             if await request.is_disconnected():
                 break
+            if on_alive is not None and (
+                last_alive is None or time.monotonic() - last_alive >= ALIVE_INTERVAL_SECONDS
+            ):
+                last_alive = time.monotonic()
+                try:
+                    await on_alive()
+                except Exception:  # noqa: BLE001 — a marker failure must not end the stream
+                    logger.warning("sse_on_alive_failed")
             # redis-py's own timeout handling (not an outer asyncio.wait_for)
             # so a slow/absent message never leaves the shared connection's
             # read cancelled mid-frame — it just returns None on timeout.
@@ -198,7 +216,14 @@ async def stream_events(
     allowed_queue_ids = await QueueService(session).allowed_queue_ids(user.id, "ro")
     is_admin = await PermissionEngine(session).is_admin(user.id)
     return StreamingResponse(
-        _event_stream(request, redis_client, allowed_queue_ids, user.id, is_admin),
+        _event_stream(
+            request,
+            redis_client,
+            allowed_queue_ids,
+            user.id,
+            is_admin,
+            on_alive=lambda: mark_agent_online(redis_client, user.id),
+        ),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

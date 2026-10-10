@@ -349,3 +349,94 @@ async def test_publish_new_ticket_in_queue_payload_shape() -> None:
         "queue_id": 3,
         "queue_name": "Raw",
     }
+
+
+def test_chat_events_are_queue_scoped() -> None:
+    from tiqora.api.v1.events import _should_forward
+
+    raw = json.dumps(
+        {"type": "chat_waiting", "session_id": "a" * 32, "ticket_id": 1, "queue_id": 7}
+    )
+    assert _should_forward(raw, {7}) is True
+    assert _should_forward(raw, {8}) is False
+    assert _should_forward(json.dumps({"type": "chat_message", "ticket_id": 1}), {7}) is False
+    for event_type in ("chat_assigned", "chat_message", "chat_typing", "chat_ended"):
+        msg = json.dumps({"type": event_type, "ticket_id": 1, "queue_id": 7})
+        assert _should_forward(msg, {7}) is True
+        assert _should_forward(msg, set()) is False
+
+
+@pytest.mark.asyncio
+async def test_event_stream_marks_agent_online(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tiqora.api.v1 import events as events_module
+
+    monkeypatch.setattr(events_module, "HEARTBEAT_INTERVAL_SECONDS", 0.05)
+    monkeypatch.setattr(events_module, "ALIVE_INTERVAL_SECONDS", 0.0)
+    calls: list[int] = []
+
+    async def alive() -> None:
+        calls.append(1)
+
+    gen = events_module._event_stream(
+        cast(Any, _FakeRequest()), cast(Any, _FakeRedis()), set(), on_alive=alive
+    )
+    try:
+        first = await asyncio.wait_for(gen.__anext__(), timeout=5)
+        assert first == b": heartbeat\n\n"
+        assert len(calls) >= 1  # marked at connect
+        await asyncio.wait_for(gen.__anext__(), timeout=5)
+        assert len(calls) >= 2  # and again once the interval passed
+    finally:
+        await gen.aclose()
+
+
+@pytest.mark.asyncio
+async def test_event_stream_survives_failing_on_alive(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tiqora.api.v1 import events as events_module
+
+    monkeypatch.setattr(events_module, "HEARTBEAT_INTERVAL_SECONDS", 0.05)
+
+    async def boom() -> None:
+        raise RuntimeError("redis down")
+
+    gen = events_module._event_stream(
+        cast(Any, _FakeRequest()), cast(Any, _FakeRedis()), set(), on_alive=boom
+    )
+    try:
+        assert await asyncio.wait_for(gen.__anext__(), timeout=5) == b": heartbeat\n\n"
+    finally:
+        await gen.aclose()
+
+
+@pytest.mark.asyncio
+async def test_publish_chat_event_payload_shape() -> None:
+    from tiqora.events.pubsub import publish_chat_event
+
+    fake_redis = _FakeRedis()
+    await publish_chat_event(
+        cast(Any, fake_redis),
+        "chat_assigned",
+        session_id="b" * 32,
+        ticket_id=5,
+        queue_id=7,
+        user_id=3,
+        topic_ref="1:support",
+    )
+    await publish_chat_event(
+        cast(Any, fake_redis), "chat_waiting", session_id="b" * 32, ticket_id=5, queue_id=7
+    )
+    await publish_chat_event(
+        cast(Any, fake_redis), "bogus", session_id="b" * 32, ticket_id=5, queue_id=7
+    )
+    payloads = [json.loads(m) for ch, m in fake_redis.published if ch == TIQORA_EVENTS_CHANNEL]
+    assert payloads == [
+        {
+            "type": "chat_assigned",
+            "session_id": "b" * 32,
+            "ticket_id": 5,
+            "queue_id": 7,
+            "user_id": 3,
+            "topic_ref": "1:support",
+        },
+        {"type": "chat_waiting", "session_id": "b" * 32, "ticket_id": 5, "queue_id": 7},
+    ]
