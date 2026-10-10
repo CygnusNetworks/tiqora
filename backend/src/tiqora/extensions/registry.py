@@ -75,6 +75,14 @@ class Registry:
     def points(self) -> list[ExtensionPoint[Any]]:
         return [p for k, p in self._points.items() if self._items.get(k)]
 
+    def replace_contents(self, other: Registry) -> None:
+        """Adopt ``other``'s items in place (bootstrap only: late plugin boot, see R-BOOT-RETRY).
+
+        Holders of this registry keep seeing a frozen registry; only the content changes.
+        """
+        self._points = dict(other._points)
+        self._items = {k: dict(v) for k, v in other._items.items()}
+
     def freeze(self) -> None:
         self._frozen = True
 

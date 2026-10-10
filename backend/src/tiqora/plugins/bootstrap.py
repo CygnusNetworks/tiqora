@@ -7,9 +7,10 @@ or partially loaded registry and a log line.
 
 from __future__ import annotations
 
+import asyncio
 import functools
 import time
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 
 import structlog
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
@@ -17,7 +18,7 @@ from packaging.version import InvalidVersion, Version
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.config import Settings
-from tiqora.extensions.core import install_registry, register_core
+from tiqora.extensions.core import get_registry, install_registry, register_core
 from tiqora.extensions.registry import Registry
 from tiqora.jobs.service import utc_now
 from tiqora.plugins import store
@@ -64,32 +65,143 @@ def _finish(registry: Registry) -> Registry:
     return registry
 
 
+#: set by the last ``init_registry``: the core-only fallback was caused by missing plugin tables
+_tables_missing = False
+BOOT_FAILED_MESSAGE = "Start abgebrochen: Erweiterungen konnten nicht geladen werden"
+RETRY_INTERVAL_SECONDS: float = 60.0
+RETRY_MAX_SECONDS: float = 1800.0
+
+
+def is_missing_table_error(exc: BaseException) -> bool:
+    """True for "table doesn't exist" on MariaDB (1146) and PostgreSQL (42P01 / UndefinedTable)."""
+    pending: list[BaseException] = [exc]
+    seen: set[int] = set()
+    while pending:
+        cur = pending.pop()
+        if id(cur) in seen:
+            continue
+        seen.add(id(cur))
+        if cur.args and cur.args[0] == 1146:
+            return True
+        if getattr(cur, "sqlstate", None) == "42P01" or getattr(cur, "pgcode", None) == "42P01":
+            return True
+        if type(cur).__name__ in {"UndefinedTableError", "UndefinedTable"}:
+            return True
+        for nxt in (getattr(cur, "orig", None), cur.__cause__, cur.__context__):
+            if isinstance(nxt, BaseException):
+                pending.append(nxt)
+    return False
+
+
+def plugin_tables_missing() -> bool:
+    return _tables_missing
+
+
 async def init_registry(
     *,
     role: PluginRole,
     settings: Settings,
     session_factory: async_sessionmaker[AsyncSession],
+    _late: bool = False,
 ) -> Registry:
-    """Build + freeze the process registry (core, then enabled plugins) and install it."""
+    """Build + freeze the process registry (core, then enabled plugins) and install it.
+
+    ``_late`` is the retry after a core-only boot (R-BOOT-RETRY): a success swaps the
+    content of the existing, still core-only registry in place; a failure changes nothing.
+    """
+    global _tables_missing
     registry = _core_only()  # a broken core registration still fails the boot
     if settings.plugins_safe_mode:
         log.warning("plugins_safe_mode", role=role)
         set_loaded_plugins([])
+        _tables_missing = False
         return _finish(registry)
+    active_written: list[str] = []
     try:
-        results = await _load_plugins(registry, role, settings, session_factory)
+        results = await _load_plugins(registry, role, settings, session_factory, active_written)
     except Exception as exc:  # R-BOOT-ANYERR: our own plugin path must not block startup
         log.error(
             "plugins_boot_failed",
             role=role,
             error=f"{type(exc).__name__}: {exc}"[:500],
-            exc_info=True,
+            exc_info=not _late,
         )
-        registry = _core_only()  # drop anything a half-finished load committed
+        _tables_missing = is_missing_table_error(exc)
+        if _late:
+            return get_registry()
+        await _correct_active_rows(session_factory, role, active_written)
         set_loaded_plugins([])
-        return _finish(registry)
+        return _finish(_core_only())  # drop anything a half-finished load committed
+    _tables_missing = False
+    if _late:
+        current = get_registry()
+        if all(r.owner == "core" for r in current.registrations()):
+            current.replace_contents(registry)
+            set_loaded_plugins(results)
+            return current
+        log.warning("plugins_boot_retry_skipped", role=role, reason="registry already in use")
+        return current
     set_loaded_plugins(results)
     return _finish(registry)
+
+
+async def _correct_active_rows(
+    factory: async_sessionmaker[AsyncSession], role: PluginRole, plugin_ids: list[str]
+) -> None:
+    """Rows written as active before a boot failure must not claim a plugin runs here."""
+    for pid in plugin_ids:
+        try:
+            await store.mark_result(
+                factory,
+                pid,
+                role,
+                state=RuntimeState.FAILED,
+                version=None,
+                error=BOOT_FAILED_MESSAGE,
+                now=utc_now(),
+                keep_attempts=True,
+            )
+        except Exception as exc:
+            log.warning(
+                "plugin_state_write_failed",
+                plugin=pid,
+                role=role,
+                error=f"{type(exc).__name__}: {exc}"[:300],
+            )
+
+
+async def retry_plugin_boot(
+    *,
+    role: PluginRole,
+    settings: Settings,
+    session_factory: async_sessionmaker[AsyncSession],
+    interval: float | None = None,
+    max_seconds: float | None = None,
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> bool:
+    """Worker/mcp that booted before the api migrated: retry until the tables exist.
+
+    Every ``interval`` seconds (60) for up to ``max_seconds`` (30 min). The api never
+    retries (it runs the migration). Returns True once plugins were loaded.
+    """
+    if role == "api" or not _tables_missing:
+        return False
+    step = RETRY_INTERVAL_SECONDS if interval is None else interval
+    limit = RETRY_MAX_SECONDS if max_seconds is None else max_seconds
+    started = clock()
+    attempt = 0
+    while clock() - started < limit:
+        await sleep(step)
+        attempt += 1
+        log.info("plugins_boot_retry", role=role, attempt=attempt)
+        await init_registry(
+            role=role, settings=settings, session_factory=session_factory, _late=True
+        )
+        if not _tables_missing:
+            return True
+    log.warning("plugins_boot_retry_gave_up", role=role, attempts=attempt)
+    return False
 
 
 def _requirement_problem(
@@ -121,6 +233,7 @@ async def _load_plugins(
     role: PluginRole,
     settings: Settings,
     factory: async_sessionmaker[AsyncSession],
+    active_written: list[str],
 ) -> list[PluginLoadResult]:
     plugins: Sequence[DiscoveredPlugin] = discovered_plugins()
     if not plugins:
@@ -141,6 +254,7 @@ async def _load_plugins(
         state: RuntimeState,
         error: str | None,
         contributions: tuple[tuple[str, str], ...] = (),
+        imported: bool = False,
     ) -> None:
         version = plugin.manifest.version if plugin.manifest else plugin.dist_version
         results[plugin.plugin_id] = PluginLoadResult(
@@ -175,7 +289,11 @@ async def _load_plugins(
                 version=version,
                 error=error,
                 now=utc_now(),
+                # only a load that really ran may reset the crash counter
+                keep_attempts=not (state is RuntimeState.ACTIVE or imported),
             )
+            if state is RuntimeState.ACTIVE:
+                active_written.append(plugin.plugin_id)
         except Exception as exc:
             log.warning(
                 "plugin_state_write_failed",
@@ -219,7 +337,7 @@ async def _load_plugins(
             await record(p, RuntimeState.FAILED, problem)
             continue
         remaining = budget - (time.monotonic() - started)
-        if remaining <= 0:
+        if remaining < 1:  # too little left for a meaningful import attempt
             await record(p, RuntimeState.FAILED, BUDGET_EXHAUSTED_MESSAGE)
             continue
         try:
@@ -245,7 +363,7 @@ async def _load_plugins(
         except Exception as exc:
             if not isinstance(exc, RegistrationRejected | PluginLoadTimeout):
                 log.warning("plugin_load_traceback", plugin=p.plugin_id, role=role, exc_info=True)
-            await record(p, RuntimeState.FAILED, _error_text(exc))
+            await record(p, RuntimeState.FAILED, _error_text(exc), imported=True)
             continue
         await record(p, RuntimeState.ACTIVE, None, tuple(committed))
     return list(results.values())

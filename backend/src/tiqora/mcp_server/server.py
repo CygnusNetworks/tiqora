@@ -51,6 +51,7 @@ All fully async — NO sync DB calls, requests, or time.sleep anywhere.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
@@ -2215,10 +2216,16 @@ async def _app_lifespan(app: Any) -> AsyncIterator[None]:
     from tiqora.plugins.bootstrap import init_registry
 
     await init_registry(role="mcp", settings=settings, session_factory=_mcp_state.session_factory)
+    from tiqora.plugins.bootstrap import retry_plugin_boot
+
+    plugin_retry = asyncio.create_task(
+        retry_plugin_boot(role="mcp", settings=settings, session_factory=_mcp_state.session_factory)
+    )
     logger.info("tiqora_mcp_started", database=settings.database_url[:30])
     try:
         yield
     finally:
+        plugin_retry.cancel()
         await _mcp_state.aclose()
         _mcp_state = None
         logger.info("tiqora_mcp_stopped")

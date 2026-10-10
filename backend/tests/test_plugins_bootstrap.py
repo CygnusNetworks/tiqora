@@ -30,7 +30,12 @@ from tiqora.extensions import get_registry, set_registry_for_tests
 from tiqora.jobs.registry import JOB_HANDLERS
 from tiqora.plugins import bootstrap as bootstrap_mod
 from tiqora.plugins import store
-from tiqora.plugins.bootstrap import BUDGET_EXHAUSTED_MESSAGE, init_registry
+from tiqora.plugins.bootstrap import (
+    BUDGET_EXHAUSTED_MESSAGE,
+    init_registry,
+    plugin_tables_missing,
+    retry_plugin_boot,
+)
 from tiqora.plugins.state import (
     PluginStatus,
     RuntimeState,
@@ -212,7 +217,7 @@ async def test_boot_budget_fails_the_remaining_plugins(
     settings: Settings,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """R-BOOT-BUDGET: two slow plugins, 1 s budget -> the second is not even imported."""
+    """R-BOOT-BUDGET: two slow plugins, 2 s budget -> the second is not even imported."""
     monkeypatch.setenv("TQ_SLOW_SECONDS", "3")
     fixture_plugins("tq_fixture_slow", plugin_id="org.example.slow")
     fixture_plugins(
@@ -222,7 +227,7 @@ async def test_boot_budget_fails_the_remaining_plugins(
         manifest_overrides={"id": "org.example.plg49slow2", "short_id": "slowtwo"},
     )
     s = settings.model_copy(
-        update={"plugins_boot_budget_seconds": 1, "plugins_import_timeout_seconds": 20}
+        update={"plugins_boot_budget_seconds": 2, "plugins_import_timeout_seconds": 20}
     )
     await init_registry(role="api", settings=s, session_factory=factory)
     results = loaded_plugins()
@@ -325,6 +330,9 @@ async def test_unexpected_error_after_a_load_drops_the_partial_registry(
     assert reg.get(SETTINGS_SECTIONS, "plugins.org.example.hello") is None  # ... but is dropped
     assert {r.owner for r in reg.registrations()} == {"core"}
     assert loaded_plugins() == {} and reg.frozen and get_registry() is reg
+    # the row written as active before the failure is corrected for this role
+    (row,) = await runtime_rows(factory, "org.example.hello", role="api")
+    assert row.state == "failed" and row.error == bootstrap_mod.BOOT_FAILED_MESSAGE
 
 
 async def test_failing_mark_loading_skips_the_plugin(
@@ -507,3 +515,178 @@ def test_startup_wiring_calls_init_registry() -> None:
 )
 def test_summarize_status(kwargs: dict[str, object], expected: PluginStatus) -> None:
     assert summarize_status(**kwargs) == expected  # type: ignore[arg-type]
+
+
+async def test_less_than_a_second_of_budget_records_the_budget_message(
+    fixture_plugins: Installer, factory: async_sessionmaker[AsyncSession], settings: Settings
+) -> None:
+    fixture_plugins()
+    s = settings.model_copy(update={"plugins_boot_budget_seconds": 1})
+    await init_registry(role="api", settings=s, session_factory=factory)
+    assert loaded_plugins()["org.example.hello"].error == BUDGET_EXHAUSTED_MESSAGE
+    assert "tq_fixture_hello" not in sys.modules
+
+
+async def test_crash_counter_is_kept_for_plugins_not_imported(
+    fixture_plugins: Installer, factory: async_sessionmaker[AsyncSession], settings: Settings
+) -> None:
+    fixture_plugins()
+    for _ in range(2):
+        await mark_loading(factory, "org.example.hello", "api", "1.0.0", T0)
+    env_off = settings.model_copy(update={"plugins_disabled": "org.example.hello"})
+    await init_registry(role="api", settings=env_off, session_factory=factory)
+    (row,) = await runtime_rows(factory, "org.example.hello", role="api")
+    assert (row.state, row.boot_attempts) == ("disabled", 2)
+    no_budget = settings.model_copy(update={"plugins_boot_budget_seconds": 1})
+    await init_registry(role="api", settings=no_budget, session_factory=factory)
+    (row,) = await runtime_rows(factory, "org.example.hello", role="api")
+    assert (row.state, row.boot_attempts) == ("failed", 2)
+    await init_registry(role="api", settings=settings, session_factory=factory)  # real load
+    (row,) = await runtime_rows(factory, "org.example.hello", role="api")
+    assert (row.state, row.boot_attempts) == ("active", 0)
+
+
+async def test_mark_loading_is_atomic(factory: async_sessionmaker[AsyncSession]) -> None:
+    import asyncio
+
+    await mark_loading(factory, "org.example.plg49p", "api", "1", T0)  # row exists
+    counts = await asyncio.gather(
+        *(mark_loading(factory, "org.example.plg49p", "api", "1", T0) for _ in range(8))
+    )
+    assert sorted(counts) == list(range(2, 10))
+
+
+def test_is_missing_table_error_classes() -> None:
+    class Orig(Exception):
+        pass
+
+    wrapped = ProgrammingError("SELECT", {}, Orig(1146, "Table 'x' doesn't exist"))
+    assert bootstrap_mod.is_missing_table_error(wrapped)
+
+    class UndefinedTableError(Exception):
+        sqlstate = "42P01"
+
+    assert bootstrap_mod.is_missing_table_error(
+        ProgrammingError("SELECT", {}, UndefinedTableError())
+    )
+    assert not bootstrap_mod.is_missing_table_error(ProgrammingError("SELECT", {}, Orig(1064, "x")))
+    assert not bootstrap_mod.is_missing_table_error(RuntimeError("boom"))
+
+
+class FakeClock:
+    def __init__(self, on_sleep: object = None) -> None:
+        self.now = 0.0
+        self.sleeps: list[float] = []
+        self.on_sleep = on_sleep
+
+    def clock(self) -> float:
+        return self.now
+
+    async def sleep(self, seconds: float) -> None:
+        self.sleeps.append(seconds)
+        self.now += seconds
+        if self.on_sleep is not None and len(self.sleeps) == 1:
+            await self.on_sleep()  # type: ignore[operator]
+
+
+async def _drop_plugin_tables(db_url: str) -> list[object]:
+    engine = create_async_engine(db_url)
+    tables = [t for t in TiqoraBase.metadata.sorted_tables if t.name.startswith("tiqora_plugin")]
+    async with engine.begin() as conn:
+        await conn.run_sync(lambda c: TiqoraBase.metadata.drop_all(c, tables=tables))
+    await engine.dispose()
+    return list(tables)
+
+
+async def _create_plugin_tables(db_url: str) -> None:
+    engine = create_async_engine(db_url)
+    tables = [t for t in TiqoraBase.metadata.sorted_tables if t.name.startswith("tiqora_plugin")]
+    async with engine.begin() as conn:
+        await conn.run_sync(lambda c: TiqoraBase.metadata.create_all(c, tables=tables))
+    await engine.dispose()
+
+
+async def test_worker_retries_until_the_tables_exist(
+    fixture_plugins: Installer,
+    db_url: str,
+    factory: async_sessionmaker[AsyncSession],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Worker started before the api migrated: core-only first, plugins after 60 s."""
+    fixture_plugins()
+    monkeypatch.setattr("tiqora.plugins.store.BOOT_RETRY_DELAY_SECONDS", 0.0)
+    await _drop_plugin_tables(db_url)
+    try:
+        first = await init_registry(role="worker", settings=settings, session_factory=factory)
+        assert plugin_tables_missing() and loaded_plugins() == {}
+        assert first.get(SETTINGS_SECTIONS, "plugins.org.example.hello") is None
+        fake = FakeClock(on_sleep=lambda: _create_plugin_tables(db_url))
+        assert await retry_plugin_boot(
+            role="worker",
+            settings=settings,
+            session_factory=factory,
+            sleep=fake.sleep,
+            clock=fake.clock,
+        )
+        assert fake.sleeps == [60.0]
+        assert not plugin_tables_missing()
+        # the registry object everybody captured now carries the plugin
+        assert get_registry() is first
+        assert (
+            first.get(SETTINGS_SECTIONS, "plugins.org.example.hello") is not None and first.frozen
+        )
+        assert loaded_plugins()["org.example.hello"].state is RuntimeState.ACTIVE
+    finally:
+        await _create_plugin_tables(db_url)
+
+
+async def test_worker_retry_gives_up_after_thirty_minutes_and_api_never_retries(
+    fixture_plugins: Installer,
+    db_url: str,
+    factory: async_sessionmaker[AsyncSession],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture_plugins()
+    monkeypatch.setattr("tiqora.plugins.store.BOOT_RETRY_DELAY_SECONDS", 0.0)
+    await _drop_plugin_tables(db_url)
+    try:
+        await init_registry(role="mcp", settings=settings, session_factory=factory)
+        api = FakeClock()
+        assert not await retry_plugin_boot(
+            role="api", settings=settings, session_factory=factory, sleep=api.sleep, clock=api.clock
+        )
+        assert api.sleeps == []
+        fake = FakeClock()
+        assert not await retry_plugin_boot(
+            role="mcp",
+            settings=settings,
+            session_factory=factory,
+            sleep=fake.sleep,
+            clock=fake.clock,
+        )
+        assert fake.sleeps == [60.0] * 30
+        assert loaded_plugins() == {} and plugin_tables_missing()
+        assert "tq_fixture_hello" not in sys.modules
+    finally:
+        await _create_plugin_tables(db_url)
+
+
+async def test_no_retry_when_the_core_only_boot_had_another_cause(
+    factory: async_sessionmaker[AsyncSession], settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def boom() -> object:
+        raise PermissionError("kein Zugriff")
+
+    monkeypatch.setattr(bootstrap_mod, "discovered_plugins", boom)
+    await init_registry(role="worker", settings=settings, session_factory=factory)
+    fake = FakeClock()
+    assert not await retry_plugin_boot(
+        role="worker",
+        settings=settings,
+        session_factory=factory,
+        sleep=fake.sleep,
+        clock=fake.clock,
+    )
+    assert fake.sleeps == []

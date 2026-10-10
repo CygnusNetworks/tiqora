@@ -174,32 +174,43 @@ async def mark_loading(
     now: datetime,
 ) -> int:
     """Count a boot attempt (committed before any plugin code runs); returns the new count."""
+    key = (TiqoraPluginRuntime.plugin_id == plugin_id) & (TiqoraPluginRuntime.role == role)
     for attempt in (1, 2):
         async with factory() as session:
-            row = await session.get(TiqoraPluginRuntime, (plugin_id, role))
-            if row is None:
-                row = TiqoraPluginRuntime(
-                    plugin_id=plugin_id,
-                    role=role,
+            # atomic increment: concurrent boots of the same role cannot lose a count
+            updated = await session.execute(
+                update(TiqoraPluginRuntime)
+                .where(key)
+                .values(
                     state=RuntimeState.LOADING.value,
                     version=version[:64],
-                    boot_attempts=1,
+                    boot_attempts=TiqoraPluginRuntime.boot_attempts + 1,
                     updated_at=now,
                 )
-                session.add(row)
-            else:
-                row.state = RuntimeState.LOADING.value
-                row.version = version[:64]
-                row.boot_attempts = row.boot_attempts + 1
-                row.updated_at = now
-            count = row.boot_attempts
+            )
+            if updated.rowcount == 0:  # type: ignore[attr-defined]
+                session.add(
+                    TiqoraPluginRuntime(
+                        plugin_id=plugin_id,
+                        role=role,
+                        state=RuntimeState.LOADING.value,
+                        version=version[:64],
+                        boot_attempts=1,
+                        updated_at=now,
+                    )
+                )
             try:
-                await session.commit()
+                await session.flush()
             except IntegrityError:
+                await session.rollback()
                 if attempt == 2:
                     raise
                 continue
-            return count
+            count = (
+                await session.execute(select(TiqoraPluginRuntime.boot_attempts).where(key))
+            ).scalar_one()
+            await session.commit()
+            return int(count)
     raise AssertionError("unreachable")  # pragma: no cover
 
 
@@ -212,13 +223,19 @@ async def mark_result(
     version: str | None,
     error: str | None,
     now: datetime,
+    keep_attempts: bool = False,
 ) -> None:
-    """Record the outcome; the crash counter resets unless the plugin is quarantined."""
+    """Record the outcome; the crash counter resets unless quarantined or ``keep_attempts``.
+
+    ``keep_attempts`` is for plugins that were not imported in this boot (disabled, budget
+    used up, missing dependency): only a load that actually ran may reset the counter.
+    """
     clipped = error[:MAX_ERROR_LEN] if error is not None else None
     for attempt in (1, 2):
         async with factory() as session:
             row = await session.get(TiqoraPluginRuntime, (plugin_id, role))
             quarantined = state is RuntimeState.QUARANTINED
+            keep = quarantined or keep_attempts
             if row is None:
                 session.add(
                     TiqoraPluginRuntime(
@@ -235,7 +252,7 @@ async def mark_result(
                 row.state = state.value
                 row.version = version[:64] if version is not None else None
                 row.error = clipped
-                if not quarantined:
+                if not keep:
                     row.boot_attempts = 0
                 row.updated_at = now
             try:

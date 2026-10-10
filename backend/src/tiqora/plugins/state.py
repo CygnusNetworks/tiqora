@@ -91,7 +91,9 @@ def summarize_status(
         return "quarantined"
     if RuntimeState.FAILED in states:
         return "failed"
-    if api_state is None:
+    if (
+        api_state is None
+    ):  # R-STATUS-ROLES-AMEND: "unknown" (api never booted) ranks before restart_required
         return "unknown"
     if enabled != (api_state is RuntimeState.ACTIVE):
         return "restart_required"

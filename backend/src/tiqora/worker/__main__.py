@@ -342,11 +342,20 @@ def run_worker() -> None:
         init_registry(role="worker", settings=settings, session_factory=get_session_factory())
     )
 
+    from tiqora.plugins.bootstrap import retry_plugin_boot
+
+    # Started before the api migrated: wait for the plugin tables, then load plugins late.
+    plugin_retry = loop.create_task(
+        retry_plugin_boot(role="worker", settings=settings, session_factory=get_session_factory())
+    )
+
     logger.info("tiqora_worker_starting", redis_url=settings.redis_url)
     try:
         loop.run_until_complete(_ensure_legacy_schema_at_worker_start())
         loop.run_until_complete(_run_all_loops(stop))
     finally:
+        plugin_retry.cancel()
+        loop.run_until_complete(asyncio.gather(plugin_retry, return_exceptions=True))
         loop.close()
         logger.info("tiqora_worker_stopped")
 
