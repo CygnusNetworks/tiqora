@@ -1,0 +1,1 @@
+{"nav": {"overview": "Hello", "admin": "Hello (admin)"}, "page": {"title": "Hello page"}, "panel": {"title": "Hello"}, "widget": {"title": "Hello weather"}, "settings": {"title": "Hello extension", "fields": {"greeting": {"label": "Greeting"}, "api_token": {"label": "Access token"}}}, "jobs": {"echo": "Hello echo"}}

@@ -1,0 +1,1 @@
+{"nav": {"overview": "Hallo", "admin": "Hallo (Admin)"}, "page": {"title": "Hallo-Seite"}, "panel": {"title": "Hallo"}, "widget": {"title": "Hallo-Wetter"}, "settings": {"title": "Hallo-Erweiterung", "fields": {"greeting": {"label": "Begrüßung"}, "api_token": {"label": "Zugangsschlüssel"}}}, "jobs": {"echo": "Hallo-Echo"}}
