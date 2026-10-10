@@ -226,3 +226,8 @@ export function filterErrors(root: EditGroup, fields: FilterFieldDef[]): Map<str
   walk(root);
   return out;
 }
+
+/** Wire-level check callers run before saving: condition id of `fromFilter(filter)` -> i18n key. */
+export function ticketFilterErrors(filter: TicketFilter | null | undefined, fields: FilterFieldDef[]): Map<string, string> {
+  return filterErrors(fromFilter(filter).root, fields);
+}

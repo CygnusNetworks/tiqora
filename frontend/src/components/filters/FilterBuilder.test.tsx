@@ -196,4 +196,28 @@ describe("FilterBuilder", () => {
     expect(screen.getByTestId("filter-builder-add-condition")).toBeDisabled();
     expect(screen.getByTestId("filter-builder-row-0-remove")).toBeDisabled();
   });
+
+  it("moves focus to a neighbour after removing a row or group", async () => {
+    renderBuilder({
+      version: 1,
+      where: { all: [
+        { field: "title", op: "eq", value: "a" },
+        { field: "title", op: "eq", value: "b" },
+        { field: "locked", op: "is_true" },
+      ] },
+    } as never);
+    fireEvent.click(screen.getByTestId("filter-builder-row-1-remove"));
+    expect(document.activeElement).toBe(screen.getByTestId("filter-builder-row-1-field"));
+    fireEvent.click(screen.getByTestId("filter-builder-row-1-remove"));
+    expect(document.activeElement).toBe(screen.getByTestId("filter-builder-row-0-field"));
+    fireEvent.click(screen.getByTestId("filter-builder-row-0-remove"));
+    expect(document.activeElement).toBe(screen.getByTestId("filter-builder-add-condition"));
+  });
+
+  it("focuses the add button after removing the last group", () => {
+    renderBuilder(null);
+    fireEvent.click(screen.getByTestId("filter-builder-add-group"));
+    fireEvent.click(screen.getByTestId("filter-builder-group-0-remove"));
+    expect(document.activeElement).toBe(screen.getByTestId("filter-builder-add-condition"));
+  });
 });

@@ -5352,8 +5352,6 @@
       "day": "Days",
       "week": "Weeks"
     },
-    "yes": "Yes",
-    "no": "No",
     "chooseValues": "Choose …",
     "invalid": {
       "required": "Please enter a value.",

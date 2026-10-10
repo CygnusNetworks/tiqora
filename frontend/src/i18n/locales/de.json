@@ -5360,8 +5360,6 @@
       "day": "Tage",
       "week": "Wochen"
     },
-    "yes": "Ja",
-    "no": "Nein",
     "chooseValues": "Auswählen …",
     "invalid": {
       "required": "Bitte einen Wert angeben.",

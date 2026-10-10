@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { Button } from "@/components/ui/Button";
@@ -69,7 +69,7 @@ function summarize(
  * Edits a `TicketFilter` as "all / any of these conditions" with one level of groups.
  * Keeps its own edit tree (typing needs it) and takes over `value` again when the parent
  * passes a different filter. Every change is reported through `onChange`, valid or not;
- * check the result with `filterErrors` before saving.
+ * run `ticketFilterErrors(filter, fields)` on the result before saving (empty map = valid).
  */
 export function FilterBuilder({
   fields,
@@ -88,6 +88,8 @@ export function FilterBuilder({
   const uid = useId();
   const [model, setModel] = useState(() => fromFilter(value));
   const lastProp = useRef(wireKey(value));
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const focusAfter = useRef<string | null>(null);
   const [touched, setTouched] = useState<ReadonlySet<string>>(new Set());
 
   // The parent handed over a different filter than the one it last got from us.
@@ -99,6 +101,14 @@ export function FilterBuilder({
       setTouched(new Set());
     }
   }
+
+  // After a removal the focused button is gone: move focus to a neighbour.
+  useEffect(() => {
+    const id = focusAfter.current;
+    if (!id) return;
+    focusAfter.current = null;
+    rootRef.current?.querySelector<HTMLElement>(`[data-testid="${id}"]`)?.focus();
+  });
 
   const byKey = useMemo(() => new Map(fields.map((f) => [f.key, f])), [fields]);
   const labels = useMemo(() => new Map(fields.map((f) => [f.key, f.label])), [fields]);
@@ -225,9 +235,13 @@ export function FilterBuilder({
             disabled={disabled}
             data-testid={`${rowId}-remove`}
             aria-label={`${t("filters.remove")}: ${label}`}
-            onClick={() =>
-              patchGroup(group.id, (g) => ({ ...g, children: g.children.filter((x) => x.id !== c.id) }))
-            }
+            onClick={() => {
+              const rows = group.children.filter((x) => x.kind === "condition").length;
+              // next row takes this index; else the previous one; else "add condition"
+              focusAfter.current =
+                i < rows - 1 ? `${rowId}-field` : i > 0 ? `${prefix}-row-${i - 1}-field` : `${prefix}-add-condition`;
+              patchGroup(group.id, (g) => ({ ...g, children: g.children.filter((x) => x.id !== c.id) }));
+            }}
           >
             ✕
           </Button>
@@ -287,9 +301,17 @@ export function FilterBuilder({
               disabled={disabled}
               data-testid={`${prefix}-remove`}
               aria-label={t("filters.removeGroup")}
-              onClick={() =>
-                patchGroup(model.root.id, (r) => ({ ...r, children: r.children.filter((x) => x.id !== group.id) }))
-              }
+              onClick={() => {
+                const at = model.root.children.filter((x) => x.kind === "group").findIndex((x) => x.id === group.id);
+                const groups = model.root.children.filter((x) => x.kind === "group").length;
+                focusAfter.current =
+                  at < groups - 1
+                    ? `${testId}-group-${at}-mode-all`
+                    : at > 0
+                      ? `${testId}-group-${at - 1}-mode-all`
+                      : `${testId}-add-condition`;
+                patchGroup(model.root.id, (r) => ({ ...r, children: r.children.filter((x) => x.id !== group.id) }));
+              }}
               className="ml-auto"
             >
               ✕
@@ -341,6 +363,6 @@ export function FilterBuilder({
   };
 
   return (
-    <div data-testid={testId}>{renderGroup(model.root, testId, false)}</div>
+    <div ref={rootRef} data-testid={testId}>{renderGroup(model.root, testId, false)}</div>
   );
 }

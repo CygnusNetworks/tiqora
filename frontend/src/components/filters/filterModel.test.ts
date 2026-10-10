@@ -6,6 +6,7 @@ import {
   defaultOp,
   emptyValueFor,
   filterErrors,
+  ticketFilterErrors,
   fromFilter,
   toFilter,
   type FilterFieldDef,
@@ -118,5 +119,13 @@ describe("filterModel", () => {
     expect(defaultOp(["is_false", "is_true"])).toBe("is_true");
     expect(defaultOp(["in", "not_in"])).toBe("in");
     expect(defaultOp(["lte"])).toBe("lte");
+  });
+
+  it("checks a wire filter before saving", () => {
+    const bad = { version: 1, where: { all: [{ field: "created", op: "between", value: { from: "", to: "" } }] } };
+    expect([...ticketFilterErrors(bad as never, [dateField]).values()]).toEqual(["filters.invalid.date"]);
+    const ok = { version: 1, where: { all: [{ field: "created", op: "within_last", value: { amount: 2, unit: "day" } }] } };
+    expect(ticketFilterErrors(ok as never, [dateField]).size).toBe(0);
+    expect(ticketFilterErrors(null, [dateField]).size).toBe(0);
   });
 });
