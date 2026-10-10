@@ -781,11 +781,11 @@ narrower than Znuny), **by design** (deliberate platform choice).
 
 | Znuny feature | Status | Note |
 |---|---|---|
-| Saved searches | missing | Search supports filters/tokens, but they cannot be saved |
+| Saved searches | yes | Saved ticket searches ("Gespeicherte Suchen") with sharing by group, sidebar entries with ticket counts and the import of Znuny search profiles ("Suchvorlagen aus Znuny übernehmen"; read-only and one-way, full-text and future-relative times are not taken over, see [Search profiles](#search-profiles)) |
 | Configurable dashboard widgets | missing | Fixed dashboard sections, no per-agent layout |
 | Link overview / link-type admin | missing | Ticket links can be listed and created; no delete, overview page or FAQ/appointment targets |
 | Note to linked tickets (`AgentTicketNoteToLinkedTicket`) | missing | |
-| Stats framework | partial | Configurable statistics not yet (builder in phase 2); 25 built-in reports incl. Znuny `TicketAccountedTime`-style time accounting, SLA in working minutes from the Znuny calendars, XLSX/CSV export; no Znuny stats import / scheduling yet. See [Reporting differences](#reporting-differences-to-znuny-stats) |
+| Stats framework | partial | Report builder ("Bericht erstellen": rows, columns, values, filter, period) with saved reports, sharing by group, runtime parameters (Znuny "changeable at runtime"), JSON/YAML report files and the `stats` group rights; 25 built-in reports incl. Znuny `TicketAccountedTime`-style time accounting, SLA in working minutes from the Znuny calendars, XLSX/CSV export. Znuny stats import and scheduling are still missing (phase 3). See [Reporting differences](#reporting-differences-to-znuny-stats) |
 | Ticket export | partial | `GET /tickets/export.csv` (synchronous) plus `POST /tickets/export-jobs` which runs the export as a background job with progress, cancel and download; no Znuny equivalent (Znuny has CSV via stats only) |
 | Bulk action | partial | State, priority, owner, queue, lock only |
 | Preferences | partial | Language, TOTP/passkeys; no queue favourites, ticket-list options or notification matrix |
@@ -949,3 +949,87 @@ figures differ from Znuny's `Kernel::System::Stats`:
   a wider result keeps an arbitrary subset and is flagged truncated.
 - **Admin rebuild.** Rebuilding the report data from the admin page restarts the
   build: reports show a hint and are incomplete until the rebuild has finished.
+- **Saved reports and rights.** Who may do what (`reporting/rights.py`). With
+  `reporting.access = all_agents` every agent may view reports and **save private
+  ones**; sharing (to groups or to everybody) needs `rw` on Znuny's `stats` group or
+  admin. With `stats_group`, viewing needs `ro` and every save needs `rw` on that
+  group; admins may do everything. This differs from Znuny, where only the `stats`
+  group (admins in a stock install) may touch statistics at all. `GET
+  /api/v1/auth/me` returns `can_view_reports`, `can_create_reports` and
+  `can_share_reports` (each implies the one before it).
+- **Owner-only editing.** Only the owner (with the save right) and admins change a
+  saved report; a shared report is read-only for everybody else, who can copy it
+  ("Kopieren") into their own. `PUT` replaces the whole report and uses the `version`
+  as optimistic lock (a stale version answers 409). Keeping the stored sharing needs
+  no share right; widening it does. Sharing groups are limited to the agent's own
+  groups (admins: all valid groups).
+- **Admins see everything by id.** An admin can open, run, edit and delete any saved
+  report by id (private ones included); the report list hides other people's private
+  reports unless asked for (`all=true`). Everybody else gets 404 for a report they
+  cannot see, so existence is not revealed.
+- **Soft delete.** Deleting sets the report invalid: it disappears from lists and
+  answers 410 when addressed directly (dashboards or bookmarks that still point at
+  it). Owners may always delete their own report, even after `reporting.access`
+  changed to `stats_group`. The worker purges reports deleted more than 90 days ago
+  for good. Each agent can own 500 valid reports.
+- **Runtime parameters.** A parameter whose operator is `eq` takes exactly one
+  value (also as default). A yes/no parameter (`is_true` / `is_false`) with a
+  default is a fixed filter: it is shown as "Immer an (Vorgabe des Berichts)" and the
+  viewer cannot switch it off; without a default it is an optional switch. Values
+  outside `allowed_values` are rejected. A parameter marked required must be
+  filled.
+- **Scope.** Saved or built-in, a report always runs in the viewer's own queue
+  scope (`ro` queues), also when someone else owns it, so a shared report shows
+  different numbers to different people. Cached results are kept per viewer scope.
+- **Report files.** Reports export to and import from JSON or YAML files
+  (`GET /reports/{key}/file`, `POST /reports/import-file`). The import only fills the
+  builder; nothing is saved before "Speichern". Znuny stats XML is not read.
+
+### Search profiles
+
+Znuny keeps the saved searches of an agent as `search_profile` rows (login
+`TicketSearch::<login>`). Tiqora imports them on demand (`GET|POST
+/api/v1/saved-searches/import/znuny`, "Suchvorlagen aus Znuny übernehmen" in the
+searches sidebar) and never writes the Znuny table:
+
+- **One-way and read-only.** The import copies; later changes in Tiqora do not go
+  back to Znuny. Only the importing agent's own profiles are read (login compared
+  case-insensitively); `last-search` is skipped. The result is a private saved search
+  (marked "aus Znuny") named like the profile.
+- **Re-import updates in place.** Importing a profile again (it was changed in Znuny
+  afterwards) replaces the criteria and the archive flag of the search created
+  earlier and raises its version; name, sharing and sort order are kept.
+- **Partly mapped profiles are not preselected.** A profile with anything that
+  could not be taken over is still importable but carries the badge "nur teilweise
+  übernommen" and is not ticked in the dialog; the list shows each skipped key with
+  the reason. Fully mapped profiles are preselected. A profile where nothing maps (or
+  whose result is not a valid Tiqora filter) cannot be imported.
+- **Not taken over:** full-text search (`Fulltext`, `From`, `To`, `Cc`, `Subject`,
+  `Body`, attachment name, article dynamic fields), time points in the future
+  (`Next`/`After`), close, last-change, escalation and article times, search
+  operators in patterns, dynamic fields that are unknown or of an unsupported type,
+  and every key Tiqora does not know.
+
+Mapping (conditions are ANDed; keys with an empty value are ignored, Znuny stores
+every form field):
+
+| Znuny key | Tiqora condition | Not mappable |
+|---|---|---|
+| `QueueIDs` (+ `UseSubQueues`: all queues below the selected ones) | queue is one of | non-integer: "Kein gültiger Wert." |
+| `StateIDs`, `PriorityIDs`, `TypeIDs`, `ServiceIDs`, `SLAIDs`, `OwnerIDs`, `ResponsibleIDs` | state / priority / type / service / SLA / owner / responsible is one of | non-integer |
+| `StateTypeIDs` | state type is one of | unknown state type |
+| `WatchUserIDs` | watched by one of | non-integer |
+| `LockIDs` | only locked kinds (`lock`, `tmp_lock`) -> locked; only `unlock` -> not locked; both -> no condition | unknown lock type |
+| `TicketNumber` | number equals / starts with (`abc*`) / contains (`*abc*`); several values -> any | operators (`\|\|`, `&&`, `!`, brackets, quotes, other `*` placements) |
+| `Title` | every word: title contains the word | operators |
+| `CustomerIDRaw`, `CustomerUserLoginRaw` | customer id / login equals (several: is one of) | |
+| `CustomerID`, `CustomerUserLogin` (only without the Raw key) | same pattern rule as ticket number | operators |
+| `SearchInArchive` | `AllTickets` -> include archived; `ArchivedTickets` -> include archived and archived only; `NotArchivedTickets` -> nothing | non-admins: archived tickets are only searchable by admins, reported as skipped |
+| `TicketCreateTime*`, `TicketChangeTime*`, `TicketPendingTime*` | created / changed / pending until: "last N units" -> within last, "before N units" -> older than, time slot -> between / after / before | future time points; invalid or inverted dates; invalid amount |
+| `TicketCloseTime*`, `TicketLastChangeTime*`, `TicketEscalationTime*`, `ArticleCreateTime*` | none | no such field in Tiqora's search |
+| `Search_DynamicField_<Name>` | Text/TextArea: pattern rule; Dropdown/Multiselect: is one of; Checkbox: yes / no; Date/DateTime: time point or slot as above | unknown field, unsupported type, operators |
+
+Details: a time point of N months counts as 30 days each and N years as 365
+days; a time slot is read in the importing agent's time zone, and, like Znuny, its
+end day is included. A single `*` matches everything and adds no condition.
+Pattern values with other `*` placements or operators are reported, not guessed.

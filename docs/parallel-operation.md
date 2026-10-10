@@ -169,6 +169,14 @@ slightly different figures (see
 [Reporting differences](compatibility.md#reporting-differences-to-znuny-stats)).
 Run exactly one worker so the incremental loop has a single writer.
 
+Saved reports and saved searches live in `tiqora_*` tables only. Znuny's own
+saved searches (`search_profile`) are **read only** for Tiqora: it never writes,
+changes or deletes them, and Znuny keeps working with them. An agent imports them
+on demand ("Suchvorlagen aus Znuny übernehmen"); a profile changed in Znuny
+afterwards is not synced automatically but can be imported again, which updates
+the earlier copy. Changes made in Tiqora never go back. Znuny statistics definitions are not read
+(stats import is still missing).
+
 ## Escalation recompute
 
 Source: `Ticket.pm` → `TicketEscalationIndexBuild`.
