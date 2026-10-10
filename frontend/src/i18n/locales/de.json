@@ -3895,7 +3895,7 @@
           },
           "access": {
             "label": "Wer darf Berichte sehen",
-            "help": "Alle Agenten oder nur Mitglieder der Gruppe „stats“, wie in Znuny.",
+            "help": "„Alle Agenten“: alle sehen Berichte und können eigene speichern; Teilen braucht Schreibrecht in der Gruppe „stats“. „Gruppe stats“: Lesen braucht Leserecht, Speichern und Teilen Schreibrecht in „stats“.",
             "options": {
               "all_agents": "Alle Agenten",
               "stats_group": "Nur Gruppe „stats“"
@@ -5459,7 +5459,37 @@
       "needShareRight": "Zum Teilen fehlt die Berechtigung (Gruppe „stats“, Schreibrecht)."
     },
     "saved": {
-      "conflict": "Der Bericht wurde inzwischen geändert. Bitte neu laden."
+      "conflict": "Der Bericht wurde inzwischen geändert. Bitte neu laden.",
+      "mine": "Meine Berichte",
+      "shared": "Geteilte Berichte",
+      "newReport": "Neuer Bericht",
+      "open": "Öffnen",
+      "edit": "Bearbeiten",
+      "copy": "Kopieren",
+      "delete": "Löschen",
+      "download": "Herunterladen",
+      "exportJson": "Als JSON herunterladen",
+      "exportYaml": "Als YAML herunterladen",
+      "deleteTitle": "Bericht löschen",
+      "deleteConfirm": "Den Bericht „{{name}}“ löschen? Er verschwindet auch bei allen, mit denen er geteilt ist.",
+      "deleteFailed": "Der Bericht konnte nicht gelöscht werden.",
+      "deleted": "Dieser Bericht wurde gelöscht.",
+      "notFound": "Dieser Bericht wurde nicht gefunden.",
+      "broken": "Dieser Bericht ist nicht mehr gültig und kann nicht geöffnet werden.",
+      "backToList": "Zur Berichtsübersicht",
+      "owner": "von {{name}}",
+      "sharedWith": "Geteilt mit: {{target}}",
+      "private": "Nur ich",
+      "allAdmin": "Alle Berichte",
+      "allAdminHint": "Auch private Berichte anderer anzeigen",
+      "actions": "Aktionen für {{name}}",
+      "readOnly": "nur lesen",
+      "required": "Bitte {{label}} wählen",
+      "choose": "Bitte wählen",
+      "clearChoice": "{{label}}: Auswahl aufheben",
+      "defaultHint": "Ohne Auswahl gilt: {{values}}",
+      "alwaysOn": "Immer an (Vorgabe des Berichts)",
+      "privateOther": "Privat"
     }
   },
   "filters": {
@@ -5580,6 +5610,34 @@
     "noRight": "Diese Suche darfst du nicht bearbeiten.",
     "open": "Öffnen",
     "countLabel_one": "{{count}} Ticket",
-    "countLabel_other": "{{count}} Tickets"
+    "countLabel_other": "{{count}} Tickets",
+    "import": {
+      "entry": "Suchvorlagen aus Znuny übernehmen",
+      "title": "Suchvorlagen aus Znuny übernehmen",
+      "description": "Deine in Znuny gespeicherten Suchvorlagen werden als gespeicherte Suchen angelegt. In Znuny bleibt alles unverändert.",
+      "hint": "Was Tiqora nicht abbilden kann, wird weggelassen und unter „Nicht übernommen“ aufgeführt. Teilweise übernommene Suchen sind deshalb nicht vorausgewählt: Sie fänden mehr Tickets als in Znuny.",
+      "loading": "Suchvorlagen werden geladen…",
+      "loadFailed": "Die Suchvorlagen aus Znuny konnten nicht geladen werden.",
+      "empty": "In Znuny sind für dich keine Suchvorlagen gespeichert.",
+      "willUpdate": "wird aktualisiert",
+      "partial": "nur teilweise übernommen",
+      "conditions_one": "{{count}} Bedingung wird übernommen",
+      "conditions_other": "{{count}} Bedingungen werden übernommen",
+      "nothingMappable": "Keine Bedingung übernehmbar",
+      "unmapped_one": "Nicht übernommen ({{count}})",
+      "unmapped_other": "Nicht übernommen ({{count}})",
+      "apply": "Übernehmen ({{count}})",
+      "applying": "Wird übernommen…",
+      "applyFailed": "Die Suchvorlagen konnten nicht übernommen werden.",
+      "close": "Schließen",
+      "created_one": "{{count}} angelegt",
+      "created_other": "{{count}} angelegt",
+      "updated_one": "{{count}} aktualisiert",
+      "updated_other": "{{count}} aktualisiert",
+      "skipped_one": "{{count}} übersprungen",
+      "skipped_other": "{{count}} übersprungen",
+      "nothingDone": "Es wurde nichts übernommen.",
+      "whereToFind": "Du findest die Suchen unter „Alle gespeicherten Suchen…“ in der Seitenleiste."
+    }
   }
 }

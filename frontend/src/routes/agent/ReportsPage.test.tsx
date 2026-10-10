@@ -7,15 +7,16 @@ import i18n from "@/i18n";
 import { DEMO_FACTS, DEMO_REPORT_CATALOGUE, demoSources, resolveReportRun } from "@/demo/reportsMock";
 import { ApiError } from "@/lib/api";
 import { dateRangeForPreset } from "@/lib/dateRanges";
-import { reportsApi, type ReportRunIn } from "@/lib/reportsApi";
+import { reportsApi, type ReportItem, type ReportRunIn } from "@/lib/reportsApi";
 import { runRetry } from "@/components/reports/useReportRun";
 import { ReportsPage } from "./ReportsPage";
 
 let searchParams: Record<string, unknown> = {};
+const navigate = vi.hoisted(() => vi.fn());
 
 vi.mock("@tanstack/react-router", () => ({
   useSearch: () => searchParams,
-  useNavigate: () => vi.fn(),
+  useNavigate: () => navigate,
   Link: ({
     children,
     to,
@@ -44,7 +45,7 @@ vi.mock("@tanstack/react-router", () => ({
 
 vi.mock("@/lib/reportsApi", async (orig) => ({
   ...(await orig<typeof import("@/lib/reportsApi")>()),
-  reportsApi: { catalogue: vi.fn(), run: vi.fn(), get: vi.fn(), export: vi.fn(), sources: vi.fn(), factsStatus: vi.fn() },
+  reportsApi: { catalogue: vi.fn(), run: vi.fn(), get: vi.fn(), export: vi.fn(), sources: vi.fn(), factsStatus: vi.fn(), remove: vi.fn() },
 }));
 
 vi.mock("@/lib/api", async (orig) => ({
@@ -57,9 +58,11 @@ vi.mock("@/lib/api", async (orig) => ({
   },
 }));
 
-const authFlags = vi.hoisted(() => ({ canViewReports: true }));
+const authFlags = vi.hoisted(() => ({ canViewReports: true, canCreate: false, isAdmin: false }));
 vi.mock("@/auth/AuthContext", () => ({
-  useAuth: () => ({ user: { is_admin: false, can_view_reports: authFlags.canViewReports } }),
+  useAuth: () => ({
+    user: { id: 7, is_admin: authFlags.isAdmin, can_view_reports: authFlags.canViewReports, can_create_reports: authFlags.canCreate },
+  }),
 }));
 
 function renderPage() {
@@ -81,6 +84,9 @@ beforeAll(async () => {
 
 beforeEach(() => {
   searchParams = {};
+  navigate.mockReset();
+  authFlags.canCreate = false;
+  authFlags.isAdmin = false;
   vi.mocked(reportsApi.catalogue).mockReset().mockResolvedValue(DEMO_REPORT_CATALOGUE);
   vi.mocked(reportsApi.run)
     .mockReset()
@@ -370,5 +376,151 @@ describe("ReportsPage", () => {
     // each tail only fills its own report's columns
     expect(await cells("__other__:open")).toEqual(["7", "—", "—", "—"]);
     expect(await cells("__other__:activity")).toEqual(["—", "11", "0", "0"]);
+  });
+
+  describe("saved reports", () => {
+    const definition = DEMO_REPORT_CATALOGUE.reports.find((r) => r.key === "builtin.volume")!.definition;
+    const saved = (over: Partial<ReportItem> & { id: number; name: string }): ReportItem =>
+      ({
+        key: String(over.id),
+        kind: "saved",
+        definition,
+        description: `Beschreibung ${over.name}`,
+        visibility: "private",
+        group_ids: [],
+        owner: { user_id: 7, name: "Ich" },
+        version: 1,
+        overview: false,
+        read_only: false,
+        ...over,
+      }) as ReportItem;
+    const mockCatalogue = (extra: ReportItem[]) =>
+      vi.mocked(reportsApi.catalogue).mockResolvedValue({
+        ...DEMO_REPORT_CATALOGUE,
+        reports: [...DEMO_REPORT_CATALOGUE.reports, ...extra],
+      });
+    const MINE = saved({ id: 41, name: "Meins" });
+    const THEIRS = saved({
+      id: 42,
+      name: "Vom Team",
+      owner: { user_id: 9, name: "Kim" },
+      visibility: "groups",
+      group_ids: [2],
+      read_only: true,
+    });
+
+    it("lists my and shared saved reports above the catalogue", async () => {
+      mockCatalogue([MINE, THEIRS]);
+      authFlags.canCreate = true;
+      renderPage();
+      const mine = await screen.findByTestId("reports-saved-mine");
+      expect(mine).toHaveTextContent("Meins");
+      expect(mine).not.toHaveTextContent("Vom Team");
+      expect(mine).toHaveTextContent("Nur ich");
+      const shared = screen.getByTestId("reports-saved-shared");
+      expect(shared).toHaveTextContent("Vom Team");
+      expect(shared).toHaveTextContent("von Kim");
+      expect(shared).toHaveTextContent("Geteilt mit: Gruppen");
+      // before the built-in catalogue
+      expect(mine.compareDocumentPosition(screen.getByTestId("reports-catalogue")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(screen.getByTestId("reports-saved-card-41-open")).toHaveAttribute("href", "/agent/reports/41");
+      // saved reports are not mixed into the built-in categories
+      expect(screen.queryByTestId("reports-card-41")).toBeNull();
+    });
+
+    it("offers a read-only shared report no edit or delete, but copy and download", async () => {
+      mockCatalogue([THEIRS]);
+      authFlags.canCreate = true;
+      renderPage();
+      fireEvent.click(await screen.findByTestId("reports-saved-card-42-menu"));
+      expect(screen.getByTestId("reports-saved-card-42-copy")).toBeInTheDocument();
+      expect(screen.getByTestId("reports-saved-card-42-json")).toBeInTheDocument();
+      expect(screen.getByTestId("reports-saved-card-42-yaml")).toBeInTheDocument();
+      expect(screen.queryByTestId("reports-saved-card-42-edit")).toBeNull();
+      expect(screen.queryByTestId("reports-saved-card-42-delete")).toBeNull();
+      fireEvent.click(screen.getByTestId("reports-saved-card-42-copy"));
+      expect(navigate).toHaveBeenCalledWith({ to: "/agent/reports/new", search: { from: "42" } });
+    });
+
+    it("edits an own report", async () => {
+      mockCatalogue([MINE]);
+      authFlags.canCreate = true;
+      renderPage();
+      fireEvent.click(await screen.findByTestId("reports-saved-card-41-menu"));
+      fireEvent.click(screen.getByTestId("reports-saved-card-41-edit"));
+      expect(navigate).toHaveBeenCalledWith({ to: "/agent/reports/$reportKey/edit", params: { reportKey: "41" } });
+    });
+
+    it("deletes after confirmation and refreshes", async () => {
+      const remove = vi.mocked(reportsApi.remove).mockReset().mockResolvedValue(undefined);
+      mockCatalogue([MINE]);
+      authFlags.canCreate = true;
+      renderPage();
+      fireEvent.click(await screen.findByTestId("reports-saved-card-41-menu"));
+      fireEvent.click(screen.getByTestId("reports-saved-card-41-delete"));
+      expect(await screen.findByTestId("confirm-dialog")).toHaveTextContent("„Meins“");
+      expect(remove).not.toHaveBeenCalled(); // asks first
+      fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+      await waitFor(() => expect(remove).toHaveBeenCalledWith(41));
+      await waitFor(() => expect(vi.mocked(reportsApi.catalogue)).toHaveBeenCalledTimes(2));
+    });
+
+    it("keeps the report when deleting is cancelled", async () => {
+      const remove = vi.mocked(reportsApi.remove).mockReset().mockResolvedValue(undefined);
+      mockCatalogue([MINE]);
+      authFlags.canCreate = true;
+      renderPage();
+      fireEvent.click(await screen.findByTestId("reports-saved-card-41-menu"));
+      fireEvent.click(screen.getByTestId("reports-saved-card-41-delete"));
+      fireEvent.click(await screen.findByTestId("confirm-dialog-cancel"));
+      expect(remove).not.toHaveBeenCalled();
+      expect(screen.getByTestId("reports-saved-card-41")).toBeInTheDocument();
+    });
+
+    it("shows why a broken report cannot open and only lets it be deleted", async () => {
+      mockCatalogue([
+        saved({ id: 43, name: "Kaputt", definition: null, definition_error: "Die Datenbasis „plugin.x“ gibt es nicht mehr." }),
+      ]);
+      authFlags.canCreate = true;
+      renderPage();
+      const card = await screen.findByTestId("reports-saved-card-43");
+      expect(within(card).getByTestId("reports-saved-card-43-error")).toHaveTextContent("Die Datenbasis „plugin.x“");
+      expect(within(card).queryByTestId("reports-saved-card-43-open")).toBeNull();
+      fireEvent.click(screen.getByTestId("reports-saved-card-43-menu"));
+      expect(screen.getByTestId("reports-saved-card-43-delete")).toBeInTheDocument();
+      expect(screen.queryByTestId("reports-saved-card-43-edit")).toBeNull();
+      expect(screen.queryByTestId("reports-saved-card-43-copy")).toBeNull();
+      expect(screen.queryByTestId("reports-saved-card-43-json")).toBeNull();
+    });
+
+    it("shows 'Neuer Bericht' and 'Kopieren' on built-ins only with the create right", async () => {
+      renderPage();
+      await screen.findByTestId("reports-card-builtin.volume");
+      expect(screen.queryByTestId("reports-new")).toBeNull();
+      expect(screen.queryByTestId("reports-card-builtin.volume-copy")).toBeNull();
+    });
+
+    it("with the create right: new report link and a copy button on built-in cards", async () => {
+      authFlags.canCreate = true;
+      renderPage();
+      expect(await screen.findByTestId("reports-new")).toHaveAttribute("href", "/agent/reports/new");
+      fireEvent.click(await screen.findByTestId("reports-card-builtin.volume-copy"));
+      expect(navigate).toHaveBeenCalledWith({ to: "/agent/reports/new", search: { from: "builtin.volume" } });
+    });
+
+    it("admins can show everybody's reports", async () => {
+      authFlags.isAdmin = true;
+      renderPage();
+      const toggle = await screen.findByTestId("reports-all-toggle");
+      expect(vi.mocked(reportsApi.catalogue).mock.calls.at(-1)![1]).toEqual({ all: false });
+      fireEvent.click(toggle);
+      await waitFor(() => expect(vi.mocked(reportsApi.catalogue).mock.calls.at(-1)![1]).toEqual({ all: true }));
+    });
+
+    it("hides the admin toggle from agents", async () => {
+      renderPage();
+      await screen.findByTestId("reports-catalogue");
+      expect(screen.queryByTestId("reports-all-toggle")).toBeNull();
+    });
   });
 });

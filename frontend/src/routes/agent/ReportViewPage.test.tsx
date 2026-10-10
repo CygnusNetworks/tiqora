@@ -7,7 +7,7 @@ import i18n from "@/i18n";
 import { DEMO_FACTS, demoReport, demoSources, resolveReportRun } from "@/demo/reportsMock";
 import { ApiError } from "@/lib/api";
 import { jobsApi, type Job } from "@/lib/jobsApi";
-import { reportsApi, type ReportExportIn, type ReportRunIn } from "@/lib/reportsApi";
+import { reportsApi, type ReportExportIn, type ReportItem, type ReportParameter, type ReportRunIn } from "@/lib/reportsApi";
 import { setDisplayTimeZone } from "@/lib/timeZone";
 import { ReportViewPage } from "./ReportViewPage";
 
@@ -46,9 +46,11 @@ vi.mock("@/lib/api", async (orig) => ({
   },
 }));
 
-const authFlags = vi.hoisted(() => ({ canViewReports: true }));
+const authFlags = vi.hoisted(() => ({ canViewReports: true, canCreate: false }));
 vi.mock("@/auth/AuthContext", () => ({
-  useAuth: () => ({ user: { is_admin: false, can_view_reports: authFlags.canViewReports } }),
+  useAuth: () => ({
+    user: { is_admin: false, can_view_reports: authFlags.canViewReports, can_create_reports: authFlags.canCreate },
+  }),
 }));
 
 function renderPage() {
@@ -68,6 +70,7 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
+  authFlags.canCreate = false;
   routeParams = { reportKey: "builtin.volume" };
   searchParams = {};
   navigate.mockReset();
@@ -240,5 +243,163 @@ describe("ReportViewPage", () => {
     expect(reportsApi.run).not.toHaveBeenCalled();
     expect(screen.queryByTestId("report-loading")).not.toBeInTheDocument();
     expect(screen.queryByTestId("report-export-xlsx")).not.toBeInTheDocument();
+  });
+
+  describe("saved reports", () => {
+    const channel = (over: Partial<ReportParameter> = {}): ReportParameter => ({
+      key: "channel",
+      field: "channel",
+      op: "in",
+      required: false,
+      ...over,
+    });
+    const saved = (parameters: ReportParameter[], over: Partial<ReportItem> = {}): ReportItem =>
+      ({
+        key: "41",
+        kind: "saved",
+        id: 41,
+        name: "Meins",
+        description: "Mein Bericht",
+        definition: { ...demoReport("builtin.volume")!.definition, source: "tickets", parameters },
+        visibility: "private",
+        group_ids: [],
+        owner: { user_id: 7, name: "Ich" },
+        version: 1,
+        overview: false,
+        read_only: false,
+        ...over,
+      }) as ReportItem;
+    const open = (item: ReportItem) => {
+      routeParams = { reportKey: "41" };
+      vi.mocked(reportsApi.get).mockResolvedValue(item);
+      // the demo engine knows built-in keys only
+      vi.mocked(reportsApi.run).mockImplementation(async (body) => resolveReportRun({ ...body, report_key: "builtin.volume" }));
+    };
+    const lastRun = () => vi.mocked(reportsApi.run).mock.calls.at(-1)![0] as ReportRunIn;
+
+    it("runs a saved report by its id with parameter values from the address", async () => {
+      open(saved([channel()]));
+      searchParams = { params: { channel: ["email"] } };
+      renderPage();
+      await waitFor(() => expect(reportsApi.run).toHaveBeenCalled());
+      expect(lastRun()).toMatchObject({ report_key: "41", parameters: { channel: ["email"] } });
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Meins");
+      expect(screen.getByText("Mein Bericht")).toBeInTheDocument();
+      expect(await screen.findByTestId("report-params-channel-chip-email")).toHaveTextContent("E-Mail");
+    });
+
+    it("puts a chosen value into the address", async () => {
+      open(saved([channel()]));
+      renderPage();
+      fireEvent.click(await screen.findByTestId("report-params-channel"));
+      fireEvent.click(screen.getByRole("option", { name: "Telefon" }));
+      expect(navigate).toHaveBeenLastCalledWith(
+        expect.objectContaining({ search: expect.objectContaining({ params: { channel: ["phone"] } }) }),
+      );
+    });
+
+    it("sends exactly one value for an eq parameter, even if the address carries more", async () => {
+      open(saved([channel({ op: "eq" })]));
+      searchParams = { params: { channel: ["email", "phone"] } };
+      renderPage();
+      await waitFor(() => expect(reportsApi.run).toHaveBeenCalled());
+      expect(lastRun().parameters).toEqual({ channel: ["email"] });
+    });
+
+    it("sends a switched-on yes/no parameter", async () => {
+      open(saved([{ key: "arch", field: "archived", op: "is_true", required: false }]));
+      searchParams = { params: { arch: true } };
+      renderPage();
+      await waitFor(() => expect(reportsApi.run).toHaveBeenCalled());
+      expect(lastRun().parameters).toEqual({ arch: true });
+      expect(await screen.findByRole("switch")).toBeChecked();
+    });
+
+    it("waits for a required parameter and says which", async () => {
+      open(saved([channel({ required: true })]));
+      renderPage();
+      expect(await screen.findByTestId("report-params-channel-required")).toHaveTextContent("Bitte Kanal wählen");
+      expect(reportsApi.run).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("report-loading")).toBeNull();
+    });
+
+    it("runs once the required parameter has a value", async () => {
+      open(saved([channel({ required: true })]));
+      searchParams = { params: { channel: ["phone"] } };
+      renderPage();
+      await waitFor(() => expect(reportsApi.run).toHaveBeenCalled());
+      expect(screen.queryByTestId("report-params-channel-required")).toBeNull();
+      expect(lastRun().parameters).toEqual({ channel: ["phone"] });
+    });
+
+    it("leaves the queue parameter to the filter bar", async () => {
+      open(saved([{ key: "queues", field: "queue", op: "in", required: false }]));
+      renderPage();
+      await screen.findByTestId("report-filter-queues");
+      expect(screen.queryByTestId("report-params")).toBeNull();
+    });
+
+    it("shows edit, copy and download for a saved report", async () => {
+      authFlags.canCreate = true;
+      open(saved([]));
+      renderPage();
+      expect(await screen.findByTestId("report-view-edit")).toHaveAttribute("href", "/agent/reports/$reportKey/edit");
+      expect(screen.getByTestId("report-view-copy")).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("report-view-download"));
+      expect(screen.getByTestId("report-view-download-json")).toBeInTheDocument();
+      expect(screen.getByTestId("report-view-download-yaml")).toBeInTheDocument();
+    });
+
+    it("offers no edit on a read-only report and no edit/copy without the create right", async () => {
+      authFlags.canCreate = true;
+      open(saved([], { read_only: true }));
+      const first = renderPage();
+      await screen.findByTestId("report-view-copy");
+      expect(screen.queryByTestId("report-view-edit")).toBeNull();
+      first.unmount();
+      authFlags.canCreate = false;
+      open(saved([]));
+      renderPage();
+      await screen.findByTestId("report-view-download");
+      expect(screen.queryByTestId("report-view-edit")).toBeNull();
+      expect(screen.queryByTestId("report-view-copy")).toBeNull();
+    });
+
+    it("has no saved-report actions on a built-in report", async () => {
+      authFlags.canCreate = true;
+      renderPage();
+      await screen.findByTestId("report-view-chart");
+      expect(screen.queryByTestId("report-view-edit")).toBeNull();
+      expect(screen.queryByTestId("report-view-download")).toBeNull();
+    });
+
+    it("shows the deleted message on 410 and does not run", async () => {
+      routeParams = { reportKey: "41" };
+      vi.mocked(reportsApi.get).mockRejectedValue(
+        new ApiError(410, { detail: { message: "Der Bericht „Meins“ wurde gelöscht." } }, "/api/v1/reports/41"),
+      );
+      renderPage();
+      const gone = await screen.findByTestId("report-view-gone");
+      expect(gone).toHaveTextContent("Dieser Bericht wurde gelöscht.");
+      expect(screen.getByTestId("report-view-gone-back")).toHaveAttribute("href", "/agent/reports");
+      expect(reportsApi.run).not.toHaveBeenCalled();
+    });
+
+    it("shows a not-found message on 404", async () => {
+      routeParams = { reportKey: "999" };
+      vi.mocked(reportsApi.get).mockRejectedValue(
+        new ApiError(404, { detail: { message: "Bericht nicht gefunden." } }, "/api/v1/reports/999"),
+      );
+      renderPage();
+      expect(await screen.findByTestId("report-view-notfound")).toHaveTextContent("Dieser Bericht wurde nicht gefunden.");
+      expect(screen.queryByTestId("report-view-gone")).toBeNull();
+    });
+
+    it("shows why a broken report cannot open", async () => {
+      open(saved([], { definition: null, definition_error: "Die Datenbasis „plugin.x“ gibt es nicht mehr." }));
+      renderPage();
+      expect(await screen.findByTestId("report-error")).toHaveTextContent("Die Datenbasis „plugin.x“");
+      expect(reportsApi.run).not.toHaveBeenCalled();
+    });
   });
 });

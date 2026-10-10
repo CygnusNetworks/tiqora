@@ -1,6 +1,10 @@
 import { dateRangeForPreset, type DateRangePreset } from "@/lib/dateRanges";
-import type { Grain, ReportDefinition, ReportRunIn } from "@/lib/reportsApi";
+import type { Grain, ReportDefinition, ReportParameter, ReportRunIn } from "@/lib/reportsApi";
 import { displayTimeZone } from "@/lib/timeZone";
+
+/** A runtime parameter's value: chosen values (`in`/`eq`) or on/off (`is_true`/`is_false`). */
+export type ReportParamValue = (string | number)[] | boolean | null;
+export type ReportParamValues = Record<string, ReportParamValue>;
 
 /** Filter values of one report view. `preset: null` = the report's own default range. */
 export type ReportFilterState = {
@@ -10,6 +14,8 @@ export type ReportFilterState = {
   grain: Grain | null;
   choice: string | null;
   queues: number[];
+  /** Runtime parameters other than the queues (`ReportParameterControls`). */
+  params?: ReportParamValues;
 };
 
 export const EMPTY_FILTER: ReportFilterState = {
@@ -53,6 +59,38 @@ export function hasQueueParameter(definition: ReportDefinition): boolean {
   return (definition.parameters ?? []).some((p) => p.key === "queues");
 }
 
+const isBoolOp = (p: ReportParameter) => p.op === "is_true" || p.op === "is_false";
+
+/** The parameters with their own control; the queues have the filter bar. */
+export function runtimeParameters(definition: ReportDefinition): ReportParameter[] {
+  return (definition.parameters ?? []).filter((p) => p.key !== "queues");
+}
+
+/**
+ * What a run gets from the chosen values: only set ones, only the definition's parameters. A required
+ * parameter without a choice takes its default (the server insists on a value even when it has one).
+ */
+export function effectiveParams(definition: ReportDefinition, values: ReportParamValues | undefined): ReportParamValues {
+  const out: ReportParamValues = {};
+  for (const p of runtimeParameters(definition)) {
+    const v = values?.[p.key];
+    if (isBoolOp(p)) {
+      if (v === true) out[p.key] = true;
+    } else if (Array.isArray(v) && v.length > 0) {
+      out[p.key] = v;
+    } else if (p.required && p.default && p.default.length > 0) {
+      out[p.key] = [...p.default];
+    }
+  }
+  return out;
+}
+
+/** Required parameters nothing was chosen for: the run waits for them. */
+export function missingRequired(definition: ReportDefinition, values: ReportParamValues | undefined): ReportParameter[] {
+  const given = effectiveParams(definition, values);
+  return runtimeParameters(definition).filter((p) => p.required && given[p.key] === undefined);
+}
+
 /** Absolute dates of the filter: a named preset is recomputed for today (bookmarks stay relative). */
 export function filterRange(state: ReportFilterState): { from: string; to: string } | null {
   if (state.preset === null || state.preset === "reset") return null;
@@ -86,6 +124,10 @@ export function toRunIn(
   if (state.grain) body.grain = state.grain;
   const at = definition ? choiceIndex(definition) : 0;
   if (state.choice && at >= 0) body.dimension_choices = { [String(at)]: state.choice };
-  if (state.queues.length > 0) body.parameters = { queues: state.queues };
+  const parameters: NonNullable<ReportRunIn["parameters"]> = definition
+    ? effectiveParams(definition, state.params)
+    : {};
+  if (state.queues.length > 0) parameters.queues = state.queues;
+  if (Object.keys(parameters).length > 0) body.parameters = parameters;
   return body;
 }

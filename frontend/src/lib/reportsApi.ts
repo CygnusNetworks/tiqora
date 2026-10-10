@@ -17,6 +17,7 @@ import type { JobAccepted } from "./jobsApi";
 export type ReportDefinition = Schemas["ReportDefinition"];
 export type ReportResult = Schemas["ReportResultOut"];
 export type ReportColumn = Schemas["ResultColumnOut"];
+export type ReportParameter = Schemas["ReportParameter"];
 export type ReportRunIn = Schemas["ReportRunIn"];
 export type ReportRunOut = Schemas["ReportRunOut"];
 export type ReportExportIn = Schemas["ReportExportIn"];

@@ -51,6 +51,7 @@ function demoSavedReports(): ReportItem[] {
       definition: {
         ...builtinDefinition("builtin.volume_by_queue"),
         measures: [m("open_tickets")],
+        parameters: [{ key: "channel", field: "channel", op: "in", required: false }],
         filter: { version: 1, where: { field: "owner_id", op: "eq", value: 1 } },
         visualization: { type: "bar", chart_measures: [0] },
       } as ReportDefinition,
