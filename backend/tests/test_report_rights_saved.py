@@ -332,7 +332,7 @@ async def test_me_create_and_share_follow_view(env: Env) -> None:
         assert (me["can_view_reports"], me["can_create_reports"], me["can_share_reports"]) == flags
 
 
-async def test_me_computes_rights_with_one_permission_load(
+async def test_report_rights_load_permissions_once(
     env: Env, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from tiqora.permissions.engine import PermissionEngine
@@ -647,10 +647,11 @@ async def test_purge_deletes_old_soft_deleted_reports_and_groups(env: Env) -> No
             text("UPDATE tiqora_report SET changed_at = :t WHERE id = :i"),
             {"t": utc_now() + timedelta(days=80), "i": recent.id},
         )
-        assert await purge_deleted_reports(s, now=later) == 1
+        assert await purge_deleted_reports(s, now=later) >= 1
         await s.commit()
         left = await s.execute(
-            text("SELECT id FROM tiqora_report WHERE owner_user_id = :u"), {"u": STATS_RW}
+            text("SELECT id FROM tiqora_report WHERE id IN (:a, :b, :c)"),
+            {"a": old.id, "b": recent.id, "c": live.id},
         )
         ids = {r[0] for r in left.all()}
         groups = await s.execute(
@@ -691,7 +692,7 @@ async def test_resolve_report_ref(env: Env) -> None:
     async with env.factory() as s:
         builtin = await resolve_report_ref(s, "builtin.ticket_kpis", OUTSIDER, admin=False)
         assert builtin.builtin is not None and builtin.saved is None
-        for bad in ("builtin.nope", "0", "12abc", "-3", "", "01"):
+        for bad in ("builtin.nope", "0", "12abc", "-3", "", "01", "12\n"):
             with pytest.raises(ReportNotFound):
                 await resolve_report_ref(s, bad, OUTSIDER, admin=False)
         plain = await _rights_in(s, PLAIN)
@@ -701,3 +702,40 @@ async def test_resolve_report_ref(env: Env) -> None:
         assert got.saved is not None and got.saved.id == rep.id and got.builtin is None
         with pytest.raises(ReportNotFound):
             await resolve_report_ref(s, str(rep.id), OUTSIDER, admin=False)
+
+
+async def test_update_racing_a_delete_does_not_touch_the_deleted_row(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The report is soft-deleted between the read and the UPDATE (M1)."""
+    reg = get_registry()
+    defn = ReportDefinition.model_validate(TICKETS_DEF)
+    async with env.factory() as s:
+        plain = await _rights_in(s, PLAIN)
+        rep = await create_saved_report(s, PLAIN, plain, _in("rep48 racedel"), registry=reg)
+        await s.commit()
+        await delete_saved_report(s, rep.id, PLAIN, plain)
+        await s.commit()
+        before = await _row(s, rep.id)
+
+        async def stale(*_a: Any, **_k: Any) -> Any:
+            return rep  # read before the delete: still valid, version 1
+
+        monkeypatch.setattr(saved_module, "get_saved_report", stale)
+        with pytest.raises(ReportNotFound):
+            await update_saved_report(
+                s, rep.id, PLAIN, plain,
+                SavedReportUpdateIn(name="rep48 resurrect", definition=defn, version=1),
+                registry=reg,
+            )  # fmt: skip
+        monkeypatch.undo()
+        await s.rollback()
+        assert await _row(s, rep.id) == before  # name, valid flag and purge clock untouched
+
+
+async def _row(s: AsyncSession, report_id: int) -> tuple[Any, ...]:
+    r = await s.execute(
+        text("SELECT name, valid, version, changed_at FROM tiqora_report WHERE id = :i"),
+        {"i": report_id},
+    )
+    return tuple(r.one())

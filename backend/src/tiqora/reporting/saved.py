@@ -30,7 +30,7 @@ from tiqora.reporting.rights import ReportRights
 
 Visibility = Literal["private", "groups", "all"]
 #: ``report_key`` of a saved report is its decimal id
-SAVED_KEY_RE: Final = re.compile(r"^[1-9][0-9]{0,17}$")
+SAVED_KEY_RE: Final = re.compile(r"[1-9][0-9]{0,17}")
 MAX_SAVED_REPORTS_PER_USER: Final = 500
 DELETED_REPORT_RETENTION_DAYS: Final = 90
 BROKEN_DEFINITION_MESSAGE: Final = "Der gespeicherte Bericht kann nicht mehr gelesen werden."
@@ -322,7 +322,11 @@ async def update_saved_report(
 
     result = await session.execute(
         update(TiqoraReport)
-        .where(TiqoraReport.id == report_id, TiqoraReport.version == body.version)
+        .where(
+            TiqoraReport.id == report_id,
+            TiqoraReport.version == body.version,
+            TiqoraReport.valid.is_(True),
+        )
         .values(
             name=name,
             description=body.description,
@@ -337,6 +341,8 @@ async def update_saved_report(
     )
     if result.rowcount == 0:  # type: ignore[attr-defined]  # two concurrent saves
         current = await _load(session, report_id)
+        if current is None or not current.valid:  # deleted between load and write
+            raise ReportNotFound(str(report_id))
         raise ReportVersionConflict(current.version if current else body.version)
     await _replace_groups(session, report_id, groups)
     fresh = await _load(session, report_id)
@@ -351,12 +357,14 @@ async def delete_saved_report(
     row = await get_saved_report(session, report_id, user_id, admin=rights.admin)
     if row.owner_user_id != user_id and not rights.admin:
         raise ReportForbidden("Dieser Bericht darf nur von seinem Besitzer gelöscht werden.")
-    await session.execute(
+    result = await session.execute(
         update(TiqoraReport)
-        .where(TiqoraReport.id == report_id)
+        .where(TiqoraReport.id == report_id, TiqoraReport.valid.is_(True))
         .values(valid=False, changed_at=utc_now(), changed_by=user_id)
         .execution_options(synchronize_session=False)
     )
+    if result.rowcount == 0:  # type: ignore[attr-defined]  # deleted concurrently
+        raise ReportNotFound(str(report_id))
     await session.flush()
 
 
@@ -413,7 +421,7 @@ async def resolve_report_ref(
         if builtin is None:
             raise ReportNotFound(key)
         return ResolvedReport(key=key, definition=builtin.definition, builtin=builtin, saved=None)
-    if not SAVED_KEY_RE.match(key):
+    if not SAVED_KEY_RE.fullmatch(key):
         raise ReportNotFound(key)
     saved = await get_saved_report(session, int(key), user_id, admin=admin)
     if saved.definition is None:
