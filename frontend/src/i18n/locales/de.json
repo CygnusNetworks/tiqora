@@ -5334,5 +5334,61 @@
     "rangeInvalid": "Das Startdatum liegt nach dem Enddatum. Bitte den Zeitraum korrigieren.",
     "deniedTitle": "Kein Zugriff auf Berichte",
     "deniedBody": "Ihr Konto darf die Berichte nicht ansehen. Bitte wenden Sie sich an Ihre Administration."
+  },
+  "filters": {
+    "all": "Alle Bedingungen müssen zutreffen",
+    "any": "Mindestens eine muss zutreffen",
+    "not": "Nicht (Gruppe umkehren)",
+    "group": "Gruppe",
+    "addCondition": "Bedingung hinzufügen",
+    "addGroup": "Gruppe hinzufügen",
+    "remove": "Bedingung entfernen",
+    "removeGroup": "Gruppe entfernen",
+    "field": "Feld",
+    "operator": "Vergleich",
+    "value": "Wert",
+    "empty": "Keine Bedingung – es wird nicht gefiltert.",
+    "tooComplex": "Dieser Filter ist zu komplex, um ihn hier zu bearbeiten.",
+    "reset": "Filter zurücksetzen",
+    "from": "Von",
+    "to": "Bis",
+    "amount": "Anzahl",
+    "unit": "Einheit",
+    "units": {
+      "minute": "Minuten",
+      "hour": "Stunden",
+      "day": "Tage",
+      "week": "Wochen"
+    },
+    "yes": "Ja",
+    "no": "Nein",
+    "chooseValues": "Auswählen …",
+    "invalid": {
+      "required": "Bitte einen Wert angeben.",
+      "number": "Bitte eine ganze Zahl angeben.",
+      "date": "Bitte ein gültiges Datum angeben.",
+      "list": "Bitte mindestens einen Wert angeben."
+    },
+    "ops": {
+      "eq": "ist",
+      "neq": "ist nicht",
+      "in": "ist eines von",
+      "not_in": "ist keines von",
+      "contains": "enthält",
+      "starts_with": "beginnt mit",
+      "is_empty": "ist leer",
+      "is_not_empty": "ist nicht leer",
+      "lt": "kleiner als",
+      "lte": "höchstens",
+      "gt": "größer als",
+      "gte": "mindestens",
+      "between": "zwischen",
+      "before": "vor",
+      "after": "nach",
+      "within_last": "in den letzten",
+      "older_than": "älter als",
+      "is_true": "ja",
+      "is_false": "nein"
+    }
   }
 }

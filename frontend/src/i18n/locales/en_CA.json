@@ -5334,5 +5334,61 @@
     "rangeInvalid": "The start date is after the end date. Please correct the period.",
     "deniedTitle": "No access to reports",
     "deniedBody": "Your account is not allowed to view reports. Please contact your administrator."
+  },
+  "filters": {
+    "all": "All conditions must match",
+    "any": "At least one must match",
+    "not": "Not (invert group)",
+    "group": "Group",
+    "addCondition": "Add condition",
+    "addGroup": "Add group",
+    "remove": "Remove condition",
+    "removeGroup": "Remove group",
+    "field": "Field",
+    "operator": "Comparison",
+    "value": "Value",
+    "empty": "No condition – nothing is filtered.",
+    "tooComplex": "This filter is too complex to edit here.",
+    "reset": "Reset filter",
+    "from": "From",
+    "to": "To",
+    "amount": "Amount",
+    "unit": "Unit",
+    "units": {
+      "minute": "Minutes",
+      "hour": "Hours",
+      "day": "Days",
+      "week": "Weeks"
+    },
+    "yes": "Yes",
+    "no": "No",
+    "chooseValues": "Choose …",
+    "invalid": {
+      "required": "Please enter a value.",
+      "number": "Please enter a whole number.",
+      "date": "Please enter a valid date.",
+      "list": "Please enter at least one value."
+    },
+    "ops": {
+      "eq": "is",
+      "neq": "is not",
+      "in": "is one of",
+      "not_in": "is none of",
+      "contains": "contains",
+      "starts_with": "starts with",
+      "is_empty": "is empty",
+      "is_not_empty": "is not empty",
+      "lt": "less than",
+      "lte": "at most",
+      "gt": "greater than",
+      "gte": "at least",
+      "between": "between",
+      "before": "before",
+      "after": "after",
+      "within_last": "within the last",
+      "older_than": "older than",
+      "is_true": "yes",
+      "is_false": "no"
+    }
   }
 }
