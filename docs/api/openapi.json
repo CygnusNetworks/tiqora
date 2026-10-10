@@ -30084,6 +30084,62 @@
         "title": "TicketProcessStateOut",
         "type": "object"
       },
+      "TicketQueryIn": {
+        "description": "List the tickets matching a filter (same page shape as ``GET /tickets``).",
+        "properties": {
+          "filter": {
+            "$ref": "#/components/schemas/Filter"
+          },
+          "include_archived": {
+            "default": false,
+            "description": "Also list archived tickets (admins only; ignored otherwise).",
+            "title": "Include Archived",
+            "type": "boolean"
+          },
+          "limit": {
+            "default": 50,
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Offset",
+            "type": "integer"
+          },
+          "order": {
+            "default": "desc",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "title": "Order",
+            "type": "string"
+          },
+          "sort": {
+            "default": "age",
+            "enum": [
+              "age",
+              "created",
+              "changed",
+              "tn",
+              "title",
+              "priority",
+              "activity",
+              "deadline"
+            ],
+            "title": "Sort",
+            "type": "string"
+          }
+        },
+        "required": [
+          "filter"
+        ],
+        "title": "TicketQueryIn",
+        "type": "object"
+      },
       "TicketSearchHitOut": {
         "description": "Compact ticket hit for agent link/merge pickers.",
         "properties": {
@@ -77307,6 +77363,82 @@
           }
         },
         "summary": "New Ticket Default Queue",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/query": {
+      "post": {
+        "description": "Tickets matching ``filter`` inside the caller's ``ro`` queues.\n\nQueues the caller cannot read never match (no error that reveals them).\nNeeds ``tickets:rw`` for API keys like every POST.",
+        "operationId": "query_tickets_api_v1_tickets_query_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketQueryIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedTickets"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Query Tickets",
         "tags": [
           "tickets"
         ]

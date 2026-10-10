@@ -7909,6 +7909,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/query": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Query Tickets
+         * @description Tickets matching ``filter`` inside the caller's ``ro`` queues.
+         *
+         *     Queues the caller cannot read never match (no error that reveals them).
+         *     Needs ``tickets:rw`` for API keys like every POST.
+         */
+        post: operations["query_tickets_api_v1_tickets_query_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/search": {
         parameters: {
             query?: never;
@@ -19307,6 +19330,41 @@ export interface components {
             process_name?: string | null;
             /** Process State */
             process_state?: string | null;
+        };
+        /**
+         * TicketQueryIn
+         * @description List the tickets matching a filter (same page shape as ``GET /tickets``).
+         */
+        TicketQueryIn: {
+            filter: components["schemas"]["Filter"];
+            /**
+             * Include Archived
+             * @description Also list archived tickets (admins only; ignored otherwise).
+             * @default false
+             */
+            include_archived: boolean;
+            /**
+             * Limit
+             * @default 50
+             */
+            limit: number;
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
+            /**
+             * Order
+             * @default desc
+             * @enum {string}
+             */
+            order: "asc" | "desc";
+            /**
+             * Sort
+             * @default age
+             * @enum {string}
+             */
+            sort: "age" | "created" | "changed" | "tn" | "title" | "priority" | "activity" | "deadline";
         };
         /**
          * TicketSearchHitOut
@@ -40003,6 +40061,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueueSuggestion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    query_tickets_api_v1_tickets_query_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TicketQueryIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedTickets"];
                 };
             };
             /** @description Validation Error */

@@ -251,3 +251,14 @@ def test_saved_report_routes_and_share_groups_scopes() -> None:
         frozenset({"tickets:ro"}), method="GET", path="/api/v1/reference/share-groups"
     )
     assert not scopes_allow(ro, method="GET", path="/api/v1/reference/share-groups")
+
+
+def test_tickets_query_is_a_post_and_needs_tickets_rw() -> None:
+    # POST /tickets/query only reads, but like POST /ticket-filters/count it is a POST:
+    # a read-only key cannot call it (R-APIKEY), a tickets:rw key can.
+    path = "/api/v1/tickets/query"
+    assert path_to_area(path) == "tickets"
+    assert not scopes_allow(frozenset({"tickets:ro"}), method="POST", path=path)
+    assert not scopes_allow(frozenset({"read"}), method="POST", path=path)
+    assert scopes_allow(frozenset({"tickets:rw"}), method="POST", path=path)
+    assert scopes_allow(frozenset({"tickets:ro"}), method="GET", path="/api/v1/tickets")

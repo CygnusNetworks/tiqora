@@ -52,6 +52,7 @@ from tiqora.domain.schemas import (
     TicketDetail,
     TicketLinkCreateRequest,
     TicketLinkTargetOut,
+    TicketSortKey,
     UtcDateTime,
     as_naive_utc,
 )
@@ -82,7 +83,7 @@ from tiqora.domain.ticket_write_service import (
     TicketNotFound as WriteNotFound,
 )
 from tiqora.domain.timezones import format_in_zone, resolve_user_time_zone
-from tiqora.filters import FilterError
+from tiqora.filters import Filter, FilterError
 from tiqora.filters.ticket_params import TicketListParams, filter_from_list_params
 from tiqora.filters.tickets import compile_ticket_filter, ticket_query_scope
 from tiqora.jobs.handlers.ticket_export import TICKET_EXPORT_JOB, TicketExportPayload
@@ -94,6 +95,9 @@ from tiqora.jobs.service import (
     lock_user_job_quota,
 )
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.reporting.engine import QueryBudget
+from tiqora.reporting.settings import load_reporting_settings
+from tiqora.reporting.sql import ReportQueryTimeout, statement_timeout
 from tiqora.znuny.sysconfig import SysConfig
 
 # ---------------------------------------------------------------------------
@@ -460,6 +464,60 @@ class MyTicketCounts(BaseModel):
 
     open: int
     new: int
+
+
+#: Upper bound per statement of ``POST /tickets/query`` (nginx cuts /api/ at 90 s).
+QUERY_STATEMENT_SECONDS = 30
+QUERY_TIMEOUT_MESSAGE = "Die Abfrage hat zu lange gebraucht. Bitte den Filter einschränken."
+
+
+class TicketQueryIn(BaseModel):
+    """List the tickets matching a filter (same page shape as ``GET /tickets``)."""
+
+    filter: Filter
+    sort: TicketSortKey = "age"
+    order: Literal["asc", "desc"] = "desc"
+    offset: int = Field(0, ge=0)
+    limit: int = Field(50, ge=1, le=200)
+    include_archived: bool = Field(
+        False, description="Also list archived tickets (admins only; ignored otherwise)."
+    )
+
+
+@router.post("/query", response_model=PaginatedTickets)
+async def query_tickets(
+    body: TicketQueryIn, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> PaginatedTickets:
+    """Tickets matching ``filter`` inside the caller's ``ro`` queues.
+
+    Queues the caller cannot read never match (no error that reveals them).
+    Needs ``tickets:rw`` for API keys like every POST.
+    """
+    include_archived = body.include_archived
+    if include_archived and not await PermissionEngine(session).is_admin(user.id):
+        include_archived = False
+    reporting = await load_reporting_settings(session, settings)
+    seconds = min(QueryBudget.inline(reporting).statement_seconds(), QUERY_STATEMENT_SECONDS)
+    try:
+        async with statement_timeout(session, seconds):
+            scope = await ticket_query_scope(session, user.id, include_archived=include_archived)
+            stmt = await compile_ticket_filter(session, body.filter, scope)
+            return await TicketService(session).page_from_stmt(
+                user.id,
+                stmt,
+                offset=body.offset,
+                limit=body.limit,
+                sort=body.sort,
+                order=body.order,
+            )
+    except FilterError as exc:
+        raise HTTPException(
+            status_code=422, detail={"message": exc.message, "path": exc.path}
+        ) from exc
+    except ReportQueryTimeout:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail={"message": QUERY_TIMEOUT_MESSAGE}
+        ) from None
 
 
 @router.get("/my-counts", response_model=MyTicketCounts)
