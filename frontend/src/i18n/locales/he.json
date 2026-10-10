@@ -2757,7 +2757,7 @@
         "admin": "ממשק API לניהול",
         "mcp": "שרת MCP",
         "compat": "Znuny GenericInterface",
-        "plugins": "Extensions (plugins)"
+        "plugins": "Extensions"
       }
     },
     "processes": {

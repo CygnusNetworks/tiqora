@@ -4,8 +4,8 @@ Storage remains the ``tiqora_api_key.scopes`` CSV column. Empty/NULL means
 unrestricted (full privileges of the bound user). Tokens:
 
 * ``*`` — unrestricted
-* ``read`` — legacy: every REST area as ``:ro``
-* ``write`` — legacy: every REST area as ``:rw``
+* ``read`` — legacy: every REST area as ``:ro`` (not mcp/compat/plugins)
+* ``write`` — legacy: every REST area as ``:rw`` (not mcp/compat/plugins)
 * ``mcp`` — legacy: ``mcp:rw``
 * ``<area>:ro`` / ``<area>:rw`` — area-level access
 
@@ -40,8 +40,11 @@ API_KEY_AREAS: tuple[str, ...] = (
 
 API_KEY_AREAS_SET: frozenset[str] = frozenset(API_KEY_AREAS)
 
-# Areas expanded by legacy ``read`` / ``write`` (not mcp/compat unless explicit).
-_REST_AREAS: tuple[str, ...] = tuple(a for a in API_KEY_AREAS if a not in ("mcp", "compat"))
+# Areas expanded by legacy ``read`` / ``write`` (not mcp/compat/plugins: those need an explicit
+# grant, so existing integration keys never gain access to plugin code).
+_REST_AREAS: tuple[str, ...] = tuple(
+    a for a in API_KEY_AREAS if a not in ("mcp", "compat", "plugins")
+)
 
 _LEGACY_TOKENS: frozenset[str] = frozenset({"read", "write", "mcp", "*"})
 

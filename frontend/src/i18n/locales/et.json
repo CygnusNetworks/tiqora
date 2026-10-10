@@ -2757,7 +2757,7 @@
         "admin": "Administraatori API",
         "mcp": "MCP-server",
         "compat": "Znuny GenericInterface",
-        "plugins": "Extensions (plugins)"
+        "plugins": "Extensions"
       }
     },
     "processes": {

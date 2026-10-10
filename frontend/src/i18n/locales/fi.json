@@ -2757,7 +2757,7 @@
         "admin": "Hallinta-API",
         "mcp": "MCP-palvelin",
         "compat": "Znuny GenericInterface",
-        "plugins": "Extensions (plugins)"
+        "plugins": "Extensions"
       }
     },
     "processes": {

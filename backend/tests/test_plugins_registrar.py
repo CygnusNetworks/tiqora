@@ -193,6 +193,44 @@ def test_public_route_needs_capability() -> None:
     assert len(reg.staged) == 1
 
 
+async def _plain(request: Any) -> Any:
+    return None
+
+
+async def _ws(websocket: Any) -> None:
+    return None
+
+
+def _plain_route_router() -> APIRouter:
+    r = APIRouter()
+    r.add_route("/raw", _plain)
+    return r
+
+
+def _ws_router() -> APIRouter:
+    r = APIRouter()
+    r.add_websocket_route("/ws", _ws)
+    return r
+
+
+def _mount_router() -> APIRouter:
+    from starlette.routing import Mount
+
+    r = APIRouter()
+    r.routes.append(Mount("/sub", app=lambda *a: None))
+    return r
+
+
+@pytest.mark.parametrize("make", [_plain_route_router, _ws_router, _mount_router])
+def test_authenticated_router_only_takes_fastapi_routes(make: Any) -> None:
+    reg = _registrar(points=["core.http.routes", "core.http.public_routes"])
+    with pytest.raises(RegistrationRejected, match="Nur FastAPI-Routen"):
+        reg.route(make())
+    assert not reg.staged
+    reg.route(make(), public=True)  # public routers keep their behaviour
+    assert len(reg.staged) == 1
+
+
 def test_scheduled_task_requires_exactly_one_schedule(registrar: PluginRegistrar) -> None:
     with pytest.raises(RegistrationRejected, match="Zeitplan"):
         registrar.scheduled_task("tt", tick)

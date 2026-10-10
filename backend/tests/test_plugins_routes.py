@@ -15,7 +15,7 @@ from tiqora.api.app import create_app
 from tiqora.api.deps import get_auth_service, get_current_user, get_db, get_redis
 from tiqora.config import Settings
 from tiqora.domain.auth import AuthenticatedUser
-from tiqora.extensions.core import register_core, set_registry_for_tests
+from tiqora.extensions.core import get_registry, register_core, set_registry_for_tests
 from tiqora.extensions.registry import Registry
 from tiqora.plugins.context import make_plugin_context
 from tiqora.plugins.discovery import discover_plugins
@@ -130,10 +130,7 @@ async def test_unknown_or_unloaded_plugin_404(
 
 async def test_mount_is_idempotent_and_reports_ids(fixture_plugins: Installer) -> None:
     app = _app_with_hello(fixture_plugins)
-    registry = (
-        app.state.plugin_router
-        and __import__("tiqora.extensions.core").extensions.core.get_registry()
-    )
+    registry = get_registry()
     assert mount_plugin_routes(app, registry) == []
     mounts = [r for r in app.state.plugin_router.routes if isinstance(r, Mount)]
     assert [m.path for m in mounts] == ["/" + PLUGIN_ID]
@@ -241,3 +238,38 @@ async def test_plugins_rw_and_unrestricted_keys_can_do_both(fixture_plugins: Ins
         assert await _key_request(fixture_plugins, scopes, "GET") == 200
         assert await _key_request(fixture_plugins, scopes, "POST") == 200
     assert _echo_calls() == ["k", "k"]
+
+
+@pytest.mark.parametrize("method,legacy", [("GET", "read"), ("POST", "write")])
+async def test_legacy_read_write_keys_get_no_plugin_access(
+    fixture_plugins: Installer, method: str, legacy: str
+) -> None:
+    assert await _key_request(fixture_plugins, frozenset({legacy}), method) == 403
+    assert _echo_calls() == []
+
+
+async def test_mount_refuses_unauthenticated_route_in_authenticated_router(
+    fixture_plugins: Installer,
+) -> None:
+    from fastapi import APIRouter
+
+    from tiqora.plugins.routes import PLUGIN_ROUTES, PluginRoute
+
+    async def raw(request: Any) -> Any:
+        from starlette.responses import JSONResponse
+
+        return JSONResponse({"leak": True})
+
+    fixture_plugins()
+    router = APIRouter()
+    router.add_route("/raw", raw)
+    reg = Registry()
+    register_core(reg)
+    reg.add(PLUGIN_ROUTES, PluginRoute(f"{PLUGIN_ID}:0", PLUGIN_ID, router, False), owner=PLUGIN_ID)
+    reg.freeze()
+    set_loaded_plugins([PluginLoadResult(PLUGIN_ID, "1.0.0", RuntimeState.ACTIVE, None, ())])
+    app = create_app(Settings(environment="test"))
+    assert mount_plugin_routes(app, reg) == []
+    async with _client(app) as c:
+        assert (await c.get(f"{BASE}/raw")).status_code == 404
+        assert (await c.post(f"{BASE}/raw")).status_code == 404

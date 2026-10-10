@@ -2757,7 +2757,7 @@
         "admin": "Administratorski API",
         "mcp": "MCP poslužitelj",
         "compat": "Znuny generičko sučelje",
-        "plugins": "Extensions (plugins)"
+        "plugins": "Extensions"
       }
     },
     "processes": {

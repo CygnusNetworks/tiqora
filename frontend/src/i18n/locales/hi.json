@@ -2757,7 +2757,7 @@
         "admin": "व्यवस्थापक एपीआई",
         "mcp": "एमसीपी सर्वर",
         "compat": "ज़नुनी जेनेरिकइंटरफ़ेस",
-        "plugins": "Extensions (plugins)"
+        "plugins": "Extensions"
       }
     },
     "processes": {

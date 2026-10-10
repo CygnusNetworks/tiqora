@@ -71,7 +71,7 @@ export function parseScopesToMode(scopes: string | null | undefined): {
     // Expand legacy into custom matrix for editing
     if (parts.includes("write") || parts.includes("read")) {
       for (const area of API_KEY_AREAS) {
-        if (area === "mcp" || area === "compat") continue;
+        if (area === "mcp" || area === "compat" || area === "plugins") continue;
         selection[area] = parts.includes("write") ? "rw" : "ro";
       }
     }

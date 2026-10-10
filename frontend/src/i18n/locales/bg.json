@@ -2757,7 +2757,7 @@
         "admin": "Администраторски API",
         "mcp": "MCP сървър",
         "compat": "Znuny GenericInterface",
-        "plugins": "Extensions (plugins)"
+        "plugins": "Extensions"
       }
     },
     "processes": {

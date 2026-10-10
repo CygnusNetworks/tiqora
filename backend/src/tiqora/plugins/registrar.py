@@ -11,6 +11,7 @@ from collections.abc import Awaitable, Callable, Iterable
 from typing import Any, Final
 
 from fastapi import APIRouter
+from fastapi.routing import APIRoute
 from pydantic import BaseModel
 
 from tiqora.extensions.registry import ExtensionPoint
@@ -134,6 +135,16 @@ class PluginRegistrar:
         def check() -> None:
             if public:
                 self._require_declared(PUBLIC_ROUTES_CAPABILITY)
+                return
+            # Authentication is attached per APIRoute at mount time; plain Starlette routes,
+            # mounts and websockets would bypass it.
+            for r in router.routes:
+                if not isinstance(r, APIRoute):
+                    raise RegistrationRejected(
+                        "Nur FastAPI-Routen (@router.get/post …) sind für angemeldete "
+                        "Schnittstellen erlaubt; Starlette-Routen, Mounts und WebSockets "
+                        "nur mit Freigabe für öffentliche Schnittstellen"
+                    )
 
         item = PluginRoute(
             key=f"{self.plugin_id}:{self._route_count}",

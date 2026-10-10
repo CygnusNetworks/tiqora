@@ -2757,7 +2757,7 @@
         "admin": "管理接口",
         "mcp": "MCP服务器",
         "compat": "Zuny 通用接口",
-        "plugins": "Extensions (plugins)"
+        "plugins": "Extensions"
       }
     },
     "processes": {

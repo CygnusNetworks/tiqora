@@ -2757,7 +2757,7 @@
         "admin": "واجهة برمجة تطبيقات المشرف",
         "mcp": "خادم MCP",
         "compat": "واجهة Znuny العامة",
-        "plugins": "Extensions (plugins)"
+        "plugins": "Extensions"
       }
     },
     "processes": {

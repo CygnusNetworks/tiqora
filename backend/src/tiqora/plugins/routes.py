@@ -7,8 +7,9 @@ from typing import Final
 
 import structlog
 from fastapi import APIRouter, Depends, FastAPI
+from fastapi.routing import APIRoute
 from starlette.responses import JSONResponse
-from starlette.routing import Mount, Router
+from starlette.routing import BaseRoute, Mount, Router
 from starlette.types import Receive, Scope, Send
 
 from tiqora.extensions.registry import ExtensionPoint, Registry
@@ -38,6 +39,14 @@ async def _not_found(scope: Scope, receive: Receive, send: Send) -> None:
     await JSONResponse({"detail": "Erweiterung nicht gefunden"}, status_code=404)(
         scope, receive, send
     )
+
+
+def _assert_authenticated(routes: list[BaseRoute]) -> None:
+    """Only APIRoutes receive the ``get_current_user`` dependency from ``include_router``;
+    plain Starlette routes, mounts and websockets would be served without it."""
+    for r in routes:
+        if not isinstance(r, APIRoute):
+            raise RuntimeError(f"route {getattr(r, 'path', r)!r} would be served unauthenticated")
 
 
 def create_plugin_router() -> Router:
@@ -74,10 +83,17 @@ def mount_plugin_routes(app: FastAPI, registry: Registry) -> list[str]:
         )
         sub.state = app.state
         sub.dependency_overrides = app.dependency_overrides
-        for route in by_plugin[plugin_id]:
-            sub.include_router(
-                route.router, dependencies=[] if route.public else [Depends(get_current_user)]
-            )
+        try:
+            for route in by_plugin[plugin_id]:
+                if not route.public:
+                    _assert_authenticated(list(route.router.routes))
+                sub.include_router(
+                    route.router, dependencies=[] if route.public else [Depends(get_current_user)]
+                )
+        except RuntimeError as exc:
+            # Defence in depth behind the registrar check: never serve an unauthenticated route.
+            logger.error("plugin_routes_refused", plugin=plugin_id, error=str(exc))
+            continue
         router.routes.append(Mount(f"/{plugin_id}", app=sub))
         done.add(plugin_id)
         mounted.append(plugin_id)

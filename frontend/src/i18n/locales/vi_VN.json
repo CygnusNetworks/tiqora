@@ -2757,7 +2757,7 @@
         "admin": "API quản trị",
         "mcp": "máy chủ MCP",
         "compat": "Giao diện chung của Znuny",
-        "plugins": "Extensions (plugins)"
+        "plugins": "Extensions"
       }
     },
     "processes": {

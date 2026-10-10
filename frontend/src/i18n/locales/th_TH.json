@@ -2757,7 +2757,7 @@
         "admin": "API ผู้ดูแลระบบ",
         "mcp": "เซิร์ฟเวอร์เอ็มซีพี",
         "compat": "Znuny อินเทอร์เฟซทั่วไป",
-        "plugins": "Extensions (plugins)"
+        "plugins": "Extensions"
       }
     },
     "processes": {
