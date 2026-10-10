@@ -16,9 +16,11 @@ from typing import Annotated, Any, NoReturn, cast
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
 from pydantic import ValidationError
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.deps import CurrentUser, DbSession, get_redis
+from tiqora.db.tiqora.models import TiqoraSavedSearch
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.filters import FilterError
 from tiqora.filters.ticket_params import filter_from_list_params
@@ -36,6 +38,12 @@ from tiqora.saved_searches.schemas import (
     SavedSearchOut,
     SavedSearchPrefsIn,
     SavedSearchUpdateIn,
+    UnmappedOut,
+    ZnunyImportIn,
+    ZnunyImportPreviewOut,
+    ZnunyImportResultOut,
+    ZnunyImportSkippedOut,
+    ZnunyProfilePreviewOut,
 )
 from tiqora.saved_searches.store import (
     SavedSearch,
@@ -46,6 +54,8 @@ from tiqora.saved_searches.store import (
     SavedSearchNotFound,
     SavedSearchPrefs,
 )
+from tiqora.saved_searches.znuny_import import MappedProfile, map_search_profile
+from tiqora.saved_searches.znuny_reader import load_lookups, load_znuny_profiles
 
 logger = structlog.get_logger(__name__)
 
@@ -268,6 +278,126 @@ async def saved_search_counts(
         if p.show_in_sidebar and p.show_count
     ][: store.MAX_SIDEBAR_COUNTS]
     return SavedSearchCountsOut(counts=await _sidebar_counts(session, user, admin, entries, cache))
+
+
+NOT_IMPORTABLE_MESSAGE = "Keine Bedingung übernehmbar."
+PROFILE_NOT_FOUND_MESSAGE = "Suchvorlage nicht gefunden."
+
+
+async def _map_profiles(
+    session: AsyncSession, user: AuthenticatedUser, admin: bool, only: set[str] | None = None
+) -> dict[str, tuple[MappedProfile, str | None]]:
+    """The caller's own Znuny profiles, mapped; second item = validation error or ``None``.
+
+    Only the caller's profiles are ever read (their login), never anybody else's.
+    """
+    profiles = await load_znuny_profiles(session, user.login)
+    if only is not None:
+        profiles = {n: v for n, v in profiles.items() if n in only}
+    if not profiles:
+        return {}
+    lookups = await load_lookups(session, user.id)
+    out: dict[str, tuple[MappedProfile, str | None]] = {}
+    for name, values in profiles.items():
+        mapped = map_search_profile(name, values, lookups, is_admin=admin)
+        error: str | None = None
+        if mapped.criteria.where is not None:
+            try:
+                await store.validate_criteria(session, mapped.criteria)
+            except FilterError as exc:
+                error = exc.message
+        out[name] = (mapped, error)
+    return out
+
+
+def _importable(mapped: MappedProfile, error: str | None) -> bool:
+    return mapped.criteria.where is not None and error is None
+
+
+@router.get("/import/znuny", response_model=ZnunyImportPreviewOut)
+async def preview_znuny_import(user: CurrentUser, session: DbSession) -> ZnunyImportPreviewOut:
+    """The caller's saved ticket searches from Znuny, as they would be imported.
+
+    Read-only on the Znuny tables. A profile with ``unmapped`` entries imports only partly
+    (``partial``): clients should not preselect it.
+    """
+    admin = await PermissionEngine(session).is_admin(user.id)
+    mapped = await _map_profiles(session, user, admin)
+    existing: dict[str, int] = {}
+    if mapped:
+        rows = await session.execute(
+            select(TiqoraSavedSearch.source_name, TiqoraSavedSearch.id).where(
+                TiqoraSavedSearch.owner_user_id == user.id,
+                TiqoraSavedSearch.source == "znuny",
+                TiqoraSavedSearch.source_name.in_(list(mapped)),
+            )
+        )
+        existing = {str(n): int(i) for n, i in rows.all()}
+    profiles = []
+    for name in sorted(mapped, key=lambda n: (n.casefold(), n)):
+        profile, error = mapped[name]
+        unmapped = [
+            UnmappedOut(key=u.key, value=u.value, reason=u.reason) for u in profile.unmapped
+        ]
+        if error is not None:
+            unmapped.append(UnmappedOut(key="criteria", value="", reason=error))
+        profiles.append(
+            ZnunyProfilePreviewOut(
+                name=name,
+                criteria=profile.criteria,
+                include_archived=profile.include_archived,
+                unmapped=unmapped,
+                existing_id=existing.get(name),
+                importable=_importable(profile, error),
+                partial=bool(unmapped),
+            )
+        )
+    return ZnunyImportPreviewOut(profiles=profiles)
+
+
+@router.post("/import/znuny", response_model=ZnunyImportResultOut)
+async def apply_znuny_import(
+    body: ZnunyImportIn, user: CurrentUser, session: DbSession
+) -> ZnunyImportResultOut:
+    """Import the named profiles as private saved searches; a re-import updates in place.
+
+    Per name: unknown -> skipped, nothing mappable or invalid criteria -> skipped (reason
+    given), otherwise created or updated (keyed by profile name). One commit at the end.
+    """
+    admin = await PermissionEngine(session).is_admin(user.id)
+    names = list(dict.fromkeys(body.names))
+    mapped = await _map_profiles(session, user, admin, only=set(names))
+    created: list[int] = []
+    updated: list[int] = []
+    skipped: list[ZnunyImportSkippedOut] = []
+    for name in names:
+        entry = mapped.get(name)
+        if entry is None:
+            skipped.append(ZnunyImportSkippedOut(name=name, reason=PROFILE_NOT_FOUND_MESSAGE))
+            continue
+        profile, error = entry
+        if not _importable(profile, error):
+            skipped.append(ZnunyImportSkippedOut(name=name, reason=error or NOT_IMPORTABLE_MESSAGE))
+            continue
+        try:
+            search_id, outcome = await store.upsert_imported(
+                session,
+                user.id,
+                source_name=name,
+                criteria=profile.criteria,
+                include_archived=profile.include_archived,
+            )
+            if outcome == "created":
+                position = await store.next_position(session, user.id)
+                await store.set_prefs(
+                    session, search_id, user.id, SavedSearchPrefs(True, False, position)
+                )
+        except SavedSearchInvalid as exc:  # e.g. the per-user limit
+            skipped.append(ZnunyImportSkippedOut(name=name, reason=exc.message))
+            continue
+        (created if outcome == "created" else updated).append(search_id)
+    await session.commit()
+    return ZnunyImportResultOut(created=created, updated=updated, skipped=skipped)
 
 
 @router.get("/{search_id}", response_model=SavedSearchOut)

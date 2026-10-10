@@ -279,3 +279,12 @@ def test_saved_searches_map_to_tickets_and_writes_need_rw() -> None:
         assert not scopes_allow(frozenset({"tickets:ro"}), method=method, path=path), path
         assert scopes_allow(frozenset({"tickets:rw"}), method=method, path=path), path
     assert not scopes_allow(frozenset({"kb:rw"}), method="GET", path=base)
+
+
+def test_znuny_import_preview_reads_and_apply_writes() -> None:
+    # R-APIKEY: the preview only reads Znuny, applying creates saved searches
+    path = "/api/v1/saved-searches/import/znuny"
+    assert path_to_area(path) == "tickets"
+    assert scopes_allow(frozenset({"tickets:ro"}), method="GET", path=path)
+    assert not scopes_allow(frozenset({"tickets:ro"}), method="POST", path=path)
+    assert scopes_allow(frozenset({"tickets:rw"}), method="POST", path=path)

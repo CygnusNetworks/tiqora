@@ -30958,6 +30958,29 @@
         "title": "TypeRefOut",
         "type": "object"
       },
+      "UnmappedOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "value",
+          "reason"
+        ],
+        "title": "UnmappedOut",
+        "type": "object"
+      },
       "UserCreate": {
         "properties": {
           "email": {
@@ -32113,6 +32136,148 @@
           "processed"
         ],
         "title": "WhatsAppWebhookResponse",
+        "type": "object"
+      },
+      "ZnunyImportIn": {
+        "additionalProperties": false,
+        "properties": {
+          "names": {
+            "items": {
+              "maxLength": 200,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "names"
+        ],
+        "title": "ZnunyImportIn",
+        "type": "object"
+      },
+      "ZnunyImportPreviewOut": {
+        "properties": {
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/ZnunyProfilePreviewOut"
+            },
+            "title": "Profiles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "profiles"
+        ],
+        "title": "ZnunyImportPreviewOut",
+        "type": "object"
+      },
+      "ZnunyImportResultOut": {
+        "properties": {
+          "created": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Created",
+            "type": "array"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/ZnunyImportSkippedOut"
+            },
+            "title": "Skipped",
+            "type": "array"
+          },
+          "updated": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Updated",
+            "type": "array"
+          }
+        },
+        "required": [
+          "created",
+          "updated",
+          "skipped"
+        ],
+        "title": "ZnunyImportResultOut",
+        "type": "object"
+      },
+      "ZnunyImportSkippedOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "reason"
+        ],
+        "title": "ZnunyImportSkippedOut",
+        "type": "object"
+      },
+      "ZnunyProfilePreviewOut": {
+        "properties": {
+          "criteria": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Filter"
+              }
+            ]
+          },
+          "existing_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Existing Id"
+          },
+          "importable": {
+            "title": "Importable",
+            "type": "boolean"
+          },
+          "include_archived": {
+            "title": "Include Archived",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "partial": {
+            "title": "Partial",
+            "type": "boolean"
+          },
+          "unmapped": {
+            "items": {
+              "$ref": "#/components/schemas/UnmappedOut"
+            },
+            "title": "Unmapped",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "criteria",
+          "include_archived",
+          "unmapped",
+          "existing_id",
+          "importable",
+          "partial"
+        ],
+        "title": "ZnunyProfilePreviewOut",
         "type": "object"
       }
     }
@@ -73679,6 +73844,146 @@
           }
         },
         "summary": "Saved Search Counts",
+        "tags": [
+          "saved-searches"
+        ]
+      }
+    },
+    "/api/v1/saved-searches/import/znuny": {
+      "get": {
+        "description": "The caller's saved ticket searches from Znuny, as they would be imported.\n\nRead-only on the Znuny tables. A profile with ``unmapped`` entries imports only partly\n(``partial``): clients should not preselect it.",
+        "operationId": "preview_znuny_import_api_v1_saved_searches_import_znuny_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZnunyImportPreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Znuny Import",
+        "tags": [
+          "saved-searches"
+        ]
+      },
+      "post": {
+        "description": "Import the named profiles as private saved searches; a re-import updates in place.\n\nPer name: unknown -> skipped, nothing mappable or invalid criteria -> skipped (reason\ngiven), otherwise created or updated (keyed by profile name). One commit at the end.",
+        "operationId": "apply_znuny_import_api_v1_saved_searches_import_znuny_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ZnunyImportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZnunyImportResultOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Znuny Import",
         "tags": [
           "saved-searches"
         ]

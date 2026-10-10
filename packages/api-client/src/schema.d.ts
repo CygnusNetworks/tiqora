@@ -7506,6 +7506,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/saved-searches/import/znuny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Znuny Import
+         * @description The caller's saved ticket searches from Znuny, as they would be imported.
+         *
+         *     Read-only on the Znuny tables. A profile with ``unmapped`` entries imports only partly
+         *     (``partial``): clients should not preselect it.
+         */
+        get: operations["preview_znuny_import_api_v1_saved_searches_import_znuny_get"];
+        put?: never;
+        /**
+         * Apply Znuny Import
+         * @description Import the named profiles as private saved searches; a re-import updates in place.
+         *
+         *     Per name: unknown -> skipped, nothing mappable or invalid criteria -> skipped (reason
+         *     given), otherwise created or updated (keyed by profile name). One commit at the end.
+         */
+        post: operations["apply_znuny_import_api_v1_saved_searches_import_znuny_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/saved-searches/{search_id}": {
         parameters: {
             query?: never;
@@ -19773,6 +19803,15 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** UnmappedOut */
+        UnmappedOut: {
+            /** Key */
+            key: string;
+            /** Reason */
+            reason: string;
+            /** Value */
+            value: string;
+        };
         /** UserCreate */
         UserCreate: {
             /** Email */
@@ -20144,6 +20183,48 @@ export interface components {
         WhatsAppWebhookResponse: {
             /** Processed */
             processed: number;
+        };
+        /** ZnunyImportIn */
+        ZnunyImportIn: {
+            /** Names */
+            names: string[];
+        };
+        /** ZnunyImportPreviewOut */
+        ZnunyImportPreviewOut: {
+            /** Profiles */
+            profiles: components["schemas"]["ZnunyProfilePreviewOut"][];
+        };
+        /** ZnunyImportResultOut */
+        ZnunyImportResultOut: {
+            /** Created */
+            created: number[];
+            /** Skipped */
+            skipped: components["schemas"]["ZnunyImportSkippedOut"][];
+            /** Updated */
+            updated: number[];
+        };
+        /** ZnunyImportSkippedOut */
+        ZnunyImportSkippedOut: {
+            /** Name */
+            name: string;
+            /** Reason */
+            reason: string;
+        };
+        /** ZnunyProfilePreviewOut */
+        ZnunyProfilePreviewOut: {
+            criteria: components["schemas"]["Filter"];
+            /** Existing Id */
+            existing_id: number | null;
+            /** Importable */
+            importable: boolean;
+            /** Include Archived */
+            include_archived: boolean;
+            /** Name */
+            name: string;
+            /** Partial */
+            partial: boolean;
+            /** Unmapped */
+            unmapped: components["schemas"]["UnmappedOut"][];
         };
     };
     responses: never;
@@ -39356,6 +39437,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SavedSearchCountsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_znuny_import_api_v1_saved_searches_import_znuny_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZnunyImportPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_znuny_import_api_v1_saved_searches_import_znuny_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZnunyImportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZnunyImportResultOut"];
                 };
             };
             /** @description Validation Error */

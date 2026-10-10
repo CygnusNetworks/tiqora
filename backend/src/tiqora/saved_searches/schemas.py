@@ -100,3 +100,54 @@ class SavedSearchOut(BaseModel):
 class SavedSearchCountsOut(BaseModel):
     #: ``str(id)`` -> count; ``None`` = could not be counted (invalid criteria, timeout)
     counts: dict[str, int | None]
+
+
+class UnmappedOut(BaseModel):
+    key: str
+    value: str
+    reason: str
+
+
+class ZnunyProfilePreviewOut(BaseModel):
+    name: str
+    # same wrap serializer as ``SavedSearchOut``: no ``"value": null`` in conditions
+    criteria: Annotated[
+        Filter,
+        Field(json_schema_extra={"anyOf": [{"$ref": "#/components/schemas/Filter"}]}),
+    ]
+    include_archived: bool
+    unmapped: list[UnmappedOut]
+    #: id of the search imported from this profile earlier -> applying updates it
+    existing_id: int | None
+    #: ``False`` when no condition could be taken over (or the criteria fail validation)
+    importable: bool
+    #: some keys were not taken over: the import is broader than the Znuny original, so
+    #: clients must not preselect it
+    partial: bool
+
+    @field_serializer("criteria", mode="wrap")
+    def _criteria_without_nones(
+        self, value: Filter, _handler: SerializerFunctionWrapHandler
+    ) -> Any:
+        return value.model_dump(by_alias=True, exclude_none=True)
+
+
+class ZnunyImportPreviewOut(BaseModel):
+    profiles: list[ZnunyProfilePreviewOut]  # sorted by name
+
+
+class ZnunyImportIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    names: list[Annotated[str, Field(max_length=200)]] = Field(min_length=1, max_length=100)
+
+
+class ZnunyImportSkippedOut(BaseModel):
+    name: str
+    reason: str
+
+
+class ZnunyImportResultOut(BaseModel):
+    created: list[int]
+    updated: list[int]
+    skipped: list[ZnunyImportSkippedOut]
