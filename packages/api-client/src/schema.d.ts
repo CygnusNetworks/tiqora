@@ -3388,6 +3388,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/plugins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Plugins */
+        get: operations["list_plugins_api_v1_admin_plugins_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/plugins/{plugin_id}/enabled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Plugin Enabled */
+        put: operations["set_plugin_enabled_api_v1_admin_plugins__plugin_id__enabled_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/plugins/{plugin_id}/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reset Plugin */
+        post: operations["reset_plugin_api_v1_admin_plugins__plugin_id__reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/postmaster-filters": {
         parameters: {
             query?: never;
@@ -6697,6 +6748,40 @@ export interface paths {
          *     and dial out over the trunk.
          */
         post: operations["dial_api_v1_phone_dial_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/frontend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Frontend Plugins */
+        get: operations["list_frontend_plugins_api_v1_plugins_frontend_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/{plugin_id}/assets/{version}/{path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plugin Asset */
+        get: operations["plugin_asset_api_v1_plugins__plugin_id__assets__version___path__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -12901,6 +12986,66 @@ export interface components {
             /** Unowned New */
             unowned_new: number;
         };
+        /** DashboardWidgetContribution */
+        DashboardWidgetContribution: {
+            /**
+             * Category
+             * @default other
+             * @enum {string}
+             */
+            category: "tickets" | "reports" | "team" | "ai" | "itsm" | "other";
+            /** Component */
+            component: string;
+            /** Description Key */
+            description_key?: string | null;
+            /**
+             * Icon
+             * @default puzzle
+             */
+            icon: string;
+            /** Key */
+            key: string;
+            /** Permission */
+            permission?: string | null;
+            /**
+             * Refresh On
+             * @default []
+             */
+            refresh_on: string[];
+            /** Settings Schema */
+            settings_schema?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * @default {
+             *       "default": [
+             *         4,
+             *         3
+             *       ],
+             *       "max": [
+             *         12,
+             *         8
+             *       ],
+             *       "min": [
+             *         2,
+             *         2
+             *       ]
+             *     }
+             */
+            size: components["schemas"]["WidgetSize"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            slot: "dashboard.widget";
+            /** Title Key */
+            title_key: string;
+            /**
+             * Version
+             * @default 1
+             */
+            version: number;
+        };
         /** DatastoresOut */
         DatastoresOut: {
             database: components["schemas"]["DbStatusOut"];
@@ -15153,6 +15298,41 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** NavContribution */
+        NavContribution: {
+            /**
+             * Admin Only
+             * @default false
+             */
+            admin_only: boolean;
+            /**
+             * Group
+             * @default plugins
+             * @enum {string}
+             */
+            group: "workspace" | "knowledge" | "insights" | "plugins";
+            /**
+             * Icon
+             * @default puzzle
+             */
+            icon: string;
+            /** Key */
+            key: string;
+            /** Label Key */
+            label_key: string;
+            /**
+             * Order
+             * @default 100
+             */
+            order: number;
+            /** Route */
+            route: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            slot: "agent.nav";
+        };
         /**
          * NewProcessTicketIn
          * @description Body of ``POST /api/v1/process/tickets``: start dialog values of a new process ticket.
@@ -16059,6 +16239,147 @@ export interface components {
             source_table?: string | null;
             /** Tag Name */
             tag_name?: string | null;
+        };
+        /** PluginAdminListOut */
+        PluginAdminListOut: {
+            /** Plugins */
+            plugins: components["schemas"]["PluginAdminOut"][];
+            /** Safe Mode */
+            safe_mode: boolean;
+        };
+        /** PluginAdminOut */
+        PluginAdminOut: {
+            /** Capabilities */
+            capabilities: components["schemas"]["PluginCapabilityOut"][];
+            /** Categories */
+            categories: string[];
+            /** Contributions */
+            contributions: components["schemas"]["PluginContributionOut"][];
+            /** Description */
+            description: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Homepage */
+            homepage: string | null;
+            /** Hooks */
+            hooks: components["schemas"]["PluginHookOut"][];
+            /** Id */
+            id: string;
+            /** Installed At */
+            installed_at: string | null;
+            /** License */
+            license: string | null;
+            /** Name */
+            name: string;
+            /** Publisher */
+            publisher: string;
+            /** Runtime */
+            runtime: components["schemas"]["PluginRuntimeOut"][];
+            /** Settings Section */
+            settings_section: string | null;
+            /** Source */
+            source: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "disabled" | "failed" | "quarantined" | "incompatible" | "invalid" | "restart_required" | "unknown";
+            /** Status Message */
+            status_message: string | null;
+            /** Support */
+            support: string | null;
+            /** Version */
+            version: string;
+        };
+        /** PluginCapabilityOut */
+        PluginCapabilityOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "extension_point" | "outbound_host" | "frontend_slot";
+            /** Value */
+            value: string;
+        };
+        /** PluginContributionOut */
+        PluginContributionOut: {
+            /** Key */
+            key: string;
+            /** Point Key */
+            point_key: string;
+        };
+        /** PluginEnabledIn */
+        PluginEnabledIn: {
+            /** Enabled */
+            enabled: boolean;
+        };
+        /** PluginFrontendOut */
+        PluginFrontendOut: {
+            /** Asset Base */
+            asset_base: string;
+            /** Contributions */
+            contributions: (components["schemas"]["NavContribution"] | components["schemas"]["RouteContribution"] | components["schemas"]["TicketSidebarContribution"] | components["schemas"]["DashboardWidgetContribution"])[];
+            /** Entry */
+            entry: string | null;
+            /** Id */
+            id: string;
+            /** Locales */
+            locales: string[];
+            /** Name */
+            name: string;
+            /** Styles */
+            styles: string[];
+            /** Version */
+            version: string;
+        };
+        /** PluginHookOut */
+        PluginHookOut: {
+            /** Consecutive Failures */
+            consecutive_failures: number;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "event" | "task";
+            /** Last Error */
+            last_error: string | null;
+            /** Last Error At */
+            last_error_at: string | null;
+            /** Last Ok At */
+            last_ok_at: string | null;
+            /** Last Run At */
+            last_run_at: string | null;
+            /** Name */
+            name: string;
+            /** Schedule */
+            schedule: string | null;
+            /** Total Failures */
+            total_failures: number;
+            /** Tripped */
+            tripped: boolean;
+        };
+        /** PluginRuntimeOut */
+        PluginRuntimeOut: {
+            /** Boot Attempts */
+            boot_attempts: number;
+            /** Error */
+            error: string | null;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "api" | "worker" | "mcp";
+            /** State */
+            state: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: string | null;
         };
         /** PortalArticleOut */
         PortalArticleOut: {
@@ -17257,6 +17578,27 @@ export interface components {
             name?: string | null;
             /** Valid Id */
             valid_id?: number | null;
+        };
+        /** RouteContribution */
+        RouteContribution: {
+            /**
+             * Admin Only
+             * @default false
+             */
+            admin_only: boolean;
+            /** Component */
+            component: string;
+            /** Key */
+            key: string;
+            /** Path */
+            path: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            slot: "agent.route";
+            /** Title Key */
+            title_key: string;
         };
         /** SalutationOut */
         SalutationOut: {
@@ -19101,6 +19443,25 @@ export interface components {
             /** Tn */
             tn: string;
         };
+        /** TicketSidebarContribution */
+        TicketSidebarContribution: {
+            /** Component */
+            component: string;
+            /** Key */
+            key: string;
+            /**
+             * Order
+             * @default 100
+             */
+            order: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            slot: "ticket.sidebar";
+            /** Title Key */
+            title_key: string;
+        };
         /** TicketTypeCreate */
         TicketTypeCreate: {
             /** Name */
@@ -19608,6 +19969,42 @@ export interface components {
         WhatsAppWebhookResponse: {
             /** Processed */
             processed: number;
+        };
+        /** WidgetSize */
+        WidgetSize: {
+            /**
+             * Default
+             * @default [
+             *       4,
+             *       3
+             *     ]
+             */
+            default: [
+                number,
+                number
+            ];
+            /**
+             * Max
+             * @default [
+             *       12,
+             *       8
+             *     ]
+             */
+            max: [
+                number,
+                number
+            ];
+            /**
+             * Min
+             * @default [
+             *       2,
+             *       2
+             *     ]
+             */
+            min: [
+                number,
+                number
+            ];
         };
     };
     responses: never;
@@ -28468,6 +28865,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OAuth2TokenConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_plugins_api_v1_admin_plugins_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginAdminListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_plugin_enabled_api_v1_admin_plugins__plugin_id__enabled_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                plugin_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginEnabledIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginAdminOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_plugin_api_v1_admin_plugins__plugin_id__reset_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                plugin_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginAdminOut"];
                 };
             };
             /** @description Validation Error */
@@ -37388,6 +37892,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DialOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_frontend_plugins_api_v1_plugins_frontend_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginFrontendOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plugin_asset_api_v1_plugins__plugin_id__assets__version___path__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                plugin_id: string;
+                version: string;
+                path: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

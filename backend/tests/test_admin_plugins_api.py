@@ -1,0 +1,326 @@
+"""Admin plugin API (``/api/v1/admin/plugins``) on both dialects.
+
+Plugin rows of ``org.example.hello`` (and ``org.example.plg49*``) are removed by the
+``factory`` fixture of ``_plugins_state_helpers``.
+"""
+
+from __future__ import annotations
+
+import sys
+from collections.abc import AsyncIterator, Iterator
+from typing import Any
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from tests._plugins_state_helpers import (  # noqa: F401
+    T0,
+    db_url_fixture,
+    factory_fixture,
+    seed_plugin_row,
+    session_fixture,
+)
+from tests.plugins.helpers import Installer
+from tiqora.api.app import create_app
+from tiqora.api.deps import get_current_user, get_db
+from tiqora.api.v1.admin.deps import get_admin_user
+from tiqora.config import Settings
+from tiqora.db.tiqora.models import TiqoraPlugin
+from tiqora.domain.auth import AuthenticatedUser
+from tiqora.extensions.core import register_core, set_registry_for_tests
+from tiqora.extensions.registry import Registry
+from tiqora.permissions.engine import PermissionEngine
+from tiqora.plugins import store
+from tiqora.plugins.context import make_plugin_context
+from tiqora.plugins.discovery import discover_plugins
+from tiqora.plugins.loader import commit_registrar, import_and_register
+from tiqora.plugins.state import PluginLoadResult, RuntimeState, set_loaded_plugins
+
+pytestmark = pytest.mark.db
+
+BASE = "/api/v1/admin/plugins"
+PLUGIN_ID = "org.example.hello"
+ROOT = AuthenticatedUser(
+    id=1, login="root@localhost", first_name="Root", last_name="Admin", auth_method="session"
+)
+AGENT = AuthenticatedUser(
+    id=7, login="agent@example.org", first_name="Ann", last_name="Agent", auth_method="session"
+)
+
+
+@pytest.fixture(autouse=True)
+def _reset_plugin_state() -> Iterator[None]:
+    yield
+    set_registry_for_tests(None)
+    set_loaded_plugins([])
+
+
+def _app(
+    factory: async_sessionmaker[AsyncSession], *, safe_mode: bool = False, admin: bool = True
+) -> Any:
+    async def _db() -> Any:
+        async with factory() as session:
+            yield session
+
+    app = create_app(Settings(environment="test", plugins_safe_mode=safe_mode))
+    app.dependency_overrides[get_db] = _db
+    if admin:
+        app.dependency_overrides[get_admin_user] = lambda: ROOT
+    else:
+        app.dependency_overrides[get_current_user] = lambda: AGENT
+    return app
+
+
+def _client(app: Any) -> AsyncClient:
+    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+
+
+@pytest.fixture(name="admin_client")
+async def admin_client_fixture(
+    factory: async_sessionmaker[AsyncSession],
+) -> AsyncIterator[AsyncClient]:
+    async with _client(_app(factory)) as c:
+        yield c
+
+
+@pytest.fixture(name="admin_client_safe_mode")
+async def admin_client_safe_mode_fixture(
+    factory: async_sessionmaker[AsyncSession],
+) -> AsyncIterator[AsyncClient]:
+    async with _client(_app(factory, safe_mode=True)) as c:
+        yield c
+
+
+@pytest.fixture(name="agent_client")
+async def agent_client_fixture(
+    factory: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> AsyncIterator[AsyncClient]:
+    async def not_admin(self: PermissionEngine, user_id: int) -> bool:
+        return False
+
+    monkeypatch.setattr(PermissionEngine, "is_admin", not_admin)
+    async with _client(_app(factory, admin=False)) as c:
+        yield c
+
+
+@pytest.fixture(name="seeded_runtime")
+async def seeded_runtime_fixture(
+    fixture_plugins: Installer, factory: async_sessionmaker[AsyncSession]
+) -> None:
+    fixture_plugins()
+    (p,) = discover_plugins()
+    reg = Registry()
+    register_core(reg)
+    commit_registrar(reg, import_and_register(p, make_plugin_context(p)))
+    reg.freeze()
+    set_registry_for_tests(reg)
+    set_loaded_plugins([PluginLoadResult(PLUGIN_ID, "1.0.0", RuntimeState.ACTIVE, None, ())])
+    async with factory() as s:
+        await store.sync_discovered(s, [p], auto_enable=True, now=T0)
+        await s.commit()
+    await store.mark_result(
+        factory, PLUGIN_ID, "api", state=RuntimeState.ACTIVE, version="1.0.0", error=None, now=T0
+    )
+
+
+async def _plugin_row(factory: async_sessionmaker[AsyncSession], plugin_id: str) -> TiqoraPlugin:
+    async with factory() as s:
+        return (
+            await s.execute(select(TiqoraPlugin).where(TiqoraPlugin.id == plugin_id))
+        ).scalar_one()
+
+
+async def _seed_tripped_hook(factory: async_sessionmaker[AsyncSession], key: str) -> None:
+    kind, plugin_id, _ = key.split(":", 2)
+    async with factory() as s:
+        hook = await store.ensure_hook(
+            s, hook_key=key, plugin_id=plugin_id, kind=kind, initial_cursor=5, now=T0
+        )
+        await store.record_hook_failure(s, hook, error="kaputt", now=T0, trip_after=1)
+        await s.commit()
+
+
+def _by_id(body: dict[str, Any], plugin_id: str) -> dict[str, Any]:
+    (p,) = [x for x in body["plugins"] if x["id"] == plugin_id]
+    return p  # type: ignore[no-any-return]
+
+
+async def test_list_active_plugin(
+    fixture_plugins: Installer, admin_client: AsyncClient, seeded_runtime: None
+) -> None:
+    body = (await admin_client.get(BASE)).json()
+    assert body["safe_mode"] is False
+    p = _by_id(body, PLUGIN_ID)
+    assert p["status"] == "active" and p["enabled"] is True and p["publisher"] == "Example GmbH"
+    assert p["status_message"] is None and p["version"] == "1.0.0"
+    assert p["name"] == "Hallo-Erweiterung" and p["categories"] == ["tickets"]
+    assert {"kind": "outbound_host", "value": "api.example.org"} in p["capabilities"]
+    assert {"kind": "frontend_slot", "value": "ticket.sidebar"} in p["capabilities"]
+    # R-PUBLIC-ROUTES: the unauthenticated-interface capability is visible
+    assert {"kind": "extension_point", "value": "core.http.public_routes"} in p["capabilities"]
+    assert {"point_key": "core.mcp.tools", "key": "hello_echo"} in p["contributions"]
+    assert p["settings_section"] == "plugins.org.example.hello"
+    assert {r["role"] for r in p["runtime"]} == {"api"}
+    assert p["installed_at"] is not None
+
+
+async def test_hooks_listed_with_schedule(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    seeded_runtime: None,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    await _seed_tripped_hook(factory, "task:org.example.hello:tick")
+    await _seed_tripped_hook(factory, "event:org.example.hello:flaky")
+    hooks = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)["hooks"]
+    assert [h["key"] for h in hooks] == [
+        "event:org.example.hello:flaky",
+        "task:org.example.hello:tick",
+    ]
+    flaky, tick = hooks
+    assert flaky["kind"] == "event" and flaky["name"] == "flaky" and flaky["schedule"] is None
+    assert tick["kind"] == "task" and tick["name"] == "tick" and tick["schedule"] == "jede Minute"
+    assert tick["tripped"] is True and tick["last_error"] == "kaputt"
+
+
+async def test_runtime_roles_sorted_and_worker_failure_named(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    seeded_runtime: None,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    await store.mark_result(
+        factory, PLUGIN_ID, "mcp", state=RuntimeState.ACTIVE, version="1.0.0", error=None, now=T0
+    )
+    await store.mark_result(
+        factory,
+        PLUGIN_ID,
+        "worker",
+        state=RuntimeState.FAILED,
+        version="1.0.0",
+        error="RuntimeError: kaputt",
+        now=T0,
+    )
+    p = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+    assert [r["role"] for r in p["runtime"]] == ["api", "worker", "mcp"]
+    assert p["status"] == "failed"  # api active, worker failed
+    assert p["status_message"] == "Hintergrunddienst: RuntimeError: kaputt"
+
+
+async def test_quarantined_worker_message(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    seeded_runtime: None,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    await store.mark_result(
+        factory,
+        PLUGIN_ID,
+        "worker",
+        state=RuntimeState.QUARANTINED,
+        version=None,
+        error=None,
+        now=T0,
+    )
+    p = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+    assert p["status"] == "quarantined"
+    assert p["status_message"].startswith("Beim Start wiederholt abgestürzt")
+
+
+async def test_never_started_is_unknown(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    fixture_plugins()
+    (p,) = discover_plugins()
+    async with factory() as s:
+        await store.sync_discovered(s, [p], auto_enable=True, now=T0)
+        await s.commit()
+    got = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+    assert got["status"] == "unknown" and got["status_message"] == "Noch nicht gestartet."
+    assert got["runtime"] == []
+
+
+async def test_plugin_gone_from_image_is_invalid(
+    admin_client: AsyncClient, factory: async_sessionmaker[AsyncSession]
+) -> None:
+    await seed_plugin_row(factory, "org.example.plg49gone", enabled=True)
+    got = _by_id((await admin_client.get(BASE)).json(), "org.example.plg49gone")
+    assert got["status"] == "invalid"
+    assert got["status_message"] == "Nicht mehr im Image enthalten"
+    assert got["capabilities"] == [] and got["contributions"] == []
+
+
+async def test_disable_needs_restart(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    seeded_runtime: None,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    r = await admin_client.put(f"{BASE}/{PLUGIN_ID}/enabled", json={"enabled": False})
+    assert r.status_code == 200
+    assert r.json()["status"] == "restart_required"
+    assert r.json()["status_message"] == "Änderung wird nach einem Neustart von Tiqora wirksam."
+    row = await _plugin_row(factory, PLUGIN_ID)
+    assert row.enabled is False and row.changed_by == 1
+
+
+async def test_enable_discovered_plugin_without_row(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    fixture_plugins()
+    r = await admin_client.put(f"{BASE}/{PLUGIN_ID}/enabled", json={"enabled": True})
+    assert r.status_code == 200 and r.json()["enabled"] is True
+    assert (await _plugin_row(factory, PLUGIN_ID)).enabled is True
+
+
+async def test_reset_clears_quarantine_and_hooks(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    fixture_plugins()
+    await store.mark_result(
+        factory,
+        PLUGIN_ID,
+        "worker",
+        state=RuntimeState.QUARANTINED,
+        version="1.0.0",
+        error=None,
+        now=T0,
+    )
+    await _seed_tripped_hook(factory, "event:org.example.hello:flaky")
+    r = await admin_client.post(f"{BASE}/{PLUGIN_ID}/reset")
+    assert r.status_code == 200
+    worker = [x for x in r.json()["runtime"] if x["role"] == "worker"][0]
+    assert worker["state"] == "disabled" and worker["boot_attempts"] == 0
+    (hook,) = [h for h in r.json()["hooks"] if h["key"] == "event:org.example.hello:flaky"]
+    assert hook["tripped"] is False and hook["consecutive_failures"] == 0
+
+
+async def test_safe_mode_lists_without_import(
+    fixture_plugins: Installer, admin_client_safe_mode: AsyncClient
+) -> None:
+    fixture_plugins()
+    body = (await admin_client_safe_mode.get(BASE)).json()
+    assert body["safe_mode"] is True and [p["id"] for p in body["plugins"]] == [PLUGIN_ID]
+    assert body["plugins"][0]["contributions"] == []
+    assert "tq_fixture_hello" not in sys.modules
+
+
+async def test_unknown_plugin_404(admin_client: AsyncClient) -> None:
+    put = await admin_client.put(f"{BASE}/org.example.nope/enabled", json={"enabled": True})
+    assert put.status_code == 404
+    assert (await admin_client.post(f"{BASE}/org.example.nope/reset")).status_code == 404
+
+
+async def test_non_admin_403(agent_client: AsyncClient) -> None:
+    assert (await agent_client.get(BASE)).status_code == 403
+    put = await agent_client.put(f"{BASE}/{PLUGIN_ID}/enabled", json={"enabled": True})
+    assert put.status_code == 403
+    assert (await agent_client.post(f"{BASE}/{PLUGIN_ID}/reset")).status_code == 403

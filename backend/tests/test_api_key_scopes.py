@@ -160,6 +160,11 @@ _UNSCOPED_EXEMPT: frozenset[str] = frozenset(
     {
         # Browser redirect target of the OAuth2 provider (no API key involved).
         "/api/v1/oauth2/callback",
+        # Plugin frontend list and static files: only the SPA (session cookie) uses them;
+        # scoped integration keys have no use for them. Plugin HTTP routes themselves live
+        # under /api/plugins and have the "plugins" area.
+        "/api/v1/plugins/frontend",
+        "/api/v1/plugins/{plugin_id}/assets/{version}/{path}",
     }
 )
 
