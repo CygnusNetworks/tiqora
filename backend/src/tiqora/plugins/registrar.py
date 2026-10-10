@@ -141,8 +141,9 @@ class PluginRegistrar:
             for r in router.routes:
                 if not isinstance(r, APIRoute):
                     raise RegistrationRejected(
-                        "Nur FastAPI-Routen (@router.get/post …) sind für angemeldete "
-                        "Schnittstellen erlaubt; Starlette-Routen, Mounts und WebSockets "
+                        "Nur FastAPI-Routen (@router.get/post …) direkt auf diesem Router "
+                        "sind für angemeldete Schnittstellen erlaubt; verschachtelte Router "
+                        "(include_router), Starlette-Routen, Mounts und WebSockets "
                         "nur mit Freigabe für öffentliche Schnittstellen"
                     )
 

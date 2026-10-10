@@ -273,3 +273,36 @@ async def test_mount_refuses_unauthenticated_route_in_authenticated_router(
     async with _client(app) as c:
         assert (await c.get(f"{BASE}/raw")).status_code == 404
         assert (await c.post(f"{BASE}/raw")).status_code == 404
+
+
+async def test_routes_added_to_plugin_router_after_mount_are_not_served(
+    fixture_plugins: Installer,
+) -> None:
+    from starlette.responses import JSONResponse
+    from starlette.routing import Mount as StarletteMount
+
+    app = _app_with_hello(fixture_plugins)
+    app.dependency_overrides[get_current_user] = lambda: ROOT
+    mod = sys.modules["tq_fixture_hello.plugin"]
+
+    async def raw(request: Any) -> Any:
+        return JSONResponse({"leak": True})
+
+    async def later() -> dict[str, bool]:
+        return {"later": True}
+
+    mod.router.add_route("/raw", raw)
+    mod.router.routes.append(StarletteMount("/m", app=JSONResponse({"leak": True})))
+    mod.router.add_api_route("/later", later, methods=["GET"])
+    mod.public_router.add_api_route("/later-public", later, methods=["GET"])
+    async with _client(app) as c:
+        assert (await c.get(f"{BASE}/raw")).status_code == 404
+        assert (await c.get(f"{BASE}/m/x")).status_code == 404
+        assert (await c.get(f"{BASE}/later")).status_code == 404
+        assert (await c.get(f"{BASE}/later-public")).status_code == 404
+        assert (await c.get(f"{BASE}/hello")).status_code == 200
+    app.dependency_overrides.clear()
+    app.dependency_overrides[get_db] = _no_db
+    app.dependency_overrides[get_redis] = lambda: _FakeRedis()
+    async with _client(app) as c:
+        assert (await c.get(f"{BASE}/hello")).status_code == 401

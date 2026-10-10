@@ -49,6 +49,18 @@ def _assert_authenticated(routes: list[BaseRoute]) -> None:
             raise RuntimeError(f"route {getattr(r, 'path', r)!r} would be served unauthenticated")
 
 
+def _snapshot(source: APIRouter) -> APIRouter:
+    """A private copy of the validated routes: the plugin keeps no reference to the router the
+    sub-app serves, so routes it adds to its own router after mount are never exposed."""
+    fresh = APIRouter(
+        dependencies=list(source.dependencies),
+        tags=list(source.tags),
+        responses=dict(source.responses),
+    )
+    fresh.routes.extend(list(source.routes))
+    return fresh
+
+
 def create_plugin_router() -> Router:
     """Empty router for ``/api/plugins``; unknown or inactive plugins answer a JSON 404."""
     return Router(routes=[], default=_not_found)
@@ -88,7 +100,8 @@ def mount_plugin_routes(app: FastAPI, registry: Registry) -> list[str]:
                 if not route.public:
                     _assert_authenticated(list(route.router.routes))
                 sub.include_router(
-                    route.router, dependencies=[] if route.public else [Depends(get_current_user)]
+                    _snapshot(route.router),
+                    dependencies=[] if route.public else [Depends(get_current_user)],
                 )
         except RuntimeError as exc:
             # Defence in depth behind the registrar check: never serve an unauthenticated route.
