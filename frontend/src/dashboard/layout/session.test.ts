@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { EditWidget, Rect } from "../model";
-import { editReducer, initialEditState, type EditAction, type EditState, type WidgetLike } from "./session";
+import { createEditReducer, editReducer, initialEditState, type EditAction, type EditState, type WidgetLike } from "./session";
 
 const COUNTER: WidgetLike = {
   key: "core.counter",
@@ -122,12 +122,35 @@ test("editing at lg keeps an explicit md rect", () => {
   expect(s.widgets[0].layout.md).toEqual({ x: 5, y: 1, w: 3, h: 2 });
 });
 
-test("resize honours the min and max passed with the action and pushes neighbours", () => {
-  const s = editReducer(state([w("a"), w("b", { x: 0, y: 2, w: 3, h: 2 })]), {
-    type: "resize", id: "a", size: { w: 20, h: 9 }, bp: "lg", min: [2, 2], max: [4, 3],
-  });
-  expect(s.widgets[0].layout.lg).toEqual({ x: 0, y: 0, w: 4, h: 3 });
-  expect(s.widgets[1].layout.lg.y).toBe(3);
+const SIZES = (k: string) => (k === "core.counter" ? { min: [2, 2] as [number, number], max: [4, 3] as [number, number] } : undefined);
+const sized = createEditReducer(SIZES);
+
+test("resize clamps to the type's min and max from the injected lookup and pushes neighbours", () => {
+  const ws = [w("a"), w("b", { x: 0, y: 2, w: 3, h: 2 })];
+  const big = sized(state(ws), { type: "resize", id: "a", size: { w: 20, h: 9 }, bp: "lg" });
+  expect(big.widgets[0].layout.lg).toEqual({ x: 0, y: 0, w: 4, h: 3 });
+  expect(big.widgets[1].layout.lg.y).toBe(3);
+  const small = sized(state(ws), { type: "resize", id: "a", size: { w: 1, h: 1 }, bp: "lg" });
+  expect(small.widgets[0].layout.lg).toMatchObject({ w: 2, h: 2 });
+});
+
+test("unknown types fall back to [1,1]", () => {
+  const u = { ...w("u"), type_key: "plugin.x" };
+  const s = sized(state([u]), { type: "resize", id: "u", size: { w: 1, h: 1 }, bp: "lg" });
+  expect(s.widgets[0].layout.lg).toMatchObject({ w: 1, h: 1 });
+});
+
+test("the first md edit keeps every widget at or above its minimum", () => {
+  const ws = [w("a", { x: 0, y: 0, w: 2, h: 2 }), w("b", { x: 2, y: 0, w: 2, h: 2 }), w("c", { x: 4, y: 0, w: 2, h: 2 })];
+  // 2 lg cells scale to round(1.33) = 1 on md, below the counter minimum of 2
+  const s = sized(state(ws), { type: "move", id: "c", to: { x: 6, y: 0 }, bp: "md" });
+  for (const x of s.widgets) expect(x.layout.md!.w).toBeGreaterThanOrEqual(2);
+  for (const x of s.widgets) expect(x.layout.md!.h).toBeGreaterThanOrEqual(2);
+});
+
+test("a gesture that changes nothing creates no history", () => {
+  const s = state([w1]);
+  expect(editReducer(s, { type: "move", id: "w1", to: { x: 0, y: 0 }, bp: "lg" })).toBe(s);
 });
 
 test("shift moves a widget one place in phone order and is a no-op at the ends", () => {

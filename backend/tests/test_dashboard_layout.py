@@ -1,3 +1,7 @@
+import json
+from pathlib import Path
+from typing import Any
+
 import pytest
 from pydantic import ValidationError
 
@@ -65,3 +69,27 @@ def test_push_down_beyond_the_row_limit_is_a_settings_error() -> None:
 def test_chain_of_overlaps_stacks_without_gaps() -> None:
     out = normalize_rects([(c, Rect(x=0, y=0, w=12, h=2)) for c in "abc"])
     assert [out[c].y for c in "abc"] == [0, 2, 4]
+
+
+_CASES_FILE = (
+    Path(__file__).resolve().parents[2] / "frontend/src/dashboard/layout/normalizeCases.json"
+)
+_CASES = json.loads(_CASES_FILE.read_text())["cases"]
+
+
+@pytest.mark.parametrize("case", _CASES, ids=[c["name"] for c in _CASES])
+def test_matches_the_frontend_cross_check_fixture(case: dict[str, Any]) -> None:
+    """Drift guard: the frontend engine (grid.ts normalizeRects) runs the same cases."""
+    raw = case["input"]
+    if isinstance(raw, dict):
+        pairs = [(f"w{i:02d}", raw["rect"]) for i in range(raw["repeat"])]
+    else:
+        pairs = [(wid, r) for wid, r in raw]
+    items = [(wid, Rect(x=r[0], y=r[1], w=r[2], h=r[3])) for wid, r in pairs]
+    if "error" in case:
+        with pytest.raises(SettingsError) as e:
+            normalize_rects(items, cols=case["cols"])
+        assert e.value.message == case["error"]
+        return
+    out = normalize_rects(items, cols=case["cols"])
+    assert {k: [v.x, v.y, v.w, v.h] for k, v in out.items()} == case["expected"]

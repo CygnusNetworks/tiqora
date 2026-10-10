@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { EditWidget, Rect } from "../model";
-import { breakpointForWidth, layoutForBreakpoint, smOrder } from "./breakpoints";
+import { breakpointForWidth, layoutTooTall, layoutForBreakpoint, smOrder } from "./breakpoints";
 import { collides } from "./grid";
 
 const w = (id: string, lg: Rect): EditWidget => ({
@@ -64,4 +64,10 @@ test("lg output is overlap free and agrees with the backend rule", () => {
 
 test("smOrder is the array order, not the visual order", () => {
   expect(smOrder([w("b", { x: 0, y: 5, w: 3, h: 1 }), w("a", { x: 0, y: 0, w: 3, h: 1 })])).toEqual(["b", "a"]);
+});
+
+test("layoutTooTall flags lg and md layouts the backend would reject", () => {
+  expect(layoutTooTall([w("a", { x: 0, y: 0, w: 3, h: 2 })])).toBe(false);
+  expect(layoutTooTall([w("a", { x: 0, y: 990, w: 3, h: 24 })])).toBe(true);
+  expect(layoutTooTall([{ ...w("a", { x: 0, y: 0, w: 3, h: 2 }), layout: { lg: { x: 0, y: 0, w: 3, h: 2 }, md: { x: 0, y: 999, w: 3, h: 24 } } }])).toBe(true);
 });

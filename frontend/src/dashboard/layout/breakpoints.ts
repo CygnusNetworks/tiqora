@@ -47,3 +47,10 @@ export function layoutForBreakpoint(
 export function smOrder(widgets: EditWidget[]): string[] {
   return widgets.map((w) => w.id);
 }
+
+/** True when the backend would reject the layout ("Das Layout ist zu hoch."): lg at 12 cols, stored md at 8 cols. */
+export function layoutTooTall(widgets: EditWidget[]): boolean {
+  const lg = normalizeRects(widgets.map((w) => ({ id: w.id, rect: w.layout.lg })), COLS.lg).tooTall;
+  const md = normalizeRects(widgets.filter((w) => w.layout.md).map((w) => ({ id: w.id, rect: w.layout.md! })), COLS.md).tooTall;
+  return lg || md;
+}

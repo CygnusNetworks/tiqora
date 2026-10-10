@@ -91,8 +91,11 @@ describe("normalizeRects mirrors backend normalize_rects (normalizeCases.json)",
   for (const c of cases.cases) {
     test(c.name, () => {
       const input =
-        typeof c.input === "string"
-          ? Array.from({ length: 40 }, (_, i): [string, number[]] => [`w${String(i).padStart(2, "0")}`, [0, 999, 12, 24]])
+        !Array.isArray(c.input)
+          ? Array.from({ length: (c.input as { repeat: number }).repeat }, (_, i): [string, number[]] => [
+              `w${String(i).padStart(2, "0")}`,
+              (c.input as { rect: number[] }).rect,
+            ])
           : (c.input as [string, number[]][]);
       const { rects: out, tooTall } = normalizeRects(
         input.map(([id, [x, y, w, h]]) => ({ id, rect: { x, y, w, h } })),

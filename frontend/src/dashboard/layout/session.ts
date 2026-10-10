@@ -28,12 +28,15 @@ export interface EditState {
 type Bp = "lg" | "md";
 type Size = [number, number];
 
+/** Injected size limits per widget type (Task 12 passes the widget registry's sizes). Unknown type -> undefined. */
+export type SizeLookup = (typeKey: string) => { min: Size; max?: Size } | undefined;
+const noSizes: SizeLookup = () => undefined;
+
 export type EditAction =
   | { type: "reset"; name: string; widgets: EditWidget[]; version: number }
   | { type: "add"; def: WidgetLike; id: string; at?: { x: number; y: number }; bp: Bp }
   | { type: "move"; id: string; to: { x: number; y: number }; bp: Bp; now?: number; coalesce?: boolean }
-  // `min`/`max` (from the widget definition) are optional additions to D8: the reducer only knows type keys.
-  | { type: "resize"; id: string; size: { w: number; h: number }; bp: Bp; now?: number; coalesce?: boolean; min?: Size; max?: Size }
+  | { type: "resize"; id: string; size: { w: number; h: number }; bp: Bp; now?: number; coalesce?: boolean }
   | { type: "remove"; id: string }
   | { type: "duplicate"; id: string; newId: string }
   | { type: "settings"; id: string; settings: Record<string, unknown>; titleOverride: string | null }
@@ -64,10 +67,17 @@ function commit(s: EditState, patch: Partial<EditState>, coalesce: { key: string
   };
 }
 
-function itemsAt(widgets: EditWidget[], bp: Bp): LayoutItem[] {
+function limits(sizes: SizeLookup, key: string, cols: number): { min: Size; max: Size } {
+  const l = sizes(key);
+  const min = l?.min ?? [1, 1];
+  const max = l?.max ?? [cols, MAX_H];
+  return { min: [Math.min(min[0], cols), min[1]], max: [Math.min(max[0], cols), max[1]] };
+}
+
+function itemsAt(widgets: EditWidget[], bp: Bp, sizes: SizeLookup): LayoutItem[] {
   const cols = COLS[bp];
-  const rects = layoutForBreakpoint(widgets, bp, () => [1, 1]);
-  return widgets.map((w) => ({ id: w.id, rect: rects.get(w.id)!, min: [1, 1], max: [cols, MAX_H] }));
+  const rects = layoutForBreakpoint(widgets, bp, (k) => limits(sizes, k, cols).min);
+  return widgets.map((w) => ({ id: w.id, rect: rects.get(w.id)!, ...limits(sizes, w.type_key, cols) }));
 }
 
 /** Write the rects of `items` back into `layout[bp]` of every widget (md becomes explicit for all). */
@@ -80,16 +90,16 @@ function applyItems(widgets: EditWidget[], bp: Bp, items: LayoutItem[]): EditWid
   });
 }
 
-function gesture(s: EditState, a: Extract<EditAction, { type: "move" | "resize" }>): EditState {
+function gesture(s: EditState, a: Extract<EditAction, { type: "move" | "resize" }>, sizes: SizeLookup): EditState {
   const cols = COLS[a.bp];
-  let items = itemsAt(s.widgets, a.bp);
+  const items = itemsAt(s.widgets, a.bp, sizes);
   const idx = items.findIndex((i) => i.id === a.id);
   if (idx < 0) return s;
-  if (a.type === "resize" && (a.min || a.max)) {
-    items = items.map((i) => (i.id === a.id ? { ...i, min: a.min ?? i.min, max: a.max ?? i.max } : i));
-  }
   const next =
     a.type === "move" ? moveItem(items, a.id, a.to, cols) : resizeItem(items, a.id, a.size, cols);
+  if (next.every((n, i) => JSON.stringify(n.rect) === JSON.stringify(items[i].rect))) {
+    return s; // no-op gesture: no history step
+  }
   const widgets = applyItems(s.widgets, a.bp, next);
   const key = `${a.type}:${a.id}:${a.bp}`;
   if (a.coalesce && a.now !== undefined) {
@@ -113,7 +123,15 @@ function restore(s: EditState, from: Snapshot, past: Snapshot[], future: Snapsho
   };
 }
 
-export function editReducer(s: EditState, a: EditAction): EditState {
+/** Pure reducer with injected per-type size limits (min/max); unknown types fall back to [1,1]. */
+export function createEditReducer(sizes: SizeLookup): (s: EditState, a: EditAction) => EditState {
+  return (s, a) => reduce(s, a, sizes);
+}
+
+/** Reducer without size knowledge (every type is [1,1]..[cols,24]). Prefer `createEditReducer`. */
+export const editReducer = createEditReducer(noSizes);
+
+function reduce(s: EditState, a: EditAction, sizes: SizeLookup): EditState {
   switch (a.type) {
     case "reset":
       return initialEditState(a.name, a.widgets, a.version);
@@ -121,11 +139,11 @@ export function editReducer(s: EditState, a: EditAction): EditState {
       return a.id === s.selectedId ? s : { ...s, selectedId: a.id };
     case "move":
     case "resize":
-      return gesture(s, a);
+      return gesture(s, a, sizes);
     case "add": {
       const [w, h] = a.def.size.default;
       const cols = COLS[a.bp];
-      const items = itemsAt(s.widgets, a.bp);
+      const items = itemsAt(s.widgets, a.bp, sizes);
       const spot = a.at ?? firstFreeSpot(items, w, h, cols);
       const rect = clampRect({ ...spot, w, h }, cols, a.def.size.min, a.def.size.max);
       const fresh: LayoutItem = { id: a.id, rect, min: a.def.size.min, max: a.def.size.max };
@@ -141,7 +159,7 @@ export function editReducer(s: EditState, a: EditAction): EditState {
       let widgets = [...s.widgets, widget];
       if (a.bp === "md") {
         // md edit: the lg rect of the new widget goes to the first free lg spot
-        const lg = firstFreeSpot(itemsAt(s.widgets, "lg"), w, h, COLS.lg);
+        const lg = firstFreeSpot(itemsAt(s.widgets, "lg", sizes), w, h, COLS.lg);
         widget = { ...widget, layout: { lg: { ...lg, w, h }, md: rect } };
         widgets = [...s.widgets, widget];
       }
@@ -155,7 +173,7 @@ export function editReducer(s: EditState, a: EditAction): EditState {
       const idx = s.widgets.findIndex((w) => w.id === a.id);
       if (idx < 0) return s;
       const src = s.widgets[idx];
-      const lgItems = itemsAt(s.widgets, "lg");
+      const lgItems = itemsAt(s.widgets, "lg", sizes);
       const spot = firstFreeSpot(lgItems, src.layout.lg.w, src.layout.lg.h, COLS.lg);
       const copy: EditWidget = {
         ...src,
@@ -169,7 +187,7 @@ export function editReducer(s: EditState, a: EditAction): EditState {
     case "settings": {
       if (!s.widgets.some((w) => w.id === a.id)) return s;
       return commit(s, {
-        widgets: s.widgets.map((w) => (w.id === a.id ? { ...w, settings: a.settings, title_override: a.titleOverride } : w)),
+        widgets: s.widgets.map((w) => (w.id === a.id ? { ...w, settings: structuredClone(a.settings), title_override: a.titleOverride } : w)),
       });
     }
     case "rename":
