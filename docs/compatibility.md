@@ -796,7 +796,7 @@ narrower than Znuny), **by design** (deliberate platform choice).
 | Znuny feature | Status | Note |
 |---|---|---|
 | SysConfig edit/deploy UI | by design | Settings are read from `sysconfig_*`; change them in Znuny or via `Admin::Config::Update` |
-| Package Manager (OPM), Support Data Collector, Cloud Services, OTRSBusiness, web installer | by design | |
+| Package Manager (OPM), Support Data Collector, Cloud Services, OTRSBusiness, web installer | by design | OPM itself is by design (Perl packages cannot run). Tiqora plugins replace OPM add-ons (phase 1: settings, routes, ticket events, scheduled tasks, background jobs, MCP tools and four UI slots); see [plugins.md](plugins.md). |
 | Sessions, SelectBox SQL, performance log, maintenance windows | missing | A user's sessions can be revoked from user admin |
 | General system log / communication log | missing | Mail log and AI audit exist |
 | Calendar admin, ticket appointment rules (queue/SLA) | missing | Agent calendar exists; only the calendar name is set on queue/SLA |

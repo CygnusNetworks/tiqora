@@ -737,7 +737,7 @@ export const PLUGIN_SHARED_MODULES = [
 - Plugin build (`@tiqora/plugin-sdk/vite`): `tiqoraPluginConfig({ entry, outDir })` → Vite library build, `formats: ["es"]`, `fileName: "index"`, `rollupOptions.external` = every specifier, `output.paths` = specifier → `PLUGIN_RUNTIME_PATH + file + ".js"`, `output.inlineDynamicImports: true` (R-HATCH-I18N), `cssCodeSplit: false`.
 - Loader: `GET /api/v1/plugins/frontend` (React Query key `["plugins", "frontend"]`, `staleTime: Infinity`, `retry: false`; error → zero plugins, no toast), fetched only inside `AgentShell` and `AdminShell` (`PluginProvider`), never on login/portal. `loadPluginModule(p)` → `import(/* @vite-ignore */ p.asset_base + p.entry)` raced against `PLUGIN_IMPORT_TIMEOUT_MS = 10000`; result must be `{ default: { components: Record<string, ComponentType> } }`; cached per `id@version`; style links appended once (`<link rel="stylesheet">`, same origin). i18n: `ensurePluginI18n(p, lang)` fetches `asset_base + "i18n/<lang>.json"` (fallback `en`, then nothing) into namespace `plugin.<id>` (`i18n.addResourceBundle(lang, ns, data, true, true)`), so keys like `plugin.com.example.hello:settings.title` resolve anywhere.
 - Safe mode: `?plugins=off` stores `sessionStorage["tiqora.plugins.off"]="1"` (until `?plugins=on` or the tab closes); `PluginProvider` then neither fetches nor imports; the admin plugins page shows "Erweiterungen sind in diesem Browserfenster ausgeschaltet".
-- Containment: every slot instance renders inside `<PluginBoundary pluginId pluginName>` (class error boundary + `Suspense`); failures render "Erweiterung „{{name}}“ konnte nicht geladen werden." (+ "Details" with the message) and log `console.error` once.
+- Containment: every slot instance renders inside `<PluginBoundary plugin>` (`plugin` is the `FrontendPlugin`; id and name come from it) (class error boundary + `Suspense`); failures render "Erweiterung „{{name}}“ konnte nicht geladen werden." (+ "Details" with the message) and log `console.error` once.
 - Slots: `agent.nav` → `PluginNavItems group=…` inside each existing `NavGroup` plus a new group "Erweiterungen" (`sidebar.plugins`) for `group: "plugins"`, links to `/agent/plugins/$pluginId/<route.path>`, rendered from the manifest without loading plugin code (labels from the plugin namespace, fallback: contribution key); `agent.route` → one TanStack route `/agent/plugins/$pluginId/$` (`PluginRoutePage`, longest `path` prefix match of the splat, props `{ path, subPath }`); `ticket.sidebar` → `PluginTicketPanels ticketId` between `ProcessWidget` and `PresenceBar` in `TicketZoomPage` (each panel a bordered card with title, ordered by `order`; nothing else in the zoom changes — memory "Ticketansicht: fertige Teile"); `dashboard.widget` → P13.
 - SDK runtime surface (`packages/plugin-sdk/src/index.ts`, all runtime values `declare`d, implemented by `frontend/src/plugins/sdkRuntime.tsx`; `sdkRuntime.tsx` ends with `export const runtimeCheck = { … } satisfies SdkRuntime` so `pnpm lint` (tsc) fails on drift):
 
@@ -804,11 +804,14 @@ export interface WidgetDefinition<S = Record<string, unknown>> {
   dataEndpoint: string | null;               // backend provider key (dashboards plan adds core.dashboard.providers);
                                              // null for plugin widgets in phase 1 (they call their own routes)
   refreshOn: string[];                       // SSE event types
-  permission: string | null;
+  permission: string | null;                 // reserved; phase 1 ignores it (the dashboards plan defines its semantics)
   component: ComponentType<WidgetProps<S>>;  // plugin: lazy, wrapped in PluginBoundary by the host
   migrate?: (old: unknown, fromVersion: number) => S;
 }
-export const DASHBOARD_WIDGETS = createExtensionPoint<WidgetDefinition>("core.dashboard.widgets", (w) => w.key);
+// Items may have any settings type: WidgetDefinition<{ city: string }> is not assignable to
+// WidgetDefinition<Record<string, unknown>> under strictFunctionTypes (R-WIDGET-GENERIC).
+export const DASHBOARD_WIDGETS: ExtensionPoint<WidgetDefinition<any>>   // createExtensionPoint<WidgetDefinition<any>>("core.dashboard.widgets", (w) => w.key); register() also wakes useDashboardWidgetDefinitions
+export function defineWidget<S>(def: WidgetDefinition<S>): WidgetDefinition<any>  // typed widgets register without casts
 export function registerPluginWidgets(plugins: FrontendPlugin[]): void   // idempotent; owner = plugin id
 export function useDashboardWidgetDefinitions(): WidgetDefinition[]      // re-renders when plugins finished loading
 ```

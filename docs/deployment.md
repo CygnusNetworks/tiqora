@@ -14,6 +14,7 @@ built frontend static assets. Process role is selected at start:
 | `worker` | Background worker (Znuny-write poller, indexing, outbox/webhooks, daemon takeovers, background-job runner for exports and the GenericInterface mails (`ArticleSend`, auto responses) etc.; poll interval `TIQORA_JOBS_POLL_INTERVAL_SECONDS`, default 2, range 1-60) |
 | `ai-worker` | AI subsystem loop (triage, auto-reply, auto-summary), isolated from the main worker; inert unless `operation_mode=tiqora_primary` and `daemon.ai_worker.enabled` |
 | `mcp` | FastMCP server |
+| `tiqora <command…>` | One-off CLI run through the entrypoint (`tiqora migrate upgrade`, `tiqora plugins list`, `tiqora plugins bake …`); no server is started |
 
 Registry targets (CI):
 
@@ -72,6 +73,66 @@ and never commit real credentials.
 
 Full settings live in `tiqora.config.Settings` (pydantic-settings). See below
 for OIDC and Kerberos/SPNEGO-specific variables.
+
+## Erweiterungen einbauen (Plugins)
+
+Plugins (see [plugins.md](plugins.md)) are installed **only by baking them into
+the image**: there is no runtime `pip install`, and the baked image ships
+without `pip`. Admins can switch plugins on and off and edit their settings;
+nothing else.
+
+### Bake workflow
+
+1. Write `plugins.txt` (pinned names or built wheels, optional
+   `--hash=sha256:…` per line, at most one `--index-url https://…`; git
+   sources and `--extra-index-url` are rejected). Use hashes in production:
+   once any line has a hash pip requires hashes for the transitive
+   dependencies too.
+2. Generate the build context with the image you run today:
+
+   ```bash
+   docker run --rm -v "$PWD:/work" ghcr.io/cygnusnetworks/tiqora:<version> \
+     tiqora plugins bake /work/plugins.txt --output /work/build
+   ```
+
+   (`--base-image <image>` when the image has no release version.)
+3. `docker build -t tiqora-with-plugins build/`. The last build step runs
+   `tiqora plugins verify --import --strict`: a plugin that is incomplete
+   (for example `web/index.js` dropped from the wheel by `.gitignore`), cannot
+   be imported, or pins `tiqora`/`tiqora-sdk` fails the build.
+4. Use the new image for `tiqora-api`, `tiqora-worker` **and** `tiqora-mcp`.
+   The `ai-worker` does not load plugins.
+
+### Restart order
+
+Roll out in this order: `tiqora-api` first, then `tiqora-worker` and
+`tiqora-mcp`. The first release with plugins adds the `tiqora_plugin*` tables
+through the API's migration at start (`TIQORA_RUN_MIGRATIONS=1`). A worker or
+MCP process that starts earlier boots core-only, logs `plugins_boot_failed`
+and retries loading plugins every 60 seconds for up to 30 minutes; after that
+it needs a restart. Run exactly **one** `tiqora-worker` replica: with two,
+every plugin task runs twice and event subscribers race for their cursors.
+Switching a plugin on or off takes effect after a restart of all three.
+
+### Environment variables
+
+| Variable | Default | Notes |
+|---|---|---|
+| `TIQORA_PLUGINS_SAFE_MODE` | `false` | `1` imports no plugin code in api/worker/mcp. The admin page still lists plugins (without importing them). |
+| `TIQORA_PLUGINS_DISABLED` | *(empty)* | Comma-separated plugin ids that are not loaded, whatever their switch says. |
+| `TIQORA_PLUGINS_AUTO_ENABLE` | `true` | Newly discovered plugins start switched on; `0` requires a click in the admin page. |
+| `TIQORA_PLUGINS_IMPORT_TIMEOUT_SECONDS` | `20` (1–300) | Import limit per plugin. A timed-out import keeps running in its daemon thread and its module-level side effects can still happen; an import that holds the GIL in C cannot be timed out at all (use safe mode or `TIQORA_PLUGINS_DISABLED`). |
+| `TIQORA_PLUGINS_BOOT_BUDGET_SECONDS` | `60` (1–3600) | Total import time of all plugins per process start; plugins after it are marked failed without being imported. |
+| `TIQORA_PLUGIN_EVENTS_INTERVAL_SECONDS` | `5` (5–300) | Tick of the event delivery loop (`plugin_events`). |
+| `TIQORA_PLUGIN_EVENTS_GAP_HOLD_SECONDS` | `60` (5–3600) | How long a missing `ticket_history` id holds delivery back before it is skipped. Run Galera with a single write node: events from rows committed late on another write node can be missed. |
+| `TIQORA_PLUGIN_TASKS_INTERVAL_SECONDS` | `15` (5–300) | Tick of the scheduled-task loop (`plugin_tasks`). |
+
+Plugin handler and task timeouts are cooperative: blocking code in a plugin
+freezes the process, and a running task holds the `plugin_tasks` loop for up to
+300 seconds. Browser safe mode (`?plugins=off`) loads no plugin code in that
+tab. The SPA CSP (`script-src 'self'`, `connect-src 'self'`) is the only
+browser-side control for plugin frontends and is enforced only in production
+(`TIQORA_CSP_ENFORCE`).
 
 ## OIDC / SSO configuration
 

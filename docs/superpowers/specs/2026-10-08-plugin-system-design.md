@@ -1,7 +1,9 @@
 # Plugin system — design
 
 > Part of the [competitive parity roadmap](2026-10-08-competitive-parity-roadmap-design.md).
-> Status: proposed 2026-10-08. Decisions below are fixed unless marked "open".
+> Status: proposed 2026-10-08. Phase 1 implemented 2026-10-10 — see plan
+> [2026-10-10-wave2-plugin-system](../plans/2026-10-10-wave2-plugin-system.md) and
+> [plugins.md](../../plugins.md). Decisions below are fixed unless marked "open".
 
 ## Goal
 
