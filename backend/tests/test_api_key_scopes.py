@@ -161,6 +161,12 @@ _UNSCOPED_EXEMPT: frozenset[str] = frozenset(
         "/api/v1/oauth2/callback",
     }
 )
+# Prefixes whose routes are deliberately sessions/unrestricted-keys only (R-DASH-APIKEY:
+# the dashboard data route mixes the tickets, calendar and agents areas).
+_UNSCOPED_EXEMPT_PREFIXES: tuple[str, ...] = (
+    "/api/v1/dashboards",
+    "/api/v1/dashboard-widget-types",
+)
 
 
 def test_every_api_v1_route_resolves_to_a_known_scope_area() -> None:
@@ -176,7 +182,10 @@ def test_every_api_v1_route_resolves_to_a_known_scope_area() -> None:
     unknown = sorted(
         p
         for p in paths
-        if p.startswith("/api/v1/") and p not in _UNSCOPED_EXEMPT and path_to_area(p) == "_unknown"
+        if p.startswith("/api/v1/")
+        and p not in _UNSCOPED_EXEMPT
+        and not p.startswith(_UNSCOPED_EXEMPT_PREFIXES)
+        and path_to_area(p) == "_unknown"
     )
     assert unknown == []
 
@@ -227,3 +236,39 @@ def test_reports_and_reporting_map_to_stats() -> None:
     assert not scopes_allow(frozenset({"tickets:rw"}), method="GET", path="/api/v1/reports")
     # the admin reporting page stays admin-only
     assert path_to_area("/api/v1/admin/reporting/status") == "admin"
+
+
+def test_dashboards_stay_unknown_so_only_sessions_and_unrestricted_keys_get_in() -> None:
+    """R-DASH-APIKEY: /data mixes tickets, calendar and agents, so no single area fits."""
+    paths = (
+        "/api/v1/dashboards",
+        "/api/v1/dashboards/1",
+        "/api/v1/dashboards/1/data",
+        "/api/v1/dashboards/1/widgets/wid00001/settings",
+        "/api/v1/dashboard-widget-types",
+        "/api/v1/dashboard-widget-types/core.counter/data",
+    )
+    for path in paths:
+        assert path_to_area(path) == "_unknown", path
+        assert path_to_areas(path) == ("_unknown",), path
+    # the admin templates keep their admin area by prefix
+    assert path_to_area("/api/v1/admin/dashboard-templates") == "admin"
+    for scopes in (
+        frozenset({"tickets:rw"}),
+        frozenset({"tickets:ro"}),
+        frozenset({"read"}),
+        frozenset({"write"}),
+        frozenset({"stats:rw"}),
+    ):
+        for method in ("GET", "PUT", "PATCH", "DELETE", "POST"):
+            for path in ("/api/v1/dashboards/1", "/api/v1/dashboard-widget-types"):
+                assert not scopes_allow(scopes, method=method, path=path), (scopes, method, path)
+        with pytest.raises(HTTPException) as exc:
+            assert_scope_allows(scopes, method="GET", path="/api/v1/dashboards/1")
+        assert exc.value.status_code == 403
+        with pytest.raises(HTTPException) as exc:
+            assert_scope_allows(scopes, method="PUT", path="/api/v1/dashboards/1")
+        assert exc.value.status_code == 403
+    for method in ("GET", "PUT", "DELETE"):
+        assert scopes_allow(None, method=method, path="/api/v1/dashboards/1")
+        assert_scope_allows(None, method=method, path="/api/v1/dashboards/1")
