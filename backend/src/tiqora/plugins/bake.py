@@ -68,11 +68,18 @@ def parse_plugins_txt(path: Path) -> PluginsTxt:
                     f"{where}: --extra-index-url ist nicht erlaubt (Verwechslungsgefahr mit "
                     "öffentlichen Paketen); bitte genau einen internen --index-url nutzen"
                 )
-            if name == "--index-url" and value.strip():
+            if name == "--index-url":
+                url = value.strip()
+                if not url or len(url.split()) != 1:
+                    raise BakeError(
+                        f"{where}: --index-url erwartet genau eine Adresse und sonst nichts"
+                    )
+                if not url.startswith("https://"):
+                    raise BakeError(f"{where}: --index-url muss mit https:// beginnen")
                 if index_seen:
                     raise BakeError(f"{where}: --index-url darf nur einmal vorkommen")
                 index_seen = True
-                lines.append(f"--index-url {value.strip()}")
+                lines.append(f"--index-url {url}")
                 continue
             if name.startswith("--hash"):
                 raise BakeError(f"{where}: --hash gehört ans Ende einer Paketzeile")
@@ -129,15 +136,19 @@ def render_dockerfile(base_image: str, *, has_wheels: bool) -> str:
 
 
 def default_base_image(env: Mapping[str, str] = os.environ) -> str | None:
-    import tiqora_sdk  # noqa: F401  (loads first: compat -> tiqora_sdk -> API -> compat cycle)
     from tiqora.plugins.compat import release_core_version
 
     version = release_core_version(env)
     return f"{IMAGE_REPOSITORY}:{version}" if version is not None else None
 
 
+_IMAGE_RE: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/:@-]*$")
+
+
 def bake(plugins_txt: Path, output: Path, *, base_image: str | None) -> None:
     parsed = parse_plugins_txt(plugins_txt)
+    if base_image is not None and not _IMAGE_RE.fullmatch(base_image):
+        raise BakeError(f"--base-image „{base_image}“ ist keine gültige Image-Angabe")
     image = base_image or default_base_image()
     if image is None:
         raise BakeError(
@@ -191,7 +202,6 @@ async def verify_installed_plugins(
     timeout: float,  # noqa: ASYNC109  (mirrors run_in_daemon_thread)
 ) -> list[str]:
     """One German line per problem, prefixed with the plugin id; empty when all is well."""
-    import tiqora_sdk  # noqa: F401  (loads first: compat -> tiqora_sdk -> API -> compat cycle)
     from tiqora.plugins.compat import check_compat, release_core_version
     from tiqora.plugins.loader import run_in_daemon_thread
 

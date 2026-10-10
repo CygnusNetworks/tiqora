@@ -52,7 +52,6 @@ def add_plugins_subparser(sub: argparse._SubParsersAction) -> None:  # type: ign
 
 
 async def _cmd_list(args: argparse.Namespace) -> int:
-    import tiqora_sdk  # noqa: F401  (loads first: compat -> tiqora_sdk -> API -> compat cycle)
     from tiqora.plugins.compat import check_compat, release_core_version
 
     core = release_core_version()

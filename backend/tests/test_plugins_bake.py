@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import types
 from pathlib import Path
 
@@ -73,6 +75,9 @@ def test_parse_passes_hashes_through(tmp_path: Path) -> None:
         ("--extra-index-url https://git.example.org/simple", "--extra-index-url"),
         ("crm @ git+https://git.example.org/crm.git", "gebautes Wheel"),
         ("git+https://git.example.org/crm.git", "gebautes Wheel"),
+        ("--index-url https://a.example.org/s --trusted-host a.example.org", "genau eine Adresse"),
+        ("--index-url", "genau eine Adresse"),
+        ("--index-url http://a.example.org/simple", "https://"),
         ("crm==1.0 --hash=sha256:xyz", "--hash"),
         ("crm==1.0 --no-binary", "--hash"),
         ("./src", "Wheel"),
@@ -232,3 +237,25 @@ def test_entrypoint_has_passthrough_role() -> None:
     assert "api|worker|mcp|ai-worker|tiqora" in text
     dockerfile = (root / "Dockerfile").read_text()
     assert "plugins constraints > /app/backend/core-constraints.txt" in dockerfile
+
+
+def test_bake_rejects_bad_base_image(tmp_path: Path) -> None:
+    with pytest.raises(BakeError, match="--base-image"):
+        bake(_txt(tmp_path, "a==1\n"), tmp_path / "out", base_image="x\nUSER root")
+
+
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "import tiqora.plugins.compat",
+        "import tiqora.plugins.bootstrap",
+        "import tiqora.worker.__main__; import tiqora.plugins.bootstrap",
+        "import tiqora.mcp_server.server",
+        "import tiqora.main",
+    ],
+)
+def test_fresh_process_imports(statement: str) -> None:
+    done = subprocess.run(
+        [sys.executable, "-c", statement], capture_output=True, text=True, timeout=120
+    )
+    assert done.returncode == 0, done.stderr[-2000:]

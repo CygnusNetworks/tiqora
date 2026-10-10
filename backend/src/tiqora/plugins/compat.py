@@ -12,7 +12,6 @@ from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
 from tiqora.plugins.manifest import PluginManifest
-from tiqora_sdk import SDK_VERSION
 
 log = structlog.get_logger(__name__)
 
@@ -30,9 +29,14 @@ def release_core_version(env: Mapping[str, str] = os.environ) -> Version | None:
 
 
 def check_compat(
-    manifest: PluginManifest, *, core: Version | None, sdk: str = SDK_VERSION
+    manifest: PluginManifest, *, core: Version | None, sdk: str | None = None
 ) -> str | None:
     """German reason why the plugin cannot run here, or None when compatible."""
+    if sdk is None:
+        # lazy: tiqora_sdk imports the API, which imports this module (import cycle otherwise)
+        from tiqora_sdk import SDK_VERSION
+
+        sdk = SDK_VERSION
     if not SpecifierSet(manifest.sdk).contains(Version(sdk), prereleases=True):
         return f"Erweiterung benötigt SDK {manifest.sdk}, dieses Tiqora bringt {sdk} mit"
     if manifest.tiqora is None:
