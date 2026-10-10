@@ -2756,7 +2756,8 @@
         "agents": "坐席",
         "admin": "管理接口",
         "mcp": "MCP服务器",
-        "compat": "Zuny 通用接口"
+        "compat": "Zuny 通用接口",
+        "plugins": "Extensions (plugins)"
       }
     },
     "processes": {

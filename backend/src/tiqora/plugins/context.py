@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tiqora.db.engine import get_session_factory
 from tiqora.security.outbound import HostResolver, pin_outbound_url
 
 if TYPE_CHECKING:
@@ -127,8 +128,6 @@ class PluginTickets:
         the ticket is then only returned when that agent holds ``ro`` on its queue.
         """
         if session is None:
-            from tiqora.db.engine import get_session_factory
-
             async with get_session_factory()() as own:
                 return await self.get(ticket_id, as_agent=as_agent, session=own)
         row = (await session.execute(_TICKET_SQL, {"id": ticket_id})).first()
@@ -166,8 +165,6 @@ class PluginContext:
         return structlog.get_logger("plugin").bind(plugin=self.plugin_id)  # type: ignore[no-any-return]
 
     def session_factory(self) -> async_sessionmaker[AsyncSession]:
-        from tiqora.db.engine import get_session_factory
-
         return get_session_factory()
 
     async def settings(self, session: AsyncSession | None = None) -> BaseModel:
@@ -182,7 +179,7 @@ class PluginContext:
             raise LookupError("Erweiterung hat keine Einstellungen")
         secret_key = get_settings().secret_key
         if session is None:
-            async with self.session_factory()() as own:
+            async with get_session_factory()() as own:
                 return await load_section_values(own, section, secret_key=secret_key)
         return await load_section_values(session, section, secret_key=secret_key)
 

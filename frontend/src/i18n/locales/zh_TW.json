@@ -2756,7 +2756,8 @@
         "agents": "服務人員",
         "admin": "管理介面",
         "mcp": "MCP伺服器",
-        "compat": "Zuny 通用介面"
+        "compat": "Zuny 通用介面",
+        "plugins": "Extensions (plugins)"
       }
     },
     "processes": {

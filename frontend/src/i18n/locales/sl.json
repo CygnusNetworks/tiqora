@@ -2756,7 +2756,8 @@
         "agents": "Agenti",
         "admin": "Skrbniški API",
         "mcp": "MCP strežnik",
-        "compat": "Znuny GenericInterface"
+        "compat": "Znuny GenericInterface",
+        "plugins": "Extensions (plugins)"
       }
     },
     "processes": {

@@ -2756,7 +2756,8 @@
         "agents": "Agen",
         "admin": "API Admin",
         "mcp": "server MCP",
-        "compat": "Antarmuka Generik Znuny"
+        "compat": "Antarmuka Generik Znuny",
+        "plugins": "Extensions (plugins)"
       }
     },
     "processes": {

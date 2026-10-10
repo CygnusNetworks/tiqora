@@ -2756,7 +2756,8 @@
         "agents": "Πράκτορες",
         "admin": "API διαχειριστή",
         "mcp": "Διακομιστής MCP",
-        "compat": "Γενική διεπαφή Znuny"
+        "compat": "Γενική διεπαφή Znuny",
+        "plugins": "Extensions (plugins)"
       }
     },
     "processes": {

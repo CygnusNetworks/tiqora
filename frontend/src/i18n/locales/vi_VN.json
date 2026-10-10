@@ -2756,7 +2756,8 @@
         "agents": "Nhân viên",
         "admin": "API quản trị",
         "mcp": "máy chủ MCP",
-        "compat": "Giao diện chung của Znuny"
+        "compat": "Giao diện chung của Znuny",
+        "plugins": "Extensions (plugins)"
       }
     },
     "processes": {

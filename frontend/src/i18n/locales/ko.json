@@ -2756,7 +2756,8 @@
         "agents": "에이전트",
         "admin": "관리 API",
         "mcp": "MCP 서버",
-        "compat": "Znuny 일반 인터페이스"
+        "compat": "Znuny 일반 인터페이스",
+        "plugins": "Extensions (plugins)"
       }
     },
     "processes": {

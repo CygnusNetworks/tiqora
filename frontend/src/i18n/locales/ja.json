@@ -2764,7 +2764,8 @@
         "agents": "エージェント",
         "admin": "管理者API",
         "mcp": "MCPサーバー",
-        "compat": "Znuny GenericInterface"
+        "compat": "Znuny GenericInterface",
+        "plugins": "Extensions (plugins)"
       }
     },
     "processes": {

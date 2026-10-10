@@ -2756,7 +2756,8 @@
         "agents": "Temsilciler",
         "admin": "Yönetici API'sı",
         "mcp": "MCP sunucusu",
-        "compat": "Znuny GenericArayüz"
+        "compat": "Znuny GenericArayüz",
+        "plugins": "Extensions (plugins)"
       }
     },
     "processes": {

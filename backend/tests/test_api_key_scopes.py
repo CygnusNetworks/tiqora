@@ -71,6 +71,7 @@ def test_path_to_area_mapping() -> None:
     assert path_to_area("/api/v1/auth/me") is None
     assert path_to_area("/znuny-compat/TicketGet") == "compat"
     assert path_to_area("/api/v1/unknown-thing") == "_unknown"
+    assert path_to_area("/api/plugins/org.example.hello/hello") == "plugins"
 
 
 def test_scopes_allow_area_ro_rw() -> None:
@@ -227,3 +228,12 @@ def test_reports_and_reporting_map_to_stats() -> None:
     assert not scopes_allow(frozenset({"tickets:rw"}), method="GET", path="/api/v1/reports")
     # the admin reporting page stays admin-only
     assert path_to_area("/api/v1/admin/reporting/status") == "admin"
+
+
+def test_plugins_area_scopes() -> None:
+    path = "/api/plugins/org.example.hello/echo"
+    assert not scopes_allow(frozenset({"kb:rw", "tickets:rw"}), method="GET", path=path)
+    assert scopes_allow(frozenset({"plugins:ro"}), method="GET", path=path)
+    assert not scopes_allow(frozenset({"plugins:ro"}), method="POST", path=path)
+    assert scopes_allow(frozenset({"plugins:rw"}), method="POST", path=path)
+    assert scopes_allow(None, method="POST", path=path)

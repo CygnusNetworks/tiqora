@@ -2756,7 +2756,8 @@
         "agents": "عوامل",
         "admin": "API مدیریت",
         "mcp": "سرور MCP",
-        "compat": "رابط عمومی Znuny"
+        "compat": "رابط عمومی Znuny",
+        "plugins": "Extensions (plugins)"
       }
     },
     "processes": {

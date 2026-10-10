@@ -2756,7 +2756,8 @@
         "agents": "Agenti",
         "admin": "Administratorski API",
         "mcp": "MCP poslužitelj",
-        "compat": "Znuny generičko sučelje"
+        "compat": "Znuny generičko sučelje",
+        "plugins": "Extensions (plugins)"
       }
     },
     "processes": {

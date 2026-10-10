@@ -2756,7 +2756,8 @@
         "agents": "Agenten",
         "admin": "Beheer API",
         "mcp": "MCP-server",
-        "compat": "Znuny Generieke interface"
+        "compat": "Znuny Generieke interface",
+        "plugins": "Extensions (plugins)"
       }
     },
     "processes": {

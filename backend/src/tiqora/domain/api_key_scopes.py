@@ -35,6 +35,7 @@ API_KEY_AREAS: tuple[str, ...] = (
     "admin",
     "mcp",
     "compat",
+    "plugins",
 )
 
 API_KEY_AREAS_SET: frozenset[str] = frozenset(API_KEY_AREAS)
@@ -79,6 +80,8 @@ _PATH_PREFIX_TO_AREA: tuple[tuple[str, str], ...] = (
     ("/api/v1/agents", "agents"),
     ("/api/v1/sse", "events"),
     ("/znuny-compat", "compat"),
+    # Plugin routes (third-party code) mount outside /api/v1; they need an explicit grant.
+    ("/api/plugins", "plugins"),
 )
 
 # Prefixes whose area is held by several features: any one of them grants access

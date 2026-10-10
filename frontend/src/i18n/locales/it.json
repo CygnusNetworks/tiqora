@@ -2756,7 +2756,8 @@
         "agents": "Agenti",
         "admin": "Amministratore API",
         "mcp": "Server MCP",
-        "compat": "ZnunyInterfaccia generica"
+        "compat": "ZnunyInterfaccia generica",
+        "plugins": "Extensions (plugins)"
       }
     },
     "processes": {

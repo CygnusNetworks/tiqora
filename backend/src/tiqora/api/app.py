@@ -103,7 +103,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Build + freeze the extension registry now so a broken registration fails at boot.
     from tiqora.plugins.bootstrap import init_registry
 
-    await init_registry(role="api", settings=settings, session_factory=app.state.session_factory)
+    registry = await init_registry(
+        role="api", settings=settings, session_factory=app.state.session_factory
+    )
+    from tiqora.plugins.routes import mount_plugin_routes
+
+    mount_plugin_routes(app, registry)
 
     # Detect OTRS/Znuny schema tier and refuse unknown shapes (with override).
     # Soft-skip only when the DB is unreachable (dev/tests without a peer DB);
@@ -402,6 +407,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "docs": "/docs",
                 "health": "/health",
             }
+
+    # Plugin routes (/api/plugins/<id>/…): sub-apps are mounted by the lifespan once the
+    # registry is built. Must come before the SPA fallback.
+    from tiqora.plugins.routes import create_plugin_router
+
+    app.state.plugin_router = create_plugin_router()
+    app.mount("/api/plugins", app.state.plugin_router)
 
     # Must be last: the SPA fallback matches any remaining GET path.
     mount_spa(app, cfg)

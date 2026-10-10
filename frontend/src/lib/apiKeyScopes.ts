@@ -19,6 +19,7 @@ export const API_KEY_AREAS = [
   "admin",
   "mcp",
   "compat",
+  "plugins",
 ] as const;
 
 export type ApiKeyArea = (typeof API_KEY_AREAS)[number];
