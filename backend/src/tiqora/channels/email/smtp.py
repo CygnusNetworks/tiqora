@@ -8,10 +8,10 @@ protocol so tests can inject a capturing fake.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from email import policy as email_policy
 from email.message import EmailMessage
-from email.utils import formatdate, getaddresses, make_msgid
+from email.utils import formatdate, getaddresses, make_msgid, parseaddr
 from typing import TYPE_CHECKING, Literal, Protocol
 
 import aiosmtplib
@@ -61,6 +61,34 @@ def envelope_recipients(message: EmailMessage, extra: str | None) -> list[str] |
     if extra not in recipients:
         recipients.append(extra)
     return recipients
+
+
+#: RFC 2606 reserves the ``.invalid`` TLD; Tiqora uses it for chat visitors without an address
+#: (``visitor-…@chat.invalid``). No mail path may hand such an address to the mail server.
+INVALID_TLD = "invalid"
+_INVALID_TLD_REFUSAL = "5.1.2 Reserved .invalid domain, not sent"
+
+
+def is_reserved_invalid_address(address: str) -> bool:
+    """True for an address (bare or ``"Name" <addr>``) in the reserved ``.invalid`` TLD."""
+    _name, addr = parseaddr(address or "")
+    domain = addr.rpartition("@")[2].strip().rstrip(".").lower()
+    return domain == INVALID_TLD or domain.endswith("." + INVALID_TLD)
+
+
+def drop_invalid_tld(addresses: Iterable[str], *, context: str) -> list[str]:
+    """*addresses* without the reserved ``.invalid`` ones; logs ``mail_recipient_invalid_tld``
+    with the number dropped (never the addresses) and *context* (R-NOTIFY a)."""
+    values = list(addresses)
+    kept = [a for a in values if not is_reserved_invalid_address(a)]
+    if len(kept) != len(values):
+        logger.info("mail_recipient_invalid_tld", context=context, dropped=len(values) - len(kept))
+    return kept
+
+
+def _header_recipients(message: EmailMessage) -> list[str]:
+    values = [str(v) for f in ("To", "Cc", "Bcc") for v in message.get_all(f, [])]
+    return [addr for _name, addr in getaddresses(values) if addr]
 
 
 def smtp_reply_codes(exc: BaseException) -> list[int]:
@@ -205,6 +233,20 @@ class SmtpMailSender:
         """
         use_tls = self._security == "ssl"
         start_tls = True if self._security == "starttls" else False if use_tls else None
+        explicit = envelope_recipients(message, self.sendmail_bcc)
+        candidates = explicit if explicit is not None else _header_recipients(message)
+        kept = drop_invalid_tld(candidates, context="smtp_send")
+        if len(kept) != len(candidates):
+            if not kept:
+                # Nothing deliverable left: refuse like a mail server would (permanent 5xx),
+                # so callers record a failure instead of "sent" and never retry.
+                raise aiosmtplib.SMTPRecipientsRefused(
+                    [
+                        aiosmtplib.SMTPRecipientRefused(550, _INVALID_TLD_REFUSAL, addr)
+                        for addr in candidates
+                    ]
+                )
+            explicit = kept
         kwargs: dict[str, object] = {
             "hostname": self._host,
             "port": self._port,
@@ -212,7 +254,7 @@ class SmtpMailSender:
             "timeout": self._timeout,
             "use_tls": use_tls,
             "start_tls": start_tls,
-            "recipients": envelope_recipients(message, self.sendmail_bcc),
+            "recipients": explicit,
         }
         if envelope_from is not None:
             kwargs["sender"] = envelope_from
@@ -226,9 +268,7 @@ class SmtpMailSender:
             # bytes — re-serialising the message could re-fold a header or
             # re-encode a part and break the signature. Bcc is on the object
             # only (for the envelope), never in the raw bytes.
-            values = [str(v) for f in ("To", "Cc", "Bcc") for v in message.get_all(f, [])]
-            rcpts = kwargs["recipients"] or [a for _n, a in getaddresses(values) if a]
-            kwargs["recipients"] = rcpts
+            kwargs["recipients"] = kwargs["recipients"] or _header_recipients(message)
             if "sender" not in kwargs:
                 kwargs["sender"] = next(
                     (a for _n, a in getaddresses([str(message.get("From", ""))]) if a), ""

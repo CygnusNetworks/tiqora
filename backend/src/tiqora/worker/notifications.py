@@ -87,6 +87,7 @@ from tiqora.channels.email.smtp import (
     MailSender,
     SmtpMailSender,
     build_message,
+    drop_invalid_tld,
     message_id_domain,
 )
 from tiqora.config import Settings, get_settings
@@ -381,7 +382,7 @@ async def _resolve_recipients(
         ).fetchall()
         prefs = {str(k): _decode_pref(v) for k, v in row}
         email = prefs.get("UserEmail", "")
-        if not email:
+        if not email or not drop_invalid_tld([email], context="notification_agent"):
             return
         key = ("Agent", email.lower())
         if key in seen:
@@ -490,7 +491,8 @@ async def _resolve_recipients(
             ).first()
             if art_row is not None and art_row[0]:
                 email = get_email_address(str(art_row[0]))
-        if email:
+        # A chat visitor without an address writes as ``visitor-…@chat.invalid`` (R-NOTIFY a).
+        if email and drop_invalid_tld([email], context="notification_customer"):
             key = ("Customer", email.lower())
             if key not in seen:
                 seen.add(key)

@@ -247,3 +247,63 @@ def test_loop_hint_wins_over_auto_submitted() -> None:
     """Notifications keep Znuny's own value; the header must not appear twice."""
     msg = _message(loop_hint=True, auto_submitted="auto-replied")
     assert msg.get_all("Auto-Submitted") == ["auto-generated"]
+
+
+# -- reserved .invalid TLD (R-NOTIFY a) ---------------------------------------------------------
+
+
+class _FakeSend:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    async def send(self, message: Any, **kwargs: Any) -> tuple[dict[str, Any], str]:
+        self.calls.append(kwargs)
+        return {}, "ok"
+
+
+def test_is_reserved_invalid_address() -> None:
+    from tiqora.channels.email.smtp import is_reserved_invalid_address
+
+    assert is_reserved_invalid_address("visitor-abc@chat.invalid")
+    assert is_reserved_invalid_address('"Besucher" <visitor-abc@chat.INVALID.>')
+    assert is_reserved_invalid_address("x@invalid")
+    assert not is_reserved_invalid_address("kunde@example.com")
+    assert not is_reserved_invalid_address("x@invalid.example.com")
+    assert not is_reserved_invalid_address("x@notinvalid")
+
+
+@pytest.mark.asyncio
+async def test_smtp_send_drops_invalid_tld_recipients(monkeypatch: pytest.MonkeyPatch) -> None:
+    from structlog.testing import capture_logs
+
+    fake = _FakeSend()
+    monkeypatch.setattr("tiqora.channels.email.smtp.aiosmtplib.send", fake.send)
+    sender = SmtpMailSender(host="mail.example.org")
+    msg = _message(
+        to_addrs='"Besucher" <visitor-abc@chat.invalid>, kunde@example.com',
+        cc_addrs="cc@example.com",
+    )
+    with capture_logs() as logs:
+        await sender.send(msg)
+    assert fake.calls[0]["recipients"] == ["kunde@example.com", "cc@example.com"]
+    assert any(e["event"] == "mail_recipient_invalid_tld" and e["dropped"] == 1 for e in logs)
+    # nothing to drop: aiosmtplib keeps reading the headers itself (unchanged behaviour)
+    await sender.send(_message())
+    assert fake.calls[1]["recipients"] is None
+
+
+@pytest.mark.asyncio
+async def test_smtp_send_refuses_when_only_invalid_tld_recipients(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import aiosmtplib
+
+    from tiqora.channels.email.smtp import is_permanent_smtp_failure
+
+    fake = _FakeSend()
+    monkeypatch.setattr("tiqora.channels.email.smtp.aiosmtplib.send", fake.send)
+    sender = SmtpMailSender(host="mail.example.org", sendmail_bcc="archive@chat.invalid")
+    with pytest.raises(aiosmtplib.SMTPRecipientsRefused) as exc:
+        await sender.send(_message(to_addrs="visitor-abc@chat.invalid"))
+    assert fake.calls == []
+    assert is_permanent_smtp_failure(exc.value)

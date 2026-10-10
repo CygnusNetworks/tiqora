@@ -1712,3 +1712,72 @@ async def test_ticket_times_are_rendered_in_each_recipients_time_zone(
         }
     finally:
         await engine.dispose()
+
+
+@pytest.mark.db
+async def test_reserved_invalid_tld_recipients_are_dropped(mariadb_znuny_url: str) -> None:
+    """R-NOTIFY (a): a chat visitor without an address writes as ``…@chat.invalid``; neither
+    the Customer fallback (newest customer article's From) nor an agent address in that
+    reserved TLD may reach the mail server. A valid recipient of the same event still does."""
+    from structlog.testing import capture_logs
+
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+    owner_id, other_id = 48540, 48541  # webchat plan band (Task 6)
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            queue_id = await _insert_queue(session, "notify-q-wc48-invalid-tld")
+            await _insert_agent(session, user_id=owner_id, login="wc48.notify.owner")
+            await _set_user_prefs(session, owner_id, "owner@agents.invalid")
+            await _insert_agent(session, user_id=other_id, login="wc48.notify.other")
+            await _set_user_prefs(session, other_id, "other@example.com")
+            ticket_id = await _insert_ticket(
+                session, "NOTIFY_WC48_INVALID", owner_id=owner_id, queue_id=queue_id
+            )
+            article_id = await _insert_article(
+                session, ticket_id, sender_type="customer", is_visible=1
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO article_data_mime (article_id, a_from, a_subject, a_body,"
+                    " a_content_type, incoming_time, create_time, create_by, change_time,"
+                    " change_by)"
+                    " VALUES (:aid, '\"Besucher\" <visitor-abc123@chat.invalid>', 'Chat',"
+                    " 'Hallo', 'text/plain', 0, current_timestamp, 1, current_timestamp, 1)"
+                ),
+                {"aid": article_id},
+            )
+            await _insert_notification_event(
+                session,
+                "wc48-invalid-tld",
+                items={
+                    "Events": ["TicketCreate"],
+                    "QueueID": [str(queue_id)],
+                    "Recipients": ["AgentOwner", "Customer"],
+                    "RecipientAgents": [str(other_id)],
+                    "Transports": ["Email"],
+                },
+                subject="WC48-INVALID-TLD",
+                body="Hallo",
+            )
+            await _insert_outbox_event(session, "TicketCreate", ticket_id)
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+
+        with capture_logs() as logs:
+            result = await run_notifications_tick(session_factory=factory, mail_sender=sender)
+        assert result["sent"] == 1
+        assert [str(m["To"]) for m in sender.sent] == ["other@example.com"]
+        contexts = {e.get("context") for e in logs if e["event"] == "mail_recipient_invalid_tld"}
+        assert contexts == {"notification_agent", "notification_customer"}
+    finally:
+        async with factory() as session:
+            await session.execute(
+                text("DELETE FROM user_preferences WHERE user_id IN (:a, :b)"),
+                {"a": owner_id, "b": other_id},
+            )
+            await session.commit()
+        await engine.dispose()
