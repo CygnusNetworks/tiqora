@@ -700,12 +700,9 @@ async def _template_row(session: AsyncSession, template_id: int) -> TiqoraDashbo
     return row
 
 
-async def _template_out(session: AsyncSession, row: TiqoraDashboard) -> DashboardTemplateOut:
-    count = await session.execute(
-        select(func.count())
-        .select_from(TiqoraDashboardWidget)
-        .where(TiqoraDashboardWidget.dashboard_id == row.id)
-    )
+def _template_out(
+    row: TiqoraDashboard, role_ids: list[int], widget_count: int
+) -> DashboardTemplateOut:
     return DashboardTemplateOut(
         id=row.id,
         name=row.name,
@@ -720,9 +717,34 @@ async def _template_out(session: AsyncSession, row: TiqoraDashboard) -> Dashboar
         sort=row.sort,
         group_ids=[],
         source_template_id=None,
-        role_ids=sorted(await _role_ids_of(session, row.id)),
-        widget_count=int(count.scalar_one()),
+        role_ids=sorted(role_ids),
+        widget_count=widget_count,
     )
+
+
+async def _templates_out(
+    session: AsyncSession, rows: Sequence[TiqoraDashboard]
+) -> list[DashboardTemplateOut]:
+    """Role links and widget counts for all rows in two IN-list queries."""
+    ids = [r.id for r in rows]
+    roles: dict[int, list[int]] = {i: [] for i in ids}
+    counts: dict[int, int] = {i: 0 for i in ids}
+    if ids:
+        res = await session.execute(
+            select(TiqoraDashboardRole.dashboard_id, TiqoraDashboardRole.role_id).where(
+                TiqoraDashboardRole.dashboard_id.in_(ids)
+            )
+        )
+        for did, rid in res.all():
+            roles[int(did)].append(int(rid))
+        res = await session.execute(
+            select(TiqoraDashboardWidget.dashboard_id, func.count())
+            .where(TiqoraDashboardWidget.dashboard_id.in_(ids))
+            .group_by(TiqoraDashboardWidget.dashboard_id)
+        )
+        for did, n in res.all():
+            counts[int(did)] = int(n)
+    return [_template_out(r, roles[r.id], counts[r.id]) for r in rows]
 
 
 async def list_templates(session: AsyncSession) -> list[DashboardTemplateOut]:
@@ -732,7 +754,7 @@ async def list_templates(session: AsyncSession) -> list[DashboardTemplateOut]:
         .order_by(TiqoraDashboard.sort, TiqoraDashboard.id)
         .execution_options(populate_existing=True)
     )
-    return [await _template_out(session, r) for r in res.scalars().all()]
+    return await _templates_out(session, list(res.scalars().all()))
 
 
 async def create_template(
@@ -763,7 +785,7 @@ async def create_template(
     for rid in role_ids:
         session.add(TiqoraDashboardRole(dashboard_id=row.id, role_id=rid))
     await session.flush()
-    return await _template_out(session, await _template_row(session, row.id))
+    return (await _templates_out(session, [await _template_row(session, row.id)]))[0]
 
 
 async def update_template(
@@ -802,7 +824,7 @@ async def update_template(
     for rid in role_ids:
         session.add(TiqoraDashboardRole(dashboard_id=template_id, role_id=rid))
     await session.flush()
-    return await _template_out(session, await _template_row(session, template_id))
+    return (await _templates_out(session, [await _template_row(session, template_id)]))[0]
 
 
 async def delete_template(session: AsyncSession, template_id: int) -> None:

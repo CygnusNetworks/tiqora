@@ -26434,9 +26434,9 @@ export interface operations {
     };
     update_template_api_v1_admin_dashboard_templates__template_id__put: {
         parameters: {
-            query?: {
-                /** @description Optimistic lock (optional) */
-                version?: number | null;
+            query: {
+                /** @description Optimistic lock: the version last read */
+                version: number;
             };
             header?: {
                 authorization?: string | null;

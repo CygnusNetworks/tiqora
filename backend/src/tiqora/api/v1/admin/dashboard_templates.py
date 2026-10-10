@@ -49,7 +49,7 @@ async def create_template(
 ) -> DashboardTemplateOut:
     try:
         out = await store.create_template(session, admin.id, body)
-    except (store.DashboardInvalid, store.DashboardNotFound) as exc:
+    except store.DashboardInvalid as exc:
         await _fail(session, exc)
     await session.commit()
     return out
@@ -61,7 +61,7 @@ async def update_template(
     session: DbSession,
     template_id: int,
     body: DashboardTemplateIn,
-    version: int | None = Query(None, ge=1, description="Optimistic lock (optional)"),
+    version: int = Query(..., ge=1, description="Optimistic lock: the version last read"),
 ) -> DashboardTemplateOut:
     _ = admin
     try:

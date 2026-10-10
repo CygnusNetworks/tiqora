@@ -94,7 +94,9 @@ async def test_invalid_role_is_422_on_create_and_update(env: Env) -> None:
     r = await env.admin.post(URL, json=_props("dash497 y", role_ids=[ROLE_2]))
     assert r.status_code == 422 and r.json()["detail"]["path"] == "role_ids"
     tpl = await _create(env)
-    r = await env.admin.put(f"{URL}/{tpl['id']}", json=_props(role_ids=[ROLE_1, ROLE_2]))
+    r = await env.admin.put(
+        f"{URL}/{tpl['id']}", json=_props(role_ids=[ROLE_1, ROLE_2]), params={"version": 1}
+    )
     assert r.status_code == 422 and r.json()["detail"]["path"] == "role_ids"
     got = (await env.admin.get(URL)).json()
     assert next(t for t in got if t["id"] == tpl["id"])["role_ids"] == [ROLE_1]
@@ -105,6 +107,7 @@ async def test_update_properties_and_delete_cascades(env: Env) -> None:
     upd = await env.admin.put(
         f"{URL}/{tpl['id']}",
         json=_props("dash497 t2", role_ids=[ROLE_1, ROLE_EXTRA], locked=True, sort=3),
+        params={"version": 1},
     )
     assert upd.status_code == 200
     out = upd.json()
@@ -125,10 +128,14 @@ async def test_update_properties_and_delete_cascades(env: Env) -> None:
 
 
 async def test_update_unknown_or_non_template_is_404(env: Env) -> None:
-    assert (await env.admin.put(f"{URL}/99999999", json=_props())).status_code == 404
+    assert (
+        await env.admin.put(f"{URL}/99999999", json=_props(), params={"version": 1})
+    ).status_code == 404
     # a personal dashboard is not a template, even for an admin
     assert (
-        await env.admin.put(f"{URL}/{env.foreign_dashboard_id}", json=_props())
+        await env.admin.put(
+            f"{URL}/{env.foreign_dashboard_id}", json=_props(), params={"version": 1}
+        )
     ).status_code == 404
     assert (await env.admin.delete(f"{URL}/{env.foreign_dashboard_id}")).status_code == 404
     assert await env.count_rows("tiqora_dashboard", id=env.foreign_dashboard_id) == 1
@@ -170,7 +177,7 @@ async def test_locking_a_template_makes_it_a_read_only_tab_for_role_members(env:
     assert [t for t in tabs if t["kind"] == "template"] == []  # unlocked: not a tab
     assert (await member.get(f"/api/v1/dashboards/{tpl['id']}")).status_code == 404
 
-    r = await env.admin.put(f"{URL}/{tpl['id']}", json=_props(locked=True))
+    r = await env.admin.put(f"{URL}/{tpl['id']}", json=_props(locked=True), params={"version": 1})
     assert r.status_code == 200
     tabs = (await member.get("/api/v1/dashboards")).json()
     assert [t["id"] for t in tabs if t["kind"] == "template"] == [tpl["id"]]
@@ -191,7 +198,9 @@ async def test_template_reaches_only_current_role_members(env: Env) -> None:
     ] == []
     assert (await other.get(f"/api/v1/dashboards/{tpl['id']}")).status_code == 404
     # moving the template to another role takes it away from A
-    await env.admin.put(f"{URL}/{tpl['id']}", json=_props(locked=True, role_ids=[ROLE_EXTRA]))
+    await env.admin.put(
+        f"{URL}/{tpl['id']}", json=_props(locked=True, role_ids=[ROLE_EXTRA]), params={"version": 1}
+    )
     mine = env.as_user(USER_A)
     assert [
         t for t in (await mine.get("/api/v1/dashboards")).json() if t["kind"] == "template"
@@ -203,3 +212,19 @@ async def test_admin_api_key_area(env: Env) -> None:
     assert not scopes_allow(frozenset({"tickets:rw"}), method="GET", path=URL)
     assert not scopes_allow(frozenset({"admin:ro"}), method="POST", path=URL)
     assert scopes_allow(frozenset({"admin:rw"}), method="POST", path=URL)
+
+
+async def test_update_without_version_is_422_and_changes_nothing(env: Env) -> None:
+    tpl = await _create(env)
+    r = await env.admin.put(f"{URL}/{tpl['id']}", json=_props("dash497 nope"))
+    assert r.status_code == 422
+    assert await env.count_rows("tiqora_dashboard", id=tpl["id"], name=tpl["name"]) == 1
+    assert await env.count_rows("tiqora_dashboard", id=tpl["id"], version=1) == 1
+
+
+async def test_list_reports_roles_and_widget_counts_per_template(env: Env) -> None:
+    a = await _create(env, name="dash497 la", role_ids=[ROLE_1, ROLE_EXTRA], sort=1)
+    b = await _create(env, name="dash497 lb", role_ids=[], sort=2)
+    got = {t["id"]: t for t in (await env.admin.get(URL)).json()}
+    assert sorted(got[a["id"]]["role_ids"]) == [ROLE_1, ROLE_EXTRA]
+    assert got[b["id"]]["role_ids"] == [] and got[b["id"]]["widget_count"] == 11

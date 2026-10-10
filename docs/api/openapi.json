@@ -45573,22 +45573,15 @@
             }
           },
           {
-            "description": "Optimistic lock (optional)",
+            "description": "Optimistic lock: the version last read",
             "in": "query",
             "name": "version",
-            "required": false,
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "minimum": 1,
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Optimistic lock (optional)",
-              "title": "Version"
+              "description": "Optimistic lock: the version last read",
+              "minimum": 1,
+              "title": "Version",
+              "type": "integer"
             }
           },
           {
