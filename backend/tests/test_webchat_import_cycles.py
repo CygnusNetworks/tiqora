@@ -21,6 +21,8 @@ MODULES = [
     "tiqora.webchat.stream",
     "tiqora.webchat.public_api",
     "tiqora.api.v1.chat",
+    "tiqora.api.v1.tickets",
+    "tiqora.domain.ticket_write_service",
     "tiqora.main",
 ]
 

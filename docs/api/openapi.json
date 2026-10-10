@@ -28965,6 +28965,175 @@
         "title": "TicketAttributeRelationUpdate",
         "type": "object"
       },
+      "TicketChatOut": {
+        "description": "The newest chat of a ticket for the agent's conversation header (``ro`` on its queue).\n\n``visitor_email_verified`` is always False in phase 1 (R-NOTIFY b): the address is what\nthe visitor typed; nothing proved they own it.",
+        "properties": {
+          "accepted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted At"
+          },
+          "assigned_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Name"
+          },
+          "assigned_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned User Id"
+          },
+          "end_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Reason"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "page_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Url"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "topic_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic Label"
+          },
+          "visitor_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visitor Email"
+          },
+          "visitor_email_verified": {
+            "default": false,
+            "title": "Visitor Email Verified",
+            "type": "boolean"
+          },
+          "visitor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visitor Name"
+          },
+          "visitor_online": {
+            "title": "Visitor Online",
+            "type": "boolean"
+          },
+          "visitor_typing": {
+            "title": "Visitor Typing",
+            "type": "boolean"
+          },
+          "waiting_since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waiting Since"
+          }
+        },
+        "required": [
+          "session_id",
+          "status",
+          "end_reason",
+          "visitor_name",
+          "visitor_email",
+          "topic_label",
+          "page_url",
+          "language",
+          "waiting_since",
+          "accepted_at",
+          "ended_at",
+          "assigned_user_id",
+          "assigned_name",
+          "visitor_online",
+          "visitor_typing"
+        ],
+        "title": "TicketChatOut",
+        "type": "object"
+      },
       "TicketCreateRequest": {
         "properties": {
           "archive_flag": {
@@ -80248,7 +80417,7 @@
         ]
       },
       "post": {
-        "description": "Add an article to a ticket. Requires ``rw`` permission.\n\nAgent email replies (``channel=email``, ``sender_type=agent``) are SMTP-\ndelivered then stored (send-then-store). Delivery failure returns HTTP 502\nand does not leave a silent no-op 201.\n\nTelegram replies may carry ``attachments``, ``telegram_buttons`` and\n``telegram_reply_to_article_id`` (422 on any other channel); a failed\nTelegram send returns 409 with nothing stored. Outgoing agent email may\ncarry ``attachments`` as well (413 over the upload limit).\n\nWith ``state_id`` the ticket's state is changed after the article, in the\nsame transaction (PATCH semantics). The state change is validated before\nthe article is created, so an invalid one returns 403/404/422 without\nsending or storing anything.",
+        "description": "Add an article to a ticket. Requires ``rw`` permission.\n\nAgent email replies (``channel=email``, ``sender_type=agent``) are SMTP-\ndelivered then stored (send-then-store). Delivery failure returns HTTP 502\nand does not leave a silent no-op 201.\n\nTelegram replies may carry ``attachments``, ``telegram_buttons`` and\n``telegram_reply_to_article_id`` (422 on any other channel); a failed\nTelegram send returns 409 with nothing stored. Outgoing agent email may\ncarry ``attachments`` as well (413 over the upload limit).\n\nWith ``state_id`` the ticket's state is changed after the article, in the\nsame transaction (PATCH semantics). The state change is validated before\nthe article is created, so an invalid one returns 403/404/422 without\nsending or storing anything.\n\nWeb chat (``channel=webchat``, agent, visible for the customer): the reply is also posted\ninto the ticket's live chat. A chat nobody accepted yet is accepted first, in its own\ntransaction (R-REPLY-ACCEPT-FIRST); a refused accept refuses the reply (409\n``at_capacity`` / ``already_taken`` / ``not_waiting``, 403 ``forbidden``). No live chat \u2192\n409 ``chat_not_live``; nothing is stored in either case. ``attachments`` are allowed.",
         "operationId": "create_article_api_v1_tickets__ticket_id__articles_post",
         "parameters": [
           {
@@ -81922,6 +82091,164 @@
         "summary": "Retract Telegram Article",
         "tags": [
           "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/chat": {
+      "get": {
+        "description": "The ticket's newest chat for the conversation header (visitor, topic, status,\nonline/typing); 404 when the ticket has none.",
+        "operationId": "get_ticket_chat_api_v1_tickets__ticket_id__chat_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketChatOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "No ro permission on the ticket's queue (`forbidden`)"
+          },
+          "404": {
+            "description": "Unknown ticket or no chat on it (`not_found`)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ticket Chat",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/chat/typing": {
+      "post": {
+        "description": "The agent is typing in the ticket's live chat (the visitor sees it; at most one\nsignal per 2 s, the rest is dropped). Needs ``note`` on the ticket's queue.",
+        "operationId": "post_ticket_chat_typing_api_v1_tickets__ticket_id__chat_typing_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "No note permission on the ticket's queue (`forbidden`)"
+          },
+          "404": {
+            "description": "Unknown ticket (`not_found`)"
+          },
+          "409": {
+            "description": "The ticket has no live chat (`chat_not_live`)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Ticket Chat Typing",
+        "tags": [
+          "chat"
         ]
       }
     },

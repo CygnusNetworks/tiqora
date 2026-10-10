@@ -8572,6 +8572,12 @@ export interface paths {
          *     same transaction (PATCH semantics). The state change is validated before
          *     the article is created, so an invalid one returns 403/404/422 without
          *     sending or storing anything.
+         *
+         *     Web chat (``channel=webchat``, agent, visible for the customer): the reply is also posted
+         *     into the ticket's live chat. A chat nobody accepted yet is accepted first, in its own
+         *     transaction (R-REPLY-ACCEPT-FIRST); a refused accept refuses the reply (409
+         *     ``at_capacity`` / ``already_taken`` / ``not_waiting``, 403 ``forbidden``). No live chat →
+         *     409 ``chat_not_live``; nothing is stored in either case. ``attachments`` are allowed.
          */
         post: operations["create_article_api_v1_tickets__ticket_id__articles_post"];
         delete?: never;
@@ -8945,6 +8951,48 @@ export interface paths {
          *     parts). Requires ``note``.
          */
         post: operations["retract_telegram_article_api_v1_tickets__ticket_id__articles__article_id__telegram_retract_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ticket Chat
+         * @description The ticket's newest chat for the conversation header (visitor, topic, status,
+         *     online/typing); 404 when the ticket has none.
+         */
+        get: operations["get_ticket_chat_api_v1_tickets__ticket_id__chat_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/chat/typing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Ticket Chat Typing
+         * @description The agent is typing in the ticket's live chat (the visitor sees it; at most one
+         *     signal per 2 s, the rest is dropped). Needs ``note`` on the ticket's queue.
+         */
+        post: operations["post_ticket_chat_typing_api_v1_tickets__ticket_id__chat_typing_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -19078,6 +19126,50 @@ export interface components {
             filename?: string | null;
             /** Priority */
             priority?: number | null;
+        };
+        /**
+         * TicketChatOut
+         * @description The newest chat of a ticket for the agent's conversation header (``ro`` on its queue).
+         *
+         *     ``visitor_email_verified`` is always False in phase 1 (R-NOTIFY b): the address is what
+         *     the visitor typed; nothing proved they own it.
+         */
+        TicketChatOut: {
+            /** Accepted At */
+            accepted_at: string | null;
+            /** Assigned Name */
+            assigned_name: string | null;
+            /** Assigned User Id */
+            assigned_user_id: number | null;
+            /** End Reason */
+            end_reason: string | null;
+            /** Ended At */
+            ended_at: string | null;
+            /** Language */
+            language: string | null;
+            /** Page Url */
+            page_url: string | null;
+            /** Session Id */
+            session_id: string;
+            /** Status */
+            status: string;
+            /** Topic Label */
+            topic_label: string | null;
+            /** Visitor Email */
+            visitor_email: string | null;
+            /**
+             * Visitor Email Verified
+             * @default false
+             */
+            visitor_email_verified: boolean;
+            /** Visitor Name */
+            visitor_name: string | null;
+            /** Visitor Online */
+            visitor_online: boolean;
+            /** Visitor Typing */
+            visitor_typing: boolean;
+            /** Waiting Since */
+            waiting_since: string | null;
         };
         /** TicketCreateRequest */
         TicketCreateRequest: {
@@ -42616,6 +42708,109 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ticket_chat_api_v1_tickets__ticket_id__chat_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketChatOut"];
+                };
+            };
+            /** @description No ro permission on the ticket's queue (`forbidden`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown ticket or no chat on it (`not_found`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_ticket_chat_typing_api_v1_tickets__ticket_id__chat_typing_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No note permission on the ticket's queue (`forbidden`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown ticket (`not_found`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The ticket has no live chat (`chat_not_live`) */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -190,3 +190,28 @@ class ChatAcceptOut(BaseModel):
 
 class ChatEndIn(BaseModel):
     close_ticket: bool = False
+
+
+class TicketChatOut(BaseModel):
+    """The newest chat of a ticket for the agent's conversation header (``ro`` on its queue).
+
+    ``visitor_email_verified`` is always False in phase 1 (R-NOTIFY b): the address is what
+    the visitor typed; nothing proved they own it.
+    """
+
+    session_id: str
+    status: str
+    end_reason: str | None
+    visitor_name: str | None
+    visitor_email: str | None
+    visitor_email_verified: bool = False
+    topic_label: str | None
+    page_url: str | None
+    language: str | None
+    waiting_since: UtcDateTime | None
+    accepted_at: UtcDateTime | None
+    ended_at: UtcDateTime | None
+    assigned_user_id: int | None
+    assigned_name: str | None
+    visitor_online: bool
+    visitor_typing: bool

@@ -2675,6 +2675,26 @@ class TicketWriteService:
                 user_id=user_id,
                 article=article,
             )
+        # An agent's customer-visible web-chat line also goes into the live chat
+        # (transcript + visitor stream); only exactly this combination -- notes,
+        # email and every other channel never reach the visitor.
+        if (
+            article.channel.lower() == "webchat"
+            and article.sender_type == "agent"
+            and article.is_visible_for_customer
+        ):
+            from tiqora.webchat.agent import ChatNotLive, deliver_agent_chat_reply
+
+            try:
+                return await deliver_agent_chat_reply(
+                    self._session,
+                    self._sysconfig,
+                    ticket_id=ticket_id,
+                    user_id=user_id,
+                    article=article,
+                )
+            except ChatNotLive as exc:
+                raise InvalidInput("chat_not_live") from exc
         return await add_article(
             self._session,
             ticket_id=ticket_id,

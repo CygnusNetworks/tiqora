@@ -11,7 +11,7 @@ import re
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from html import escape as html_escape
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Final, Literal
 
 import structlog
 from fastapi import APIRouter, HTTPException, Query, status
@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.attachment_response import safe_attachment_response
-from tiqora.api.deps import AppSettings, CurrentUser, DbSession
+from tiqora.api.deps import AppSettings, CurrentUser, DbSession, RedisDep
 from tiqora.api.uploads import MAX_ATTACHMENT_BYTES
 from tiqora.api.v1.ai import AiToolTraceOut, parse_tool_trace
 from tiqora.channels.email.outbound_reply import OutboundMailError
@@ -92,8 +92,11 @@ from tiqora.jobs.service import (
     enqueue_job,
     find_active_job,
     lock_user_job_quota,
+    utc_now,
 )
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.webchat.agent import accept_waiting_chat_for_reply, agent_chat_body
+from tiqora.webchat.notify import flush_chat_notifications
 from tiqora.znuny.sysconfig import SysConfig
 
 # ---------------------------------------------------------------------------
@@ -302,6 +305,33 @@ def _map_exc(exc: Exception) -> HTTPException:
 _TELEGRAM_ATTACHMENTS_MAX_BYTES = 50 * 1024 * 1024
 
 
+def _is_chat_reply(body: ArticleCreateRequest) -> bool:
+    """An agent's customer-visible web-chat line (``TicketWriteService.add_article`` posts it
+    into the ticket's live chat); every other article is untouched by the chat code."""
+    return (
+        body.channel.lower() == "webchat"
+        and body.sender_type == "agent"
+        and body.is_visible_for_customer
+    )
+
+
+#: Refusals of a web-chat reply (``InvalidInput(code)``, R-REPLY-ERRORS) → HTTP status.
+_CHAT_REPLY_REFUSALS: Final = {
+    "chat_not_live": status.HTTP_409_CONFLICT,
+    "chat_not_accepted": status.HTTP_409_CONFLICT,
+    "at_capacity": status.HTTP_409_CONFLICT,
+    "already_taken": status.HTTP_409_CONFLICT,
+    "not_waiting": status.HTTP_409_CONFLICT,
+    "forbidden": status.HTTP_403_FORBIDDEN,
+}
+
+
+def _chat_reply_refusal(exc: InvalidInput) -> HTTPException | None:
+    code = str(exc)
+    http_status = _CHAT_REPLY_REFUSALS.get(code)
+    return HTTPException(status_code=http_status, detail=code) if http_status else None
+
+
 def _telegram_extras(
     body: ArticleCreateRequest,
 ) -> tuple[list[tuple[str, str, bytes]], TelegramSendOptions | None]:
@@ -311,6 +341,15 @@ def _telegram_extras(
     request uses none of them). 422 when they are used off Telegram, on bad
     base64, or when the decoded total exceeds Telegram's 50 MB upload limit.
     """
+    if _is_chat_reply(body):
+        # A web-chat reply carries files like an email (listed in the chat); buttons and
+        # quotes stay Telegram-only.
+        if body.telegram_buttons or body.telegram_reply_to_article_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="buttons/quotes are only supported for Telegram replies",
+            )
+        return decode_attachments(body.attachments), None
     if body.attachments and body.channel.lower() == "email" and body.sender_type == "agent":
         # Outgoing agent email carries files too (reply dialog); buttons and
         # quotes stay Telegram-only.
@@ -1626,6 +1665,7 @@ async def create_article(
     user: CurrentUser,
     session: DbSession,
     settings: AppSettings,
+    redis_client: RedisDep,
 ) -> ArticleCreateResponse:
     """Add an article to a ticket. Requires ``rw`` permission.
 
@@ -1642,6 +1682,12 @@ async def create_article(
     same transaction (PATCH semantics). The state change is validated before
     the article is created, so an invalid one returns 403/404/422 without
     sending or storing anything.
+
+    Web chat (``channel=webchat``, agent, visible for the customer): the reply is also posted
+    into the ticket's live chat. A chat nobody accepted yet is accepted first, in its own
+    transaction (R-REPLY-ACCEPT-FIRST); a refused accept refuses the reply (409
+    ``at_capacity`` / ``already_taken`` / ``not_waiting``, 403 ``forbidden``). No live chat →
+    409 ``chat_not_live``; nothing is stored in either case. ``attachments`` are allowed.
     """
     attachments, telegram_options = _telegram_extras(body)
     wants_security = body.email_security is not None and body.email_security.active
@@ -1650,6 +1696,19 @@ async def create_article(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="email_security is only supported for outgoing agent email",
         )
+    chat_reply = _is_chat_reply(body)
+    if chat_reply:
+        try:
+            # Refuse an empty/too long line before the implicit accept takes the chat.
+            agent_chat_body(body.body, body.content_type, [a[0] for a in attachments])
+            await accept_waiting_chat_for_reply(
+                session, SysConfig(session), ticket_id=ticket_id, user_id=user.id, now=utc_now()
+            )
+        except InvalidInput as exc:
+            refusal = _chat_reply_refusal(exc)
+            raise (refusal or _map_exc(exc)) from exc
+        finally:
+            await flush_chat_notifications(session, redis_client)
     svc = _write_service(session, settings)
     try:
         async with session.begin():
@@ -1693,7 +1752,10 @@ async def create_article(
         OutboundMailError,
         TelegramDeliveryError,
     ) as exc:
-        raise _map_exc(exc) from exc
+        refusal = _chat_reply_refusal(exc) if chat_reply and isinstance(exc, InvalidInput) else None
+        raise (refusal or _map_exc(exc)) from exc
+    if chat_reply:
+        await flush_chat_notifications(session, redis_client)
 
     if body.ai_draft_id is not None:
         # Outside the write transaction above (already committed): the AI
