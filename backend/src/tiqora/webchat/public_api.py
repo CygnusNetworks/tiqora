@@ -318,13 +318,18 @@ async def visitor_session(
     return chat
 
 
-async def _authorised(
+async def authorised_session(
     session_id: str,
     request: Request,
     db: AsyncSession,
     limiter: ChatRateLimiter,
     settings: Settings,
 ) -> tuple[TiqoraChatSession, CachedConfig]:
+    """R-PREAUTH steps 3-4 for a session endpoint: channel switch, token, the session's config.
+
+    Raises ``ChatError`` (``disabled``/``not_found``) or the ``auth_fail`` ``RateLimited``;
+    callers map them with ``chat_error_response`` and then apply their per-session limits.
+    """
     await _require_channel(db)
     chat = await visitor_session(
         session_id, request, db, limiter=limiter, ip_hash=request_ip_hash(request, settings)
@@ -633,7 +638,7 @@ async def get_chat_session_state(
 ) -> ChatSessionOut | JSONResponse:
     limiter = ChatRateLimiter(redis_client)
     try:
-        chat, cached = await _authorised(session_id, request, db, limiter, settings)
+        chat, cached = await authorised_session(session_id, request, db, limiter, settings)
         await _session_read_limit(limiter, chat.id)
         now = utc_now()
         await touch_visitor_last_seen(db, chat, now)
@@ -659,7 +664,7 @@ async def list_chat_messages(
     """Transcript lines with ``seq > after`` in order."""
     limiter = ChatRateLimiter(redis_client)
     try:
-        chat, _cached = await _authorised(session_id, request, db, limiter, settings)
+        chat, _cached = await authorised_session(session_id, request, db, limiter, settings)
         await _session_read_limit(limiter, chat.id)
         rows = await load_messages_since(db, chat.id, after, limit)
         await touch_visitor_last_seen(db, chat, utc_now())
@@ -686,7 +691,7 @@ async def post_chat_message(
     """One visitor line; a retry with the same ``client_id`` returns the stored line."""
     limiter = ChatRateLimiter(redis_client)
     try:
-        chat, cached = await _authorised(session_id, request, db, limiter, settings)
+        chat, cached = await authorised_session(session_id, request, db, limiter, settings)
         await _message_limits(limiter, cached.values, chat.id, request_ip_hash(request, settings))
         message = await post_visitor_message(
             db,
@@ -714,7 +719,7 @@ async def post_chat_typing(
     """The visitor is typing; at most one signal per 2 s, the rest is dropped silently."""
     limiter = ChatRateLimiter(redis_client)
     try:
-        chat, _cached = await _authorised(session_id, request, db, limiter, settings)
+        chat, _cached = await authorised_session(session_id, request, db, limiter, settings)
         if chat.status not in LIVE_STATUSES:
             raise ChatError("session_closed", 409)
         if await limiter.try_hit("typing", chat.id, window_seconds=TYPING_WINDOW_SECONDS):
@@ -785,7 +790,7 @@ async def post_chat_attachment(
     """
     limiter = ChatRateLimiter(redis_client)
     try:
-        chat, cached = await _authorised(session_id, request, db, limiter, settings)
+        chat, cached = await authorised_session(session_id, request, db, limiter, settings)
         policy = cached.values.upload_policy
         raw_length = request.headers.get("content-length")
         if not content_length_within(raw_length, policy.max_bytes + UPLOAD_ENVELOPE_SLACK):
@@ -804,7 +809,6 @@ async def post_chat_attachment(
             limit=UPLOADS_PER_IP_10MIN,
             window_seconds=600,
         )
-        await _spend_upload_budget(redis_client, int(cached.config.id), int(raw_length or 0))
         try:
             async with request.form(max_files=1, max_fields=3) as form:
                 upload = form.get("file")
@@ -821,6 +825,9 @@ async def post_chat_attachment(
                 client_id = _form_text(form.get("client_id"))
         except StarletteHTTPException as exc:  # malformed multipart, too many parts
             raise ChatError("upload_rejected", 422, errors={"file": "type"}) from exc
+        # Charged on the bytes actually received: a declared length alone (client hangs up
+        # after a few bytes) must not drain the config's daily budget.
+        await _spend_upload_budget(redis_client, int(cached.config.id), len(content))
         message = await post_visitor_attachment(
             db,
             SysConfig(db),
@@ -857,7 +864,7 @@ async def get_chat_attachment(
     download; ``nosniff`` + ``CSP: sandbox`` always)."""
     limiter = ChatRateLimiter(redis_client)
     try:
-        chat, _cached = await _authorised(session_id, request, db, limiter, settings)
+        chat, _cached = await authorised_session(session_id, request, db, limiter, settings)
         await _session_read_limit(limiter, chat.id)
         message = (
             await db.execute(
@@ -901,7 +908,7 @@ async def post_chat_contact(
     """Leave an e-mail address after a chat ended without an answer."""
     limiter = ChatRateLimiter(redis_client)
     try:
-        chat, cached = await _authorised(session_id, request, db, limiter, settings)
+        chat, cached = await authorised_session(session_id, request, db, limiter, settings)
         await _message_limits(limiter, cached.values, chat.id, request_ip_hash(request, settings))
         await set_contact(
             db, SysConfig(db), chat=chat, name=payload.name, email=payload.email, now=utc_now()
@@ -923,7 +930,7 @@ async def post_chat_end(
     """The visitor closes the chat (idempotent)."""
     limiter = ChatRateLimiter(redis_client)
     try:
-        chat, cached = await _authorised(session_id, request, db, limiter, settings)
+        chat, cached = await authorised_session(session_id, request, db, limiter, settings)
         await _message_limits(limiter, cached.values, chat.id, request_ip_hash(request, settings))
         await end_by_visitor(db, chat=chat, now=utc_now())
         await _commit_and_flush(db, redis_client)

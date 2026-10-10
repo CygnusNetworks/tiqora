@@ -1,6 +1,7 @@
 """Origin handling for the web-chat widget: allowed websites, same-origin checks, frame CSP.
 
-Everything here is pure (no I/O). The CSP header is built only from strings that matched
+Everything here is pure (no I/O; ``own_origin`` only logs a one-time warning). The CSP
+header is built only from strings that matched
 ``_ORIGIN_RE`` (``[a-z0-9.-]`` host, digits port), so nothing a visitor or an admin types can
 break out of a directive.
 """
