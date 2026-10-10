@@ -10,7 +10,7 @@ import {
   createMemoryHistory,
 } from "@tanstack/react-router";
 import i18n from "@/i18n";
-import { helloPlugin, navEntry } from "@/test/pluginFixtures";
+import { helloPlugin, navEntry, routePage } from "@/test/pluginFixtures";
 import { AgentShell } from "./AgentShell";
 
 // Header widgets pull in their own api/SSE machinery that's out of scope for
@@ -129,7 +129,7 @@ describe("AgentShell sidebar", () => {
   it("shows an Erweiterungen group with plugin entries", async () => {
     i18n.addResourceBundle("de", "plugin.org.example.hello", { nav: { overview: "Hallo" } }, true, true);
     frontend.mockResolvedValue([
-      helloPlugin({ locales: [], contributions: [navEntry("overview", "overview")] }),
+      helloPlugin({ locales: [], contributions: [routePage("overview", "overview"), navEntry("overview", "overview")] }),
     ]);
     await renderShell();
     expect(await screen.findByText("Erweiterungen")).toBeInTheDocument();

@@ -1,7 +1,8 @@
 /**
  * Page of a plugin inside the agent shell: `/agent/plugins/<pluginId>/<path…>`.
  * The longest matching `agent.route` path of the plugin wins; the rest of the
- * URL goes to the component as `subPath`.
+ * URL goes to the component as `subPath`; a sub path with `.`/`..` segments
+ * (also percent-encoded) is not found, so it never reaches the plugin.
  */
 import { useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -29,7 +30,20 @@ export function resolvePluginRoute(
   }
   if (!best) return null;
   const path = best.path.replace(/^\/+|\/+$/g, "");
-  return { contribution: best, subPath: rest.slice(path.length).replace(/^\/+/, "") };
+  const subPath = rest.slice(path.length).replace(/^\/+/, "");
+  if (subPath && subPath.split("/").some(isDotSegment)) return null;
+  return { contribution: best, subPath };
+}
+
+/** `.` or `..`, also percent-encoded; an undecodable segment counts as one too. */
+function isDotSegment(segment: string): boolean {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(segment);
+  } catch {
+    return true;
+  }
+  return decoded === "." || decoded === ".." || segment === "." || segment === "..";
 }
 
 export function PluginRoutePage() {
@@ -62,7 +76,8 @@ export function PluginRoutePage() {
       <h1 className="font-display text-2xl font-semibold text-ink">
         {t(`${pluginNamespace(plugin.id)}:${contribution.title_key}`, { defaultValue: contribution.key })}
       </h1>
-      <PluginBoundary plugin={plugin}>
+      {/* keyed: a crash on one page must not stick when the agent opens another page */}
+      <PluginBoundary key={contribution.key} plugin={plugin}>
         <PluginComponent plugin={plugin} name={contribution.component} props={{ path: contribution.path, subPath }} />
       </PluginBoundary>
     </div>

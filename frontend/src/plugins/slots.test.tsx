@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useState, type ReactNode } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import {
+  Outlet,
   RouterProvider,
   createMemoryHistory,
   createRootRoute,
@@ -11,12 +12,13 @@ import {
   createRouter,
 } from "@tanstack/react-router";
 import i18n from "@/i18n";
-import { dashboardWidget, helloPlugin, navEntry, ticketPanel } from "@/test/pluginFixtures";
+import { dashboardWidget, helloPlugin, navEntry, routePage, ticketPanel } from "@/test/pluginFixtures";
 import type { FrontendPlugin } from "@/lib/pluginsApi";
 import { DASHBOARD_WIDGETS } from "./dashboardWidgets";
 import { setPluginImporterForTests } from "./loader";
 import { PluginProvider } from "./PluginProvider";
 import { PluginNavItems, PluginTicketPanels, PluginWidgetsSection } from "./slots";
+import { PluginRoutePage } from "@/routes/agent/PluginRoutePage";
 
 const { frontend } = vi.hoisted(() => ({ frontend: vi.fn() }));
 vi.mock("@/lib/pluginsApi", () => ({ pluginsApi: { frontend } }));
@@ -30,6 +32,8 @@ const HELLO: FrontendPlugin = helloPlugin({
   // The texts are pre-loaded below; no request for them in these tests.
   locales: [],
   contributions: [
+    routePage("overview", "overview"),
+    { ...routePage("admin", "admin"), admin_only: true },
     navEntry("overview", "overview"),
     { ...navEntry("admin", "admin"), admin_only: true },
     ticketPanel("info"),
@@ -45,11 +49,19 @@ const HelloWidget = ({ settings }: { settings: { city: string } }) => <p>Stadt {
 function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
   const [router] = useState(() => {
-    const root = createRootRoute({ component: () => <>{children}</> });
+    const root = createRootRoute({
+      notFoundComponent: () => null,
+      component: () => (
+        <>
+          {children}
+          <Outlet />
+        </>
+      ),
+    });
     const splat = createRoute({
       getParentRoute: () => root,
       path: "/agent/plugins/$pluginId/$",
-      component: () => null,
+      component: PluginRoutePage,
     });
     return createRouter({
       routeTree: root.addChildren([splat]),
@@ -111,13 +123,66 @@ describe("PluginNavItems", () => {
 
   it("nav label falls back to the contribution key without translations", async () => {
     frontend.mockResolvedValue([
-      helloPlugin({ id: "org.example.untranslated", locales: [], contributions: [navEntry("overview", "overview")] }),
+      helloPlugin({
+        id: "org.example.untranslated",
+        locales: [],
+        contributions: [routePage("overview", "overview"), navEntry("overview", "overview")],
+      }),
     ]);
     render(<Providers><PluginNavItems group="plugins" /></Providers>);
     expect(await screen.findByRole("link", { name: "overview" })).toHaveAttribute(
       "href",
       "/agent/plugins/org.example.untranslated/overview",
     );
+  });
+});
+
+describe("PluginNavItems with a route key that differs from its path", () => {
+  const CRM = helloPlugin({
+    locales: [],
+    contributions: [routePage("main", "crm/overview"), navEntry("crm", "main")],
+  });
+  const HelloPage = ({ path }: { path: string }) => <p>Seite {path}</p>;
+
+  it("links to the route's path and the click lands on the plugin page", async () => {
+    frontend.mockResolvedValue([CRM]);
+    setPluginImporterForTests(() => Promise.resolve({ default: { components: { HelloPage } } }));
+    render(<Providers><PluginNavItems group="plugins" /></Providers>);
+    const link = await screen.findByRole("link", { name: "crm" });
+    expect(link).toHaveAttribute("href", "/agent/plugins/org.example.hello/crm/overview");
+    fireEvent.click(link);
+    expect(await screen.findByText("Seite crm/overview")).toBeInTheDocument();
+    expect(screen.getByTestId("plugin-page-org.example.hello")).toBeInTheDocument();
+    expect(screen.queryByTestId("plugin-page-not-found")).toBeNull();
+  });
+
+  it("highlights only the entry of the exact page when routes nest", async () => {
+    frontend.mockResolvedValue([
+      helloPlugin({
+        locales: [],
+        contributions: [
+          routePage("list", "deals"),
+          routePage("detail", "deals/open"),
+          navEntry("deals", "list"),
+          navEntry("open", "detail"),
+        ],
+      }),
+    ]);
+    setPluginImporterForTests(() => Promise.resolve({ default: { components: { HelloPage } } }));
+    render(<Providers><PluginNavItems group="plugins" /></Providers>);
+    fireEvent.click(await screen.findByRole("link", { name: "open" }));
+    expect(await screen.findByText("Seite deals/open")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "open" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "deals" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("skips an entry whose route is missing", async () => {
+    frontend.mockResolvedValue([
+      helloPlugin({ locales: [], contributions: [navEntry("crm", "gone"), routePage("main", "x"), navEntry("ok", "main")] }),
+    ]);
+    render(<Providers><PluginNavItems group="plugins" /></Providers>);
+    expect(await screen.findByRole("link", { name: "ok" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "crm" })).toBeNull();
   });
 });
 
@@ -134,6 +199,30 @@ describe("PluginTicketPanels", () => {
     const { container } = render(<Providers><PluginTicketPanels ticketId={1} /></Providers>);
     await waitFor(() => expect(frontend).toHaveBeenCalled());
     expect(container.querySelector("[data-testid^='plugin-ticket-panel-']")).toBeNull();
+  });
+
+  it("a panel that failed for one ticket gets a fresh start on the next ticket", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const Picky = ({ ticketId }: { ticketId: number }) => {
+      if (ticketId === 123) throw new Error("kaputt");
+      return <p>Ticket {ticketId}</p>;
+    };
+    setPluginImporterForTests(() => Promise.resolve({ default: { components: { HelloPanel: Picky } } }));
+    // no router here: the router of `Providers` keeps the children of its first render
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const at = (ticketId: number) => (
+      <QueryClientProvider client={client}>
+        <I18nextProvider i18n={i18n}>
+          <PluginProvider>
+            <PluginTicketPanels ticketId={ticketId} />
+          </PluginProvider>
+        </I18nextProvider>
+      </QueryClientProvider>
+    );
+    const { rerender } = render(at(123));
+    expect(await screen.findByText("Erweiterung „Hallo“ konnte nicht geladen werden.")).toBeInTheDocument();
+    rerender(at(124));
+    expect(await screen.findByText("Ticket 124")).toBeInTheDocument();
   });
 
   it("a broken panel does not hide the others", async () => {

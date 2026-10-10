@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import { RouterProvider, createMemoryHistory, createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
@@ -21,6 +21,7 @@ vi.mock("@/auth/AuthContext", () => ({
 const route = (path: string) => routePage(path.replace(/\W/g, "_"), path);
 
 function HelloPage({ path, subPath }: { path: string; subPath: string }) {
+  if (path === "boom") throw new Error("kaputt");
   return <p>Seite {path} / {subPath}</p>;
 }
 
@@ -32,7 +33,7 @@ async function renderAt(url: string) {
     history: createMemoryHistory({ initialEntries: [url] }),
   });
   await router.load();
-  render(
+  return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <I18nextProvider i18n={i18n}>
         <PluginProvider>
@@ -41,7 +42,7 @@ async function renderAt(url: string) {
         </PluginProvider>
       </I18nextProvider>
     </QueryClientProvider>,
-  );
+  ) && router;
 }
 
 beforeEach(async () => {
@@ -72,9 +73,28 @@ describe("resolvePluginRoute", () => {
     expect(resolvePluginRoute(cs, "overviewx")).toBeNull();
     expect(resolvePluginRoute(cs, "")).toBeNull();
   });
+
+  it("refuses sub paths with dot segments, also encoded", () => {
+    const cs = [route("overview"), route("admin")];
+    for (const splat of ["overview/../admin", "overview/./x", "overview/a/..", "overview/%2e%2e/admin", "overview/%2E/x", "overview/%zz"]) {
+      expect(resolvePluginRoute(cs, splat)).toBeNull();
+    }
+    expect(resolvePluginRoute(cs, "overview/a.b/..c")).toMatchObject({ subPath: "a.b/..c" });
+  });
 });
 
 describe("PluginRoutePage", () => {
+  it("a crashed page does not stick when the agent opens another page of the same plugin", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    frontend.mockResolvedValue([
+      helloPlugin({ locales: [], contributions: [routePage("boom", "boom"), routePage("fine", "fine")] }),
+    ]);
+    const router = await renderAt("/agent/plugins/org.example.hello/boom");
+    expect(await screen.findByText("Erweiterung „Hallo“ konnte nicht geladen werden.")).toBeInTheDocument();
+    await act(() => router.history.push("/agent/plugins/org.example.hello/fine"));
+    expect(await screen.findByText("Seite fine /")).toBeInTheDocument();
+  });
+
   it("renders the plugin component with the title and sub path", async () => {
     await renderAt("/agent/plugins/org.example.hello/overview/7");
     expect(await screen.findByRole("heading", { name: "Übersicht" })).toBeInTheDocument();
