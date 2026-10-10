@@ -41,7 +41,7 @@ class Schedule:
             except ValueError as exc:
                 if "kein" in str(exc):
                     raise ValueError(
-                        f"Ungültiger Zeitplan „{self.cron}“: kein gültiger Termin (z. B. 31. Februar)"
+                        f"Ungültiger Zeitplan „{self.cron}“: kein gültiger Termin"
                     ) from exc
                 raise
 
