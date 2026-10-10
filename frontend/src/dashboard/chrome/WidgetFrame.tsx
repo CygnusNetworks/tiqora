@@ -108,7 +108,7 @@ export function WidgetFrame({
             "truncate",
             // KPI label: never gives way to the header extras (the delta truncates instead)
             variant === "kpi"
-              ? "max-w-full shrink-0 text-sm font-medium text-muted"
+              ? cn("text-sm font-medium text-muted", hostActions ? "min-w-0 flex-1" : "max-w-full shrink-0")
               : "min-w-0 flex-1 text-[15px] font-semibold text-ink",
           )}
         >

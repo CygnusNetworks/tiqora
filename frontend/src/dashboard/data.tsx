@@ -375,3 +375,39 @@ export function usePreviewData(
   if (query.isError) return { status: "error", refetch };
   return { status: "loading", refetch };
 }
+
+// ---------------------------------------------------------------- edit mode (R-DASH-PREVIEW-BUDGET)
+
+const contentKey = (w: Pick<EditWidget, "type_key" | "type_version" | "settings">) =>
+  `${w.type_key}@${w.type_version}:${settingsHash(w.settings)}`;
+
+/**
+ * Data of the widgets while editing. A widget with the same type, version and settings as one the
+ * view loaded keeps that widget's batch result (moving, resizing, duplicating and undoing never
+ * fetch); a new or changed data widget is listed in `previewIds` and fetched through
+ * `usePreviewData`. Only finished results (`ok`, `forbidden`) are reused.
+ */
+export function editDataPlan(
+  saved: EditWidget[],
+  savedStates: Record<string, WidgetDataState>,
+  current: EditWidget[],
+  hasDataEndpoint: (typeKey: string) => boolean,
+): { byWidget: Record<string, WidgetDataState>; previewIds: ReadonlySet<string> } {
+  const reusable = new Map<string, WidgetDataState>();
+  for (const w of saved) {
+    const state = savedStates[w.id];
+    if (state && (state.status === "ok" || state.status === "forbidden")) reusable.set(contentKey(w), state);
+  }
+  const byWidget: Record<string, WidgetDataState> = {};
+  const previewIds = new Set<string>();
+  for (const w of current) {
+    if (!hasDataEndpoint(w.type_key)) {
+      byWidget[w.id] = { status: "none" };
+      continue;
+    }
+    const reuse = reusable.get(contentKey(w));
+    if (reuse) byWidget[w.id] = reuse;
+    else previewIds.add(w.id);
+  }
+  return { byWidget, previewIds };
+}

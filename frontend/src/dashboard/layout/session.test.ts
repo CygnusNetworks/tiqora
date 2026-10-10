@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { EditWidget, Rect } from "../model";
-import { createEditReducer, editReducer, initialEditState, type EditAction, type EditState, type WidgetLike } from "./session";
+import { createEditReducer, editReducer, initialEditState, layoutItems, type EditAction, type EditState, type WidgetLike } from "./session";
 
 const COUNTER: WidgetLike = {
   key: "core.counter",
@@ -186,4 +186,23 @@ test("removing the selected widget clears the selection; undo of a remove brings
   s = editReducer(s, { type: "remove", id: "w1" });
   expect(s.selectedId).toBeNull();
   expect(editReducer(s, { type: "undo" }).widgets.map((x) => x.id)).toEqual(["w1"]);
+});
+
+test("restore replaces name and widgets as one undoable, dirty step", () => {
+  const restored = [w("r1", { x: 4, y: 0, w: 3, h: 2 })];
+  const s = editReducer(state([w1]), { type: "restore", name: "Entwurf", widgets: restored });
+  expect(s.name).toBe("Entwurf");
+  expect(s.widgets).toEqual(restored);
+  expect(s.dirty).toBe(true);
+  expect(s.past).toHaveLength(1);
+  const back = editReducer(s, { type: "undo" });
+  expect(back.widgets).toEqual([w1]);
+  expect(back.dirty).toBe(false);
+});
+
+test("layoutItems gives the reducer's rects and per-type limits", () => {
+  const items = layoutItems([w("a", { x: 11, y: 0, w: 3, h: 2 })], "lg", () => ({ min: [2, 2], max: [4, 3] }));
+  expect(items).toEqual([{ id: "a", rect: { x: 9, y: 0, w: 3, h: 2 }, min: [2, 2], max: [4, 3] }]);
+  const unknown = layoutItems([w("b")], "md", () => undefined);
+  expect(unknown[0]).toMatchObject({ min: [1, 1], max: [8, 24] });
 });

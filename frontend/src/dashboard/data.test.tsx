@@ -6,7 +6,7 @@ import i18n from "@/i18n";
 import { dashboardKeys, dashboardsApi, type DashboardData, type WidgetResult } from "@/lib/dashboardsApi";
 import { handleSSEMessage } from "@/lib/useSSE";
 import { DASHBOARD_WIDGETS } from "@/plugins/dashboardWidgets";
-import { PENDING_RETRY_DELAYS_MS, useDashboardData, usePreviewData } from "./data";
+import { editDataPlan, PENDING_RETRY_DELAYS_MS, useDashboardData, usePreviewData, type WidgetDataState } from "./data";
 import type { EditWidget } from "./model";
 import { registerCoreWidgets } from "./widgets";
 
@@ -355,4 +355,45 @@ describe("usePreviewData", () => {
 // The registry is module state shared with other test files in this worker.
 afterEach(() => {
   if (!DASHBOARD_WIDGETS.get("core.counter")) registerCoreWidgets();
+});
+
+describe("editDataPlan (R-DASH-PREVIEW-BUDGET)", () => {
+  const withSettings = (w: EditWidget, settings: Record<string, unknown>, version = 1): EditWidget => ({ ...w, settings, type_version: version });
+  const saved = [
+    withSettings(wire("a", "core.counter"), { source: { kind: "preset", preset: "mine_open" } }),
+    withSettings(wire("b", "core.ticket-list"), { limit: 8 }),
+    withSettings(wire("c", "core.escalations"), { limit: 8 }),
+    wire("n", "core.notes"),
+  ];
+  const states: Record<string, WidgetDataState> = {
+    a: { status: "ok", data: { value: 3 } },
+    b: { status: "forbidden", error: "Nein." },
+    c: { status: "pending" },
+    n: { status: "none" },
+  };
+  const hasData = (key: string) => key !== "core.notes";
+
+  it("unchanged widgets keep their batch result, even moved or with reordered settings keys", () => {
+    const moved = { ...saved[0], layout: { lg: { x: 6, y: 4, w: 3, h: 2 } } };
+    const plan = editDataPlan(saved, states, [moved, saved[1], saved[3]], hasData);
+    expect(plan.byWidget).toEqual({ a: states.a, b: states.b, n: { status: "none" } });
+    expect([...plan.previewIds]).toEqual([]);
+  });
+
+  it("a duplicate with the same settings reuses the original's result", () => {
+    const plan = editDataPlan(saved, states, [saved[0], { ...saved[0], id: "a-copy" }], hasData);
+    expect(plan.byWidget["a-copy"]).toBe(states.a);
+    expect(plan.previewIds.size).toBe(0);
+  });
+
+  it("changed settings, a newer type version, a new widget and an unfinished batch result go through the preview", () => {
+    const plan = editDataPlan(
+      saved,
+      states,
+      [withSettings(saved[0], { source: { kind: "preset", preset: "mine_new" } }), withSettings(saved[1], { limit: 8 }, 2), saved[2], wire("new", "core.reminders")],
+      hasData,
+    );
+    expect([...plan.previewIds].sort()).toEqual(["a", "b", "c", "new"]);
+    expect(plan.byWidget).toEqual({});
+  });
 });

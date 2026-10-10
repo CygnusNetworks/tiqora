@@ -1,11 +1,12 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
+import { dashboardsApi } from "@/lib/dashboardsApi";
 import { DASHBOARD_WIDGETS, registerPluginWidgets } from "@/plugins/dashboardWidgets";
 import { setPluginImporterForTests } from "@/plugins/loader";
 import { dashboardWidget, helloPlugin } from "@/test/pluginFixtures";
-import { DashboardGrid } from "./DashboardGrid";
+import { DashboardGrid, type EditHandlers } from "./DashboardGrid";
 import type { WidgetDataState } from "./data";
 import type { Breakpoint, EditWidget } from "./model";
 import { registerCoreWidgets } from "./widgets";
@@ -159,5 +160,60 @@ describe("DashboardGrid", () => {
     rerender(view(same));
     expect(within(screen.getByTestId("widget-f")).getByText("wieder da")).toBeVisible();
     DASHBOARD_WIDGETS.clearForTests();
+  });
+
+  describe("edit mode", () => {
+    function editGrid(widgets: EditWidget[], edit: EditHandlers, opts: { data?: Record<string, WidgetDataState>; bp?: Breakpoint } = {}) {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const view = (ws: EditWidget[]) => (
+        <QueryClientProvider client={client}>
+          <DashboardGrid widgets={ws} mode="edit" breakpoint={opts.bp ?? "lg"} dashboardId={1} canEdit data={opts.data ?? {}} onRetry={() => {}} edit={edit} />
+        </QueryClientProvider>
+      );
+      const r = render(view(widgets));
+      return { rerender: (ws: EditWidget[]) => r.rerender(view(ws)) };
+    }
+
+    it("a widget listed in previewIds is fetched once through the preview route; moving it does not refetch", async () => {
+      const preview = vi.spyOn(dashboardsApi, "previewData").mockResolvedValue({ status: "ok", data: { value: 42, delta: null, spark: [] } });
+      const changed = { ...wire("a", "core.counter"), settings: { source: { kind: "preset", preset: "mine_new" } } };
+      const same = wire("b", "core.counter", 3);
+      const { rerender } = editGrid([changed, same], { previewIds: new Set(["a"]) }, { data: { b: ok(5) } });
+      expect(within(await screen.findByTestId("widget-a", {}, { timeout: 2000 })).getByText("42")).toBeVisible();
+      expect(preview).toHaveBeenCalledTimes(1);
+      expect(preview).toHaveBeenCalledWith("core.counter", changed.settings, expect.anything());
+      expect(within(screen.getByTestId("widget-b")).getByText("5")).toBeVisible();
+      rerender([{ ...changed, layout: { lg: { x: 6, y: 0, w: 3, h: 2 } } }, same]);
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 350));
+      });
+      expect(preview).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId("widget-a").style.gridColumn).toBe("7 / span 3");
+    });
+
+    it("header buttons appear only for the handlers given; duplicating is disabled at the limit", () => {
+      const onDuplicate = vi.fn();
+      editGrid([wire("a", "core.notes", 0, 0, 4, 2)], { onDuplicate, canDuplicate: false });
+      const cell = screen.getByTestId("widget-a");
+      expect(within(cell).getByRole("button", { name: "Duplizieren" })).toBeDisabled();
+      expect(within(cell).queryByRole("button", { name: "Entfernen" })).toBeNull();
+      expect(within(cell).queryByRole("button", { name: "Einstellungen" })).toBeNull();
+    });
+
+    it("the widget named by a failed save gets the danger outline; the body is inert", () => {
+      editGrid([wire("a", "core.notes", 0, 0, 4, 2), wire("b", "core.notes", 4, 0, 4, 2)], { invalidWidgetId: "b" });
+      expect(screen.getByTestId("widget-b")).toHaveClass("ring-danger");
+      expect(screen.getByTestId("widget-a")).not.toHaveClass("ring-danger");
+      expect(within(screen.getByTestId("widget-a")).getByTestId("widget-body")).toHaveAttribute("inert");
+    });
+
+    it("keyboard in a right-to-left grid: ArrowRight moves towards the inline start", () => {
+      const onMove = vi.fn();
+      editGrid([wire("a", "core.notes", 4, 0, 4, 2)], { onMove });
+      const cell = screen.getByTestId("widget-a");
+      screen.getByTestId("dashboard-grid").style.direction = "rtl";
+      fireEvent.keyDown(cell, { key: "ArrowRight" });
+      expect(onMove).toHaveBeenCalledWith("a", { x: 3, y: 0 }, "keyboard");
+    });
   });
 });

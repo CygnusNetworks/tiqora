@@ -34,6 +34,8 @@ const noSizes: SizeLookup = () => undefined;
 
 export type EditAction =
   | { type: "reset"; name: string; widgets: EditWidget[]; version: number }
+  /** A restored draft: replaces name and widgets as one undoable step (the session stays dirty). */
+  | { type: "restore"; name: string; widgets: EditWidget[] }
   | { type: "add"; def: WidgetLike; id: string; at?: { x: number; y: number }; bp: Bp }
   | { type: "move"; id: string; to: { x: number; y: number }; bp: Bp; now?: number; coalesce?: boolean }
   | { type: "resize"; id: string; size: { w: number; h: number }; bp: Bp; now?: number; coalesce?: boolean }
@@ -72,6 +74,14 @@ function limits(sizes: SizeLookup, key: string, cols: number): { min: Size; max:
   const min = l?.min ?? [1, 1];
   const max = l?.max ?? [cols, MAX_H];
   return { min: [Math.min(min[0], cols), min[1]], max: [Math.min(max[0], cols), max[1]] };
+}
+
+/**
+ * The rects (overlap-free, clamped) and per-type limits the reducer works on at `bp` — the drag
+ * preview uses the same items, so the preview equals the committed result.
+ */
+export function layoutItems(widgets: EditWidget[], bp: Bp, sizes: SizeLookup): LayoutItem[] {
+  return itemsAt(widgets, bp, sizes);
 }
 
 function itemsAt(widgets: EditWidget[], bp: Bp, sizes: SizeLookup): LayoutItem[] {
@@ -135,6 +145,8 @@ function reduce(s: EditState, a: EditAction, sizes: SizeLookup): EditState {
   switch (a.type) {
     case "reset":
       return initialEditState(a.name, a.widgets, a.version);
+    case "restore":
+      return commit(s, { name: a.name, widgets: a.widgets, selectedId: null });
     case "select":
       return a.id === s.selectedId ? s : { ...s, selectedId: a.id };
     case "move":

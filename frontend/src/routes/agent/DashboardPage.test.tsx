@@ -12,6 +12,7 @@ import {
 import i18n from "@/i18n";
 import { api, ApiError } from "@/lib/api";
 import {
+  DashboardConflictError,
   dashboardsApi,
   type Dashboard,
   type DashboardTab,
@@ -338,16 +339,16 @@ describe("DashboardPage", () => {
     expect(screen.getByRole("tab", { name: "Mein Start" })).toHaveAttribute("aria-controls", panel.id);
   });
 
-  it("the placeholder buttons look disabled (no hover look, dimmed, not-allowed cursor)", async () => {
+  it("the placeholder buttons look disabled (no hover look, dimmed, not-allowed cursor); 'Anpassen' is live", async () => {
     await renderPage();
     await screen.findByTestId("dashboard-grid");
-    for (const name of ["Anpassen", "Teilen", "Neues Dashboard"]) {
+    for (const name of ["Teilen", "Neues Dashboard"]) {
       const button = screen.getByRole("button", { name });
       expect(button).toBeVisible();
       expect(button).toBeDisabled();
       expect(button).toHaveClass("disabled:opacity-50", "disabled:cursor-not-allowed");
     }
-    expect(screen.getByRole("button", { name: "Anpassen" })).toHaveClass("disabled:hover:bg-accent");
+    expect(screen.getByRole("button", { name: "Anpassen" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Teilen" })).toHaveClass("disabled:hover:bg-surface");
     expect(screen.getByRole("button", { name: "Neues Dashboard" })).toHaveClass("disabled:hover:text-muted");
   });
@@ -646,5 +647,371 @@ describe("DashboardPage", () => {
     await screen.findByTestId("dashboard-grid");
     expect(screen.queryByTestId("plugin-widgets")).toBeNull();
     expect(screen.queryByText("Erweiterungen")).toBeNull();
+  });
+
+  // ---------------------------------------------------------------- edit mode (Task 12)
+
+  describe("edit mode", () => {
+    const KEY = "tiqora.dashboard.draft.5.1";
+    // grid 1200 px wide: one column step (1200 - 11 * 16) / 12 + 16 = 101.33 px, one row step 80 px
+    const STEP_X = (1200 - 11 * 16) / 12 + 16;
+    const STEP_Y = 80;
+    let save: ReturnType<typeof vi.fn>;
+    let previewData: ReturnType<typeof vi.fn>;
+
+    /** jsdom has no PointerEvent: a MouseEvent of the pointer type carries clientX/Y. */
+    function firePointer(target: EventTarget, type: string, init: { clientX?: number; clientY?: number } = {}) {
+      const ev = new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: init.clientX ?? 0, clientY: init.clientY ?? 0 });
+      Object.defineProperty(ev, "pointerId", { value: 1 });
+      act(() => {
+        target.dispatchEvent(ev);
+      });
+    }
+    function mockGridRect(width = 1200) {
+      vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+        left: 0, top: 0, right: width, bottom: 2000, width, height: 2000, x: 0, y: 0, toJSON: () => ({}),
+      } as DOMRect);
+    }
+    async function enterEdit() {
+      await renderPage();
+      fireEvent.click(await screen.findByRole("button", { name: "Anpassen" }));
+      return screen.findByRole("toolbar", { name: "Bearbeiten" });
+    }
+    const cellOf = (id: string) => screen.getByTestId(`widget-${id}`);
+    const rowStart = (id: string) => Number(cellOf(id).style.gridRow.split(" / ")[0]);
+    const order = () =>
+      Array.from(screen.getByTestId("dashboard-grid").querySelectorAll<HTMLElement>("[data-type]")).map((el) => el.dataset.widgetId);
+    const undoButton = () => screen.getByRole("button", { name: "Rückgängig" });
+    const redoButton = () => screen.getByRole("button", { name: "Wiederholen" });
+    const moveFirst = () => fireEvent.keyDown(cellOf("w-counter-1"), { key: "ArrowRight" });
+
+    beforeEach(() => {
+      mockDashboard({ version: 3 });
+      // like the server: the saved dashboard is what the next GET returns
+      save = vi.spyOn(dashboardsApi, "save").mockImplementation(async (id, body) => {
+        const saved = demoDashboard({ ...dashboards.get(id), version: body.version + 1, widgets: body.widgets });
+        dashboards.set(id, saved);
+        return saved;
+      }) as never;
+      previewData = vi.spyOn(dashboardsApi, "previewData").mockResolvedValue(ok()) as never;
+    });
+
+    it("Anpassen shows the dark toolbar, the column guide, handles and the keyboard hint; view-only chrome disappears", async () => {
+      const bar = await enterEdit();
+      expect(bar).toHaveTextContent("Mein Start bearbeiten");
+      expect(bar).toHaveClass("bg-ink", "text-surface");
+      expect(bar).toHaveFocus();
+      expect(screen.getByTestId("dashboard-grid")).toHaveAttribute("data-editing", "true");
+      expect(screen.getAllByTestId(/-handle$/)).toHaveLength(11);
+      expect(screen.getAllByTestId(/-resize$/)).toHaveLength(11);
+      expect(
+        screen.getByText(/Pfeiltasten verschieben, Umschalt \+ Pfeiltasten ändern die Größe, Eingabe öffnet die Einstellungen/),
+      ).toBeVisible();
+      expect(undoButton()).toBeDisabled();
+      expect(redoButton()).toBeDisabled();
+      expect(cellOf("w-list")).toHaveAttribute("aria-roledescription", "verschiebbares Widget");
+      expect(cellOf("w-list")).toHaveAttribute("tabindex", "0");
+      for (const name of ["Anpassen", "Teilen", "Neues Dashboard"]) expect(screen.queryByRole("button", { name })).toBeNull();
+      expect(screen.queryByRole("tablist")).toBeNull();
+      expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    });
+
+    it("dragging a widget by its handle shows the lifted widget and the snapped target, then commits one move and one undo step", async () => {
+      await enterEdit();
+      mockGridRect(1200);
+      firePointer(screen.getByTestId("widget-w-list-handle"), "pointerdown", { clientX: 10, clientY: 10 });
+      firePointer(window, "pointermove", { clientX: 10 - 4 * STEP_X, clientY: 10 + 5 });
+      expect(screen.getByTestId("drop-target")).toHaveStyle({ gridColumn: "3 / span 6", gridRow: "6 / span 5" });
+      expect(cellOf("w-list")).toHaveStyle({ opacity: "0.96" });
+      expect(cellOf("w-list").style.transform).toContain(`translate(${10 - 4 * STEP_X - 10}px, 5px)`);
+      expect(cellOf("w-list").style.gridColumn).toBe("7 / span 6"); // stays in its slot while lifted
+      expect(rowStart("w-list-new")).toBe(11); // the others shift live
+      expect(undoButton()).toBeDisabled();
+      firePointer(window, "pointerup");
+      expect(screen.queryByTestId("drop-target")).toBeNull();
+      expect(cellOf("w-list").style.gridColumn).toBe("3 / span 6");
+      expect(cellOf("w-list").style.gridRow).toBe("6 / span 5");
+      expect(cellOf("w-list").style.transform).toBe("");
+      fireEvent.click(undoButton());
+      expect(cellOf("w-list").style.gridColumn).toBe("7 / span 6");
+      expect(undoButton()).toBeDisabled(); // exactly one step
+    });
+
+    it("Escape during a drag aborts without history", async () => {
+      await enterEdit();
+      mockGridRect(1200);
+      firePointer(screen.getByTestId("widget-w-list-handle"), "pointerdown", { clientX: 10, clientY: 10 });
+      firePointer(window, "pointermove", { clientX: 300, clientY: 300 });
+      expect(screen.getByTestId("drop-target")).toBeVisible();
+      fireEvent.keyDown(window, { key: "Escape" });
+      firePointer(window, "pointerup");
+      expect(screen.queryByTestId("drop-target")).toBeNull();
+      expect(undoButton()).toBeDisabled();
+      expect(cellOf("w-list").style.gridColumn).toBe("7 / span 6");
+      expect(screen.getByRole("toolbar", { name: "Bearbeiten" })).toBeVisible(); // Escape does not leave edit mode
+    });
+
+    it("resizing via the corner handle respects min and max and pushes the widget below", async () => {
+      await enterEdit();
+      mockGridRect(1200);
+      firePointer(screen.getByTestId("widget-w-counter-1-resize"), "pointerdown", { clientX: 300, clientY: 130 });
+      firePointer(window, "pointermove", { clientX: 300 + 6 * STEP_X, clientY: 130 + 5 * STEP_Y });
+      firePointer(window, "pointerup");
+      // counter: min [2,2], max [4,3]
+      expect(cellOf("w-counter-1").style.gridColumn).toBe("1 / span 4");
+      expect(cellOf("w-counter-1").style.gridRow).toBe("1 / span 3");
+      expect(rowStart("w-esc")).toBeGreaterThanOrEqual(4); // y >= 3: pushed down, no overlap
+    });
+
+    it("keyboard: arrows move one cell, Shift+arrows resize, Enter opens the settings, with a live announcement", async () => {
+      await enterEdit();
+      const w = cellOf("w-counter-1");
+      w.focus();
+      fireEvent.keyDown(w, { key: "ArrowRight" });
+      expect(w.style.gridColumn).toBe("2 / span 3");
+      fireEvent.keyDown(w, { key: "ArrowDown", shiftKey: true });
+      expect(w.style.gridRow).toBe("1 / span 3");
+      expect(screen.getByRole("status")).toHaveTextContent(/„Meine offenen“ ist jetzt in Spalte 2, Zeile 1, 3 mal 3/);
+      expect(w).toHaveFocus();
+      fireEvent.keyDown(w, { key: "Enter" });
+      const dialog = screen.getByRole("dialog", { name: /Einstellungen/ });
+      expect(dialog).toBeVisible();
+      expect(dialog).toHaveTextContent("Meine offenen");
+    });
+
+    it("per-widget settings, duplicate and remove buttons act on the session only (nothing is saved yet)", async () => {
+      await enterEdit();
+      fireEvent.click(within(cellOf("w-list")).getByRole("button", { name: "Duplizieren" }));
+      expect(order()).toHaveLength(12);
+      expect(order().indexOf("w-list")).toBe(6);
+      fireEvent.click(within(cellOf("w-list")).getByRole("button", { name: "Entfernen" }));
+      expect(order()).toHaveLength(11);
+      expect(order()).not.toContain("w-list");
+      expect(screen.getByRole("status")).toHaveTextContent("„Meine offenen Tickets“ entfernt");
+      fireEvent.click(within(cellOf("w-esc")).getByRole("button", { name: "Einstellungen" }));
+      expect(screen.getByRole("dialog", { name: /Einstellungen/ })).toBeVisible();
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it("undo and redo buttons and Ctrl/Cmd+Z / Shift+Ctrl/Cmd+Z mirror the reducer", async () => {
+      await enterEdit();
+      moveFirst();
+      expect(cellOf("w-counter-1").style.gridColumn).toBe("2 / span 3");
+      fireEvent.click(undoButton());
+      expect(cellOf("w-counter-1").style.gridColumn).toBe("1 / span 3");
+      expect(redoButton()).toBeEnabled();
+      fireEvent.keyDown(document.body, { key: "z", ctrlKey: true, shiftKey: true });
+      expect(cellOf("w-counter-1").style.gridColumn).toBe("2 / span 3");
+      fireEvent.keyDown(document.body, { key: "z", metaKey: true });
+      expect(cellOf("w-counter-1").style.gridColumn).toBe("1 / span 3");
+      fireEvent.keyDown(document.body, { key: "y", ctrlKey: true });
+      expect(cellOf("w-counter-1").style.gridColumn).toBe("2 / span 3");
+    });
+
+    it("the draft is written 500 ms after the last change and the toolbar shows 'Entwurf gesichert · 10:42'", async () => {
+      await enterEdit();
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      vi.setSystemTime(new Date("2026-10-10T08:42:00Z")); // 10:42 in Europe/Berlin
+      moveFirst();
+      await act(() => vi.advanceTimersByTimeAsync(499));
+      expect(localStorage.getItem(KEY)).toBeNull();
+      expect(screen.queryByText(/Entwurf gesichert/)).toBeNull();
+      await act(() => vi.advanceTimersByTimeAsync(2));
+      expect(JSON.parse(localStorage.getItem(KEY)!).baseVersion).toBe(3);
+      expect(screen.getByText("Entwurf gesichert · 10:42")).toBeVisible();
+    });
+
+    it("blocked localStorage: editing works, no draft text, no crash", async () => {
+      vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
+        throw new Error("blocked");
+      });
+      await enterEdit();
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      moveFirst();
+      await act(() => vi.advanceTimersByTimeAsync(600));
+      expect(cellOf("w-counter-1").style.gridColumn).toBe("2 / span 3"); // the edit itself worked
+      expect(screen.queryByText(/Entwurf gesichert/)).toBeNull(); // no false "saved" claim
+      expect(screen.getByRole("toolbar", { name: "Bearbeiten" })).toBeVisible();
+    });
+
+    it("re-entering edit mode offers to restore a draft of the same base version and silently drops one of an older version", async () => {
+      const draftWidgets = [DEFAULT_WIDGETS[0], DEFAULT_WIDGETS[6]].map((w) => ({
+        id: w.id,
+        type_key: w.type_key,
+        type_version: w.type_version,
+        title_override: null,
+        settings: w.settings ?? {},
+        layout: { lg: { ...w.layout.lg, y: 0, x: w.id === "w-list" ? 6 : 0 } },
+      }));
+      const seed = (baseVersion: number) =>
+        localStorage.setItem(KEY, JSON.stringify({ baseVersion, savedAt: Date.parse("2026-10-10T08:42:00Z"), name: "Mein Start", widgets: draftWidgets }));
+      seed(3);
+      await enterEdit();
+      fireEvent.click(await screen.findByRole("button", { name: "Entwurf von 10:42 wiederherstellen" }));
+      expect(order()).toEqual(["w-counter-1", "w-list"]);
+      expect(cellOf("w-list").style.gridRow).toBe("1 / span 5");
+      expect(undoButton()).toBeEnabled(); // restoring is one undoable step
+      fireEvent.click(screen.getByRole("button", { name: "Verwerfen" }));
+      fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Änderungen verwerfen" }));
+      expect(await screen.findByRole("button", { name: "Anpassen" })).toBeVisible();
+      seed(2);
+      fireEvent.click(screen.getByRole("button", { name: "Anpassen" }));
+      await screen.findByRole("toolbar", { name: "Bearbeiten" });
+      expect(screen.queryByText(/Entwurf von/)).toBeNull();
+      expect(localStorage.getItem(KEY)).toBeNull();
+    });
+
+    it("Verwerfen with changes asks first, then clears the draft and restores the saved state; without changes it leaves directly", async () => {
+      await enterEdit();
+      fireEvent.click(screen.getByRole("button", { name: "Verwerfen" }));
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      expect(screen.queryByRole("toolbar")).toBeNull(); // a clean session leaves at once
+      expect(screen.getByRole("button", { name: "Anpassen" })).toHaveFocus();
+      fireEvent.click(screen.getByRole("button", { name: "Anpassen" }));
+      await screen.findByRole("toolbar", { name: "Bearbeiten" });
+      moveFirst();
+      localStorage.setItem(KEY, "{}"); // as if the autosave had run
+      fireEvent.click(screen.getByRole("button", { name: "Verwerfen" }));
+      const confirm = screen.getByRole("alertdialog", { name: "Änderungen verwerfen?" });
+      fireEvent.click(within(confirm).getByRole("button", { name: "Weiter bearbeiten" }));
+      expect(screen.getByRole("toolbar", { name: "Bearbeiten" })).toBeVisible();
+      fireEvent.click(screen.getByRole("button", { name: "Verwerfen" }));
+      fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Änderungen verwerfen" }));
+      expect(localStorage.getItem(KEY)).toBeNull();
+      expect(screen.queryByRole("toolbar")).toBeNull();
+      expect(cellOf("w-counter-1").style.gridColumn).toBe("1 / span 3");
+    });
+
+    it("Speichern sends widgets in array order with the base version, clears the draft and returns to view mode", async () => {
+      await enterEdit();
+      moveFirst();
+      localStorage.setItem(KEY, "{}");
+      fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+      await waitFor(() => expect(screen.queryByRole("toolbar")).toBeNull());
+      expect(save).toHaveBeenCalledTimes(1);
+      const [id, body] = save.mock.calls[0];
+      expect(id).toBe(1);
+      expect(body).toMatchObject({ name: "Mein Start", icon: null, version: 3 });
+      expect(body.widgets.map((w: { id: string }) => w.id)).toEqual(IDS);
+      expect(body.widgets[0]).toEqual({
+        id: "w-counter-1",
+        type_key: "core.counter",
+        type_version: 1,
+        title_override: null,
+        settings: DEFAULT_WIDGETS[0].settings,
+        layout: { lg: { x: 1, y: 0, w: 3, h: 2 } },
+      });
+      expect(localStorage.getItem(KEY)).toBeNull();
+      expect(cellOf("w-counter-1").style.gridColumn).toBe("2 / span 3");
+      expect(screen.getByRole("button", { name: "Anpassen" })).toHaveFocus();
+    });
+
+    it("a layout the server would reject as too tall is not sent", async () => {
+      mockDashboard({ version: 3, widgets: [wire("w-tall", "core.notes", { lg: { x: 0, y: 999, w: 4, h: 2 } })] });
+      await enterEdit();
+      fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+      expect(await within(screen.getByRole("toolbar")).findByRole("alert")).toHaveTextContent("Das Layout ist zu hoch.");
+      expect(save).not.toHaveBeenCalled();
+    });
+
+    it("conflict keeps the session and the draft and offers reload or continue; reload keeps the draft for the new version", async () => {
+      save.mockRejectedValue(new DashboardConflictError("Dieses Dashboard wurde inzwischen geändert.", 4));
+      await enterEdit();
+      moveFirst();
+      localStorage.setItem(KEY, JSON.stringify({ baseVersion: 3 }));
+      fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+      const dialog = await screen.findByRole("alertdialog", { name: /inzwischen geändert/ });
+      expect(localStorage.getItem(KEY)).not.toBeNull();
+      expect(screen.getByRole("toolbar", { name: "Bearbeiten" })).toBeVisible();
+      fireEvent.click(within(dialog).getByRole("button", { name: "Weiter bearbeiten" }));
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      expect(cellOf("w-counter-1").style.gridColumn).toBe("2 / span 3");
+      const gets = apiMock.get.mock.calls.length;
+      fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+      fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Neu laden" }));
+      await waitFor(() => expect(screen.queryByRole("toolbar")).toBeNull());
+      await waitFor(() => expect(apiMock.get.mock.calls.length).toBeGreaterThan(gets));
+      const stored = JSON.parse(localStorage.getItem(KEY)!);
+      expect(stored.baseVersion).toBe(4);
+      expect(stored.widgets[0].layout.lg.x).toBe(1);
+    });
+
+    it("a 422 with a widget path outlines that widget and opens its settings", async () => {
+      save.mockRejectedValue(
+        new ApiError(422, { detail: { message: "Der Wert muss zwischen 1 und 50 liegen.", path: "widgets[6].settings.limit" } }, "/api/v1/dashboards/1"),
+      );
+      await enterEdit();
+      fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+      const dialog = await screen.findByRole("dialog", { name: /Einstellungen/ });
+      expect(dialog).toBeVisible();
+      expect(cellOf("w-list")).toHaveClass("ring-danger");
+      expect(within(dialog).getByText("Der Wert muss zwischen 1 und 50 liegen.")).toBeVisible();
+      expect(screen.getByRole("toolbar", { name: "Bearbeiten" })).toBeVisible();
+    });
+
+    it("entering edit mode reuses the view's data: no preview request, no second batch; a duplicate with the same settings reuses it too", async () => {
+      await enterEdit();
+      expect(within(cellOf("w-counter-1")).getByText("12")).toBeVisible();
+      moveFirst();
+      fireEvent.click(within(cellOf("w-list")).getByRole("button", { name: "Duplizieren" }));
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 350));
+      });
+      expect(previewData).not.toHaveBeenCalled();
+      expect(apiMock.data).toHaveBeenCalledTimes(1); // only the pre-edit view load
+      expect(apiMock.widgetData).not.toHaveBeenCalled();
+    });
+
+    it("an unknown widget type stays in the grid in edit mode and is saved back unchanged when untouched", async () => {
+      mockDashboard({ version: 3, widgets: [wire("g1", "org.example.gone", { lg: { x: 0, y: 0, w: 4, h: 2 } }, { a: 1 })] });
+      await enterEdit();
+      expect(within(cellOf("g1")).getByRole("button", { name: "Entfernen" })).toBeVisible();
+      expect(screen.getByTestId("widget-g1-handle")).toBeVisible();
+      fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+      await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+      expect(save.mock.calls[0][1].widgets[0]).toEqual({
+        id: "g1",
+        type_key: "org.example.gone",
+        type_version: 1,
+        title_override: null,
+        settings: { a: 1 },
+        layout: { lg: { x: 0, y: 0, w: 4, h: 2 } },
+      });
+    });
+
+    // ---- phone
+    it("on a phone-width container edit mode offers only up/down and settings per widget — no gallery, drag, duplicate or remove", async () => {
+      containerWidth = 390;
+      await enterEdit();
+      const w = cellOf("w-list");
+      expect(within(w).getByRole("button", { name: "Nach oben" })).toBeVisible();
+      expect(within(w).getByRole("button", { name: "Nach unten" })).toBeVisible();
+      expect(within(w).getByRole("button", { name: "Einstellungen" })).toBeVisible();
+      for (const name of ["Duplizieren", "Entfernen", "Widget hinzufügen"]) expect(screen.queryByRole("button", { name })).toBeNull();
+      expect(screen.queryByTestId("widget-w-list-handle")).toBeNull();
+      expect(screen.queryByTestId(/-resize$/)).toBeNull();
+      expect(screen.queryByTestId("counter-group")).toBeNull(); // every widget carries its own controls
+      expect(screen.getByText(/die Reihenfolge lässt sich hier ändern/)).toBeVisible();
+      const prevIndex = order().indexOf("w-list");
+      fireEvent.click(within(w).getByRole("button", { name: "Nach oben" }));
+      expect(order().indexOf("w-list")).toBe(prevIndex - 1);
+      expect(within(cellOf("w-list")).getByRole("button", { name: "Nach oben" })).toHaveFocus();
+      expect(screen.getByRole("status")).toHaveTextContent("ist jetzt an Stelle 6 von 11");
+      fireEvent.click(undoButton());
+      expect(order().indexOf("w-list")).toBe(prevIndex);
+    });
+
+    it("'Nach oben' on the first and 'Nach unten' on the last widget are disabled; arrow keys reorder on the phone", async () => {
+      containerWidth = 390;
+      await enterEdit();
+      const all = Array.from(screen.getByTestId("dashboard-grid").querySelectorAll<HTMLElement>("[data-type]"));
+      expect(within(all[0]).getByRole("button", { name: "Nach oben" })).toBeDisabled();
+      expect(within(all[0]).getByRole("button", { name: "Nach unten" })).toBeEnabled();
+      expect(within(all.at(-1)!).getByRole("button", { name: "Nach unten" })).toBeDisabled();
+      fireEvent.keyDown(cellOf("w-counter-1"), { key: "ArrowDown" });
+      expect(order().slice(0, 2)).toEqual(["w-counter", "w-counter-1"]);
+      fireEvent.keyDown(cellOf("w-counter-1"), { key: "Enter" });
+      expect(screen.getByRole("dialog", { name: /Einstellungen/ })).toBeVisible();
+    });
   });
 });

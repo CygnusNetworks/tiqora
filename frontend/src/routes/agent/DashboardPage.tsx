@@ -6,18 +6,13 @@ import { useAuth } from "@/auth/AuthContext";
 import { toBcp47 } from "@/i18n";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import {
-  dashboardKeys,
-  dashboardsApi,
-  type Dashboard,
-  type DashboardTab,
-  type DashboardWidgetRow,
-} from "@/lib/dashboardsApi";
+import { dashboardKeys, dashboardsApi, type Dashboard, type DashboardTab } from "@/lib/dashboardsApi";
 import { displayTimeZone } from "@/lib/timeZone";
 import { DashboardGrid } from "@/dashboard/DashboardGrid";
 import { useDashboardData } from "@/dashboard/data";
+import { DashboardEditMode } from "@/dashboard/edit/DashboardEditMode";
 import { greetingKey } from "@/dashboard/legacy";
-import type { EditWidget } from "@/dashboard/model";
+import { toEditWidget } from "@/dashboard/model";
 import { DashboardTabs } from "@/dashboard/tabs/DashboardTabs";
 import { useGridBreakpoint } from "@/dashboard/useGridBreakpoint";
 import { useSelectedDashboard } from "@/dashboard/useSelectedDashboard";
@@ -30,17 +25,6 @@ export interface DashboardSearch {
 
 // Once per page load, before the first read of the widget registry (idempotent).
 registerCoreWidgets();
-
-function toEditWidget(row: DashboardWidgetRow): EditWidget {
-  return {
-    id: row.id,
-    type_key: row.type_key,
-    type_version: row.type_version,
-    title_override: row.title_override ?? null,
-    settings: row.settings ?? {},
-    layout: { lg: row.layout.lg, ...(row.layout.md ? { md: row.layout.md } : {}) },
-  };
-}
 
 function tabOf(d: Dashboard): DashboardTab {
   const { widgets: _widgets, ...tab } = d;
@@ -71,7 +55,8 @@ function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }
 /**
  * The agent home page: greeting, the tab row of the agent's dashboards and the widget grid of the
  * selected one. First visit (no own dashboard yet, R-DASH-FIRST-VISIT) creates "Mein Start".
- * "Anpassen" (edit mode), "Teilen" and "+" are placeholders here; later tasks wire them.
+ * "Anpassen" switches to edit mode: the edit toolbar replaces greeting, tabs and header buttons
+ * until "Speichern" or "Verwerfen". "Teilen" and "+" are placeholders until Tasks 16 and 15.
  */
 export function DashboardPage() {
   const { t, i18n } = useTranslation();
@@ -132,7 +117,32 @@ export function DashboardPage() {
 
   const dashboard = dashQ.data && dashQ.data.id === selectedId ? dashQ.data : undefined;
   const widgets = useMemo(() => (dashboard ? dashboard.widgets.map(toEditWidget) : []), [dashboard]);
-  const { byWidget, refetch } = useDashboardData(dashboard?.id ?? 0, widgets, { enabled: dashboard !== undefined });
+  const [editing, setEditing] = useState(false);
+  const isEditing = editing && dashboard !== undefined && dashboard.can_edit && user != null;
+  // While editing nothing is fetched for the view; its last data is reused by the edit grid.
+  const { byWidget, refetch } = useDashboardData(dashboard?.id ?? 0, widgets, {
+    enabled: dashboard !== undefined && !isEditing,
+  });
+  // Back in view mode the focus returns to "Anpassen".
+  const customizeRef = useRef<HTMLButtonElement>(null);
+  const returnFocus = useRef(false);
+  useEffect(() => {
+    if (isEditing || !returnFocus.current) return;
+    returnFocus.current = false;
+    customizeRef.current?.focus();
+  }, [isEditing]);
+  const leaveEdit = useCallback(() => {
+    returnFocus.current = true;
+    setEditing(false);
+  }, []);
+  const reloadAfterConflict = useCallback(() => {
+    if (dashboard) {
+      void qc.invalidateQueries({ queryKey: dashboardKeys.one(dashboard.id) });
+      void qc.invalidateQueries({ queryKey: dashboardKeys.data(dashboard.id) });
+      void qc.invalidateQueries({ queryKey: dashboardKeys.list() });
+    }
+    leaveEdit();
+  }, [dashboard, qc, leaveEdit]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const breakpoint = useGridBreakpoint(containerRef);
@@ -147,7 +157,19 @@ export function DashboardPage() {
   }).format(new Date());
 
   let content;
-  if (listQ.isError) {
+  if (isEditing && dashboard && user) {
+    content = (
+      <DashboardEditMode
+        dashboard={dashboard}
+        userId={user.id}
+        breakpoint={breakpoint}
+        savedWidgets={widgets}
+        savedData={byWidget}
+        onLeave={leaveEdit}
+        onReload={reloadAfterConflict}
+      />
+    );
+  } else if (listQ.isError) {
     content = <ErrorBox message={t("dashboards.view.listFailed")} onRetry={() => void listQ.refetch()} />;
   } else if (ensureFailed) {
     content = (
@@ -197,6 +219,7 @@ export function DashboardPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-8" data-testid="dashboard">
+      {!isEditing && (
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-2.5">
           <div>
@@ -217,30 +240,36 @@ export function DashboardPage() {
               </button>
             )}
             {dashboard.can_edit && (
-              <button type="button" disabled className={cn(BUTTON, "bg-accent px-4 font-semibold text-accent-ink hover:bg-accent/90 disabled:hover:bg-accent")}>
+              <button
+                ref={customizeRef}
+                type="button"
+                onClick={() => setEditing(true)}
+                className={cn(BUTTON, "bg-accent px-4 font-semibold text-accent-ink hover:bg-accent/90")}
+              >
                 {t("dashboards.view.customize")}
               </button>
             )}
           </div>
         )}
       </header>
+      )}
 
-      {dashboard?.kind === "template" && dashboard.can_edit && (
+      {!isEditing && dashboard?.kind === "template" && dashboard.can_edit && (
         <p className="rounded-[14px] border border-accent/30 bg-accent/10 px-4 py-2.5 text-sm text-ink">
           {t("dashboards.view.templateBanner", { name: dashboard.name })}
         </p>
       )}
-      {dashboard?.kind === "template" && dashboard.locked && !dashboard.can_edit && (
+      {!isEditing && dashboard?.kind === "template" && dashboard.locked && !dashboard.can_edit && (
         <p className="text-sm text-muted">{t("dashboards.view.lockedHint")}</p>
       )}
 
       <div
         ref={containerRef}
         id={panelId}
-        role="tabpanel"
-        aria-labelledby={isTab ? `${panelId}-tab-${selectedId}` : undefined}
-        aria-label={isTab ? undefined : dashboard?.name}
-        tabIndex={widgets.length === 0 ? 0 : undefined}
+        role={isEditing ? undefined : "tabpanel"}
+        aria-labelledby={!isEditing && isTab ? `${panelId}-tab-${selectedId}` : undefined}
+        aria-label={isEditing || isTab ? undefined : dashboard?.name}
+        tabIndex={!isEditing && widgets.length === 0 ? 0 : undefined}
         className="min-w-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         {content}

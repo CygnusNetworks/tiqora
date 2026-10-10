@@ -31,3 +31,22 @@ export interface EditWidget {
   settings: Record<string, unknown>;
   layout: { lg: Rect; md?: Rect };
 }
+
+/** A stored widget row (API shape) as the edit model; `md` only when stored. */
+export function toEditWidget(row: {
+  id: string;
+  type_key: string;
+  type_version: number;
+  title_override?: string | null;
+  settings?: Record<string, unknown> | null;
+  layout: { lg: Rect; md?: Rect | null };
+}): EditWidget {
+  return {
+    id: row.id,
+    type_key: row.type_key,
+    type_version: row.type_version,
+    title_override: row.title_override ?? null,
+    settings: row.settings ?? {},
+    layout: { lg: row.layout.lg, ...(row.layout.md ? { md: row.layout.md } : {}) },
+  };
+}

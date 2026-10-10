@@ -43,6 +43,7 @@ export default tseslint.config(
             "useWidgetData",
             "useDashboardData",
             "usePreviewData",
+            "editDataPlan",
             "PENDING_RETRY_DELAYS_MS",
             "useWidgetChrome",
           ],
