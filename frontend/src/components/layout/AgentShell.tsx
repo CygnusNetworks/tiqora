@@ -16,6 +16,7 @@ import { ConnectionStatus } from "@/components/agent/ConnectionStatus";
 import { AccountMenu } from "@/components/agent/AccountMenu";
 import { OnlineAgentsPopover } from "@/components/agent/OnlineAgentsPopover";
 import { TimeZoneHint } from "@/components/agent/TimeZoneHint";
+import { SavedSearchNav } from "@/components/searches/SavedSearchNav";
 import { effectiveTimeZone } from "@/lib/timeZone";
 import {
   AddressBookIcon,
@@ -28,6 +29,7 @@ import {
   HelpIcon,
   InboxIcon,
   MailIcon,
+  PlusIcon,
   SearchIcon,
   ServerIcon,
   ShieldIcon,
@@ -532,6 +534,27 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             testId="agent-nav-services"
             onNavigate={onNavigate}
           />
+        </NavGroup>
+
+        <NavGroup
+          id="searches"
+          title={t("sidebar.searches")}
+          collapsed={!!collapsedGroups.searches}
+          onToggle={() => toggleGroup("searches")}
+          action={
+            <Link
+              to="/agent/searches/new"
+              onClick={onNavigate}
+              aria-label={t("savedSearches.newAria")}
+              title={t("savedSearches.new")}
+              data-testid="sidebar-searches-new"
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+            >
+              <PlusIcon className="h-3.5 w-3.5" />
+            </Link>
+          }
+        >
+          <SavedSearchNav onNavigate={onNavigate} />
         </NavGroup>
 
         <QueueNavSection

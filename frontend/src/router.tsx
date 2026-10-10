@@ -13,6 +13,9 @@ import { ReportBuilderPage } from "@/routes/agent/ReportBuilderPage";
 import { validateReportBuilderSearch } from "@/routes/agent/reportBuilderSearch";
 import { ReportViewPage } from "@/routes/agent/ReportViewPage";
 import { validateReportViewSearch } from "@/routes/agent/reportViewSearch";
+import { SavedSearchPage } from "@/routes/agent/SavedSearchPage";
+import { SavedSearchEditorPage } from "@/routes/agent/SavedSearchEditorPage";
+import { validateSavedSearchSearch } from "@/routes/agent/savedSearchSearch";
 import { QueuesPage, type QueuesSearch } from "@/routes/agent/QueuesPage";
 import { TicketZoomPage } from "@/routes/agent/TicketZoomPage";
 import { SearchPage, type SearchSearch } from "@/routes/agent/SearchPage";
@@ -505,6 +508,27 @@ const agentReportViewRoute = createRoute({
   path: "/reports/$reportKey",
   validateSearch: validateReportViewSearch,
   component: ReportViewPage,
+});
+
+// Static segment first: "new" is never read as a search id.
+const agentSearchNewRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/searches/new",
+  component: SavedSearchEditorPage,
+});
+
+const agentSearchEditRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/searches/$searchId/edit",
+  component: SavedSearchEditorPage,
+});
+
+// Consumed by the dashboards later: keep the path.
+const agentSearchViewRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/searches/$searchId",
+  validateSearch: validateSavedSearchSearch,
+  component: SavedSearchPage,
 });
 
 const agentCalendarRoute = createRoute({
@@ -1169,6 +1193,9 @@ const routeTree = rootRoute.addChildren([
     agentReportNewRoute,
     agentReportEditRoute,
     agentReportViewRoute,
+    agentSearchNewRoute,
+    agentSearchEditRoute,
+    agentSearchViewRoute,
     agentCalendarRoute,
     agentTemplatesRoute,
     agentServicesRoute,

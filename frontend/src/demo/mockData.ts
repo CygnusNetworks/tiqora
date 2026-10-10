@@ -1867,6 +1867,24 @@ export function resolveData(path: string, method: string): unknown | undefined {
     return agentQueues.flatMap((q) => [q, ...q.children]).map((q) => ({ id: q.id, name: q.name }));
   if (p.endsWith("/api/v1/reference/states")) return STATES.map((s) => ({ id: s.state_id, name: s.state, type_name: s.state_type }));
   if (p.endsWith("/api/v1/reference/priorities")) return PRIOS.map((x) => ({ id: x.priority_id, name: x.priority }));
+  // Pickers of the ticket filter (saved searches): ticket types, services and SLAs.
+  if (p.endsWith("/api/v1/reference/types"))
+    return [
+      { id: 1, name: "Incident" },
+      { id: 2, name: "Service Request" },
+      { id: 3, name: "Change Request" },
+    ];
+  if (p.endsWith("/api/v1/reference/services"))
+    return [
+      { id: 1, name: "E-Mail" },
+      { id: 2, name: "VPN" },
+      { id: 3, name: "Arbeitsplatz" },
+    ];
+  if (p.endsWith("/api/v1/reference/slas"))
+    return [
+      { id: 1, name: "Standard (8x5)" },
+      { id: 2, name: "Premium (24x7)" },
+    ];
   if (p.endsWith("/api/v1/reference/agents")) return OWNERS.map((o) => ({ id: o.owner_id, login: o.owner_login, name: o.owner_name }));
   if (p.endsWith("/api/v1/tickets/dashboard-summary")) return { my_open: 9, my_new: 3, unowned_new: 5, escalated: 6 };
   if (p.endsWith("/api/v1/tickets") && method === "GET") return ticketListPage();

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
 import { api, type MutationRequest, type TicketListChannel, type TicketListItem } from "@/lib/api";
@@ -43,6 +43,7 @@ import { fieldOptionsApi } from "@/lib/fieldOptionsApi";
 import { useAgentOptions } from "@/lib/agentOptions";
 import { apiErrorMessage } from "@/lib/avatarApi";
 import { JobDialog } from "@/components/jobs/JobDialog";
+import { SaveViewDialog, type SaveViewParams } from "@/components/searches/SaveViewDialog";
 import { priorityLabel } from "@/lib/priority";
 import { stateLabel } from "@/lib/status";
 
@@ -249,6 +250,8 @@ export function QueuesPage() {
   const [applying, setApplying] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [status, setStatus] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [saveViewOpen, setSaveViewOpen] = useState(false);
+  const [savedView, setSavedView] = useState<{ id: number; name: string } | null>(null);
 
   const clearSelection = () => {
     setSelected(new Set());
@@ -672,6 +675,12 @@ export function QueuesPage() {
         onClose={() => setExportJobId(null)}
         testId="queue-export-job"
       />
+      <SaveViewDialog
+        open={saveViewOpen}
+        onClose={() => setSaveViewOpen(false)}
+        listParams={{ ...filterParams, sort, order } as SaveViewParams}
+        onSaved={(saved) => setSavedView({ id: saved.id, name: saved.name })}
+      />
       <div className="min-w-0 flex-1 space-y-3 p-3">
         <div>
           <div className="flex flex-wrap items-center gap-2.5">
@@ -759,6 +768,10 @@ export function QueuesPage() {
             })}
           </div>
 
+          <div className="flex items-center gap-2">
+          <Button onClick={() => setSaveViewOpen(true)} data-testid="queues-save-view">
+            {t("savedSearches.saveView")}
+          </Button>
           <Menu
             align="right"
             panelTestId="queue-more-menu"
@@ -794,6 +807,7 @@ export function QueuesPage() {
               {t("queue.exportCsv")}
             </MenuItem>
           </Menu>
+          </div>
         </div>
 
         {exportError && (
@@ -986,6 +1000,20 @@ export function QueuesPage() {
               </span>
             )}
           </div>
+        )}
+
+        {savedView && (
+          <p className="text-xs font-medium text-green" role="status" data-testid="queues-view-saved">
+            {t("savedSearches.saveViewDone", { name: savedView.name })}{" "}
+            <Link
+              to="/agent/searches/$searchId"
+              params={{ searchId: String(savedView.id) }}
+              search={{}}
+              className="text-accent underline"
+            >
+              {t("savedSearches.open")}
+            </Link>
+          </p>
         )}
 
         <TicketTable

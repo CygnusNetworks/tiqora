@@ -65,6 +65,11 @@ vi.mock("@/lib/api", async () => {
   return { ...actual, api: { listQueues, myTicketCounts, dashboardSummary } };
 });
 
+const { listSearches, searchCounts } = vi.hoisted(() => ({ listSearches: vi.fn(), searchCounts: vi.fn() }));
+vi.mock("@/lib/savedSearchesApi", () => ({
+  savedSearchesApi: { list: listSearches, counts: searchCounts, setPrefs: vi.fn() },
+}));
+
 async function renderShell(initialEntry = "/agent") {
   const rootRoute = createRootRoute({
     component: () => (
@@ -76,6 +81,8 @@ async function renderShell(initialEntry = "/agent") {
   const childPaths = [
     "/agent",
     "/agent/queues",
+    "/agent/searches/new",
+    "/agent/searches/$searchId",
     "/agent/kb",
     "/agent/calendar",
     "/agent/reports",
@@ -117,6 +124,8 @@ describe("AgentShell sidebar", () => {
       escalated: 0,
       ai_escalated: 0,
     });
+    listSearches.mockReset().mockResolvedValue([]);
+    searchCounts.mockReset().mockResolvedValue({ counts: {} });
     window.localStorage.clear();
     authFlags.canUseDirectory = false;
     void i18n.changeLanguage("de");
@@ -279,5 +288,29 @@ describe("AgentShell sidebar", () => {
     const pill = await screen.findByTestId("nav-escalated-count");
     expect(pill).toHaveTextContent("3");
     expect(screen.getByTestId("agent-nav-inbox")).toContainElement(pill);
+  });
+
+  it("renders the saved-search group between workspace and queues", async () => {
+    await renderShell();
+    const order = (await screen.findAllByTestId(/^sidebar-group-.+-toggle$/)).map((el) =>
+      el.getAttribute("data-testid"),
+    );
+    expect(order.slice(0, 4)).toEqual([
+      "sidebar-group-workspace-toggle",
+      "sidebar-group-searches-toggle",
+      "sidebar-group-queues-toggle",
+      "sidebar-group-knowledge-toggle",
+    ]);
+    expect(screen.getByTestId("sidebar-searches-new")).toHaveAttribute("href", "/agent/searches/new");
+  });
+
+  it("collapses the saved-search group and hides its entries", async () => {
+    listSearches.mockResolvedValue([
+      { id: 1, name: "Meine VIP", show_in_sidebar: true, show_count: false, position: 0 },
+    ]);
+    await renderShell();
+    expect(await screen.findByTestId("sidebar-search-1")).toHaveAttribute("href", "/agent/searches/1");
+    fireEvent.click(screen.getByTestId("sidebar-group-searches-toggle"));
+    expect(screen.queryByTestId("sidebar-search-1")).not.toBeInTheDocument();
   });
 });
