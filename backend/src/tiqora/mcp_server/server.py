@@ -2215,12 +2215,22 @@ async def _app_lifespan(app: Any) -> AsyncIterator[None]:
     _mcp_state = McpState(settings)
     from tiqora.plugins.bootstrap import init_registry
 
-    await init_registry(role="mcp", settings=settings, session_factory=_mcp_state.session_factory)
-    from tiqora.plugins.bootstrap import retry_plugin_boot
-
-    plugin_retry = asyncio.create_task(
-        retry_plugin_boot(role="mcp", settings=settings, session_factory=_mcp_state.session_factory)
+    registry = await init_registry(
+        role="mcp", settings=settings, session_factory=_mcp_state.session_factory
     )
+    from tiqora.plugins.bootstrap import retry_plugin_boot
+    from tiqora.plugins.mcp import register_plugin_mcp_tools
+
+    register_plugin_mcp_tools(mcp, registry)
+
+    session_factory = _mcp_state.session_factory
+
+    async def _retry_and_bind() -> None:
+        # A late plugin boot swaps the registry content in place; bind the new tools then.
+        if await retry_plugin_boot(role="mcp", settings=settings, session_factory=session_factory):
+            register_plugin_mcp_tools(mcp, registry)
+
+    plugin_retry = asyncio.create_task(_retry_and_bind())
     logger.info("tiqora_mcp_started", database=settings.database_url[:30])
     try:
         yield

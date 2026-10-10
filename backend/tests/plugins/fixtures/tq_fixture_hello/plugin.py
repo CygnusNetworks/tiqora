@@ -83,10 +83,9 @@ async def run_echo_job(ctx: JobContext, payload: EchoPayload) -> dict[str, Any]:
 async def echo_tool(ctx: Context, text: str, times: int = 1) -> dict[str, Any]:
     """Echo text back.
 
-    Parameters
-    ----------
-    text: The text to echo.
-    times: How often.
+    Args:
+        text: The text to echo.
+        times: How often.
     """
     return {"text": text * times}
 
