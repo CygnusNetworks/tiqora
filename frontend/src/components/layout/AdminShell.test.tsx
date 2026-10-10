@@ -64,6 +64,11 @@ async function renderShell(initialPath = "/admin") {
 }
 
 describe("AdminShell", () => {
+  it("keeps a plugin settings form in the system group", async () => {
+    await renderShell("/admin/settings/plugins.org.example.demo");
+    expect(screen.getByTestId("admin-nav-plugins")).toBeInTheDocument();
+  });
+
   it("renders the icon rail with one button per group and only the active group's pages", async () => {
     await renderShell("/admin/queues");
     expect(screen.getByTestId("admin-nav-rail")).toBeInTheDocument();

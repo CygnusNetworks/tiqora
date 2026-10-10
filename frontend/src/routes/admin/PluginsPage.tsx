@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -20,7 +20,7 @@ type Status = PluginAdmin["status"];
 /** Chip colour per status (R-SOFTCHIP): green = running, danger = needs attention, muted = nothing to do. */
 const STATUS_COLOR: Record<Status, string> = {
   active: "var(--color-green)",
-  restart_required: "var(--color-amber)",
+  restart_required: "var(--color-muted)",
   unknown: "var(--color-muted)",
   disabled: "var(--color-muted)",
   failed: "var(--color-danger)",
@@ -156,29 +156,58 @@ function PluginDetails({ plugin }: { plugin: PluginAdmin }) {
   );
 }
 
+type FocusTarget = { id: string; what: "switch" | "retry" };
+
 function PluginCard({
   plugin,
   disabled,
+  focusWhat,
+  onFocused,
   onToggle,
   onRetry,
 }: {
   plugin: PluginAdmin;
   disabled: boolean;
+  /** Set after an action on this card: where focus goes once the card is enabled again. */
+  focusWhat: FocusTarget["what"] | null;
+  onFocused: () => void;
   onToggle: (enabled: boolean) => void;
   onRetry: () => void;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const id = plugin.id;
+  const rowRef = useRef<HTMLLIElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  // A disabled control drops focus; give it back (or, when the "Erneut
+  // versuchen" button is gone, move it to the plugin's heading).
+  useEffect(() => {
+    if (!focusWhat || disabled) return;
+    const row = rowRef.current;
+    if (focusWhat === "switch") {
+      row?.querySelector<HTMLElement>(`[data-testid="plugin-enabled-${id}"]`)?.focus();
+    } else {
+      const retry = row?.querySelector<HTMLElement>(`[data-testid="plugin-retry-${id}"]`);
+      (retry ?? headingRef.current)?.focus();
+    }
+    onFocused();
+  }, [focusWhat, disabled, id, onFocused]);
   return (
     <li
+      ref={rowRef}
       className="rounded-xl border border-hairline bg-surface p-4"
       data-testid={`plugin-card-${id}`}
     >
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h2 className="font-display text-base font-semibold text-ink">{plugin.name}</h2>
+            <h2
+              ref={headingRef}
+              tabIndex={-1}
+              className="font-display text-base font-semibold text-ink focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              {plugin.name}
+            </h2>
             <SoftChip color={STATUS_COLOR[plugin.status]} data-testid={`plugin-status-${id}`}>
               {t(`admin.plugins.status.${plugin.status}`)}
             </SoftChip>
@@ -261,6 +290,15 @@ export function PluginsPage() {
     mutationFn: (id: string) => pluginsApi.reset(id),
     onSuccess: replace,
   });
+  const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
+  const clearFocus = useCallback(() => setFocusTarget(null), []);
+  const run = (target: FocusTarget, start: () => void) => {
+    // A new action clears the previous error.
+    toggleM.reset();
+    retryM.reset();
+    setFocusTarget(target);
+    start();
+  };
   const busy = toggleM.isPending || retryM.isPending;
   const actionError = toggleM.error ?? retryM.error;
 
@@ -328,8 +366,12 @@ export function PluginsPage() {
               key={plugin.id}
               plugin={plugin}
               disabled={busy}
-              onToggle={(enabled) => toggleM.mutate({ id: plugin.id, enabled })}
-              onRetry={() => retryM.mutate(plugin.id)}
+              focusWhat={focusTarget?.id === plugin.id ? focusTarget.what : null}
+              onFocused={clearFocus}
+              onToggle={(enabled) =>
+                run({ id: plugin.id, what: "switch" }, () => toggleM.mutate({ id: plugin.id, enabled }))
+              }
+              onRetry={() => run({ id: plugin.id, what: "retry" }, () => retryM.mutate(plugin.id))}
             />
           ))}
         </ul>

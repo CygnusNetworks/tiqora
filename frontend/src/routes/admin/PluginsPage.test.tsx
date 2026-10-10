@@ -191,6 +191,37 @@ describe("PluginsPage", () => {
     expect(screen.queryByTestId("admin-plugins-browser-off")).toBeNull();
   });
 
+  it("returns focus to the switch after toggling and clears an old error on success", async () => {
+    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE] });
+    setEnabled.mockRejectedValueOnce(new Error("x")).mockResolvedValueOnce({ ...ACTIVE, enabled: false });
+    renderPage();
+    const sw = await screen.findByRole("switch", { name: "Hallo-Erweiterung" });
+    fireEvent.click(sw);
+    expect(await screen.findByTestId("admin-plugins-action-error")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("switch", { name: "Hallo-Erweiterung" })).toHaveFocus());
+    fireEvent.click(screen.getByRole("switch", { name: "Hallo-Erweiterung" }));
+    await waitFor(() => expect(screen.queryByTestId("admin-plugins-action-error")).toBeNull());
+    await waitFor(() => expect(screen.getByRole("switch", { name: "Hallo-Erweiterung" })).toHaveFocus());
+  });
+
+  it("moves focus to the heading when the retry button disappears", async () => {
+    adminList.mockResolvedValue({ safe_mode: false, plugins: [QUARANTINED] });
+    reset.mockResolvedValue({ ...QUARANTINED, status: "disabled", status_message: null });
+    renderPage();
+    fireEvent.click(await screen.findByTestId("plugin-retry-org.example.crashy"));
+    await waitFor(() => expect(screen.queryByTestId("plugin-retry-org.example.crashy")).toBeNull());
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "Absturz-Erweiterung" })).toHaveFocus(),
+    );
+  });
+
+  it("shows restart-needed muted, not in a warning colour", async () => {
+    adminList.mockResolvedValue({ safe_mode: false, plugins: [adminPlugin({ status: "restart_required", enabled: false })] });
+    renderPage();
+    const chip = await screen.findByTestId("plugin-status-org.example.hello");
+    expect(chip.style.color).toBe("var(--color-muted)");
+  });
+
   it("shows an error when the switch fails", async () => {
     adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE] });
     setEnabled.mockRejectedValue(new Error("x"));
