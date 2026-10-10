@@ -5490,7 +5490,7 @@
         "title": "Kennzahl",
         "description": "Eine Zahl mit Verlauf, z. B. deine offenen Tickets",
         "empty": "Keine Zahl vorhanden.",
-        "delta": "{{delta}} seit gestern"
+        "delta": "{{delta}} seit dem letzten Stand"
       },
       "queueOverview": {
         "title": "Queues",
@@ -5518,7 +5518,8 @@
       "reminders": {
         "title": "Erinnerungen fällig",
         "description": "Wartende Tickets, deren Erinnerung fällig ist",
-        "empty": "Keine fälligen Erinnerungen."
+        "empty": "Keine fälligen Erinnerungen.",
+        "overdue": "Überfällig"
       },
       "recentViews": {
         "title": "Zuletzt angesehen",

@@ -139,6 +139,30 @@ describe("settingsWithDefaults", () => {
     });
   });
 
+  it("checks array length bounds and declared nested properties", () => {
+    const d = anyDef({
+      settingsSchema: {
+        type: "object",
+        properties: {
+          columns: { type: "array", minItems: 1, maxItems: 2, items: { type: "string" }, default: ["tn"] },
+          source: {
+            type: "object",
+            properties: { preset: { type: "string", enum: ["mine_open", "mine_new"] } },
+            default: { kind: "preset", preset: "mine_open" },
+          },
+          label: { type: "string", minLength: 1, default: "x" },
+        },
+      },
+    });
+    expect(settingsWithDefaults(d, { columns: [], source: { kind: "preset", preset: "bogus" }, label: "" }, 1)).toEqual({
+      columns: ["tn"],
+      source: { kind: "preset", preset: "mine_open" },
+      label: "x",
+    });
+    expect(settingsWithDefaults(d, { columns: ["a", "b", "c"] }, 1).columns).toEqual(["tn"]);
+    expect(settingsWithDefaults(d, { source: { kind: "preset", preset: "mine_new" } }, 1).source).toEqual({ kind: "preset", preset: "mine_new" });
+  });
+
   it("never hands out the schema's own default objects", () => {
     const d = anyDef({ settingsSchema: { type: "object", properties: { columns: { type: "array", default: ["tn"] } } } });
     const a = settingsWithDefaults(d, {}, 1);

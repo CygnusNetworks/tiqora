@@ -27,7 +27,8 @@ function signed(n: number): string {
   return "±0";
 }
 
-/** KPI tile: label, change since the last day with a sample, mono value and a 14-day sparkline. */
+/** KPI tile: label, change against the last earlier day with a sample (not always yesterday —
+ * weekends and days without a visit have none), mono value and a 14-day sparkline. */
 export function CounterWidget({ settings, size, mode }: WidgetProps<CounterSettings>) {
   const { t } = useTranslation();
   const { status, data } = useWidgetData<CounterData>();
@@ -60,7 +61,7 @@ export function CounterWidget({ settings, size, mode }: WidgetProps<CounterSetti
             >
               {typeof d?.value === "number" ? d.value : "—"}
             </span>
-            <Sparkline points={Array.isArray(d?.spark) ? d.spark : []} tone={tone === "neutral" ? "neutral" : tone} />
+            <Sparkline points={Array.isArray(d?.spark) ? d.spark : []} tone={tone} />
           </div>
         )}
       </WidgetDataBody>

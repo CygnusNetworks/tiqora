@@ -8,14 +8,15 @@ export interface NotesSettings {
   markdown: string;
 }
 
-/** Free text (markdown, sanitised by `MarkdownView`); shared with the dashboard it is on. */
+/** Free text (markdown, `MarkdownView` restricted profile: one person writes it for everyone the
+ * dashboard is shared with, so no forms, images or embeds); shared with the dashboard it is on. */
 export function NotesWidget({ settings, mode }: WidgetProps<NotesSettings>) {
   const { t } = useTranslation();
   const markdown = typeof settings.markdown === "string" ? settings.markdown.trim() : "";
   return (
     <WidgetFrame title={t("dashboards.widgets.notes.title")} mode={mode} testId="notes-widget">
       {markdown ? (
-        <MarkdownView markdown={markdown} className="leading-relaxed" data-testid="notes-markdown" />
+        <MarkdownView markdown={markdown} profile="restricted" className="leading-relaxed" data-testid="notes-markdown" />
       ) : (
         <WidgetEmpty>{t("dashboards.widgets.notes.empty")}</WidgetEmpty>
       )}

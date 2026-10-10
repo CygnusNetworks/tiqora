@@ -5490,7 +5490,7 @@
         "title": "Key figure",
         "description": "A number with its trend, e.g. your open tickets",
         "empty": "No number available.",
-        "delta": "{{delta}} since yesterday"
+        "delta": "{{delta}} since the last count"
       },
       "queueOverview": {
         "title": "Queues",
@@ -5518,7 +5518,8 @@
       "reminders": {
         "title": "Reminders due",
         "description": "Pending tickets whose reminder is due",
-        "empty": "No reminders due."
+        "empty": "No reminders due.",
+        "overdue": "Overdue"
       },
       "recentViews": {
         "title": "Recently viewed",

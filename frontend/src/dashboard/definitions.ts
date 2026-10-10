@@ -136,14 +136,23 @@ function fits(value: unknown, prop: Schema): boolean {
     case "string":
       return (
         typeof value === "string" &&
-        (typeof prop.maxLength !== "number" || value.length <= prop.maxLength)
+        (typeof prop.maxLength !== "number" || value.length <= prop.maxLength) &&
+        (typeof prop.minLength !== "number" || value.length >= prop.minLength)
       );
     case "boolean":
       return typeof value === "boolean";
-    case "object":
-      return isPlainObject(value);
+    case "object": {
+      if (!isPlainObject(value)) return false;
+      // Declared nested properties that are present must fit too (e.g. a preset name).
+      const nested = isPlainObject(prop.properties) ? prop.properties : {};
+      return Object.entries(nested).every(
+        ([k, sub]) => !(k in value) || !isPlainObject(sub) || fits(value[k], sub),
+      );
+    }
     case "array": {
       if (!Array.isArray(value)) return false;
+      if (typeof prop.minItems === "number" && value.length < prop.minItems) return false;
+      if (typeof prop.maxItems === "number" && value.length > prop.maxItems) return false;
       const items = isPlainObject(prop.items) ? prop.items : null;
       return items === null || value.every((item) => fits(item, items));
     }

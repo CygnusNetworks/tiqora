@@ -1,12 +1,10 @@
 import { useTranslation } from "react-i18next";
-import { humanDuration } from "@/lib/status";
+import { escalationLevel, humanDuration } from "@/lib/status";
 import { cn } from "@/lib/cn";
 import { formatDurationSince, nearestEscalation, type EscalationEpochs } from "../legacy";
 
-/** Within this many seconds an upcoming deadline is shown in the escalation colour. */
-const SOON_SECONDS = 3600;
-
-/** "Fällig" of a ticket: since a breach (danger), the time left before a deadline, or "—". */
+/** "Fällig" of a ticket: since a breach (danger), the time left before a deadline (escalation
+ * colour inside the app's warning window, `escalationLevel`), or "—". */
 export function DueText({ ticket, testId }: { ticket: EscalationEpochs; testId?: string }) {
   const { t } = useTranslation();
   const epoch = nearestEscalation(ticket);
@@ -24,7 +22,10 @@ export function DueText({ ticket, testId }: { ticket: EscalationEpochs; testId?:
       </span>
     );
   return (
-    <span data-testid={testId} className={cn(epoch - now <= SOON_SECONDS ? "text-escalation" : "text-muted")}>
+    <span
+      data-testid={testId}
+      className={cn(escalationLevel(epoch) === "approaching" ? "text-escalation" : "text-muted")}
+    >
       {t("dashboards.due.in", { duration: humanDuration(t, epoch - now) })}
     </span>
   );

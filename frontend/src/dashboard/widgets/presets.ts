@@ -7,6 +7,9 @@ export interface PresetSource {
   preset: TicketPreset;
 }
 
+/** Znuny's "nobody" owner (backend `UNASSIGNED_OWNER_ID`): unowned tickets belong to user 1. */
+export const UNASSIGNED_OWNER_ID = 1;
+
 export const DEFAULT_SOURCE: PresetSource = { kind: "preset", preset: "mine_open" };
 
 /** The preset a `source` names, or null for other (future) source kinds. */
@@ -33,7 +36,7 @@ export function presetQueueSearch(preset: TicketPreset, userId: number | null | 
     case "mine_new":
       return userId ? { owner_id: userId, state_type: "new" } : null;
     case "unowned_new":
-      return { owner_id: 1, state_type: "new" };
+      return { owner_id: UNASSIGNED_OWNER_ID, state_type: "new" };
     default:
       return null;
   }

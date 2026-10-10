@@ -38,6 +38,11 @@ export function RemindersWidget({ size, mode }: WidgetProps<RemindersSettings>) 
                   linkMode={rowLinkMode(mode)}
                   trailing={
                     <span data-testid={`reminder-${ticket.id}-due`} className={cn(overdue && "text-danger")}>
+                      {overdue && (
+                        <span className="me-1.5 font-sans font-semibold">
+                          {t("dashboards.widgets.reminders.overdue")}
+                        </span>
+                      )}
                       {formatDateTime(new Date(until * 1000), locale)}
                     </span>
                   }

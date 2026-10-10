@@ -23,8 +23,9 @@ const shows = (columns: ColumnKey[] | undefined, key: ColumnKey) => !columns || 
  * With avatars on (AccountMenu), the customer's picture leads the row.
  *
  * Dashboard widgets pass `density` (compact = tighter rows), `columns` (which of number, title,
- * queue, state and priority show; none given = all, today's look) and `linkMode` (`inert` = not a
- * tab stop while editing, `none` = plain text in previews).
+ * customer, queue, state and priority show; none given = today's look, where the customer is the
+ * avatar only) and `linkMode` (`inert` = not a tab stop while editing, `none` = plain text in
+ * previews). A chosen `customer` column shows the customer under the title (Mobile mockup).
  */
 export function DashboardTicketRow({
   ticket,
@@ -66,8 +67,18 @@ export function DashboardTicketRow({
       {shows(columns, "tn") && (
         <span className="shrink-0 font-mono text-xs text-accent">{ticket.tn}</span>
       )}
-      <span className="min-w-0 flex-1 truncate">
-        {shows(columns, "title") || !shows(columns, "tn") ? ticket.title : null}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate">
+          {shows(columns, "title") || !shows(columns, "tn") ? ticket.title : null}
+        </span>
+        {columns?.includes("customer") && customerLabel && (
+          <span
+            className="block truncate text-xs text-muted"
+            data-testid={`dashboard-ticket-${ticket.id}-customer`}
+          >
+            {customerLabel}
+          </span>
+        )}
       </span>
 
       <span className="hidden shrink-0 items-center gap-2.5 sm:flex">
