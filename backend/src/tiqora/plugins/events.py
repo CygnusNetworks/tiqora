@@ -178,8 +178,8 @@ class GapTracker:
     committed) or forever (rollbacks). A missing id holds delivery back for ``hold_seconds``;
     then it is skipped and logged once. ``step``/``offset`` are the connection's
     auto_increment_increment/offset: ids that are not on this writer's lattice
-    (``id % step != offset % step``) belong to another Galera writer and count as present, never as gaps. (Galera multi-writer can therefore
-    delay events by up to the hold time.)
+    (``id % step != offset % step``) belong to another Galera writer and count as present,
+    never as gaps. (Galera multi-writer can therefore delay events by up to the hold time.)
     """
 
     def __init__(self, *, hold_seconds: float, step: int = 1, offset: int | None = None) -> None:
