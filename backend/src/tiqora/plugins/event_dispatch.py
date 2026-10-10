@@ -55,7 +55,7 @@ from tiqora.plugins.events import (
     TicketEvent,
     events_from_history,
 )
-from tiqora.plugins.state import is_active
+from tiqora.plugins.state import is_active, really_cancelled
 from tiqora.plugins.store import (
     MAX_ERROR_LEN,
     advance_hook_cursor,
@@ -144,6 +144,11 @@ def _describe(exc: BaseException) -> str:
     return f"{type(exc).__name__}: {exc}"[:MAX_ERROR_LEN]
 
 
+def _cancelled_by_plugin(exc: asyncio.CancelledError) -> str:
+    """Error text for a ``CancelledError`` that plugin code raised on its own."""
+    return _describe(exc) if str(exc) else "CancelledError: von der Erweiterung selbst ausgelöst"
+
+
 @dataclass(slots=True)
 class _Outcome:
     delivered: int = 0
@@ -179,14 +184,21 @@ async def _save_cursor(run: _Run, hook: TiqoraPluginHook, cursor: int) -> None:
         await session.commit()
 
 
-async def _call_handler(sub: EventSubscriber, ctx: EventContext, event: TicketEvent) -> str | None:
+async def _call_handler(
+    sub: EventSubscriber,
+    ctx: EventContext,
+    event: TicketEvent,
+    stop: asyncio.Event | None = None,
+) -> str | None:
     """Run one handler under its own time budget; returns the error text or None."""
     timeout = asyncio.timeout(sub.timeout_seconds)
     try:
         async with timeout:
             await sub.handler(ctx, event)
-    except asyncio.CancelledError:
-        raise  # the worker is shutting down; not the plugin's fault
+    except asyncio.CancelledError as exc:
+        if really_cancelled(stop):
+            raise  # the worker is shutting down; not the plugin's fault
+        return _cancelled_by_plugin(exc)  # raised by plugin code itself (B-I1)
     except TimeoutError as exc:
         if timeout.expired():
             return f"Zeitlimit von {sub.timeout_seconds} Sekunden überschritten"
@@ -221,7 +233,7 @@ async def _run_subscriber(
             ):
                 break  # carries on next tick; not a failure
             ctx = EventContext(plugin=plugin, attempt=hook.consecutive_failures + 1)
-            error = await _call_handler(sub, ctx, event)
+            error = await _call_handler(sub, ctx, event, run.stop)
             if error is None:
                 async with run.factory() as session:
                     await record_hook_success(session, hook, cursor=row.id, now=run.now())
@@ -257,7 +269,9 @@ async def _run_subscriber(
         if pending is not None:
             await _save_cursor(run, hook, pending)
     except asyncio.CancelledError:
-        raise
+        if really_cancelled(run.stop):
+            raise
+        logger.exception("plugin_subscriber_bookkeeping_failed", subscriber=sub.key)
     except Exception:  # noqa: BLE001 - bookkeeping errors stay with this subscriber
         logger.exception("plugin_subscriber_bookkeeping_failed", subscriber=sub.key)
     return outcome
@@ -346,7 +360,7 @@ async def run_plugin_events_tick(
     )
     for (sub, _hook), outcome in zip(live, outcomes, strict=True):
         if isinstance(outcome, BaseException):
-            if isinstance(outcome, asyncio.CancelledError):
+            if isinstance(outcome, asyncio.CancelledError) and really_cancelled(stop):
                 raise outcome
             logger.error("plugin_subscriber_crashed", subscriber=sub.key, error=_describe(outcome))
             continue

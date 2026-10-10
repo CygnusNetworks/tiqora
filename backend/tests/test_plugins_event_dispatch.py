@@ -352,6 +352,38 @@ async def test_system_exit_in_handler_is_a_failure_not_a_crash(
     assert _ids(got, "good") == [49400]
 
 
+async def test_cancelled_error_raised_by_handler_is_a_failure_not_a_crash(
+    url, f, reg, got, fail_on, slow, fail_with, tick
+) -> None:
+    """A plugin raising CancelledError outside a shutdown must not end the worker (B-I1)."""
+    fail_with[0] = asyncio.CancelledError
+    fail_on.add(49401)
+    _hist(url, 49400, "NewTicket", 49400)
+    _hist(url, 49401, "StateUpdate", 49400)
+    res = await tick()
+    flaky = (await _hooks(f))[FLAKY]
+    assert res["failed"] == 1 and flaky.consecutive_failures == 1
+    assert (flaky.last_error or "").startswith("CancelledError")
+    assert flaky.cursor == 49400  # booked up to the event before the failed one
+    assert _ids(got, "good") == [49400, 49401]  # the other subscriber still got its events
+    for _ in range(TRIP_AFTER - 1):
+        await tick()
+    assert (await _hooks(f))[FLAKY].tripped_at is not None  # counts towards the breaker
+
+
+async def test_real_cancellation_of_the_tick_still_propagates(
+    url, f, reg, got, fail_on, slow, tick
+) -> None:
+    slow[0] = 0.8  # below the handler timeout of 1 s
+    _hist(url, 49400, "NewTicket", 49400)
+    running = asyncio.create_task(tick())
+    await asyncio.sleep(0.3)
+    running.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await running
+    assert (await _hooks(f))[FLAKY].consecutive_failures == 0  # not booked as a failure
+
+
 async def test_new_subscriber_starts_at_max_history_id(
     url, f, reg, got, fail_on, slow, tick
 ) -> None:

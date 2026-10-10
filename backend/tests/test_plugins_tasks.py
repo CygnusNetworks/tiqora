@@ -358,6 +358,51 @@ async def test_system_exit_in_a_task_is_a_failure(f, clock, tick) -> None:  # ty
         set_loaded_plugins([])
 
 
+async def test_cancelled_error_raised_by_a_task_is_a_failure(f, clock, tick) -> None:  # type: ignore[no-untyped-def]
+    """A plugin raising CancelledError outside a shutdown must not end the worker (B-I1)."""
+    seen: list[int] = []
+
+    async def cancels(ctx: TaskContext) -> None:
+        raise asyncio.CancelledError
+
+    async def other(ctx: TaskContext) -> None:
+        seen.append(1)
+
+    registry = Registry()
+    registry.add(SCHEDULED_TASKS, _task("cancels", cancels, every_seconds=60), owner=PLUGIN)
+    registry.add(SCHEDULED_TASKS, _task("other", other, every_seconds=60), owner=PLUGIN)
+    registry.freeze()
+    set_loaded_plugins([PluginLoadResult(PLUGIN, "1.0.0", RuntimeState.ACTIVE, None, ())])
+    try:
+        res = await tick(registry=registry)
+        assert res["ran"] == 2 and res["failed"] == 1 and seen == [1]
+        hook = (await _hooks(f))["task:org.example.plg49b:cancels"]
+        assert hook.consecutive_failures == 1
+        assert (hook.last_error or "").startswith("CancelledError")
+    finally:
+        set_loaded_plugins([])
+
+
+async def test_real_cancellation_of_the_task_tick_still_propagates(f, clock, tick) -> None:  # type: ignore[no-untyped-def]
+    async def sleeper(ctx: TaskContext) -> None:
+        await asyncio.sleep(5)
+
+    registry = Registry()
+    registry.add(SCHEDULED_TASKS, _task("sleeper", sleeper, every_seconds=60), owner=PLUGIN)
+    registry.freeze()
+    set_loaded_plugins([PluginLoadResult(PLUGIN, "1.0.0", RuntimeState.ACTIVE, None, ())])
+    try:
+        running = asyncio.create_task(tick(registry=registry))
+        await asyncio.sleep(0.3)
+        running.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await running
+        hook = (await _hooks(f))["task:org.example.plg49b:sleeper"]
+        assert hook.consecutive_failures == 0
+    finally:
+        set_loaded_plugins([])
+
+
 def test_constants_and_daemon_row() -> None:
     assert MAX_PARALLEL_TASKS == 4 and TRIP_AFTER == 5
     row = DAEMON_SERVICES_BY_SLUG["plugin_tasks"]

@@ -594,8 +594,10 @@ implemented with `asyncio` cancellation. They only take effect at an `await`:
   seconds. Other due tasks wait for the next tick. The tick result field
   `tasks` counts the tasks of active plugins, not the running or due ones.
 - Do not raise or swallow `asyncio.CancelledError`. One raised by plugin
-  code outside a shutdown propagates out of the tick (it is not booked as a
-  plugin failure), as a cancellation does.
+  code while the worker is not stopping (for example `t.cancel(); await t`
+  without a guard) is booked as an ordinary failure of that handler or task
+  and counts towards the circuit breaker. The tick and the other plugins
+  carry on. Only a real cancellation (worker shutdown) passes through.
 - Run exactly one worker replica: with two, every task runs twice.
 
 ### Background jobs

@@ -17,7 +17,7 @@ from tiqora.db.tiqora.models import TiqoraPluginHook
 from tiqora.extensions.registry import ExtensionPoint, Registry
 from tiqora.jobs.service import utc_now
 from tiqora.plugins.context import PluginContext, minimal_context
-from tiqora.plugins.state import is_active
+from tiqora.plugins.state import is_active, really_cancelled
 from tiqora.plugins.store import (
     MAX_ERROR_LEN,
     ensure_hook,
@@ -141,14 +141,23 @@ def _describe(exc: BaseException) -> str:
     return f"{type(exc).__name__}: {exc}"[:MAX_ERROR_LEN]
 
 
-async def _call_task(task: ScheduledTask, ctx: TaskContext) -> str | None:
+def _cancelled_by_plugin(exc: asyncio.CancelledError) -> str:
+    """Error text for a ``CancelledError`` that plugin code raised on its own."""
+    return _describe(exc) if str(exc) else "CancelledError: von der Erweiterung selbst ausgelöst"
+
+
+async def _call_task(
+    task: ScheduledTask, ctx: TaskContext, stop: asyncio.Event | None = None
+) -> str | None:
     """Run one task under its own timeout; returns the error text or None."""
     timeout = asyncio.timeout(task.timeout_seconds)
     try:
         async with timeout:
             await task.run(ctx)
-    except asyncio.CancelledError:
-        raise  # the worker is shutting down; not the plugin's fault
+    except asyncio.CancelledError as exc:
+        if really_cancelled(stop):
+            raise  # the worker is shutting down; not the plugin's fault
+        return _cancelled_by_plugin(exc)  # raised by plugin code itself (B-I1)
     except TimeoutError as exc:
         if timeout.expired():
             return f"Zeitlimit von {task.timeout_seconds} Sekunden überschritten"
@@ -197,7 +206,7 @@ async def _run_task(
                 scheduled_for=scheduled_for,
                 last_run_at=last_run_at,
             )
-            error = await _call_task(task, ctx)
+            error = await _call_task(task, ctx, stop)
             async with factory() as session:
                 if error is None:
                     await record_hook_success(session, hook, cursor=None, now=now())
@@ -217,7 +226,9 @@ async def _run_task(
                 if outcome.tripped:
                     logger.error("plugin_task_tripped", task=task.key, failures=TRIP_AFTER)
     except asyncio.CancelledError:
-        raise
+        if really_cancelled(stop):
+            raise
+        logger.exception("plugin_task_bookkeeping_failed", task=task.key)
     except Exception:  # noqa: BLE001 - bookkeeping errors stay with this task
         logger.exception("plugin_task_bookkeeping_failed", task=task.key)
     return outcome
@@ -291,7 +302,7 @@ async def run_plugin_tasks_tick(
     )
     for (task, _hook), outcome in zip(due, outcomes, strict=True):
         if isinstance(outcome, BaseException):
-            if isinstance(outcome, asyncio.CancelledError):
+            if isinstance(outcome, asyncio.CancelledError) and really_cancelled(stop):
                 raise outcome
             logger.error("plugin_task_crashed", task=task.key, error=_describe(outcome))
             continue

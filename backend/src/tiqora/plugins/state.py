@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import threading
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
@@ -54,6 +55,33 @@ def set_loaded_plugins(results: Iterable[PluginLoadResult]) -> None:
 def is_active(plugin_id: str) -> bool:
     result = _LOADED.get(plugin_id)
     return result is not None and result.state is RuntimeState.ACTIVE
+
+
+def mark_failed(plugin_id: str, error: str) -> None:
+    """Turn a loaded plugin into FAILED for this process (e.g. its routes were refused)."""
+    global _LOADED
+    with _LOCK:
+        current = _LOADED.get(plugin_id)
+        if current is None:
+            return
+        failed = PluginLoadResult(
+            current.plugin_id, current.version, RuntimeState.FAILED, error, current.contributions
+        )
+        _LOADED = MappingProxyType({**_LOADED, plugin_id: failed})
+
+
+def really_cancelled(stop: asyncio.Event | None = None) -> bool:
+    """True when a ``CancelledError`` means the running task is cancelled or the worker stops.
+
+    Plugin code can raise ``CancelledError`` on its own (``t.cancel(); await t`` unguarded).
+    Outside a real cancellation that is a plugin failure, not a shutdown (B-I1). An
+    ``asyncio.timeout`` block turns its own cancellation into ``TimeoutError`` and uncancels
+    the task, so this is never the timeout case.
+    """
+    task = asyncio.current_task()
+    if task is not None and task.cancelling() > 0:
+        return True
+    return stop is not None and stop.is_set()
 
 
 PluginStatus = Literal[
