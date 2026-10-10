@@ -171,6 +171,26 @@ async def test_plugin_exception_is_a_clean_error_and_counts() -> None:
     assert plugin_mcp_failures(PLUGIN) == 0
 
 
+@pytest.mark.parametrize("exc", [SystemExit(2), KeyboardInterrupt(), GeneratorExit()])
+async def test_base_exception_in_plugin_tool_is_a_tool_error(exc: BaseException) -> None:
+    """sys.exit() & co. in a plugin tool must not end the MCP process (B-I2)."""
+
+    async def leave(ctx: Context) -> dict[str, str]:
+        raise exc
+
+    server = FastMCP("t")
+    register_plugin_mcp_tools(
+        server, _registry(_tool("hello_leave", leave), _tool("hello_fine", echo))
+    )
+    before = plugin_mcp_failures(PLUGIN)
+    res = await asyncio.wait_for(_call(server, "hello_leave", {}), 10)
+    assert res.is_error and _text(res) == "Das Werkzeug ist fehlgeschlagen"
+    assert plugin_mcp_failures(PLUGIN) == before + 1
+    # the server keeps serving
+    ok = await asyncio.wait_for(_call(server, "hello_fine", {"text": "a"}), 10)
+    assert ok.data == {"text": "a"}
+
+
 async def test_idempotent_and_inactive(fixture_plugins: Installer) -> None:
     server = FastMCP("t")
     reg = _hello_registry(fixture_plugins)

@@ -6,6 +6,8 @@ committed all-or-nothing by :func:`tiqora.plugins.loader.commit_registrar`.
 
 from __future__ import annotations
 
+import asyncio
+import dataclasses
 import functools
 import inspect
 import re
@@ -17,7 +19,7 @@ from fastapi.routing import APIRoute
 from pydantic import BaseModel
 
 from tiqora.extensions.registry import ExtensionPoint
-from tiqora.jobs.registry import JOB_HANDLERS, JobHandler
+from tiqora.jobs.registry import JOB_HANDLERS, JobHandler, JobRun
 from tiqora.plugins.context import PluginContext
 from tiqora.plugins.events import EVENT_SUBSCRIBERS, EventHandler, EventSubscriber
 from tiqora.plugins.manifest import PluginManifest
@@ -36,6 +38,26 @@ _EVENT_RE: Final = re.compile(r"^(\*|[A-Za-z][A-Za-z0-9_]*\*?)$")
 PUBLIC_ROUTES_CAPABILITY: Final = "core.http.public_routes"
 MAX_SETTINGS_KEY_LEN: Final = 200
 MAX_TIMEOUT_SECONDS: Final = 300
+
+
+def shield_job_run(run: JobRun) -> JobRun:
+    """Wrap a plugin job handler so ``SystemExit`` & co. become an ordinary job error (B-I2).
+
+    The job runner maps every ``Exception`` (including ``JobRetry``/``JobFailed``/``JobCancelled``)
+    and relies on ``CancelledError`` for its timeout; both pass unchanged. Any other
+    ``BaseException`` from plugin code would end the worker's event loop.
+    """
+
+    @functools.wraps(run)
+    async def shielded(ctx: Any, payload: Any) -> dict[str, Any] | None:
+        try:
+            return await run(ctx, payload)
+        except (Exception, asyncio.CancelledError):
+            raise
+        except BaseException as exc:  # noqa: BLE001 - sys.exit() in plugin code must not end the worker
+            raise RuntimeError(f"{type(exc).__name__}: {exc}") from exc
+
+    return shielded
 
 
 class RegistrationRejected(ValueError):
@@ -249,7 +271,9 @@ class PluginRegistrar:
                     "(<name>: a-z, 0-9 und _)"
                 )
 
-        self._stage(JOB_HANDLERS, handler, check=check)
+        self._stage(
+            JOB_HANDLERS, dataclasses.replace(handler, run=shield_job_run(handler.run)), check=check
+        )
 
     def mcp_tool(
         self,

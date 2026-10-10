@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 from pathlib import Path
 from typing import Any
 
@@ -141,7 +142,10 @@ def test_namespace_rules_reject(registrar: PluginRegistrar, kind: str) -> None:
 def test_job_handler_staged(registrar: PluginRegistrar) -> None:
     handler = _job("org.example.hello.echo")
     registrar.job_handler(handler)
-    assert (JOB_HANDLERS, handler) in registrar.staged
+    (staged,) = [h for p, h in registrar.staged if p is JOB_HANDLERS]
+    # staged with its run shielded against SystemExit & co. (B-I2), everything else unchanged
+    assert staged.run.__wrapped__ is handler.run  # type: ignore[attr-defined]
+    assert dataclasses.replace(staged, run=handler.run) == handler
     with pytest.raises(RegistrationRejected, match="bereits registriert"):
         registrar.job_handler(handler)
 

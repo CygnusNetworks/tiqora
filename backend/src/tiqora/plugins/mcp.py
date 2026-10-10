@@ -142,9 +142,9 @@ def _make_wrapper(registry: Registry, tool: McpTool) -> Callable[..., Awaitable[
             raise ToolError(
                 f"Zeitlimit von {live.timeout_seconds} Sekunden überschritten"
             ) from None
-        except ToolError:
+        except (ToolError, asyncio.CancelledError):
             raise
-        except Exception as exc:
+        except BaseException as exc:  # noqa: BLE001 - sys.exit() & co. must not end the mcp process
             # No traceback, message or settings reach the client; details only in the log.
             _record_failure(live, "error", exc)
             raise ToolError("Das Werkzeug ist fehlgeschlagen") from None

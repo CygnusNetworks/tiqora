@@ -22,7 +22,7 @@ from tiqora.extensions.core import register_core
 from tiqora.extensions.registry import Registry
 from tiqora.jobs import JobContext, UnknownJobKind, enqueue_job, get_job
 from tiqora.jobs.registry import JOB_HANDLERS, JobHandler
-from tiqora.jobs.runner import UNKNOWN_KIND_MESSAGE, JobRunner
+from tiqora.jobs.runner import FAILED_MESSAGE, UNKNOWN_KIND_MESSAGE, JobRunner
 from tiqora.jobs.schemas import job_out
 from tiqora.plugins.context import make_plugin_context
 from tiqora.plugins.discovery import discover_plugins
@@ -178,3 +178,49 @@ async def test_plugin_result_privacy_follows_the_handler_flag(
     for kind, other_result in ((KIND, {"echo": "x"}), (private.kind, None)):
         assert job_out(shown[kind], [], reg2, viewer_id=7).result == {"echo": "x"}  # creator
         assert job_out(shown[kind], [], reg2, viewer_id=8).result == other_result  # someone else
+
+
+@pytest.mark.parametrize("exc", [SystemExit(3), KeyboardInterrupt(), GeneratorExit()])
+async def test_base_exception_in_plugin_job_is_a_job_error_not_a_crash(
+    f: async_sessionmaker[AsyncSession], fixture_plugins: Installer, exc: BaseException
+) -> None:
+    """sys.exit() & co. in a plugin job handler must not end the worker (B-I2)."""
+    fixture_plugins()
+    (p,) = discover_plugins()
+    registrar = import_and_register(p, make_plugin_context(p))
+
+    async def leave(jc: JobContext, payload: Any) -> None:
+        raise exc
+
+    registrar.job_handler(
+        JobHandler(
+            kind="org.example.hello.leave",
+            payload_model=_Payload,
+            run=leave,
+            title_key="plugin.org.example.hello:jobs.leave",
+        )
+    )
+    reg = Registry()
+    register_core(reg)
+    commit_registrar(reg, registrar)
+    async with f() as s:
+        bad = await enqueue_job(
+            s, kind="org.example.hello.leave", payload={"text": "x"}, created_by=None, registry=reg
+        )
+        await s.commit()
+        bad_id = bad.id
+    runner = JobRunner(session_factory=f, settings=_SETTINGS, registry=reg, worker_id="t:1")
+    await runner.run_once()
+    await runner.wait_idle()
+    failed = await _fetch(f, bad_id)
+    assert failed.status == "failed" and failed.error == FAILED_MESSAGE
+    # the runner is still alive and runs the next job
+    async with f() as s:
+        good = await enqueue_job(
+            s, kind=KIND, payload={"text": "ok"}, created_by=None, registry=reg
+        )
+        await s.commit()
+        good_id = good.id
+    await runner.run_once()
+    await runner.wait_idle()
+    assert (await _fetch(f, good_id)).status == "succeeded"
