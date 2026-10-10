@@ -8576,8 +8576,9 @@ export interface paths {
          *     Web chat (``channel=webchat``, agent, visible for the customer): the reply is also posted
          *     into the ticket's live chat. A chat nobody accepted yet is accepted first, in its own
          *     transaction (R-REPLY-ACCEPT-FIRST); a refused accept refuses the reply (409
-         *     ``at_capacity`` / ``already_taken`` / ``not_waiting``, 403 ``forbidden``). No live chat →
-         *     409 ``chat_not_live``; nothing is stored in either case. ``attachments`` are allowed.
+         *     ``at_capacity`` / ``already_taken``, 403 ``forbidden``). No live chat → 409
+         *     ``chat_not_live``; nothing is stored in either case. The text and ``state_id`` are
+         *     validated before the implicit accept. ``attachments`` are allowed.
          */
         post: operations["create_article_api_v1_tickets__ticket_id__articles_post"];
         delete?: never;

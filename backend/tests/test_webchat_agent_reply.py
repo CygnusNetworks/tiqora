@@ -33,7 +33,7 @@ from tests._webchat_fixtures import (
     seed_queue_agent,
 )
 from tiqora.api.app import create_app
-from tiqora.api.deps import get_current_user, get_redis
+from tiqora.api.deps import get_auth_service, get_current_user, get_redis
 from tiqora.channels.email.smtp import CapturingMailSender
 from tiqora.config import Settings, get_settings
 from tiqora.db.tiqora.base import TiqoraBase
@@ -46,6 +46,7 @@ from tiqora.domain.ticket_write_service import (
     create_ticket,
 )
 from tiqora.events.pubsub import TIQORA_EVENTS_CHANNEL
+from tiqora.webchat import agent as webchat_agent
 from tiqora.webchat.agent import accept_session
 from tiqora.webchat.availability import (
     ensure_agent_state_row,
@@ -663,3 +664,160 @@ async def test_agent_typing_rate_limited(env: Env) -> None:
     assert res.status_code == 409
     assert res.json() == {"detail": "chat_not_live"}
     assert _chat_publishes(env, chat.id) == []
+
+
+# -- fix round 1: races, other agent, state_id, API-key scopes --------------------------------
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_reply_into_chat_active_with_another_agent(env: Env) -> None:
+    """Any agent with ``note`` may answer an ACTIVE chat (R-REPLY-ERRORS); no re-accept."""
+    chat, _token = await _active(env, 20)  # accepted by AGENT
+    async with _client(env, AGENT2) as client:
+        res = await client.post(f"/api/v1/tickets/{chat.ticket_id}/articles", json=_reply())
+    assert res.status_code == 201, res.text
+    newest = (await _messages(env, chat.id))[-1]
+    assert (newest["sender"], newest["user_id"], newest["meta"]) == (
+        "agent",
+        AGENT2,
+        {"agent_name": "Nina"},
+    )
+    row = await _chat(env, chat.id)
+    assert (row.status, row.assigned_user_id) == ("active", AGENT)
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_reply_loses_the_accept_race(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    """AGENT takes the chat between AGENT2's pre-step read and its accept → 409
+    ``already_taken``, AGENT2 writes nothing (R-REPLY-ACCEPT-FIRST)."""
+    chat, _token = await _start(env, 21)
+    original = webchat_agent.ensure_agent_state_row
+
+    async def ensure_then_lose(db: AsyncSession, user_id: int, *, now: Any) -> None:
+        await _accept(env, chat, AGENT)
+        await original(db, user_id, now=now)
+
+    monkeypatch.setattr(webchat_agent, "ensure_agent_state_row", ensure_then_lose)
+    articles = await _article_count(env, chat.ticket_id)
+    async with _client(env, AGENT2) as client:
+        res = await client.post(f"/api/v1/tickets/{chat.ticket_id}/articles", json=_reply())
+    assert res.status_code == 409
+    assert res.json() == {"detail": "already_taken"}
+    assert await _article_count(env, chat.ticket_id) == articles
+    assert [m["sender"] for m in await _messages(env, chat.id)] == ["visitor", "system"]
+    assert (await _chat(env, chat.id)).assigned_user_id == AGENT
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_chat_ended_before_the_implicit_accept(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ended between the pre-step read and the accept → the same ``chat_not_live``."""
+    chat, _token = await _start(env, 22)
+    original = webchat_agent.ensure_agent_state_row
+
+    async def ensure_after_end(db: AsyncSession, user_id: int, *, now: Any) -> None:
+        async with env.factory() as other:
+            await end_by_visitor(other, chat=chat, now=NOW)
+            await other.commit()
+        await original(db, user_id, now=now)
+
+    monkeypatch.setattr(webchat_agent, "ensure_agent_state_row", ensure_after_end)
+    articles = await _article_count(env, chat.ticket_id)
+    async with _client(env) as client:
+        res = await client.post(f"/api/v1/tickets/{chat.ticket_id}/articles", json=_reply())
+    assert res.status_code == 409
+    assert res.json() == {"detail": "chat_not_live"}
+    assert await _article_count(env, chat.ticket_id) == articles
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_invalid_state_refused_before_the_implicit_accept(env: Env) -> None:
+    chat, _token = await _start(env, 23)
+    async with _client(env) as client:
+        res = await client.post(
+            f"/api/v1/tickets/{chat.ticket_id}/articles", json=_reply(state_id=999999)
+        )
+    assert res.status_code == 422, res.text
+    assert (await _chat(env, chat.id)).status == "waiting"
+    assert [m["sender"] for m in await _messages(env, chat.id)] == ["visitor"]
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_refused_caller_gets_no_agent_state_row(env: Env) -> None:
+    chat, _token = await _start(env, 24)
+    async with _client(env, NOPERM) as client:
+        res = await client.post(f"/api/v1/tickets/{chat.ticket_id}/articles", json=_reply())
+    assert res.status_code == 403
+    rows = await _rows(env, "SELECT 1 FROM tiqora_chat_agent_state WHERE user_id = :u", u=NOPERM)
+    assert rows == []
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_no_typing_signal_for_a_waiting_chat(env: Env) -> None:
+    chat, _token = await _start(env, 25)
+    env.redis.published.clear()
+    async with _client(env) as client:
+        res = await client.post(f"/api/v1/tickets/{chat.ticket_id}/chat/typing")
+    assert res.status_code == 204
+    assert _chat_publishes(env, chat.id) == []
+
+
+class _ScopedKeyAuth:
+    """``AuthService`` stand-in: every ``tiqora_*`` bearer resolves to AGENT with *scopes*."""
+
+    def __init__(self, scopes: frozenset[str]) -> None:
+        self._user = AuthenticatedUser(
+            id=AGENT,
+            login="wc48-reply-max",
+            first_name="Max",
+            last_name="Muster",
+            auth_method="api_key",
+            api_key_scopes=scopes,
+        )
+
+    async def resolve_session(self, token: str) -> AuthenticatedUser | None:
+        return None
+
+    async def resolve_api_key(self, raw: str) -> AuthenticatedUser | None:
+        return self._user if raw.startswith("tiqora_") else None
+
+
+def _key_client(env: Env, scopes: str) -> AsyncClient:
+    app = create_app(Settings(environment="test"))
+    app.state.session_factory = env.factory
+    auth = _ScopedKeyAuth(frozenset(scopes.split(",")))
+    app.dependency_overrides[get_auth_service] = lambda: auth
+    app.dependency_overrides[get_redis] = lambda: env.redis
+    return AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url=SELF,
+        headers={"Authorization": "Bearer tiqora_wc48testkey"},
+    )
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_agent_chat_api_with_scoped_api_keys(env: Env) -> None:
+    """R-CHAT-SCOPE through the real auth dependency: ``/api/v1/chat`` is ``tickets``."""
+    chat, _token = await _start(env, 26)
+    accept = f"/api/v1/chat/sessions/{chat.id}/accept"
+    async with _key_client(env, "tickets:ro") as client:
+        assert (await client.get("/api/v1/chat/inbox")).status_code == 200
+        res = await client.post(accept)
+        assert res.status_code == 403
+        assert res.json() == {"detail": "API key lacks tickets:rw scope"}
+    async with _key_client(env, "kb:rw") as client:
+        assert (await client.get("/api/v1/chat/inbox")).status_code == 403
+        assert (await client.post(accept)).status_code == 403
+    assert (await _chat(env, chat.id)).status == "waiting"
+    async with _key_client(env, "tickets:rw") as client:
+        res = await client.post(accept)
+        assert res.status_code == 200, res.text
+    assert (await _chat(env, chat.id)).assigned_user_id == AGENT

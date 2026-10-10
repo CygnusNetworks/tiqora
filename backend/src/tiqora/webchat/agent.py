@@ -550,8 +550,9 @@ async def accept_waiting_chat_for_reply(
     notifications with ``flush_chat_notifications`` right after — also when the reply then
     fails, the chat stays accepted. No live chat, or an active one: nothing happens (the
     reply itself decides). Refusals of the accept refuse the reply, nothing is written:
-    ``InvalidInput(code)`` with ``forbidden`` (403), ``at_capacity`` / ``already_taken`` /
-    ``not_waiting`` (409); a chat purged meanwhile is left to the reply (``chat_not_live``).
+    ``InvalidInput(code)`` with ``forbidden`` (403, checked before anything is written),
+    ``at_capacity`` / ``already_taken`` (409); a chat purged or ended meanwhile
+    (``not_found`` / ``not_waiting``) is left to the reply, which answers ``chat_not_live``.
     """
     if db.in_transaction():
         raise RuntimeError("accept_waiting_chat_for_reply needs a session without a transaction")
@@ -560,6 +561,11 @@ async def accept_waiting_chat_for_reply(
         await db.rollback()
         return
     session_id = chat.id
+    if not await RwQueues(db, user_id).allows(await _ticket_queue_id(db, chat)):
+        # Refused before writing anything (no agent-state row for an unauthorised caller);
+        # accept_session re-checks under its locks.
+        await db.rollback()
+        raise InvalidInput("forbidden")
     # The state row must exist (and be committed) before accept_session locks it.
     await ensure_agent_state_row(db, user_id, now=now)
     await db.commit()
@@ -567,7 +573,9 @@ async def accept_waiting_chat_for_reply(
         await accept_session(db, sysconfig, session_id=session_id, user_id=user_id, now=now)
     except ChatError as exc:
         await db.rollback()
-        if exc.code == "not_found":
+        if exc.code in ("not_found", "not_waiting"):
+            # Purged or ended meanwhile: the reply re-reads the chat under its lock and
+            # answers ``chat_not_live`` — one code for "the chat is over".
             return
         raise InvalidInput(exc.code) from exc
     await db.commit()
@@ -715,11 +723,13 @@ async def agent_typing(db: AsyncSession, client: Any, *, ticket_id: int, user_id
     """The agent is typing in the ticket's live chat: ``note`` on the ticket's queue
     (``TicketNotFound`` / ``TicketAccessDenied``), ``ChatNotLive`` without a live chat; at
     most one ``typing`` signal per chat per 2 s reaches the visitor stream, the rest is
-    dropped. Nothing is stored."""
+    dropped. A ``waiting`` chat gets no signal (nobody joined yet). Nothing is stored."""
     await assert_ticket_note_permission(db, user_id=user_id, ticket_id=ticket_id)
     chat = await live_session_for_ticket(db, ticket_id)
     if chat is None:
         raise ChatNotLive(ticket_id)
+    if chat.status != "active":
+        return
     limiter = ChatRateLimiter(client)
     if await limiter.try_hit(
         AGENT_TYPING_SCOPE, chat.id, window_seconds=AGENT_TYPING_WINDOW_SECONDS

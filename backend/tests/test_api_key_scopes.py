@@ -227,3 +227,26 @@ def test_reports_and_reporting_map_to_stats() -> None:
     assert not scopes_allow(frozenset({"tickets:rw"}), method="GET", path="/api/v1/reports")
     # the admin reporting page stays admin-only
     assert path_to_area("/api/v1/admin/reporting/status") == "admin"
+
+
+def test_agent_chat_api_maps_to_tickets() -> None:
+    """R-CHAT-SCOPE: ``/api/v1/chat/*`` is the ``tickets`` area (GET ro, writes rw)."""
+    accept = "/api/v1/chat/sessions/0123456789abcdef0123456789abcdef/accept"
+    for path in ("/api/v1/chat/inbox", "/api/v1/chat/agent-state", "/api/v1/chat/topics", accept):
+        assert path_to_area(path) == "tickets", path
+    assert path_to_area("/api/v1/tickets/5/chat/typing") == "tickets"
+    ro, rw, kb = frozenset({"tickets:ro"}), frozenset({"tickets:rw"}), frozenset({"kb:rw"})
+    assert scopes_allow(ro, method="GET", path="/api/v1/chat/inbox")
+    assert not scopes_allow(ro, method="POST", path=accept)
+    assert not scopes_allow(ro, method="PUT", path="/api/v1/chat/agent-state")
+    assert scopes_allow(rw, method="POST", path=accept)
+    assert scopes_allow(rw, method="GET", path="/api/v1/chat/inbox")
+    assert not scopes_allow(kb, method="GET", path="/api/v1/chat/inbox")
+    assert not scopes_allow(kb, method="POST", path=accept)
+    with pytest.raises(HTTPException) as exc:
+        assert_scope_allows(ro, method="POST", path=accept)
+    assert exc.value.status_code == 403
+    assert exc.value.detail == "API key lacks tickets:rw scope"
+    with pytest.raises(HTTPException) as exc:
+        assert_scope_allows(kb, method="GET", path="/api/v1/chat/inbox")
+    assert exc.value.detail == "API key lacks tickets:ro scope"

@@ -63,6 +63,9 @@ _PATH_PREFIX_TO_AREA: tuple[tuple[str, str], ...] = (
     ("/api/v1/jobs", "tickets"),
     ("/api/v1/ticket-filters", "tickets"),
     ("/api/v1/avatars", "tickets"),
+    # Agent web-chat API (availability, inbox, accept, end): chats are tickets and accepting
+    # or ending one changes ticket owner/lock/state (R-CHAT-SCOPE). GET = ro, writes = rw.
+    ("/api/v1/chat", "tickets"),
     ("/api/v1/customers", "customers"),
     ("/api/v1/customer-directory", "customers"),
     ("/api/v1/kb", "kb"),

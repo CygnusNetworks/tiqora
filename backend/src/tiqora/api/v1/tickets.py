@@ -321,7 +321,6 @@ _CHAT_REPLY_REFUSALS: Final = {
     "chat_not_accepted": status.HTTP_409_CONFLICT,
     "at_capacity": status.HTTP_409_CONFLICT,
     "already_taken": status.HTTP_409_CONFLICT,
-    "not_waiting": status.HTTP_409_CONFLICT,
     "forbidden": status.HTTP_403_FORBIDDEN,
 }
 
@@ -1686,8 +1685,9 @@ async def create_article(
     Web chat (``channel=webchat``, agent, visible for the customer): the reply is also posted
     into the ticket's live chat. A chat nobody accepted yet is accepted first, in its own
     transaction (R-REPLY-ACCEPT-FIRST); a refused accept refuses the reply (409
-    ``at_capacity`` / ``already_taken`` / ``not_waiting``, 403 ``forbidden``). No live chat →
-    409 ``chat_not_live``; nothing is stored in either case. ``attachments`` are allowed.
+    ``at_capacity`` / ``already_taken``, 403 ``forbidden``). No live chat → 409
+    ``chat_not_live``; nothing is stored in either case. The text and ``state_id`` are
+    validated before the implicit accept. ``attachments`` are allowed.
     """
     attachments, telegram_options = _telegram_extras(body)
     wants_security = body.email_security is not None and body.email_security.active
@@ -1696,7 +1696,18 @@ async def create_article(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="email_security is only supported for outgoing agent email",
         )
+    svc = _write_service(session, settings)
     chat_reply = _is_chat_reply(body)
+    if chat_reply and body.state_id is not None:
+        # The implicit accept below commits; an invalid next state must refuse first.
+        try:
+            await svc.validate_state_change(
+                user.id, ticket_id, body.state_id, pending_time=body.pending_time
+            )
+        except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+            await session.rollback()
+            raise _map_exc(exc) from exc
+        await session.rollback()
     if chat_reply:
         try:
             # Refuse an empty/too long line before the implicit accept takes the chat.
@@ -1709,7 +1720,6 @@ async def create_article(
             raise (refusal or _map_exc(exc)) from exc
         finally:
             await flush_chat_notifications(session, redis_client)
-    svc = _write_service(session, settings)
     try:
         async with session.begin():
             if body.state_id is not None:
