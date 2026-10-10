@@ -44,7 +44,10 @@ export function CounterWidget({ settings, size, mode }: WidgetProps<CounterSetti
       testId="counter-widget"
       actions={
         delta != null && (
-          <span className={cn("shrink-0 text-xs font-semibold", deltaGood ? "text-green" : "text-muted")}>
+          <span
+            title={t("dashboards.widgets.counter.delta", { delta: signed(delta) })}
+            className={cn("min-w-0 truncate text-xs font-semibold", deltaGood ? "text-green" : "text-muted")}
+          >
             {t("dashboards.widgets.counter.delta", { delta: signed(delta) })}
           </span>
         )

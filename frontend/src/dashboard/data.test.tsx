@@ -91,17 +91,65 @@ describe("useDashboardData", () => {
     expect(widgetData).not.toHaveBeenCalled();
   });
 
-  it("a failed batch turns the data widgets into error tiles; retry fetches only that widget", async () => {
+  it("a failed batch turns every data widget into an error tile; a tile's retry fetches the whole batch again", async () => {
     data.mockRejectedValueOnce(new Error("boom"));
     const { result } = renderHook(() => useDashboardData(1, WIDGETS, { enabled: true }), { wrapper });
     await waitFor(() => expect(result.current.byWidget["w-counter"].status).toBe("error"));
+    expect(result.current.byWidget["w-esc"].status).toBe("error");
     expect(result.current.byWidget["w-notes"].status).toBe("none");
+
+    // still failing: every tile is an error tile again (none turns into a false empty state)
+    let fail: (e: Error) => void = () => {};
+    data.mockImplementationOnce(() => new Promise<DashboardData>((_r, reject) => (fail = reject)));
+    act(() => result.current.refetch("w-counter"));
+    await waitFor(() => expect(result.current.byWidget["w-esc"].status).toBe("loading"));
+    expect(result.current.byWidget["w-counter"].status).toBe("loading");
+    act(() => fail(new Error("still down")));
+    await waitFor(() => expect(result.current.byWidget["w-counter"].status).toBe("error"));
+    expect(result.current.byWidget["w-esc"].status).toBe("error");
+    expect(client.getQueryData(dashboardKeys.data(1))).toBeUndefined();
+
+    act(() => result.current.refetch("w-esc"));
+    await waitFor(() => expect(result.current.byWidget["w-counter"]).toMatchObject({ status: "ok", data: { value: 1 } }));
+    expect(result.current.byWidget["w-esc"].status).toBe("ok");
+    expect(data).toHaveBeenCalledTimes(3);
+    for (const call of data.mock.calls) expect(call[1]).toBeUndefined();
+    expect(widgetData).not.toHaveBeenCalled();
+  });
+
+  it("a tile answered 'error' inside a successful batch retries only that widget", async () => {
+    data.mockResolvedValueOnce({ widgets: { "w-counter": { status: "error", error: "Kaputt." }, "w-esc": ok(2) } });
+    const { result } = renderHook(() => useDashboardData(1, WIDGETS, { enabled: true }), { wrapper });
+    await waitFor(() => expect(result.current.byWidget["w-counter"]).toMatchObject({ status: "error", error: "Kaputt." }));
     act(() => result.current.refetch("w-counter"));
     expect(result.current.byWidget["w-counter"].status).toBe("loading");
     await waitFor(() => expect(result.current.byWidget["w-counter"]).toMatchObject({ status: "ok", data: { value: 9 } }));
+    expect(result.current.byWidget["w-esc"]).toMatchObject({ status: "ok", data: { value: 2 } });
     expect(widgetData).toHaveBeenCalledTimes(1);
     expect(widgetData).toHaveBeenCalledWith(1, "w-counter", expect.anything());
     expect(data).toHaveBeenCalledTimes(1);
+  });
+
+  it("an SSE refresh during a slow first batch creates no partial entry: the other tiles keep loading", async () => {
+    vi.useFakeTimers();
+    let release: (v: DashboardData) => void = () => {};
+    data.mockImplementationOnce(() => new Promise<DashboardData>((r) => (release = r)));
+    data.mockResolvedValue({ widgets: { "w-counter": ok(7), "w-esc": ok(8) } });
+    const { result } = renderHook(() => useDashboardData(1, WIDGETS, { enabled: true }), { wrapper });
+    emit({ type: "ticket_new_in_queue", ticket_id: 3, tn: "1", title: "x", queue_id: 1, queue_name: "Q" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2100);
+    });
+    expect(data).toHaveBeenCalledTimes(2); // the SSE batch ran ...
+    expect(client.getQueryData(dashboardKeys.data(1))).toBeUndefined(); // ... but wrote nothing yet
+    expect(result.current.byWidget["w-counter"].status).toBe("loading");
+    expect(result.current.byWidget["w-esc"].status).toBe("loading");
+    await act(async () => {
+      release({ widgets: { "w-counter": ok(1), "w-esc": ok(2) } });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.byWidget["w-counter"]).toMatchObject({ status: "ok", data: { value: 1 } });
+    expect(result.current.byWidget["w-esc"]).toMatchObject({ status: "ok", data: { value: 2 } });
   });
 
   it("polls a pending widget with growing pauses, gives up with a message, and never polls while hidden", async () => {

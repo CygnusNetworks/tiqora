@@ -17,11 +17,14 @@ export function DashboardTabs({
   selectedId,
   onSelect,
   onCreate,
+  panelId,
 }: {
   tabs: DashboardTab[];
   selectedId: number | null;
   onSelect: (id: number) => void;
   onCreate?: () => void;
+  /** Id of the tab panel (the page's content area); tab ids are `<panelId>-tab-<id>`. */
+  panelId?: string;
 }) {
   const { t } = useTranslation();
   const baseId = useId();
@@ -61,8 +64,9 @@ export function DashboardTabs({
               }}
               type="button"
               role="tab"
-              id={`${baseId}-t${tab.id}`}
+              id={panelId ? `${panelId}-tab-${tab.id}` : `${baseId}-t${tab.id}`}
               aria-selected={selected}
+              aria-controls={panelId}
               aria-describedby={description ? descId : undefined}
               tabIndex={tab.id === focusable ? 0 : -1}
               data-testid={`dashboard-tab-${tab.id}`}
@@ -99,7 +103,7 @@ export function DashboardTabs({
         disabled={!onCreate}
         onClick={onCreate}
         className={cn(
-          "rounded-full border border-dashed border-hairline px-[11px] py-1.5 text-[13px] leading-none text-muted transition-colors hover:bg-surface-subtle hover:text-ink disabled:cursor-default disabled:hover:bg-transparent",
+          "rounded-full border border-dashed border-hairline px-[11px] py-1.5 text-[13px] leading-none text-muted transition-colors hover:bg-surface-subtle hover:text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted",
           FOCUS,
         )}
       >

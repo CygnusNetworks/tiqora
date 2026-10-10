@@ -24,14 +24,27 @@ export interface EditHandlers {
 }
 
 const NO_FILTERS: Record<string, unknown> = {};
+const NONE_STATE: WidgetDataState = { status: "none" };
 const COUNTER = "core.counter";
 
-/** Catches a widget that throws while rendering, so one broken widget never takes the page down. */
-class CellBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+type CellBoundaryProps = { fallback: ReactNode; resetKeys: readonly unknown[]; children: ReactNode };
+
+/**
+ * Catches a widget that throws while rendering, so one broken widget never takes the page down.
+ * New data or settings (`resetKeys`) give the widget another try.
+ */
+class CellBoundary extends Component<CellBoundaryProps, { failed: boolean }> {
   state = { failed: false };
 
   static getDerivedStateFromError(): { failed: boolean } {
     return { failed: true };
+  }
+
+  componentDidUpdate(prev: CellBoundaryProps): void {
+    const changed =
+      prev.resetKeys.length !== this.props.resetKeys.length ||
+      prev.resetKeys.some((key, i) => !Object.is(key, this.props.resetKeys[i]));
+    if (this.state.failed && changed) this.setState({ failed: false });
   }
 
   componentDidCatch(error: unknown, _info: ErrorInfo): void {
@@ -80,6 +93,9 @@ function GridCell({
     [def, widget.settings, widget.type_version],
   );
   const id = widget.id;
+  // Stable per cell, so the widget does not re-render with every grid render.
+  const dataValue = useMemo(() => ({ ...state, refetch: () => onRetry(id) }), [state, onRetry, id]);
+  const chrome = useMemo(() => ({ titleOverride: widget.title_override, canEdit }), [widget.title_override, canEdit]);
   const waiting = state.status === "loading" || state.status === "pending";
   const size = { w: rect.w, h: rect.h };
 
@@ -110,8 +126,8 @@ function GridCell({
       <Widget instanceId={id} settings={settings} size={size} filters={NO_FILTERS} mode={mode} />
     );
     body = (
-      <WidgetChromeProvider value={{ titleOverride: widget.title_override, canEdit }}>
-        <WidgetDataProvider value={{ ...state, refetch: () => onRetry(id) }}>
+      <WidgetChromeProvider value={chrome}>
+        <WidgetDataProvider value={dataValue}>
           {def.owner === "core" ? (
             content
           ) : (
@@ -138,6 +154,7 @@ function GridCell({
       style={style}
     >
       <CellBoundary
+        resetKeys={[state.data, state.status, widget.settings, widget.type_key, widget.type_version]}
         fallback={
           <PlainTile>
             <p role="alert" className="text-sm text-danger">
@@ -193,7 +210,7 @@ export function DashboardGrid({
         key={w.id}
         widget={w}
         def={defByKey.get(w.type_key)}
-        state={data[w.id] ?? { status: "none" }}
+        state={data[w.id] ?? NONE_STATE}
         rect={rect}
         mode={mode}
         canEdit={canEdit}

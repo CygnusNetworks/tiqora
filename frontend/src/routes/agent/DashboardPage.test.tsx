@@ -134,6 +134,7 @@ const apiMock = {
 // ---------------------------------------------------------------- render
 
 let client: QueryClient;
+let currentRouter: { state: { location: { search: Record<string, unknown> } } } | null = null;
 
 async function renderPage(search: { d?: number } = {}) {
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -149,6 +150,7 @@ async function renderPage(search: { d?: number } = {}) {
   await act(async () => {
     await router.load();
   });
+  currentRouter = router;
   return render(
     <QueryClientProvider client={client}>
       <I18nextProvider i18n={i18n}>
@@ -309,6 +311,45 @@ describe("DashboardPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Mein Start" }));
     expect(screen.getByRole("tab", { name: "Mein Start", selected: true })).toBeVisible();
     expect(await screen.findByTestId("widget-w-counter-1")).toBeVisible();
+  });
+
+  it("picking a tab drops ?d= from the address, so a reload opens the picked dashboard", async () => {
+    await renderPage({ d: 2 });
+    expect(await screen.findByRole("tab", { name: "Team Support", selected: true })).toBeVisible();
+    expect(currentRouter!.state.location.search).toEqual({ d: 2 });
+    fireEvent.click(screen.getByRole("tab", { name: "Mein Start" }));
+    await waitFor(() => expect(currentRouter!.state.location.search).toEqual({}));
+    expect(screen.getByRole("tab", { name: "Mein Start", selected: true })).toBeVisible();
+    expect(localStorage.getItem("tiqora.dashboard.last")).toBe("1");
+    cleanup();
+    await renderPage({}); // the "reload"
+    expect(await screen.findByRole("tab", { name: "Mein Start", selected: true })).toBeVisible();
+  });
+
+  it("the content area is the tab panel of the selected tab; loading is announced", async () => {
+    let release: (d: Dashboard) => void = () => {};
+    apiMock.get.mockImplementationOnce(() => new Promise<Dashboard>((r) => (release = r)));
+    await renderPage();
+    const loading = await screen.findByRole("status", { name: "Dashboard wird geladen" });
+    expect(loading).toHaveAttribute("aria-busy", "true");
+    await act(async () => release(DEFAULT_DASHBOARD));
+    const panel = screen.getByRole("tabpanel", { name: "Mein Start" });
+    expect(panel).toContainElement(await screen.findByTestId("dashboard-grid"));
+    expect(screen.getByRole("tab", { name: "Mein Start" })).toHaveAttribute("aria-controls", panel.id);
+  });
+
+  it("the placeholder buttons look disabled (no hover look, dimmed, not-allowed cursor)", async () => {
+    await renderPage();
+    await screen.findByTestId("dashboard-grid");
+    for (const name of ["Anpassen", "Teilen", "Neues Dashboard"]) {
+      const button = screen.getByRole("button", { name });
+      expect(button).toBeVisible();
+      expect(button).toBeDisabled();
+      expect(button).toHaveClass("disabled:opacity-50", "disabled:cursor-not-allowed");
+    }
+    expect(screen.getByRole("button", { name: "Anpassen" })).toHaveClass("disabled:hover:bg-accent");
+    expect(screen.getByRole("button", { name: "Teilen" })).toHaveClass("disabled:hover:bg-surface");
+    expect(screen.getByRole("button", { name: "Neues Dashboard" })).toHaveClass("disabled:hover:text-muted");
   });
 
   it("the remembered dashboard opens on the next visit", async () => {

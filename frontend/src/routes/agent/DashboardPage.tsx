@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSearch } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
 import { toBcp47 } from "@/i18n";
@@ -15,7 +15,6 @@ import {
 } from "@/lib/dashboardsApi";
 import { displayTimeZone } from "@/lib/timeZone";
 import { DashboardGrid } from "@/dashboard/DashboardGrid";
-import { WidgetSkeleton } from "@/dashboard/chrome/WidgetSkeleton";
 import { useDashboardData } from "@/dashboard/data";
 import { greetingKey } from "@/dashboard/legacy";
 import type { EditWidget } from "@/dashboard/model";
@@ -51,7 +50,7 @@ function tabOf(d: Dashboard): DashboardTab {
 const notThere = (err: unknown) => err instanceof ApiError && (err.status === 404 || err.status === 403);
 
 const BUTTON =
-  "rounded-lg px-3.5 py-2 text-[13px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-default";
+  "rounded-lg px-3.5 py-2 text-[13px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
 
 function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }) {
   const { t } = useTranslation();
@@ -87,6 +86,16 @@ export function DashboardPage() {
   });
   const tabs = listQ.data;
   const { selectedId, select, reject } = useSelectedDashboard(tabs, { d });
+  const navigate = useNavigate();
+  const panelId = useId();
+  // A picked tab also drops `?d=`, so a reload opens the picked dashboard, not the linked one.
+  const onSelect = useCallback(
+    (id: number) => {
+      select(id);
+      if (d != null) void navigate({ to: ".", search: {}, replace: true });
+    },
+    [select, d, navigate],
+  );
 
   // First visit: nobody owns a dashboard yet (the list may hold locked role templates).
   const ensured = useRef(false);
@@ -155,8 +164,15 @@ export function DashboardPage() {
     content = <ErrorBox message={t("dashboards.view.loadFailed")} onRetry={() => void dashQ.refetch()} />;
   } else if (!dashboard) {
     content = (
-      <div aria-label={t("dashboards.view.loading")} className="rounded-[14px] border border-hairline bg-surface px-[18px] py-4">
-        <WidgetSkeleton rows={6} />
+      <div
+        role="status"
+        aria-busy="true"
+        aria-label={t("dashboards.view.loading")}
+        className="flex flex-col gap-3 rounded-[14px] border border-hairline bg-surface px-[18px] py-4"
+      >
+        {["92%", "74%", "84%", "62%", "92%", "74%"].map((width, i) => (
+          <div key={i} className="h-3.5 rounded bg-surface-subtle motion-safe:animate-pulse" style={{ width }} />
+        ))}
       </div>
     );
   } else if (widgets.length === 0) {
@@ -187,7 +203,7 @@ export function DashboardPage() {
             <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">{greeting}</h1>
             <p className="mt-1 text-sm text-muted">{today}</p>
           </div>
-          {tabs && tabs.length > 0 && <DashboardTabs tabs={tabs} selectedId={selectedId} onSelect={select} />}
+          {tabs && tabs.length > 0 && <DashboardTabs tabs={tabs} selectedId={selectedId} onSelect={onSelect} panelId={panelId} />}
         </div>
         {dashboard && (dashboard.can_share || dashboard.can_edit) && (
           <div className="flex gap-2">
@@ -195,13 +211,13 @@ export function DashboardPage() {
               <button
                 type="button"
                 disabled
-                className={cn(BUTTON, "border border-hairline bg-surface text-ink hover:bg-surface-subtle")}
+                className={cn(BUTTON, "border border-hairline bg-surface text-ink hover:bg-surface-subtle disabled:hover:bg-surface")}
               >
                 {t("dashboards.view.share")}
               </button>
             )}
             {dashboard.can_edit && (
-              <button type="button" disabled className={cn(BUTTON, "bg-accent px-4 font-semibold text-accent-ink hover:bg-accent/90")}>
+              <button type="button" disabled className={cn(BUTTON, "bg-accent px-4 font-semibold text-accent-ink hover:bg-accent/90 disabled:hover:bg-accent")}>
                 {t("dashboards.view.customize")}
               </button>
             )}
@@ -218,7 +234,15 @@ export function DashboardPage() {
         <p className="text-sm text-muted">{t("dashboards.view.lockedHint")}</p>
       )}
 
-      <div ref={containerRef} className="min-w-0">
+      <div
+        ref={containerRef}
+        id={panelId}
+        role="tabpanel"
+        aria-labelledby={isTab ? `${panelId}-tab-${selectedId}` : undefined}
+        aria-label={isTab ? undefined : dashboard?.name}
+        tabIndex={widgets.length === 0 ? 0 : undefined}
+        className="min-w-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
         {content}
       </div>
     </div>

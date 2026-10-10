@@ -142,9 +142,12 @@ export function useDashboardData(
     if (!enabled) return;
     const life = new AbortController();
     const key = dashboardKeys.data(dashboardId);
+    // Only into an existing batch: a partial entry would turn a failed or still running batch into
+    // "success" and every widget missing from `fresh` would show an empty state instead of
+    // error/loading. Without an entry the (re)fetched full batch brings these widgets anyway.
     const merge = (fresh: Record<string, WidgetResult>) => {
       if (life.signal.aborted) return;
-      qc.setQueryData<DashboardData>(key, (old) => ({ widgets: { ...(old?.widgets ?? {}), ...fresh } }));
+      qc.setQueryData<DashboardData>(key, (old) => old && { widgets: { ...old.widgets, ...fresh } });
     };
     const fetchOne = async (widgetId: string): Promise<WidgetResult | null> => {
       try {
@@ -249,6 +252,11 @@ export function useDashboardData(
         for (const widgetId of pendingIds) if (!polls.has(widgetId)) schedulePoll(widgetId, 0);
       },
       refetch(widgetId) {
+        if (qc.getQueryData(key) === undefined) {
+          // the batch itself failed: one request for the whole dashboard again
+          void qc.refetchQueries({ queryKey: key, exact: true });
+          return;
+        }
         stopPoll(widgetId);
         setRefetching((prev) => new Set(prev).add(widgetId));
         void fetchOne(widgetId).then((result) => {
@@ -320,11 +328,11 @@ export function useDashboardData(
       else if (refetching.has(w.id)) out[w.id] = { status: "loading" };
       else if (entry) out[w.id] = toState(entry);
       else if (batchData) out[w.id] = { status: "none" };
-      else if (batch.isError) out[w.id] = { status: "error" };
+      else if (batch.isError && !batch.isFetching) out[w.id] = { status: "error" };
       else out[w.id] = { status: "loading" };
     }
     return out;
-  }, [widgets, defByKey, batchData, batch.isError, refetching]);
+  }, [widgets, defByKey, batchData, batch.isError, batch.isFetching, refetching]);
 
   return { byWidget, refetch };
 }

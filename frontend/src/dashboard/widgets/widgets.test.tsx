@@ -250,6 +250,17 @@ describe("core.counter", () => {
     expect(container.querySelector("polyline")).toHaveClass("stroke-danger");
   });
 
+  it("on a narrow tile the label stays and the delta text gives way (truncates, full text as title)", async () => {
+    await renderWidget("core.counter", preset("unowned_new"), { status: "ok", data: { value: 5, delta: 2, spark: [3, 5] } });
+    const label = screen.getByRole("heading", { name: "Zum Übernehmen" });
+    expect(label).toHaveClass("shrink-0", "max-w-full", "truncate");
+    expect(label).not.toHaveClass("flex-1");
+    const delta = screen.getByText("+2 seit dem letzten Stand");
+    expect(delta).toHaveClass("min-w-0", "truncate");
+    expect(delta).not.toHaveClass("shrink-0");
+    expect(delta).toHaveAttribute("title", "+2 seit dem letzten Stand");
+  });
+
   it("keeps a rise of a fewer-is-better counter and every change of the others muted", async () => {
     await renderWidget("core.counter", preset("unowned_new"), { status: "ok", data: { value: 5, delta: 2, spark: [3, 5] } });
     expect(screen.getByText("+2 seit dem letzten Stand")).toHaveClass("text-muted");

@@ -133,4 +133,31 @@ describe("DashboardGrid", () => {
     DASHBOARD_WIDGETS.clearForTests();
     setPluginImporterForTests(null);
   });
+
+  it("a crashed widget gets another try when its data changes", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    let explode = true;
+    function Flaky() {
+      if (explode) throw new Error("kaputt");
+      return <p>wieder da</p>;
+    }
+    DASHBOARD_WIDGETS.register(
+      { ...DASHBOARD_WIDGETS.get("core.notes")!, key: "org.example.flaky", owner: "org.example", component: Flaky },
+      "org.example",
+    );
+    const widgets = [wire("f", "org.example.flaky")];
+    const client = new QueryClient();
+    const view = (data: Record<string, WidgetDataState>) => (
+      <QueryClientProvider client={client}>
+        <DashboardGrid widgets={widgets} mode="view" breakpoint="lg" dashboardId={1} canEdit data={data} onRetry={() => {}} />
+      </QueryClientProvider>
+    );
+    const { rerender } = render(view({ f: ok(1) }));
+    expect(within(screen.getByTestId("widget-f")).getByText("Dieses Widget konnte nicht angezeigt werden.")).toBeVisible();
+    explode = false;
+    const same = { f: ok(1) };
+    rerender(view(same));
+    expect(within(screen.getByTestId("widget-f")).getByText("wieder da")).toBeVisible();
+    DASHBOARD_WIDGETS.clearForTests();
+  });
 });
