@@ -7,7 +7,7 @@
  */
 import i18n from "@/i18n";
 import type { FrontendPlugin } from "@/lib/pluginsApi";
-import { pluginAssetUrl } from "./loader";
+import { PLUGIN_IMPORT_TIMEOUT_MS, pluginAssetUrl } from "./loader";
 
 export function pluginNamespace(pluginId: string): string {
   return `plugin.${pluginId}`;
@@ -15,8 +15,8 @@ export function pluginNamespace(pluginId: string): string {
 
 const LOCALE_CODE = /^[A-Za-z]{2,3}(?:[_-][A-Za-z0-9]{2,8})?$/;
 
-/** Successful (or in-flight) loads per `id@version:lang`. */
-const loads = new Map<string, Promise<boolean>>();
+/** Successful (or in-flight) loads per `id@version:lang`: the file's texts. */
+const loads = new Map<string, Promise<object | null>>();
 
 /** The plugin's best file for `lang`: exact, then without region, then English. */
 function pickLocale(available: string[], lang: string): string | null {
@@ -27,28 +27,36 @@ function pickLocale(available: string[], lang: string): string | null {
   return null;
 }
 
-async function fetchBundle(plugin: FrontendPlugin, lang: string): Promise<boolean> {
+async function fetchBundle(plugin: FrontendPlugin, lang: string): Promise<object | null> {
+  // Same limit as the module import; a stalled file must not hold the slot.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PLUGIN_IMPORT_TIMEOUT_MS);
   try {
     const url = pluginAssetUrl(plugin, `i18n/${lang}.json`);
-    const res = await fetch(url, { credentials: "same-origin", headers: { Accept: "application/json" } });
-    if (!res.ok) return false;
+    const res = await fetch(url, {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
     const data: unknown = await res.json();
-    if (typeof data !== "object" || data === null || Array.isArray(data)) return false;
-    i18n.addResourceBundle(lang, pluginNamespace(plugin.id), data, true, true);
-    return true;
+    if (typeof data !== "object" || data === null || Array.isArray(data)) return null;
+    return data;
   } catch (err) {
     console.warn(`[plugin ${plugin.id}] translations ${lang} not loaded`, err);
-    return false;
+    return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
-function loadOnce(plugin: FrontendPlugin, lang: string): Promise<boolean> {
+function loadOnce(plugin: FrontendPlugin, lang: string): Promise<object | null> {
   const key = `${plugin.id}@${plugin.version}:${lang}`;
   const existing = loads.get(key);
   if (existing) return existing;
-  const promise = fetchBundle(plugin, lang).then((ok) => {
-    if (!ok) loads.delete(key); // try again next time (language switch, reload of the list)
-    return ok;
+  const promise = fetchBundle(plugin, lang).then((data) => {
+    if (!data) loads.delete(key); // try again next time (language switch, reload of the list)
+    return data;
   });
   loads.set(key, promise);
   return promise;
@@ -57,12 +65,24 @@ function loadOnce(plugin: FrontendPlugin, lang: string): Promise<boolean> {
 /**
  * Make the plugin's texts for `lang` available. English is loaded as well when
  * the plugin has it, for keys the chosen file lacks (i18next falls back to en).
- * Never rejects.
+ * A file without region (`pt.json` for `pt_BR`) is also registered under the
+ * requested language: the app's i18next (`load: "currentOnly"`) resolves
+ * `pt_BR` → `en` and would never look at `pt`. Never rejects.
  */
 export async function ensurePluginI18n(plugin: FrontendPlugin, lang: string): Promise<void> {
   const available = plugin.locales.filter((code) => LOCALE_CODE.test(code));
   const chosen = pickLocale(available, lang);
   if (!chosen) return;
   const wanted = chosen !== "en" && available.includes("en") ? [chosen, "en"] : [chosen];
-  await Promise.all(wanted.map((code) => loadOnce(plugin, code)));
+  const ns = pluginNamespace(plugin.id);
+  await Promise.all(
+    wanted.map(async (code) => {
+      const data = await loadOnce(plugin, code);
+      if (!data) return;
+      i18n.addResourceBundle(code, ns, data, true, true);
+      if (code === chosen && code !== lang && code !== "en") {
+        i18n.addResourceBundle(lang, ns, data, true, true);
+      }
+    }),
+  );
 }

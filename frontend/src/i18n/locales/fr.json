@@ -2179,7 +2179,8 @@
       "smime": "S/MIME",
       "aiModels": "Modèles",
       "identityProviders": "Identity providers",
-      "reporting": "Report data"
+      "reporting": "Report data",
+      "plugins": "Extensions"
     },
     "table": {
       "id": "ID",
@@ -3494,7 +3495,8 @@
       "settingsJobs": "Background tasks such as exports: how many run at once and how long results are kept.",
       "identityProviders": "Set up sign-in through Microsoft, Google, SAML or LDAP.",
       "reporting": "Check the state of the report data and have everything recalculated.",
-      "settingsReporting": "Reports: time zone, access, cache and limits for results and exports."
+      "settingsReporting": "Reports: time zone, access, cache and limits for results and exports.",
+      "plugins": "Switch installed extensions on or off, check their state and configure them."
     },
     "types": {
       "title_plural": "Types de ticket",
@@ -4387,6 +4389,80 @@
       "ownership": "Tiqora deploys changes itself (Znuny is switched off).",
       "deployNow": "Deploy",
       "deployFailed": "Deployment failed."
+    },
+    "plugins": {
+      "description": "Extensions add functions to Tiqora. They ship with the Tiqora image; here you switch them on or off.",
+      "trustNote": "Extensions run inside Tiqora with full access. The information below shows what an extension claims to do - it is not a safeguard. Only switch on extensions you trust.",
+      "loadError": "The extensions could not be loaded.",
+      "actionError": "The change could not be saved.",
+      "safeMode": "Safe mode: Tiqora was started without extensions. Switches only take effect once Tiqora is started normally again.",
+      "browserOff": "Extensions are switched off in this browser tab (?plugins=off). Use ?plugins=on to load them again.",
+      "empty": "No extensions are installed.",
+      "version": "Version {{version}}",
+      "publisher": "by {{publisher}}",
+      "settings": "Settings",
+      "retry": "Try again",
+      "details": "Details",
+      "hideDetails": "Hide details",
+      "status": {
+        "active": "Active",
+        "disabled": "Switched off",
+        "failed": "Error",
+        "quarantined": "Skipped",
+        "incompatible": "Not compatible",
+        "invalid": "Invalid",
+        "restart_required": "Restart needed",
+        "unknown": "Unknown"
+      },
+      "processes": {
+        "title": "Where the extension runs",
+        "process": "Service",
+        "state": "State",
+        "version": "Version",
+        "error": "Error",
+        "roles": {
+          "api": "Web interface and API",
+          "worker": "Background service",
+          "mcp": "AI interface (MCP)"
+        },
+        "states": {
+          "loading": "Starting",
+          "active": "Active",
+          "failed": "Error",
+          "quarantined": "Skipped",
+          "disabled": "Switched off",
+          "incompatible": "Not compatible",
+          "invalid": "Invalid"
+        }
+      },
+      "hooks": {
+        "title": "Automatic processes",
+        "onTicketChange": "on ticket changes",
+        "stopped": "Stopped after {{count}} errors",
+        "lastError": "Last error"
+      },
+      "capabilities": {
+        "title": "What this extension declares",
+        "none": "Nothing declared.",
+        "host": "Calls {{host}}",
+        "point": {
+          "events": "Reacts to ticket changes",
+          "routes": "Provides its own interfaces (login required)",
+          "public_routes": "Offers publicly reachable interfaces (no login)",
+          "mcp_tools": "Adds tools to the AI interface (MCP)",
+          "scheduled_tasks": "Runs scheduled tasks in the background",
+          "builtin_reports": "Provides ready-made reports",
+          "report_sources": "Provides data sources for reports",
+          "other": "Uses the extension point {{value}}"
+        },
+        "slot": {
+          "nav": "Adds a menu entry",
+          "route": "Adds a page of its own",
+          "ticket_sidebar": "Shows a panel in the ticket view",
+          "widget": "Shows a tile on the dashboard",
+          "other": "Extends the interface ({{value}})"
+        }
+      }
     }
   },
   "kb": {

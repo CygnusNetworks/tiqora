@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vite
 import i18n from "@/i18n";
 import { helloPlugin } from "@/test/pluginFixtures";
 import { ensurePluginI18n, pluginNamespace } from "./i18n";
+import { PLUGIN_IMPORT_TIMEOUT_MS } from "./loader";
 
 const plugin = helloPlugin();
 let fetchMock: Mock;
@@ -12,6 +13,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -45,15 +47,46 @@ describe("plugin translations", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("prefers the language without region before English", async () => {
+  it("prefers the language without region before English, and pt_BR users see the pt texts", async () => {
     const p = helloPlugin({ id: "org.example.region", locales: ["pt", "en"] });
-    fetchMock.mockImplementation(() => Promise.resolve(json({ a: "x" })));
+    fetchMock.mockImplementation((url: string) =>
+      Promise.resolve(json(url.endsWith("/pt.json") ? { a: "Olá" } : { a: "Hello", b: "Only English" })),
+    );
     await ensurePluginI18n(p, "pt_BR");
     const urls = fetchMock.mock.calls.map((c) => c[0] as string);
     expect(urls).toEqual([
       "/api/v1/plugins/org.example.region/assets/1.0.0/i18n/pt.json",
       "/api/v1/plugins/org.example.region/assets/1.0.0/i18n/en.json",
     ]);
+    // The app's i18next (load: "currentOnly", fallbackLng: "en") resolves pt_BR → en.
+    expect(i18n.t("plugin.org.example.region:a", { lng: "pt_BR" })).toBe("Olá");
+    expect(i18n.t("plugin.org.example.region:b", { lng: "pt_BR" })).toBe("Only English");
+    expect(i18n.t("plugin.org.example.region:a", { lng: "pt" })).toBe("Olá");
+  });
+
+  it("a translation file that never answers is aborted after the import timeout", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    let signal: AbortSignal | undefined;
+    fetchMock.mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise((_, reject) => {
+          signal = init.signal ?? undefined;
+          signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+        }),
+    );
+    const p = helloPlugin({ id: "org.example.stall", locales: ["de"] });
+    let settled = false;
+    const done = ensurePluginI18n(p, "de").then(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(PLUGIN_IMPORT_TIMEOUT_MS - 1);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(2);
+    await done;
+    expect(signal?.aborted).toBe(true);
+    expect(i18n.hasResourceBundle("de", "plugin.org.example.stall")).toBe(false);
+    vi.useRealTimers();
   });
 
   it("loads each file once and never rejects on HTTP or network errors", async () => {

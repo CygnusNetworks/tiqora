@@ -54,6 +54,8 @@ const EXACT_ACTIVE_ROUTES = new Set(
 /** Group of the admin page whose route is the longest prefix of *pathname*
  * — `/admin/ai/queues/5` resolves to the `ai-queues` page, not `ai`. */
 function groupForPath(pathname: string): AdminPageGroup | null {
+  // Plugin settings forms are reached from the extensions page (system group).
+  if (pathname.startsWith("/admin/settings/plugins.")) return "system";
   let best: { group: AdminPageGroup; len: number } | null = null;
   for (const page of ADMIN_PAGES) {
     if (pathname === page.route || pathname.startsWith(`${page.route}/`)) {

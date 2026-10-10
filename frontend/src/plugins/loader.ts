@@ -47,9 +47,21 @@ export function clearPluginModuleCacheForTests(): void {
 
 const ASSET_PREFIX = "/api/v1/plugins/";
 
-/** Characters/sequences that could leave the plugin's asset directory or this origin. */
+/**
+ * Characters/sequences that could leave the plugin's asset directory or this
+ * origin — including their percent-encoded forms, which the URL parser turns
+ * back into dot segments (`%2e%2e`) or that a server may decode into
+ * separators (`%2f`, `%5c`); `%25` is refused so they cannot hide behind
+ * double encoding.
+ */
 function unsafePart(value: string): boolean {
-  return value.includes("//") || value.includes(":") || value.includes("..") || /[\\?#\s]/.test(value);
+  return (
+    value.includes("//") ||
+    value.includes(":") ||
+    value.includes("..") ||
+    /[\\?#\s]/.test(value) ||
+    /%(?:2e|2f|5c|25)/i.test(value)
+  );
 }
 
 /**
@@ -102,13 +114,6 @@ function load(plugin: FrontendPlugin): Promise<PluginModule> {
   addStyles(styleUrls);
 
   const importer = testImporter ?? customImporter ?? nativeImporter;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  // Armed synchronously, so the timeout runs even if the import never settles.
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      reject(new Error(`Zeitüberschreitung: Erweiterung „${plugin.name}“ hat nicht rechtzeitig geladen`));
-    }, PLUGIN_IMPORT_TIMEOUT_MS);
-  });
   const imported = Promise.resolve()
     .then(() => importer(entryUrl))
     .then((mod) => {
@@ -118,7 +123,21 @@ function load(plugin: FrontendPlugin): Promise<PluginModule> {
       }
       return { components: def.components };
     });
-  return Promise.race([imported, timeout]).finally(() => clearTimeout(timer));
+  return withTimeout(imported, plugin);
+}
+
+/**
+ * `work` raced against PLUGIN_IMPORT_TIMEOUT_MS. The timer is armed
+ * synchronously, so it runs even if `work` never settles.
+ */
+function withTimeout<T>(work: Promise<T>, plugin: FrontendPlugin): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`Zeitüberschreitung: Erweiterung „${plugin.name}“ hat nicht rechtzeitig geladen`));
+    }, PLUGIN_IMPORT_TIMEOUT_MS);
+  });
+  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
 }
 
 /** The plugin's module; one import per `id@version`. A failed load is retried on the next call. */
@@ -141,7 +160,13 @@ const componentKey = (plugin: FrontendPlugin, name: string) => `${plugin.id}@${p
  * level: a component that suspends while mounting loses its hook state, so a
  * lazy created in useMemo would be re-created (and re-imported) on every
  * Suspense retry and a failed load would never reach the error boundary.
- * `prepare` runs alongside the import (the plugin's translations).
+ * `prepare` runs alongside the import (the plugin's translations); both
+ * together get the import timeout, so a stalled translation file also ends
+ * in the slot's error message instead of an endless spinner.
+ *
+ * Note: after a failed native `import()` the browser may keep the module as
+ * errored in its module map, so "a later mount tries again" can reject again
+ * without a new request until the page is reloaded.
  */
 export function pluginComponent(
   plugin: FrontendPlugin,
@@ -153,7 +178,12 @@ export function pluginComponent(
   let component = components.get(key);
   if (!component) {
     component = lazy(() =>
-      Promise.all([loadPluginModule(plugin), prepare?.()])
+      // Our timer is armed before the import's and the fetch's own ones, so
+      // a stall ends here, in the slot's error message.
+      withTimeout(
+        Promise.resolve().then(() => Promise.all([loadPluginModule(plugin), prepare?.()])),
+        plugin,
+      )
         .then(([mod]) => {
           const found = mod.components[name];
           if (!found) throw new Error(`Baustein „${name}“ fehlt`);

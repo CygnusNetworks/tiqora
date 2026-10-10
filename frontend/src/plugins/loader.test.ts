@@ -76,6 +76,11 @@ describe("loadPluginModule", () => {
     ["protocol-relative entry", { entry: "web//evil.example.org/x.js" }],
     ["entry climbing out", { entry: "web/../../../evil.js" }],
     ["style climbing out", { styles: ["web/../../x.css"] }],
+    ["encoded dot segments in the asset base", { asset_base: "/api/v1/plugins/%2e%2e/%2e%2e/evil/" }],
+    ["upper-case encoded dot segments in the entry", { entry: "web/%2E%2E/%2E%2E/evil.js" }],
+    ["encoded slash in the entry", { entry: "web%2f..%2fevil.js" }],
+    ["encoded backslash in a style", { styles: ["web%5C%5Cevil.css"] }],
+    ["double-encoded dot in the entry", { entry: "web/%252e%252e/evil.js" }],
   ])("refuses a cross-origin or escaping address: %s", async (_label, overrides) => {
     const importer = vi.fn();
     setPluginImporterForTests(importer);

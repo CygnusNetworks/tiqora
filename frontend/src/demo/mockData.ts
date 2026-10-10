@@ -9,7 +9,7 @@
  * auto-authenticated).
  */
 
-import type { FrontendPlugin } from "@/lib/pluginsApi";
+import type { FrontendPlugin, PluginAdminList } from "@/lib/pluginsApi";
 import { resolve as resolveDashboardsDemo } from "./dashboardsMock";
 import { demoCatalogue, demoFacts, demoReport, demoReportingStatus, demoReportJob, demoSources } from "./reportsMock";
 
@@ -1835,6 +1835,13 @@ const demoPluginTexts = {
     },
     panel: { title: "Demo", body: "Die Erweiterung sieht Ticket {{id}}." },
     widget: { title: "Demo-Kachel", body: "Hallo von der Demo-Erweiterung." },
+    settings: {
+      title: "Demo-Erweiterung",
+      fields: {
+        greeting: { label: "Begrüßung", help: "Dieser Text erscheint auf der Demo-Seite." },
+        api_token: { label: "Zugangsschlüssel", help: "Wird verschlüsselt gespeichert und nie wieder angezeigt." },
+      },
+    },
   },
   en: {
     nav: { overview: "Demo" },
@@ -1849,13 +1856,117 @@ const demoPluginTexts = {
     },
     panel: { title: "Demo", body: "The extension sees ticket {{id}}." },
     widget: { title: "Demo tile", body: "Hello from the demo extension." },
+    settings: {
+      title: "Demo extension",
+      fields: {
+        greeting: { label: "Greeting", help: "This text appears on the demo page." },
+        api_token: { label: "Access key", help: "Stored encrypted and never shown again." },
+      },
+    },
   },
+};
+
+/** `GET /api/v1/admin/plugins`: one active, one skipped (quarantined), one waiting for a restart. */
+const demoAdminPlugins: PluginAdminList = {
+  safe_mode: false,
+  plugins: [
+    {
+      id: "org.example.demo",
+      name: "Demo-Erweiterung",
+      version: "1.0.0",
+      publisher: "Example Org",
+      description: "Zeigt eine Beispielseite, ein Ticketfeld und eine Dashboard-Kachel.",
+      homepage: null,
+      support: null,
+      license: null,
+      categories: [],
+      source: "image",
+      installed_at: "2026-10-01T09:00:00Z",
+      enabled: true,
+      status: "active",
+      status_message: null,
+      settings_section: "plugins.org.example.demo",
+      capabilities: [
+        { kind: "extension_point", value: "core.events.subscribers" },
+        { kind: "extension_point", value: "core.worker.scheduled_tasks" },
+        { kind: "outbound_host", value: "api.example.org" },
+        { kind: "frontend_slot", value: "agent.nav" },
+        { kind: "frontend_slot", value: "agent.route" },
+        { kind: "frontend_slot", value: "ticket.sidebar" },
+        { kind: "frontend_slot", value: "dashboard.widget" },
+      ],
+      contributions: [],
+      hooks: [
+        {
+          key: "event:org.example.demo:notify", kind: "event", name: "notify", schedule: null,
+          tripped: false, consecutive_failures: 0, total_failures: 0, last_error: null,
+          last_error_at: null, last_ok_at: "2026-10-10T07:55:00Z", last_run_at: "2026-10-10T07:55:00Z",
+        },
+        {
+          key: "task:org.example.demo:cleanup", kind: "task", name: "cleanup", schedule: "täglich um 03:00",
+          tripped: false, consecutive_failures: 0, total_failures: 0, last_error: null,
+          last_error_at: null, last_ok_at: "2026-10-10T01:00:00Z", last_run_at: "2026-10-10T01:00:00Z",
+        },
+      ],
+      runtime: [
+        { role: "api", state: "active", version: "1.0.0", error: null, boot_attempts: 1, updated_at: "2026-10-10T06:00:00Z" },
+        { role: "worker", state: "active", version: "1.0.0", error: null, boot_attempts: 1, updated_at: "2026-10-10T06:00:00Z" },
+      ],
+    },
+    {
+      id: "org.example.crashy",
+      name: "Absturz-Beispiel",
+      version: "0.3.1",
+      publisher: "Example Org",
+      description: "Eine Erweiterung, die beim Start abgestürzt ist.",
+      homepage: null,
+      support: null,
+      license: null,
+      categories: [],
+      source: "image",
+      installed_at: "2026-10-01T09:00:00Z",
+      enabled: true,
+      status: "quarantined",
+      status_message: "Beim Start wiederholt abgestürzt – wird übersprungen, bis Sie „Erneut versuchen“ wählen.",
+      settings_section: null,
+      capabilities: [{ kind: "extension_point", value: "core.mcp.tools" }],
+      contributions: [],
+      hooks: [],
+      runtime: [
+        { role: "mcp", state: "quarantined", version: "0.3.1", error: "ImportError: kaputt", boot_attempts: 3, updated_at: "2026-10-10T06:00:00Z" },
+      ],
+    },
+    {
+      id: "org.example.later",
+      name: "Später-Beispiel",
+      version: "2.0.0",
+      publisher: "Example Org",
+      description: "Wurde gerade ausgeschaltet.",
+      homepage: null,
+      support: null,
+      license: null,
+      categories: [],
+      source: "image",
+      installed_at: "2026-10-01T09:00:00Z",
+      enabled: false,
+      status: "restart_required",
+      status_message: "Änderung wird nach einem Neustart von Tiqora wirksam.",
+      settings_section: null,
+      capabilities: [{ kind: "extension_point", value: "core.http.public_routes" }],
+      contributions: [],
+      hooks: [],
+      runtime: [
+        { role: "api", state: "active", version: "2.0.0", error: null, boot_attempts: 1, updated_at: "2026-10-10T06:00:00Z" },
+      ],
+    },
+  ],
 };
 
 export function resolveData(path: string, method: string): unknown | undefined {
   const p = path;
   // Plugins: the demo plugin's list entry and its translations (code: src/demo/demoPlugin.tsx).
   if (p.endsWith("/api/v1/plugins/frontend")) return demoPluginFrontend;
+  if (p.endsWith("/api/v1/admin/plugins")) return demoAdminPlugins;
   if (p.endsWith("/api/v1/plugins/org.example.demo/assets/1.0.0/i18n/de.json")) return demoPluginTexts.de;
   if (p.endsWith("/api/v1/plugins/org.example.demo/assets/1.0.0/i18n/en.json")) return demoPluginTexts.en;
   // Auth
@@ -2055,7 +2166,28 @@ export function resolveData(path: string, method: string): unknown | undefined {
       { key: "avatars", title_key: "admin.settings.avatars.title", owner: "core" },
       { key: "jobs", title_key: "admin.settings.jobs.title", owner: "core" },
       { key: "reporting", title_key: "admin.settings.reporting.title", owner: "core" },
+      { key: "plugins.org.example.demo", title_key: "plugin.org.example.demo:settings.title", owner: "org.example.demo" },
     ];
+  if (p.endsWith("/admin/settings-sections/plugins.org.example.demo"))
+    return {
+      key: "plugins.org.example.demo",
+      title_key: "plugin.org.example.demo:settings.title",
+      i18n_prefix: "plugin.org.example.demo:settings",
+      json_schema: {
+        properties: {
+          greeting: { default: "Hallo", maxLength: 80, title: "Greeting", type: "string" },
+          api_token: {
+            anyOf: [{ type: "string", format: "password", writeOnly: true }, { type: "null" }],
+            default: null,
+            title: "Api Token",
+          },
+        },
+        title: "DemoSettings",
+        type: "object",
+      },
+      values: { greeting: "Hallo", api_token: "********" },
+      secrets_set: ["api_token"],
+    };
   if (p.endsWith("/admin/settings-sections/reporting"))
     return {
       key: "reporting",
