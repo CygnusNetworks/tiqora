@@ -476,6 +476,88 @@ async def test_without_tracker_uses_a_process_tracker_with_step_and_offset(
     assert _ids(got, "good") == [49400]
 
 
+async def _set_hook(f: async_sessionmaker[AsyncSession], key: str, **values: Any) -> None:
+    async with f() as session:
+        await session.execute(
+            update(TiqoraPluginHook).where(TiqoraPluginHook.hook_key == key).values(**values)
+        )
+        await session.commit()
+
+
+async def test_lagging_subscriber_does_not_hold_back_others(
+    url, f, reg, got, fail_on, slow, tick, monkeypatch
+) -> None:
+    """R-DISPATCH-FRONTIER: each subscriber reads its own range.
+
+    ``flaky`` is 5,000 ids behind; the band has no room for 5,000 real rows, so the batch is
+    shrunk to 2 rows instead: a shared window from the smallest cursor would hand ``good``
+    nothing this tick.
+    """
+    monkeypatch.setattr(event_dispatch, "EVENT_BATCH", 2)
+    _hist(url, 49400, "NewTicket", 49400)
+    for id_ in (49401, 49402, 49403):
+        _hist(url, id_, "OwnerUpdate", 49400)
+    _hist(url, 49404, "StateUpdate", 49400)
+    await _set_hook(f, GOOD, cursor=49403)
+    await _set_hook(f, FLAKY, cursor=44399)
+    await tick()
+    assert _ids(got, "good") == [49404]
+    assert (await _hooks(f))[GOOD].cursor == 49404
+
+
+async def test_reset_replays_old_holes_without_waiting(
+    url, f, reg, got, fail_on, slow, tick
+) -> None:
+    """Holes at or below the frontier are final: a reset subscriber's replay never waits."""
+    clock = [0.0]
+    tracker = GapTracker(hold_seconds=60)
+    ids = list(range(49400, 49420, 2))  # 10 rows, 9 holes
+    _hist(url, ids[0], "NewTicket", 49400)
+    for id_ in ids[1:]:
+        _hist(url, id_, "StateUpdate", 49400)
+    await _set_hook(f, FLAKY, tripped_at=NOW, consecutive_failures=TRIP_AFTER)
+    for _ in range(len(ids)):  # each new hole above the frontier is held once
+        await tick(tracker=tracker, wall_clock=lambda: clock[0])
+        clock[0] += 60
+    assert _ids(got, "good") == ids and _ids(got, "flaky") == []
+    async with f() as session:
+        await reset_plugin(session, PLUGIN, now=utc_now())
+        await session.commit()
+    res = await tick(tracker=tracker, wall_clock=lambda: clock[0])  # clock does not move
+    assert _ids(got, "flaky") == ids and res["failed"] == 0
+
+
+async def test_skipped_hole_is_never_held_again(url, f, reg, got, fail_on, slow, tick) -> None:
+    clock = [0.0]
+    tracker = GapTracker(hold_seconds=60)
+    _hist(url, 49400, "NewTicket", 49400)
+    _hist(url, 49402, "StateUpdate", 49400)
+    await tick(tracker=tracker, wall_clock=lambda: clock[0])
+    clock[0] = 60.0
+    await tick(tracker=tracker, wall_clock=lambda: clock[0])
+    assert _ids(got, "good") == [49400, 49402]
+    await _set_hook(f, GOOD, cursor=49399)  # replay right after the skip
+    clock[0] = 61.0
+    await tick(tracker=tracker, wall_clock=lambda: clock[0])
+    assert _ids(got, "good") == [49400, 49402, 49400, 49402]
+
+
+async def test_new_hole_above_frontier_holds_up_to_hold_seconds(
+    url, f, reg, got, fail_on, slow, tick
+) -> None:
+    clock = [0.0]
+    tracker = GapTracker(hold_seconds=60)
+    _hist(url, 49400, "NewTicket", 49400)
+    _hist(url, 49402, "StateUpdate", 49400)
+    for at in (0.0, 30.0, 59.0):
+        clock[0] = at
+        res = await tick(tracker=tracker, wall_clock=lambda: clock[0])
+        assert _ids(got, "good") == [49400] and res["horizon"] == 49400
+    clock[0] = 60.0
+    await tick(tracker=tracker, wall_clock=lambda: clock[0])
+    assert _ids(got, "good") == [49400, 49402]
+
+
 async def test_batch_size_is_bounded() -> None:
     assert EVENT_BATCH == 500 and TRIP_AFTER == 5
 

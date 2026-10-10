@@ -7,9 +7,13 @@ One tick (worker loop ``plugin_events``):
 2. Each subscriber has a hook row ``event:<key>`` with a cursor (last handled
    ``ticket_history.id``). New rows and NULL cursors (plugin switched off and on) start at
    ``MAX(ticket_history.id)``: no replay. Tripped hooks are skipped.
-3. Up to :data:`EVENT_BATCH` history rows after the smallest cursor are read; the
-   :class:`GapTracker` horizon holds back ids that may still be committed late.
-4. Every subscriber runs concurrently. Rows it does not want only move its cursor; a matching
+3. A process-level *frontier* is the highest gap-safe id ever returned by the
+   :class:`GapTracker` (R-DISPATCH-FRONTIER). Only ids above it are held back (a missing id may
+   still be committed late); ids at or below it are settled, holes there are final and never
+   held again. Each tick reads up to :data:`EVENT_BATCH` rows above the frontier to move it.
+4. Every subscriber reads its own range (cursor, frontier], at most :data:`EVENT_BATCH` rows, so
+   a lagging (or just reset) subscriber never holds back the others. Subscribers run
+   concurrently. Rows a subscriber does not want only move its cursor; a matching
    event runs the handler under its own timeout. Delivery is *at least once*: the cursor is
    committed after every handled matching event (R-ATLEASTONCE), so a crash re-delivers at
    most the event that was running. ``event.id`` is the idempotency key.
@@ -26,6 +30,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+import weakref
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -73,9 +78,16 @@ _HISTORY_SQL = text(
     " FROM ticket_history th JOIN ticket_history_type tht ON tht.id = th.history_type_id"
     " WHERE th.id > :after ORDER BY th.id LIMIT :n"
 )
+_HISTORY_RANGE_SQL = text(
+    "SELECT th.id, tht.name, th.ticket_id, th.article_id, th.name, th.create_by, th.create_time"
+    " FROM ticket_history th JOIN ticket_history_type tht ON tht.id = th.history_type_id"
+    " WHERE th.id > :after AND th.id <= :upto ORDER BY th.id LIMIT :n"
+)
 
 #: the process's gap tracker (created lazily on the first tick without an explicit one)
 _TRACKER: GapTracker | None = None
+#: frontier per tracker: the highest horizon it ever returned (never moves back)
+_FRONTIERS: weakref.WeakKeyDictionary[GapTracker, int] = weakref.WeakKeyDictionary()
 
 
 def hook_key(subscriber: EventSubscriber) -> str:
@@ -105,10 +117,15 @@ async def _max_history_id(session: AsyncSession) -> int:
 
 
 async def _read_history(
-    factory: async_sessionmaker[AsyncSession], after: int, limit: int
+    factory: async_sessionmaker[AsyncSession], after: int, limit: int, upto: int | None = None
 ) -> list[HistoryRow]:
     async with factory() as session:
-        result = await session.execute(_HISTORY_SQL, {"after": after, "n": limit})
+        if upto is None:
+            result = await session.execute(_HISTORY_SQL, {"after": after, "n": limit})
+        else:
+            result = await session.execute(
+                _HISTORY_RANGE_SQL, {"after": after, "upto": upto, "n": limit}
+            )
         return [
             HistoryRow(
                 id=int(r[0]),
@@ -135,11 +152,21 @@ class _Outcome:
 
 
 @dataclass(frozen=True, slots=True)
-class _Run:
-    factory: async_sessionmaker[AsyncSession]
+class _Window:
+    """A subscriber's rows in (cursor, frontier], with their events."""
+
     rows: Sequence[HistoryRow]
     events: dict[int, TicketEvent]
-    horizon: int
+
+
+def _window(rows: Sequence[HistoryRow]) -> _Window:
+    return _Window(rows=rows, events={e.id: e for e in events_from_history(rows)})
+
+
+@dataclass(frozen=True, slots=True)
+class _Run:
+    factory: async_sessionmaker[AsyncSession]
+    frontier: int
     budget: float
     now: Callable[[], datetime]
     wall_clock: Callable[[], float]
@@ -169,20 +196,23 @@ async def _call_handler(sub: EventSubscriber, ctx: EventContext, event: TicketEv
     return None
 
 
-async def _run_subscriber(run: _Run, sub: EventSubscriber, hook: TiqoraPluginHook) -> _Outcome:
+async def _run_subscriber(
+    run: _Run, sub: EventSubscriber, hook: TiqoraPluginHook, window: _Window
+) -> _Outcome:
     """Deliver this subscriber's events in id order; never raises for plugin or DB errors."""
     outcome = _Outcome()
     started = run.wall_clock()
-    cursor = hook.cursor if hook.cursor is not None else run.horizon
+    assert hook.cursor is not None  # live hooks only (ensure_hook resolved NULL cursors)
+    cursor = hook.cursor
     pending: int | None = None  # last row passed over without a handler call, not yet stored
     plugin = sub.context or minimal_context(sub.plugin_id)
     try:
-        for row in run.rows:
+        for row in window.rows:
             if row.id <= cursor:
                 continue
-            if row.id > run.horizon:
+            if row.id > run.frontier:
                 break
-            event = run.events.get(row.id)
+            event = window.events.get(row.id)
             if event is None or not sub.matches(event.event):
                 pending = row.id
                 continue
@@ -276,22 +306,43 @@ async def run_plugin_events_tick(
     ]
     if not live:
         return result
-    after = min(int(h.cursor) for _s, h in live if h.cursor is not None)
-    rows = await _read_history(session_factory, after, EVENT_BATCH)
-    horizon = tracker.horizon(after, [r.id for r in rows], wall_clock())
-    result["horizon"] = horizon
+    cursors = [int(h.cursor) for _s, h in live if h.cursor is not None]
+    previous = _FRONTIERS.get(tracker)
+    if previous is None:
+        # Cold start: everything up to the highest stored cursor was delivered past a horizon
+        # of an earlier run, so it is settled. Cursors equal to ``start`` may be hooks created
+        # right now at the end of the history and prove nothing; only ids above the result go
+        # through the hold.
+        old = [int(h.cursor) for h in hooks.values() if h.cursor is not None and h.cursor < start]
+        previous = max(old) if old else min(cursors)
+    leading = await _read_history(session_factory, previous, EVENT_BATCH)
+    frontier = max(previous, tracker.horizon(previous, [r.id for r in leading], wall_clock()))
+    _FRONTIERS[tracker] = frontier
+    result["horizon"] = frontier
+
+    # each subscriber reads its own range; rows above the old frontier come from ``leading``
+    lagging: dict[int, _Window] = {}
+    windows: list[_Window] = []
+    for cursor in cursors:
+        if cursor >= previous:
+            windows.append(_window([r for r in leading if cursor < r.id <= frontier]))
+            continue
+        if cursor not in lagging:
+            rows = await _read_history(session_factory, cursor, EVENT_BATCH, upto=frontier)
+            lagging[cursor] = _window(rows)
+        windows.append(lagging[cursor])
+
     run = _Run(
         factory=session_factory,
-        rows=rows,
-        events={e.id: e for e in events_from_history(rows)},
-        horizon=horizon,
+        frontier=frontier,
         budget=run_budget_seconds(settings),
         now=now,
         wall_clock=wall_clock,
         stop=stop,
     )
     outcomes = await asyncio.gather(
-        *(_run_subscriber(run, s, h) for s, h in live), return_exceptions=True
+        *(_run_subscriber(run, s, h, w) for (s, h), w in zip(live, windows, strict=True)),
+        return_exceptions=True,
     )
     for (sub, _hook), outcome in zip(live, outcomes, strict=True):
         if isinstance(outcome, BaseException):
