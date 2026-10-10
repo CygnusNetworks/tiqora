@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import csv
@@ -95,9 +96,8 @@ from tiqora.jobs.service import (
     lock_user_job_quota,
 )
 from tiqora.permissions.engine import PermissionEngine
-from tiqora.reporting.engine import QueryBudget
 from tiqora.reporting.settings import load_reporting_settings
-from tiqora.reporting.sql import ReportQueryTimeout, statement_timeout
+from tiqora.reporting.sql import ReportQueryTimeout, invalidate_quietly, statement_timeout
 from tiqora.znuny.sysconfig import SysConfig
 
 # ---------------------------------------------------------------------------
@@ -468,6 +468,8 @@ class MyTicketCounts(BaseModel):
 
 #: Upper bound per statement of ``POST /tickets/query`` (nginx cuts /api/ at 90 s).
 QUERY_STATEMENT_SECONDS = 30
+#: Overall deadline of the whole request, below nginx's 90 s.
+QUERY_DEADLINE_SECONDS: float = 75
 QUERY_TIMEOUT_MESSAGE = "Die Abfrage hat zu lange gebraucht. Bitte den Filter einschränken."
 
 
@@ -484,7 +486,14 @@ class TicketQueryIn(BaseModel):
     )
 
 
-@router.post("/query", response_model=PaginatedTickets)
+@router.post(
+    "/query",
+    response_model=PaginatedTickets,
+    responses={
+        422: {"description": "Invalid filter (`detail.message`, `detail.path`)."},
+        504: {"description": "The query took too long (`detail.message`); narrow the filter."},
+    },
+)
 async def query_tickets(
     body: TicketQueryIn, user: CurrentUser, session: DbSession, settings: AppSettings
 ) -> PaginatedTickets:
@@ -497,9 +506,9 @@ async def query_tickets(
     if include_archived and not await PermissionEngine(session).is_admin(user.id):
         include_archived = False
     reporting = await load_reporting_settings(session, settings)
-    seconds = min(QueryBudget.inline(reporting).statement_seconds(), QUERY_STATEMENT_SECONDS)
+    seconds = min(reporting.query_timeout_seconds, QUERY_STATEMENT_SECONDS)
     try:
-        async with statement_timeout(session, seconds):
+        async with asyncio.timeout(QUERY_DEADLINE_SECONDS), statement_timeout(session, seconds):
             scope = await ticket_query_scope(session, user.id, include_archived=include_archived)
             stmt = await compile_ticket_filter(session, body.filter, scope)
             return await TicketService(session).page_from_stmt(
@@ -514,7 +523,9 @@ async def query_tickets(
         raise HTTPException(
             status_code=422, detail={"message": exc.message, "path": exc.path}
         ) from exc
-    except ReportQueryTimeout:
+    except (ReportQueryTimeout, TimeoutError):
+        # a cancelled driver call leaves the connection mid-protocol: never reuse it
+        await invalidate_quietly(session)
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail={"message": QUERY_TIMEOUT_MESSAGE}
         ) from None

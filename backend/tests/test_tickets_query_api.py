@@ -8,6 +8,7 @@ Every row the module writes is deleted again.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator, Generator
 from datetime import datetime
 from typing import Any, get_args
@@ -227,6 +228,9 @@ async def test_query_equals_list_tickets_for_same_params(env: Env) -> None:
         )
     ).json()
     assert [t["id"] for t in listed["items"]] == [T_ALPHA]
+    # ``age_seconds`` is wall-clock based: two requests may straddle a second boundary
+    for old, new in zip(listed["items"], queried["items"], strict=True):
+        assert abs(old.pop("age_seconds") - new.pop("age_seconds")) <= 2
     assert queried == listed  # same enrichment, same page shape
 
 
@@ -310,3 +314,20 @@ async def test_timeout_is_504_with_message(env: Env, monkeypatch: pytest.MonkeyP
     resp = await env.client.post("/api/v1/tickets/query", json={"filter": {}})
     assert resp.status_code == 504
     assert resp.json()["detail"]["message"] == tickets_api.QUERY_TIMEOUT_MESSAGE
+
+
+async def test_overall_deadline_is_504_with_message(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _slow(*_a: Any, **_k: Any) -> Any:
+        await asyncio.sleep(30)
+
+    monkeypatch.setattr(TicketService, "page_from_stmt", _slow)
+    monkeypatch.setattr(tickets_api, "QUERY_DEADLINE_SECONDS", 0.2)
+    env.as_user(AGENT)
+    resp = await env.client.post("/api/v1/tickets/query", json={"filter": {}})
+    assert resp.status_code == 504
+    assert resp.json()["detail"]["message"] == tickets_api.QUERY_TIMEOUT_MESSAGE
+    monkeypatch.undo()  # the connection was dropped, the next request still works
+    ok = await env.client.post("/api/v1/tickets/query", json={"filter": {}})
+    assert ok.status_code == 200 and ok.json()["total"] == 1
