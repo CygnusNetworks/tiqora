@@ -90,4 +90,27 @@ describe("SavedSearchNav", () => {
     renderNav();
     expect(await screen.findByTestId("sidebar-search-empty")).toHaveTextContent("noch keine gespeicherten Suchen");
   });
+
+  it("opens the Znuny import dialog from the list of all searches", async () => {
+    mockList([s({ id: 1, name: "Sichtbar" })]);
+    mockCounts({});
+    const preview = vi.spyOn(savedSearchesApi, "znunyPreview").mockResolvedValue({ profiles: [] });
+    renderNav();
+    expect(preview).not.toHaveBeenCalled();
+    await user.click(await screen.findByTestId("sidebar-searches-all"));
+    const entry = await screen.findByTestId("sidebar-searches-import-znuny");
+    expect(entry).toHaveTextContent("Suchvorlagen aus Znuny übernehmen");
+    await user.click(entry);
+    expect(await screen.findByTestId("znuny-import-empty")).toBeInTheDocument();
+    expect(screen.queryByTestId("sidebar-searches-all-panel")).toBeNull();
+    expect(preview).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers the import also when there are no searches yet", async () => {
+    mockList([]);
+    vi.spyOn(savedSearchesApi, "znunyPreview").mockResolvedValue({ profiles: [] });
+    renderNav();
+    await user.click(await screen.findByTestId("sidebar-searches-all"));
+    expect(await screen.findByTestId("sidebar-searches-import-znuny")).toBeInTheDocument();
+  });
 });

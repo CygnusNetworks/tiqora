@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -7,6 +8,7 @@ import { Switch } from "@/components/ui/Switch";
 import { cn } from "@/lib/cn";
 import { savedSearchesApi, type SavedSearch } from "@/lib/savedSearchesApi";
 import { SAVED_SEARCHES_KEY, useSavedSearches } from "./savedSearchQueries";
+import { ZnunyImportDialog } from "./ZnunyImportDialog";
 
 const rowBase =
   "group flex items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-[13.5px] transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
@@ -52,7 +54,15 @@ function SearchRow({
 }
 
 /** Every search the person can see, each with a switch for "show in the sidebar". */
-function AllSearches({ searches, onNavigate }: { searches: SavedSearch[]; onNavigate?: () => void }) {
+function AllSearches({
+  searches,
+  onNavigate,
+  onImport,
+}: {
+  searches: SavedSearch[];
+  onNavigate?: () => void;
+  onImport: () => void;
+}) {
   const { t } = useTranslation();
   const close = usePopoverClose();
   const queryClient = useQueryClient();
@@ -61,10 +71,29 @@ function AllSearches({ searches, onNavigate }: { searches: SavedSearch[]; onNavi
       savedSearchesApi.setPrefs(search.id, { show_in_sidebar: on, show_count: search.show_count }),
     onSettled: () => queryClient.invalidateQueries({ queryKey: SAVED_SEARCHES_KEY }),
   });
+  const importEntry = (
+    <button
+      type="button"
+      onClick={() => {
+        close();
+        onImport();
+      }}
+      className="mt-1 w-full rounded-md px-1.5 py-1.5 text-left text-[12.5px] text-accent hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+      data-testid="sidebar-searches-import-znuny"
+    >
+      {t("savedSearches.import.entry")}
+    </button>
+  );
   if (searches.length === 0) {
-    return <p className="px-1 py-2 text-xs text-muted">{t("savedSearches.empty")}</p>;
+    return (
+      <div>
+        <p className="px-1 py-2 text-xs text-muted">{t("savedSearches.empty")}</p>
+        {importEntry}
+      </div>
+    );
   }
   return (
+    <div>
     <ul className="space-y-0.5" data-testid="sidebar-searches-all-list">
       {searches.map((s) => (
         <li key={s.id} className="flex items-center gap-2 rounded-md px-1.5 py-1">
@@ -90,6 +119,8 @@ function AllSearches({ searches, onNavigate }: { searches: SavedSearch[]; onNavi
         </li>
       ))}
     </ul>
+    <div className="mt-1 border-t border-hairline pt-1">{importEntry}</div>
+    </div>
   );
 }
 
@@ -97,6 +128,7 @@ function AllSearches({ searches, onNavigate }: { searches: SavedSearch[]; onNavi
 export function SavedSearchNav({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
   const { listQ, counts } = useSavedSearches();
+  const [importOpen, setImportOpen] = useState(false);
   const all = listQ.data ?? [];
   const pinned = all.filter((s) => s.show_in_sidebar).sort((a, b) => a.position - b.position || a.id - b.id);
   return (
@@ -137,9 +169,10 @@ export function SavedSearchNav({ onNavigate }: { onNavigate?: () => void }) {
             </button>
           )}
         >
-          <AllSearches searches={all} onNavigate={onNavigate} />
+          <AllSearches searches={all} onNavigate={onNavigate} onImport={() => setImportOpen(true)} />
         </Popover>
       )}
+      <ZnunyImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
   );
 }
