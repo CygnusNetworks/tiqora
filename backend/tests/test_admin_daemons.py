@@ -83,7 +83,7 @@ async def test_get_daemons_defaults(mariadb_znuny_url: str) -> None:
     try:
         async with factory() as session:
             out = await admin_daemons.list_daemons(_root_user(), session)
-            assert len(out.services) == 20
+            assert len(out.services) == 21
             by_slug = {s.slug: s for s in out.services}
             # Znuny RenewCustomerSMIMECertificates: active by default, 02:02,
             # itself a no-op unless SMIME + SMIME::FetchFromCustomer are on.
@@ -107,6 +107,10 @@ async def test_get_daemons_defaults(mariadb_znuny_url: str) -> None:
             assert plugin_events.enabled is True
             assert plugin_events.toggleable is False
             assert plugin_events.interval_seconds == 5
+            plugin_tasks = by_slug["plugin_tasks"]
+            assert plugin_tasks.enabled is True
+            assert plugin_tasks.toggleable is False
+            assert plugin_tasks.interval_seconds == 15
             for slug in (
                 "postmaster",
                 "escalation",

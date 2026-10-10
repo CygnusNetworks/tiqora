@@ -467,3 +467,16 @@ async def record_hook_failure(
     hook.last_error_at = now
     hook.tripped_at = tripped_at
     return tripped_now
+
+
+async def record_hook_run_start(
+    session: AsyncSession, hook: TiqoraPluginHook, *, now: datetime
+) -> None:
+    """A task run is about to start: ``last_run_at`` is stored before the run (no hot loop)."""
+    await session.execute(
+        update(TiqoraPluginHook)
+        .where(TiqoraPluginHook.hook_key == hook.hook_key)
+        .values(last_run_at=now)
+    )
+    await session.flush()
+    hook.last_run_at = now

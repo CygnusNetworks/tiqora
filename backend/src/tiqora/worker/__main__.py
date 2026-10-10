@@ -186,6 +186,19 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             stop=stop,
         )
 
+    from tiqora.plugins.tasks import MIN_RUN_BUDGET_SECONDS, run_plugin_tasks_tick
+
+    async def plugin_tasks_tick() -> dict[str, int]:
+        # live registry every tick (late plugin boot); a slow task never holds up the others
+        return await run_plugin_tasks_tick(
+            registry=get_registry(),
+            session_factory=get_session_factory(),
+            stop=stop,
+            budget_seconds=float(
+                max(settings.plugin_tasks_interval_seconds * 2, MIN_RUN_BUDGET_SECONDS)
+            ),
+        )
+
     job_runner = JobRunner(
         session_factory=get_session_factory(), settings=settings, registry=get_registry()
     )
@@ -270,6 +283,13 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             "plugin_events",
             plugin_events_tick,
             settings.plugin_events_interval_seconds,
+            None,
+            stop,
+        ),
+        _interval_loop(
+            "plugin_tasks",
+            plugin_tasks_tick,
+            settings.plugin_tasks_interval_seconds,
             None,
             stop,
         ),

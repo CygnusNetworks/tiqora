@@ -3113,6 +3113,10 @@
         "plugin_events": {
           "name": "Extensions: pass on ticket changes",
           "description": "Passes new ticket changes on to the extensions that react to them."
+        },
+        "plugin_tasks": {
+          "name": "Extensions: scheduled tasks",
+          "description": "Starts the regular tasks of the extensions."
         }
       },
       "takeoverBadge": "Prevzatie",

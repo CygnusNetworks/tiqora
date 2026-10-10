@@ -3121,6 +3121,10 @@
         "plugin_events": {
           "name": "Erweiterungen: Ticketänderungen weitergeben",
           "description": "Gibt neue Ticketänderungen an Erweiterungen weiter, die darauf reagieren."
+        },
+        "plugin_tasks": {
+          "name": "Erweiterungen: zeitgesteuerte Aufgaben",
+          "description": "Startet die regelmäßigen Aufgaben der Erweiterungen."
         }
       },
       "takeoverBadge": "Übernahme",

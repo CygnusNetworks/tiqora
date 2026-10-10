@@ -262,6 +262,18 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         interval_settings_attr="plugin_events_interval_seconds",
         tick_timeout_seconds=330,
     ),
+    # Like plugin_events: a tick starts no task after 30 s (MIN_RUN_BUDGET_SECONDS) but waits for
+    # the ones already running, at most MAX_TIMEOUT_SECONDS (300 s) each.
+    DaemonService(
+        slug="plugin_tasks",
+        enabled_key=None,
+        default_enabled=True,
+        toggleable=False,
+        schedule_kind="interval",
+        interval_key=None,
+        interval_settings_attr="plugin_tasks_interval_seconds",
+        tick_timeout_seconds=330,
+    ),
 )
 
 DAEMON_SERVICES_BY_SLUG: dict[str, DaemonService] = {s.slug: s for s in DAEMON_SERVICES}
