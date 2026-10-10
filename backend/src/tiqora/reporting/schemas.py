@@ -182,19 +182,44 @@ class ReportExportIn(ReportRunIn):
     )
 
 
-class BuiltinReportOut(BaseModel):
+class ReportOwnerOut(BaseModel):
+    user_id: int
+    #: "First Last" (the login when both are empty)
+    name: str
+
+
+class ReportOut(BaseModel):
+    """A catalogue entry: a built-in report or a saved one."""
+
+    #: ``builtin.<name>`` or the saved report's id as a decimal string
     key: str
-    category: str
-    title_key: str
-    description_key: str
-    #: the catalogue definition as written (parameter controls are built from it)
-    definition: ReportDefinition
-    overview: bool
-    read_only: bool = True
+    kind: Literal["builtin", "saved"]
+    id: int | None = None
+    #: built-ins only
+    category: str | None = None
+    title_key: str | None = None
+    description_key: str | None = None
+    #: saved reports only (literal text)
+    name: str | None = None
+    description: str | None = None
+    #: the definition as written (parameter controls are built from it); ``None`` only for
+    #: a saved report whose stored definition can no longer be read (``definition_error``)
+    definition: ReportDefinition | None
+    definition_error: str | None = None
+    overview: bool = False
+    #: built-in, or saved without edit right for this viewer
+    read_only: bool
+    owner: ReportOwnerOut | None = None
+    visibility: Literal["private", "groups", "all"] | None = None
+    group_ids: list[int] = Field(default_factory=list)
+    version: int | None = None
+    copied_from: str | None = None
+    changed_at: UtcDateTime | None = None
 
 
 class ReportCatalogueOut(BaseModel):
-    reports: list[BuiltinReportOut]
+    #: built-ins first (catalogue order), then saved reports by name
+    reports: list[ReportOut]
     facts: FactsStatusOut
 
 

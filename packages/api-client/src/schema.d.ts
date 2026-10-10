@@ -7155,6 +7155,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reference/share-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Share Groups
+         * @description Groups the agent may share a report / search / dashboard with (admin: every valid group).
+         */
+        get: operations["list_share_groups_api_v1_reference_share_groups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reference/slas": {
         parameters: {
             query?: never;
@@ -7284,11 +7304,17 @@ export interface paths {
         };
         /**
          * List Reports
-         * @description The built-in reports (catalogue order) and the readiness of the report data.
+         * @description Built-in reports (catalogue order), then the saved reports the viewer may open (by name).
+         *
+         *     ``all=true`` additionally lists other people's private reports; admins only.
          */
         get: operations["list_reports_api_v1_reports_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Report
+         * @description Save a report; ``visibility`` other than ``private`` needs the share right.
+         */
+        post: operations["create_report_api_v1_reports_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7318,6 +7344,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/import-file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Report File
+         * @description Parse and validate a report file (JSON or YAML); saves nothing.
+         */
+        post: operations["import_report_file_api_v1_reports_import_file_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/run": {
         parameters: {
             query?: never;
@@ -7341,6 +7387,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/{report_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Report
+         * @description Replace a saved report completely (every field is written).
+         *
+         *     ``version`` is the optimistic lock (409 with ``current_version``). The stored sharing
+         *     may be kept unchanged without the share right; changing it needs that right.
+         */
+        put: operations["update_report_api_v1_reports__report_id__put"];
+        post?: never;
+        /**
+         * Delete Report
+         * @description Soft-delete a saved report (its owner always may, admins any).
+         */
+        delete: operations["delete_report_api_v1_reports__report_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/{report_key}": {
         parameters: {
             query?: never;
@@ -7348,8 +7421,33 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Report */
+        /**
+         * Get Report
+         * @description A built-in report (404 for an unknown key) or a saved one by id.
+         *
+         *     Unknown and invisible saved reports are both 404; a deleted one is 410.
+         */
         get: operations["get_report_api_v1_reports__report_key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{report_key}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Report File
+         * @description The report as a JSON / YAML file (built-ins: the report key is the name).
+         */
+        get: operations["download_report_file_api_v1_reports__report_key__file_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -11739,25 +11837,6 @@ export interface components {
             state_id?: number | null;
             /** To Address */
             to_address: string;
-        };
-        /** BuiltinReportOut */
-        BuiltinReportOut: {
-            /** Category */
-            category: string;
-            definition: components["schemas"]["ReportDefinition"];
-            /** Description Key */
-            description_key: string;
-            /** Key */
-            key: string;
-            /** Overview */
-            overview: boolean;
-            /**
-             * Read Only
-             * @default true
-             */
-            read_only: boolean;
-            /** Title Key */
-            title_key: string;
         };
         /** CalendarOut */
         CalendarOut: {
@@ -16897,7 +16976,7 @@ export interface components {
         ReportCatalogueOut: {
             facts: components["schemas"]["FactsStatusOut"];
             /** Reports */
-            reports: components["schemas"]["BuiltinReportOut"][];
+            reports: components["schemas"]["ReportOut"][];
         };
         /** ReportDefinition */
         ReportDefinition: {
@@ -16991,6 +17070,90 @@ export interface components {
                     [key: string]: string;
                 };
             };
+        };
+        /** ReportFileImportIn */
+        ReportFileImportIn: {
+            /** Content */
+            content: string;
+        };
+        /**
+         * ReportFileOut
+         * @description The export / import file.
+         */
+        ReportFileOut: {
+            definition: components["schemas"]["ReportDefinition"];
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Format
+             * @default tiqora-report
+             * @constant
+             */
+            format: "tiqora-report";
+            /**
+             * Format Version
+             * @default 1
+             * @constant
+             */
+            format_version: 1;
+            /** Name */
+            name: string;
+        };
+        /**
+         * ReportOut
+         * @description A catalogue entry: a built-in report or a saved one.
+         */
+        ReportOut: {
+            /** Category */
+            category?: string | null;
+            /** Changed At */
+            changed_at?: string | null;
+            /** Copied From */
+            copied_from?: string | null;
+            definition: components["schemas"]["ReportDefinition"] | null;
+            /** Definition Error */
+            definition_error?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Description Key */
+            description_key?: string | null;
+            /** Group Ids */
+            group_ids?: number[];
+            /** Id */
+            id?: number | null;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "builtin" | "saved";
+            /** Name */
+            name?: string | null;
+            /**
+             * Overview
+             * @default false
+             */
+            overview: boolean;
+            owner?: components["schemas"]["ReportOwnerOut"] | null;
+            /** Read Only */
+            read_only: boolean;
+            /** Title Key */
+            title_key?: string | null;
+            /** Version */
+            version?: number | null;
+            /** Visibility */
+            visibility?: ("private" | "groups" | "all") | null;
+        };
+        /** ReportOwnerOut */
+        ReportOwnerOut: {
+            /** Name */
+            name: string;
+            /** User Id */
+            user_id: number;
         };
         /**
          * ReportParameter
@@ -17306,6 +17469,53 @@ export interface components {
              */
             valid_id: number;
         };
+        /** SavedReportIn */
+        SavedReportIn: {
+            /** Copied From */
+            copied_from?: string | null;
+            definition: components["schemas"]["ReportDefinition"];
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Group Ids */
+            group_ids?: number[];
+            /** Name */
+            name: string;
+            /**
+             * Visibility
+             * @default private
+             * @enum {string}
+             */
+            visibility: "private" | "groups" | "all";
+        };
+        /**
+         * SavedReportUpdateIn
+         * @description PUT is a full replace (every field is written); ``version`` is the optimistic lock.
+         */
+        SavedReportUpdateIn: {
+            /** Copied From */
+            copied_from?: string | null;
+            definition: components["schemas"]["ReportDefinition"];
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Group Ids */
+            group_ids?: number[];
+            /** Name */
+            name: string;
+            /** Version */
+            version: number;
+            /**
+             * Visibility
+             * @default private
+             * @enum {string}
+             */
+            visibility: "private" | "groups" | "all";
+        };
         /** SearchHit */
         SearchHit: {
             /**
@@ -17459,6 +17669,13 @@ export interface components {
             values: {
                 [key: string]: unknown;
             };
+        };
+        /** ShareGroupOut */
+        ShareGroupOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
         };
         /** SignKeyOptionOut */
         SignKeyOptionOut: {
@@ -38159,6 +38376,39 @@ export interface operations {
             };
         };
     };
+    list_share_groups_api_v1_reference_share_groups_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareGroupOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_slas_api_v1_reference_slas_get: {
         parameters: {
             query?: {
@@ -38373,7 +38623,9 @@ export interface operations {
     };
     list_reports_api_v1_reports_get: {
         parameters: {
-            query?: never;
+            query?: {
+                all?: boolean;
+            };
             header?: {
                 authorization?: string | null;
             };
@@ -38391,6 +38643,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReportCatalogueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_report_api_v1_reports_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedReportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOut"];
                 };
             };
             /** @description Validation Error */
@@ -38428,6 +38717,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_report_file_api_v1_reports_import_file_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportFileImportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportFileOut"];
                 };
             };
             /** @description Validation Error */
@@ -38487,6 +38813,78 @@ export interface operations {
             };
         };
     };
+    update_report_api_v1_reports__report_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                report_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedReportUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_report_api_v1_reports__report_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                report_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_report_api_v1_reports__report_key__get: {
         parameters: {
             query?: never;
@@ -38508,7 +38906,44 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BuiltinReportOut"];
+                    "application/json": components["schemas"]["ReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_report_file_api_v1_reports__report_key__file_get: {
+        parameters: {
+            query?: {
+                format?: "json" | "yaml";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                report_key: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

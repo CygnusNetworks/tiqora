@@ -38,7 +38,7 @@ function ReportViewPageContent() {
     retry: false,
   });
   const report = reportQ.data;
-  const definition = report?.definition;
+  const definition = report?.definition ?? undefined;
   const state = useMemo(() => filterFromSearch(search, definition), [search, definition]);
   const body = useMemo(
     // A start after the end is never sent; the filter bar says what to fix.
@@ -63,7 +63,8 @@ function ReportViewPageContent() {
     });
   };
 
-  const title = report ? t(report.title_key) : "";
+  const title = report ? (report.title_key ? t(report.title_key) : (report.name ?? "")) : "";
+  const description = report?.description_key ? t(report.description_key) : (report?.description ?? "");
   const range = result?.time_window
     ? { from: result.time_window.start_date, to: result.time_window.end_date }
     : filterRange(state);
@@ -92,14 +93,14 @@ function ReportViewPageContent() {
         <Spinner />
       ) : !report || !definition ? (
         <p className="rounded-lg border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-ink" role="alert" data-testid="report-error">
-          {reportErrorMessage(reportQ.error, t("reports.error"))}
+          {report?.definition_error ?? reportErrorMessage(reportQ.error, t("reports.error"))}
         </p>
       ) : (
         <>
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 max-w-3xl">
               <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">{title}</h1>
-              <p className="mt-1 text-sm text-muted">{t(report.description_key)}</p>
+              <p className="mt-1 text-sm text-muted">{description}</p>
             </div>
             {body && <ReportExportButton runIn={body} result={result} title={title} infoLines={infoLines} />}
           </div>

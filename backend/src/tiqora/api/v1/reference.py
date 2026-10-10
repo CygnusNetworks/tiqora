@@ -37,6 +37,7 @@ from tiqora.domain.schemas import UtcDateTime
 from tiqora.domain.ticket_service import TicketAccessDenied, TicketNotFound
 from tiqora.domain.ticket_write_service import InvalidInput
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.permissions.sharing import share_groups_for
 from tiqora.znuny.sysconfig import SysConfig
 
 router = APIRouter(prefix="/reference", tags=["reference"])
@@ -631,3 +632,14 @@ async def field_options(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found") from exc
     except TicketAccessDenied as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden") from exc
+
+
+class ShareGroupOut(BaseModel):
+    id: int
+    name: str
+
+
+@router.get("/share-groups", response_model=list[ShareGroupOut])
+async def list_share_groups(user: CurrentUser, session: DbSession) -> list[ShareGroupOut]:
+    """Groups the agent may share a report / search / dashboard with (admin: every valid group)."""
+    return [ShareGroupOut(id=g.id, name=g.name) for g in await share_groups_for(session, user.id)]

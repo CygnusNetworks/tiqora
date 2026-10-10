@@ -344,7 +344,9 @@ async def test_catalogue_lists_builtins_and_facts_status(env: Env) -> None:
     first = body["reports"][0]
     assert first["key"] == "builtin.ticket_kpis"
     assert first["category"] == "overview" and first["overview"] is True
-    assert first["read_only"] is True
+    assert first["kind"] == "builtin" and first["read_only"] is True
+    assert first["id"] is None and first["group_ids"] == [] and first["owner"] is None
+    assert {r["kind"] for r in body["reports"]} == {"builtin"}  # no saved rows seeded here
     assert first["title_key"] == "reports.builtin.ticket_kpis.title"
     assert body["facts"]["backfill_status"] in ("pending", "running", "done")
     assert body["facts"]["ready"] is False  # state row reset per test

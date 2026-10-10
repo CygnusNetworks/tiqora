@@ -19,7 +19,19 @@ export type ReportColumn = Schemas["ResultColumnOut"];
 export type ReportRunIn = Schemas["ReportRunIn"];
 export type ReportRunOut = Schemas["ReportRunOut"];
 export type ReportExportIn = Schemas["ReportExportIn"];
-export type BuiltinReport = Schemas["BuiltinReportOut"];
+/** A catalogue entry: built-in or saved (`kind`); `definition` is `null` for a broken saved report. */
+export type ReportItem = Schemas["ReportOut"];
+/** A built-in report: the i18n keys and the definition are always present. */
+export type BuiltinReport = ReportItem & {
+  kind: "builtin";
+  definition: ReportDefinition;
+  category: string;
+  title_key: string;
+  description_key: string;
+};
+export function isBuiltinReport(r: ReportItem): r is BuiltinReport {
+  return r.kind === "builtin" && r.definition != null && r.category != null && r.title_key != null && r.description_key != null;
+}
 export type ReportCatalogue = Schemas["ReportCatalogueOut"];
 export type FactsStatus = Schemas["FactsStatusOut"];
 export type ReportingStatus = Schemas["ReportingStatusOut"];
@@ -35,7 +47,7 @@ export const reportsApi = {
     return api.request<ReportCatalogue>("GET", "/api/v1/reports", { signal });
   },
   get(key: string, signal?: AbortSignal) {
-    return api.request<BuiltinReport>("GET", `/api/v1/reports/${encodeURIComponent(key)}`, {
+    return api.request<ReportItem>("GET", `/api/v1/reports/${encodeURIComponent(key)}`, {
       signal,
     });
   },

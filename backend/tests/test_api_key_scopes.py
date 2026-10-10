@@ -227,3 +227,27 @@ def test_reports_and_reporting_map_to_stats() -> None:
     assert not scopes_allow(frozenset({"tickets:rw"}), method="GET", path="/api/v1/reports")
     # the admin reporting page stays admin-only
     assert path_to_area("/api/v1/admin/reporting/status") == "admin"
+
+
+def test_saved_report_routes_and_share_groups_scopes() -> None:
+    """Saved-report CRUD and files fall under ``stats``; share groups under ``tickets``."""
+    for path in (
+        "/api/v1/reports/12",
+        "/api/v1/reports/12/file",
+        "/api/v1/reports/import-file",
+    ):
+        assert path_to_area(path) == "stats", path
+    assert path_to_area("/api/v1/reference/share-groups") == "tickets"
+    ro, rw = frozenset({"stats:ro"}), frozenset({"stats:rw"})
+    assert scopes_allow(ro, method="GET", path="/api/v1/reports/12/file")
+    for method, path in (
+        ("POST", "/api/v1/reports"),
+        ("PUT", "/api/v1/reports/12"),
+        ("DELETE", "/api/v1/reports/12"),
+    ):
+        assert not scopes_allow(ro, method=method, path=path), (method, path)
+        assert scopes_allow(rw, method=method, path=path), (method, path)
+    assert scopes_allow(
+        frozenset({"tickets:ro"}), method="GET", path="/api/v1/reference/share-groups"
+    )
+    assert not scopes_allow(ro, method="GET", path="/api/v1/reference/share-groups")

@@ -18,6 +18,7 @@ import {
   reportErrorMessage,
   reportsApi,
   type BuiltinReport,
+  isBuiltinReport,
   type Grain,
   type ReportResult,
   type ReportRunIn,
@@ -201,7 +202,8 @@ function ReportsPageContent() {
     queryKey: ["reports", "catalogue"],
     queryFn: ({ signal }) => reportsApi.catalogue(signal),
   });
-  const reports = useMemo(() => catalogueQ.data?.reports ?? [], [catalogueQ.data]);
+  // saved reports (and broken ones without a definition) get their own list in a later task
+  const reports = useMemo(() => (catalogueQ.data?.reports ?? []).filter(isBuiltinReport), [catalogueQ.data]);
   const byKey = useMemo(() => new Map(reports.map((r) => [r.key, r])), [reports]);
   const blocked = rangeInvalid(filter);
   const grain = overviewGrain(filter);

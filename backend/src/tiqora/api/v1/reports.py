@@ -15,9 +15,9 @@ timeout; a used-up budget answers 504 with a JSON message. Large reports
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Final, NoReturn, cast
+from typing import Annotated, Any, Final, Literal, NoReturn, cast
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,11 +27,12 @@ from tiqora.extensions.core import get_registry
 from tiqora.filters import FilterError
 from tiqora.jobs.schemas import JobAccepted
 from tiqora.jobs.service import count_active_jobs, enqueue_job, lock_user_job_quota
+from tiqora.permissions.sharing import ShareGroupError
 from tiqora.reporting.access import require_report_access
 from tiqora.reporting.cache import CacheBackend, ReportCache, read_cache_generation
 from tiqora.reporting.catalogue import BUILTIN_REPORTS, BuiltinReport
 from tiqora.reporting.compiler import RunParams
-from tiqora.reporting.definition import DefinitionError, ReportDefinition
+from tiqora.reporting.definition import DefinitionError, ReportDefinition, validate_definition
 from tiqora.reporting.engine import QueryBudget, estimate_rows, execute_and_store, plan_report
 from tiqora.reporting.jobs import (
     REPORT_EXPORT_JOB,
@@ -40,13 +41,39 @@ from tiqora.reporting.jobs import (
     ReportExportPayload,
     ReportRunPayload,
     RequestError,
+    export_slug,
     prepare_run,
 )
+from tiqora.reporting.labels import resolve_labels
+from tiqora.reporting.report_file import (
+    ReportFileImportIn,
+    ReportFileOut,
+    dump_report_file,
+    parse_report_file,
+)
+from tiqora.reporting.rights import ReportRights, report_rights
+from tiqora.reporting.saved import (
+    SAVED_KEY_RE,
+    ReportForbidden,
+    ReportGone,
+    ReportNotFound,
+    ReportVersionConflict,
+    SavedReport,
+    SavedReportIn,
+    SavedReportUpdateIn,
+    can_edit_report,
+    create_saved_report,
+    delete_saved_report,
+    get_saved_report,
+    update_saved_report,
+    visible_saved_reports,
+)
 from tiqora.reporting.schemas import (
-    BuiltinReportOut,
     FactsStatusOut,
     ReportCatalogueOut,
     ReportExportIn,
+    ReportOut,
+    ReportOwnerOut,
     ReportRunIn,
     ReportRunOut,
     ReportSourceOut,
@@ -96,15 +123,87 @@ async def _prepare(
         _unprocessable(exc.message, exc.path, exc.status_code)
 
 
-def _builtin_out(report: BuiltinReport) -> BuiltinReportOut:
-    return BuiltinReportOut(
+def _builtin_out(report: BuiltinReport) -> ReportOut:
+    return ReportOut(
         key=report.key,
+        kind="builtin",
         category=report.category,
         title_key=report.title_key,
         description_key=report.description_key,
         definition=report.definition,
         overview=report.overview,
+        read_only=True,
     )
+
+
+def _saved_out(
+    report: SavedReport, rights: ReportRights, user_id: int, owner_names: dict[str, str]
+) -> ReportOut:
+    return ReportOut(
+        key=str(report.id),
+        kind="saved",
+        id=report.id,
+        name=report.name,
+        description=report.description,
+        definition=report.definition,
+        definition_error=report.definition_error,
+        read_only=not can_edit_report(report, user_id, rights),
+        owner=ReportOwnerOut(
+            user_id=report.owner_user_id,
+            name=owner_names.get(str(report.owner_user_id), str(report.owner_user_id)),
+        ),
+        visibility=report.visibility,
+        group_ids=list(report.group_ids),
+        version=report.version,
+        copied_from=report.copied_from,
+        changed_at=report.changed_at,
+    )
+
+
+NOT_FOUND_MESSAGE: Final = "Bericht nicht gefunden."
+
+
+def _store_error(exc: Exception) -> NoReturn:
+    """Map the saved-report store's exceptions to the API's error bodies."""
+    if isinstance(exc, ReportNotFound):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail={"message": NOT_FOUND_MESSAGE}
+        ) from None
+    if isinstance(exc, ReportGone):
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail={"message": f"Der Bericht „{exc.name}“ wurde gelöscht."},
+        ) from None
+    if isinstance(exc, ReportForbidden):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail={"message": exc.message}
+        ) from None
+    if isinstance(exc, ReportVersionConflict):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "Der Bericht wurde inzwischen geändert. Bitte neu laden.",
+                "current_version": exc.current_version,
+            },
+        ) from None
+    if isinstance(exc, ShareGroupError | DefinitionError):
+        _unprocessable(exc.message, exc.path)
+    raise exc
+
+
+_STORE_ERRORS = (
+    ReportNotFound,
+    ReportGone,
+    ReportForbidden,
+    ReportVersionConflict,
+    ShareGroupError,
+    DefinitionError,
+)
+
+
+async def _owner_names(session: AsyncSession, reports: list[SavedReport]) -> dict[str, str]:
+    ids = sorted({r.owner_user_id for r in reports})
+    return await resolve_labels(session, "user", ids) if ids else {}
 
 
 def _source_out(src: ReportSource) -> ReportSourceOut:
@@ -176,12 +275,57 @@ def _accepted(job_id: int, job_status: str) -> JobAccepted:
 
 @router.get("", response_model=ReportCatalogueOut)
 async def list_reports(
-    user: CurrentUser, session: DbSession, settings: AppSettings
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    all_: Annotated[bool, Query(alias="all")] = False,
 ) -> ReportCatalogueOut:
-    """The built-in reports (catalogue order) and the readiness of the report data."""
-    await _access(session, user, settings)
+    """Built-in reports (catalogue order), then the saved reports the viewer may open (by name).
+
+    ``all=true`` additionally lists other people's private reports; admins only.
+    """
+    reporting = await _access(session, user, settings)
+    rights = await report_rights(session, user.id, reporting)
+    saved = await visible_saved_reports(
+        session, user.id, admin=rights.admin, include_others_private=all_ and rights.admin
+    )
+    names = await _owner_names(session, saved)
     reports = [_builtin_out(r) for r in get_registry().items(BUILTIN_REPORTS)]
+    reports.extend(_saved_out(r, rights, user.id, names) for r in saved)
     return ReportCatalogueOut(reports=reports, facts=await facts_status(session))
+
+
+@router.post("", status_code=status.HTTP_201_CREATED, response_model=ReportOut)
+async def create_report(
+    body: SavedReportIn, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> ReportOut:
+    """Save a report; ``visibility`` other than ``private`` needs the share right."""
+    reporting = await _access(session, user, settings)
+    rights = await report_rights(session, user.id, reporting)
+    try:
+        created = await create_saved_report(session, user.id, rights, body, registry=get_registry())
+    except _STORE_ERRORS as exc:
+        _store_error(exc)
+    out = _saved_out(created, rights, user.id, await _owner_names(session, [created]))
+    await session.commit()
+    return out
+
+
+@router.post("/import-file", response_model=ReportFileOut)
+async def import_report_file(
+    body: ReportFileImportIn, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> ReportFileOut:
+    """Parse and validate a report file (JSON or YAML); saves nothing."""
+    await _access(session, user, settings)
+    try:
+        parsed = parse_report_file(body.content)
+        try:
+            validate_definition(parsed.definition, get_registry())
+        except DefinitionError as exc:
+            raise DefinitionError(exc.message, path="definition." + exc.path) from exc
+    except DefinitionError as exc:
+        _unprocessable(exc.message, exc.path)
+    return parsed
 
 
 @router.post(
@@ -306,18 +450,109 @@ async def export_report(
     return _accepted(job.id, job.status)
 
 
-@router.get("/{report_key}", response_model=BuiltinReportOut)
+async def _load_for_view(
+    session: AsyncSession, user: AuthenticatedUser, reporting: ReportingSettings, report_key: str
+) -> tuple[ReportOut, ReportRights]:
+    rights = await report_rights(session, user.id, reporting)
+    if report_key.startswith("builtin."):
+        report = get_registry().get(BUILTIN_REPORTS, report_key)
+        if report is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"message": f"Unbekannter Bericht „{report_key}“.", "path": "report_key"},
+            )
+        return _builtin_out(report), rights
+    if not SAVED_KEY_RE.fullmatch(report_key):
+        _store_error(ReportNotFound(report_key))
+    try:
+        saved = await get_saved_report(session, int(report_key), user.id, admin=rights.admin)
+    except _STORE_ERRORS as exc:
+        _store_error(exc)
+    names = await _owner_names(session, [saved])
+    return _saved_out(saved, rights, user.id, names), rights
+
+
+@router.get("/{report_key}/file")
+async def download_report_file(
+    report_key: str,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    fmt: Annotated[Literal["json", "yaml"], Query(alias="format")] = "json",
+) -> Response:
+    """The report as a JSON / YAML file (built-ins: the report key is the name)."""
+    reporting = await _access(session, user, settings)
+    report, _rights = await _load_for_view(session, user, reporting, report_key)
+    if report.definition is None:
+        _unprocessable(
+            report.definition_error or "Der Bericht kann nicht gelesen werden.", "definition"
+        )
+    name = report.name or report.key
+    content = dump_report_file(
+        ReportFileOut(
+            name=name, description=report.description or "", definition=report.definition
+        ),
+        fmt,
+    )
+    return Response(
+        content=content,
+        media_type="application/json" if fmt == "json" else "application/yaml",
+        headers={"Content-Disposition": f'attachment; filename="{export_slug(name)}.{fmt}"'},
+    )
+
+
+@router.get("/{report_key}", response_model=ReportOut)
 async def get_report(
     report_key: str, user: CurrentUser, session: DbSession, settings: AppSettings
-) -> BuiltinReportOut:
-    await _access(session, user, settings)
-    report = get_registry().get(BUILTIN_REPORTS, report_key)
-    if report is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"message": f"Unbekannter Bericht „{report_key}“."},
+) -> ReportOut:
+    """A built-in report (404 for an unknown key) or a saved one by id.
+
+    Unknown and invisible saved reports are both 404; a deleted one is 410.
+    """
+    reporting = await _access(session, user, settings)
+    report, _rights = await _load_for_view(session, user, reporting, report_key)
+    return report
+
+
+@router.put("/{report_id}", response_model=ReportOut)
+async def update_report(
+    report_id: int,
+    body: SavedReportUpdateIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> ReportOut:
+    """Replace a saved report completely (every field is written).
+
+    ``version`` is the optimistic lock (409 with ``current_version``). The stored sharing
+    may be kept unchanged without the share right; changing it needs that right.
+    """
+    reporting = await _access(session, user, settings)
+    rights = await report_rights(session, user.id, reporting)
+    try:
+        updated = await update_saved_report(
+            session, report_id, user.id, rights, body, registry=get_registry()
         )
-    return _builtin_out(report)
+    except _STORE_ERRORS as exc:
+        _store_error(exc)
+    out = _saved_out(updated, rights, user.id, await _owner_names(session, [updated]))
+    await session.commit()
+    return out
+
+
+@router.delete("/{report_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_report(
+    report_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> Response:
+    """Soft-delete a saved report (its owner always may, admins any)."""
+    reporting = await _access(session, user, settings)
+    rights = await report_rights(session, user.id, reporting)
+    try:
+        await delete_saved_report(session, report_id, user.id, rights)
+    except _STORE_ERRORS as exc:
+        _store_error(exc)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @sources_router.get("/sources", response_model=list[ReportSourceOut])
