@@ -59,8 +59,10 @@ example-crm==2.3.1
 
 Regeln, die `bake` prüft (Fehlermeldungen sind deutsch):
 
-- Pakete sind feste Versionen (`name==1.2.3`), gebaute Wheels (lokale Datei
-  oder `name @ https://…whl`).
+- Erlaubt sind Paketnamen, gebaute Wheels (lokale Datei oder
+  `name @ https://…whl`). `bake` prüft nur die Schreibweise und erzwingt keine
+  festen Versionen. Dringend empfohlen: feste Versionen (`name==1.2.3`) und
+  `--hash` (siehe unten), damit ein Neubau dasselbe Image ergibt.
 - **Keine Git-Quellen** (`git+https://…`): Das Image enthält kein `git`.
   Bauen Sie ein Wheel und geben Sie das an.
 - **Keine `--extra-index-url`.** Erlaubt ist höchstens eine `--index-url`, und
@@ -216,7 +218,7 @@ Eine kaputte Erweiterung soll weder den Start noch die Anmeldung verhindern.
   Blockierender (synchroner) Code hält den ganzen Prozess an. Eine laufende
   geplante Aufgabe hält die Schleife der geplanten Aufgaben bis zu 300 Sekunden
   fest (andere fällige Aufgaben warten dann auf den nächsten Durchlauf). Auf der Seite
-  "Dienste" zählt `tasks` die aktiven Aufgaben, nicht die fälligen.
+  "Dienste" zählt `tasks` die Aufgaben aktiver Erweiterungen, nicht die gerade laufenden oder fälligen.
 - **Schnittstellen und Schlüssel.** Die Schnittstellen einer Erweiterung liegen
   unter `/api/plugins/<Kennung>/…`. API-Schlüssel mit eingeschränkten Rechten
   brauchen dafür den Bereich `plugins` (`plugins:ro` für Lesen, `plugins:rw` für
@@ -291,6 +293,11 @@ silently, and you only notice in the browser. List them under `artifacts` as
 above. `tiqora plugins verify` (and therefore the baked image build) catches
 this: it reports `web/index.js fehlt im Paket`, and `i18n/en.json fehlt` when
 the plugin has a UI or settings but no English translation.
+Beware of unanchored `.gitignore` patterns such as `*.js` or `index.js`: they
+match files anywhere in the tree and drop them from the wheel. (A pattern with a
+slash like `web/index.js` is anchored to the repository root and does not match
+`src/<package>/web/index.js`.) Always check the result of the build with
+`tiqora plugins verify`.
 
 Do not declare `tiqora` or `tiqora-sdk` as dependencies: the plugin runs
 inside Tiqora, which provides them. `verify --strict` (part of the bake)
@@ -585,7 +592,7 @@ implemented with `asyncio` cancellation. They only take effect at an `await`:
   and `await asyncio.to_thread(...)` for blocking calls.
 - A running task occupies the `plugin_tasks` loop until it ends, at most 300
   seconds. Other due tasks wait for the next tick. The tick result field
-  `tasks` counts *active* tasks, not due ones.
+  `tasks` counts the tasks of active plugins, not the running or due ones.
 - Do not raise or swallow `asyncio.CancelledError`. One raised by plugin
   code outside a shutdown propagates out of the tick (it is not booked as a
   plugin failure), as a cancellation does.
@@ -715,7 +722,7 @@ Limits you must know:
 | `agent.route` | `path` (`a-z0-9-` segments), `component`, `title_key`, `admin_only` | `{ path, subPath }` | `/agent/plugins/<id>/<path>` |
 | `agent.nav` | `route` (key of an `agent.route` of the same plugin), `label_key`, `icon` (`book calendar chart clock inbox mail puzzle search server shield user`), `group` (`workspace knowledge insights plugins`), `order`, `admin_only` | none (rendered by the host) | Sidebar |
 | `ticket.sidebar` | `component`, `title_key`, `order` | `{ ticketId }` | Ticket view, below the process widget |
-| `dashboard.widget` | `component`, `title_key`, `description_key`, `version`, `category` (`tickets reports team ai itsm other`), `icon`, `size` (`[w, h]` in a 12-column grid), `settings_schema`, `refresh_on`, `permission` | `WidgetProps<S>` | Section "Erweiterungen" of the dashboard |
+| `dashboard.widget` | `component`, `title_key`, `description_key`, `version`, `category` (`tickets reports team ai itsm other`), `icon`, `size` (`{"default": [w, h], "min": [w, h], "max": [w, h]}` in a 12-column grid), `settings_schema`, `refresh_on`, `permission` | `WidgetProps<S>` | Section "Erweiterungen" of the dashboard |
 
 `WidgetProps<S>`: `instanceId` (stable id of the placed widget; `"preview"` in
 the gallery), `settings: S` (defaults from `settings_schema` applied),
@@ -746,8 +753,9 @@ plugin has a UI or settings; `de.json` and others optional) is loaded into the
 i18next namespace `plugin.<id>`. Fallback order: the language, the language
 without region, English. Keys used by the host: the labels in the web manifest
 (`nav.overview`, `page.title`, …), `settings.title`,
-`settings.fields.<field>.label` for the generated settings form and
-`jobs.<name>` for job titles. Use `t("plugin.<id>:some.key")` anywhere, or
+`settings.fields.<field>.label` for the generated settings form. A job's
+title comes from `JobHandler.title_key` (for example
+`plugin.<id>:jobs.echo`). Use `t("plugin.<id>:some.key")` anywhere, or
 `usePluginTranslation()` inside your components.
 
 ### Content Security Policy
@@ -803,7 +811,9 @@ Was die erste Ausbaustufe bewusst nicht kann (auf Deutsch, in einfachen Worten):
 - **Kein Schreiben an Tickets über das SDK.** Das SDK liest nur
   (`ctx.tickets.get`). Änderungen laufen über Tiqoras eigene Schnittstellen.
 - **Vier Stellen in der Oberfläche** (Menüpunkt, Seite, Ticketfeld, Kachel).
-  Erweiterungen können nichts an Anmeldung, Middleware oder Berichten ändern.
+  Das SDK bietet keinen Erweiterungspunkt für Anmeldung, Middleware oder
+  Berichte; der Erweiterungscode läuft aber mit vollem Vertrauen im Prozess
+  (siehe Teil 1).
   Das Dashboard zeigt Kacheln von Erweiterungen in einem eigenen Abschnitt, bis
   das Raster der Dashboards kommt.
 - **Ein Schreiber für Ereignisse.** Siehe Galera-Hinweis oben; Ereignisse
