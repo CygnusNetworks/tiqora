@@ -174,10 +174,22 @@ async def test_slow_provider_is_pending_others_ok() -> None:
 
 
 async def test_default_grace_gives_the_database_a_second_to_abort_first() -> None:
-    """Client budget = provider budget + 1 s: a 0.3 s run with a 0.05 s budget still finishes."""
-    reg = registry_with(provider("t.slow", slow_sleep(0.3), timeout_seconds=0.05))
+    """Client budget = provider budget + 1 s: a 1.5 s run with a 1.2 s budget still finishes."""
+    reg = registry_with(provider("t.slow", slow_sleep(1.5), timeout_seconds=1.2))
     out = await run_batch(fake_factory, reg, 1, [W("a", "t.slow")])
-    assert out["a"].status == "ok" and out["a"].data == {"slept": 0.3}
+    assert out["a"].status == "ok" and out["a"].data == {"slept": 1.5}
+
+
+async def test_a_budget_within_the_grace_is_pending_without_running() -> None:
+    ran: list[int] = []
+
+    async def record(ctx: ProviderContext, settings: Any) -> dict[str, Any]:
+        ran.append(1)
+        return {}
+
+    reg = registry_with(provider("t.rec", record, timeout_seconds=1.0))
+    out = await run_batch(fake_factory, reg, 1, [W("a", "t.rec")])  # default grace 1 s
+    assert out["a"].status == "pending" and ran == []
 
 
 async def test_provider_exception_is_error_status() -> None:
@@ -352,3 +364,82 @@ async def test_cancelling_the_batch_closes_running_sessions() -> None:
     with pytest.raises(asyncio.CancelledError):
         await task
     assert log == ["enter", "exit"]
+
+
+# --- process-wide cap per engine (R-DASH-GLOBAL-CAP) ---------------------------------------
+
+
+class FakePool:
+    def __init__(self, size: int) -> None:
+        self._size = size
+
+    def size(self) -> int:
+        return self._size
+
+
+class FakeEngine:
+    def __init__(self, pool_size: int) -> None:
+        self.pool = FakePool(pool_size)
+
+
+class EngineFactory(CapacityFactory):
+    """A session factory bound to a fake engine (``kw["bind"]`` like ``async_sessionmaker``)."""
+
+    def __init__(self, pool_size: int) -> None:
+        super().__init__(capacity=pool_size)
+        self.kw = {"bind": FakeEngine(pool_size)}
+
+
+def test_provider_slots_are_per_engine_and_half_the_pool() -> None:
+    async def check() -> None:
+        five, four = EngineFactory(5), EngineFactory(4)
+        assert runner.provider_slots(five) is runner.provider_slots(five)
+        assert runner.provider_slots(five) is not runner.provider_slots(four)
+        assert runner.provider_slots(five)._value == 2  # type: ignore[union-attr]
+        assert runner.provider_slots(EngineFactory(1))._value == 1  # type: ignore[union-attr]
+        assert runner.provider_slots(recording_factory([])) is None  # no engine: no cap
+
+    asyncio.run(check())
+
+
+async def test_batches_and_single_widgets_share_the_engine_cap() -> None:
+    pool = EngineFactory(pool_size=4)  # cap 2 for every caller of this engine
+    reg = registry_with(provider("t.slow", slow_sleep(0.1)))
+    batches = [
+        run_batch(pool, reg, 1, [W(f"b{b}w{i}", "t.slow") for i in range(4)]) for b in range(3)
+    ]
+    singles = [run_widget(pool, reg, 1, W(f"s{i}", "t.slow"), preview=True) for i in range(3)]
+    results = await asyncio.gather(*batches, *singles)
+    statuses = [r.status for out in results[:3] for r in out.values()]  # type: ignore[union-attr]
+    statuses += [r.status for r in results[3:]]  # type: ignore[union-attr]
+    assert statuses == ["ok"] * 15
+    assert pool.max_open == 2 and pool.total == 15 and pool.open == 0
+
+
+async def test_waiting_for_the_engine_cap_counts_against_the_budget() -> None:
+    """A widget starved past its budget is pending and never runs."""
+    pool = EngineFactory(pool_size=2)  # cap 1
+    ran: list[str] = []
+
+    async def hog(ctx: ProviderContext, settings: Any) -> dict[str, Any]:
+        ran.append("hog")
+        await asyncio.sleep(0.5)
+        return {}
+
+    async def probe(ctx: ProviderContext, settings: Any) -> dict[str, Any]:
+        ran.append("probe")
+        return {}
+
+    reg = registry_with(
+        provider("t.hog", hog, timeout_seconds=5),
+        provider("t.probe", probe, timeout_seconds=0.6),
+    )
+    hogging = asyncio.create_task(run_widget(pool, reg, 1, W("h", "t.hog"), grace=0.2))
+    await asyncio.sleep(0.05)
+    started = time.monotonic()
+    out = (await run_batch(pool, reg, 1, [W("p", "t.probe")], grace=0.2))["p"]
+    # slot free after ~0.45 s, 0.15 s left <= 0.2 s grace: pending at once, not at the 0.8 s cut
+    assert out.status == "pending"
+    assert time.monotonic() - started < 0.7
+    assert (await hogging).status == "ok"  # type: ignore[union-attr]
+    assert ran == ["hog"]

@@ -15,7 +15,7 @@ from typing import Any
 import pytest
 
 from tests._dashboard_helpers import Env, open_env
-from tiqora.dashboard.samples import record_and_history
+from tiqora.dashboard.samples import purge_old_samples, record_and_history
 
 pytestmark = pytest.mark.db
 
@@ -73,13 +73,37 @@ async def test_same_day_is_overwritten_not_duplicated_and_old_rows_pruned(env: E
     await record(env, value=1, today=T)
     await record(env, value=2, today=T)
     assert await env.sample_rows(U) == [("preset:mine_open", "2026-10-10", 2)]
-    # another counter of the same user is pruned too (rows of that user), others' rows are not
     await record(env, value=7, today=T, key="preset:mine_new")
     await record(env, value=8, today=T, user_id=U2)
     later = T + timedelta(days=40)
-    await record(env, value=3, today=later)  # > 35 days: older rows of U dropped
+    await record(env, value=3, today=later)  # > 35 days: older rows dropped
     assert await env.sample_rows(U) == [("preset:mine_open", later.isoformat(), 3)]
-    assert await env.sample_rows(U2) == [("preset:mine_open", "2026-10-10", 8)]
+
+
+async def test_old_samples_of_every_user_are_purged_once_a_day(env: Env) -> None:
+    """Users who stopped visiting do not keep history beyond the retention (global purge)."""
+    await record(env, value=1, today=T - timedelta(days=40), user_id=U2)  # U2 never returns
+    await record(env, value=2, today=T - timedelta(days=35), user_id=U2)
+    await record(env, value=3, today=T)  # U's first write of the day purges for everybody
+    assert await env.sample_rows(U2) == [
+        ("preset:mine_open", (T - timedelta(days=35)).isoformat(), 2)
+    ]
+    # once per day: a stale row that appears later today stays until tomorrow's first write
+    env._sql_write(
+        "INSERT INTO tiqora_dashboard_counter_sample"
+        " (user_id, counter_key, sample_day, value, sampled_at)"
+        " VALUES (:u, 'preset:mine_new', :d, 9, :t)",
+        u=U2,
+        d=T - timedelta(days=50),
+        t=env.now,
+    )
+    await record(env, value=4, today=T, key="preset:mine_new")
+    assert len(await env.sample_rows(U2)) == 2
+    await record(env, value=5, today=T + timedelta(days=1))
+    assert await env.sample_rows(U2) == []  # T-35 is now 36 days old, T-50 gone too
+    async with env.session() as s:
+        assert await purge_old_samples(s, today=T + timedelta(days=100)) >= 1
+        await s.rollback()
 
 
 async def test_rows_within_keep_days_survive_the_prune(env: Env) -> None:

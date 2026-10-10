@@ -3,11 +3,17 @@
 Rules that keep one dashboard from starving the connection pool or the API:
 
 - Every provider gets its **own** session (``AsyncSession`` is not concurrency-safe) and at
-  most :data:`DASHBOARD_PROVIDER_CONCURRENCY` run at once per call; a widget waiting for a slot
-  does not spend its budget.
-- A provider's whole unit — session, connection checkout, ``statement_timeout`` of
-  ``ceil(budget)`` seconds and the run — sits inside ``asyncio.wait_for(budget + grace)``, so
-  the database aborts a slow statement first and the connection stays clean.
+  most :data:`DASHBOARD_PROVIDER_CONCURRENCY` run at once per call; a widget waiting for such a
+  per-request slot does not spend its budget.
+- Process-wide, provider connections of one engine are capped at ``max(1, pool_size // 2)``
+  (R-DASH-GLOBAL-CAP, :func:`provider_slots`), shared by batches, single-widget fetches and
+  previews, so many agents opening the home page at once leave the rest of the pool to the API.
+  Waiting for that slot and for the connection counts against the widget's budget; when no more
+  than the grace second is left, the widget is ``pending`` without running its statements.
+- A provider's whole unit — global slot, session, connection checkout, ``statement_timeout``
+  of the budget remaining at statement start, and the run — sits inside
+  ``asyncio.wait_for(budget + grace)``, so the database aborts a slow statement first and the
+  connection stays clean, also under pool pressure.
 - When the client side has to cancel anyway (budget, batch deadline, request cancelled), the
   connection is invalidated before anything else touches it: a cancelled aiomysql/asyncpg call
   leaves it mid-protocol and it must never go back to the pool.
@@ -20,11 +26,11 @@ Rules that keep one dashboard from starving the connection pool or the API:
 from __future__ import annotations
 
 import asyncio
-import math
 from collections.abc import Callable, Mapping, Sequence
-from contextlib import AbstractAsyncContextManager
+from contextlib import AbstractAsyncContextManager, nullcontext
 from datetime import datetime
 from typing import Any, Final, Protocol
+from weakref import WeakKeyDictionary
 
 import structlog
 from pydantic import ValidationError
@@ -62,6 +68,14 @@ NEWER_VERSION_MESSAGE: Final = "Dieses Widget braucht eine neuere Version."
 
 #: cancelled provider tasks still closing their sessions after a batch returned
 _CLOSING: set[asyncio.Task[Any]] = set()
+#: process-wide provider slots per engine (and event loop), see :func:`provider_slots`
+_ENGINE_SLOTS: WeakKeyDictionary[Any, tuple[asyncio.AbstractEventLoop, asyncio.Semaphore]] = (
+    WeakKeyDictionary()
+)
+
+
+class _Starved(Exception):  # noqa: N818 - internal signal
+    """Too little budget left after waiting for a slot or a connection."""
 
 
 class WidgetRow(Protocol):
@@ -78,6 +92,29 @@ class WidgetRow(Protocol):
 
 
 SessionFactory = Callable[[], AbstractAsyncContextManager[Any]]
+
+
+def provider_slots(factory: SessionFactory) -> asyncio.Semaphore | None:
+    """The process-wide provider semaphore of the factory's engine (R-DASH-GLOBAL-CAP).
+
+    Sized ``max(1, pool_size // 2)`` (overflow not counted). ``None`` when the factory has no
+    engine with a sized pool (test stubs, ``NullPool``).
+    """
+    kw = getattr(factory, "kw", None)
+    engine = kw.get("bind") if isinstance(kw, dict) else None
+    if engine is None:
+        return None
+    pool = getattr(getattr(engine, "sync_engine", engine), "pool", None)
+    size = getattr(pool, "size", None)
+    if not callable(size):
+        return None
+    loop = asyncio.get_running_loop()
+    cached = _ENGINE_SLOTS.get(engine)
+    if cached is not None and cached[0] is loop:
+        return cached[1]
+    slots = asyncio.Semaphore(max(1, int(size()) // 2))
+    _ENGINE_SLOTS[engine] = (loop, slots)
+    return slots
 
 
 def _pending() -> WidgetDataOut:
@@ -120,34 +157,51 @@ async def _unit(
     *,
     user_id: int,
     budget: float,
+    grace: float,
     redis: Redis | None,
     now: datetime,
     preview: bool,
 ) -> dict[str, Any]:
-    async with factory() as session:
-        conn = _Connection(session)
-        ctx = ProviderContext(
-            user_id=user_id, session=session, now=now, filters={}, redis=redis, preview=preview
-        )
-        try:
-            if getattr(session, "bind", None) is not None:
-                await session.connection()  # checkout inside the budget
-                conn.held = True
-                async with statement_timeout(session, max(1, math.ceil(budget))):
-                    try:
-                        data = await provider.run(ctx, settings)
-                    except asyncio.CancelledError:
-                        # before statement_timeout's reset runs on a mid-protocol connection
-                        await conn.invalidate()
-                        raise
-            else:  # sessions without a bind (tests): nothing to bound server-side
-                conn.held = True
-                data = await provider.run(ctx, settings)
-            await session.commit()
-            return data
-        except asyncio.CancelledError:
-            await conn.invalidate()
-            raise
+    loop = asyncio.get_running_loop()
+    started = loop.time()
+
+    def remaining() -> float:
+        """Budget left; ``_Starved`` when no more than the grace is left."""
+        left = budget - (loop.time() - started)
+        if left <= grace:
+            raise _Starved
+        return left
+
+    slots = provider_slots(factory)
+    async with slots if slots is not None else nullcontext():
+        remaining()  # waiting for the slot counts against the budget
+        async with factory() as session:
+            conn = _Connection(session)
+            ctx = ProviderContext(
+                user_id=user_id, session=session, now=now, filters={}, redis=redis, preview=preview
+            )
+            try:
+                if getattr(session, "bind", None) is not None:
+                    await session.connection()  # checkout inside the budget
+                    conn.held = True
+                    # whole seconds of what is left: the database aborts before the client
+                    seconds = max(1, int(remaining()))
+                    async with statement_timeout(session, seconds):
+                        try:
+                            data = await provider.run(ctx, settings)
+                        except asyncio.CancelledError:
+                            # before statement_timeout's reset runs on a mid-protocol connection
+                            await conn.invalidate()
+                            raise
+                else:  # sessions without a bind (tests): nothing to bound server-side
+                    conn.held = True
+                    remaining()
+                    data = await provider.run(ctx, settings)
+                await session.commit()
+                return data
+            except asyncio.CancelledError:
+                await conn.invalidate()
+                raise
 
 
 async def _run_one(
@@ -171,6 +225,7 @@ async def _run_one(
                 settings,
                 user_id=user_id,
                 budget=budget,
+                grace=grace,
                 redis=redis,
                 now=now,
                 preview=preview,
@@ -178,6 +233,9 @@ async def _run_one(
             budget + grace,
         )
     except TimeoutError:
+        return _pending()
+    except _Starved:
+        logger.info("dashboard_provider_starved", key=provider.key, widget_id=widget.id)
         return _pending()
     except ProviderForbidden as exc:
         return WidgetDataOut(status="forbidden", error=exc.message)

@@ -110,8 +110,9 @@ async def test_counter_for_a_user_without_queues_is_zero(env: Env) -> None:
 
 async def test_counter_writes_one_sample_per_counter_and_day(env: Env) -> None:
     reg = registry()
-    await run_batch(env.factory, reg, USER_B, [counter("mine_open", "c1"), counter("mine_new")])
-    out = await run_batch(env.factory, reg, USER_B, [counter("mine_open", "c1")])
+    both = [counter("mine_open", "c1"), counter("mine_new")]
+    await run_batch(env.factory, reg, USER_B, both, now=env.now)  # fixed clock: no midnight flake
+    out = await run_batch(env.factory, reg, USER_B, [counter("mine_open", "c1")], now=env.now)
     assert out["c1"].data is not None and out["c1"].data["spark"] == [1]
     rows = await env.sample_rows(USER_B)
     assert [(k, v) for k, _, v in rows] == [("preset:mine_new", 0), ("preset:mine_open", 1)]

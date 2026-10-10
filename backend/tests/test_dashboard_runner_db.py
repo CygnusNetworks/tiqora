@@ -69,7 +69,9 @@ async def backend_id(session: AsyncSession) -> int:
     return int((await session.execute(text(sql))).scalar_one())
 
 
-def sleeper(probe: Probe, seconds: float, *, timeout_seconds: float) -> DashboardProvider:
+def sleeper(
+    probe: Probe, seconds: float, *, timeout_seconds: float, key: str = "test.sleep"
+) -> DashboardProvider:
     async def run(ctx: ProviderContext, settings: Any) -> dict[str, Any]:
         probe.running += 1
         probe.max_running = max(probe.max_running, probe.running)
@@ -83,7 +85,7 @@ def sleeper(probe: Probe, seconds: float, *, timeout_seconds: float) -> Dashboar
             probe.running -= 1
 
     return DashboardProvider(
-        key="test.sleep",
+        key=key,
         version=1,
         settings_model=_Any,
         run=run,
@@ -95,9 +97,10 @@ class _Any(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
-def registry_with(p: DashboardProvider) -> Registry:
+def registry_with(*providers: DashboardProvider) -> Registry:
     reg = Registry()
-    reg.add(DASHBOARD_PROVIDERS, p)
+    for p in providers:
+        reg.add(DASHBOARD_PROVIDERS, p)
     reg.freeze()
     return reg
 
@@ -119,7 +122,10 @@ def count_invalidations(engine: AsyncEngine) -> list[int]:
     return seen
 
 
-async def test_a_slow_dashboard_leaves_connections_for_other_requests(env: Env) -> None:
+async def test_concurrent_loads_share_the_engine_cap_and_leave_the_pool_to_the_api(
+    env: Env,
+) -> None:
+    """Pool of 4 -> at most 2 provider connections for batches, single fetches and previews."""
     probe = Probe()
     widgets = [
         WidgetIn(
@@ -127,11 +133,10 @@ async def test_a_slow_dashboard_leaves_connections_for_other_requests(env: Env) 
             type_key="test.sleep",
             layout=WidgetLayouts(lg=Rect(x=0, y=i * 2, w=3, h=2)),
         )
-        for i in range(8)
+        for i in range(3)
     ]
     d = await env.make_personal(USER_A, name="dash497 langsam", widgets=widgets)
-    # five connections in all: four for the providers, one for everybody else
-    async with small_pool(env, size=2, overflow=3) as engine:
+    async with small_pool(env, size=4, overflow=0) as engine:
         factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
         async def _db() -> Any:
@@ -142,23 +147,71 @@ async def test_a_slow_dashboard_leaves_connections_for_other_requests(env: Env) 
         app.dependency_overrides[get_db] = _db
         app.dependency_overrides[get_session_factory_dep] = lambda: factory
         app.dependency_overrides[get_current_user] = lambda: _agent(USER_A)
-        reg = registry_with(sleeper(probe, 1.5, timeout_seconds=5))
+        reg = registry_with(sleeper(probe, 0.5, timeout_seconds=5))
         app.dependency_overrides[get_dashboard_registry] = lambda: reg
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
-            batch = asyncio.create_task(c.get(f"/api/v1/dashboards/{d.id}/data"))
-            for _ in range(60):  # until the providers hold four connections
-                if probe.running == 4 or batch.done():
+            base = f"/api/v1/dashboards/{d.id}"
+            calls = [
+                *(c.get(f"{base}/data") for _ in range(2)),
+                c.get(f"{base}/widgets/sleep0001/data"),
+                c.post("/api/v1/dashboard-widget-types/test.sleep/data", json={}),
+            ]
+            load = asyncio.gather(*calls)
+            for _ in range(60):  # until the providers hold their connections
+                if probe.running == 2 or load.done():
                     break
                 await asyncio.sleep(0.05)
-            assert probe.running == 4, batch.done() and batch.result().json()
+            assert probe.running == 2
             started = time.monotonic()
             other = await c.get("/api/v1/dashboards")
-            assert other.status_code == 200 and time.monotonic() - started < 0.8
-            r = await batch
-        assert r.status_code == 200
-        assert {w["status"] for w in r.json()["widgets"].values()} == {"ok"}
-        assert len(r.json()["widgets"]) == 8 and probe.max_running == 4
+            assert other.status_code == 200 and time.monotonic() - started < 1.5
+            batch1, batch2, single, preview = await load
+        statuses = [w["status"] for b in (batch1, batch2) for w in b.json()["widgets"].values()]
+        assert statuses == ["ok"] * 6
+        assert single.json()["status"] == preview.json()["status"] == "ok"
+        assert probe.max_running == 2  # 8 provider runs, never more than half the pool
         assert engine.sync_engine.pool.checkedout() == 0  # type: ignore[attr-defined]
+
+
+async def test_a_widget_starved_past_its_budget_is_pending_without_sql(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Pool of 2 -> cap 1. The statement timeout is what is left of the budget at its start."""
+    limits: list[int] = []
+    real_timeout = runner.statement_timeout
+
+    @asynccontextmanager
+    async def recording(session: Any, seconds: int) -> AsyncIterator[None]:
+        limits.append(seconds)
+        async with real_timeout(session, seconds):
+            yield
+
+    monkeypatch.setattr(runner, "statement_timeout", recording)
+    hog, starved, waiter = Probe(), Probe(), Probe()
+
+    reg = registry_with(
+        sleeper(hog, 1.5, timeout_seconds=5, key="test.hog"),
+        sleeper(starved, 0.0, timeout_seconds=2, key="test.starved"),
+        sleeper(waiter, 0.0, timeout_seconds=5, key="test.waiter"),
+    )
+    async with small_pool(env, size=2, overflow=0) as engine:
+        checkouts: list[int] = []
+        event.listen(engine.sync_engine.pool, "checkout", lambda *a: checkouts.append(1))
+        factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        first = asyncio.create_task(run_batch(factory, reg, USER_A, [W("h", "test.hog")]))
+        for _ in range(100):  # until the hog holds the only slot
+            if hog.running:
+                break
+            await asyncio.sleep(0.02)
+        second = run_batch(factory, reg, USER_A, [W("s", "test.starved")])
+        third = run_batch(factory, reg, USER_A, [W("w", "test.waiter")])
+        out_h, out_s, out_w = await asyncio.gather(first, second, third)
+    assert (out_h["h"].status, out_s["s"].status, out_w["w"].status) == ("ok", "pending", "ok")
+    assert starved.backend_ids == []  # the starved provider never ran a statement
+    assert len(checkouts) == 2  # ... and never took a connection (hog and waiter did)
+    hog_limit, waiter_limit = limits  # the starved one never reached its statement
+    assert hog_limit == 4  # 5 s budget, a moment spent on the checkout
+    assert waiter_limit in (2, 3)  # waited ~1.5 s for the slot: what was left
 
 
 async def test_the_database_aborts_a_slow_statement_first(env: Env) -> None:
@@ -166,12 +219,12 @@ async def test_the_database_aborts_a_slow_statement_first(env: Env) -> None:
     async with small_pool(env, size=1, overflow=0) as engine:
         factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
         invalidated = count_invalidations(engine)
-        reg = registry_with(sleeper(probe, 4.0, timeout_seconds=1))
+        reg = registry_with(sleeper(probe, 4.0, timeout_seconds=2))
         started = time.monotonic()
         out = await run_batch(factory, reg, USER_A, [W("a", "test.sleep")])
         elapsed = time.monotonic() - started
         assert out["a"].status == "pending"
-        assert elapsed < 1.9  # server-side abort at 1 s, before the client's 2 s
+        assert elapsed < 2.5  # server-side abort at 1 s (what was left: 1.9x s), client at 3 s
         assert invalidated == []  # a clean abort keeps the connection
         async with factory() as s:
             # the same connection came back, without the statement limit
@@ -198,10 +251,10 @@ async def test_a_client_side_cancel_invalidates_the_connection(
     async with small_pool(env, size=1, overflow=0) as engine:
         factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
         invalidated = count_invalidations(engine)
-        reg = registry_with(sleeper(probe, 4.0, timeout_seconds=0.2))
+        reg = registry_with(sleeper(probe, 4.0, timeout_seconds=1.2))
         started = time.monotonic()
         out = await run_batch(factory, reg, USER_A, [W("a", "test.sleep")])
-        assert out["a"].status == "pending" and time.monotonic() - started < 2.5
+        assert out["a"].status == "pending" and time.monotonic() - started < 3.5
         assert invalidated == [1]
         assert engine.sync_engine.pool.checkedout() == 0  # type: ignore[attr-defined]
         async with factory() as s:
