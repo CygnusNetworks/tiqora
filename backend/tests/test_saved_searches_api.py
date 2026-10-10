@@ -626,6 +626,26 @@ async def test_counts_are_cached_for_the_viewer_and_keyed_by_version(
     assert (await _counts(env))[sid] == 0 and len(calls) == 2  # new version -> new key
 
 
+async def test_counts_evaluate_the_viewer_scope_once_per_request(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[int] = []
+    real = saved_searches_api.ticket_query_scope
+
+    async def _spy(*a: Any, **k: Any) -> Any:
+        calls.append(1)
+        return await real(*a, **k)
+
+    monkeypatch.setattr(saved_searches_api, "ticket_query_scope", _spy)
+    env.as_user(SEARCHER)
+    ids = [(await _create(env, f"rep48 S{i}", show_count=True))["id"] for i in range(3)]
+    counts = await _counts(env)
+    assert [counts[str(i)] for i in ids] == [2, 2, 2]  # still the searcher's queue only
+    assert len(calls) == 1
+    calls.clear()
+    assert (await _counts(env))[str(ids[0])] == 2 and calls == []  # all cached: no scope at all
+
+
 async def test_counts_stop_at_the_shared_deadline(
     env: Env, monkeypatch: pytest.MonkeyPatch
 ) -> None:

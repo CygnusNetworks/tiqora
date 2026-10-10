@@ -45,12 +45,18 @@ from tiqora.reporting.run_service import (
 )
 from tiqora.reporting.schemas import ReportRunIn
 from tiqora.reporting.semantic import REPORT_SOURCES
-from tiqora.reporting.settings import REPORTING_SECTION, load_reporting_settings
+from tiqora.reporting.settings import (
+    REPORTING_SECTION,
+    ReportingSettings,
+    load_reporting_settings,
+)
 from tiqora.reporting.state import load_state
 from tiqora.settings_sections.store import save_section_values
 
 pytestmark = pytest.mark.db
 
+#: default reporting settings (all_agents) for direct seam calls
+_RS = ReportingSettings()
 LO, HI = 48120, 48169
 OWNER, VIEWER, PEER = 48120, 48121, 48122
 G30, G31 = 48130, 48131
@@ -599,7 +605,11 @@ async def test_deferred_and_enqueue_carry_extra_filter(env: Env) -> None:
         )
         assert out.result is None and out.deferred == "forced"
         accepted = await enqueue_report_ref(
-            s, user_id=OWNER, run=ReportRunIn(report_key=key), extra_filter=out.extra_filter
+            s,
+            user_id=OWNER,
+            run=ReportRunIn(report_key=key),
+            extra_filter=out.extra_filter,
+            reporting=reporting,
         )
     await env.run_jobs()
     env.as_user(OWNER)
@@ -623,7 +633,7 @@ async def test_job_extra_filter_narrows_the_job_result(env: Env) -> None:
     key = await _saved(env, OWNER)
     async with env.factory() as s:
         accepted = await enqueue_report_ref(
-            s, user_id=OWNER, run=ReportRunIn(report_key=key), extra_filter=narrow
+            s, user_id=OWNER, run=ReportRunIn(report_key=key), extra_filter=narrow, reporting=_RS
         )
     await env.run_jobs()
     env.as_user(OWNER)
@@ -636,9 +646,9 @@ async def test_enqueue_cap_raises(env: Env) -> None:
     run = ReportRunIn(report_key="builtin.ticket_kpis")
     async with env.factory() as s:
         for _ in range(MAX_ACTIVE_REPORT_JOBS_PER_USER):
-            await enqueue_report_ref(s, user_id=OWNER, run=run, extra_filter=None)
+            await enqueue_report_ref(s, user_id=OWNER, run=run, extra_filter=None, reporting=_RS)
         with pytest.raises(TooManyReportJobs):
-            await enqueue_report_ref(s, user_id=OWNER, run=run, extra_filter=None)
+            await enqueue_report_ref(s, user_id=OWNER, run=run, extra_filter=None, reporting=_RS)
 
 
 async def test_old_payload_without_extra_filter_still_runs(env: Env) -> None:
@@ -695,11 +705,39 @@ async def test_seam_enforces_report_access_itself(env: Env) -> None:
                 user_id=PEER,
                 run=ReportRunIn(report_key="builtin.ticket_kpis"),
                 extra_filter=None,
+                reporting=reporting,
             )
         assert enq_exc.value.status_code == 403
         # the owner holds stats rw: allowed
         accepted = await enqueue_report_ref(
-            s, user_id=OWNER, run=ReportRunIn(report_key="builtin.ticket_kpis"), extra_filter=None
+            s,
+            user_id=OWNER,
+            run=ReportRunIn(report_key="builtin.ticket_kpis"),
+            extra_filter=None,
+            reporting=reporting,
+        )
+        assert accepted.job_id > 0
+
+
+async def test_seam_checks_access_with_the_callers_settings(env: Env) -> None:
+    """The seam uses the reporting settings it is given (the request's), not global ones."""
+    # stored access stays all_agents; the caller's settings say stats_group
+    async with env.factory() as s:
+        with pytest.raises(HTTPException) as exc:
+            await enqueue_report_ref(
+                s,
+                user_id=PEER,
+                run=ReportRunIn(report_key="builtin.ticket_kpis"),
+                extra_filter=None,
+                reporting=ReportingSettings(access="stats_group"),
+            )
+        assert exc.value.status_code == 403
+        accepted = await enqueue_report_ref(
+            s,
+            user_id=PEER,
+            run=ReportRunIn(report_key="builtin.ticket_kpis"),
+            extra_filter=None,
+            reporting=ReportingSettings(access="all_agents"),
         )
         assert accepted.job_id > 0
 
@@ -724,7 +762,7 @@ async def test_not_filter_round_trips_through_the_job_payload(env: Env) -> None:
     key = await _saved(env, OWNER)
     async with env.factory() as s:
         accepted = await enqueue_report_ref(
-            s, user_id=OWNER, run=ReportRunIn(report_key=key), extra_filter=flt
+            s, user_id=OWNER, run=ReportRunIn(report_key=key), extra_filter=flt, reporting=_RS
         )
     stored = ReportRunPayload.model_validate(_job_payload(env, accepted.job_id))
     assert stored.extra_filter == flt

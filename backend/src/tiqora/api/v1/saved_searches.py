@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from dataclasses import replace
 from typing import Annotated, Any, NoReturn, cast
 
 import structlog
@@ -24,7 +25,7 @@ from tiqora.db.tiqora.models import TiqoraSavedSearch
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.filters import FilterError
 from tiqora.filters.ticket_params import filter_from_list_params
-from tiqora.filters.tickets import count_tickets, ticket_query_scope
+from tiqora.filters.tickets import TicketQueryScope, count_tickets, ticket_query_scope
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.permissions.sharing import ShareGroupError
 from tiqora.reporting.cache import CacheBackend
@@ -199,13 +200,19 @@ async def create_saved_search(
 
 
 async def _count_one(
-    session: AsyncSession, user_id: int, search: SavedSearch, admin: bool, seconds: int
+    session: AsyncSession,
+    user_id: int,
+    search: SavedSearch,
+    admin: bool,
+    seconds: int,
+    scopes: list[TicketQueryScope],
 ) -> int:
+    """Count one search; ``scopes`` memoises the viewer's scope for the whole request."""
     assert search.criteria is not None
     async with statement_timeout(session, seconds):
-        scope = await ticket_query_scope(
-            session, user_id, include_archived=admin and search.include_archived
-        )
+        if not scopes:  # the viewer's permissions are evaluated once per request
+            scopes.append(await ticket_query_scope(session, user_id))
+        scope = replace(scopes[0], include_archived=admin and search.include_archived)
         return await count_tickets(session, search.criteria, scope)
 
 
@@ -223,6 +230,7 @@ async def _sidebar_counts(
     """
     deadline = time.monotonic() + store.COUNTS_DEADLINE_SECONDS
     counts: dict[str, int | None] = {}
+    scopes: list[TicketQueryScope] = []  # filled on the first cache miss
     for search, _prefs in entries:
         key = f"saved-search-count:{user.id}:{search.id}:{search.version}"
         counts[str(search.id)] = None
@@ -242,7 +250,8 @@ async def _sidebar_counts(
         try:
             # the deadline is literal: a count still running when it passes is cancelled
             counts[str(search.id)] = await asyncio.wait_for(
-                _count_one(session, user.id, search, admin, seconds), timeout=remaining
+                _count_one(session, user.id, search, admin, seconds, scopes),
+                timeout=remaining,
             )
         except (FilterError, ValidationError, ReportQueryTimeout, TimeoutError):
             counts[str(search.id)] = None

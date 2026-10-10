@@ -281,7 +281,11 @@ A rollback restores the criteria but raises `version`, so an editor opened in th
 meantime gets a conflict instead of overwriting silently.
 
 Not scrubbed: free-text conditions (for example `title contains ...`), saved
-names and descriptions, and sidebar preferences hold no customer data. In delete
+names and descriptions, and sidebar preferences hold no customer data. Report job
+rows (`tiqora_job` of kind `core.report_run` / `core.report_export`) keep their
+payload (an inline definition and runtime parameters, for example
+`customer_user` = an erased login) and their result until the job retention
+(`jobs.retention_days`) purges them; the erasure does not touch them. In delete
 mode a saved `customer` filter that selected the erased company now selects the
 token (the company's tickets carry it), also for tickets of other customers of
 that company that were not erased.

@@ -34,6 +34,8 @@ SAVED_KEY_RE: Final = re.compile(r"[1-9][0-9]{0,17}")
 MAX_SAVED_REPORTS_PER_USER: Final = 500
 DELETED_REPORT_RETENTION_DAYS: Final = 90
 BROKEN_DEFINITION_MESSAGE: Final = "Der gespeicherte Bericht kann nicht mehr gelesen werden."
+SAVE_RIGHT_MESSAGE: Final = "Für das Speichern von Berichten fehlt die Berechtigung."
+SHARE_RIGHT_MESSAGE: Final = "Für das Teilen von Berichten fehlt die Berechtigung."
 LIMIT_MESSAGE: Final = (
     f"Es sind höchstens {MAX_SAVED_REPORTS_PER_USER} Berichte pro Person möglich."
 )
@@ -245,12 +247,12 @@ async def create_saved_report(
     registry: Registry,
 ) -> SavedReport:
     if not rights.create:
-        raise ReportForbidden("Für das Speichern von Berichten fehlt die Berechtigung.")
+        raise ReportForbidden(SAVE_RIGHT_MESSAGE)
     name = _clean_name(body.name)
     _validate(body.definition, registry)
     groups: tuple[int, ...] = ()
     if body.visibility != "private" and not rights.share:
-        raise ReportForbidden("Für das Teilen von Berichten fehlt die Berechtigung.")
+        raise ReportForbidden(SHARE_RIGHT_MESSAGE)
     if body.visibility == "groups":
         if not body.group_ids:
             raise ShareGroupError("Bitte mindestens eine Gruppe auswählen.")
@@ -263,7 +265,8 @@ async def create_saved_report(
         )
     ).scalar_one()
     if int(owned) >= MAX_SAVED_REPORTS_PER_USER:
-        raise ReportForbidden(LIMIT_MESSAGE)
+        # 422 with path ``name``, the same answer as the saved-search limit
+        raise DefinitionError(LIMIT_MESSAGE, path="name")
     now = utc_now()
     row = TiqoraReport(
         name=name,
@@ -298,27 +301,32 @@ async def update_saved_report(
     """Full replace. Invisible -> ReportNotFound; visible but not editable -> ReportForbidden."""
     row = await get_saved_report(session, report_id, user_id, admin=rights.admin)
     if not can_edit_report(row, user_id, rights):
+        if row.owner_user_id == user_id:  # the owner, but without the save right
+            raise ReportForbidden(SAVE_RIGHT_MESSAGE)
         raise ReportForbidden("Dieser Bericht darf nur von seinem Besitzer geändert werden.")
     if body.version != row.version:
         raise ReportVersionConflict(row.version)
     name = _clean_name(body.name)
     _validate(body.definition, registry)
 
-    # R-SHAREKEEP: keeping the stored sharing needs no share right and no re-validation; only
-    # a changed visibility / added groups go through the rights and ``check_share_groups``.
+    # R-SHAREKEEP: keeping or narrowing the stored sharing needs no share right; only widening
+    # it does (a group added to a group share, or private -> groups/all, groups -> all), as for
+    # saved searches. Groups not stored yet always go through ``check_share_groups``.
     groups: tuple[int, ...] = ()
     if body.visibility == "groups":
         wanted = tuple(sorted(set(body.group_ids)))
         if not wanted:
             raise ShareGroupError("Bitte mindestens eine Gruppe auswählen.")
-        if not (row.visibility == "groups" and wanted == row.group_ids):
-            if not rights.share:
-                raise ReportForbidden("Für das Teilen von Berichten fehlt die Berechtigung.")
-            added = [g for g in wanted if g not in row.group_ids]
+        stored = row.group_ids if row.visibility == "groups" else ()
+        added = [g for g in wanted if g not in stored]
+        if added:
+            widening = row.visibility != "all"  # all -> some groups is narrowing
+            if widening and not rights.share:
+                raise ReportForbidden(SHARE_RIGHT_MESSAGE)
             await check_share_groups(session, user_id, added)
         groups = wanted
     elif body.visibility == "all" and row.visibility != "all" and not rights.share:
-        raise ReportForbidden("Für das Teilen von Berichten fehlt die Berechtigung.")
+        raise ReportForbidden(SHARE_RIGHT_MESSAGE)
 
     result = await session.execute(
         update(TiqoraReport)

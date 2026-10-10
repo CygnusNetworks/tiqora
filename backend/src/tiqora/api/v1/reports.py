@@ -359,7 +359,11 @@ async def run_report_endpoint(
         )
         if outcome.result is None:
             job = await enqueue_report_ref(
-                session, user_id=user.id, run=body, extra_filter=outcome.extra_filter
+                session,
+                user_id=user.id,
+                run=body,
+                extra_filter=outcome.extra_filter,
+                reporting=reporting,
             )
             out = ReportRunOut(job=job)
             return JSONResponse(
@@ -493,7 +497,7 @@ async def update_report(
     """Replace a saved report completely (every field is written).
 
     ``version`` is the optimistic lock (409 with ``current_version``). The stored sharing
-    may be kept unchanged without the share right; changing it needs that right.
+    may be kept or narrowed without the share right; widening it needs that right.
     """
     reporting = await _access(session, user, settings)
     rights = await report_rights(session, user.id, reporting)
@@ -512,9 +516,14 @@ async def update_report(
 async def delete_report(
     report_id: ReportId, user: CurrentUser, session: DbSession, settings: AppSettings
 ) -> Response:
-    """Soft-delete a saved report (its owner always may, admins any)."""
-    reporting = await _access(session, user, settings)
-    rights = await report_rights(session, user.id, reporting)
+    """Soft-delete a saved report (its owner always may, admins any).
+
+    No report-access check: after ``reporting.access`` changed to
+    ``stats_group`` an owner without view right can still remove their own reports;
+    reports they cannot see stay 404, the store allows only owner and admin.
+    """
+    reporting = await load_reporting_settings(session, settings)
+    rights = await report_rights(session, user.id, reporting)  # for the admin flag
     try:
         await delete_saved_report(session, report_id, user.id, rights)
     except _STORE_ERRORS as exc:

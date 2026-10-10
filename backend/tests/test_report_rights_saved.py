@@ -469,8 +469,9 @@ async def test_create_limit_per_user(env: Env, monkeypatch: pytest.MonkeyPatch) 
         plain = await _rights_in(s, PLAIN)
         a = await create_saved_report(s, PLAIN, plain, _in("rep48 l1"), registry=reg)
         await create_saved_report(s, PLAIN, plain, _in("rep48 l2"), registry=reg)
-        with pytest.raises(ReportForbidden):
+        with pytest.raises(DefinitionError) as limit:  # 422 with path, like saved searches
             await create_saved_report(s, PLAIN, plain, _in("rep48 l3"), registry=reg)
+        assert limit.value.path == "name"
         await delete_saved_report(s, a.id, PLAIN, plain)  # deleted reports do not count
         await create_saved_report(s, PLAIN, plain, _in("rep48 l3"), registry=reg)
 
@@ -566,17 +567,25 @@ async def test_update_keeps_stored_sharing_without_share_right(env: Env) -> None
             registry=reg,
         )  # fmt: skip
         assert (kept.visibility, kept.group_ids, kept.version) == ("groups", (G30, G31), 2)
-        with pytest.raises(ReportForbidden):  # changing the group set needs the share right
+        # narrowing (dropping a group) needs no share right, like saved searches and the docs
+        narrowed = await update_saved_report(
+            s, rep.id, STATS_RW, owner_now,
+            SavedReportUpdateIn(name="rep48 keep3", definition=defn, version=2,
+                                visibility="groups", group_ids=[G30]),
+            registry=reg,
+        )  # fmt: skip
+        assert (narrowed.group_ids, narrowed.version) == ((G30,), 3)
+        with pytest.raises(ReportForbidden):  # widening (adding a group back) does
             await update_saved_report(
                 s, rep.id, STATS_RW, owner_now,
-                SavedReportUpdateIn(name="rep48 keep3", definition=defn, version=2,
-                                    visibility="groups", group_ids=[G30]),
+                SavedReportUpdateIn(name="rep48 keep3", definition=defn, version=3,
+                                    visibility="groups", group_ids=[G30, G31]),
                 registry=reg,
             )  # fmt: skip
         # private / all ignore group_ids without validation and store no group rows
         priv = await update_saved_report(
             s, rep.id, STATS_RW, owner_now,
-            SavedReportUpdateIn(name="rep48 keep4", definition=defn, version=2,
+            SavedReportUpdateIn(name="rep48 keep4", definition=defn, version=3,
                                 visibility="private", group_ids=[48999]),
             registry=reg,
         )  # fmt: skip
@@ -592,6 +601,32 @@ async def test_update_keeps_stored_sharing_without_share_right(env: Env) -> None
                 s, own.id, MEMBER, member_share,
                 SavedReportUpdateIn(name="rep48 own", definition=defn, version=1,
                                     visibility="groups", group_ids=[G30, G31]),
+                registry=reg,
+            )  # fmt: skip
+
+
+async def test_narrowing_from_all_to_groups_needs_no_share_right(env: Env) -> None:
+    reg = get_registry()
+    defn = ReportDefinition.model_validate(TICKETS_DEF)
+    async with env.factory() as s:
+        rw = await _rights_in(s, STATS_RW)
+        rep = await create_saved_report(
+            s, STATS_RW, rw, _in("rep48 alle", visibility="all"), registry=reg
+        )
+        await s.commit()
+        owner_now = ReportRights(view=True, create=True, share=False, admin=False)
+        narrowed = await update_saved_report(
+            s, rep.id, STATS_RW, owner_now,
+            SavedReportUpdateIn(name="rep48 alle", definition=defn, version=1,
+                                visibility="groups", group_ids=[G30]),
+            registry=reg,
+        )  # fmt: skip
+        assert (narrowed.visibility, narrowed.group_ids) == ("groups", (G30,))
+        with pytest.raises(ReportForbidden):  # back to everybody is widening again
+            await update_saved_report(
+                s, rep.id, STATS_RW, owner_now,
+                SavedReportUpdateIn(name="rep48 alle", definition=defn, version=2,
+                                    visibility="all"),
                 registry=reg,
             )  # fmt: skip
 

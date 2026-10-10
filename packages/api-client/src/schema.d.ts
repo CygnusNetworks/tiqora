@@ -7400,13 +7400,17 @@ export interface paths {
          * @description Replace a saved report completely (every field is written).
          *
          *     ``version`` is the optimistic lock (409 with ``current_version``). The stored sharing
-         *     may be kept unchanged without the share right; changing it needs that right.
+         *     may be kept or narrowed without the share right; widening it needs that right.
          */
         put: operations["update_report_api_v1_reports__report_id__put"];
         post?: never;
         /**
          * Delete Report
          * @description Soft-delete a saved report (its owner always may, admins any).
+         *
+         *     No report-access check: after ``reporting.access`` changed to
+         *     ``stats_group`` an owner without view right can still remove their own reports;
+         *     reports they cannot see stay 404, the store allows only owner and admin.
          */
         delete: operations["delete_report_api_v1_reports__report_id__delete"];
         options?: never;

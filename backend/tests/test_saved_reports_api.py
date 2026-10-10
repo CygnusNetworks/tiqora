@@ -19,6 +19,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 import tiqora.reporting.jobs as report_jobs
+import tiqora.reporting.saved as saved_module
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db
 from tiqora.api.v1.reports import get_report_cache
@@ -585,3 +586,78 @@ async def test_oversized_report_ids_are_not_500(env: Env) -> None:
     assert huge.status_code == 404  # key route: not a valid saved key
     absent = await env.client.delete(f"/api/v1/reports/{2**63 - 1}")
     assert absent.status_code == 404
+
+
+# ---------------------------------------------------------------- final fix wave
+
+
+#: VIEWER gets ``ro`` on Znuny's ``stats`` group (view without the save right under stats_group)
+_VIEWER_STATS_RO = (
+    "INSERT INTO group_user (user_id, group_id, permission_key,"
+    " create_time, create_by, change_time, change_by)"
+    " SELECT 48061, id, 'ro', '2026-10-01', 1, '2026-10-01', 1"
+    " FROM permission_groups WHERE name = 'stats' AND valid_id = 1"
+)
+_VIEWER_STATS_RO_UNDO = (
+    "DELETE FROM group_user WHERE user_id = 48061 AND group_id IN"
+    " (SELECT id FROM permission_groups WHERE name = 'stats')"
+)
+
+
+async def test_owner_without_report_access_may_still_delete(env: Env) -> None:
+    """R-OWNDELETE over HTTP: after the switch to stats_group the owner can clean up."""
+    env.as_user(VIEWER)  # all_agents: may save private reports, holds nothing on stats
+    made = await _create(env, {"name": "rep48 verwaist", "definition": TICKETS_DEF})
+    await env.set_access("stats_group")
+    assert (await env.client.get("/api/v1/reports")).status_code == 403  # no view right now
+    env.as_user(STRANGER)  # invisible stays 404, existence is not revealed
+    assert (await env.client.delete(f"/api/v1/reports/{made['id']}")).status_code == 404
+    env.as_user(VIEWER)
+    assert (await env.client.delete(f"/api/v1/reports/{made['id']}")).status_code == 204
+    await env.set_access("all_agents")
+    assert (await env.client.get(f"/api/v1/reports/{made['key']}")).status_code == 410
+
+
+async def test_owner_without_save_right_is_told_so(env: Env) -> None:
+    env.as_user(VIEWER)
+    made = await _create(env, {"name": "rep48 ro", "definition": TICKETS_DEF})
+    _run_sql(env.sync_url, (_VIEWER_STATS_RO,))
+    try:
+        await env.set_access("stats_group")  # stats ro: view yes, save no
+        resp = await env.client.put(
+            f"/api/v1/reports/{made['id']}",
+            json={"name": "rep48 ro2", "definition": TICKETS_DEF, "version": 1},
+        )
+        assert resp.status_code == 403
+        assert resp.json()["detail"]["message"] == (
+            "Für das Speichern von Berichten fehlt die Berechtigung."
+        )
+        # a colleague's shared report keeps the owner text
+        env.as_user(OWNER)
+        shared = await _create(
+            env,
+            {"name": "rep48 geteilt", "definition": TICKETS_DEF, "visibility": "groups",
+             "group_ids": [G70]},
+        )  # fmt: skip
+        env.as_user(VIEWER)
+        other = await env.client.put(
+            f"/api/v1/reports/{shared['id']}",
+            json={"name": "rep48 x", "definition": TICKETS_DEF, "version": 1},
+        )
+        assert other.status_code == 403 and "Besitzer" in other.json()["detail"]["message"]
+    finally:
+        _run_sql(env.sync_url, (_VIEWER_STATS_RO_UNDO,))
+
+
+async def test_per_user_limit_is_422_like_searches(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(saved_module, "MAX_SAVED_REPORTS_PER_USER", 1)
+    env.as_user(OWNER)
+    await _create(env, {"name": "rep48 eins", "definition": TICKETS_DEF})
+    resp = await env.client.post(
+        "/api/v1/reports", json={"name": "rep48 zwei", "definition": TICKETS_DEF}
+    )
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["detail"]["path"] == "name"
+    assert "Berichte pro Person" in resp.json()["detail"]["message"]

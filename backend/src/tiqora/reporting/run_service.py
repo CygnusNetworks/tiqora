@@ -24,7 +24,6 @@ from fastapi import status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.config import get_settings
 from tiqora.domain.timezones import resolve_user_time_zone, valid_time_zone
 from tiqora.extensions.core import get_registry
 from tiqora.filters import AllOf, Condition, Filter
@@ -48,7 +47,7 @@ from tiqora.reporting.schemas import (
     ReportRunIn,
 )
 from tiqora.reporting.semantic import REPORT_SOURCES, ReportSource
-from tiqora.reporting.settings import ReportingSettings, load_reporting_settings
+from tiqora.reporting.settings import ReportingSettings
 from tiqora.reporting.sql import Grain
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -425,14 +424,14 @@ async def enqueue_report_ref(
     user_id: int,
     run: ReportRunIn,
     extra_filter: Filter | None,
+    reporting: ReportingSettings,
 ) -> JobAccepted:
     """Queue a ``core.report_run`` job (private result); :class:`TooManyReportJobs` at the cap.
 
-    Report access is checked first (403 ``HTTPException``, like the routes).
+    Report access is checked first with the caller's ``reporting`` settings (403
+    ``HTTPException``, like the routes).
     """
-    await require_report_access(
-        session, user_id, await load_reporting_settings(session, get_settings())
-    )
+    await require_report_access(session, user_id, reporting)
     # PostgreSQL: an estimate's SET LOCAL statement_timeout (possibly ~1 s near the deadline)
     # lives until the transaction ends; never let it hit the enqueue
     await session.rollback()

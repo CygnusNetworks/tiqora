@@ -781,7 +781,7 @@ narrower than Znuny), **by design** (deliberate platform choice).
 
 | Znuny feature | Status | Note |
 |---|---|---|
-| Saved searches | yes | Saved ticket searches ("Gespeicherte Suchen") with sharing by group, sidebar entries with ticket counts and the import of Znuny search profiles ("Suchvorlagen aus Znuny übernehmen"; read-only and one-way, full-text and future-relative times are not taken over, see [Search profiles](#search-profiles)) |
+| Saved searches | yes | Saved ticket searches ("Gespeicherte Suchen") with sharing by group (a colleague sees a shared search when holding `ro` on one of its groups), sidebar entries with ticket counts (counted are the first 15 entries that show a count), GDPR erasure of customer logins in saved criteria (see [GDPR](gdpr.md#saved-searches-and-reports)) and the import of Znuny search profiles ("Suchvorlagen aus Znuny übernehmen"; read-only and one-way, full-text and future-relative times are not taken over, see [Search profiles](#search-profiles)) |
 | Configurable dashboard widgets | missing | Fixed dashboard sections, no per-agent layout |
 | Link overview / link-type admin | missing | Ticket links can be listed and created; no delete, overview page or FAQ/appointment targets |
 | Note to linked tickets (`AgentTicketNoteToLinkedTicket`) | missing | |
