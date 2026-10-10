@@ -33,3 +33,4 @@ async def test_admin_extensions_lists_channels_point() -> None:
     channels = points["core.channels"]
     assert {"key": "telegram", "owner": "core"} in channels["items"]
     assert channels["sdk_stable"] is False
+    assert points["core.job_handlers"]["sdk_stable"] is True

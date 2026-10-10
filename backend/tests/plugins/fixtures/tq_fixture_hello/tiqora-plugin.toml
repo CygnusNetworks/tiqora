@@ -15,6 +15,7 @@ sdk = ">=0.1,<0.2"
 
 [capabilities]
 extension_points = ["core.settings_sections", "core.http.routes", "core.events.subscribers",
-                    "core.worker.scheduled_tasks", "core.job_handlers", "core.mcp.tools"]
+                    "core.worker.scheduled_tasks", "core.job_handlers", "core.mcp.tools",
+                    "core.http.public_routes"]
 outbound_hosts = ["api.example.org", "*.example.net"]
 frontend_slots = ["agent.nav", "agent.route", "ticket.sidebar", "dashboard.widget"]

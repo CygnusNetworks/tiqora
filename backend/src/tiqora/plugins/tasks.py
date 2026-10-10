@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Any, Final
 
+from tiqora.extensions.registry import ExtensionPoint
+from tiqora.plugins.context import PluginContext
 from tiqora.util.cron import CronExpr
 
 MIN_INTERVAL_SECONDS = 30
@@ -75,3 +79,31 @@ def next_due(schedule: Schedule, *, last_run_at: datetime | None, created_at: da
     if schedule.cron is None:
         raise ValueError("Ungültiger Zeitplan: keine Angabe gesetzt")
     return CronExpr.parse(schedule.cron).next_after(base)
+
+
+@dataclass(frozen=True, slots=True)
+class TaskContext:
+    plugin: PluginContext
+    scheduled_for: datetime
+    last_run_at: datetime | None
+
+
+TaskRun = Callable[[TaskContext], Awaitable[dict[str, Any] | None]]
+
+
+@dataclass(frozen=True, slots=True)
+class ScheduledTask:
+    key: str  # "<plugin_id>:<name>"
+    plugin_id: str
+    schedule: Schedule
+    run: TaskRun
+    timeout_seconds: int
+    context: PluginContext | None = None
+
+
+SCHEDULED_TASKS: Final[ExtensionPoint[ScheduledTask]] = ExtensionPoint(
+    key="core.worker.scheduled_tasks",
+    item_key=lambda t: t.key,
+    description="Periodic tasks run by the worker.",
+    sdk_stable=True,
+)

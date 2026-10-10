@@ -1,0 +1,11 @@
+manifest_version = 1
+id = "org.example.broken"
+short_id = "broken"
+name = "Kaputte Erweiterung"
+version = "1.0.0"
+publisher = "Example GmbH"
+entry = "tq_fixture_broken:plugin"
+sdk = ">=0.1,<0.2"
+
+[capabilities]
+extension_points = ["core.job_handlers"]

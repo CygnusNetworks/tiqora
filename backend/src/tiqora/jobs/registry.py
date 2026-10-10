@@ -81,4 +81,5 @@ JOB_HANDLERS: ExtensionPoint[JobHandler] = ExtensionPoint(
     key="core.job_handlers",
     item_key=lambda h: h.kind,
     description="Background job handlers, run by the worker's job runner.",
+    sdk_stable=True,
 )
