@@ -9,8 +9,9 @@ from tiqora.dashboard.providers import DashboardProvider, ProviderContext
 from tiqora.dashboard.settings_models import RemindersSettings
 from tiqora.domain.ticket_service import TicketService
 
-#: how many pending tickets are looked at, soonest due first
-_SCAN_LIMIT = 50
+#: how many pending tickets are looked at: the soonest-due ones (sorted by ``until_time``),
+#: so a due reminder is never hidden behind later ones; 200 is the service's page cap
+_SCAN_LIMIT = 200
 
 
 async def run_reminders(ctx: ProviderContext, settings: RemindersSettings) -> dict[str, Any]:
@@ -20,7 +21,7 @@ async def run_reminders(ctx: ProviderContext, settings: RemindersSettings) -> di
         ctx.user_id,
         owner_id=ctx.user_id,
         state_type="pending",
-        sort="age",
+        sort="until",
         order="asc",
         limit=_SCAN_LIMIT,
     )

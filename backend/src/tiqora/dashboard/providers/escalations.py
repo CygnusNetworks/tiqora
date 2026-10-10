@@ -38,14 +38,16 @@ async def run_escalations(ctx: ProviderContext, settings: EscalationsSettings) -
         limit=settings.limit,
     )
     items: list[dict[str, Any]] = []
+    skipped = 0
     for ticket in page.items:
         deadline = nearest_deadline(ticket)
         if deadline is None:
+            skipped += 1
             continue
         epoch, kind = deadline
         items.append({"ticket": ticket.model_dump(mode="json"), "epoch": epoch, "kind": kind})
     oldest = min((i["epoch"] for i in items), default=None)
-    return {"items": items, "total": page.total, "oldest_epoch": oldest}
+    return {"items": items, "total": page.total - skipped, "oldest_epoch": oldest}
 
 
 def escalations_provider() -> DashboardProvider:

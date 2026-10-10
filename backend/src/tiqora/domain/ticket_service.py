@@ -225,6 +225,8 @@ _LAST_ACTIVITY = func.coalesce(
 #: rather than over NULLs because MariaDB's LEAST returns NULL as soon as one
 #: argument is NULL, while PostgreSQL skips them.
 _NO_DEADLINE = 2**31 - 1
+#: Pending reminder time (``until_time > 0``); tickets without one sort last ascending.
+_PENDING_UNTIL = case((Ticket.until_time > 0, Ticket.until_time), else_=_NO_DEADLINE)
 _NEAREST_DEADLINE = func.least(
     *(
         case((col > 0, col), else_=_NO_DEADLINE)
@@ -441,6 +443,7 @@ class TicketService:
         "priority": Ticket.ticket_priority_id,
         "activity": _LAST_ACTIVITY,
         "deadline": _NEAREST_DEADLINE,
+        "until": _PENDING_UNTIL,
     }
 
     async def _ai_escalated_ids(self) -> set[int]:

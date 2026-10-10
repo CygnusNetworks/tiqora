@@ -276,6 +276,7 @@ class Env:
         self._restore_escalations: dict[int, int] = {}
         self.foreign_dashboard_id = 0
         self.now = now
+        self.app: Any = None  #: the FastAPI app behind ``client``
 
     # --- sessions and store shortcuts ------------------------------------------
 
@@ -480,7 +481,13 @@ class Env:
         )
 
     def make_appointment(
-        self, *, calendar_group: int, title: str, start: datetime, hours: int = 1
+        self,
+        *,
+        calendar_group: int,
+        title: str,
+        start: datetime,
+        hours: int = 1,
+        all_day: bool = False,
     ) -> None:
         """An appointment (naive UTC ``start``) in the band calendar of ``calendar_group``."""
         cal = CALENDARS[calendar_group]
@@ -494,9 +501,9 @@ class Env:
         self._sql_write(
             "INSERT INTO calendar_appointment (calendar_id, unique_id, title, start_time,"
             " end_time, all_day, create_time, create_by, change_time, change_by)"
-            " VALUES (:c, :u, :ti, :s, :e, 0, :t, 1, :t, 1)",
+            " VALUES (:c, :u, :ti, :s, :e, :ad, :t, 1, :t, 1)",
             c=cal, u=f"dash497-{uuid.uuid4().hex}", ti=title, s=start,
-            e=start + timedelta(hours=hours), t=now,
+            e=start + timedelta(hours=hours), t=now, ad=int(all_day),
         )  # fmt: skip
 
     def _sql_write(self, sql: str, **params: Any) -> None:
@@ -569,6 +576,7 @@ async def open_env(sync_url: str) -> AsyncIterator[Env]:
     try:
         async with _client(app) as c, _client(anon_app) as a, _client(admin_app) as ad:
             env = Env(sync_url, factory, c, a, ad, current)
+            env.app = app
             d = await store_foreign(env)
             env.foreign_dashboard_id = d
             yield env

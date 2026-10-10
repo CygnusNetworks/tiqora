@@ -9,7 +9,7 @@ from __future__ import annotations
 import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
@@ -278,8 +278,6 @@ async def test_calendar_agenda_days_and_limit(env: Env) -> None:
 
 
 def test_agenda_window_is_the_zone_day_in_naive_utc() -> None:
-    from datetime import datetime
-
     start, end = agenda_window(datetime(2026, 1, 15, 23, 30), "Europe/Berlin", 2)
     # 23:30 UTC is already the 16th in Berlin (UTC+1)
     assert start == datetime(2026, 1, 15, 23, 0) and end == datetime(2026, 1, 17, 23, 0)
@@ -312,12 +310,67 @@ async def test_online_route_and_helper_return_the_same_list(env: Env) -> None:
     from tiqora.api.deps import get_redis
 
     redis = FakeRedis({online_key(USER_A): '{"avatar_url": null}'})
-    env.client._transport.app.dependency_overrides[get_redis] = lambda: redis  # type: ignore[attr-defined]
-    async with env.session() as s:
-        helper = [a.model_dump(mode="json") for a in await list_online_agents_for(redis, s)]  # type: ignore[arg-type]
-    resp = await env.as_user(USER_A).get("/api/v1/agents/online")
+    env.app.dependency_overrides[get_redis] = lambda: redis
+    try:
+        async with env.session() as s:
+            helper = [a.model_dump(mode="json") for a in await list_online_agents_for(redis, s)]  # type: ignore[arg-type]
+        resp = await env.as_user(USER_A).get("/api/v1/agents/online")
+    finally:
+        env.app.dependency_overrides.pop(get_redis, None)
     assert resp.status_code == 200
     assert helper == resp.json() and [a["id"] for a in helper] == [USER_A]
+
+
+# --- review fixes -----------------------------------------------------------------------
+
+
+async def test_reminders_scan_finds_a_due_reminder_behind_older_pending_tickets(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The scan is ordered by due time, so older-created far-future reminders cannot hide it."""
+    from tiqora.dashboard.providers import reminders
+
+    monkeypatch.setattr(reminders, "_SCAN_LIMIT", 2)
+    far = int(time.time()) + 90 * 86400
+    for i in range(3):  # created before a_pending, due in three months
+        env._sql_write(
+            "INSERT INTO ticket (id, tn, title, queue_id, ticket_lock_id, type_id, user_id,"
+            " responsible_user_id, ticket_priority_id, ticket_state_id, timeout, until_time,"
+            " escalation_time, escalation_update_time, escalation_response_time,"
+            " escalation_solution_time, archive_flag, create_time, create_by, change_time,"
+            " change_by) SELECT :id, :tn, :ti, queue_id, ticket_lock_id, type_id, user_id,"
+            " responsible_user_id, ticket_priority_id, ticket_state_id, 0, :u, 0, 0, 0, 0, 0,"
+            " :t, 1, :t, 1 FROM ticket WHERE id = :src",
+            id=49736 + i, tn=f"20261010497{36 + i}", ti=f"dash497 far{i}", u=far + i,
+            t=datetime(2026, 9, 1), src=TICKETS["a_pending"],
+        )  # fmt: skip
+    data = await data_of(env, USER_A, W("r", "core.reminders", settings={"window_hours": 24}))
+    assert ticket_ids(data) == [TICKETS["a_pending"]] and data["total"] == 1
+
+
+async def test_escalations_total_matches_the_listed_items(env: Env) -> None:
+    data = await data_of(env, USER_A, W("e", "core.escalations", settings={"within_hours": 72}))
+    assert data["total"] == len(data["items"])
+
+
+async def test_all_day_appointments_belong_to_their_date_in_a_far_zone(env: Env) -> None:
+    zone = "Pacific/Pago_Pago"  # UTC-11: local date differs from the UTC date for half a day
+    env._sql_write(
+        "INSERT INTO user_preferences (user_id, preferences_key, preferences_value)"
+        " VALUES (:u, :k, :v)",
+        u=USER_A, k=USER_TIME_ZONE_KEY, v=zone,
+    )  # fmt: skip
+    from tiqora.dashboard.providers.calendar_agenda import start_day
+
+    today = datetime.combine(start_day(env.now, zone), datetime.min.time())
+    for title, day in (
+        ("dash497 gestern", today - timedelta(days=1)),
+        ("dash497 heute", today),
+        ("dash497 morgen", today + timedelta(days=1)),
+    ):
+        env.make_appointment(calendar_group=GROUP_1, title=title, start=day, hours=24, all_day=True)
+    out = await data_of(env, USER_A, W("k", "core.calendar-agenda"), now=env.now)
+    assert [i["title"] for i in out["items"]] == ["dash497 heute"]
 
 
 # --- cross-provider ----------------------------------------------------------------------
