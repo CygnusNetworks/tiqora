@@ -29,7 +29,7 @@ export function ShareFields({
   const groupsQ = useQuery({
     queryKey: ["reports", "share-groups"],
     queryFn: ({ signal }) => reportsApi.shareGroups(signal),
-    enabled: value.visibility === "groups",
+    enabled: canShare && value.visibility === "groups",
     staleTime: 60_000,
   });
   const options = (groupsQ.data ?? []).map((g) => ({ value: String(g.id), label: g.name }));

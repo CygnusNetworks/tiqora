@@ -106,7 +106,14 @@ export function BuilderParametersEditor({
                 <SelectField
                   items={opsOf(field).map((o) => ({ value: o, label: t(`filters.ops.${o}`) }))}
                   value={op}
-                  onChange={(v) => patch(i, { op: v, ...(NO_VALUE_OPS.has(v) ? { allowed_values: null, default: null } : {}) })}
+                  onChange={(v) =>
+                    patch(i, {
+                      op: v,
+                      ...(NO_VALUE_OPS.has(v) ? { allowed_values: null, default: null } : {}),
+                      // "eq" takes a single default value
+                      ...(v === "eq" && toList(p.default).length > 1 ? { default: toList(p.default).slice(0, 1) } : {}),
+                    })
+                  }
                   testId={`${testId}-op-${i}`}
                   aria-label={`${label}: ${t("reports.builder.parameterOp")}`}
                 />
@@ -129,9 +136,12 @@ export function BuilderParametersEditor({
                   <span className="block text-xs text-muted">{t("reports.builder.parameterDefault")}</span>
                   <FilterValueInput
                     field={field}
-                    op="in"
-                    value={toList(p.default)}
-                    onChange={(v) => patch(i, { default: toList(v).length > 0 ? toList(v) : null })}
+                    op={op === "eq" ? "eq" : "in"}
+                    value={op === "eq" ? toList(p.default)[0] : toList(p.default)}
+                    onChange={(v) => {
+                      const list = op === "eq" ? (v === undefined || v === null || v === "" ? [] : [v as string | number]) : toList(v);
+                      patch(i, { default: list.length > 0 ? list : null });
+                    }}
                     testId={`${testId}-default-${i}`}
                     label={`${label}: ${t("reports.builder.parameterDefault")}`}
                   />

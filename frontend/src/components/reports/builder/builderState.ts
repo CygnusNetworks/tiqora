@@ -432,6 +432,8 @@ export function validate(state: BuilderState, source: ReportSource | undefined, 
       const bad = (p[name] ?? []).some((v) => !parameterValueOk(v, field));
       if (bad) add(`parameters.${i}.${name}`, "parameterValueInvalid");
     }
+    // "eq" compares with one value: a longer default fails every run that supplies no value.
+    if ((p.op ?? "in") === "eq" && (p.default ?? []).length > 1) add(`parameters.${i}.default`, "parameterValueInvalid");
     if (p.allowed_values && p.default && p.default.some((v) => !p.allowed_values!.includes(v))) {
       add(`parameters.${i}.default`, "parameterValueInvalid");
     }

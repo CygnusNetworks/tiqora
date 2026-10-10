@@ -239,6 +239,12 @@ describe("builderState", () => {
     expect(keys(withParam({ op: "eq" }))).toEqual([]);
   });
 
+  it("an eq parameter takes one default value, like the backend", () => {
+    expect(keys(withParam({ op: "eq", default: [1, 2] }))).toEqual(["parameterValueInvalid"]);
+    expect(keys(withParam({ op: "eq", default: [1] }))).toEqual([]);
+    expect(keys(withParam({ op: "in", default: [1, 2] }))).toEqual([]);
+  });
+
   it("parameter values are typed like the backend checks them", () => {
     expect(keys(withParam({ default: ["3"] }))).toEqual(["parameterValueInvalid"]); // id field wants integers
     expect(keys(withParam({ allowed_values: [1, 2], default: [3] }))).toEqual(["parameterValueInvalid"]); // default not allowed

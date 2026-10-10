@@ -21,10 +21,13 @@ export function BuilderPreview({ definition, issues }: { definition: ReportDefin
 
   return (
     <section className="space-y-3 lg:sticky lg:top-4 lg:self-start" aria-labelledby="builder-preview-title" data-testid="builder-preview">
+      <p className="sr-only" role="status">
+        {!shown ? t("reports.builder.previewInvalid") : result ? "" : t("reports.loading")}
+      </p>
       <h2 id="builder-preview-title" className="text-xs font-semibold uppercase tracking-wide text-muted">
         {t("reports.builder.preview")}
       </h2>
-      <div className="min-h-[16rem] rounded-lg border border-hairline bg-surface p-4" aria-live="polite">
+      <div className="min-h-[16rem] rounded-lg border border-hairline bg-surface p-4">
         {!shown ? (
           <div data-testid="builder-preview-issues">
             <p className="text-sm text-muted">{t("reports.builder.previewInvalid")}</p>

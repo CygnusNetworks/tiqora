@@ -328,6 +328,21 @@ describe("ReportBuilderPage", () => {
     expect(within(editor).queryByTestId("builder-parameters-item-1")).not.toBeInTheDocument();
   });
 
+  it("keeps a single default value when a changeable field switches to eq", async () => {
+    const def = demoReport("builtin.volume_by_queue")!.definition;
+    vi.mocked(reportsApi.get).mockResolvedValueOnce(
+      saved({ definition: { ...def, parameters: [{ key: "queues", field: "queue", op: "in", default: [1, 2] }] } as never }),
+    );
+    renderAt("/agent/reports/41/edit", CAN);
+    await user.click(await screen.findByTestId("builder-parameters-op-0"));
+    await user.click(screen.getByRole("option", { name: "ist" }));
+    await waitFor(() => {
+      const sent = vi.mocked(reportsApi.run).mock.calls.at(-1)![0].definition!;
+      expect(sent.parameters?.[0]).toMatchObject({ op: "eq", default: [1] });
+    });
+    expect(screen.getByTestId("builder-save")).toBeEnabled();
+  });
+
   it("debounces the preview", async () => {
     expect(DEBOUNCE_MS).toBe(700);
     previewDebounce.ms = DEBOUNCE_MS;

@@ -214,6 +214,14 @@ def test_core_sources_registered_with_expected_keys() -> None:
             },
             "parameters[0].allowed_values[0]",
         ),
+        (  # "eq" takes one default value: more would fail every run without a value
+            {
+                "source": "tickets",
+                "measures": [{"key": "tickets"}],
+                "parameters": [{"key": "q", "field": "queue", "op": "eq", "default": [1, 2]}],
+            },
+            "parameters[0].default",
+        ),
         (  # enum values are checked
             {
                 "source": "tickets",
@@ -705,3 +713,16 @@ def test_common_filter_several_keys_are_anded() -> None:
             {"field": "queue", "op": "in", "value": [5]},
         ]
     }
+
+
+def test_eq_parameter_accepts_one_default_value() -> None:
+    validate_definition(
+        ReportDefinition.model_validate(
+            {
+                "source": "tickets",
+                "measures": [{"key": "tickets"}],
+                "parameters": [{"key": "q", "field": "queue", "op": "eq", "default": [1]}],
+            }
+        ),
+        _registry(),
+    )

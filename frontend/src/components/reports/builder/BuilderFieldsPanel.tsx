@@ -51,7 +51,7 @@ function DimensionItem({
   const testId = `builder-${target}`;
   const update = (patch: Partial<DimensionSlot>) => dispatch({ type: "updateDimension", target, index, patch });
   const choiceOptions = (source?.dimensions ?? [])
-    .filter((d) => d.key !== slot.key && d.kind === dim?.kind)
+    .filter((d) => d.key !== slot.key)
     .map((d) => ({ value: d.key, label: t(d.label_key) }));
   const columnAt = state.columnAt ?? state.rows.length;
   const first = target === "rows" ? index === 0 : columnAt <= 0;

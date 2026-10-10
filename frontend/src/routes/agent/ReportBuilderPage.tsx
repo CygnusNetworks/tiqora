@@ -89,6 +89,7 @@ function Editor({
   const [state, dispatch] = useReducer(builderReducer, start.state);
   const baseline = useRef(JSON.stringify(start.state));
   const [share, setShare] = useState<ShareValue>(start.share);
+  const shareBaseline = useRef(JSON.stringify(start.share));
   const [dialog, setDialog] = useState<"create" | "update" | "copy" | null>(null);
   const [tried, setTried] = useState(false);
   const [saveError, setSaveError] = useState<SaveError | null>(null);
@@ -108,7 +109,7 @@ function Editor({
   const issues = useMemo(() => validate(state, source), [state, source]);
   const definition = useMemo(() => (issues.length === 0 ? toDefinition(state) : null), [issues, state]);
   const canShare = user?.can_share_reports ?? false;
-  const dirty = !done && JSON.stringify(state) !== baseline.current;
+  const dirty = !done && (JSON.stringify(state) !== baseline.current || JSON.stringify(share) !== shareBaseline.current);
 
   useEffect(() => {
     if (!dirty) return;
