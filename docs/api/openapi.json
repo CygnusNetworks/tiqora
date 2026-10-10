@@ -72722,6 +72722,8 @@
             "name": "report_id",
             "required": true,
             "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Report Id",
               "type": "integer"
             }
@@ -72788,6 +72790,8 @@
             "name": "report_id",
             "required": true,
             "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Report Id",
               "type": "integer"
             }

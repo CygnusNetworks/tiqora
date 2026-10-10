@@ -41,38 +41,59 @@ def dump_report_file(out: ReportFileOut, fmt: Literal["json", "yaml"]) -> bytes:
     return yaml.safe_dump(data, allow_unicode=True, sort_keys=False).encode("utf-8")
 
 
+def _too_deep() -> DefinitionError:
+    return DefinitionError(TOO_DEEP_MESSAGE, path="content")
+
+
 def _load_yaml(content: str) -> Any:
+    """Safe YAML load; aliases and collections nested deeper than ``MAX_NESTING`` are refused.
+
+    Both checks run on the parser's event stream, which aborts at the first offending
+    event (quoted brackets, block indentation and flow nesting are all counted right).
+    """
+    depth = 0
     for event in yaml.parse(content, Loader=yaml.SafeLoader):
         if isinstance(event, yaml.AliasEvent):
             raise DefinitionError(ANCHOR_MESSAGE, path="content")
+        if isinstance(event, yaml.SequenceStartEvent | yaml.MappingStartEvent):
+            depth += 1
+            if depth > MAX_NESTING:
+                raise _too_deep()
+        elif isinstance(event, yaml.SequenceEndEvent | yaml.MappingEndEvent):
+            depth -= 1
     return yaml.safe_load(content)
 
 
-def _too_nested(content: str) -> bool:
-    """Cheap linear pre-check: flow nesting (brackets) deeper than any real definition.
-
-    Pure-Python YAML needs minutes for a 200 000 character ``[[[[…`` document, so the
-    nesting is bounded before either loader runs (brackets inside strings count too,
-    which only ever rejects pathological files).
-    """
+def _json_too_deep(content: str) -> bool:
+    """Linear scan of the JSON structure that skips string contents (and their escapes)."""
     depth = 0
+    in_string = escaped = False
     for ch in content:
-        if ch in "[{":
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+        elif ch == '"':
+            in_string = True
+        elif ch in "[{":
             depth += 1
             if depth > MAX_NESTING:
                 return True
-        elif ch in "]}" and depth:
+        elif ch in "]}":
             depth -= 1
     return False
 
 
 def _load(content: str) -> Any:
-    if _too_nested(content):
-        raise DefinitionError(TOO_DEEP_MESSAGE, path="content")
+    if _json_too_deep(content):
+        raise _too_deep()
     try:
         return json.loads(content)
     except RecursionError:
-        raise DefinitionError(TOO_DEEP_MESSAGE, path="content") from None
+        raise _too_deep() from None
     except ValueError:
         pass
     try:
@@ -80,7 +101,7 @@ def _load(content: str) -> Any:
     except DefinitionError:
         raise
     except (RecursionError, yaml.YAMLError, ValueError):
-        raise DefinitionError(TOO_DEEP_MESSAGE, path="content") from None
+        raise _too_deep() from None
 
 
 def parse_report_file(content: str) -> ReportFileOut:

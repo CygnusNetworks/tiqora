@@ -17,7 +17,8 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Final, Literal, NoReturn, cast
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -160,6 +161,8 @@ def _saved_out(
     )
 
 
+#: saved-report id in a path: bounded to the database's BIGINT so huge ids are a 422, not a 500
+ReportId = Annotated[int, Path(ge=1, le=2**63 - 1)]
 NOT_FOUND_MESSAGE: Final = "Bericht nicht gefunden."
 
 
@@ -318,7 +321,7 @@ async def import_report_file(
     """Parse and validate a report file (JSON or YAML); saves nothing."""
     await _access(session, user, settings)
     try:
-        parsed = parse_report_file(body.content)
+        parsed = await run_in_threadpool(parse_report_file, body.content)
         try:
             validate_definition(parsed.definition, get_registry())
         except DefinitionError as exc:
@@ -516,7 +519,7 @@ async def get_report(
 
 @router.put("/{report_id}", response_model=ReportOut)
 async def update_report(
-    report_id: int,
+    report_id: ReportId,
     body: SavedReportUpdateIn,
     user: CurrentUser,
     session: DbSession,
@@ -542,7 +545,7 @@ async def update_report(
 
 @router.delete("/{report_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_report(
-    report_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+    report_id: ReportId, user: CurrentUser, session: DbSession, settings: AppSettings
 ) -> Response:
     """Soft-delete a saved report (its owner always may, admins any)."""
     reporting = await _access(session, user, settings)

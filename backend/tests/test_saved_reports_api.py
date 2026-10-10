@@ -561,3 +561,27 @@ async def test_share_groups_endpoint(env: Env) -> None:
     env.as_user(1)  # admin: every valid group
     groups = (await env.client.get("/api/v1/reference/share-groups")).json()
     assert {g["id"] for g in groups} >= {G70, G71}
+
+
+async def test_deleted_private_report_is_404_for_a_stranger(env: Env) -> None:
+    env.as_user(OWNER)
+    made = await _create(env, {"name": "rep48 weg", "definition": TICKETS_DEF})
+    assert (await env.client.delete(f"/api/v1/reports/{made['id']}")).status_code == 204
+    assert (await env.client.get(f"/api/v1/reports/{made['key']}")).status_code == 410  # owner
+    env.as_user(STRANGER)
+    gone = await env.client.get(f"/api/v1/reports/{made['key']}")
+    assert gone.status_code == 404  # existence of the deleted report stays hidden
+    assert "rep48 weg" not in gone.text
+    assert (await env.client.delete(f"/api/v1/reports/{made['id']}")).status_code == 404
+
+
+async def test_oversized_report_ids_are_not_500(env: Env) -> None:
+    body = {"name": "x", "definition": TICKETS_DEF, "version": 1}
+    for rid in (2**63, 10**30, 0):
+        put = await env.client.put(f"/api/v1/reports/{rid}", json=body)
+        assert put.status_code == 422, (rid, put.text)
+        assert (await env.client.delete(f"/api/v1/reports/{rid}")).status_code == 422
+    huge = await env.client.get(f"/api/v1/reports/{10**30}")
+    assert huge.status_code == 404  # key route: not a valid saved key
+    absent = await env.client.delete(f"/api/v1/reports/{2**63 - 1}")
+    assert absent.status_code == 404

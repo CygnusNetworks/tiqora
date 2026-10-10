@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 
 import pytest
 
@@ -72,3 +73,34 @@ def test_deeply_nested_yaml_is_a_definition_error() -> None:
     with pytest.raises(DefinitionError) as err:
         parse_report_file("a: " + "[" * 100_000)
     assert err.value.path == "content"
+
+
+def _assert_rejected_quickly(content: str) -> None:
+    started = time.monotonic()
+    with pytest.raises(DefinitionError) as err:
+        parse_report_file(content)
+    assert err.value.path == "content" and "verschachtelt" in err.value.message
+    assert time.monotonic() - started < 2
+
+
+def test_yaml_with_quoted_closers_and_deep_nesting_is_rejected_quickly() -> None:
+    # quoted "]" padding cannot hide the nesting from a textual bracket counter
+    padding = '"' + "]" * 60_000 + '"'
+    _assert_rejected_quickly(f"a: {padding}\nb: " + "[" * 70 + "x" + "]" * 70 + "\n")
+    _assert_rejected_quickly("[" * 66_000 + ", ".join([padding] * 2))
+
+
+def test_block_style_deep_nesting_is_rejected_quickly() -> None:
+    lines = [" " * i + "k:" for i in range(0, 140)]
+    _assert_rejected_quickly("\n".join(lines) + " v\n")
+    _assert_rejected_quickly("\n".join("  " * i + "- " for i in range(0, 80)) + "x\n")
+
+
+def test_json_with_quoted_closers_and_deep_nesting_is_rejected_quickly() -> None:
+    padding = '"' + "]}" * 50_000 + '"'
+    _assert_rejected_quickly("[" * 70 + padding + "]" * 70)
+
+
+def test_brackets_inside_json_strings_do_not_count_as_nesting() -> None:
+    out = ReportFileOut(name="[" * 150, definition=ReportDefinition.model_validate(TICKETS_DEF))
+    assert parse_report_file(dump_report_file(out, "json").decode()) == out
