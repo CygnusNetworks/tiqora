@@ -5608,6 +5608,23 @@
       "overwriteMessage": "You started your changes before a newer version of this dashboard was saved (as of {{newer}}). “Replace and save” replaces that version completely with yours; what was changed there is lost.",
       "overwriteMessageTemplate": "You started your changes before a newer version of this template was saved (as of {{newer}}). “Replace and save” replaces it completely with yours: other people's changes are lost, for everyone who gets the template through their role.",
       "overwriteConfirm": "Replace and save"
+    },
+    "gallery": {
+      "title": "Add widget",
+      "open": "Add widget",
+      "close": "Close gallery",
+      "search": "Search",
+      "searchPlaceholder": "e.g. escalation, note, queue",
+      "groups": {
+        "tickets": "Tickets",
+        "me": "For me",
+        "team": "Team"
+      },
+      "hint": "Drag onto the grid or click – the widget lands in the first free gap.",
+      "limit": "No more than {{max}} widgets are possible.",
+      "empty": "Nothing found",
+      "clearSearch": "Clear search",
+      "added": "“{{title}}” added"
     }
   }
 }

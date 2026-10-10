@@ -42,6 +42,8 @@ export interface EditToolbarProps {
   saving: boolean;
   /** A failed save that names no widget (too tall, server message, network). */
   error: string | null;
+  /** "Widget hinzufügen": shows or hides the widget gallery (absent on phones, where there is none). */
+  gallery?: { open: boolean; onToggle: () => void };
 }
 
 /**
@@ -64,6 +66,7 @@ export const EditToolbar = forwardRef<HTMLDivElement, EditToolbarProps>(function
     onSave,
     saving,
     error,
+    gallery,
   },
   ref,
 ) {
@@ -125,6 +128,16 @@ export const EditToolbar = forwardRef<HTMLDivElement, EditToolbarProps>(function
         >
           <UndoIcon redo />
         </button>
+        {gallery && (
+          <button
+            type="button"
+            aria-expanded={gallery.open}
+            onClick={gallery.onToggle}
+            className={cn(BTN, OUTLINE, "px-3.5", gallery.open && "bg-surface/15")}
+          >
+            {t("dashboards.gallery.open")}
+          </button>
+        )}
         <button type="button" onClick={onDiscard} disabled={saving} className={cn(BTN, OUTLINE, "px-3.5")}>
           {t("dashboards.edit.discard")}
         </button>

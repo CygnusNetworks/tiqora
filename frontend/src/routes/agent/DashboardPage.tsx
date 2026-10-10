@@ -149,6 +149,9 @@ export function DashboardPage() {
   }, [dashboard, qc, leaveEdit]);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  // Column beside the grid for the widget gallery in edit mode (the grid's width, and so its
+  // breakpoint, follows whether the gallery is open).
+  const [galleryHost, setGalleryHost] = useState<HTMLElement | null>(null);
   const breakpoint = useGridBreakpoint(containerRef);
 
   const greeting = t(`dashboard.greeting.${greetingKey()}`, { name: user?.first_name || user?.login || "" });
@@ -171,6 +174,7 @@ export function DashboardPage() {
         savedData={byWidget}
         onLeave={leaveEdit}
         onReload={reloadAfterConflict}
+        galleryHost={galleryHost}
       />
     );
   } else if (listQ.isError) {
@@ -267,16 +271,19 @@ export function DashboardPage() {
         <p className="text-sm text-muted">{t("dashboards.view.lockedHint")}</p>
       )}
 
-      <div
-        ref={containerRef}
-        id={panelId}
-        role={isEditing ? undefined : "tabpanel"}
-        aria-labelledby={!isEditing && isTab ? `${panelId}-tab-${selectedId}` : undefined}
-        aria-label={isEditing || isTab ? undefined : dashboard?.name}
-        tabIndex={!isEditing && widgets.length === 0 ? 0 : undefined}
-        className="min-w-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-      >
-        {content}
+      <div className={isEditing ? "flex items-start gap-5" : undefined}>
+        <div
+          ref={containerRef}
+          id={panelId}
+          role={isEditing ? undefined : "tabpanel"}
+          aria-labelledby={!isEditing && isTab ? `${panelId}-tab-${selectedId}` : undefined}
+          aria-label={isEditing || isTab ? undefined : dashboard?.name}
+          tabIndex={!isEditing && widgets.length === 0 ? 0 : undefined}
+          className="min-w-0 flex-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          {content}
+        </div>
+        {isEditing && <div ref={setGalleryHost} className="sticky top-24 w-[340px] flex-none self-start empty:hidden max-lg:hidden" />}
       </div>
     </div>
   );

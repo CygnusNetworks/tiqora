@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type DragEvent,
   type ErrorInfo,
   type HTMLAttributes,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -30,7 +31,9 @@ import { usePreviewData, WidgetDataProvider, type WidgetDataState } from "./data
 import { canUseWidget, settingsWithDefaults } from "./definitions";
 import { GearIcon, PhoneControls } from "./edit/PhoneControls";
 import { useDragResize, type DragCommit } from "./edit/useDragResize";
+import { WIDGET_DRAG_TYPE } from "./gallery/galleryModel";
 import { layoutForBreakpoint } from "./layout/breakpoints";
+import { pixelsToCell } from "./layout/grid";
 import { keyToAction } from "./layout/keyboard";
 import { layoutItems, type SizeLookup } from "./layout/session";
 import { COLS, GAP, MAX_WIDGETS_PER_DASHBOARD, ROW_H, type Breakpoint, type EditWidget, type LayoutItem, type Rect } from "./model";
@@ -53,6 +56,8 @@ export interface EditHandlers {
   invalidWidgetId?: string | null;
   /** Data widgets whose data comes from the preview route (new or changed settings). */
   previewIds?: ReadonlySet<string>;
+  /** A gallery card dropped on the grid: the widget key and the snapped cell under the pointer. */
+  onDropWidget?: (key: string, at: { x: number; y: number }) => void;
 }
 
 const NO_FILTERS: Record<string, unknown> = {};
@@ -396,6 +401,30 @@ export function DashboardGrid({
   );
   const { onHandlePointerDown, onResizePointerDown, drag } = useDragResize({ gridRef, cols, items, onCommit });
 
+  // A card of the widget gallery dropped on the grid (HTML5 drag and drop; foreign payloads are ignored).
+  const onGalleryDragOver = useCallback(
+    (e: DragEvent<HTMLElement>) => {
+      if (!edit?.onDropWidget || !Array.from(e.dataTransfer?.types ?? []).includes(WIDGET_DRAG_TYPE)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    },
+    [edit],
+  );
+  const onGalleryDrop = useCallback(
+    (e: DragEvent<HTMLElement>) => {
+      const grid = gridRef.current;
+      if (!edit?.onDropWidget || !grid || !Array.from(e.dataTransfer?.types ?? []).includes(WIDGET_DRAG_TYPE)) return;
+      e.preventDefault();
+      const key = e.dataTransfer.getData(WIDGET_DRAG_TYPE);
+      if (!key) return;
+      const box = grid.getBoundingClientRect();
+      const rtl = getComputedStyle(grid).direction === "rtl";
+      const x = rtl ? box.right - e.clientX : e.clientX - box.left;
+      edit.onDropWidget(key, pixelsToCell({ x, y: e.clientY - box.top }, { width: box.width, cols }));
+    },
+    [edit, cols],
+  );
+
   const remove = useCallback(
     (id: string) => {
       const i = widgets.findIndex((w) => w.id === id);
@@ -647,6 +676,8 @@ export function DashboardGrid({
           data-dashboard-id={dashboardId}
           data-editing="true"
           className="outline-none"
+          onDragOver={onGalleryDragOver}
+          onDrop={onGalleryDrop}
           style={{
             ...gridStyle,
             // the column guide: one tinted stripe per column

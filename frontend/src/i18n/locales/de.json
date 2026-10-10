@@ -5616,6 +5616,23 @@
       "overwriteMessage": "Du hast deine Änderungen begonnen, bevor eine neuere Fassung dieses Dashboards gespeichert wurde (Stand {{newer}}). „Ersetzen und speichern“ ersetzt diese Fassung vollständig durch deine; was dort geändert wurde, geht verloren.",
       "overwriteMessageTemplate": "Du hast deine Änderungen begonnen, bevor eine neuere Fassung dieser Vorlage gespeichert wurde (Stand {{newer}}). „Ersetzen und speichern“ ersetzt sie vollständig durch deine: Änderungen anderer gehen verloren, und das gilt für alle, die die Vorlage über ihre Rolle bekommen.",
       "overwriteConfirm": "Ersetzen und speichern"
+    },
+    "gallery": {
+      "title": "Widget hinzufügen",
+      "open": "Widget hinzufügen",
+      "close": "Galerie schließen",
+      "search": "Suchen",
+      "searchPlaceholder": "z. B. Eskalation, Notiz, Queue",
+      "groups": {
+        "tickets": "Tickets",
+        "me": "Für mich",
+        "team": "Team"
+      },
+      "hint": "Ins Raster ziehen oder anklicken – das Widget landet in der ersten freien Lücke.",
+      "limit": "Es sind höchstens {{max}} Widgets möglich.",
+      "empty": "Nichts gefunden",
+      "clearSearch": "Suche löschen",
+      "added": "„{{title}}“ hinzugefügt"
     }
   }
 }

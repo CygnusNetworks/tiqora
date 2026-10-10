@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { useOptionalAuth } from "@/auth/AuthContext";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { Dashboard } from "@/lib/dashboardsApi";
-import { useDashboardWidgetDefinitions } from "@/plugins/dashboardWidgets";
+import { useDashboardWidgetDefinitions, type WidgetDefinition } from "@/plugins/dashboardWidgets";
 import { DashboardGrid, type EditHandlers } from "../DashboardGrid";
 import { editDataPlan, type WidgetDataState } from "../data";
+import { canUseWidget } from "../definitions";
+import { GalleryPanel } from "../gallery/GalleryPanel";
+import { widgetLikeOf, widgetTexts } from "../gallery/galleryModel";
 import { MAX_WIDGETS_PER_DASHBOARD, type Breakpoint, type EditWidget } from "../model";
 import { toBcp47 } from "@/i18n";
 import { formatTimeOfDay } from "@/lib/format";
@@ -17,6 +22,28 @@ import { WidgetSettingsDialog } from "./WidgetSettingsDialog";
 function newWidgetId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
   return `w${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+}
+
+/**
+ * Where the gallery sits by window width (not by the grid's container, which shrinks when the
+ * panel opens): "side" next to the grid from 1024 px, "overlay" on tablets, none on phones
+ * (widgets there are only reordered; the page also drops it while the grid is at the phone breakpoint). Without `matchMedia` (tests) it is "side".
+ */
+function useGalleryPlacement(): "side" | "overlay" | "none" {
+  const query = (): "side" | "overlay" | "none" => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return "side";
+    if (window.matchMedia("(min-width: 1024px)").matches) return "side";
+    return window.matchMedia("(min-width: 640px)").matches ? "overlay" : "none";
+  };
+  const [placement, setPlacement] = useState(query);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const lists = [window.matchMedia("(min-width: 1024px)"), window.matchMedia("(min-width: 640px)")];
+    const update = () => setPlacement(query());
+    lists.forEach((l) => l.addEventListener("change", update));
+    return () => lists.forEach((l) => l.removeEventListener("change", update));
+  }, []);
+  return placement;
 }
 
 const EDITABLE_TARGET = "input, textarea, select, [contenteditable=''], [contenteditable='true'], [role='dialog'], [role='alertdialog']";
@@ -34,6 +61,7 @@ export function DashboardEditMode({
   savedData,
   onLeave,
   onReload,
+  galleryHost,
 }: {
   dashboard: Dashboard;
   userId: number;
@@ -45,6 +73,8 @@ export function DashboardEditMode({
   onLeave: () => void;
   /** After a conflict: leave and load the dashboard again. */
   onReload: () => void;
+  /** Column next to the grid that holds the gallery on wide screens (inline below the grid when absent). */
+  galleryHost?: HTMLElement | null;
 }) {
   const { t, i18n } = useTranslation();
   const session = useEditSession(dashboard, userId);
@@ -62,6 +92,28 @@ export function DashboardEditMode({
   const [saving, setSaving] = useState(false);
   const gridBoxRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
+
+  // The widget gallery: open at first on wide screens, closed on tablets (it overlays the grid there).
+  const viewportPlacement = useGalleryPlacement();
+  const placement = breakpoint === "sm" ? "none" : viewportPlacement;
+  const user = useOptionalAuth()?.user;
+  const [galleryChoice, setGalleryChoice] = useState<boolean | null>(null);
+  const galleryOpen = placement !== "none" && (galleryChoice ?? placement === "side");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const focusSearch = useRef(false);
+  const [added, setAdded] = useState("");
+  useEffect(() => {
+    if (galleryOpen && focusSearch.current) searchRef.current?.focus();
+    focusSearch.current = false;
+  }, [galleryOpen]);
+  const toggleGallery = () => {
+    focusSearch.current = !galleryOpen;
+    setGalleryChoice(!galleryOpen);
+  };
+  const closeGallery = () => {
+    setGalleryChoice(false);
+    toolbarRef.current?.focus();
+  };
 
   // Entering edit mode puts the focus on the toolbar (announced as "Bearbeiten").
   useEffect(() => {
@@ -84,6 +136,24 @@ export function DashboardEditMode({
   }, [invalidId, openSettings]);
 
   const bp = breakpoint === "sm" ? null : breakpoint;
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const addWidget = useCallback(
+    (def: WidgetDefinition, at?: { x: number; y: number }) => {
+      if (!bp || stateRef.current.widgets.length >= MAX_WIDGETS_PER_DASHBOARD) return;
+      dispatch({ type: "add", def: widgetLikeOf(def), id: newWidgetId(), ...(at ? { at } : {}), bp });
+      setAdded(t("dashboards.gallery.added", { title: widgetTexts(def, t).title }));
+    },
+    [bp, dispatch, t],
+  );
+  const dropWidget = useCallback(
+    (key: string, at: { x: number; y: number }) => {
+      const def = defs.find((d) => d.key === key);
+      const allowed = { is_admin: user?.is_admin ?? false, can_view_reports: user?.can_view_reports ?? false };
+      if (def && canUseWidget(def, allowed)) addWidget(def, at);
+    },
+    [defs, user?.is_admin, user?.can_view_reports, addWidget],
+  );
   const handlers = useMemo<EditHandlers>(
     () => ({
       onRemove: (id) => dispatch({ type: "remove", id }),
@@ -99,8 +169,9 @@ export function DashboardEditMode({
       canDuplicate: state.widgets.length < MAX_WIDGETS_PER_DASHBOARD,
       invalidWidgetId: session.invalidWidgetId,
       previewIds: plan.previewIds,
+      onDropWidget: dropWidget,
     }),
-    [dispatch, openSettings, bp, state.widgets.length, session.invalidWidgetId, plan.previewIds],
+    [dispatch, openSettings, bp, state.widgets.length, session.invalidWidgetId, plan.previewIds, dropWidget],
   );
 
   // Ctrl/Cmd+Z undoes, Shift+Ctrl/Cmd+Z and Ctrl/Cmd+Y redo — not inside fields or dialogs.
@@ -151,6 +222,7 @@ export function DashboardEditMode({
         onSave={() => void save()}
         saving={saving}
         error={session.saveError}
+        gallery={placement === "none" ? undefined : { open: galleryOpen, onToggle: toggleGallery }}
       />
       <div ref={gridBoxRef}>
         <DashboardGrid
@@ -164,6 +236,35 @@ export function DashboardEditMode({
           edit={handlers}
         />
       </div>
+      <div aria-live="polite" className="sr-only">
+        {added}
+      </div>
+      {galleryOpen && (placement === "overlay" || !galleryHost) && (
+        <GalleryPanel
+          ref={searchRef}
+          widgetCount={state.widgets.length}
+          onAdd={addWidget}
+          onClose={closeGallery}
+          className={
+            placement === "overlay"
+              ? "fixed inset-y-3 right-3 z-40 w-[340px] max-w-[calc(100vw-1.5rem)] overflow-y-auto shadow-xl"
+              : undefined
+          }
+        />
+      )}
+      {galleryOpen &&
+        placement === "side" &&
+        galleryHost &&
+        createPortal(
+          <GalleryPanel
+            ref={searchRef}
+            widgetCount={state.widgets.length}
+            onAdd={addWidget}
+            onClose={closeGallery}
+            className="max-h-[calc(100vh-7rem)] overflow-y-auto"
+          />,
+          galleryHost,
+        )}
       {settingsFor && (
         <WidgetSettingsDialog
           title={settingsFor.title}

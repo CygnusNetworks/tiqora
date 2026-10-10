@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import {
@@ -1091,6 +1091,124 @@ describe("DashboardPage", () => {
       expect(screen.getByRole("status")).toHaveTextContent("ist jetzt an Stelle 6 von 11");
       fireEvent.click(undoButton());
       expect(order().indexOf("w-list")).toBe(prevIndex);
+    });
+
+    describe("widget gallery", () => {
+      const WIDE = wire("w-wide", "core.notes", { lg: { x: 0, y: 0, w: 12, h: 2 } });
+      const dropData = (payload: Record<string, string>) => ({
+        types: Object.keys(payload),
+        getData: (k: string) => payload[k] ?? "",
+        dropEffect: "none",
+      });
+      /** jsdom has no DragEvent: build the drop and give it the pointer position by hand. */
+      const drop = (payload: Record<string, string>, x: number, y: number) => {
+        const ev = createEvent.drop(screen.getByTestId("dashboard-grid"), { dataTransfer: dropData(payload) });
+        Object.defineProperty(ev, "clientX", { value: x });
+        Object.defineProperty(ev, "clientY", { value: y });
+        fireEvent(screen.getByTestId("dashboard-grid"), ev);
+      };
+      const MIME = "application/x-tiqora-widget";
+      const ids = () => order().filter((id): id is string => !!id);
+      const gcell = (id: string) =>
+        screen.getByTestId("dashboard-grid").querySelector<HTMLElement>(`[data-widget-id="${id}"]`)!;
+      const gallery = () => screen.getByRole("complementary", { name: "Widget hinzufügen" });
+
+      it("is open beside the grid in edit mode with the groups and the plugin widget in 'Für mich'", async () => {
+        i18n.addResourceBundle("de", "plugin.org.example.demo", { hello: "Hallo-Widget" }, true, true);
+        DASHBOARD_WIDGETS.register(
+          defineWidget({
+            key: "org.example.demo.hello",
+            owner: "org.example.demo",
+            version: 1,
+            titleKey: "hello",
+            ns: "plugin.org.example.demo",
+            category: "other",
+            icon: "puzzle",
+            size: { default: [4, 3], min: [2, 2], max: [12, 8] },
+            settingsSchema: null,
+            dataEndpoint: null,
+            refreshOn: [],
+            permission: null,
+            component: () => null,
+          }),
+          "org.example.demo",
+        );
+        await enterEdit();
+        expect(within(gallery()).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Tickets", "Für mich", "Team"]);
+        expect(within(gallery()).getByRole("button", { name: /Hallo-Widget/ })).toBeVisible();
+        expect(screen.getByRole("button", { name: "Widget hinzufügen", expanded: true })).toBeVisible();
+      });
+
+      it("a click adds the widget with a fresh uuid in the first free spot, as one undo step", async () => {
+        mockDashboard({ widgets: [WIDE] });
+        await enterEdit();
+        fireEvent.click(within(gallery()).getByRole("button", { name: /Notizen/ }));
+        fireEvent.click(within(gallery()).getByRole("button", { name: /Notizen/ }));
+        const added = ids().filter((id) => id !== "w-wide");
+        expect(added).toHaveLength(2);
+        expect(added[0]).toMatch(/^[0-9a-f-]{36}$/);
+        expect(added[0]).not.toBe(added[1]);
+        expect(gcell(added[0]).style.gridRow).toMatch(/^3 \//);
+        expect(undoButton()).toBeEnabled();
+        fireEvent.click(undoButton());
+        expect(ids()).toHaveLength(2);
+      });
+
+      it("dropping a card on the grid adds the widget at the snapped cell", async () => {
+        mockDashboard({ widgets: [WIDE] });
+        await enterEdit();
+        mockGridRect(1200);
+        drop({ [MIME]: "core.counter" }, 205, 165);
+        const added = ids().filter((id) => id !== "w-wide");
+        expect(added).toHaveLength(1);
+        expect(gcell(added[0]).style.gridColumn).toMatch(/^3 \//);
+        expect(gcell(added[0]).style.gridRow).toMatch(/^3 \//);
+        expect(undoButton()).toBeEnabled();
+      });
+
+      it("a drop with a foreign or unknown payload does nothing", async () => {
+        mockDashboard({ widgets: [WIDE] });
+        await enterEdit();
+        mockGridRect(1200);
+        drop({ "text/plain": "core.counter" }, 100, 100);
+        drop({ [MIME]: "org.example.unknown" }, 100, 100);
+        expect(ids()).toEqual(["w-wide"]);
+        expect(undoButton()).toBeDisabled();
+      });
+
+      it("accepts the drag only for its own payload (dragover is cancelled for it, not for text)", async () => {
+        await enterEdit();
+        const grid = screen.getByTestId("dashboard-grid");
+        expect(fireEvent.dragOver(grid, { dataTransfer: dropData({ [MIME]: "core.counter" }) })).toBe(false);
+        expect(fireEvent.dragOver(grid, { dataTransfer: dropData({ "text/plain": "x" }) })).toBe(true);
+      });
+
+      it("at 40 widgets the cards are disabled, a drop adds nothing and the panel says so", async () => {
+        const many = Array.from({ length: 40 }, (_, i) => wire(`m-${i}`, "core.notes", { lg: { x: 0, y: i, w: 12, h: 1 } }));
+        mockDashboard({ widgets: many });
+        await enterEdit();
+        expect(screen.getByText("Es sind höchstens 40 Widgets möglich.")).toBeVisible();
+        expect(within(gallery()).getByRole("button", { name: /Notizen/ })).toBeDisabled();
+        mockGridRect(1200);
+        drop({ [MIME]: "core.counter" }, 100, 100);
+        expect(ids()).toHaveLength(40);
+      });
+
+      it("Escape closes it and the focus returns to the toolbar; the toolbar button opens it again with the search focused", async () => {
+        const bar = await enterEdit();
+        fireEvent.keyDown(within(gallery()).getByLabelText("Suchen"), { key: "Escape" });
+        expect(screen.queryByRole("complementary", { name: "Widget hinzufügen" })).toBeNull();
+        expect(bar).toContainElement(document.activeElement as HTMLElement);
+        fireEvent.click(screen.getByRole("button", { name: "Widget hinzufügen", expanded: false }));
+        expect(within(gallery()).getByLabelText("Suchen")).toHaveFocus();
+      });
+
+      it("on a phone there is no gallery and no button", async () => {
+        containerWidth = 390;
+        await enterEdit();
+        expect(screen.queryByRole("complementary", { name: "Widget hinzufügen" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Widget hinzufügen" })).toBeNull();
+      });
     });
 
     it("'Nach oben' on the first and 'Nach unten' on the last widget are disabled; arrow keys reorder on the phone", async () => {
