@@ -8066,6 +8066,79 @@
         "title": "ChannelConfigUpdate",
         "type": "object"
       },
+      "ChatAcceptOut": {
+        "properties": {
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ticket_id"
+        ],
+        "title": "ChatAcceptOut",
+        "type": "object"
+      },
+      "ChatAgentStateIn": {
+        "description": "``topics`` empty = every topic the agent may take; refs must come from ``/chat/topics``.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "max_concurrent": {
+            "default": 3,
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Max Concurrent",
+            "type": "integer"
+          },
+          "topics": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Topics",
+            "type": "array"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "ChatAgentStateIn",
+        "type": "object"
+      },
+      "ChatAgentStateOut": {
+        "properties": {
+          "active_count": {
+            "title": "Active Count",
+            "type": "integer"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "max_concurrent": {
+            "title": "Max Concurrent",
+            "type": "integer"
+          },
+          "topics": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Topics",
+            "type": "array"
+          }
+        },
+        "required": [
+          "available",
+          "topics",
+          "max_concurrent",
+          "active_count"
+        ],
+        "title": "ChatAgentStateOut",
+        "type": "object"
+      },
       "ChatAttachmentOut": {
         "properties": {
           "content_type": {
@@ -8116,6 +8189,128 @@
           }
         },
         "title": "ChatContactIn",
+        "type": "object"
+      },
+      "ChatEndIn": {
+        "properties": {
+          "close_ticket": {
+            "default": false,
+            "title": "Close Ticket",
+            "type": "boolean"
+          }
+        },
+        "title": "ChatEndIn",
+        "type": "object"
+      },
+      "ChatInboxItemOut": {
+        "properties": {
+          "accepted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted At"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "waiting",
+              "active"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tn": {
+            "title": "Tn",
+            "type": "string"
+          },
+          "topic_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic Label"
+          },
+          "visitor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visitor Name"
+          },
+          "waiting_since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waiting Since"
+          }
+        },
+        "required": [
+          "session_id",
+          "ticket_id",
+          "tn",
+          "title",
+          "topic_label",
+          "visitor_name",
+          "status",
+          "waiting_since",
+          "accepted_at"
+        ],
+        "title": "ChatInboxItemOut",
+        "type": "object"
+      },
+      "ChatInboxOut": {
+        "properties": {
+          "mine": {
+            "items": {
+              "$ref": "#/components/schemas/ChatInboxItemOut"
+            },
+            "title": "Mine",
+            "type": "array"
+          },
+          "waiting": {
+            "items": {
+              "$ref": "#/components/schemas/ChatInboxItemOut"
+            },
+            "title": "Waiting",
+            "type": "array"
+          }
+        },
+        "required": [
+          "waiting",
+          "mine"
+        ],
+        "title": "ChatInboxOut",
         "type": "object"
       },
       "ChatMessageIn": {
@@ -8744,6 +8939,35 @@
           }
         },
         "title": "ChatTheme",
+        "type": "object"
+      },
+      "ChatTopicRefOut": {
+        "description": "A chat topic the agent may take (``rw`` on its queue); ``ref`` = ``<config_id>:<key>``.",
+        "properties": {
+          "config_name": {
+            "title": "Config Name",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "queue_id": {
+            "title": "Queue Id",
+            "type": "integer"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "config_name",
+          "label",
+          "queue_id"
+        ],
+        "title": "ChatTopicRefOut",
         "type": "object"
       },
       "CompanyCreateOut": {
@@ -66139,6 +66363,454 @@
         "summary": "Receive Webhook",
         "tags": [
           "channels:whatsapp"
+        ]
+      }
+    },
+    "/api/v1/chat/agent-state": {
+      "get": {
+        "description": "The agent's \"Chats annehmen\" state and how many chats they hold now.",
+        "operationId": "get_chat_agent_state_api_v1_chat_agent_state_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatAgentStateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Chat Agent State",
+        "tags": [
+          "chat"
+        ]
+      },
+      "put": {
+        "description": "Set availability, topic filter (refs from ``GET /chat/topics``; empty = all) and the\nconcurrent-chat limit.",
+        "operationId": "put_chat_agent_state_api_v1_chat_agent_state_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatAgentStateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatAgentStateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "A topic ref the agent may not take (`unknown_topic`)"
+          }
+        },
+        "summary": "Put Chat Agent State",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/chat/inbox": {
+      "get": {
+        "description": "Waiting chats the agent may accept and the agent's own active chats.",
+        "operationId": "get_chat_inbox_api_v1_chat_inbox_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatInboxOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Chat Inbox",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/chat/sessions/{session_id}/accept": {
+      "post": {
+        "description": "Take a waiting chat (first accept wins; owner + lock like Znuny).",
+        "operationId": "post_chat_accept_api_v1_chat_sessions__session_id__accept_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatAcceptOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "No rw permission on the chat's queue (`forbidden`)"
+          },
+          "404": {
+            "description": "Unknown chat (`not_found`)"
+          },
+          "409": {
+            "description": "`already_taken`, `at_capacity` or `not_waiting`"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Chat Accept",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/chat/sessions/{session_id}/end": {
+      "post": {
+        "description": "End a live chat; optionally close the ticket. Idempotent (204 again when ended).",
+        "operationId": "post_chat_end_api_v1_chat_sessions__session_id__end_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ChatEndIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "No rw permission on the chat's queue (`forbidden`)"
+          },
+          "404": {
+            "description": "Unknown chat (`not_found`)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Chat End",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/chat/topics": {
+      "get": {
+        "description": "Topics of valid chat configs whose queue the agent holds ``rw`` on.",
+        "operationId": "get_chat_topics_api_v1_chat_topics_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ChatTopicRefOut"
+                  },
+                  "title": "Response Get Chat Topics Api V1 Chat Topics Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Chat Topics",
+        "tags": [
+          "chat"
         ]
       }
     },

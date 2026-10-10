@@ -1,7 +1,10 @@
-"""Visitor-facing API models (C8) — the ONLY shapes the public chat API returns.
+"""Chat API models (C8).
 
-None of them carries a ticket id/number, queue, article id, user id, agent login or e-mail,
-or an internal note; ``serialize.message_out`` is the only serializer of a transcript line.
+Visitor-facing models (everything above the "agent side" section) are the ONLY shapes the
+public chat API returns: none of them carries a ticket id/number, queue, article id, user
+id, agent login or e-mail, or an internal note; ``serialize.message_out`` is the only
+serializer of a transcript line. The agent-side models at the end are used only by the
+authenticated agent API (``tiqora.api.v1.chat``) and never by ``/api/chat/v1``.
 """
 
 from __future__ import annotations
@@ -135,3 +138,55 @@ class ChatSessionOut(BaseModel):
 
 class ChatOfflineOut(BaseModel):
     """Empty acknowledgement of the offline form (``{}``)."""
+
+
+# -- agent side (``/api/v1/chat``, authenticated agents only) ------------------------------------
+
+
+class ChatTopicRefOut(BaseModel):
+    """A chat topic the agent may take (``rw`` on its queue); ``ref`` = ``<config_id>:<key>``."""
+
+    ref: str
+    config_name: str
+    label: str
+    queue_id: int
+
+
+class ChatAgentStateOut(BaseModel):
+    available: bool
+    topics: list[str]
+    max_concurrent: int
+    active_count: int
+
+
+class ChatAgentStateIn(BaseModel):
+    """``topics`` empty = every topic the agent may take; refs must come from ``/chat/topics``."""
+
+    available: bool
+    topics: list[str] = Field(default_factory=list, max_length=100)
+    max_concurrent: int = Field(3, ge=1, le=20)
+
+
+class ChatInboxItemOut(BaseModel):
+    session_id: str
+    ticket_id: int
+    tn: str
+    title: str
+    topic_label: str | None
+    visitor_name: str | None
+    status: Literal["waiting", "active"]
+    waiting_since: UtcDateTime | None
+    accepted_at: UtcDateTime | None
+
+
+class ChatInboxOut(BaseModel):
+    waiting: list[ChatInboxItemOut]
+    mine: list[ChatInboxItemOut]
+
+
+class ChatAcceptOut(BaseModel):
+    ticket_id: int
+
+
+class ChatEndIn(BaseModel):
+    close_ticket: bool = False

@@ -6015,6 +6015,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chat/agent-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Chat Agent State
+         * @description The agent's "Chats annehmen" state and how many chats they hold now.
+         */
+        get: operations["get_chat_agent_state_api_v1_chat_agent_state_get"];
+        /**
+         * Put Chat Agent State
+         * @description Set availability, topic filter (refs from ``GET /chat/topics``; empty = all) and the
+         *     concurrent-chat limit.
+         */
+        put: operations["put_chat_agent_state_api_v1_chat_agent_state_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Chat Inbox
+         * @description Waiting chats the agent may accept and the agent's own active chats.
+         */
+        get: operations["get_chat_inbox_api_v1_chat_inbox_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/sessions/{session_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Chat Accept
+         * @description Take a waiting chat (first accept wins; owner + lock like Znuny).
+         */
+        post: operations["post_chat_accept_api_v1_chat_sessions__session_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/sessions/{session_id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Chat End
+         * @description End a live chat; optionally close the ticket. Idempotent (204 again when ended).
+         */
+        post: operations["post_chat_end_api_v1_chat_sessions__session_id__end_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/topics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Chat Topics
+         * @description Topics of valid chat configs whose queue the agent holds ``rw`` on.
+         */
+        get: operations["get_chat_topics_api_v1_chat_topics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customer-directory": {
         parameters: {
             query?: never;
@@ -12150,6 +12255,37 @@ export interface components {
             /** Enabled */
             enabled?: boolean | null;
         };
+        /** ChatAcceptOut */
+        ChatAcceptOut: {
+            /** Ticket Id */
+            ticket_id: number;
+        };
+        /**
+         * ChatAgentStateIn
+         * @description ``topics`` empty = every topic the agent may take; refs must come from ``/chat/topics``.
+         */
+        ChatAgentStateIn: {
+            /** Available */
+            available: boolean;
+            /**
+             * Max Concurrent
+             * @default 3
+             */
+            max_concurrent: number;
+            /** Topics */
+            topics?: string[];
+        };
+        /** ChatAgentStateOut */
+        ChatAgentStateOut: {
+            /** Active Count */
+            active_count: number;
+            /** Available */
+            available: boolean;
+            /** Max Concurrent */
+            max_concurrent: number;
+            /** Topics */
+            topics: string[];
+        };
         /** ChatAttachmentOut */
         ChatAttachmentOut: {
             /** Content Type */
@@ -12170,6 +12306,45 @@ export interface components {
             email: string;
             /** Name */
             name?: string | null;
+        };
+        /** ChatEndIn */
+        ChatEndIn: {
+            /**
+             * Close Ticket
+             * @default false
+             */
+            close_ticket: boolean;
+        };
+        /** ChatInboxItemOut */
+        ChatInboxItemOut: {
+            /** Accepted At */
+            accepted_at: string | null;
+            /** Session Id */
+            session_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "waiting" | "active";
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+            /** Topic Label */
+            topic_label: string | null;
+            /** Visitor Name */
+            visitor_name: string | null;
+            /** Waiting Since */
+            waiting_since: string | null;
+        };
+        /** ChatInboxOut */
+        ChatInboxOut: {
+            /** Mine */
+            mine: components["schemas"]["ChatInboxItemOut"][];
+            /** Waiting */
+            waiting: components["schemas"]["ChatInboxItemOut"][];
         };
         /** ChatMessageIn */
         ChatMessageIn: {
@@ -12377,6 +12552,20 @@ export interface components {
              * @default #2563eb
              */
             primary_color: string;
+        };
+        /**
+         * ChatTopicRefOut
+         * @description A chat topic the agent may take (``rw`` on its queue); ``ref`` = ``<config_id>:<key>``.
+         */
+        ChatTopicRefOut: {
+            /** Config Name */
+            config_name: string;
+            /** Label */
+            label: string;
+            /** Queue Id */
+            queue_id: number;
+            /** Ref */
+            ref: string;
         };
         /** CompanyCreateOut */
         CompanyCreateOut: {
@@ -36343,6 +36532,247 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WhatsAppWebhookResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_chat_agent_state_api_v1_chat_agent_state_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatAgentStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_chat_agent_state_api_v1_chat_agent_state_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatAgentStateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatAgentStateOut"];
+                };
+            };
+            /** @description A topic ref the agent may not take (`unknown_topic`) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_chat_inbox_api_v1_chat_inbox_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatInboxOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_chat_accept_api_v1_chat_sessions__session_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatAcceptOut"];
+                };
+            };
+            /** @description No rw permission on the chat's queue (`forbidden`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown chat (`not_found`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `already_taken`, `at_capacity` or `not_waiting` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_chat_end_api_v1_chat_sessions__session_id__end_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ChatEndIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No rw permission on the chat's queue (`forbidden`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown chat (`not_found`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_chat_topics_api_v1_chat_topics_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatTopicRefOut"][];
                 };
             };
             /** @description Validation Error */

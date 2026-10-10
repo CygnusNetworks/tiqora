@@ -109,6 +109,7 @@ __all__ = [
     "VisitorContext",
     "add_system_message",
     "create_session",
+    "current_queue_id",
     "end_by_visitor",
     "post_visitor_attachment",
     "post_visitor_message",
@@ -336,7 +337,7 @@ async def _ticket_defaults(
     return state_id or 1, priority_id or 3
 
 
-async def _current_queue_id(db: AsyncSession, chat: TiqoraChatSession) -> int:
+async def current_queue_id(db: AsyncSession, chat: TiqoraChatSession) -> int:
     """The ticket's queue now (R-QUEUE-SOT); refreshes the session's copy when it moved.
 
     Called with the session row locked (the UPDATE stays inside that lock).
@@ -625,7 +626,7 @@ async def post_visitor_message(
     if locked.status not in LIVE_STATUSES:
         raise ChatError("session_closed", 409)
     await touch_visitor_last_seen(db, locked, now)
-    queue_id = await _current_queue_id(db, locked)
+    queue_id = await current_queue_id(db, locked)
     message, created = await _store_visitor_line(
         db,
         sysconfig,
@@ -722,7 +723,7 @@ async def store_visitor_attachment(
     if locked.status not in LIVE_STATUSES:
         raise ChatError("session_closed", 409)
     await touch_visitor_last_seen(db, locked, now)
-    queue_id = await _current_queue_id(db, locked)
+    queue_id = await current_queue_id(db, locked)
     body = caption_text or safe_name
     listing = [
         {"index": 0, "filename": safe_name, "content_type": content_type, "size": len(content)}
@@ -822,7 +823,7 @@ async def end_by_visitor(db: AsyncSession, *, chat: TiqoraChatSession, now: date
     locked = await _lock(db, chat.id)
     if locked.status not in LIVE_STATUSES:
         return
-    queue_id = await _current_queue_id(db, locked)
+    queue_id = await current_queue_id(db, locked)
     locked.status = "ended"
     locked.end_reason = "visitor"
     locked.ended_at = now
