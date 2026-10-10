@@ -22,21 +22,19 @@ export function presetOf(source: unknown): TicketPreset | null {
 export const FEWER_IS_BETTER: ReadonlySet<TicketPreset> = new Set(["escalated", "ai_escalated", "unowned_new"]);
 
 /**
- * The queue view behind a ticket list's "Alle N anzeigen". `mine_new` and `unowned_new` match
- * exactly; `mine_open` opens the owner's "Zu tun" view (without waiting tickets) and the escalated
- * presets the escalated view (which also lists AI handoffs) — QueuesPage has no exact view for
- * those yet (R-DASH-COUNTER-LINKS). Null when the viewer's id is needed but unknown.
+ * The queue view behind a ticket list's "Alle N anzeigen" — only where QueuesPage lists exactly the
+ * same tickets: `mine_new` and `unowned_new`. `mine_open` (QueuesPage "Zu tun" lacks waiting
+ * tickets) and the escalated presets (`escalated=true` also lists AI handoffs) get no link, as
+ * counters do (R-DASH-COUNTER-LINKS); the widget shows the total as text instead. Null as well
+ * when the viewer's id is needed but unknown.
  */
 export function presetQueueSearch(preset: TicketPreset, userId: number | null | undefined): QueueLinkSearch | null {
   switch (preset) {
-    case "mine_open":
-      return userId ? { owner_id: userId } : null;
     case "mine_new":
       return userId ? { owner_id: userId, state_type: "new" } : null;
     case "unowned_new":
       return { owner_id: 1, state_type: "new" };
-    case "escalated":
-    case "ai_escalated":
-      return { escalated: true };
+    default:
+      return null;
   }
 }

@@ -130,10 +130,9 @@ export function TicketListWidget({ settings, size, mode }: WidgetProps<TicketLis
   const items = Array.isArray(data?.items) ? data.items : [];
   const total = typeof data?.total === "number" ? data.total : items.length;
   const search = preset ? presetQueueSearch(preset, auth?.user?.id) : null;
+  const more = status === "ok" && total > items.length;
   const link: FrameLink | undefined =
-    status === "ok" && total > items.length && search
-      ? { label: t("dashboards.state.showAll", { count: total }), to: "/agent/queues", search }
-      : undefined;
+    more && search ? { label: t("dashboards.state.showAll", { count: total }), to: "/agent/queues", search } : undefined;
   const cols = tableColumns(settings.columns);
   const navIds = items.map((x) => x.id);
   const density = settings.density === "compact" ? "compact" : "comfortable";
@@ -143,6 +142,11 @@ export function TicketListWidget({ settings, size, mode }: WidgetProps<TicketLis
     <WidgetFrame
       title={preset ? t(`dashboards.presets.${preset}.list`) : t("dashboards.widgets.ticketList.title")}
       link={link}
+      actions={
+        more && !search ? (
+          <span className="shrink-0 text-xs text-muted">{t("dashboards.state.total", { count: total })}</span>
+        ) : undefined
+      }
       mode={mode}
       testId="ticket-list-widget"
     >

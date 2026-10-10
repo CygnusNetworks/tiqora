@@ -95,6 +95,7 @@ describe("WidgetFrame", () => {
     );
     expect(screen.getByRole("heading", { name: "Queues" })).toBeVisible();
     expect(screen.getByTestId("widget-body")).not.toHaveClass("pointer-events-none");
+    expect(screen.getByTestId("widget-body")).not.toHaveAttribute("inert");
     cleanup();
     render(
       <WidgetChromeProvider value={{ titleOverride: "Team-Eingang" }}>

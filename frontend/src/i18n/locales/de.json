@@ -5437,7 +5437,8 @@
       "unavailable": "Widget nicht verfügbar",
       "unavailableHint": "Diese Art von Widget gibt es hier nicht (mehr). Es bleibt gespeichert, bis du es entfernst.",
       "remove": "Entfernen",
-      "showAll": "Alle {{count}} anzeigen"
+      "showAll": "Alle {{count}} anzeigen",
+      "total": "{{count}} insgesamt"
     },
     "due": {
       "since": "seit {{duration}}",

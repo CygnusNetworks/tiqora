@@ -344,7 +344,16 @@ describe("core.ticket-list", () => {
     expect(link.getAttribute("href")).toContain("state_type=new");
     cleanup();
     await renderWidget("core.ticket-list", preset("mine_new"), { status: "ok", data: { items: rows(3), total: 3 } });
-    expect(screen.queryByText(/Alle \d+ anzeigen/)).toBeNull();
+    expect(screen.queryByText(/Alle \d+ anzeigen/)).toBeNull();    expect(screen.queryByText(/insgesamt/)).toBeNull();
+  });
+
+  it("shows the total as text, not a link, where no queue view lists the same tickets", async () => {
+    await renderWidget("core.ticket-list", preset("mine_open"), { status: "ok", data: { items: rows(8), total: 12 } });
+    expect(screen.getByText("12 insgesamt")).toBeVisible();
+    expect(screen.queryByRole("link", { name: /anzeigen/ })).toBeNull();
+    cleanup();
+    await renderWidget("core.ticket-list", preset("escalated"), { status: "ok", data: { items: rows(8), total: 9 } });
+    expect(screen.getByText("9 insgesamt")).toBeVisible();
   });
 
   it("titles itself after the preset unless the host overrides it", async () => {

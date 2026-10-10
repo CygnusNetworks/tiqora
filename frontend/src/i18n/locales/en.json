@@ -5437,7 +5437,8 @@
       "unavailable": "Widget not available",
       "unavailableHint": "This kind of widget is not available here (any more). It stays saved until you remove it.",
       "remove": "Remove",
-      "showAll": "Show all {{count}}"
+      "showAll": "Show all {{count}}",
+      "total": "{{count}} in total"
     },
     "due": {
       "since": "for {{duration}}",
