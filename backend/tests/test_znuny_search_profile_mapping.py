@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
@@ -263,7 +264,7 @@ def test_time_slot_is_local_day_bounds_in_utc() -> None:
     assert where(m) == {
         "field": "created",
         "op": "between",
-        "value": {"from": "2026-06-30T22:00:00", "to": "2026-07-31T21:59:59"},
+        "value": {"from": "2026-06-30T22:00:00", "to": "2026-07-31T22:00:00"},
     }  # CEST = UTC+2
     assert m.unmapped == ()
 
@@ -280,7 +281,7 @@ def test_time_slot_in_winter_uses_utc_plus_one() -> None:
             "TicketChangeTimeStopDay": "10",
         }
     )
-    assert where(m)["value"] == {"from": "2026-01-09T23:00:00", "to": "2026-01-10T22:59:59"}
+    assert where(m)["value"] == {"from": "2026-01-09T23:00:00", "to": "2026-01-10T23:00:00"}
 
 
 # (profile values, reported key, reason). Future time points report the AMOUNT key,
@@ -525,7 +526,7 @@ def test_dynamic_date_slot_is_local_to_utc() -> None:
     assert where(m) == {
         "field": "df.Due",
         "op": "between",
-        "value": {"from": "2026-07-01T10:30:00", "to": "2026-07-01T21:59:59"},
+        "value": {"from": "2026-07-01T10:30:00", "to": "2026-07-01T22:00:00"},
     }
     assert m.unmapped == ()
 
@@ -695,11 +696,11 @@ def test_archive_reason_wording() -> None:
 def test_one_sided_time_slots_map_to_after_and_before() -> None:
     start = _slot("TicketCreateTime", StartYear="2026", StartMonth="7", StartDay="1")
     m = _map({"TimeSearchType": "TimeSlot", **start})
-    assert where(m) == {"field": "created", "op": "after", "value": "2026-06-30T22:00:00"}
+    assert where(m) == {"field": "created", "op": "after", "value": "2026-06-30T21:59:59"}
     assert m.unmapped == ()
     stop = _slot("TicketCreateTime", StopYear="2026", StopMonth="7", StopDay="31")
     m = _map({"TimeSearchType": "TimeSlot", **stop})
-    assert where(m) == {"field": "created", "op": "before", "value": "2026-07-31T21:59:59"}
+    assert where(m) == {"field": "created", "op": "before", "value": "2026-07-31T22:00:00"}
     assert m.unmapped == ()
     validate_filter(m.criteria, TICKET_FILTER_FIELDS.get)
 
@@ -740,7 +741,7 @@ def test_slot_start_after_stop_has_its_own_reason() -> None:
 def test_dynamic_slot_one_sided_and_inverted() -> None:
     p = "Search_DynamicField_DueTimeSlot"
     m = _map({p: "1", **_slot(p, StartYear="2026", StartMonth="7", StartDay="1")})
-    assert where(m) == {"field": "df.Due", "op": "after", "value": "2026-06-30T22:00:00"}
+    assert where(m) == {"field": "df.Due", "op": "after", "value": "2026-06-30T21:59:59"}
     m = _map(
         {
             p: "1",
@@ -756,12 +757,13 @@ def test_dynamic_slot_stop_blank_parts_are_zero_once_a_time_is_given() -> None:
     base = {p: "1", **_slot(p, StopYear="2026", StopMonth="7", StopDay="1")}
     # whole day when no time of day is given
     m = _map(base)
-    assert where(m)["value"] == "2026-07-01T21:59:59"
-    # an explicit hour: blank minute/second are 00, not 59
+    assert where(m)["value"] == "2026-07-01T22:00:00"
+    # an explicit hour: blank minute/second are 00, not 59 (12:00:00 local = 10:00:00 UTC,
+    # exclusive bound one second later)
     m = _map({**base, f"{p}StopHour": "12"})
-    assert where(m)["value"] == "2026-07-01T10:00:00"
+    assert where(m)["value"] == "2026-07-01T10:00:01"
     m = _map({**base, f"{p}StopHour": "12", f"{p}StopMinute": "30"})
-    assert where(m)["value"] == "2026-07-01T10:30:00"
+    assert where(m)["value"] == "2026-07-01T10:30:01"
 
 
 def test_invalid_time_zone_falls_back_to_utc() -> None:
@@ -774,4 +776,49 @@ def test_invalid_time_zone_falls_back_to_utc() -> None:
         },
         lookups,
     )
-    assert where(m) == {"field": "created", "op": "after", "value": "2026-07-01T00:00:00"}
+    assert where(m) == {"field": "created", "op": "after", "value": "2026-06-30T23:59:59"}
+
+
+def _holds(cond: dict[str, Any], value: datetime) -> bool:
+    """Engine semantics (filters/predicates.py datetime_predicate): after = strict >,
+    before = strict <, between = [from, to)."""
+    parse = datetime.fromisoformat
+    if cond["op"] == "after":
+        return value > parse(cond["value"])
+    if cond["op"] == "before":
+        return value < parse(cond["value"])
+    assert cond["op"] == "between"
+    return parse(cond["value"]["from"]) <= value < parse(cond["value"]["to"])
+
+
+def test_slot_bounds_are_inclusive_like_znuny() -> None:
+    # local 2026-07-01 .. 2026-07-31 (CEST): UTC 06-30 22:00:00 .. 07-31 21:59:59 inclusive
+    first, last = datetime(2026, 6, 30, 22, 0, 0), datetime(2026, 7, 31, 21, 59, 59)
+    one = timedelta(seconds=1)
+    start = _slot("TicketCreateTime", StartYear="2026", StartMonth="7", StartDay="1")
+    stop = _slot("TicketCreateTime", StopYear="2026", StopMonth="7", StopDay="31")
+    both = where(_map({"TimeSearchType": "TimeSlot", **start, **stop}))
+    only_start = where(_map({"TimeSearchType": "TimeSlot", **start}))
+    only_stop = where(_map({"TimeSearchType": "TimeSlot", **stop}))
+    assert both["value"]["to"] == "2026-07-31T22:00:00"
+    assert both["value"]["from"] == "2026-06-30T22:00:00"
+    assert only_start["value"] == "2026-06-30T21:59:59"
+    assert only_stop["value"] == "2026-07-31T22:00:00"
+    for cond in (both, only_start):
+        assert _holds(cond, first) and not _holds(cond, first - one)
+    for cond in (both, only_stop):
+        assert _holds(cond, last) and not _holds(cond, last + one)
+
+
+def test_dynamic_slot_bounds_are_inclusive_like_znuny() -> None:
+    p = "Search_DynamicField_DueTimeSlot"
+    full = {
+        p: "1",
+        **_slot(p, StartYear="2026", StartMonth="7", StartDay="1", StartHour="8"),
+        **_slot(p, StopYear="2026", StopMonth="7", StopDay="1", StopHour="9", StopMinute="15"),
+    }
+    cond = where(_map(full))  # local 08:00:00 .. 09:15:00 = UTC 06:00:00 .. 07:15:00
+    assert _holds(cond, datetime(2026, 7, 1, 6, 0, 0))
+    assert not _holds(cond, datetime(2026, 7, 1, 5, 59, 59))
+    assert _holds(cond, datetime(2026, 7, 1, 7, 15, 0))
+    assert not _holds(cond, datetime(2026, 7, 1, 7, 15, 1))

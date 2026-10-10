@@ -146,7 +146,9 @@ _DF_TYPES: dict[str, tuple[str, Any]] = {
 }
 #: Znuny dynamic field types the filter catalogue supports.
 SUPPORTED_DF_TYPES = frozenset(_DF_TYPES)
-_DF_OPTION_TYPES = frozenset({"Dropdown", "Multiselect"})
+#: Dynamic field types whose values come from a configured option list.
+DF_OPTION_TYPES = frozenset({"Dropdown", "Multiselect"})
+_DF_OPTION_TYPES = DF_OPTION_TYPES
 
 
 @dataclass(frozen=True, slots=True)

@@ -22,12 +22,12 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from tiqora.filters.model import AllOf, AnyOf, Condition, ConditionOp, Filter, FilterNode
-from tiqora.filters.tickets import SUPPORTED_DF_TYPES
+from tiqora.filters.tickets import DF_OPTION_TYPES, SUPPORTED_DF_TYPES
 from tiqora.util.perl import perl_truthy
 
 FULLTEXT_REASON = (
@@ -99,7 +99,6 @@ _UNITS: dict[str, tuple[str, int]] = {
 }
 _OPERATOR_TOKENS = ("||", "&&", "!", "(", ")", '"', " + ", " - ")
 _SHOWN_LIMIT = 200
-_OPTION_DF_TYPES = frozenset({"Dropdown", "Multiselect"})  # value lists -> ``in``
 _NO_SEARCH = frozenset({"", "None"})
 _DF_SUFFIX = re.compile(
     r"TimePoint|TimePointValue|TimePointFormat|TimePointStart|TimeSlot"
@@ -191,8 +190,8 @@ def _slot_text(parts: Mapping[str, str]) -> str:
 
 def _local_bound(
     parts: Mapping[str, str], defaults: tuple[int, int, int], zone: ZoneInfo
-) -> str | None:
-    """Local date parts -> naive UTC ISO string; ``None`` when the date is not valid."""
+) -> datetime | None:
+    """Local date parts -> naive UTC datetime; ``None`` when the date is not valid."""
     if not all(_is_uint(parts.get(p, "")) for p in _PARTS[:3]):
         return None
     given = [parts.get(p, "") for p in _PARTS[3:]]
@@ -214,7 +213,7 @@ def _local_bound(
             hms[2],
             tzinfo=zone,
         )
-        return local.astimezone(UTC).replace(tzinfo=None).isoformat()
+        return local.astimezone(UTC).replace(tzinfo=None)
     except (ValueError, OverflowError):
         return None
 
@@ -247,13 +246,17 @@ def _time_slot(
     if any(used and bound is None for used, bound in zip(present, bounds, strict=True)):
         return _Problem(INVALID_DATE_REASON, shown)
     lo, hi = bounds
+    # Znuny compares inclusively (start <= value <= stop) while the filter engine uses strict
+    # ``after`` / ``before`` and a half-open ``between`` [from, to); shift by one second.
+    one = timedelta(seconds=1)
     if lo is not None and hi is not None:
         if lo > hi:
             return _Problem(SLOT_ORDER_REASON, shown)
-        return _cond(field, "between", {"from": lo, "to": hi})
+        return _cond(field, "between", {"from": lo.isoformat(), "to": (hi + one).isoformat()})
     if lo is not None:
-        return _cond(field, "after", lo)
-    return _cond(field, "before", hi)
+        return _cond(field, "after", (lo - one).isoformat())
+    assert hi is not None
+    return _cond(field, "before", (hi + one).isoformat())
 
 
 def _combine(conds: list[FilterNode], *, any_of: bool = False) -> FilterNode | None:
@@ -556,7 +559,7 @@ class _Mapper:
                 self.conds.append(_cond(field, "is_true"))
             elif flags == {"-1"}:
                 self.conds.append(_cond(field, "is_false"))
-        elif ftype in _OPTION_DF_TYPES:  # Dropdown, Multiselect
+        elif ftype in DF_OPTION_TYPES:  # Dropdown, Multiselect
             self.conds.append(_cond(field, "in", found))
         else:  # a new supported type needs its own mapping
             self.reject(base, UNSUPPORTED_REASON)
