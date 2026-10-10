@@ -1296,3 +1296,133 @@ class TiqoraReportDirtyTicket(TiqoraBase):
     queued_at: Mapped[datetime] = mapped_column(
         DateTime().with_variant(mysql.DATETIME(fsp=6), "mysql", "mariadb"), nullable=False
     )
+
+
+class TiqoraReport(TiqoraBase):
+    """A saved report definition (``definition`` is the ReportDefinition JSON).
+
+    ``valid = false`` marks a soft-deleted report. ``owner_user_id`` / ``*_by`` mirror
+    Znuny ``users.id`` without a foreign key. Timestamps are app-written naive UTC.
+    """
+
+    __tablename__ = "tiqora_report"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    owner_user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: private | groups | all
+    visibility: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="private", server_default="private"
+    )
+    definition: Mapped[str] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=False)
+    schema_version: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    #: optimistic lock, +1 per update
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    valid: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
+    #: ``builtin.<name>`` or ``<id>`` of the report this one was copied from
+    copied_from: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    changed_by: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    __table_args__ = (
+        Index("ix_tiqora_report_owner", "owner_user_id", "valid"),
+        Index("ix_tiqora_report_visibility", "visibility", "valid"),
+    )
+
+
+class TiqoraReportGroup(TiqoraBase):
+    """Groups a ``groups``-visible report is shared with (``group_id`` has no FK)."""
+
+    __tablename__ = "tiqora_report_group"
+
+    report_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("tiqora_report.id", ondelete="CASCADE", name="fk_tiqora_report_group_report"),
+        primary_key=True,
+        autoincrement=False,
+    )
+    group_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+
+    __table_args__ = (Index("ix_tiqora_report_group_group", "group_id"),)
+
+
+class TiqoraSavedSearch(TiqoraBase):
+    """A saved ticket search (``criteria`` is the wave-0 filter JSON)."""
+
+    __tablename__ = "tiqora_saved_search"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    owner_user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    criteria: Mapped[str] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=False)
+    include_archived: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    sort_by: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="age", server_default="age"
+    )
+    sort_order: Mapped[str] = mapped_column(
+        String(4), nullable=False, default="desc", server_default="desc"
+    )
+    #: tiqora | znuny
+    source: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="tiqora", server_default="tiqora"
+    )
+    #: Znuny search-profile name (re-import key); NULL never collides in the unique index
+    source_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        Index("ix_tiqora_saved_search_owner", "owner_user_id"),
+        UniqueConstraint(
+            "owner_user_id", "source", "source_name", name="uq_tiqora_saved_search_source"
+        ),
+    )
+
+
+class TiqoraSavedSearchGroup(TiqoraBase):
+    __tablename__ = "tiqora_saved_search_group"
+
+    saved_search_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "tiqora_saved_search.id", ondelete="CASCADE", name="fk_tiqora_saved_search_group_search"
+        ),
+        primary_key=True,
+        autoincrement=False,
+    )
+    group_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+
+    __table_args__ = (Index("ix_tiqora_saved_search_group_group", "group_id"),)
+
+
+class TiqoraSavedSearchPref(TiqoraBase):
+    """Per viewer: sidebar entry, count badge and order of a saved search."""
+
+    __tablename__ = "tiqora_saved_search_pref"
+
+    saved_search_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "tiqora_saved_search.id", ondelete="CASCADE", name="fk_tiqora_saved_search_pref_search"
+        ),
+        primary_key=True,
+        autoincrement=False,
+    )
+    user_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    show_in_sidebar: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
+    show_count: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
+    __table_args__ = (Index("ix_tiqora_saved_search_pref_user", "user_id", "position"),)
