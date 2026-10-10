@@ -17,6 +17,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from tests._row_cleanup import delete_above_marks, snapshot_marks
 from tiqora.config import get_settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraSettings
@@ -365,6 +366,16 @@ async def test_poll_once_reindex_failure_propagates_and_counts_error(
     await engine.dispose()
 
 
+def _channel_id_of(sync_url: str, name: str) -> int:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        value = conn.execute(
+            text("SELECT id FROM communication_channel WHERE name = :n"), {"n": name}
+        ).scalar_one()
+    engine.dispose()
+    return int(value)
+
+
 def _webchat_channel_id(sync_url: str) -> int:
     """Id of the ``WebChat`` channel row (inserted like ``ensure_channel_row`` if absent)."""
     engine = create_engine(sync_url)
@@ -419,7 +430,11 @@ async def test_webchat_follow_up_does_not_toast(
     _reset_watermarks(sync_url)
     chat = _seed_queue_and_ticket(sync_url, ns=7)
     mail = _seed_queue_and_ticket(sync_url, ns=8)
+    marks = snapshot_marks(
+        sync_url, ("article", "ticket_history", "communication_channel")
+    )  # children first
     wc_channel = _webchat_channel_id(sync_url)
+    email_channel = _channel_id_of(sync_url, "Email")
     engine = create_async_engine(_to_async_url(sync_url))
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
@@ -427,11 +442,12 @@ async def test_webchat_follow_up_does_not_toast(
         await poller.poll_once(settings=get_settings(), session_factory=factory)
 
     # Window 1: the chat ticket opens (NewTicket) with three customer lines;
-    # another ticket gets three customer e-mails (channel id 1 = Internal row
-    # of the initial data is fine here: only "not WebChat" matters).
+    # another ticket gets three customer e-mails (real Email channel row).
     _insert_history(sync_url, ticket_id=int(chat["ticket"]), history_type_id=1)
     _insert_customer_article_on(sync_url, ticket_id=int(chat["ticket"]), channel_id=wc_channel, n=3)
-    _insert_customer_article_on(sync_url, ticket_id=int(mail["ticket"]), channel_id=1, n=3)
+    _insert_customer_article_on(
+        sync_url, ticket_id=int(mail["ticket"]), channel_id=email_channel, n=3
+    )
     with (
         patch.object(poller, "reindex_ticket_ids", new=AsyncMock(return_value=2)),
         patch.object(poller, "publish_ticket_event", new=AsyncMock()),
@@ -453,3 +469,13 @@ async def test_webchat_follow_up_does_not_toast(
     pub_new2.assert_not_called()
 
     await engine.dispose()
+    delete_above_marks(sync_url, marks)
+    cleanup = create_engine(sync_url)
+    with cleanup.begin() as conn:  # the seed rows of this test (ns 7 and 8)
+        for seed in (chat, mail):
+            conn.execute(text("DELETE FROM ticket WHERE id = :i"), {"i": seed["ticket"]})
+            conn.execute(text("DELETE FROM queue WHERE id = :i"), {"i": seed["queue"]})
+            conn.execute(
+                text("DELETE FROM permission_groups WHERE id = :i"), {"i": int(seed["queue"]) + 30}
+            )
+    cleanup.dispose()

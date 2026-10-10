@@ -21,6 +21,7 @@ see docs/channels.md. Every channel defaults to *disabled*.
 from __future__ import annotations
 
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.crypto.secret import decrypt_secret, encrypt_secret
@@ -111,18 +112,31 @@ async def _lookup_id(session: AsyncSession, table: str, name_col: str, value: st
     return int(row[0]) if row is not None else None
 
 
-async def ensure_channel_row(session: AsyncSession, name: str, module: str) -> int:
+#: ``channel_data`` of a Tiqora-owned channel whose articles live in the shared
+#: Znuny MIME tables: YAML like Znuny's ``ChannelAdd`` writes it, but with NO
+#: ``ArticleDataTables`` -- a ``ChannelDrop`` of an article-less row must never
+#: be able to drop the shared ``article_data_mime*`` tables.
+EMPTY_TABLES_CHANNEL_DATA = "---\nArticleDataArticleIDField: article_id\nArticleDataTables: []\n"
+
+
+async def ensure_channel_row(
+    session: AsyncSession, name: str, module: str, *, channel_data_yaml: str | None = None
+) -> int:
     """Return ``communication_channel.id`` for *name*, inserting it if absent.
 
-    Znuny's ``communication_channel.channel_data`` column is a Perl
-    ``Storable::nfreeze`` blob. Since Tiqora writes no Perl code, and these
-    are Tiqora-only channels Znuny's own UI never renders, we copy the
-    ``channel_data`` bytes of an existing built-in row (``Internal``)
-    verbatim rather than trying to hand-construct Storable bytes. (Znuny's own
-    cache serialisation is YAML, not Storable; only this column is Storable.)
+    ``communication_channel.channel_data`` is YAML (Znuny ``ChannelAdd`` does
+    ``YAML->Dump``, ``ChannelGet`` ``YAML->Load``; not Storable). By default the
+    value of the built-in ``Internal`` row is copied verbatim; pass
+    *channel_data_yaml* to write that text instead (WebChat: empty
+    ``ArticleDataTables``). It is stored in the column type the driver returns
+    for the template (bytes on MariaDB, text on PostgreSQL).
 
-    After an INSERT the ``CommunicationChannel`` cache type is invalidated, as
-    Znuny's ``ChannelAdd`` does via ``_ChannelListCacheCleanup``.
+    Safe for concurrent first use: the INSERT runs in a SAVEPOINT; on a unique
+    violation of ``name`` the savepoint is rolled back (the surrounding
+    transaction stays usable on PostgreSQL) and the winner's row is re-read with
+    a locking read, which sees the latest committed data even on MariaDB
+    REPEATABLE READ. After an INSERT the ``CommunicationChannel`` cache type is
+    invalidated, as Znuny's ``ChannelAdd`` does via ``_ChannelListCacheCleanup``.
     """
     existing = await _lookup_id(session, "communication_channel", "name", name)
     if existing is not None:
@@ -133,22 +147,56 @@ async def ensure_channel_row(session: AsyncSession, name: str, module: str) -> i
             text("SELECT channel_data FROM communication_channel WHERE name = 'Internal' LIMIT 1")
         )
     ).first()
-    channel_data = template[0] if template is not None and template[0] is not None else b""
+    template_value = template[0] if template is not None else None
+    channel_data: bytes | str
+    if channel_data_yaml is None:
+        channel_data = template_value if template_value is not None else b""
+    elif isinstance(template_value, str):
+        channel_data = channel_data_yaml
+    else:
+        channel_data = channel_data_yaml.encode("utf-8")
 
-    await session.execute(
-        text(
-            "INSERT INTO communication_channel"
-            " (name, module, package_name, channel_data, valid_id,"
-            "  create_time, create_by, change_time, change_by)"
-            " VALUES (:n, :m, 'Tiqora', :cd, 1, current_timestamp, 1, current_timestamp, 1)"
-        ),
-        {"n": name, "m": module, "cd": channel_data},
-    )
+    try:
+        async with session.begin_nested():
+            await session.execute(
+                text(
+                    "INSERT INTO communication_channel"
+                    " (name, module, package_name, channel_data, valid_id,"
+                    "  create_time, create_by, change_time, change_by)"
+                    " VALUES (:n, :m, 'Tiqora', :cd, 1,"
+                    " current_timestamp, 1, current_timestamp, 1)"
+                ),
+                {"n": name, "m": module, "cd": channel_data},
+            )
+    except IntegrityError:
+        row = (
+            await session.execute(
+                text("SELECT id FROM communication_channel WHERE name = :n FOR UPDATE"),
+                {"n": name},
+            )
+        ).first()
+        if row is None:
+            raise
+        return int(row[0])
     channel_id = await _lookup_id(session, "communication_channel", "name", name)
     if channel_id is None:
         raise RuntimeError(f"communication_channel insert for {name!r} failed")
     await invalidate_cache_type(session, "CommunicationChannel")
     return channel_id
+
+
+async def ensure_webchat_channel_row(session: AsyncSession) -> int:
+    """``ensure_channel_row`` for the WebChat channel (empty ``ArticleDataTables``).
+
+    Every webchat article path goes through this (R-CHANNEL-ROW)."""
+    from tiqora.webchat.sessions import COMM_CHANNEL_MODULE, COMM_CHANNEL_NAME
+
+    return await ensure_channel_row(
+        session,
+        COMM_CHANNEL_NAME,
+        COMM_CHANNEL_MODULE,
+        channel_data_yaml=EMPTY_TABLES_CHANNEL_DATA,
+    )
 
 
 def normalize_phone(raw: str | None) -> str:

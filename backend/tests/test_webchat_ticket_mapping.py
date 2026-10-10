@@ -21,7 +21,7 @@ from tests._webchat_fixtures import (
     mark_cleanup_first,
     seed_queue_agent,
 )
-from tiqora.channels.common import ensure_channel_row
+from tiqora.channels.common import EMPTY_TABLES_CHANNEL_DATA, ensure_webchat_channel_row
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraChatConfig, TiqoraChatMessage, TiqoraChatSession
 from tiqora.domain.ticket_service import LIST_CHANNELS, TicketService
@@ -35,7 +35,6 @@ from tiqora.domain.ticket_write_service import (
 )
 from tiqora.reporting.facts import FACT_VERSION, channel_key
 from tiqora.webchat.models import ChatConfigValues
-from tiqora.webchat.sessions import COMM_CHANNEL_MODULE, COMM_CHANNEL_NAME
 from tiqora.webchat.store import config_values
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -67,6 +66,47 @@ def _cleanup(url: str) -> None:
     engine.dispose()
 
 
+def _stash_webchat_row(url: str) -> dict[str, object] | None:
+    """Remove a WebChat row another module left (so the tests see a fresh install);
+    returns it for ``_restore_webchat_row``. A row that articles use is kept: skip."""
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            row = (
+                conn.execute(text("SELECT * FROM communication_channel WHERE name = 'WebChat'"))
+                .mappings()
+                .first()
+            )
+            if row is None:
+                return None
+            used = conn.execute(
+                text("SELECT COUNT(*) FROM article WHERE communication_channel_id = :i"),
+                {"i": row["id"]},
+            ).scalar_one()
+            if used:
+                pytest.skip("a WebChat channel row with articles already exists")
+            conn.execute(text("DELETE FROM communication_channel WHERE id = :i"), {"i": row["id"]})
+            return dict(row)
+    finally:
+        engine.dispose()
+
+
+def _restore_webchat_row(url: str, saved: dict[str, object] | None) -> None:
+    if saved is None:
+        return
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM communication_channel WHERE name = 'WebChat'"))
+            cols = ", ".join(saved)
+            params = ", ".join(f":{c}" for c in saved)
+            conn.execute(
+                text(f"INSERT INTO communication_channel ({cols}) VALUES ({params})"), saved
+            )
+    finally:
+        engine.dispose()
+
+
 @pytest.fixture
 def env(request: pytest.FixtureRequest):  # type: ignore[no-untyped-def]
     """(sync url, async session factory); everything created is removed afterwards."""
@@ -81,10 +121,12 @@ def env(request: pytest.FixtureRequest):  # type: ignore[no-untyped-def]
     with engine.begin() as conn:
         seed_queue_agent(conn, queue_id=QUEUE, group_id=GROUP, user_id=AGENT, login="wc48-map")
     engine.dispose()
+    saved = _stash_webchat_row(url)
     aengine = create_async_engine(_to_async_url(url))
     factory = async_sessionmaker(aengine, class_=AsyncSession, expire_on_commit=False)
     yield url, factory
     delete_above_marks(url, marks, first=mark_cleanup_first(marks))
+    _restore_webchat_row(url, saved)
     _cleanup(url)
 
 
@@ -132,7 +174,7 @@ async def test_webchat_article_uses_webchat_channel_and_web_request_history(env)
     _, factory = env
     ticket_id = await _ticket(factory, "wc48 mapping")
     async with factory() as session, session.begin():
-        await ensure_channel_row(session, COMM_CHANNEL_NAME, COMM_CHANNEL_MODULE)
+        await ensure_webchat_channel_row(session)
     a1 = await _add(factory, ticket_id, _article("customer", "one"))
     a2 = await _add(factory, ticket_id, _article("customer", "two"))
     a3 = await _add(factory, ticket_id, _article("agent", "three"))
@@ -153,7 +195,10 @@ async def test_webchat_article_uses_webchat_channel_and_web_request_history(env)
         ).scalar_one()
         assert row.module == "Kernel::System::CommunicationChannel::Internal"
         assert row.package_name == "Tiqora" and int(row.valid_id) == 1
-        assert row.channel_data == internal  # copied verbatim (bytes or str per driver)
+        stored = row.channel_data
+        stored_text = stored.decode() if isinstance(stored, (bytes, memoryview)) else stored
+        assert stored_text == EMPTY_TABLES_CHANNEL_DATA  # YAML, no shared MIME tables
+        assert internal is not None
         channel_ids = (
             (
                 await session.execute(
@@ -194,11 +239,7 @@ async def test_webchat_article_uses_webchat_channel_and_web_request_history(env)
 @pytest.mark.parametrize("env", _URLS, indirect=True)
 async def test_add_article_registers_missing_channel_row(env) -> None:  # type: ignore[no-untyped-def]
     """No pre-existing row: the article must not silently land on Internal (id 1)."""
-    url, factory = env
-    engine = create_engine(url)
-    with engine.begin() as conn:
-        conn.execute(text("DELETE FROM communication_channel WHERE name = 'WebChat'"))
-    engine.dispose()
+    _, factory = env  # the fixture starts without a WebChat row
     ticket_id = await _ticket(factory, "wc48 no row")
     article_id = await _add(factory, ticket_id, _article("customer"))
     async with factory() as session:
@@ -365,3 +406,67 @@ def test_chat_channel_reports_as_webchat() -> None:
     assert channel_key("WebChat") == "webchat"
     assert FACT_VERSION == 2  # no bump: no WebChat rows exist before this deploy
     assert LIST_CHANNELS["WebChat"] == "webchat"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+async def test_ensure_webchat_channel_row_is_race_safe(env) -> None:  # type: ignore[no-untyped-def]
+    """Two first-ever writers: B's INSERT waits for A's commit, hits the unique
+    name, and must return A's id without an error (PG: no aborted transaction)."""
+    import asyncio
+
+    _, factory = env
+    async with factory() as a, a.begin():
+        id_a = await ensure_webchat_channel_row(a)
+
+        async def second() -> int:
+            async with factory() as b, b.begin():
+                got = await ensure_webchat_channel_row(b)
+                # the transaction must still be usable afterwards
+                await b.execute(text("SELECT 1"))
+                return got
+
+        task = asyncio.create_task(second())
+        await asyncio.sleep(1.0)  # B is now blocked on A's uncommitted row
+        assert not task.done()
+    id_b = await asyncio.wait_for(task, timeout=15)
+    assert id_a == id_b
+    async with factory() as session:
+        n = (
+            await session.execute(
+                text("SELECT COUNT(*) FROM communication_channel WHERE name = 'WebChat'")
+            )
+        ).scalar_one()
+    assert int(n) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+async def test_load_config_and_by_key(env) -> None:  # type: ignore[no-untyped-def]
+    from tests._webchat_fixtures import insert_config
+    from tiqora.webchat.store import load_config, load_config_by_key
+
+    url, factory = env
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        insert_config(
+            conn, config_id=48426, queue_id=QUEUE, public_key="wc_48426", origins=["https://a.test"]
+        )
+        insert_config(
+            conn,
+            config_id=48427,
+            queue_id=QUEUE,
+            public_key="wc_48427",
+            origins=["https://b.test"],
+            valid=False,
+        )
+    engine.dispose()
+    async with factory() as session:
+        row = await load_config(session, 48426)
+        assert row is not None and row.public_key == "wc_48426"
+        assert await load_config(session, 48499) is None
+        by_key = await load_config_by_key(session, "wc_48426")
+        assert by_key is not None and by_key.id == 48426
+        assert await load_config_by_key(session, "wc_48427") is None  # invalid config
+        assert await load_config_by_key(session, "wc_unknown") is None
+        assert config_values(row).allowed_origins == ["https://a.test"]

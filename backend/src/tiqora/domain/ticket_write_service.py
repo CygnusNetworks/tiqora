@@ -702,10 +702,9 @@ async def add_article(
     if ch_name == "WebChat":
         # Never fall back to Internal for a chat line (``_channel_id`` would):
         # register the row on first use (idempotent; cache cleanup inside).
-        from tiqora.channels.common import ensure_channel_row
-        from tiqora.webchat.sessions import COMM_CHANNEL_MODULE, COMM_CHANNEL_NAME
+        from tiqora.channels.common import ensure_webchat_channel_row
 
-        comm_channel_id = await ensure_channel_row(session, COMM_CHANNEL_NAME, COMM_CHANNEL_MODULE)
+        comm_channel_id = await ensure_webchat_channel_row(session)
     else:
         comm_channel_id = await _channel_id(session, ch_name)
 

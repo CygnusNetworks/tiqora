@@ -52,9 +52,8 @@ async def _scalar(session, sql: str, **params):  # type: ignore[no-untyped-def]
 
 
 async def test_webchat_article_is_readable_by_znuny(golden_session_factory) -> None:  # type: ignore[no-untyped-def]
-    from tiqora.channels.common import ensure_channel_row
+    from tiqora.channels.common import ensure_webchat_channel_row
     from tiqora.domain.ticket_write_service import ArticleIn, TicketIn, add_article, create_ticket
-    from tiqora.webchat.sessions import COMM_CHANNEL_MODULE, COMM_CHANNEL_NAME
     from tiqora.znuny.sysconfig import SysConfig
 
     async with golden_session_factory() as session:
@@ -65,7 +64,15 @@ async def test_webchat_article_is_readable_by_znuny(golden_session_factory) -> N
         )
 
     async with golden_session_factory() as session:
-        await ensure_channel_row(session, COMM_CHANNEL_NAME, COMM_CHANNEL_MODULE)
+        # A row left by an earlier run would hide what Tiqora writes now.
+        await session.execute(
+            text(
+                "DELETE FROM communication_channel WHERE name = 'WebChat' AND NOT EXISTS"
+                " (SELECT 1 FROM article a WHERE a.communication_channel_id ="
+                " communication_channel.id)"
+            )
+        )
+        await ensure_webchat_channel_row(session)
         ticket_id = await create_ticket(
             session,
             golden_session_factory,
