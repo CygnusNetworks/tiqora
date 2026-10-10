@@ -26,7 +26,7 @@
 - Every endpoint the agent/admin shells call on every page must also be answered in `frontend/e2e/fixtures/mock-api.ts` (e2e runs only on release tags; an unmocked shell call turns the tag pipeline red — wave-1 ruling R-E2E).
 - UI copy German first, plain words, named by what admins/agents recognise; no system jargon in UI text ("Erweiterung", not "Plugin"; "Neustart nötig", not "restart_required"; "Hintergrunddienst", not "Worker").
 - Znuny reference source (6.5 core) at `<repo>/znuny-6.5.22/` (read-only) for behaviour checks.
-- `tiqora_sdk` and `@tiqora/plugin-sdk` are the only plugin-facing API. Anything a plugin needs that is not in `tiqora_sdk.__all__` / the SDK `index.ts` is out of scope for phase 1 — do not export internals "because the fixture needs it"; extend the SDK deliberately (surface snapshot tests in Task 1 and Task 13 fail on any unplanned change).
+- `tiqora_sdk` and `@tiqora/plugin-sdk` are the only plugin-facing API. Anything a plugin needs that is not in `tiqora_sdk.__all__` / the SDK `index.ts` is out of scope for phase 1 — do not export internals "because the fixture needs it"; extend the SDK deliberately (surface snapshot tests in Task 3 and Task 12 fail on any unplanned change).
 
 ## Review Focus
 
@@ -98,9 +98,12 @@ Frontend / packages (new unless "mod"):
 | `packages/plugin-sdk/src/index.ts` | SDK types + ambient runtime declarations (P12) |
 | `packages/plugin-sdk/src/shared.ts` | `PLUGIN_RUNTIME_PATH`, `PLUGIN_SHARED_MODULES` |
 | `packages/plugin-sdk/src/vite.ts` | `tiqoraPluginConfig` (Vite preset) |
-| `packages/plugin-sdk/test-plugin/…` | tiny TSX plugin built with the preset by `pnpm --filter @tiqora/plugin-sdk check:preset` |
+| `packages/plugin-sdk/test-plugin/…` | tiny TSX plugin built with the preset by `pnpm --filter @tiqora/plugin-sdk check:preset` (`test-plugin/src/index.tsx`, `test-plugin/vite.config.ts`) |
+| `packages/plugin-sdk/scripts/check-preset.mjs` | asserts the test-plugin bundle imports only `/plugin-runtime/` and `./` and contains no React internals |
 | `frontend/src/plugins/runtime/{react,react-jsx-runtime,react-dom,react-query,react-router,react-i18next,sdk}.ts` | shim entry modules → `dist/plugin-runtime/*.js` |
 | `frontend/src/plugins/sdkRuntime.tsx` | host implementation of the SDK runtime |
+| `frontend/src/plugins/instanceContext.ts` | `PluginInstanceContext` (`{ pluginId, version }` of the enclosing slot instance) |
+| `frontend/scripts/check-plugin-runtime.mjs` | after the build: every `dist/plugin-runtime/<file>.js` exists, its relative imports resolve, it exports its marker name |
 | `frontend/src/plugins/safeMode.ts` | `isPluginSafeMode`, `applySafeModeFromUrl` |
 | `frontend/src/plugins/loader.ts` | `loadPluginModule`, `PLUGIN_IMPORT_TIMEOUT_MS`, `setPluginImporterForTests` |
 | `frontend/src/plugins/i18n.ts` | `pluginNamespace`, `ensurePluginI18n` |
@@ -728,8 +731,8 @@ export const PLUGIN_SHARED_MODULES = [
 ```
 
 - Host (`frontend/vite.config.ts`): `build.rollupOptions.input = { main: "index.html", "plugin-runtime/<file>": "src/plugins/runtime/<file>.ts" … }`, `preserveEntrySignatures: "exports-only"`, `output.entryFileNames: (c) => c.name.startsWith("plugin-runtime/") ? "[name].js" : "assets/[name]-[hash].js"`. The shim and the app import the same vendor chunk, so React/Query/Router/i18n are single instances. `dist/plugin-runtime/*.js` is unhashed and served by `spa_fallback` with `no-cache` (never `/assets`, whose responses are `immutable`). Dev: a Vite plugin `pluginRuntimeDev` rewrites `/plugin-runtime/<file>.js` to `/src/plugins/runtime/<file>.ts`.
-- Shim content: CJS packages (`react`, `react/jsx-runtime`, `react-dom`) get explicit named re-exports (`import * as M from "react"; export default M; export const { Children, … } = M;`); ESM packages use `export * from "…"` (+ `export { default } from` where the package has one); `sdk.ts` is `export * from "../sdkRuntime";`. `frontend/src/plugins/runtime/runtime.test.ts` asserts every public key (not starting `__`) of the real module is exported by the shim, so a library upgrade that adds exports fails the test.
-- Plugin build (`@tiqora/plugin-sdk/vite`): `tiqoraPluginConfig({ entry, outDir })` → Vite library build, `formats: ["es"]`, `fileName: "index"`, `rollupOptions.external` = every specifier, `output.paths` = specifier → `PLUGIN_RUNTIME_PATH + file + ".js"`, `cssCodeSplit: false`.
+- Shim content: CJS packages (`react`, `react/jsx-runtime`, `react-dom`) get explicit named re-exports (`import * as M from "react"; export default M; export const { Children, … } = M;`); ESM packages use `export * from "…"` (+ `export { default } from` where the package has one); `sdk.ts` re-exports exactly the `SdkRuntime` members by name (not `export *`, which would also leak `runtimeCheck`). `frontend/src/plugins/runtime/runtime.test.ts` asserts every public key (not starting `__`) of the real module is exported by the shim, so a library upgrade that adds exports fails the test.
+- Plugin build (`@tiqora/plugin-sdk/vite`): `tiqoraPluginConfig({ entry, outDir })` → Vite library build, `formats: ["es"]`, `fileName: "index"`, `rollupOptions.external` = every specifier, `output.paths` = specifier → `PLUGIN_RUNTIME_PATH + file + ".js"`, `output.inlineDynamicImports: true` (R-HATCH-I18N), `cssCodeSplit: false`.
 - Loader: `GET /api/v1/plugins/frontend` (React Query key `["plugins", "frontend"]`, `staleTime: Infinity`, `retry: false`; error → zero plugins, no toast), fetched only inside `AgentShell` and `AdminShell` (`PluginProvider`), never on login/portal. `loadPluginModule(p)` → `import(/* @vite-ignore */ p.asset_base + p.entry)` raced against `PLUGIN_IMPORT_TIMEOUT_MS = 10000`; result must be `{ default: { components: Record<string, ComponentType> } }`; cached per `id@version`; style links appended once (`<link rel="stylesheet">`, same origin). i18n: `ensurePluginI18n(p, lang)` fetches `asset_base + "i18n/<lang>.json"` (fallback `en`, then nothing) into namespace `plugin.<id>` (`i18n.addResourceBundle(lang, ns, data, true, true)`), so keys like `plugin.com.example.hello:settings.title` resolve anywhere.
 - Safe mode: `?plugins=off` stores `sessionStorage["tiqora.plugins.off"]="1"` (until `?plugins=on` or the tab closes); `PluginProvider` then neither fetches nor imports; the admin plugins page shows "Erweiterungen sind in diesem Browserfenster ausgeschaltet".
 - Containment: every slot instance renders inside `<PluginBoundary pluginId pluginName>` (class error boundary + `Suspense`); failures render "Erweiterung „{{name}}“ konnte nicht geladen werden." (+ "Details" with the message) and log `console.error` once.

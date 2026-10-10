@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from tiqora.channels.registry import CHANNELS
 from tiqora.jobs.registry import JOB_HANDLERS
 from tiqora.plugins.events import EVENT_SUBSCRIBERS
@@ -103,3 +106,11 @@ def test_no_unexported_public_names() -> None:
     public = {n for n in dir(tiqora_sdk) if not n.startswith("_")}
     # "annotations" comes from `from __future__`; "mcp" is the helper submodule.
     assert public <= set(tiqora_sdk.__all__) | {"annotations", "mcp"}
+
+
+def test_python_and_npm_sdk_versions_match() -> None:
+    import tiqora_sdk
+
+    package_json = Path(__file__).parents[2] / "packages" / "plugin-sdk" / "package.json"
+    pkg = json.loads(package_json.read_text(encoding="utf-8"))
+    assert pkg["version"] == tiqora_sdk.SDK_VERSION
