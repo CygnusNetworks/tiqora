@@ -23,6 +23,7 @@ from tiqora.channels.common import channel_enabled, encrypt_channel_secret, sett
 from tiqora.channels.registry import CHANNEL_CONFIG_KEYS
 from tiqora.domain.settings_store import get_setting, set_setting
 from tiqora.settings_sections.section import SECRET_MASK
+from tiqora.webchat.config_cache import clear_config_cache
 
 router = APIRouter(prefix="/channels", tags=["admin:channels"])
 
@@ -106,4 +107,8 @@ async def update_channel(
             value = encrypt_channel_secret(settings.secret_key, value)
         await set_setting(session, setting_key(channel, key), value)
 
-    return await _read_config(session, channel)
+    out = await _read_config(session, channel)
+    if channel == "webchat":
+        # R-PREAUTH: the public chat API caches the master switch for 10 s.
+        clear_config_cache()
+    return out

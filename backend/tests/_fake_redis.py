@@ -89,6 +89,13 @@ class FakeRedis:
         self._data[key] = str(value)
         return value
 
+    async def incrby(self, key: str, amount: int) -> int:
+        self._check()
+        self._purge(key)
+        value = int(self._data.get(key, "0")) + int(amount)
+        self._data[key] = str(value)
+        return value
+
     async def expire(self, key: str, seconds: int, nx: bool = False) -> bool:
         self._check()
         self._purge(key)
@@ -150,7 +157,7 @@ class FakePipeline:
         self._queue: list[tuple[str, tuple[Any, ...], dict[str, Any]]] = []
 
     def __getattr__(self, name: str) -> Any:
-        if name not in {"get", "set", "delete", "exists", "incr", "expire", "ttl"}:
+        if name not in {"get", "set", "delete", "exists", "incr", "incrby", "expire", "ttl"}:
             raise AttributeError(name)
 
         def _queue(*args: Any, **kwargs: Any) -> FakePipeline:

@@ -13,9 +13,12 @@ from typing import Final
 from urllib.parse import urlsplit
 
 import idna
+import structlog
 from starlette.requests import Request
 
 from tiqora.config import Settings
+
+logger = structlog.get_logger(__name__)
 
 MAX_ORIGINS: Final = 20
 CHAT_API_PATH: Final = "/api/chat/v1/"
@@ -125,13 +128,39 @@ def _base_origin(public_base_url: str) -> str | None:
 def own_origin(request: Request, settings: Settings) -> str:
     """Origin of ``public_base_url`` when set and usable, else scheme+netloc of the request.
 
+    The request fallback is for development: in production it logs
+    ``webchat_public_base_url_missing`` once (TLS usually ends at a proxy, so the request
+    scheme is ``http``).
+
     Raises ``OriginError`` when the fallback Host is not a clean origin (trailing dot, IPv6
     literal, ...). The Host fallback is only trusted as far as the deployment sets no
     ``public_base_url``; callers map the error to 403.
     """
-    return _base_origin(settings.public_base_url) or _canon(
-        f"{request.url.scheme}://{request.url.netloc}", allow_plain_http=True
+    base = _base_origin(settings.public_base_url)
+    if base is not None:
+        return base
+    if settings.is_production:
+        _warn_public_base_url_missing()
+    return _canon(f"{request.url.scheme}://{request.url.netloc}", allow_plain_http=True)
+
+
+_base_url_warning = {"done": False}
+
+
+def _warn_public_base_url_missing() -> None:
+    """Behind a TLS-terminating proxy the request origin is wrong; say so once per process."""
+    if _base_url_warning["done"]:
+        return
+    _base_url_warning["done"] = True
+    logger.warning(
+        "webchat_public_base_url_missing",
+        hint="Set TIQORA_PUBLIC_BASE_URL to the public https:// address of Tiqora.",
     )
+
+
+def reset_public_base_url_warning() -> None:
+    """Tests: let the once-per-process warning fire again."""
+    _base_url_warning["done"] = False
 
 
 def referer_origin(value: str | None) -> str | None:

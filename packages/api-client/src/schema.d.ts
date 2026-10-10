@@ -21,6 +21,211 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chat/v1/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Public Config
+         * @description What the widget shows for config *k* on the website *origin*.
+         */
+        get: operations["get_public_config_api_chat_v1_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/offline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Offline Form
+         * @description Offline form: a ticket with the visitor's message (an e-mail address is required).
+         */
+        post: operations["post_offline_form_api_chat_v1_offline_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Chat Session
+         * @description Start a chat; 409 ``offline`` when nobody can take it (use the offline form).
+         */
+        post: operations["create_chat_session_api_chat_v1_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Chat Session State */
+        get: operations["get_chat_session_state_api_chat_v1_sessions__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions/{session_id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Chat Attachment
+         * @description One file (multipart ``file``, optional ``caption``/``client_id``) = one visitor line.
+         *
+         *     Takes the raw request so nothing is parsed before the length, token and limit checks
+         *     (R-UPLOAD).
+         */
+        post: operations["post_chat_attachment_api_chat_v1_sessions__session_id__attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions/{session_id}/contact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Chat Contact
+         * @description Leave an e-mail address after a chat ended without an answer.
+         */
+        post: operations["post_chat_contact_api_chat_v1_sessions__session_id__contact_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions/{session_id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Chat End
+         * @description The visitor closes the chat (idempotent).
+         */
+        post: operations["post_chat_end_api_chat_v1_sessions__session_id__end_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions/{session_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Chat Messages
+         * @description Transcript lines with ``seq > after`` in order.
+         */
+        get: operations["list_chat_messages_api_chat_v1_sessions__session_id__messages_get"];
+        put?: never;
+        /**
+         * Post Chat Message
+         * @description One visitor line; a retry with the same ``client_id`` returns the stored line.
+         */
+        post: operations["post_chat_message_api_chat_v1_sessions__session_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions/{session_id}/messages/{seq}/attachments/{index}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Chat Attachment
+         * @description A file of this session's transcript (raster images inline, everything else as a
+         *     download; ``nosniff`` + ``CSP: sandbox`` always).
+         */
+        get: operations["get_chat_attachment_api_chat_v1_sessions__session_id__messages__seq__attachments__index__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions/{session_id}/typing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Chat Typing
+         * @description The visitor is typing; at most one signal per 2 s, the rest is dropped silently.
+         */
+        post: operations["post_chat_typing_api_chat_v1_sessions__session_id__typing_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portal/auth/login": {
         parameters: {
             query?: never;
@@ -11920,6 +12125,234 @@ export interface components {
             /** Enabled */
             enabled?: boolean | null;
         };
+        /** ChatAttachmentOut */
+        ChatAttachmentOut: {
+            /** Content Type */
+            content_type: string;
+            /** Filename */
+            filename: string;
+            /** Index */
+            index: number;
+            /** Size */
+            size: number;
+        };
+        /** ChatContactIn */
+        ChatContactIn: {
+            /**
+             * Email
+             * @default
+             */
+            email: string;
+            /** Name */
+            name?: string | null;
+        };
+        /** ChatMessageIn */
+        ChatMessageIn: {
+            /** Body */
+            body: string;
+            /** Client Id */
+            client_id?: string | null;
+        };
+        /** ChatMessageOut */
+        ChatMessageOut: {
+            /** Agent Name */
+            agent_name: string | null;
+            /** Attachments */
+            attachments: components["schemas"]["ChatAttachmentOut"][];
+            /** Body */
+            body: string | null;
+            /** Client Id */
+            client_id: string | null;
+            /** Code */
+            code: string | null;
+            /**
+             * Created
+             * Format: date-time
+             */
+            created: string;
+            /** Params */
+            params: {
+                [key: string]: string | boolean | null;
+            };
+            /**
+             * Sender
+             * @enum {string}
+             */
+            sender: "visitor" | "agent" | "system";
+            /** Seq */
+            seq: number;
+        };
+        /**
+         * ChatOfflineIn
+         * @description Offline form; the same bounds as ``ChatSessionCreateIn`` (R-INPUT).
+         *
+         *     ``email`` defaults to ``""`` so a missing address is answered by the service with
+         *     ``invalid_prechat`` / ``{"email": "required"}`` instead of FastAPI's list shape
+         *     (R-OFFLINE-EMAIL).
+         */
+        ChatOfflineIn: {
+            /**
+             * Email
+             * @default
+             */
+            email: string;
+            /** Key */
+            key: string;
+            /** Language */
+            language?: string | null;
+            /** Message */
+            message: string;
+            /** Name */
+            name?: string | null;
+            /** Origin */
+            origin: string;
+            /** Page Url */
+            page_url?: string | null;
+            /** Prechat */
+            prechat?: {
+                [key: string]: string | boolean;
+            };
+            /** Topic */
+            topic?: string | null;
+            /** Visitor Id */
+            visitor_id: string;
+        };
+        /**
+         * ChatOfflineOut
+         * @description Empty acknowledgement of the offline form (``{}``).
+         */
+        ChatOfflineOut: Record<string, never>;
+        /**
+         * ChatPublicConfigOut
+         * @description What the widget needs to render; no admin name, ids or queue data.
+         */
+        ChatPublicConfigOut: {
+            /** Greeting */
+            greeting: string | null;
+            /** Max Message Length */
+            max_message_length: number;
+            /**
+             * Offline Mode
+             * @enum {string}
+             */
+            offline_mode: "form" | "hide";
+            /** Online */
+            online: boolean;
+            /** Prechat Fields */
+            prechat_fields: components["schemas"]["ChatPublicFieldOut"][];
+            /** Privacy Url */
+            privacy_url: string | null;
+            theme: components["schemas"]["ChatTheme"];
+            /** Topics */
+            topics: components["schemas"]["ChatPublicTopicOut"][];
+            upload: components["schemas"]["ChatPublicUploadOut"];
+        };
+        /** ChatPublicFieldOut */
+        ChatPublicFieldOut: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "text" | "textarea" | "email" | "select" | "checkbox";
+            /** Label */
+            label: string;
+            /** Options */
+            options: components["schemas"]["PrechatOption"][];
+            /** Required */
+            required: boolean;
+        };
+        /** ChatPublicTopicOut */
+        ChatPublicTopicOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Online */
+            online: boolean;
+        };
+        /** ChatPublicUploadOut */
+        ChatPublicUploadOut: {
+            /** Enabled */
+            enabled: boolean;
+            /** Max Bytes */
+            max_bytes: number;
+            /** Types */
+            types: string[];
+        };
+        /** ChatSessionCreateIn */
+        ChatSessionCreateIn: {
+            /** Client Id */
+            client_id?: string | null;
+            /** Key */
+            key: string;
+            /** Language */
+            language?: string | null;
+            /** Message */
+            message: string;
+            /** Origin */
+            origin: string;
+            /** Page Url */
+            page_url?: string | null;
+            /** Prechat */
+            prechat?: {
+                [key: string]: string | boolean;
+            };
+            /** Topic */
+            topic?: string | null;
+            /** Visitor Id */
+            visitor_id: string;
+        };
+        /** ChatSessionCreatedOut */
+        ChatSessionCreatedOut: {
+            message: components["schemas"]["ChatMessageOut"];
+            /** Session Id */
+            session_id: string;
+            /** Status */
+            status: string;
+            /** Token */
+            token: string;
+        };
+        /** ChatSessionOut */
+        ChatSessionOut: {
+            /** Agent Name */
+            agent_name: string | null;
+            /** Can Send */
+            can_send: boolean;
+            /** Last Seq */
+            last_seq: number;
+            /** Needs Contact */
+            needs_contact: boolean;
+            /** Session Id */
+            session_id: string;
+            /** Status */
+            status: string;
+            /** Topic Label */
+            topic_label: string | null;
+        };
+        /** ChatTheme */
+        ChatTheme: {
+            /** Launcher Label */
+            launcher_label?: string | null;
+            /**
+             * Mode
+             * @default auto
+             * @enum {string}
+             */
+            mode: "auto" | "light" | "dark";
+            /**
+             * Position
+             * @default right
+             * @enum {string}
+             */
+            position: "right" | "left";
+            /**
+             * Primary Color
+             * @default #2563eb
+             */
+            primary_color: string;
+        };
         /** CompanyCreateOut */
         CompanyCreateOut: {
             /** Customer Id */
@@ -16230,6 +16663,13 @@ export interface components {
             /** Value */
             value: string;
         };
+        /** PrechatOption */
+        PrechatOption: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+        };
         /** PresenceEntry */
         PresenceEntry: {
             /** Mode */
@@ -19637,6 +20077,683 @@ export interface operations {
                         [key: string]: string;
                     };
                 };
+            };
+        };
+    };
+    get_public_config_api_chat_v1_config_get: {
+        parameters: {
+            query: {
+                k: string;
+                origin: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatPublicConfigOut"];
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_offline_form_api_chat_v1_offline_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatOfflineIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatOfflineOut"];
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_chat_session_api_chat_v1_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatSessionCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSessionCreatedOut"];
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_chat_session_state_api_chat_v1_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSessionOut"];
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_chat_attachment_api_chat_v1_sessions__session_id__attachments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    caption?: string;
+                    client_id?: string;
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageOut"];
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description File too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_chat_contact_api_chat_v1_sessions__session_id__contact_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatContactIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_chat_end_api_chat_v1_sessions__session_id__end_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_chat_messages_api_chat_v1_sessions__session_id__messages_get: {
+        parameters: {
+            query?: {
+                after?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageOut"][];
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_chat_message_api_chat_v1_sessions__session_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatMessageIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageOut"];
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_chat_attachment_api_chat_v1_sessions__session_id__messages__seq__attachments__index__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                seq: number;
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": unknown;
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_chat_typing_api_chat_v1_sessions__session_id__typing_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

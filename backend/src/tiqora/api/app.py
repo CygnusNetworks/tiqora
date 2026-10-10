@@ -22,6 +22,8 @@ from tiqora.config import Settings, get_settings
 from tiqora.db.engine import check_database, get_session_factory
 from tiqora.identity.env_providers import ensure_env_providers, env_ldap_tls_warnings
 from tiqora.logging_setup import configure_logging
+from tiqora.webchat.public_api import CHAT_PUBLIC_PREFIX, chat_body_limit_middleware
+from tiqora.webchat.public_api import router as webchat_public_router
 
 logger = structlog.get_logger(__name__)
 
@@ -208,6 +210,30 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("tiqora_stopped")
 
 
+_CHAT_LABEL_WORDS = frozenset(
+    {"api", "chat", "v1", "config", "sessions", "messages", "stream", "typing"}
+    | {"attachments", "contact", "end", "offline"}
+)
+
+
+def _chat_label_path(path: str) -> str:
+    """Metrics label of a public chat path: session ids → ``{id}``, numbers → ``{n}``.
+
+    The API is anonymous, so any other segment collapses to ``{x}`` (no label per URL).
+    """
+    out: list[str] = []
+    for part in path.split("/"):
+        if len(part) == 32 and all(c in "0123456789abcdef" for c in part):
+            out.append("{id}")
+        elif part.isdigit():
+            out.append("{n}")
+        elif part == "" or part in _CHAT_LABEL_WORDS:
+            out.append(part)
+        else:
+            out.append("{x}")
+    return "/".join(out)
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Build and return the FastAPI application."""
     cfg = settings or get_settings()
@@ -256,6 +282,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return await body_size_limit_middleware(request, call_next)
 
     @app.middleware("http")
+    async def chat_body_limit(request: Request, call_next: CallNext) -> StarletteResponse:
+        """R-UPLOAD: bound public chat bodies before FastAPI reads them."""
+        return await chat_body_limit_middleware(request, call_next)
+
+    @app.middleware("http")
     async def csrf_origin_check_middleware(
         request: Request, call_next: CallNext
     ) -> StarletteResponse:
@@ -297,7 +328,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.middleware("http")
     async def metrics_middleware(request: Request, call_next: CallNext) -> StarletteResponse:
         path = request.url.path
-        if path.startswith(cfg.api_prefix):
+        if path.startswith(CHAT_PUBLIC_PREFIX + "/"):
+            label_path = _chat_label_path(path)
+        elif path.startswith(cfg.api_prefix):
             # Collapse dynamic segments for low-cardinality labels
             parts = path.split("/")
             label_parts: list[str] = []
@@ -321,6 +354,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(api_v1_router, prefix=cfg.api_prefix)
     app.include_router(compat_router)
+    app.include_router(webchat_public_router, prefix=CHAT_PUBLIC_PREFIX)
     app.include_router(
         portal_router,
         prefix="/api/portal",
