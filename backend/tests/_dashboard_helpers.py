@@ -7,11 +7,12 @@ QUEUE_2); C: no groups, member of ROLE_2 (invalid role, ``roles.valid_id = 2``).
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from httpx import ASGITransport, AsyncClient
@@ -47,8 +48,34 @@ TICKETS: dict[str, int] = {
     "unowned_new": 49734,
     "b_open": 49735,
 }
+CALENDARS: dict[int, int] = {GROUP_1: 49800, GROUP_2: 49801}  #: calendar id per group
 now = utc_now().replace(microsecond=0)
 today_noon_utc = now.replace(hour=12, minute=0, second=0)
+
+
+class FakeRedis:
+    """In-memory Redis stand-in (copy of ``test_agents_online._FakeRedis``: set/get/scan_iter)."""
+
+    def __init__(self, initial: dict[str, str] | None = None) -> None:
+        self._store: dict[str, str] = dict(initial or {})
+        self.ttls: dict[str, int | None] = {}
+
+    async def set(self, key: str, value: str, ex: int | None = None) -> None:
+        self._store[key] = value
+        self.ttls[key] = ex
+
+    async def get(self, key: str) -> str | None:
+        return self._store.get(key)
+
+    async def delete(self, key: str) -> None:
+        self._store.pop(key, None)
+        self.ttls.pop(key, None)
+
+    async def scan_iter(self, match: str | None = None) -> Any:
+        for key in list(self._store.keys()):
+            if match is None or fnmatch.fnmatch(key, match):
+                yield key
+
 
 _P = {
     "ulo": 49710,
@@ -79,6 +106,7 @@ _CLEANUP = (
     "DELETE FROM calendar_appointment_ticket WHERE calendar_id BETWEEN :clo AND :chi",
     "DELETE FROM calendar_appointment WHERE calendar_id BETWEEN :clo AND :chi",
     "DELETE FROM calendar WHERE id BETWEEN :clo AND :chi",
+    "DELETE FROM user_preferences WHERE user_id BETWEEN :ulo AND :uhi",
     "DELETE FROM tiqora_ai_ticket_state WHERE ticket_id BETWEEN :tlo AND :thi",
     "DELETE FROM ticket_history WHERE ticket_id BETWEEN :tlo AND :thi",
     "DELETE FROM article WHERE ticket_id BETWEEN :tlo AND :thi",
@@ -121,7 +149,7 @@ def seed_world(sync_url: str) -> None:
     """Idempotent: removes the band, then inserts users, groups, queues, roles, tickets."""
     cleanup_world(sync_url)
     t = datetime(2026, 10, 1, 8, 0)
-    epoch = int(now.timestamp())
+    epoch = int(now.replace(tzinfo=UTC).timestamp())  # `now` is naive UTC
     engine = create_engine(sync_url)
     with engine.begin() as conn:
         state = {
@@ -450,6 +478,26 @@ class Env:
             s=solution,
             i=ticket_id,
         )
+
+    def make_appointment(
+        self, *, calendar_group: int, title: str, start: datetime, hours: int = 1
+    ) -> None:
+        """An appointment (naive UTC ``start``) in the band calendar of ``calendar_group``."""
+        cal = CALENDARS[calendar_group]
+        if not self._sql("SELECT id FROM calendar WHERE id = :i", i=cal):
+            self._sql_write(
+                "INSERT INTO calendar (id, group_id, name, salt_string, color, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:i, :g, :n, :s, '#3366cc', 1, :t, 1, :t, 1)",
+                i=cal, g=calendar_group, n=f"dash497-cal-{cal}", s=f"dash497{cal}", t=now,
+            )  # fmt: skip
+        self._sql_write(
+            "INSERT INTO calendar_appointment (calendar_id, unique_id, title, start_time,"
+            " end_time, all_day, create_time, create_by, change_time, change_by)"
+            " VALUES (:c, :u, :ti, :s, :e, 0, :t, 1, :t, 1)",
+            c=cal, u=f"dash497-{uuid.uuid4().hex}", ti=title, s=start,
+            e=start + timedelta(hours=hours), t=now,
+        )  # fmt: skip
 
     def _sql_write(self, sql: str, **params: Any) -> None:
         engine = create_engine(self.sync_url)
