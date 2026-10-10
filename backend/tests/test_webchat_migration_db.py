@@ -110,7 +110,16 @@ def _reflect(sync_url: str) -> dict[str, dict[str, Any]]:
                 (ix["name"], tuple(ix["column_names"]), bool(ix["unique"]))
                 for ix in insp.get_indexes(table)
             }
+            fks = sorted(
+                (
+                    tuple(fk["constrained_columns"]),
+                    fk["referred_table"],
+                    tuple(fk["referred_columns"]),
+                )
+                for fk in insp.get_foreign_keys(table)
+            )
             out[table] = {
+                "fks": fks,
                 "columns": cols,
                 "indexes": indexes,
                 "pk": tuple(insp.get_pk_constraint(table)["constrained_columns"]),
@@ -176,6 +185,13 @@ def test_webchat_migration_up_down_up_matches_orm(alembic_env: str) -> None:
             name for name, _, _ in first["tiqora_chat_message"]["indexes"]
         }
         assert first["tiqora_chat_agent_state"]["pk"] == ("user_id",)
+        assert ("ix_tiqora_chat_session_config", ("config_id",), False) in first[
+            "tiqora_chat_session"
+        ]["indexes"]
+        if "mysql" in sync_url:
+            columns = first["tiqora_chat_config"]["columns"]
+            assert columns["prechat_fields"][0].lower() == "mediumtext"
+            assert columns["topics"][0].lower() == "text"
 
         _migrate(_PREVIOUS, down=True)
         assert _present(sync_url) == set()

@@ -5,6 +5,7 @@ Revises: 20261009_0067
 Create Date: 2026-10-10
 
 All structured columns are JSON stored as ``TEXT`` (house style). No foreign keys:
+``prechat_fields`` is MEDIUMTEXT on MariaDB (its limits allow more than 64 KiB).
 ``ticket_id`` and the user ids point into Znuny tables. Timestamps are written by the
 application as naive UTC. ``ux_tiqora_chat_message_client`` relies on NULL ``client_id``
 values never colliding in a unique index (true on MariaDB and PostgreSQL).
@@ -16,6 +17,9 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import mysql
+
+MEDIUM_TEXT = sa.Text().with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb")
 
 revision: str = "20261010_0069"
 down_revision: str | None = "20261009_0067"
@@ -37,7 +41,7 @@ def upgrade() -> None:
         sa.Column("offline_mode", sa.String(10), nullable=False, server_default="form"),
         sa.Column("business_calendar", sa.String(10), nullable=True),
         sa.Column("wait_timeout_seconds", sa.Integer(), nullable=False, server_default="180"),
-        sa.Column("prechat_fields", sa.Text(), nullable=False),
+        sa.Column("prechat_fields", MEDIUM_TEXT, nullable=False),
         sa.Column("upload_policy", sa.Text(), nullable=False),
         sa.Column("theme", sa.Text(), nullable=False),
         sa.Column("rate_limits", sa.Text(), nullable=False),
@@ -81,6 +85,7 @@ def upgrade() -> None:
         sa.Column("purged_at", sa.DateTime(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
+    op.create_index("ix_tiqora_chat_session_config", "tiqora_chat_session", ["config_id"])
     op.create_index("ix_tiqora_chat_session_status", "tiqora_chat_session", ["status", "config_id"])
     op.create_index("ix_tiqora_chat_session_ticket", "tiqora_chat_session", ["ticket_id"])
     op.create_index(

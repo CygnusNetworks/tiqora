@@ -1324,7 +1324,7 @@ class TiqoraChatConfig(TiqoraBase):
     wait_timeout_seconds: Mapped[int] = mapped_column(
         Integer, nullable=False, default=180, server_default="180"
     )
-    prechat_fields: Mapped[str] = mapped_column(Text, nullable=False)
+    prechat_fields: Mapped[str] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=False)
     upload_policy: Mapped[str] = mapped_column(Text, nullable=False)
     theme: Mapped[str] = mapped_column(Text, nullable=False)
     rate_limits: Mapped[str] = mapped_column(Text, nullable=False)
@@ -1381,6 +1381,7 @@ class TiqoraChatSession(TiqoraBase):
     purged_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     __table_args__ = (
+        Index("ix_tiqora_chat_session_config", "config_id"),
         Index("ix_tiqora_chat_session_status", "status", "config_id"),
         Index("ix_tiqora_chat_session_ticket", "ticket_id"),
         Index("ix_tiqora_chat_session_assigned", "assigned_user_id", "status"),
