@@ -19,6 +19,7 @@ from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.dashboard.defaults import default_widgets
 from tiqora.dashboard.layout import Rect, normalize_rects
 from tiqora.dashboard.schemas import (
     MAX_DASHBOARDS_PER_USER,
@@ -26,6 +27,8 @@ from tiqora.dashboard.schemas import (
     DashboardOut,
     DashboardSaveIn,
     DashboardTabOut,
+    DashboardTemplateIn,
+    DashboardTemplateOut,
     WidgetIn,
     WidgetLayouts,
     WidgetOut,
@@ -52,12 +55,16 @@ __all__ = [
     "DashboardInvalid",
     "DashboardNotFound",
     "create_dashboard",
+    "create_template",
     "delete_dashboard",
+    "delete_template",
     "get_dashboard",
+    "list_templates",
     "list_visible",
     "patch_widget_settings",
     "save_dashboard",
     "set_order",
+    "update_template",
     "user_role_ids",
 ]
 
@@ -665,4 +672,144 @@ async def set_order(session: AsyncSession, user_id: int, ids: Sequence[int]) -> 
             .where(TiqoraDashboard.id == did, TiqoraDashboard.owner_user_id == user_id)
             .values(sort=pos)
         )
+    session.expire_all()
+
+
+# ------------------------------------------------------------------ role templates
+# Admin-only management (the route layer enforces ``AdminUser``). Templates have no owner;
+# role membership is only stored here and applied on read (``list_visible``/``ensure_start``).
+
+
+async def _check_roles(session: AsyncSession, role_ids: Sequence[int]) -> list[int]:
+    """Deduplicated role ids; an unknown or invalid role is a 422 on ``role_ids``."""
+    wanted = sorted(set(role_ids))
+    if not wanted:
+        return []
+    res = await session.execute(select(Roles.id).where(Roles.id.in_(wanted), Roles.valid_id == 1))
+    known = {int(r) for r in res.scalars().all()}
+    for rid in wanted:
+        if rid not in known:
+            raise DashboardInvalid(f"Die Rolle {rid} gibt es nicht.", "role_ids")
+    return wanted
+
+
+async def _template_row(session: AsyncSession, template_id: int) -> TiqoraDashboard:
+    row = await _load_row(session, template_id)
+    if row is None or row.kind != "template":
+        raise DashboardNotFound(template_id)
+    return row
+
+
+async def _template_out(session: AsyncSession, row: TiqoraDashboard) -> DashboardTemplateOut:
+    count = await session.execute(
+        select(func.count())
+        .select_from(TiqoraDashboardWidget)
+        .where(TiqoraDashboardWidget.dashboard_id == row.id)
+    )
+    return DashboardTemplateOut(
+        id=row.id,
+        name=row.name,
+        icon=row.icon,
+        kind="template",
+        locked=bool(row.locked),
+        is_owner=False,
+        can_edit=True,
+        can_share=False,
+        owner_name=None,
+        version=row.version,
+        sort=row.sort,
+        group_ids=[],
+        source_template_id=None,
+        role_ids=sorted(await _role_ids_of(session, row.id)),
+        widget_count=int(count.scalar_one()),
+    )
+
+
+async def list_templates(session: AsyncSession) -> list[DashboardTemplateOut]:
+    res = await session.execute(
+        select(TiqoraDashboard)
+        .where(TiqoraDashboard.kind == "template")
+        .order_by(TiqoraDashboard.sort, TiqoraDashboard.id)
+        .execution_options(populate_existing=True)
+    )
+    return [await _template_out(session, r) for r in res.scalars().all()]
+
+
+async def create_template(
+    session: AsyncSession, admin_id: int, body: DashboardTemplateIn
+) -> DashboardTemplateOut:
+    """A new template with the default widgets; its layout is then edited with the
+    dashboard PUT (admins only). ``admin_id`` is accepted for the audit trail only: the
+    template itself has no owner."""
+    _ = admin_id
+    role_ids = await _check_roles(session, body.role_ids)
+    now = utc_now()
+    row = TiqoraDashboard(
+        owner_user_id=None,
+        name=body.name,
+        icon=body.icon,
+        sort=body.sort,
+        kind="template",
+        locked=body.locked,
+        filters="{}",
+        version=1,
+        created_at=now,
+        changed_at=now,
+    )
+    session.add(row)
+    await session.flush()
+    for i, w in enumerate(default_widgets()):
+        session.add(widget_row(row.id, w, i))
+    for rid in role_ids:
+        session.add(TiqoraDashboardRole(dashboard_id=row.id, role_id=rid))
+    await session.flush()
+    return await _template_out(session, await _template_row(session, row.id))
+
+
+async def update_template(
+    session: AsyncSession,
+    template_id: int,
+    body: DashboardTemplateIn,
+    *,
+    version: int | None = None,
+) -> DashboardTemplateOut:
+    """Change name, icon, roles, lock and priority; bumps ``version``.
+
+    With ``version`` the update is an optimistic-lock compare-and-set.
+    """
+    row = await _template_row(session, template_id)
+    if version is not None and version != row.version:
+        raise DashboardConflict(row.version)
+    role_ids = await _check_roles(session, body.role_ids)
+    stmt = update(TiqoraDashboard).where(TiqoraDashboard.id == template_id)
+    if version is not None:
+        stmt = stmt.where(TiqoraDashboard.version == version)
+    res = await session.execute(
+        stmt.values(
+            name=body.name,
+            icon=body.icon,
+            sort=body.sort,
+            locked=body.locked,
+            version=TiqoraDashboard.version + 1,
+            changed_at=utc_now(),
+        )
+    )
+    if res.rowcount == 0:  # type: ignore[attr-defined]
+        raise DashboardConflict(await _current_version(session, template_id))
+    await session.execute(
+        delete(TiqoraDashboardRole).where(TiqoraDashboardRole.dashboard_id == template_id)
+    )
+    for rid in role_ids:
+        session.add(TiqoraDashboardRole(dashboard_id=template_id, role_id=rid))
+    await session.flush()
+    return await _template_out(session, await _template_row(session, template_id))
+
+
+async def delete_template(session: AsyncSession, template_id: int) -> None:
+    """Remove the template, its widgets and role rows. Copies users already made keep
+    ``source_template_id`` and live on as their own dashboards."""
+    await _template_row(session, template_id)
+    for model in (TiqoraDashboardWidget, TiqoraDashboardRole, TiqoraDashboardGroup):
+        await session.execute(delete(model).where(model.dashboard_id == template_id))
+    await session.execute(delete(TiqoraDashboard).where(TiqoraDashboard.id == template_id))
     session.expire_all()

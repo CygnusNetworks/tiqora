@@ -127,7 +127,7 @@ class WidgetPreviewIn(BaseModel):
     settings: dict[str, Any] = Field(default_factory=dict)
 
 
-class TemplateIn(BaseModel):
+class DashboardTemplateIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: _Name
@@ -137,6 +137,6 @@ class TemplateIn(BaseModel):
     sort: int = Field(0, ge=0, le=1000)
 
 
-class TemplateOut(DashboardTabOut):
+class DashboardTemplateOut(DashboardTabOut):
     role_ids: list[int]
     widget_count: int

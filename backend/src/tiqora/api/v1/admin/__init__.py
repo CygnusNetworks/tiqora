@@ -25,6 +25,7 @@ from tiqora.api.v1.admin import (
     customer_links,
     customers,
     daemons,
+    dashboard_templates,
     deploy,
     deploy_status,
     dynamic_fields,
@@ -110,5 +111,6 @@ admin_router.include_router(extensions.router)
 admin_router.include_router(settings_sections.router)
 admin_router.include_router(identity_providers.router)
 admin_router.include_router(reporting.router)
+admin_router.include_router(dashboard_templates.router)
 
 __all__ = ["admin_router"]
