@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { ensurePluginI18n } from "@/plugins/i18n";
+import { usePlugins } from "@/plugins/PluginProvider";
 import { SchemaForm } from "@/components/fields/SchemaForm";
 import type { FieldErrors, FieldValues } from "@/components/fields/types";
 import { Button } from "@/components/ui/Button";
@@ -17,7 +19,7 @@ import {
 
 /** Generic admin page for one settings section, generated from its JSON schema. */
 export function SettingsSectionPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { section: key } = useParams({ strict: false }) as { section: string };
   const qc = useQueryClient();
   const sectionQ = useQuery({
@@ -28,6 +30,29 @@ export function SettingsSectionPage() {
   const [draft, setDraft] = useState<FieldValues | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saved, setSaved] = useState(false);
+
+  // Plugin sections (`plugins.<id>`) take their labels from the plugin's own
+  // translations: show the form only once they are loaded. A plugin missing
+  // from the list (or safe mode) renders with the schema titles instead.
+  const { plugins, ready: pluginsReady } = usePlugins();
+  const pluginId = key.startsWith("plugins.") ? key.slice("plugins.".length) : null;
+  const plugin = pluginId ? plugins.find((p) => p.id === pluginId) : undefined;
+  const [textsFor, setTextsFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pluginId || !pluginsReady) return;
+    if (!plugin) {
+      setTextsFor(key);
+      return;
+    }
+    let active = true;
+    void ensurePluginI18n(plugin, i18n.language).then(() => {
+      if (active) setTextsFor(key);
+    });
+    return () => {
+      active = false;
+    };
+  }, [key, pluginId, plugin, pluginsReady, i18n.language]);
+  const waitingForTexts = pluginId !== null && textsFor !== key;
 
   useEffect(() => {
     if (sectionQ.data) setDraft(initialSectionValues(sectionQ.data));
@@ -55,7 +80,7 @@ export function SettingsSectionPage() {
       </div>
     );
   }
-  if (!sectionQ.data || !draft) {
+  if (!sectionQ.data || !draft || waitingForTexts) {
     return (
       <div className="flex justify-center p-8" data-testid="admin-settings-page">
         <Spinner />

@@ -1,0 +1,215 @@
+import type { ReactNode } from "react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { I18nextProvider } from "react-i18next";
+import i18n from "@/i18n";
+import type { PluginAdmin } from "@/lib/pluginsApi";
+import { PLUGIN_SAFE_MODE_KEY } from "@/plugins/safeMode";
+import { ADMIN_PAGES, rankAdminPages } from "@/lib/adminSearch";
+import { PluginsPage } from "./PluginsPage";
+
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ to, params, children, ...rest }: { to: string; params?: Record<string, string>; children: ReactNode; [k: string]: unknown }) => (
+    <a href={Object.entries(params ?? {}).reduce((acc, [k, v]) => acc.replace(`$${k}`, v), to)} {...rest}>
+      {children}
+    </a>
+  ),
+}));
+
+const adminList = vi.fn();
+const setEnabled = vi.fn();
+const reset = vi.fn();
+vi.mock("@/lib/pluginsApi", () => ({
+  pluginsApi: {
+    adminList: (...a: unknown[]) => adminList(...a),
+    setEnabled: (...a: unknown[]) => setEnabled(...a),
+    reset: (...a: unknown[]) => reset(...a),
+  },
+}));
+
+const UPDATED = "2026-10-10T08:00:00Z";
+
+function adminPlugin(overrides: Partial<PluginAdmin> = {}): PluginAdmin {
+  return {
+    id: "org.example.hello",
+    name: "Hallo-Erweiterung",
+    version: "1.0.0",
+    publisher: "Example Org",
+    description: "Sagt Hallo.",
+    homepage: null,
+    support: null,
+    license: null,
+    categories: [],
+    source: "image",
+    installed_at: null,
+    enabled: true,
+    status: "active",
+    status_message: null,
+    settings_section: "plugins.org.example.hello",
+    capabilities: [
+      { kind: "extension_point", value: "core.events.subscribers" },
+      { kind: "extension_point", value: "core.http.public_routes" },
+      { kind: "outbound_host", value: "api.example.org" },
+      { kind: "frontend_slot", value: "ticket.sidebar" },
+    ],
+    contributions: [],
+    hooks: [],
+    runtime: [{ role: "api", state: "active", version: "1.0.0", error: null, boot_attempts: 1, updated_at: UPDATED }],
+    ...overrides,
+  };
+}
+
+const ACTIVE = adminPlugin();
+const QUARANTINED = adminPlugin({
+  id: "org.example.crashy",
+  name: "Absturz-Erweiterung",
+  status: "quarantined",
+  status_message: "Beim Start wiederholt abgestürzt – wird übersprungen, bis Sie „Erneut versuchen“ wählen.",
+  settings_section: null,
+  runtime: [{ role: "worker", state: "quarantined", version: "1.0.0", error: "boom", boot_attempts: 3, updated_at: UPDATED }],
+});
+const TRIPPED = adminPlugin({
+  id: "org.example.tripped",
+  name: "Gestoppte Erweiterung",
+  settings_section: null,
+  hooks: [
+    {
+      key: "event:org.example.tripped:notify",
+      kind: "event",
+      name: "notify",
+      schedule: null,
+      tripped: true,
+      consecutive_failures: 5,
+      total_failures: 5,
+      last_error: "RuntimeError: kaputt",
+      last_error_at: UPDATED,
+      last_ok_at: null,
+      last_run_at: UPDATED,
+    },
+  ],
+});
+
+function renderPage() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <I18nextProvider i18n={i18n}>
+        <PluginsPage />
+      </I18nextProvider>
+    </QueryClientProvider>,
+  );
+}
+
+beforeEach(async () => {
+  await i18n.changeLanguage("de");
+  adminList.mockReset();
+  setEnabled.mockReset();
+  reset.mockReset();
+  sessionStorage.clear();
+});
+afterEach(() => sessionStorage.clear());
+
+describe("PluginsPage", () => {
+  it("lists plugins with plain-language status", async () => {
+    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE, QUARANTINED] });
+    renderPage();
+    expect(await screen.findByTestId("plugin-status-org.example.hello")).toHaveTextContent("Aktiv");
+    expect(screen.getByTestId("plugin-status-org.example.crashy")).toHaveTextContent("Übersprungen");
+    expect(
+      screen.getByText("Beim Start wiederholt abgestürzt – wird übersprungen, bis Sie „Erneut versuchen“ wählen."),
+    ).toBeInTheDocument();
+  });
+
+  it("switching off calls the API and shows the restart note", async () => {
+    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE] });
+    setEnabled.mockResolvedValue({
+      ...ACTIVE,
+      enabled: false,
+      status: "restart_required",
+      status_message: "Änderung wird nach einem Neustart von Tiqora wirksam.",
+    });
+    renderPage();
+    fireEvent.click(await screen.findByRole("switch", { name: "Hallo-Erweiterung" }));
+    await waitFor(() => expect(setEnabled).toHaveBeenCalledWith("org.example.hello", false));
+    expect(await screen.findByText("Änderung wird nach einem Neustart von Tiqora wirksam.")).toBeInTheDocument();
+    expect(screen.getByTestId("plugin-status-org.example.hello")).toHaveTextContent("Neustart nötig");
+    expect(screen.getByRole("switch", { name: "Hallo-Erweiterung" })).not.toBeChecked();
+  });
+
+  it("retry resets quarantine and stopped hooks", async () => {
+    adminList.mockResolvedValue({ safe_mode: false, plugins: [QUARANTINED, TRIPPED] });
+    reset.mockResolvedValue({ ...QUARANTINED, status: "disabled", status_message: null });
+    renderPage();
+    fireEvent.click(await screen.findByTestId("plugin-retry-org.example.crashy"));
+    await waitFor(() => expect(reset).toHaveBeenCalledWith("org.example.crashy"));
+    await waitFor(() => expect(screen.queryByTestId("plugin-retry-org.example.crashy")).toBeNull());
+    fireEvent.click(screen.getByTestId("plugin-details-org.example.tripped"));
+    expect(screen.getByText("Angehalten nach 5 Fehlern")).toBeInTheDocument();
+    expect(screen.getByText("RuntimeError: kaputt")).toBeInTheDocument();
+    expect(screen.getByTestId("plugin-retry-org.example.tripped")).toBeInTheDocument();
+  });
+
+  it("shows capabilities in plain words and the trust note in the header", async () => {
+    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE] });
+    renderPage();
+    // R-TRUST-WORDING: visible before any disclosure is opened.
+    expect(await screen.findByTestId("admin-plugins-trust-note")).toHaveTextContent(/keine Absicherung/);
+    fireEvent.click(screen.getByTestId("plugin-details-org.example.hello"));
+    expect(screen.getByText("Ruft api.example.org auf")).toBeInTheDocument();
+    expect(screen.getByText("Zeigt ein Feld in der Ticketansicht")).toBeInTheDocument();
+    // R-PUBLIC-ROUTES
+    expect(screen.getByText("Bietet öffentlich erreichbare Schnittstellen an (ohne Anmeldung)")).toBeInTheDocument();
+    expect(screen.getByText("Weboberfläche und Schnittstelle")).toBeInTheDocument();
+    expect(screen.getAllByText(/keine Absicherung/)).toHaveLength(1);
+  });
+
+  it("settings button links to the generated form", async () => {
+    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE, QUARANTINED] });
+    renderPage();
+    expect(await screen.findByTestId("plugin-settings-org.example.hello")).toHaveAttribute(
+      "href",
+      "/admin/settings/plugins.org.example.hello",
+    );
+    expect(screen.queryByTestId("plugin-settings-org.example.crashy")).toBeNull();
+  });
+
+  it("safe mode banner, browser-off note and empty state", async () => {
+    adminList.mockResolvedValue({ safe_mode: true, plugins: [] });
+    sessionStorage.setItem(PLUGIN_SAFE_MODE_KEY, "1");
+    renderPage();
+    expect(await screen.findByTestId("admin-plugins-safe-mode")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-plugins-browser-off")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-plugins-empty")).toBeInTheDocument();
+  });
+
+  it("shows no safe-mode notes in normal operation", async () => {
+    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE] });
+    renderPage();
+    await screen.findByTestId("plugin-card-org.example.hello");
+    expect(screen.queryByTestId("admin-plugins-safe-mode")).toBeNull();
+    expect(screen.queryByTestId("admin-plugins-browser-off")).toBeNull();
+  });
+
+  it("shows an error when the switch fails", async () => {
+    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE] });
+    setEnabled.mockRejectedValue(new Error("x"));
+    renderPage();
+    fireEvent.click(await screen.findByRole("switch", { name: "Hallo-Erweiterung" }));
+    expect(await screen.findByTestId("admin-plugins-action-error")).toHaveTextContent(
+      "Die Änderung konnte nicht gespeichert werden.",
+    );
+  });
+});
+
+describe("admin page registry", () => {
+  it("the palette finds the extensions page by its name and by keywords", async () => {
+    await i18n.changeLanguage("de");
+    const t = (key: string) => i18n.t(key);
+    for (const query of ["Erweiterungen", "safe mode", "opm"]) {
+      const hits = rankAdminPages(ADMIN_PAGES, query, t).map((page) => page.slug);
+      expect(hits, query).toContain("plugins");
+    }
+    expect(ADMIN_PAGES.find((page) => page.slug === "plugins")?.route).toBe("/admin/plugins");
+  });
+});

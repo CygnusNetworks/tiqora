@@ -549,6 +549,14 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     ],
   },
   {
+    slug: "plugins",
+    route: "/admin/plugins",
+    group: "system",
+    nameKey: "admin.nav.plugins",
+    descriptionKey: "admin.pageDescriptions.plugins",
+    keywords: ["erweiterungen", "plugins", "add-ons", "module", "pakete", "opm", "sicherer modus", "safe mode"],
+  },
+  {
     slug: "settings-jobs",
     route: "/admin/settings/jobs",
     group: "system",

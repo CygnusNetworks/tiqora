@@ -110,6 +110,7 @@ import { MailLogPage } from "@/routes/admin/MailLogPage";
 import { SubjectConfigPage } from "@/routes/admin/SubjectConfigPage";
 import { SettingsSectionPage } from "@/routes/admin/SettingsSectionPage";
 import { DaemonsPage } from "@/routes/admin/DaemonsPage";
+import { PluginsPage } from "@/routes/admin/PluginsPage";
 import { ReportingAdminPage } from "@/routes/admin/ReportingAdminPage";
 import { SystemInfoPage } from "@/routes/admin/SystemInfoPage";
 import { PostmasterFiltersPage } from "@/routes/admin/PostmasterFiltersPage";
@@ -1050,6 +1051,12 @@ const adminDaemonsRoute = createRoute({
   component: DaemonsPage,
 });
 
+const adminPluginsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/plugins",
+  component: PluginsPage,
+});
+
 const adminReportingRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/reporting",
@@ -1233,6 +1240,7 @@ const routeTree = rootRoute.addChildren([
     adminCustomerFieldsRoute,
     adminGdprRoute,
     adminDaemonsRoute,
+    adminPluginsRoute,
     adminReportingRoute,
     adminSettingsSectionRoute,
     adminSystemRoute,
