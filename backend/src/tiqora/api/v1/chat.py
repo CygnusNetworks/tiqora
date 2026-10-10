@@ -20,8 +20,7 @@ from fastapi import APIRouter, HTTPException, Path, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.api.deps import CurrentUser, DbSession
-from tiqora.api.v1.events import RedisDep
+from tiqora.api.deps import CurrentUser, DbSession, RedisDep
 from tiqora.jobs.service import utc_now
 from tiqora.webchat.agent import (
     RwQueues,

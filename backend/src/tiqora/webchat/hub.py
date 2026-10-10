@@ -21,8 +21,7 @@ from typing import Any, Final
 import structlog
 from fastapi import Request
 
-from tiqora.api.deps import AppSettings
-from tiqora.api.v1.events import RedisDep
+from tiqora.api.deps import AppSettings, RedisDep
 
 logger = structlog.get_logger(__name__)
 

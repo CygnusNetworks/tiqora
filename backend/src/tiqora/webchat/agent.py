@@ -5,8 +5,9 @@ inside the CALLER's transaction and never calls ``db.begin()``, ``commit()`` or
 ``rollback()``; it only queues notifications (``notify.queue_wakeup`` /
 ``queue_agent_event``), which the caller publishes with ``flush_chat_notifications`` after
 its commit. On a ``ChatError`` the caller ROLLS BACK: ``accept_session`` may already have
-inserted the agent's default state row (and refreshed the session's queue copy) when it
-refuses with ``at_capacity`` / ``already_taken``.
+refreshed the session's queue copy when it refuses. ``accept_session`` needs the agent's
+state row to exist already (``ensure_agent_state_row`` + commit first, R-REPLY-ACCEPT-FIRST;
+``availability.AgentStateMissing`` otherwise).
 
 Lock order (R-LOCK-ORDER), the same in every webchat write:
 
@@ -14,7 +15,8 @@ Lock order (R-LOCK-ORDER), the same in every webchat write:
    every accept of one agent (other tabs, the implicit accept of an agent reply), so the
    capacity count taken under it cannot be raced by the same agent;
 2. the ``tiqora_chat_session`` row — ``FOR UPDATE`` by primary key;
-3. Znuny ticket writes (``lock_ticket``, ``assign_owner``, ``change_state``);
+3. the Znuny ticket row (accept reads its queue ``FOR UPDATE`` by primary key) and the
+   ticket writes (``lock_ticket``, ``assign_owner``, ``change_state``);
 4. ``insert_message`` (``add_system_message``).
 
 Only primary-key locks: a locking RANGE read (e.g. "the agent's active chats ``FOR
@@ -88,7 +90,8 @@ logger = structlog.get_logger(__name__)
 #: ``ticket_state.name`` an agent's "Chat beenden + Ticket schließen" sets; when it is
 #: missing, the first valid state of type ``closed``.
 CLOSED_STATE_NAME: Final = "closed successful"
-#: Waiting chats listed in the inbox (oldest first).
+#: Waiting chats listed in the inbox (oldest first), counted after the ``rw`` filter. All
+#: waiting rows are loaded: the sweep ends them after ``wait_timeout_seconds`` (≤ 1 h).
 INBOX_WAITING_LIMIT: Final = 200
 
 
@@ -242,7 +245,6 @@ async def list_inbox(db: AsyncSession, *, user_id: int) -> ChatInboxOut:
                     TiqoraChatSession.purged_at.is_(None),
                 )
                 .order_by(TiqoraChatSession.waiting_since, TiqoraChatSession.created)
-                .limit(INBOX_WAITING_LIMIT)
             )
         )
         .scalars()
@@ -286,6 +288,8 @@ async def list_inbox(db: AsyncSession, *, user_id: int) -> ChatInboxOut:
         ticket = tickets.get(int(chat.ticket_id))
         if ticket is not None and await rw.allows(int(ticket["queue_id"])):
             waiting.append(item(chat, ticket))
+            if len(waiting) >= INBOX_WAITING_LIMIT:
+                break
     mine = [
         item(chat, tickets[int(chat.ticket_id)])
         for chat in mine_rows
@@ -322,7 +326,7 @@ async def accept_session(
         # agent-state lock and make the capacity count stale (silently over capacity).
         raise RuntimeError("accept_session must start its own transaction (commit first)")
     # (1) agent state FIRST, then the capacity count (the transaction's first plain read)
-    state = await lock_agent_state(db, user_id, now=now)
+    state = await lock_agent_state(db, user_id)
     held = await active_count(db, user_id)
 
     chat = await get_chat_session(db, session_id)
@@ -340,7 +344,8 @@ async def accept_session(
         raise ChatError("not_found", 404)
     if locked.status != "waiting":
         raise _refusal_for(locked.status)
-    queue_id = await current_queue_id(db, locked)
+    # (3) the ticket row, locked: its newest queue (MariaDB snapshot may predate a move)
+    queue_id = await current_queue_id(db, locked, lock_ticket_row=True)
     if not await rw.allows(queue_id):
         raise ChatError("forbidden", 403)
     result = await db.execute(
@@ -398,9 +403,13 @@ async def end_session_by_agent(
     ``TicketWriteService.change_state`` (the close screen's lock/owner/unlock parity);
     system line ``chat_ended``; wake + agent event ``chat_ended``.
 
-    Who may: any agent with ``rw`` on the ticket's current queue (the same right as
-    accepting). Idempotent: a chat that is no longer live is left alone (no permission
-    check, no write). Refusals: ``not_found``, ``forbidden`` — the caller rolls back.
+    Who may (R-END-OWN-CHAT): the agent the chat is assigned to, always — also after the
+    ticket moved to a queue they no longer hold ``rw`` on, so the chat cannot block their
+    capacity; anybody else needs ``rw`` on the ticket's current queue. Closing the ticket
+    always needs ``rw`` (``TicketWriteService.change_state``): an assignee without it gets
+    ``forbidden`` for ``close_ticket`` and nothing is written — ending without closing works.
+    Idempotent: a chat that is no longer live is left alone (no permission check, no
+    write). Refusals: ``not_found``, ``forbidden`` — the caller rolls back.
     *factory* only satisfies ``TicketWriteService`` (unused by ``change_state``).
     """
     locked = await get_chat_session(db, session_id, for_update=True)
@@ -409,7 +418,9 @@ async def end_session_by_agent(
     if locked.status not in LIVE_STATUSES:
         return
     queue_id = await current_queue_id(db, locked)
-    if not await RwQueues(db, user_id).allows(queue_id):
+    may_write = await RwQueues(db, user_id).allows(queue_id)
+    own_chat = locked.status == "active" and locked.assigned_user_id == user_id
+    if not may_write and (not own_chat or close_ticket):
         raise ChatError("forbidden", 403)
 
     locked.status = "ended"

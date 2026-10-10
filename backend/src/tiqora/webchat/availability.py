@@ -136,25 +136,33 @@ async def ensure_agent_state_row(db: AsyncSession, user_id: int, *, now: datetim
         pass
 
 
-async def lock_agent_state(db: AsyncSession, user_id: int, *, now: datetime) -> AgentChatState:
+class AgentStateMissing(RuntimeError):
+    """``lock_agent_state`` found no row: create it first in its own committed transaction."""
+
+
+async def lock_agent_state(db: AsyncSession, user_id: int) -> AgentChatState:
     """Lock step 1 (R-LOCK-ORDER): the agent's state row ``FOR UPDATE``.
 
     A locking read: it returns the newest committed row and, on MariaDB, does not take the
-    transaction's snapshot (see ``webchat.agent``). When the row is missing, the default
-    row is inserted (``ensure_agent_state_row``) and then locked; callers that can should
-    create it in an earlier, committed transaction (the accept endpoint does) — a locking
-    read of a missing row takes a gap lock on MariaDB.
+    transaction's snapshot (see ``webchat.agent``). The row must already exist —
+    ``ensure_agent_state_row`` + commit BEFORE the transaction that locks it (the accept
+    endpoint does; R-REPLY-ACCEPT-FIRST). Creating it here would need a locking read of a
+    missing row, which takes a gap lock on MariaDB: two first-time agents then deadlock on
+    their INSERTs (1213). So a missing row raises ``AgentStateMissing`` instead.
     """
-    stmt = (
-        select(TiqoraChatAgentState)
-        .where(TiqoraChatAgentState.user_id == user_id)
-        .with_for_update()
-        .execution_options(populate_existing=True)
-    )
-    row = (await db.execute(stmt)).scalar_one_or_none()
+    row = (
+        await db.execute(
+            select(TiqoraChatAgentState)
+            .where(TiqoraChatAgentState.user_id == user_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one_or_none()
     if row is None:
-        await ensure_agent_state_row(db, user_id, now=now)
-        row = (await db.execute(stmt)).scalar_one()
+        raise AgentStateMissing(
+            f"chat agent state row of user {user_id} missing — call ensure_agent_state_row"
+            " and commit before accept_session"
+        )
     return _state_from_row(row)
 
 

@@ -44,9 +44,8 @@ from starlette.datastructures import UploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from tiqora.api.attachment_response import safe_attachment_response
-from tiqora.api.deps import AppSettings, DbSession
+from tiqora.api.deps import AppSettings, DbSession, RedisDep
 from tiqora.api.uploads import MAX_ATTACHMENT_BYTES, read_upload_within_limit
-from tiqora.api.v1.events import RedisDep
 from tiqora.config import Settings
 from tiqora.db.engine import get_session_factory
 from tiqora.db.tiqora.models import TiqoraChatMessage, TiqoraChatSession

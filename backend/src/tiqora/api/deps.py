@@ -211,6 +211,10 @@ async def get_current_user_or_enroll(
     return resolved
 
 
+#: Redis client dependency. Lives here (not in ``api.v1.events``) so core packages such as
+#: ``tiqora.webchat`` can use it without importing ``tiqora.api.v1`` (import cycle with the
+#: worker: webchat -> api.v1 -> chat router -> webchat).
+RedisDep = Annotated[redis.Redis, Depends(get_redis)]
 CurrentUser = Annotated[AuthenticatedUser, Depends(get_current_user)]
 EnrollableUser = Annotated[AuthenticatedUser, Depends(get_current_user_or_enroll)]
 DbSession = Annotated[AsyncSession, Depends(get_db)]

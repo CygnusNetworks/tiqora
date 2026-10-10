@@ -337,16 +337,20 @@ async def _ticket_defaults(
     return state_id or 1, priority_id or 3
 
 
-async def current_queue_id(db: AsyncSession, chat: TiqoraChatSession) -> int:
+async def current_queue_id(
+    db: AsyncSession, chat: TiqoraChatSession, *, lock_ticket_row: bool = False
+) -> int:
     """The ticket's queue now (R-QUEUE-SOT); refreshes the session's copy when it moved.
 
     Called with the session row locked (the UPDATE stays inside that lock).
+    ``lock_ticket_row`` reads the ticket ``FOR UPDATE`` by primary key (R-LOCK-ORDER step 3):
+    a locking read returns the newest committed queue even when MariaDB's REPEATABLE READ
+    snapshot of this transaction is older (``webchat.agent.accept_session``).
     """
-    row = (
-        await db.execute(
-            text("SELECT queue_id FROM ticket WHERE id = :tid"), {"tid": int(chat.ticket_id)}
-        )
-    ).first()
+    sql = "SELECT queue_id FROM ticket WHERE id = :tid"
+    if lock_ticket_row:
+        sql += " FOR UPDATE"
+    row = (await db.execute(text(sql), {"tid": int(chat.ticket_id)})).first()
     if row is None:
         return int(chat.queue_id)
     queue_id = int(row[0])

@@ -41,15 +41,15 @@ import asyncio
 import json
 import time
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from typing import Annotated, Literal
+from typing import Literal
 
 import redis.asyncio as redis
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from tiqora.api.deps import CurrentUser, DbSession, get_redis
+from tiqora.api.deps import CurrentUser, DbSession, RedisDep
 from tiqora.domain.queue_service import QueueService
 from tiqora.domain.ticket_service import TicketAccessDenied, TicketNotFound, TicketService
 from tiqora.events.pubsub import (
@@ -69,8 +69,6 @@ HEARTBEAT_INTERVAL_SECONDS = 25
 ALIVE_INTERVAL_SECONDS = 20
 PRESENCE_TTL_SECONDS = 30
 PRESENCE_KEY_PREFIX = "tiqora:presence:"
-
-RedisDep = Annotated[redis.Redis, Depends(get_redis)]
 
 
 def _presence_key(ticket_id: int, user_id: int) -> str:

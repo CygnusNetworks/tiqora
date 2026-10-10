@@ -37,7 +37,7 @@ from tiqora.db.tiqora.models import TiqoraChatSession
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.events.pubsub import TIQORA_EVENTS_CHANNEL
 from tiqora.webchat.agent import accept_session, end_session_by_agent
-from tiqora.webchat.availability import mark_agent_online, set_agent_state
+from tiqora.webchat.availability import AgentStateMissing, mark_agent_online, set_agent_state
 from tiqora.webchat.hub import chat_channel
 from tiqora.webchat.schemas import ChatSessionCreateIn
 from tiqora.webchat.sessions import ChatError, VisitorContext, create_session, post_visitor_message
@@ -521,6 +521,68 @@ async def test_accept_refuses_a_started_transaction(env: Env) -> None:
     assert (await _chat(env, chat.id)).status == "waiting"
 
 
+async def _drop_states(env: Env, *user_ids: int) -> None:
+    async with env.factory() as db:
+        for uid in user_ids:
+            await db.execute(
+                text("DELETE FROM tiqora_chat_agent_state WHERE user_id = :u"), {"u": uid}
+            )
+        await db.commit()
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_service_accept_needs_an_existing_agent_state_row(env: Env) -> None:
+    """No insert after a locking read of a missing row (gap lock → 1213 on MariaDB)."""
+    chat = await _start(env, 46)
+    await _drop_states(env, AGENT_A)
+    async with env.factory() as db:
+        with pytest.raises(AgentStateMissing, match="ensure_agent_state_row"):
+            await accept_session(db, SysConfig(db), session_id=chat.id, user_id=AGENT_A, now=NOW)
+        await db.rollback()
+    assert (await _chat(env, chat.id)).status == "waiting"
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_first_ever_accepts_through_the_route(env: Env) -> None:
+    """Agents without a state row accept at the same time through the real route: on the
+    same chat exactly one wins; on two chats (two agents, or one agent twice) both win —
+    never a deadlock or a 500."""
+    same = await _start(env, 110)
+    one, two = await _start(env, 111), await _start(env, 112)
+    three, four = await _start(env, 113), await _start(env, 114)
+
+    async def post(user_id: int, session_id: str) -> tuple[int, Any]:
+        async with _client(env, user_id) as client:
+            res = await client.post(f"/api/v1/chat/sessions/{session_id}/accept")
+            return res.status_code, res.json()
+
+    await _drop_states(env, AGENT_A, AGENT_B)
+    results = await asyncio.gather(post(AGENT_A, same.id), post(AGENT_B, same.id))
+    assert sorted(code for code, _ in results) == [200, 409], results
+    assert [body for code, body in results if code == 409] == [{"detail": "already_taken"}]
+    assert len([m for m in await _messages(env, same.id) if m[2] == "agent_joined"]) == 1
+
+    await _drop_states(env, AGENT_A, AGENT_B)
+    results = await asyncio.gather(post(AGENT_A, one.id), post(AGENT_B, two.id))
+    assert [code for code, _ in results] == [200, 200], results
+    assert (await _chat(env, one.id)).assigned_user_id == AGENT_A
+    assert (await _chat(env, two.id)).assigned_user_id == AGENT_B
+
+    # One agent twice: free A's capacity (default 3) first — A holds one or two chats now.
+    for held in (same, one):
+        if (await _chat(env, held.id)).assigned_user_id == AGENT_A:
+            await _end(env, held.id, AGENT_A, close=False)
+    await _drop_states(env, AGENT_A)
+    results = await asyncio.gather(post(AGENT_A, three.id), post(AGENT_A, four.id))
+    assert [code for code, _ in results] == [200, 200], results
+    rows = await _rows(
+        env, "SELECT COUNT(*) FROM tiqora_chat_agent_state WHERE user_id = :u", u=AGENT_A
+    )
+    assert int(rows[0][0]) == 1
+
+
 @pytest.mark.asyncio
 @parametrize_db
 async def test_accept_writes_lock_then_owner_history(env: Env) -> None:
@@ -615,6 +677,39 @@ async def test_end_by_agent_optionally_closes(env: Env) -> None:
     assert (await _chat(env, other.id)).status == "waiting"
 
 
+@pytest.mark.asyncio
+@parametrize_db
+async def test_assigned_agent_may_end_own_chat_after_queue_move(env: Env) -> None:
+    """R-END-OWN-CHAT: the ticket moved to a queue where the assignee has only ro."""
+    chat = await _start(env, 75)
+    assert await _accept(env, chat.id, AGENT_A) == "ok"
+    async with env.factory() as db:
+        await db.execute(
+            text("UPDATE ticket SET queue_id = :q WHERE id = :t"),
+            {"q": Q_BILL, "t": chat.ticket_id},
+        )
+        await db.commit()
+    state_before = (await _ticket(env, chat.ticket_id))["state"]
+
+    async with _client(env, AGENT_B) as client:  # not the assignee, ro on Q_BILL
+        res = await client.post(f"/api/v1/chat/sessions/{chat.id}/end")
+    assert (res.status_code, res.json()) == (403, {"detail": "forbidden"})
+
+    async with _client(env, AGENT_A) as client:
+        # Closing the ticket still needs rw: refused, nothing written.
+        res = await client.post(f"/api/v1/chat/sessions/{chat.id}/end", json={"close_ticket": True})
+        assert (res.status_code, res.json()) == (403, {"detail": "forbidden"})
+        assert (await _chat(env, chat.id)).status == "active"
+        assert (await _ticket(env, chat.ticket_id))["state"] == state_before
+
+        res = await client.post(f"/api/v1/chat/sessions/{chat.id}/end")
+        assert res.status_code == 204
+    row = await _chat(env, chat.id)
+    assert (row.status, row.end_reason) == ("ended", "agent")
+    assert (await _messages(env, chat.id))[-1][2] == "chat_ended"
+    assert (await _ticket(env, chat.ticket_id))["state"] == state_before
+
+
 # -- notifications --------------------------------------------------------------------------
 
 
@@ -659,6 +754,38 @@ async def test_events_published_after_commit(env: Env) -> None:
         assert (await client.post(f"/api/v1/chat/sessions/{chat.id}/end")).status_code == 204
     types = [json.loads(p)["type"] for c, p in env.redis.published if c == TIQORA_EVENTS_CHANNEL]
     assert types == ["chat_ended"]
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_accept_reads_the_queue_under_the_ticket_lock(env: Env) -> None:
+    """The ticket moves while the accept waits for the session row: the event and the
+    session copy carry the NEW queue (a plain read would see MariaDB's older snapshot)."""
+    from tiqora.webchat.notify import flush_chat_notifications
+
+    chat = await _start(env, 85)
+    env.redis.published.clear()
+
+    async def accept() -> str:
+        async with env.factory() as db:
+            await accept_session(db, SysConfig(db), session_id=chat.id, user_id=AGENT_A, now=NOW)
+            await db.commit()
+            await flush_chat_notifications(db, env.redis)
+            return "ok"
+
+    async with env.factory() as db_x:
+        assert await get_chat_session(db_x, chat.id, for_update=True) is not None
+        task = asyncio.create_task(accept())
+        assert await _blocked(task)  # snapshot taken, waiting for the session row
+        await db_x.execute(
+            text("UPDATE ticket SET queue_id = :q WHERE id = :t"),
+            {"q": Q_SUP2, "t": chat.ticket_id},
+        )
+        await db_x.commit()
+    assert await asyncio.wait_for(task, 10) == "ok"
+    events = [json.loads(p) for c, p in env.redis.published if c == TIQORA_EVENTS_CHANNEL]
+    assert [e["queue_id"] for e in events] == [Q_SUP2]
+    assert (await _chat(env, chat.id)).queue_id == Q_SUP2
 
 
 # -- lock order (R-LOCK-ORDER): accept vs. end vs. visitor write -----------------------------
