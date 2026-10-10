@@ -21,6 +21,23 @@ type DimensionRef = ReportDefinition["dimensions"] extends (infer D)[] | undefin
 export const MAX_DIMENSIONS = 3;
 export const MAX_MEASURES = 10;
 export const MAX_PARAMETERS = 10;
+/** Backend `DimensionRef.choices` (max_length 10). */
+export const MAX_DIMENSION_CHOICES = 10;
+/** Backend `MAX_IN_VALUES`: longest `allowed_values` / `default` of a parameter. */
+export const MAX_PARAMETER_VALUES = 1000;
+/** Backend `MAX_RANGE_DAYS`: longest time range, absolute or relative. */
+export const MAX_RANGE_DAYS = 3660;
+/**
+ * Most units of a relative range that stay within MAX_RANGE_DAYS on any date (the backend
+ * resolves calendar units: 120 months are always 3652 or 3653 days, 121 at least 3680).
+ */
+const MAX_RELATIVE_COUNT: Record<string, number> = { day: MAX_RANGE_DAYS, week: 522, month: 120, quarter: 40, year: 10 };
+
+/** Days from `start` to `end`, both included; NaN for unreadable dates. */
+function spanDays(start: string, end: string): number {
+  const ms = Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`);
+  return Math.round(ms / 86_400_000) + 1;
+}
 
 /** `date` marks a time dimension: only those carry a grain (backend: grain on other kinds is a 422). */
 export type DimensionSlot = { key: string; grain: Grain | null; choices: string[]; topN: number | null; date?: boolean };
@@ -434,6 +451,9 @@ export function validate(state: BuilderState, source: ReportSource | undefined, 
     }
     // "eq" compares with one value: a longer default fails every run that supplies no value.
     if ((p.op ?? "in") === "eq" && (p.default ?? []).length > 1) add(`parameters.${i}.default`, "parameterValueInvalid");
+    for (const name of ["allowed_values", "default"] as const) {
+      if ((p[name] ?? []).length > MAX_PARAMETER_VALUES) add(`parameters.${i}.${name}`, "parameterTooManyValues");
+    }
     if (p.allowed_values && p.default && p.default.some((v) => !p.allowed_values!.includes(v))) {
       add(`parameters.${i}.default`, "parameterValueInvalid");
     }
@@ -447,13 +467,20 @@ export function validate(state: BuilderState, source: ReportSource | undefined, 
   if ([...state.rows, ...state.columns].some((d) => d.topN !== null && !(Number.isInteger(d.topN) && d.topN >= 1 && d.topN <= 100))) {
     add("dimensions", "topNInvalid");
   }
+  if ([...state.rows, ...state.columns].some((d) => d.choices.length > MAX_DIMENSION_CHOICES)) add("dimensions", "tooManyChoices");
   const tr = state.timeRange;
   if (tr) {
     const bad =
       tr.kind === "absolute"
-        ? !tr.start || !tr.end || tr.end < tr.start
-        : !Number.isInteger(tr.count) || tr.count < 1 || tr.count > 3660;
+        ? !tr.start || !tr.end || tr.end < tr.start || Number.isNaN(spanDays(tr.start, tr.end))
+        : !Number.isInteger(tr.count) || tr.count < 1;
+    const tooLong =
+      !bad &&
+      (tr.kind === "absolute"
+        ? spanDays(tr.start, tr.end) > MAX_RANGE_DAYS
+        : tr.count > (MAX_RELATIVE_COUNT[tr.unit ?? "day"] ?? MAX_RANGE_DAYS));
     if (bad) add("timeRange", "timeRangeInvalid");
+    if (tooLong) add("timeRange", "timeRangeTooLong");
   }
 
   if (meta?.name && state.name.trim() === "") add("name", "nameRequired");

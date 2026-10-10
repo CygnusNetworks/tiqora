@@ -5420,7 +5420,10 @@
         "parameterValueInvalid": "A value does not fit the chosen field or the allowed values.",
         "limitInvalid": "The row limit must be between 1 and 10,000.",
         "topNInvalid": "The top list must have between 1 and 100 entries.",
-        "timeRangeInvalid": "The time range is not valid."
+        "timeRangeInvalid": "The time range is not valid.",
+        "timeRangeTooLong": "The period may cover at most 3,660 days (about ten years).",
+        "tooManyChoices": "At most ten alternatives per grouping.",
+        "parameterTooManyValues": "At most 1,000 values per list."
       },
       "viz": {
         "table": "Table",
@@ -5597,6 +5600,7 @@
     "editTitle": "Edit search",
     "conditions": "Conditions",
     "invalidFilter": "Please check the marked conditions.",
+    "criteriaLost": "The stored conditions of this search can no longer be read and are missing here. Please set up the conditions again; without any condition the search finds every ticket you may see.",
     "saveFailed": "The search could not be saved.",
     "listTitle": "Search",
     "noRight": "You may not edit this search.",

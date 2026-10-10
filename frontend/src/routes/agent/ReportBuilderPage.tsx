@@ -34,6 +34,8 @@ import type { ReportBuilderSearch } from "./reportBuilderSearch";
 
 type Mode = "new" | "edit";
 
+const PRIVATE_SHARE: ShareValue = { visibility: "private", group_ids: [] };
+
 function Notice({ testId, children }: { testId: string; children: React.ReactNode }) {
   return (
     <div className="m-6 rounded-lg border border-hairline bg-surface p-8 text-center" data-testid={testId}>
@@ -89,6 +91,10 @@ function Editor({
   const [state, dispatch] = useReducer(builderReducer, start.state);
   const baseline = useRef(JSON.stringify(start.state));
   const [share, setShare] = useState<ShareValue>(start.share);
+  // "Als Kopie speichern" has its own sharing: without the share right a copy starts as "Nur ich"
+  // (the locked choice would otherwise carry the original's sharing into a 403), and the
+  // original's sharing stays untouched for a later "Speichern".
+  const [copyShare, setCopyShare] = useState<ShareValue>(PRIVATE_SHARE);
   const shareBaseline = useRef(JSON.stringify(start.share));
   const [dialog, setDialog] = useState<"create" | "update" | "copy" | null>(null);
   const [tried, setTried] = useState(false);
@@ -118,7 +124,8 @@ function Editor({
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
-  const groupsMissing = share.visibility === "groups" && share.group_ids.length === 0;
+  const activeShare = dialog === "copy" ? copyShare : share;
+  const groupsMissing = activeShare.visibility === "groups" && activeShare.group_ids.length === 0;
   const saveIssues = validate(state, source, { name: true, groupsMissing }).filter(
     (i) => i.key === "nameRequired" || i.key === "groupsRequired",
   );
@@ -127,12 +134,13 @@ function Editor({
     mutationFn: async (kind: "create" | "update" | "copy") => {
       const defn = toDefinition(state);
       if (!defn) throw new Error(t("reports.builder.previewInvalid"));
+      const sharing = kind === "copy" ? copyShare : share;
       const body: SavedReportIn = {
         name: state.name.trim(),
         description: state.description,
         definition: defn,
-        visibility: share.visibility,
-        group_ids: share.visibility === "groups" ? share.group_ids : [],
+        visibility: sharing.visibility,
+        group_ids: sharing.visibility === "groups" ? sharing.group_ids : [],
         copied_from: kind === "copy" ? (report?.key ?? null) : kind === "update" ? (report?.copied_from ?? null) : start.copiedFrom,
       };
       if (kind === "update" && report?.id != null) {
@@ -157,6 +165,7 @@ function Editor({
     if (kind === "copy" && report && state.name === (report.name ?? "")) {
       dispatch({ type: "setMeta", name: t("reports.builder.copyOf", { name: state.name }) });
     }
+    if (kind === "copy") setCopyShare(canShare ? share : PRIVATE_SHARE);
     setDialog(kind);
   };
 
@@ -277,8 +286,8 @@ function Editor({
         name={state.name}
         description={state.description}
         onMeta={(patch) => dispatch({ type: "setMeta", ...patch })}
-        share={share}
-        onShare={setShare}
+        share={activeShare}
+        onShare={dialog === "copy" ? setCopyShare : setShare}
         canShare={canShare}
         pending={save.isPending}
         error={saveError}

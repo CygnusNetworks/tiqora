@@ -204,7 +204,8 @@ function TimeSection({ state, source, dispatch, issues }: { state: BuilderState;
   const active = presetOf(state.timeRange);
   const zones = useMemo(() => listTimeZones(), []);
   const range = state.timeRange?.kind === "absolute" ? state.timeRange : null;
-  const invalid = issues.some((i) => i.key === "timeRangeInvalid");
+  const invalid = issues.some((i) => i.key === "timeRangeInvalid" || i.key === "timeRangeTooLong");
+  const tooLong = issues.some((i) => i.key === "timeRangeTooLong");
   const shownField = state.timeField ?? source.default_time_field ?? timeFields[0]?.key ?? null;
 
   const setCustom = (patch: { start?: string; end?: string }) => {
@@ -288,6 +289,11 @@ function TimeSection({ state, source, dispatch, issues }: { state: BuilderState;
             />
           </label>
         </div>
+      )}
+      {tooLong && (
+        <p className="text-xs text-danger" role="alert" data-testid="builder-time-too-long">
+          {t("reports.builder.issues.timeRangeTooLong")}
+        </p>
       )}
       <div className="space-y-1">
         <span id={`${id}-zone`} className="block text-xs text-muted">

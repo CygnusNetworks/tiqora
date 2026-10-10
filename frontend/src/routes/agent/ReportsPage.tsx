@@ -220,6 +220,8 @@ function SavedCard({
   const title = reportTitle(report, t);
   const broken = report.definition == null;
   const canEdit = !report.read_only && canCreate && !broken;
+  // An owner may always delete their own report, also without the save right (R-OWNDELETE).
+  const canDelete = !report.read_only || mine;
   const target =
     report.visibility === "all"
       ? t("reports.share.all")
@@ -233,7 +235,7 @@ function SavedCard({
       <div className="flex h-full flex-col gap-2 rounded-lg border border-hairline bg-surface p-3">
         <div className="flex items-start justify-between gap-2">
           <h4 className="min-w-0 break-words text-sm font-medium text-ink">{title}</h4>
-          {(!broken || !report.read_only) && (
+          {(!broken || canDelete) && (
             <Menu
               panelTestId={`${id}-menu-panel`}
               trigger={({ ref, toggleProps }) => (
@@ -275,7 +277,7 @@ function SavedCard({
                   </MenuItem>
                 </>
               )}
-              {!report.read_only && (
+              {canDelete && (
                 <>
                   {!broken && <MenuSeparator />}
                   <MenuItem testId={`${id}-delete`} danger onSelect={() => onDelete(report)}>

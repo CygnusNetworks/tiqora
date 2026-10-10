@@ -8,6 +8,7 @@ import { demoTicketFilterFields } from "@/demo/savedMock";
 import { ApiError, type TicketListItem } from "@/lib/api";
 import { reportsApi } from "@/lib/reportsApi";
 import { savedSearchesApi } from "@/lib/savedSearchesApi";
+import { SAVED_SEARCHES_KEY } from "@/components/searches/savedSearchQueries";
 import { savedSearch as s, user } from "@/components/searches/searchTestUtils";
 import { searchPreviewDebounce } from "@/components/searches/useDebouncedValue";
 import { SavedSearchEditorPage } from "./SavedSearchEditorPage";
@@ -61,6 +62,8 @@ const TICKET = {
 const PAGE = { items: [TICKET], limit: 10, offset: 0, total: 12 };
 const QUEUE_FILTER = { version: 1, where: { all: [{ field: "queue_id", op: "in", value: [1] }] } };
 
+let lastQc: QueryClient;
+
 function renderAt(path: string) {
   const root = createRootRoute({ component: () => <Outlet /> });
   const agent = createRoute({ getParentRoute: () => root, path: "/agent", component: () => <p data-testid="dashboard">Start</p> });
@@ -78,6 +81,7 @@ function renderAt(path: string) {
     history: createMemoryHistory({ initialEntries: [path] }),
   });
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  lastQc = qc;
   render(
     <QueryClientProvider client={qc}>
       <I18nextProvider i18n={i18n}>
@@ -201,12 +205,59 @@ describe("SavedSearchEditorPage", () => {
     await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({ group_ids: [3] })));
   });
 
-  it("locks sharing without the right", async () => {
+  it("lets an agent without the report share right share a search with own groups", async () => {
+    // the backend checks only group membership for searches; the stats right is about reports
     auth.user = { id: 1, is_admin: false, can_share_reports: false };
     vi.spyOn(savedSearchesApi, "countTickets").mockResolvedValue({ count: 0 });
     vi.spyOn(savedSearchesApi, "queryTickets").mockResolvedValue(PAGE as never);
+    const create = vi.spyOn(savedSearchesApi, "create").mockResolvedValue(s({ id: 9 }) as never);
     renderAt("/agent/searches/new");
-    expect(await screen.findByTestId("saved-search-editor-share-hint")).toHaveTextContent("Berechtigung");
+    const hint = await screen.findByTestId("saved-search-editor-share-hint");
+    expect(hint).not.toHaveTextContent("Berechtigung");
+    expect(hint).not.toHaveTextContent("stats");
+    await user.click(await screen.findByTestId("saved-search-editor-share-group-ids-add"));
+    await user.click(await screen.findByRole("option", { name: "Support" }));
+    await user.type(screen.getByTestId("saved-search-editor-name"), "Geteilt");
+    await user.click(screen.getByTestId("saved-search-editor-save"));
+    await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({ group_ids: [3] })));
+  });
+
+  it("keeps the loaded version when the saved searches are refreshed meanwhile", async () => {
+    const get = vi
+      .spyOn(savedSearchesApi, "get")
+      .mockResolvedValueOnce(s({ id: 5, name: "Alt", criteria: QUEUE_FILTER as never, version: 4 }))
+      .mockResolvedValue(s({ id: 5, name: "Von nebenan", criteria: QUEUE_FILTER as never, version: 5 }));
+    vi.spyOn(savedSearchesApi, "countTickets").mockResolvedValue({ count: 1 });
+    vi.spyOn(savedSearchesApi, "queryTickets").mockResolvedValue(PAGE as never);
+    const update = vi.spyOn(savedSearchesApi, "update").mockResolvedValue(s({ id: 5, version: 6 }) as never);
+    renderAt("/agent/searches/5/edit");
+    expect(await screen.findByTestId("saved-search-editor-name")).toHaveValue("Alt");
+    // a sidebar pin, a Znuny import or anything else refreshes every saved-search query
+    await lastQc.invalidateQueries({ queryKey: SAVED_SEARCHES_KEY });
+    await lastQc.invalidateQueries();
+    await waitFor(() => expect(get.mock.calls.length).toBeGreaterThanOrEqual(2));
+    await user.click(screen.getByTestId("saved-search-editor-save"));
+    await waitFor(() => expect(update).toHaveBeenCalledWith(5, expect.objectContaining({ name: "Alt", version: 4 })));
+  });
+
+  it("says when stored conditions were lost and does not save an empty filter silently", async () => {
+    vi.spyOn(savedSearchesApi, "get").mockResolvedValue(
+      s({ id: 7, name: "Kaputt", criteria: null, criteria_error: "Feld „Alt“ gibt es nicht mehr.", version: 2 }),
+    );
+    vi.spyOn(savedSearchesApi, "countTickets").mockResolvedValue({ count: 0 });
+    vi.spyOn(savedSearchesApi, "queryTickets").mockResolvedValue(PAGE as never);
+    const update = vi.spyOn(savedSearchesApi, "update").mockResolvedValue(s({ id: 7, version: 3 }) as never);
+    renderAt("/agent/searches/7/edit");
+    const notice = await screen.findByTestId("saved-search-editor-criteria-error");
+    expect(notice).toHaveTextContent("Feld „Alt“ gibt es nicht mehr.");
+    expect(notice).toHaveTextContent("Bedingungen");
+    await user.click(screen.getByTestId("saved-search-editor-save"));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(update).not.toHaveBeenCalled();
+    // building the conditions again makes it savable
+    await addQueueCondition();
+    await user.click(screen.getByTestId("saved-search-editor-save"));
+    await waitFor(() => expect(update).toHaveBeenCalledWith(7, expect.objectContaining({ criteria: QUEUE_FILTER, version: 2 })));
   });
 
   it("updates an existing search with the version it loaded, and reports a 409", async () => {
@@ -243,6 +294,6 @@ describe("SavedSearchEditorPage", () => {
   it("shows the not-found message for an unknown search", async () => {
     vi.spyOn(savedSearchesApi, "get").mockRejectedValue(new ApiError(404, { detail: { message: "x" } }, "/api/v1/saved-searches/5"));
     renderAt("/agent/searches/5/edit");
-    expect(await screen.findByTestId("saved-search-editor-not-found")).toHaveTextContent("nicht mit dir geteilt");
+    expect(await screen.findByTestId("saved-search-editor-not-found")).toHaveTextContent("nicht mit Ihnen geteilt");
   });
 });

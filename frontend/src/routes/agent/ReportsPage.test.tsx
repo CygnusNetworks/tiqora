@@ -477,6 +477,23 @@ describe("ReportsPage", () => {
       expect(screen.getByTestId("reports-saved-card-41")).toBeInTheDocument();
     });
 
+    it("lets the owner delete an own report without the save right", async () => {
+      const remove = vi.mocked(reportsApi.remove).mockReset().mockResolvedValue(undefined);
+      mockCatalogue([
+        saved({ id: 44, name: "Altlast", read_only: true }),
+        saved({ id: 45, name: "Altlast kaputt", read_only: true, definition: null, definition_error: "kaputt" }),
+      ]);
+      authFlags.canCreate = false;
+      renderPage();
+      fireEvent.click(await screen.findByTestId("reports-saved-card-45-menu"));
+      expect(screen.getByTestId("reports-saved-card-45-delete")).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("reports-saved-card-44-menu"));
+      expect(screen.queryByTestId("reports-saved-card-44-edit")).toBeNull();
+      fireEvent.click(screen.getByTestId("reports-saved-card-44-delete"));
+      fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+      await waitFor(() => expect(remove).toHaveBeenCalledWith(44));
+    });
+
     it("shows why a broken report cannot open and only lets it be deleted", async () => {
       mockCatalogue([
         saved({ id: 43, name: "Kaputt", definition: null, definition_error: "Die Datenbasis „plugin.x“ gibt es nicht mehr." }),

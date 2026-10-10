@@ -282,11 +282,38 @@ describe("builderState", () => {
     expect(keys(s)).toEqual(["topNInvalid"]);
     s = builderReducer(s, { type: "updateDimension", target: "rows", index: 0, patch: { topN: 5 } });
     s = builderReducer(s, { type: "setTime", timeRange: { kind: "relative", unit: "day", count: 4000 } as never });
-    expect(keys(s)).toEqual(["timeRangeInvalid"]);
+    expect(keys(s)).toEqual(["timeRangeTooLong"]);
     s = builderReducer(s, { type: "setTime", timeRange: { kind: "absolute", start: "2026-02-01", end: "2026-01-01" } as never });
     expect(keys(s)).toEqual(["timeRangeInvalid"]);
     s = builderReducer(s, { type: "setTime", timeRange: { kind: "relative", unit: "day", count: 30 } as never });
     expect(keys(s)).toEqual([]);
+  });
+
+  it("blocks time ranges longer than the backend's 3660 days, absolute and relative", () => {
+    const at = (timeRange: object) => keys(builderReducer(base(), { type: "setTime", timeRange: timeRange as never }));
+    // 2016-01-01 .. 2026-01-07 are 3660 days (both included), one more day is too long
+    expect(at({ kind: "absolute", start: "2016-01-01", end: "2026-01-07" })).toEqual([]);
+    expect(at({ kind: "absolute", start: "2016-01-01", end: "2026-01-08" })).toEqual(["timeRangeTooLong"]);
+    expect(at({ kind: "relative", unit: "day", count: 3660 })).toEqual([]);
+    expect(at({ kind: "relative", unit: "day", count: 3661 })).toEqual(["timeRangeTooLong"]);
+    expect(at({ kind: "relative", unit: "week", count: 522 })).toEqual([]);
+    expect(at({ kind: "relative", unit: "week", count: 523 })).toEqual(["timeRangeTooLong"]);
+    expect(at({ kind: "relative", unit: "month", count: 120 })).toEqual([]);
+    expect(at({ kind: "relative", unit: "month", count: 200 })).toEqual(["timeRangeTooLong"]);
+    expect(at({ kind: "relative", unit: "quarter", count: 41 })).toEqual(["timeRangeTooLong"]);
+    expect(at({ kind: "relative", unit: "year", count: 10 })).toEqual([]);
+    expect(at({ kind: "relative", unit: "year", count: 11 })).toEqual(["timeRangeTooLong"]);
+  });
+
+  it("limits dimension choices to 10 and parameter value lists to 1000, like the backend", () => {
+    const choices = Array.from({ length: 11 }, (_, i) => `c${i}`);
+    let s = builderReducer(base(), { type: "updateDimension", target: "rows", index: 0, patch: { choices } });
+    expect(keys(s)).toEqual(["tooManyChoices"]);
+    s = builderReducer(s, { type: "updateDimension", target: "rows", index: 0, patch: { choices: choices.slice(0, 10) } });
+    expect(keys(s)).not.toContain("tooManyChoices");
+    const many = Array.from({ length: 1001 }, (_, i) => i + 1);
+    expect(keys(withParam({ allowed_values: many }))).toEqual(["parameterTooManyValues"]);
+    expect(keys(withParam({ allowed_values: many.slice(0, 1000) }))).toEqual([]);
   });
 
   it("keeps the dimension order and series index exactly, even when the series is not last", () => {

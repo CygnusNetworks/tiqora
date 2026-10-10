@@ -53,7 +53,7 @@ function ProfileRow({
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <label
               htmlFor={`${uid}-check`}
-              className={profile.importable ? "text-sm font-medium text-ink" : "text-sm font-medium text-muted"}
+              className={`min-w-0 break-words text-sm font-medium ${profile.importable ? "text-ink" : "text-muted"}`}
             >
               {profile.name}
             </label>
@@ -88,7 +88,7 @@ function ProfileRow({
               {showUnmapped && (
                 <ul id={`${uid}-unmapped`} className="mt-1.5 space-y-1.5" data-testid={`${base}-unmapped`}>
                   {profile.unmapped.map((u, i) => (
-                    <li key={`${u.key}-${i}`} className="rounded-md bg-surface-subtle px-2.5 py-1.5 text-xs">
+                    <li key={`${u.key}-${i}`} className="break-words rounded-md bg-surface-subtle px-2.5 py-1.5 text-xs">
                       <span className="font-mono text-ink">{u.key}</span>
                       {u.value !== "" && <span className="font-mono text-muted">{`: ${u.value}`}</span>}
                       <span className="mt-0.5 block text-muted">{u.reason}</span>
@@ -175,13 +175,14 @@ export function ZnunyImportDialog({ open, onClose }: { open: boolean; onClose: (
           </p>
         )}
         {previewQ.isError && (
-          <p
-            className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-ink"
-            role="alert"
-            data-testid="znuny-import-error"
-          >
-            {reportErrorMessage(previewQ.error, t("savedSearches.import.loadFailed"))}
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger/40 bg-danger/10 px-3 py-2">
+            <p className="min-w-0 break-words text-sm text-ink" role="alert" data-testid="znuny-import-error">
+              {reportErrorMessage(previewQ.error, t("savedSearches.import.loadFailed"))}
+            </p>
+            <Button size="sm" onClick={() => void previewQ.refetch()} disabled={previewQ.isFetching} data-testid="znuny-import-retry">
+              {t("reports.retry")}
+            </Button>
+          </div>
         )}
         {previewQ.isSuccess && profiles.length === 0 && !result && (
           <p className="text-sm text-muted" data-testid="znuny-import-empty">
@@ -226,7 +227,7 @@ export function ZnunyImportDialog({ open, onClose }: { open: boolean; onClose: (
             {result.skipped.length > 0 && (
               <ul className="space-y-1.5" data-testid="znuny-import-skipped">
                 {result.skipped.map((s) => (
-                  <li key={s.name} className="rounded-md bg-surface-subtle px-2.5 py-1.5 text-xs">
+                  <li key={s.name} className="break-words rounded-md bg-surface-subtle px-2.5 py-1.5 text-xs">
                     <span className="font-medium text-ink">{s.name}</span>
                     <span className="mt-0.5 block text-muted">{s.reason}</span>
                   </li>

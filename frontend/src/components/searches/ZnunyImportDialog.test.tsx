@@ -154,6 +154,15 @@ describe("ZnunyImportDialog", () => {
     expect(await screen.findByTestId("znuny-import-error")).toHaveTextContent("Znuny nicht erreichbar");
   });
 
+  it("loads the preview again from the error", async () => {
+    const preview = vi.spyOn(savedSearchesApi, "znunyPreview").mockRejectedValueOnce(new Error("Znuny nicht erreichbar"));
+    preview.mockResolvedValue({ profiles: [] } as never);
+    renderDialog();
+    await user.click(await screen.findByTestId("znuny-import-retry"));
+    expect(await screen.findByTestId("znuny-import-empty")).toBeInTheDocument();
+    expect(preview).toHaveBeenCalledTimes(2);
+  });
+
   it("works with the demo-mode preview", async () => {
     mockPreview(demoZnunyPreview());
     renderDialog();

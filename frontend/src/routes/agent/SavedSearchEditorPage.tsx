@@ -45,7 +45,15 @@ function Editor({
   const queryClient = useQueryClient();
   const id = useId();
   const isAdmin = user?.is_admin === true;
-  const canShare = user?.can_share_reports === true;
+  // The version this editor loaded: a refetch of the search (sidebar pin, Znuny import, …)
+  // must not advance it, or a colleague's change in between would be overwritten without a 409.
+  // Only "Neu laden" (a remount) takes a newer one.
+  const [loadedVersion] = useState(existing?.version);
+  // Stored criteria that no longer parse arrive as `criteria: null` + `criteria_error`; the
+  // editor then starts empty, and an empty filter matches every ticket. Saving that needs an
+  // explicit edit of the conditions.
+  const brokenCriteria = existing != null && existing.criteria == null;
+  const [criteriaTouched, setCriteriaTouched] = useState(false);
 
   const [name, setName] = useState(existing?.name ?? "");
   const [criteria, setCriteria] = useState<TicketFilter>(existing?.criteria ?? EMPTY_FILTER);
@@ -99,6 +107,7 @@ function Editor({
 
   const nameMissing = tried && name.trim() === "";
   const invalidFilter = tried && !filterValid;
+  const criteriaLost = brokenCriteria && !criteriaTouched;
 
   const save = useMutation({
     mutationFn: () => {
@@ -112,7 +121,9 @@ function Editor({
         show_count: sidebar && showCount,
         group_ids: groupIds,
       };
-      return existing ? savedSearchesApi.update(existing.id, { ...body, version: existing.version }) : savedSearchesApi.create(body);
+      return existing
+        ? savedSearchesApi.update(existing.id, { ...body, version: loadedVersion ?? existing.version })
+        : savedSearchesApi.create(body);
     },
     onSuccess: (saved) => {
       void queryClient.invalidateQueries({ queryKey: SAVED_SEARCHES_KEY });
@@ -131,7 +142,7 @@ function Editor({
   const submit = () => {
     if (save.isPending) return;
     setTried(true);
-    if (name.trim() === "" || !filterValid) return;
+    if (name.trim() === "" || !filterValid || criteriaLost) return;
     setSaveError(null);
     save.mutate();
   };
@@ -206,10 +217,29 @@ function Editor({
             <h2 id={`${id}-conditions`} className="text-xs font-semibold uppercase tracking-wide text-muted">
               {t("savedSearches.conditions")}
             </h2>
+            {brokenCriteria && (
+              <div
+                className={`rounded-md border px-3 py-2 text-sm text-ink ${
+                  tried && criteriaLost ? "border-danger/60 bg-danger/10" : "border-warn/40 bg-warn/10"
+                }`}
+                role="alert"
+                data-testid="saved-search-editor-criteria-error"
+              >
+                <p>{t("savedSearches.criteriaLost")}</p>
+                {existing.criteria_error && <p className="mt-1 text-xs text-muted">{existing.criteria_error}</p>}
+              </div>
+            )}
             {fieldsQ.isPending ? (
               <Spinner />
             ) : (
-              <FilterBuilder fields={fields} value={criteria} onChange={setCriteria} />
+              <FilterBuilder
+                fields={fields}
+                value={criteria}
+                onChange={(next) => {
+                  setCriteriaTouched(true);
+                  setCriteria(next);
+                }}
+              />
             )}
             {invalidFilter && (
               <p className="text-xs text-danger" role="alert" data-testid="saved-search-editor-filter-error">
@@ -277,7 +307,7 @@ function Editor({
             </div>
           </div>
 
-          <SearchShareFields value={groupIds} onChange={setGroupIds} canShare={canShare} testId="saved-search-editor-share" />
+          <SearchShareFields value={groupIds} onChange={setGroupIds} testId="saved-search-editor-share" />
         </div>
 
         <section aria-labelledby={`${id}-preview`} className="min-w-0 space-y-3">

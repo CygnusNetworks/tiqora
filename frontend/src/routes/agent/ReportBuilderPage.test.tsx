@@ -225,6 +225,30 @@ describe("ReportBuilderPage", () => {
     await waitFor(() => expect(reportsApi.get).toHaveBeenCalledWith("41", expect.anything()));
   });
 
+  it("saves a copy of a shared report as 'Nur ich' without the share right", async () => {
+    vi.mocked(reportsApi.get).mockImplementation(async () => saved({ visibility: "groups", group_ids: [3] }));
+    const create = vi.spyOn(reportsApi, "create").mockResolvedValue({ key: "50", kind: "saved", id: 50 } as never);
+    const update = vi.spyOn(reportsApi, "update").mockResolvedValue({ key: "41", kind: "saved", id: 41 } as never);
+    renderAt("/agent/reports/41/edit", { can_create_reports: true, can_share_reports: false });
+    await user.click(await screen.findByTestId("builder-save-copy"));
+    expect(screen.getByTestId("share-fields-private")).toHaveAttribute("aria-checked", "true");
+    await user.click(screen.getByTestId("save-report-dialog-confirm"));
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    expect(create.mock.calls[0][0]).toMatchObject({ visibility: "private", group_ids: [], copied_from: "41" });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("keeps the original's sharing for a plain save after opening the copy dialog", async () => {
+    vi.mocked(reportsApi.get).mockImplementation(async () => saved({ visibility: "groups", group_ids: [3] }));
+    const update = vi.spyOn(reportsApi, "update").mockResolvedValue({ key: "41", kind: "saved", id: 41 } as never);
+    renderAt("/agent/reports/41/edit", { can_create_reports: true, can_share_reports: false });
+    await user.click(await screen.findByTestId("builder-save-copy"));
+    await user.click(screen.getByTestId("save-report-dialog-cancel"));
+    await user.click(screen.getByTestId("builder-save"));
+    await user.click(screen.getByTestId("save-report-dialog-confirm"));
+    await waitFor(() => expect(update).toHaveBeenCalledWith(41, expect.objectContaining({ visibility: "groups", group_ids: [3] })));
+  });
+
   it("without the create right shows the notice, no builder", async () => {
     renderAt("/agent/reports/new", { can_create_reports: false, can_share_reports: false });
     expect(await screen.findByTestId("builder-no-right")).toHaveTextContent("Berechtigung");

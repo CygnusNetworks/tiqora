@@ -121,7 +121,7 @@ describe("SavedSearchPage", () => {
   it("shows the not-found message on 404", async () => {
     vi.spyOn(savedSearchesApi, "get").mockRejectedValue(new ApiError(404, { detail: { message: "x" } }, "/api/v1/saved-searches/5"));
     renderAt("/agent/searches/5");
-    expect(await screen.findByTestId("saved-search-not-found")).toHaveTextContent("nicht mit dir geteilt");
+    expect(await screen.findByTestId("saved-search-not-found")).toHaveTextContent("nicht mit Ihnen geteilt");
   });
 
   it("hides edit and delete for shared searches", async () => {
