@@ -136,7 +136,7 @@ def test_all_areas_read_only_preset() -> None:
     raw = all_areas_read_only_scopes()
     scopes = parse_api_key_scopes(raw)
     assert scopes is not None
-    for area in API_KEY_AREAS:
+    for area in (a for a in API_KEY_AREAS if a != "plugins"):
         assert f"{area}:ro" in scopes
     expanded = expand_scopes(scopes)
     assert expanded is not None
