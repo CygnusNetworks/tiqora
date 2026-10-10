@@ -17,7 +17,8 @@ import type { FrontendPlugin } from "@/lib/pluginsApi";
 import { DASHBOARD_WIDGETS } from "./dashboardWidgets";
 import { setPluginImporterForTests } from "./loader";
 import { PluginProvider } from "./PluginProvider";
-import { PluginNavItems, PluginTicketPanels, PluginWidgetsSection } from "./slots";
+import { PluginNavItems, PluginSafeModeNote, PluginTicketPanels, PluginWidgetsSection } from "./slots";
+import { PLUGIN_SAFE_MODE_KEY } from "./safeMode";
 import { PluginRoutePage } from "@/routes/agent/PluginRoutePage";
 
 const { frontend } = vi.hoisted(() => ({ frontend: vi.fn() }));
@@ -183,6 +184,23 @@ describe("PluginNavItems with a route key that differs from its path", () => {
     render(<Providers><PluginNavItems group="plugins" /></Providers>);
     expect(await screen.findByRole("link", { name: "ok" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "crm" })).toBeNull();
+  });
+});
+
+describe("PluginSafeModeNote", () => {
+  it("tells the agent that plugins are off in this browser window", async () => {
+    sessionStorage.setItem(PLUGIN_SAFE_MODE_KEY, "1");
+    render(<Providers><PluginSafeModeNote /></Providers>);
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Erweiterungen sind in diesem Browserfenster ausgeschaltet.",
+    );
+    expect(frontend).not.toHaveBeenCalled();
+  });
+
+  it("renders nothing normally", async () => {
+    render(<Providers><PluginSafeModeNote /></Providers>);
+    await waitFor(() => expect(frontend).toHaveBeenCalled());
+    expect(screen.queryByRole("status")).toBeNull();
   });
 });
 

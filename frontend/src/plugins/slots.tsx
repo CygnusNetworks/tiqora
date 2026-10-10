@@ -23,7 +23,7 @@ import { useDashboardWidgetDefinitions, type WidgetDefinition } from "./dashboar
 import { pluginNamespace } from "./i18n";
 import { PluginBoundary } from "./PluginBoundary";
 import { PluginComponent } from "./PluginComponent";
-import { usePluginContributions } from "./PluginProvider";
+import { usePluginContributions, usePlugins } from "./PluginProvider";
 import { useVisibleNavEntries } from "./useNavGroupHasItems";
 
 const NAV_ICONS: Record<string, () => ReactNode> = {
@@ -69,6 +69,18 @@ export function PluginNavItems({ group, onNavigate }: { group: string; onNavigat
         />
       ))}
     </>
+  );
+}
+
+/** Small note in the sidebar while browser safe mode (`?plugins=off`) is on. */
+export function PluginSafeModeNote() {
+  const { t } = useTranslation();
+  const { safeMode } = usePlugins();
+  if (!safeMode) return null;
+  return (
+    <p role="status" className="mt-3 px-2.5 text-xs text-muted" data-testid="plugin-safe-mode-note">
+      {t("plugins.safeModeBrowser")}
+    </p>
   );
 }
 

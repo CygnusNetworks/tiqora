@@ -39,7 +39,7 @@ import { SSEProvider } from "@/lib/useSSE";
 import { CallPopup } from "@/components/agent/phone/CallPopup";
 import { NavItem } from "./NavItem";
 import { PluginProvider } from "@/plugins/PluginProvider";
-import { PluginNavItems } from "@/plugins/slots";
+import { PluginNavItems, PluginSafeModeNote } from "@/plugins/slots";
 import { useNavGroupHasItems } from "@/plugins/useNavGroupHasItems";
 
 /** Small "Beta" pill rendered next to the Tiqora wordmark. Replaces the old
@@ -483,6 +483,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             <PluginNavItems group="plugins" onNavigate={onNavigate} />
           </NavGroup>
         )}
+        <PluginSafeModeNote />
       </nav>
 
       {/* Version/git-sha footer — kept after removing the redundant bottom-left user card. */}

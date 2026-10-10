@@ -2,8 +2,13 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./i18n";
+import { applySafeModeFromUrl } from "./plugins/safeMode";
 import "./themes/tokens.css";
 import "./index.css";
+
+// Browser safe mode (`?plugins=off` / `?plugins=on`): store it before the router
+// redirects (`/` -> `/agent` or `/login`) and drops the query string.
+applySafeModeFromUrl(window.location.search);
 
 const root = document.getElementById("root");
 if (!root) {

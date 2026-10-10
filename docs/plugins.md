@@ -504,7 +504,9 @@ Routes are declared directly on one `APIRouter` per `registry.route(...)`
 call, using `@router.get/post/...`. **A router that contains another router
 via `include_router` is rejected**, and so are Starlette routes, mounts and
 WebSockets (unless the route is registered as public). Use one flat router,
-or call `registry.route()` several times.
+or call `registry.route()` several times. If routes are refused when the api
+starts, the plugin shows as "Fehler" with the reason "Schnittstellen nicht
+eingebunden: …" and its routes answer 404.
 
 Tiqora attaches authentication to the routes at mount time. Dependencies
 `CurrentAgent`, `AdminAgent` and `DbSession` come from `tiqora_sdk`.
@@ -513,6 +515,11 @@ check queue permissions (`ctx.tickets.get(..., as_agent=agent.id)`), and a
 route that only administrators may call must depend on `AdminAgent`. API keys
 with restricted scopes need the key area `plugins` (`plugins:ro` reads,
 `plugins:rw` writes).
+
+**Never answer `401` from a plugin route.** The host's API client treats a
+`401` as an expired session and sends the whole page to the login screen. If
+an upstream service rejects your credentials, answer `403` or `502` with a
+message instead.
 
 A `public=True` router needs the capability `core.http.public_routes`; the
 admin page then shows "Bietet öffentlich erreichbare Schnittstellen an (ohne
@@ -741,8 +748,12 @@ Limits you must know:
 |---|---|---|---|
 | `agent.route` | `path` (`a-z0-9-` segments), `component`, `title_key`, `admin_only` | `{ path, subPath }` | `/agent/plugins/<id>/<path>` |
 | `agent.nav` | `route` (key of an `agent.route` of the same plugin), `label_key`, `icon` (`book calendar chart clock inbox mail puzzle search server shield user`), `group` (`workspace knowledge insights plugins`), `order`, `admin_only` | none (rendered by the host) | Sidebar |
-| `ticket.sidebar` | `component`, `title_key`, `order` | `{ ticketId }` | Ticket view, below the process widget |
+| `ticket.sidebar` | `component`, `title_key` (reserved: phase 1 draws no host frame or title, so the component draws its own, for example with `Panel`), `order` | `{ ticketId }` | Ticket view, below the process widget |
 | `dashboard.widget` | `component`, `title_key`, `description_key`, `version`, `category` (`tickets reports team ai itsm other`), `icon`, `size` (`{"default": [w, h], "min": [w, h], "max": [w, h]}` in a 12-column grid), `settings_schema`, `refresh_on`, `permission` | `WidgetProps<S>` | Section "Erweiterungen" of the dashboard |
+
+`subPath` is the rest of the URL below the route's `path`. Treat it as
+untrusted input. A sub path with `.` or `..` segments (also percent-encoded)
+shows "page not found" and never reaches the component.
 
 `WidgetProps<S>`: `instanceId` (stable id of the placed widget; `"preview"` in
 the gallery), `settings: S` (defaults from `settings_schema` applied),
@@ -798,7 +809,10 @@ brake, and it is **enforced only in production** (`TIQORA_ENV=production`, or
 
 The plugin list is fetched once per page load. After an update, widgets and
 stylesheets of a plugin whose version changed stay as they were until the page
-is reloaded.
+is reloaded. **Reload open tabs after a Tiqora or plugin update**: a tab opened
+before the update that loads a plugin for the first time afterwards can mix old
+and new runtime files, and the plugin's slot then shows an error until the
+reload.
 
 ## SDK stability
 
