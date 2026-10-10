@@ -16,6 +16,7 @@ from datetime import datetime
 from typing import Any
 
 import pytest
+from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -38,10 +39,12 @@ from tiqora.reporting.run_service import (
     ReportRunPayload,
     RunOverrides,
     TooManyReportJobs,
+    common_filter,
     enqueue_report_ref,
     run_report_ref,
 )
 from tiqora.reporting.schemas import ReportRunIn
+from tiqora.reporting.semantic import REPORT_SOURCES
 from tiqora.reporting.settings import REPORTING_SECTION, load_reporting_settings
 from tiqora.reporting.state import load_state
 from tiqora.settings_sections.store import save_section_values
@@ -668,3 +671,64 @@ async def test_old_payload_without_extra_filter_still_runs(env: Env) -> None:
     await env.run_jobs()
     env.as_user(OWNER)
     assert (await env.job(job_id))["status"] == "succeeded"
+
+
+async def test_seam_enforces_report_access_itself(env: Env) -> None:
+    await env.set_access("stats_group")  # PEER has no stats right
+    async with env.factory() as s:
+        reporting = await load_reporting_settings(s, Settings(environment="test"))
+        with pytest.raises(HTTPException) as run_exc:
+            await run_report_ref(
+                s,
+                user_id=PEER,
+                report_key="builtin.ticket_kpis",
+                definition=None,
+                overrides=RunOverrides(),
+                reporting=reporting,
+                cache=None,
+                budget=QueryBudget.inline(reporting),
+            )
+        assert run_exc.value.status_code == 403
+        with pytest.raises(HTTPException) as enq_exc:
+            await enqueue_report_ref(
+                s,
+                user_id=PEER,
+                run=ReportRunIn(report_key="builtin.ticket_kpis"),
+                extra_filter=None,
+            )
+        assert enq_exc.value.status_code == 403
+        # the owner holds stats rw: allowed
+        accepted = await enqueue_report_ref(
+            s, user_id=OWNER, run=ReportRunIn(report_key="builtin.ticket_kpis"), extra_filter=None
+        )
+        assert accepted.job_id > 0
+
+
+async def test_scalar_common_value_is_one_value_not_characters(env: Env) -> None:
+    src = get_registry().get(REPORT_SOURCES, "tickets")
+    assert src is not None
+    flt, _ = common_filter(src, {"customer": "rep48-cust-b", "queue": 5})
+    assert flt is not None
+    assert flt.model_dump(by_alias=True, exclude_none=True)["where"] == {
+        "all": [
+            {"field": "customer", "op": "in", "value": ["rep48-cust-b"]},
+            {"field": "queue", "op": "in", "value": [5]},
+        ]
+    }
+
+
+async def test_not_filter_round_trips_through_the_job_payload(env: Env) -> None:
+    flt = Filter.model_validate(
+        {"where": {"not": {"field": "customer", "op": "in", "value": ["rep48-cust-b"]}}}
+    )
+    key = await _saved(env, OWNER)
+    async with env.factory() as s:
+        accepted = await enqueue_report_ref(
+            s, user_id=OWNER, run=ReportRunIn(report_key=key), extra_filter=flt
+        )
+    stored = ReportRunPayload.model_validate(_job_payload(env, accepted.job_id))
+    assert stored.extra_filter == flt
+    await env.run_jobs()
+    env.as_user(OWNER)
+    job = await env.job(accepted.job_id)
+    assert job["status"] == "succeeded" and [r[1] for r in job["result"]["rows"]] == [1]

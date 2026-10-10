@@ -24,12 +24,14 @@ from fastapi import status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.config import get_settings
 from tiqora.domain.timezones import resolve_user_time_zone, valid_time_zone
 from tiqora.extensions.core import get_registry
 from tiqora.filters import AllOf, Condition, Filter
 from tiqora.jobs.schemas import JobAccepted
 from tiqora.jobs.service import count_active_jobs, enqueue_job, lock_user_job_quota
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.reporting.access import require_report_access
 from tiqora.reporting.cache import ReportCache
 from tiqora.reporting.compiler import RunParams
 from tiqora.reporting.definition import DefinitionError, ReportDefinition, TimeRange
@@ -46,7 +48,7 @@ from tiqora.reporting.schemas import (
     ReportRunIn,
 )
 from tiqora.reporting.semantic import REPORT_SOURCES, ReportSource
-from tiqora.reporting.settings import ReportingSettings
+from tiqora.reporting.settings import ReportingSettings, load_reporting_settings
 from tiqora.reporting.sql import Grain
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -182,7 +184,9 @@ def common_filter(
     ignored: list[str] = []
     known = set(COMMON_FILTER_KEYS)
     for key in sorted(values):
-        chosen = list(values[key])
+        raw = values[key]
+        # a bare scalar is one value, never a sequence of characters
+        chosen = [raw] if isinstance(raw, str | int) else list(raw)
         if not chosen:
             continue
         mapped = source.common_fields.get(key) if key in known else None
@@ -324,8 +328,10 @@ async def run_report_ref(
     """Prepare, plan, look in the cache, decide inline vs job, execute.
 
     Raises :class:`RequestError`, ``DefinitionError``, ``FilterError`` and
-    ``ReportQueryTimeout``; the caller maps them.
+    ``ReportQueryTimeout``; the caller maps them. Report access is enforced here too
+    (403 ``HTTPException``, like the routes), so a direct caller cannot skip it.
     """
+    await require_report_access(session, user_id, reporting)
     prepared = await prepare_ref(
         session,
         user_id,
@@ -420,7 +426,13 @@ async def enqueue_report_ref(
     run: ReportRunIn,
     extra_filter: Filter | None,
 ) -> JobAccepted:
-    """Queue a ``core.report_run`` job (private result); :class:`TooManyReportJobs` at the cap."""
+    """Queue a ``core.report_run`` job (private result); :class:`TooManyReportJobs` at the cap.
+
+    Report access is checked first (403 ``HTTPException``, like the routes).
+    """
+    await require_report_access(
+        session, user_id, await load_reporting_settings(session, get_settings())
+    )
     # PostgreSQL: an estimate's SET LOCAL statement_timeout (possibly ~1 s near the deadline)
     # lives until the transaction ends; never let it hit the enqueue
     await session.rollback()
