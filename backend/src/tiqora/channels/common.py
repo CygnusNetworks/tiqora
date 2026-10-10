@@ -33,6 +33,7 @@ from tiqora.domain.ticket_write_service import (
     create_ticket,
 )
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.znuny.cache_invalidation import invalidate_cache_type
 from tiqora.znuny.followup import detect_followup
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -117,7 +118,11 @@ async def ensure_channel_row(session: AsyncSession, name: str, module: str) -> i
     ``Storable::nfreeze`` blob. Since Tiqora writes no Perl code, and these
     are Tiqora-only channels Znuny's own UI never renders, we copy the
     ``channel_data`` bytes of an existing built-in row (``Internal``)
-    verbatim rather than trying to hand-construct Storable bytes.
+    verbatim rather than trying to hand-construct Storable bytes. (Znuny's own
+    cache serialisation is YAML, not Storable; only this column is Storable.)
+
+    After an INSERT the ``CommunicationChannel`` cache type is invalidated, as
+    Znuny's ``ChannelAdd`` does via ``_ChannelListCacheCleanup``.
     """
     existing = await _lookup_id(session, "communication_channel", "name", name)
     if existing is not None:
@@ -142,6 +147,7 @@ async def ensure_channel_row(session: AsyncSession, name: str, module: str) -> i
     channel_id = await _lookup_id(session, "communication_channel", "name", name)
     if channel_id is None:
         raise RuntimeError(f"communication_channel insert for {name!r} failed")
+    await invalidate_cache_type(session, "CommunicationChannel")
     return channel_id
 
 

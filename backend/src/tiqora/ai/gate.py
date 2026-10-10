@@ -192,3 +192,8 @@ __all__ = [
     "set_auto_reply_paused",
     "set_operation_mode",
 ]
+
+
+#: Source channels whose customer articles are never auto-replied (live chat:
+#: a visitor waits for a human; a delayed mail-style answer would be wrong).
+AUTO_REPLY_SKIP_CHANNELS: frozenset[str] = frozenset({"webchat"})
