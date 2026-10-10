@@ -1,8 +1,9 @@
 """GDPR: erased customer logins / company ids inside saved searches and saved reports.
 
 Pure tree walker plus both dialects. Seed ids 48290-48319 (names/logins contain ``rep48``):
-saved owner 48291, searches 48290 / 48293-48296, reports 48292 / 48297-48299, ticket 48300,
-customer users 48310 / 48311. Every row the module (and the erasure runs) writes is deleted again.
+saved owner 48291, searches 48290 / 48293-48296, reports 48292 / 48297-48299 (48299: company
+only), ticket 48300, customer users 48310 / 48311. Every row the module (and the erasure
+runs) writes is deleted again.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from tiqora.gdpr.saved_criteria import replace_filter_values, scrub_saved_criter
 LO, HI = 48290, 48319
 OWNER = 48291
 S_EQ, S_OTHER, S_BAD, S_TITLE, S_CO = 48290, 48293, 48294, 48295, 48296
-R_MAIN, R_DELETED, R_OTHER = 48292, 48297, 48298
+R_MAIN, R_DELETED, R_OTHER, R_CO = 48292, 48297, 48298, 48299
 TICKET, CU_ERASE, CU_KEEP = 48300, 48310, 48311
 LOGIN = "rep48.erase@example.org"
 OTHER_LOGIN = "other@example.org"
@@ -197,6 +198,13 @@ def _seed_rows(sync_url: str) -> None:
             conn, R_OTHER, "rep48 untouched",
             _report_definition(_eq("customer_user", OTHER_LOGIN), OTHER_LOGIN), 1,
         )  # fmt: skip
+        # company only: a `customer` filter (in list) and a `customer` parameter
+        co_def = _report_definition({"all": [_eq("customer", [COMPANY, "REP48-KEEP"], "in")]})
+        co_def["parameters"] = [
+            {"key": "co", "field": "customer", "op": "in",
+             "allowed_values": [COMPANY.lower(), "REP48-KEEP"], "default": [COMPANY]}
+        ]  # fmt: skip
+        _insert_report(conn, R_CO, "rep48 company report", co_def, 1)
     engine.dispose()
 
 
@@ -305,8 +313,13 @@ async def test_scrub_rewrites_company_ids_only_when_given(env: Env) -> None:
         assert await scrub_saved_criteria(s, {"nobody@example.org": "x"}) == 0
         n = await scrub_saved_criteria(s, {}, {COMPANY: "co-tok"})
         await s.commit()
-    assert n == 1
+    assert n == 2  # search 48296 and report 48299
     assert json.loads(_criteria(env.sync_url, S_CO))["where"]["not"]["value"] == "co-tok"
+    co = _definition(env.sync_url, R_CO)
+    assert co["filter"]["where"]["all"][0]["value"] == ["co-tok", "REP48-KEEP"]
+    assert co["parameters"][0]["allowed_values"] == ["co-tok", "REP48-KEEP"]
+    assert co["parameters"][0]["default"] == ["co-tok"]
+    assert _scalar(env.sync_url, f"SELECT version FROM tiqora_report WHERE id = {R_CO}") == 2
     # a report `customer` filter is rewritten with the company map, a login is not touched by it
     async with env.factory() as s:
         n = await scrub_saved_criteria(s, {}, {OTHER_LOGIN: "never"})
@@ -419,14 +432,14 @@ async def test_erasure_anonymise_rewrites_saved_criteria_and_rollback_restores(e
     assert _definition(env.sync_url, R_MAIN)["parameters"][0]["default"] == [new_login]
     # the company id is kept in anonymize mode
     assert json.loads(_criteria(env.sync_url, S_CO))["where"]["not"]["value"] == COMPANY
-    assert LOGIN not in _criteria(env.sync_url, S_EQ).replace(
-        f'"title", "op": "contains", "value": "{LOGIN}"', ""
-    )  # noqa: E501
+    assert _definition(env.sync_url, R_CO)["filter"]["where"]["all"][0]["value"][0] == COMPANY
+    assert _scalar(env.sync_url, f"SELECT version FROM tiqora_report WHERE id = {R_CO}") == 1
 
     await rollback_job(env.factory, Settings(), result.job_id, force_parallel=True, actor="rep48")
     assert json.loads(_criteria(env.sync_url, S_EQ))["where"]["all"][0]["value"] == LOGIN
     assert _definition(env.sync_url, R_MAIN)["parameters"][0]["default"] == [LOGIN]
-    assert _scalar(env.sync_url, f"SELECT version FROM tiqora_report WHERE id = {R_MAIN}") == 1
+    # content restored, version moves forward (1 -> 2 by the erasure -> 3): open editors get 409
+    assert _scalar(env.sync_url, f"SELECT version FROM tiqora_report WHERE id = {R_MAIN}") == 3
     assert (
         _scalar(env.sync_url, f"SELECT customer_user_id FROM ticket WHERE id = {TICKET}") == LOGIN
     )
@@ -435,23 +448,28 @@ async def test_erasure_anonymise_rewrites_saved_criteria_and_rollback_restores(e
 @pytest.mark.db
 async def test_erasure_delete_mode_uses_the_ticket_tokens(env: Env) -> None:
     result = await _run_small_anonymise(env, mode="delete")
-    row = (
-        create_engine(env.sync_url)
-        .connect()
-        .execute(text(f"SELECT customer_user_id, customer_id FROM ticket WHERE id = {TICKET}"))
-        .one()
-    )
-    token_login, token_company = row[0], row[1]
+    token_login = _scalar(env.sync_url, f"SELECT customer_user_id FROM ticket WHERE id = {TICKET}")
+    token_company = _scalar(env.sync_url, f"SELECT customer_id FROM ticket WHERE id = {TICKET}")
     assert token_login != LOGIN and token_company != COMPANY
     assert "geloescht-" not in token_login
     assert json.loads(_criteria(env.sync_url, S_EQ))["where"]["all"][0]["value"] == token_login
     assert json.loads(_criteria(env.sync_url, S_CO))["where"]["not"]["value"] == token_company
     assert _definition(env.sync_url, R_DELETED)["filter"]["where"]["value"] == token_login
-    assert result.counts["saved_criteria"] == 4
+    # report `customer` filter and parameter follow the ticket's company token
+    co = _definition(env.sync_url, R_CO)
+    assert co["filter"]["where"]["all"][0]["value"] == [token_company, "REP48-KEEP"]
+    assert co["parameters"][0]["allowed_values"] == [token_company, "REP48-KEEP"]
+    assert co["parameters"][0]["default"] == [token_company]
+    assert result.counts["saved_criteria"] == 5
     # rollback brings back the master row, the ticket and the saved criteria
     await rollback_job(env.factory, Settings(), result.job_id, force_parallel=True, actor="rep48")
     assert json.loads(_criteria(env.sync_url, S_CO))["where"]["not"]["value"] == COMPANY
     assert json.loads(_criteria(env.sync_url, S_EQ))["where"]["all"][0]["value"] == LOGIN
+    co = _definition(env.sync_url, R_CO)
+    assert co["filter"]["where"]["all"][0]["value"] == [COMPANY, "REP48-KEEP"]
+    assert co["parameters"][0]["allowed_values"] == [COMPANY.lower(), "REP48-KEEP"]
+    assert co["parameters"][0]["default"] == [COMPANY]
+    assert _scalar(env.sync_url, f"SELECT version FROM tiqora_report WHERE id = {R_CO}") == 3
 
 
 @pytest.mark.db

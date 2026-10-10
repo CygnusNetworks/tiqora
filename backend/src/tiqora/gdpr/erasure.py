@@ -2145,8 +2145,12 @@ async def rollback_job(
 
             if table in SAVED_CRITERIA_TABLES:
                 # Saved searches/reports are only ever UPDATEd (criteria/definition + version).
-                if await _fetch_full_row(session, table, pk) is not None:
-                    await _update_row(session, table, pk, original)
+                current = await _fetch_full_row(session, table, pk)
+                if current is not None:
+                    # Content back, version forward: an editor opened in between gets a 409.
+                    restore = {k: v for k, v in original.items() if k != "version"}
+                    restore["version"] = int(current["version"]) + 1
+                    await _update_row(session, table, pk, restore)
                     restored += 1
                 continue
 

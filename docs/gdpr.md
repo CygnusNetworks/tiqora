@@ -273,6 +273,13 @@ rewrite rolls back with it. The original `criteria` / `definition` and `version`
 of each changed row go into `tiqora_gdpr_backup`, so a rollback of the job
 restores them too.
 
+`tiqora gdpr anonymize-customer` (CLI) does not scrub saved criteria (it leaves the
+tickets' customer references as they are; follow-up GDPR-CLI-SAVED), and Znuny
+search profiles (`search_profile`) can still hold the login, so importing such a
+profile again recreates a saved search with it (follow-up GDPR-ZNUNY-PROFILE).
+A rollback restores the criteria but raises `version`, so an editor opened in the
+meantime gets a conflict instead of overwriting silently.
+
 Not scrubbed: free-text conditions (for example `title contains ...`), saved
 names and descriptions, and sidebar preferences hold no customer data. In delete
 mode a saved `customer` filter that selected the erased company now selects the
