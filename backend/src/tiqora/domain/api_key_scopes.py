@@ -164,8 +164,11 @@ def normalize_scopes(raw: str | None) -> str | None:
 
 
 def all_areas_read_only_scopes() -> str:
-    """CSV granting :ro on every catalog area (admin 'read-only' preset)."""
-    return ",".join(f"{a}:ro" for a in API_KEY_AREAS)
+    """CSV granting :ro on every catalog area except plugins (admin 'read-only' preset).
+
+    Plugin access is always an explicit opt-in (``plugins:ro`` / ``plugins:rw``).
+    """
+    return ",".join(f"{a}:ro" for a in API_KEY_AREAS if a != "plugins")
 
 
 def expand_scopes(scopes: frozenset[str] | None) -> dict[str, ScopeLevel] | None:

@@ -23,6 +23,11 @@ export const API_KEY_AREAS = [
 ] as const;
 
 export type ApiKeyArea = (typeof API_KEY_AREAS)[number];
+
+/** Areas that are never part of a preset or legacy expansion: access is an explicit opt-in. */
+export const OPT_IN_AREAS: readonly ApiKeyArea[] = ["plugins"];
+
+const PRESET_AREAS: readonly ApiKeyArea[] = API_KEY_AREAS.filter((a) => !OPT_IN_AREAS.includes(a));
 export type AreaLevel = "off" | "ro" | "rw";
 export type ScopeMode = "unrestricted" | "read_only" | "custom";
 
@@ -33,14 +38,16 @@ export function emptyAreaSelection(): AreaSelection {
 }
 
 export function allReadOnlySelection(): AreaSelection {
-  return Object.fromEntries(API_KEY_AREAS.map((a) => [a, "ro"])) as AreaSelection;
+  const sel = emptyAreaSelection();
+  for (const a of PRESET_AREAS) sel[a] = "ro";
+  return sel;
 }
 
 /** Serialize custom selection to CSV (null if unrestricted / empty). */
 export function selectionToScopes(mode: ScopeMode, selection: AreaSelection): string | null {
   if (mode === "unrestricted") return null;
   if (mode === "read_only") {
-    return API_KEY_AREAS.map((a) => `${a}:ro`).join(",");
+    return PRESET_AREAS.map((a) => `${a}:ro`).join(",");
   }
   const parts: string[] = [];
   for (const area of API_KEY_AREAS) {
@@ -71,7 +78,7 @@ export function parseScopesToMode(scopes: string | null | undefined): {
     // Expand legacy into custom matrix for editing
     if (parts.includes("write") || parts.includes("read")) {
       for (const area of API_KEY_AREAS) {
-        if (area === "mcp" || area === "compat" || area === "plugins") continue;
+        if (area === "mcp" || area === "compat" || OPT_IN_AREAS.includes(area)) continue;
         selection[area] = parts.includes("write") ? "rw" : "ro";
       }
     }
@@ -90,7 +97,8 @@ export function parseScopesToMode(scopes: string | null | undefined): {
 
   // Detect pure read-only preset
   const isReadOnly =
-    API_KEY_AREAS.every((a) => selection[a] === "ro") &&
+    PRESET_AREAS.every((a) => selection[a] === "ro") &&
+    OPT_IN_AREAS.every((a) => selection[a] === "off") &&
     !parts.some((p) => p.endsWith(":rw") || p === "write");
   if (isReadOnly) {
     return { mode: "read_only", selection: allReadOnlySelection() };

@@ -237,3 +237,10 @@ def test_plugins_area_scopes() -> None:
     assert not scopes_allow(frozenset({"plugins:ro"}), method="POST", path=path)
     assert scopes_allow(frozenset({"plugins:rw"}), method="POST", path=path)
     assert scopes_allow(None, method="POST", path=path)
+
+
+def test_read_only_preset_excludes_plugins() -> None:
+    raw = all_areas_read_only_scopes()
+    assert "plugins" not in raw and "kb:ro" in raw
+    path = "/api/plugins/org.example.hello/hello"
+    assert not scopes_allow(parse_api_key_scopes(raw), method="GET", path=path)
