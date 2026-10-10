@@ -282,4 +282,45 @@ describe("builderState", () => {
     s = builderReducer(s, { type: "setTime", timeRange: { kind: "relative", unit: "day", count: 30 } as never });
     expect(keys(s)).toEqual([]);
   });
+
+  it("keeps the dimension order and series index exactly, even when the series is not last", () => {
+    const defn = {
+      schema_version: 1,
+      source: "tickets",
+      dimensions: [{ key: "channel" }, { key: "queue" }],
+      measures: [{ key: "tickets" }],
+      visualization: { type: "stacked_bar", series_dimension: 0 },
+      sort: [],
+      totals: { grand: false, rows: true, columns: false },
+    } as ReportDefinition;
+    const s = fromDefinition(defn);
+    expect(s.columns.map((c) => c.key)).toEqual(["channel"]);
+    expect(JSON.stringify(toDefinition(s))).toBe(JSON.stringify(defn));
+  });
+
+  it("remaps the series index when dimensions are removed or moved", () => {
+    const three = fromDefinition({
+      source: "tickets",
+      dimensions: [{ key: "queue" }, { key: "channel" }, { key: "owner" }],
+      measures: [{ key: "tickets" }],
+      visualization: { type: "stacked_bar", series_dimension: 1 },
+    } as never);
+    let s = builderReducer(three, { type: "removeDimension", target: "rows", index: 0 });
+    expect(toDefinition(s)?.dimensions?.map((d) => d.key)).toEqual(["channel", "owner"]);
+    expect(toDefinition(s)?.visualization?.series_dimension).toBe(0);
+    s = builderReducer(three, { type: "removeDimension", target: "rows", index: 1 }); // owner, after the column
+    expect(toDefinition(s)?.dimensions?.map((d) => d.key)).toEqual(["queue", "channel"]);
+    expect(toDefinition(s)?.visualization?.series_dimension).toBe(1);
+    s = builderReducer(three, { type: "moveDimension", target: "columns", index: 0, delta: 1 });
+    expect(toDefinition(s)?.dimensions?.map((d) => d.key)).toEqual(["queue", "owner", "channel"]);
+    expect(toDefinition(s)?.visualization?.series_dimension).toBe(2);
+    s = builderReducer(three, { type: "removeDimension", target: "columns", index: 0 });
+    expect(toDefinition(s)?.visualization?.series_dimension).toBeUndefined();
+    // adding a row keeps a last column last
+    s = builderReducer(builderReducer(initialState(), { type: "addDimension", target: "columns", key: "channel" }), { type: "addDimension", target: "rows", key: "queue" });
+    s = builderReducer(s, { type: "addMeasure", key: "tickets" });
+    s = builderReducer(s, { type: "addDimension", target: "rows", key: "owner" });
+    expect(toDefinition(s)?.dimensions?.map((d) => d.key)).toEqual(["queue", "owner", "channel"]);
+    expect(toDefinition(s)?.visualization?.series_dimension).toBe(2);
+  });
 });

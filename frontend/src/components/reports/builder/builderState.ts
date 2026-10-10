@@ -31,6 +31,8 @@ export type BuilderState = {
   source: string | null;
   rows: DimensionSlot[];
   columns: DimensionSlot[];
+  /** Position of the column in the full dimension list (= number of rows before it); null = last. Keeps a loaded order exactly. */
+  columnAt: number | null;
   measures: string[];
   filter: TicketFilter | null;
   parameters: ReportParameter[];
@@ -74,6 +76,7 @@ export function initialState(): BuilderState {
     source: null,
     rows: [],
     columns: [],
+    columnAt: null,
     measures: [],
     filter: null,
     parameters: [],
@@ -93,6 +96,13 @@ function swap<T>(list: T[], index: number, delta: -1 | 1): T[] {
   const next = [...list];
   [next[index], next[to]] = [next[to], next[index]];
   return next;
+}
+
+/** All dimensions in definition order: the column sits at `columnAt`, else last. */
+function orderedSlots(s: BuilderState): DimensionSlot[] {
+  if (s.columns.length === 0) return [...s.rows];
+  const at = Math.min(s.columnAt ?? s.rows.length, s.rows.length);
+  return [...s.rows.slice(0, at), s.columns[0], ...s.rows.slice(at)];
 }
 
 function dimensionCount(s: BuilderState): number {
@@ -126,19 +136,35 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       if (action.target === "columns" && state.columns.length >= 1) return state;
       const isDate = action.date ?? KNOWN_DATE_DIMENSIONS.has(action.key);
       const slot: DimensionSlot = { key: action.key, grain: isDate ? "day" : null, choices: [], topN: null, date: isDate };
-      return { ...state, [action.target]: [...state[action.target], slot] };
+      if (action.target === "columns") return { ...state, columns: [slot], columnAt: state.rows.length };
+      // A column that was last stays last when rows are added.
+      const columnLast = state.columns.length > 0 && (state.columnAt ?? state.rows.length) >= state.rows.length;
+      return {
+        ...state,
+        rows: [...state.rows, slot],
+        columnAt: columnLast ? state.rows.length + 1 : state.columnAt,
+      };
     }
     case "removeDimension": {
       const list = state[action.target];
       if (action.index < 0 || action.index >= list.length) return state;
       const removed = list[action.index].key;
+      let columnAt = state.columnAt;
+      if (action.target === "columns") columnAt = null;
+      else if (columnAt !== null && action.index < columnAt) columnAt -= 1;
       return {
         ...state,
         [action.target]: list.filter((_, i) => i !== action.index),
+        columnAt,
         sort: state.sort.filter((s) => s.key !== removed),
       };
     }
     case "moveDimension":
+      if (action.target === "columns") {
+        if (state.columns.length === 0) return state;
+        const at = (state.columnAt ?? state.rows.length) + action.delta;
+        return { ...state, columnAt: Math.max(0, Math.min(state.rows.length, at)) };
+      }
       return { ...state, [action.target]: swap(state[action.target], action.index, action.delta) };
     case "updateDimension": {
       const list = state[action.target];
@@ -230,6 +256,7 @@ export function fromDefinition(defn: ReportDefinition, meta?: { name?: string; d
   const seriesIdx = defn.visualization?.series_dimension ?? null;
   const hasColumn = seriesIdx !== null && seriesIdx >= 0 && seriesIdx < dims.length;
   const rows = dims.filter((_, i) => !hasColumn || i !== seriesIdx).map(slotFromRef);
+  // Position of the column among all dimensions is kept exactly as stored.
   const columns = hasColumn ? [slotFromRef(dims[seriesIdx])] : [];
   const base = initialState();
   const viz = defn.visualization;
@@ -240,6 +267,7 @@ export function fromDefinition(defn: ReportDefinition, meta?: { name?: string; d
     source: defn.source,
     rows,
     columns,
+    columnAt: hasColumn ? seriesIdx : null,
     measures: (defn.measures ?? []).map((m) => m.key),
     filter: defn.filter ?? null,
     parameters: defn.parameters ? [...defn.parameters] : [],
@@ -273,9 +301,9 @@ const SAVE_ONLY_ISSUES: ReadonlySet<string> = new Set(["nameRequired", "groupsRe
 
 export function toDefinition(state: BuilderState): ReportDefinition | null {
   if (validate(state, undefined).some((i) => !SAVE_ONLY_ISSUES.has(i.key))) return null;
-  const slots = [...state.rows, ...state.columns];
+  const slots = orderedSlots(state);
   const viz: Visualization = { type: state.visualization.type ?? "table" };
-  if (state.columns.length > 0) viz.series_dimension = slots.length - 1;
+  if (state.columns.length > 0) viz.series_dimension = slots.indexOf(state.columns[0]);
   if (state.visualization.chart_measures && state.visualization.chart_measures.length > 0) {
     viz.chart_measures = [...state.visualization.chart_measures];
   }
