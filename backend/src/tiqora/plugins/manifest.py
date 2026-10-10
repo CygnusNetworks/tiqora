@@ -29,7 +29,8 @@ RESERVED_SHORT_IDS: Final = frozenset(
 )
 
 _ENTRY_RE: Final = re.compile(r"^[A-Za-z_][\w.]*:[A-Za-z_]\w*$")
-_HOST_RE: Final = re.compile(r"^(\*\.)?[a-z0-9]([a-z0-9.-]*[a-z0-9])?$")
+_HOST_LABEL_RE: Final = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
+_KEY_RE: Final = re.compile(r"^[a-z0-9_-]{1,40}$")
 _ROUTE_PATH_RE: Final = re.compile(r"^[a-z0-9-]+(/[a-z0-9-]+)*$")
 _WEB_FILE_RE: Final = re.compile(r"^[A-Za-z0-9_./-]+$")
 
@@ -51,11 +52,32 @@ def _web_file(value: str, suffix: str) -> str:
         _WEB_FILE_RE.fullmatch(value) is not None
         and value.endswith(suffix)
         and not value.startswith("/")
-        and ".." not in value.split("/")
+        and not {"", ".", ".."} & set(value.split("/"))
     )
     if not ok:
         raise ValueError(f"ungültiger Dateipfad „{value}“ (relativ zu web/, Endung {suffix})")
     return value
+
+
+def _normalise_host(host: str) -> str:
+    """Lower-case/IDNA-normalise one allowlist entry; ``host`` or ``*.suffix`` only."""
+    err = ValueError(
+        f"ungültiger Hostname „{host}“ (erlaubt: host.example.org oder *.example.org, "
+        "ohne Schema, Port und Pfad)"
+    )
+    low = host.strip().lower()
+    wildcard = low.startswith("*.")
+    name = low[2:] if wildcard else low
+    try:
+        name = name.encode("idna").decode("ascii")
+    except UnicodeError:
+        raise err from None
+    labels = name.split(".")
+    if len(name) > 253 or not all(_HOST_LABEL_RE.fullmatch(label) for label in labels):
+        raise err
+    if wildcard and (len(labels) < 2 or labels[-1].isdigit()):
+        raise err  # "*.com" covers a whole public suffix; "*.1.2.3" is an IP literal
+    return ("*." if wildcard else "") + name
 
 
 class Capabilities(BaseModel):
@@ -70,10 +92,7 @@ class Capabilities(BaseModel):
     def _hosts(cls, value: list[str]) -> list[str]:
         out: list[str] = []
         for host in value:
-            low = host.strip().lower()
-            if not _HOST_RE.fullmatch(low):
-                raise ValueError(f"ungültiger Hostname „{host}“ (ohne Schema und Port)")
-            out.append(low)
+            out.append(_normalise_host(host))
         return out
 
 
@@ -199,9 +218,25 @@ def parse_manifest(text: str) -> PluginManifest:
 # --- web/manifest.json -------------------------------------------------------------------
 
 
-class NavContribution(BaseModel):
-    slot: Literal["agent.nav"]
+class _Contribution(BaseModel):
+    """Base of all web contributions.
+
+    Unknown fields are deliberately ignored (forward compatibility: a newer plugin on an
+    older core), so a typo in an optional field silently keeps its default.
+    """
+
     key: str
+
+    @field_validator("key")
+    @classmethod
+    def _key(cls, value: str) -> str:
+        if not _KEY_RE.fullmatch(value):
+            raise ValueError("Schlüssel: 1 bis 40 Zeichen aus a-z, 0-9, _ und -")
+        return value
+
+
+class NavContribution(_Contribution):
+    slot: Literal["agent.nav"]
     route: str  # key of an agent.route contribution of the same plugin
     label_key: str
     icon: str = "puzzle"
@@ -210,9 +245,8 @@ class NavContribution(BaseModel):
     admin_only: bool = False
 
 
-class RouteContribution(BaseModel):
+class RouteContribution(_Contribution):
     slot: Literal["agent.route"]
-    key: str
     path: str  # -> /agent/plugins/<id>/<path>
     component: str
     title_key: str
@@ -226,9 +260,8 @@ class RouteContribution(BaseModel):
         return value
 
 
-class TicketSidebarContribution(BaseModel):
+class TicketSidebarContribution(_Contribution):
     slot: Literal["ticket.sidebar"]
-    key: str
     component: str
     title_key: str
     order: int = 100
@@ -240,9 +273,8 @@ class WidgetSize(BaseModel):
     max: tuple[int, int] = (12, 8)
 
 
-class DashboardWidgetContribution(BaseModel):
+class DashboardWidgetContribution(_Contribution):
     slot: Literal["dashboard.widget"]
-    key: str
     component: str
     version: int = 1
     title_key: str
@@ -262,6 +294,8 @@ FrontendContribution = Annotated[
 
 
 class WebManifest(BaseModel):
+    """Unknown fields are ignored (forward compatibility)."""
+
     manifest_version: Literal[1]
     entry: str = "index.js"  # relative to web/
     styles: list[str] = []

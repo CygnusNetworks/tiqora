@@ -105,3 +105,66 @@ def test_fixture_web_manifest_parses() -> None:
 def test_reserved_short_id_rejected(reserved: str) -> None:
     with pytest.raises(ManifestError, match="reserviert"):
         parse_manifest(_manifest_text(**{'short_id = "hello"': f'short_id = "{reserved}"'}))
+
+
+def _hosts_manifest(hosts: str) -> str:
+    return _manifest_text(
+        **{'outbound_hosts = ["api.example.org", "*.example.net"]': f"outbound_hosts = {hosts}"}
+    )
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("api.example.org", "api.example.org"),
+        ("API.Example.ORG", "api.example.org"),
+        ("*.example.org", "*.example.org"),
+        ("localhost", "localhost"),
+        ("bücher.example.org", "xn--bcher-kva.example.org"),
+        ("a-b.example.org", "a-b.example.org"),
+    ],
+)
+def test_outbound_host_accepted(raw: str, expected: str) -> None:
+    m = parse_manifest(_hosts_manifest(f'["{raw}"]'))
+    assert m.capabilities.outbound_hosts == [expected]
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "https://api.example.org",
+        "api.example.org:443",
+        "api.example.org/path",
+        "*.com",
+        "*",
+        "*.*",
+        "*.*.example.org",
+        "a*.example.org",
+        "a..b",
+        "a-.example.org",
+        "-a.example.org",
+        "",
+        "*.",
+        "*.1.2.3",
+        "a_b.example.org",
+        "x" * 64 + ".example.org",
+        ".".join(["abcdefghi"] * 30),
+    ],
+)
+def test_outbound_host_rejected(bad: str) -> None:
+    with pytest.raises(ManifestError, match="Hostname"):
+        parse_manifest(_hosts_manifest(f'["{bad}"]'))
+
+
+def test_web_manifest_bad_key_rejected() -> None:
+    caps = Capabilities(frontend_slots=["ticket.sidebar"])
+    raw = _web('{"slot": "ticket.sidebar", "key": "Bad Key", "component": "X", "title_key": "t"}')
+    with pytest.raises(ManifestError, match="key"):
+        parse_web_manifest(raw, caps)
+
+
+@pytest.mark.parametrize("entry", ["./index.js", "a//b.js"])
+def test_entry_path_empty_segments_rejected(entry: str) -> None:
+    raw = ('{"manifest_version": 1, "entry": "' + entry + '"}').encode()
+    with pytest.raises(ManifestError, match="entry"):
+        parse_web_manifest(raw, Capabilities())

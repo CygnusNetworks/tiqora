@@ -88,3 +88,23 @@ def test_asset_path_resolves(fixture_plugins: Installer) -> None:
     (p,) = discover_plugins()
     assert plugin_asset_path(p, "web/index.js") == (pkg / "web" / "index.js").resolve()
     assert plugin_asset_path(p, "i18n/de.json") == (pkg / "i18n" / "de.json").resolve()
+
+
+def test_exception_in_one_distribution_becomes_problem() -> None:
+    class Boom:
+        name = "org.example.boom"
+        value = "boom:plugin"
+
+        @property
+        def dist(self) -> object:
+            raise PermissionError("kein Zugriff")
+
+    class NoDist:
+        name = "org.example.nodist"
+        value = "nodist:plugin"
+        dist = None
+
+    found = discover_plugins([Boom(), NoDist()])  # type: ignore[list-item]
+    by_id = {d.plugin_id: d for d in found}
+    assert "PermissionError" in (by_id["org.example.boom"].problem or "")
+    assert by_id["org.example.nodist"].problem == "Paket ohne Metadaten"

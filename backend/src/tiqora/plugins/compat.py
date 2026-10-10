@@ -38,7 +38,7 @@ def check_compat(
     if manifest.tiqora is None:
         return None
     if core is None:
-        log.warning("plugin_core_version_unknown", plugin=manifest.id, wanted=manifest.tiqora)
+        log.debug("plugin_core_version_unknown", plugin=manifest.id, wanted=manifest.tiqora)
         return None
     if not SpecifierSet(manifest.tiqora).contains(core, prereleases=True):
         return f"Erweiterung benötigt Tiqora {manifest.tiqora}, installiert ist {core}"
