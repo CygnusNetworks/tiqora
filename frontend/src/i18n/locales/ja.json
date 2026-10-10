@@ -5333,7 +5333,35 @@
     },
     "rangeInvalid": "The start date is after the end date. Please correct the period.",
     "deniedTitle": "No access to reports",
-    "deniedBody": "Your account is not allowed to view reports. Please contact your administrator."
+    "deniedBody": "Your account is not allowed to view reports. Please contact your administrator.",
+    "builder": {
+      "issues": {
+        "noSource": "Choose the data basis first.",
+        "noMeasure": "Add at least one value.",
+        "tooManyDimensions": "At most three rows and columns in total.",
+        "tooManyMeasures": "At most ten values.",
+        "vizNeedsTwoDimensions": "This chart type needs two groupings (or, for stacked bars, two values).",
+        "vizNeedsOneDimension": "This chart type needs exactly one grouping (bars, lines and areas: at least one).",
+        "vizNeedsNoDimension": "A single figure cannot have any groupings.",
+        "vizNeedsOneMeasure": "This chart type shows exactly one value.",
+        "nameRequired": "Please enter a name.",
+        "groupsRequired": "Choose at least one group to share with.",
+        "parameterFieldUnknown": "This field cannot be used as a filter for this data basis.",
+        "duplicateParameter": "This parameter name is already used.",
+        "filterInvalid": "A filter condition is incomplete."
+      },
+      "viz": {
+        "table": "Table",
+        "pivot": "Pivot table",
+        "bar": "Bar chart",
+        "stacked_bar": "Stacked bars",
+        "line": "Line chart",
+        "area": "Area chart",
+        "donut": "Donut chart",
+        "heatmap": "Heatmap",
+        "kpi": "Key figures"
+      }
+    }
   },
   "filters": {
     "all": "All conditions must match",

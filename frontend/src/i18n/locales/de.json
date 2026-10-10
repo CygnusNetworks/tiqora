@@ -5333,7 +5333,35 @@
     },
     "rangeInvalid": "Das Startdatum liegt nach dem Enddatum. Bitte den Zeitraum korrigieren.",
     "deniedTitle": "Kein Zugriff auf Berichte",
-    "deniedBody": "Ihr Konto darf die Berichte nicht ansehen. Bitte wenden Sie sich an Ihre Administration."
+    "deniedBody": "Ihr Konto darf die Berichte nicht ansehen. Bitte wenden Sie sich an Ihre Administration.",
+    "builder": {
+      "issues": {
+        "noSource": "Wählen Sie zuerst die Datenbasis.",
+        "noMeasure": "Fügen Sie mindestens einen Wert hinzu.",
+        "tooManyDimensions": "Zeilen und Spalten zusammen: höchstens drei.",
+        "tooManyMeasures": "Höchstens zehn Werte.",
+        "vizNeedsTwoDimensions": "Diese Darstellung braucht zwei Gruppierungen (gestapelte Balken alternativ zwei Werte).",
+        "vizNeedsOneDimension": "Diese Darstellung braucht genau eine Gruppierung (Balken, Linien und Flächen: mindestens eine).",
+        "vizNeedsNoDimension": "Eine Kennzahlen-Ansicht darf keine Gruppierung haben.",
+        "vizNeedsOneMeasure": "Diese Darstellung zeigt genau einen Wert.",
+        "nameRequired": "Bitte geben Sie einen Namen ein.",
+        "groupsRequired": "Wählen Sie mindestens eine Gruppe zum Teilen.",
+        "parameterFieldUnknown": "Dieses Feld lässt sich für diese Datenbasis nicht als Filter verwenden.",
+        "duplicateParameter": "Dieser Parametername wird schon verwendet.",
+        "filterInvalid": "Eine Filterbedingung ist unvollständig."
+      },
+      "viz": {
+        "table": "Tabelle",
+        "pivot": "Kreuztabelle",
+        "bar": "Balkendiagramm",
+        "stacked_bar": "Gestapelte Balken",
+        "line": "Liniendiagramm",
+        "area": "Flächendiagramm",
+        "donut": "Ringdiagramm",
+        "heatmap": "Heatmap",
+        "kpi": "Kennzahlen"
+      }
+    }
   },
   "filters": {
     "all": "Alle Bedingungen müssen zutreffen",
