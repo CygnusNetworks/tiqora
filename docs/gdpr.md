@@ -255,6 +255,30 @@ old login there, exactly like the ticket table does. Removing the login from the
 tickets and the report data completely requires the admin erasure (which rewrites
 the tickets' customer references and rebuilds their facts).
 
+### Saved searches and reports
+
+Saved ticket searches (`tiqora_saved_search.criteria`) and saved reports
+(`tiqora_report.definition`: the filter and the runtime parameters, including
+`allowed_values` and `default`) can name a customer. Admin erasure rewrites, in
+the same transaction as the tickets, every exact (case-insensitive) occurrence
+of an erased login (`customer_user_id` in searches, `customer_user` in reports)
+with the very value the customer's tickets received, in both modes, through all
+nested `all` / `any` / `not` groups and `in` lists. Delete mode additionally
+rewrites company ids (`customer_id` / `customer`) with the token the tickets got
+(anonymize keeps the company primary key, so nothing changes there). Soft-deleted
+reports are included. Changed rows get `version + 1` (cached counts and report
+runs are keyed by it), rows that do not mention the erased identity stay
+byte-identical, and unreadable criteria are skipped. If the erasure fails, the
+rewrite rolls back with it. The original `criteria` / `definition` and `version`
+of each changed row go into `tiqora_gdpr_backup`, so a rollback of the job
+restores them too.
+
+Not scrubbed: free-text conditions (for example `title contains ...`), saved
+names and descriptions, and sidebar preferences hold no customer data. In delete
+mode a saved `customer` filter that selected the erased company now selects the
+token (the company's tickets carry it), also for tickets of other customers of
+that company that were not erased.
+
 ### Caveats
 
 - **Parallel operation with Znuny.** The admin API bypasses the ownership
@@ -280,8 +304,9 @@ the tickets' customer references and rebuilds their facts).
 - **Scope is by ticket customer.** Only tickets whose `customer_user_id` is
   one of the selected logins are touched. The customer's address or name in
   other customers' tickets is not scrubbed, and Tiqora-owned tables other
-  than `tiqora_telegram_message` (e.g. AI drafts/audit, mail log, Telegram
-  contacts) are not touched.
+  than `tiqora_telegram_message`, the saved searches/reports (see above) and the
+  report facts (e.g. AI drafts/audit, mail log, Telegram contacts) are not
+  touched.
 - **Anonymize rollback of related tables** recomputes the replacement login
   from the job's `seed`, so it depends on `ValueMapper` producing the same
   output as at apply time.

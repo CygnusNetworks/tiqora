@@ -44,6 +44,7 @@ from tiqora.domain.settings_store import get_setting
 from tiqora.domain.ticket_write_service import SEARCH_REINDEX_EVENT, _emit_event
 from tiqora.gdpr.audit import record_audit
 from tiqora.gdpr.gate import require_write_gate
+from tiqora.gdpr.saved_criteria import SAVED_CRITERIA_TABLES, scrub_saved_criteria
 from tiqora.reporting.cache import purge_report_cache_at
 from tiqora.znuny.cache_invalidation import invalidate_cache_type, invalidate_ticket_cache
 from tiqora.znuny.sessions import delete_customer_sessions
@@ -1582,6 +1583,7 @@ async def run_erasure(
                     new_cid = company_to_new.get(str(old_cid)) or mapper.map_value(
                         str(old_cid), "login"
                     )
+                    company_to_new.setdefault(str(old_cid), str(new_cid))
                     if old_cid != new_cid:
                         changed_t["customer_id"] = old_cid
                         updates_t["customer_id"] = new_cid
@@ -2015,6 +2017,26 @@ async def run_erasure(
                 )
             )
 
+        # ---- saved searches / reports: the erased identity must not survive in criteria ----
+        # Same old->new values the tickets received; anonymize keeps the company PK. Runs in
+        # this transaction (rolls back with it) and backs the originals up for rollback_job.
+        async def _backup_saved(table: str, pk: dict[str, Any], original: dict[str, Any]) -> None:
+            await _add_backup(
+                session,
+                job_id=job_id,
+                table_name=table,
+                row_pk=pk,
+                original_row=original,
+                created=now,
+            )
+
+        counts["saved_criteria"] = await scrub_saved_criteria(
+            session,
+            login_to_new,
+            company_to_new if mode == "delete" else None,
+            backup=_backup_saved,
+        )
+
         await _refresh_report_facts(session, report_ticket_ids)
 
         # ---- cache invalidation ----
@@ -2120,6 +2142,13 @@ async def rollback_job(
             pk = _json_load_row(bak.row_pk)
             original = _json_load_row(bak.original_row)
             table = bak.table_name
+
+            if table in SAVED_CRITERIA_TABLES:
+                # Saved searches/reports are only ever UPDATEd (criteria/definition + version).
+                if await _fetch_full_row(session, table, pk) is not None:
+                    await _update_row(session, table, pk, original)
+                    restored += 1
+                continue
 
             if is_ticket_delete:
                 await _insert_row(session, table, original)
