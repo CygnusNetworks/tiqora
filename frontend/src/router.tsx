@@ -9,6 +9,8 @@ import { SetPasswordPage } from "@/routes/SetPasswordPage";
 import { LoginPage } from "@/routes/LoginPage";
 import { DashboardPage } from "@/routes/agent/DashboardPage";
 import { ReportsPage, type ReportsSearch } from "@/routes/agent/ReportsPage";
+import { ReportBuilderPage } from "@/routes/agent/ReportBuilderPage";
+import { validateReportBuilderSearch } from "@/routes/agent/reportBuilderSearch";
 import { ReportViewPage } from "@/routes/agent/ReportViewPage";
 import { validateReportViewSearch } from "@/routes/agent/reportViewSearch";
 import { QueuesPage, type QueuesSearch } from "@/routes/agent/QueuesPage";
@@ -481,6 +483,21 @@ const agentReportsRoute = createRoute({
     category: typeof s.category === "string" && /^[a-z_]{1,32}$/.test(s.category) ? s.category : undefined,
   }),
   component: ReportsPage,
+});
+
+// Static segment first: "new" is never read as a report key.
+const agentReportNewRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/reports/new",
+  validateSearch: validateReportBuilderSearch,
+  component: ReportBuilderPage,
+});
+
+// A built-in key is redirected to /reports/new?from=<key> by the page.
+const agentReportEditRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/reports/$reportKey/edit",
+  component: ReportBuilderPage,
 });
 
 const agentReportViewRoute = createRoute({
@@ -1149,6 +1166,8 @@ const routeTree = rootRoute.addChildren([
     agentSettingsRoute,
     agentStatsRoute,
     agentReportsRoute,
+    agentReportNewRoute,
+    agentReportEditRoute,
     agentReportViewRoute,
     agentCalendarRoute,
     agentTemplatesRoute,
