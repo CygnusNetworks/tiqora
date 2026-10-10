@@ -85,15 +85,74 @@ async def test_per_ip_cap_six() -> None:
     await hub.aclose()
 
 
-async def test_full_queue_drops_oldest() -> None:
+async def test_typing_is_coalesced() -> None:
     r = FakeRedis()
     hub = ChatHub(r, max_streams=10)
     q = await hub.subscribe(A)
     for _ in range(60):
         await publish_chat_typing(r, A)
     await asyncio.sleep(0.05)
-    assert q.qsize() == 50
+    assert q.qsize() == 1
     assert q.get_nowait() == {"type": "typing", "who": "agent"}
+    await hub.aclose()
+
+
+async def test_typing_never_pushes_out_a_wake() -> None:
+    r = FakeRedis()
+    hub = ChatHub(r, max_streams=10)
+    q = await hub.subscribe(A)
+    await publish_chat_wake(r, A)
+    for _ in range(60):
+        await publish_chat_typing(r, A)
+    await publish_chat_wake(r, A)
+    await asyncio.sleep(0.05)
+    items = [q.get_nowait() for _ in range(q.qsize())]
+    assert [i["type"] for i in items].count("wake") == 2
+    await hub.aclose()
+
+
+async def test_wake_overflow_closes_stream_instead_of_dropping() -> None:
+    r = FakeRedis()
+    hub = ChatHub(r, max_streams=10)
+    q = await hub.subscribe(A)
+    for _ in range(51):
+        await publish_chat_wake(r, A)
+    await asyncio.sleep(0.1)
+    assert q.qsize() == 1 and q.get_nowait() == CLOSE_ITEM
+    assert hub.active_streams == 0
+    await hub.aclose()
+
+
+async def test_full_queue_of_wakes_with_typing_drops_typing_first() -> None:
+    r = FakeRedis()
+    hub = ChatHub(r, max_streams=10)
+    q = await hub.subscribe(A)
+    await publish_chat_typing(r, A)
+    for _ in range(50):
+        await publish_chat_wake(r, A)
+    await asyncio.sleep(0.1)
+    items = [q.get_nowait() for _ in range(q.qsize())]
+    assert len(items) == 50 and all(i["type"] == "wake" for i in items)
+    assert hub.active_streams == 1
+    await hub.aclose()
+
+
+async def test_subscribe_after_aclose_refused() -> None:
+    hub = ChatHub(FakeRedis(), max_streams=10)
+    await hub.aclose()
+    with pytest.raises(StreamLimitReached):
+        await hub.subscribe(A)
+
+
+async def test_lifetime_enforced_during_redis_outage() -> None:
+    now = [0.0]
+    r = FakeRedis()
+    hub = ChatHub(r, max_streams=10, max_lifetime=1800, clock=lambda: now[0])
+    q = await hub.subscribe(A)
+    r.fail = True
+    now[0] = 1801.0
+    assert (await asyncio.wait_for(q.get(), 3)) == CLOSE_ITEM
+    assert hub.active_streams == 0
     await hub.aclose()
 
 

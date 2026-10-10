@@ -16,21 +16,20 @@ import resource
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Annotated, Any, Final
+from typing import Any, Final
 
-import redis.asyncio as redis
 import structlog
-from fastapi import Depends, Request
+from fastapi import Request
 
-from tiqora.api.deps import AppSettings, get_redis
-
-RedisDep = Annotated[redis.Redis, Depends(get_redis)]
+from tiqora.api.deps import AppSettings
+from tiqora.api.v1.events import RedisDep
 
 logger = structlog.get_logger(__name__)
 
 CHAT_CHANNEL_PREFIX: Final = "tiqora:chat:"
 QUEUE_SIZE: Final = 50
 MAX_PER_IP: Final = 6
+SWEEP_INTERVAL: Final = 1.0
 MAX_STREAM_SECONDS: Final = 30 * 60
 _FD_RESERVE: Final = 256
 _MIN_STREAMS: Final = 10
@@ -73,14 +72,15 @@ class StreamLimitReached(Exception):
         self.reason = reason
 
 
-def _put_drop_oldest(queue: asyncio.Queue[dict[str, Any]], item: dict[str, Any]) -> None:
-    while True:
-        try:
-            queue.put_nowait(item)
-            return
-        except asyncio.QueueFull:
-            with contextlib.suppress(asyncio.QueueEmpty):
-                queue.get_nowait()
+def _queue_items(queue: asyncio.Queue[dict[str, Any]]) -> Any:
+    # asyncio.Queue keeps its items in a deque; coalescing needs to look inside it.
+    return queue._queue  # type: ignore[attr-defined]
+
+
+def _force_close(queue: asyncio.Queue[dict[str, Any]]) -> None:
+    """Replace everything queued by the close item (the client reconnects and replays)."""
+    _queue_items(queue).clear()
+    queue.put_nowait(dict(CLOSE_ITEM))
 
 
 @dataclass(eq=False)
@@ -115,6 +115,7 @@ class ChatHub:
         self._reader: asyncio.Task[None] | None = None
         self._start_lock = asyncio.Lock()
         self._closed = False
+        self._sweeper: asyncio.Task[None] | None = None
 
     @property
     def active_streams(self) -> int:
@@ -137,9 +138,40 @@ class ChatHub:
                 self._ip_counts.pop(stream.ip_hash, None)
         return True
 
+    def _offer(self, stream: _Stream, item: dict[str, Any]) -> None:
+        """Queue ``item`` without ever dropping a ``wake``/``close``.
+
+        Typing items are coalesced (only the newest stays) and are what gets dropped when the
+        queue is full; if only wakes are left the stream is closed instead, so a visitor
+        reconnects and replays rather than silently missing a message.
+        """
+        queue = stream.queue
+        items = _queue_items(queue)
+        if item.get("type") == "typing":
+            for old in [i for i in items if i.get("type") == "typing"]:
+                items.remove(old)
+        elif queue.full():
+            for old in items:
+                if old.get("type") == "typing":
+                    items.remove(old)
+                    break
+        if queue.full():
+            if item.get("type") == "typing":
+                return
+            self._remove(stream)
+            _force_close(queue)
+            return
+        queue.put_nowait(item)
+
+    def _close_stream(self, stream: _Stream) -> None:
+        self._remove(stream)
+        _force_close(stream.queue)
+
     async def subscribe(
         self, session_id: str, *, ip_hash: str | None = None
     ) -> asyncio.Queue[dict[str, Any]]:
+        if self._closed:
+            raise StreamLimitReached("closed")
         existing = self._streams.get(session_id, [])
         victim = existing[0] if len(existing) >= self._max_per_session else None
         total = self._total - (1 if victim else 0)
@@ -152,8 +184,7 @@ class ChatHub:
             if ip_count >= self._max_per_ip:
                 raise StreamLimitReached("ip")
         if victim is not None:
-            self._remove(victim)
-            _put_drop_oldest(victim.queue, dict(CLOSE_ITEM))
+            self._close_stream(victim)
         await self._ensure_reader()
         stream = _Stream(
             session_id=session_id,
@@ -190,14 +221,21 @@ class ChatHub:
                 logger.warning("chat_hub_subscribe_failed", exc_info=True)
                 self._pubsub = None
             self._reader = asyncio.create_task(self._run(), name="chat-hub-reader")
+            if self._sweeper is None or self._sweeper.done():
+                self._sweeper = asyncio.create_task(self._sweep_loop(), name="chat-hub-sweeper")
 
     def _expire_streams(self) -> None:
         now = self._clock()
         for streams in list(self._streams.values()):
             for stream in list(streams):
                 if stream.expires_at <= now:
-                    self._remove(stream)
-                    _put_drop_oldest(stream.queue, dict(CLOSE_ITEM))
+                    self._close_stream(stream)
+
+    async def _sweep_loop(self) -> None:
+        """Lifetime enforcement on its own timer, independent of Redis traffic or outages."""
+        while not self._closed:
+            self._expire_streams()
+            await asyncio.sleep(SWEEP_INTERVAL)
 
     def _route(self, message: dict[str, Any]) -> None:
         if message.get("type") != "pmessage":
@@ -216,8 +254,8 @@ class ChatHub:
             return
         if not isinstance(payload, dict):
             return
-        for stream in streams:
-            _put_drop_oldest(stream.queue, dict(payload))
+        for stream in list(streams):
+            self._offer(stream, dict(payload))
 
     async def _run(self) -> None:
         while not self._closed:
@@ -225,7 +263,6 @@ class ChatHub:
                 if self._pubsub is None:
                     self._pubsub = await self._open_pubsub()
                 while not self._closed:
-                    self._expire_streams()
                     message = await self._pubsub.get_message(
                         ignore_subscribe_messages=True, timeout=1.0
                     )
@@ -246,16 +283,16 @@ class ChatHub:
 
     async def aclose(self) -> None:
         self._closed = True
-        reader, self._reader = self._reader, None
-        if reader is not None:
-            reader.cancel()
-            with contextlib.suppress(asyncio.CancelledError, Exception):
-                await reader
+        for task in (self._reader, self._sweeper):
+            if task is not None:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await task
+        self._reader = self._sweeper = None
         await self._drop_pubsub()
         for streams in list(self._streams.values()):
             for stream in list(streams):
-                self._remove(stream)
-                _put_drop_oldest(stream.queue, dict(CLOSE_ITEM))
+                self._close_stream(stream)
 
 
 async def get_chat_hub(request: Request, redis_client: RedisDep, settings: AppSettings) -> ChatHub:
