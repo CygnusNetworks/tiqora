@@ -62,6 +62,21 @@ class ChatRateLimiter:
         if int(count) > limit:
             raise RateLimited(scope, max(1, int(ttl)))
 
+    async def check(self, scope: str, subject: str, *, limit: int) -> None:
+        """Raise :class:`RateLimited` when the window already holds ``limit`` hits — without
+        counting this call. Lets a caller refuse BEFORE expensive work (e.g. the ``auth_fail``
+        bucket before a session lookup). Redis errors → :class:`ChatBackendUnavailable`."""
+        key = self._key(scope, subject)
+        try:
+            async with self._client.pipeline(transaction=True) as pipe:
+                pipe.get(key)
+                pipe.ttl(key)
+                raw, ttl = await pipe.execute()
+        except Exception as exc:  # noqa: BLE001 - fail closed on every backend error
+            raise ChatBackendUnavailable(str(exc)) from exc
+        if raw is not None and int(raw) >= limit:
+            raise RateLimited(scope, max(1, int(ttl or 0)))
+
     async def try_hit(self, scope: str, subject: str, *, window_seconds: int) -> bool:
         """True when this is the first call in the window (``SET NX EX``); Redis errors → False."""
         try:

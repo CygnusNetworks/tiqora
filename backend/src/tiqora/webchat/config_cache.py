@@ -70,6 +70,10 @@ class PublicConfigCache:
         if len(self._entries) >= MAX_ENTRIES:
             for k in [k for k, (exp, _) in self._entries.items() if exp <= now]:
                 del self._entries[k]
+        if len(self._entries) >= MAX_ENTRIES:
+            # Unknown-key probes must not evict the live configs.
+            for k in [k for k, (_, v) in self._entries.items() if v is None]:
+                del self._entries[k]
             if len(self._entries) >= MAX_ENTRIES:
                 self._entries.clear()
         self._entries[key] = (now + self._ttl, value)

@@ -34,11 +34,12 @@ from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.events.pubsub import TIQORA_EVENTS_CHANNEL
 from tiqora.jobs.service import utc_now
+from tiqora.webchat import public_api
 from tiqora.webchat.availability import mark_agent_online, set_agent_state
 from tiqora.webchat.config_cache import clear_config_cache
 from tiqora.webchat.models import MIB
 from tiqora.webchat.origins import own_origin, reset_public_base_url_warning
-from tiqora.webchat.public_api import UPLOAD_BYTES_PER_CONFIG_DAY
+from tiqora.webchat.public_api import UPLOAD_BYTES_PER_CONFIG_DAY, UPLOAD_BYTES_PER_IP_DAY
 
 pytestmark = pytest.mark.db
 
@@ -417,12 +418,36 @@ async def test_wrong_token_and_unknown_session_look_identical(env: Env) -> None:
 
 @pytest.mark.asyncio
 @parametrize_db
-async def test_token_failures_spend_auth_fail_bucket(env: Env) -> None:
+async def test_token_failures_spend_auth_fail_bucket(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    lookups: list[str] = []
+    real_lookup = public_api.get_chat_session
+
+    async def counting_lookup(db: AsyncSession, session_id: str, **kw: Any) -> Any:
+        lookups.append(session_id)
+        return await real_lookup(db, session_id, **kw)
+
+    monkeypatch.setattr(public_api, "get_chat_session", counting_lookup)
     async with _client(env) as client:
-        url = f"{API}/sessions/{'2' * 32}"
-        codes = [(await client.get(url)).status_code for _ in range(61)]
-    assert codes[:60] == [404] * 60
-    assert codes[60] == 429
+        created = await _start(client)
+        sid = created["session_id"]
+        wrong = {"X-Chat-Token": sid + "." + "W" * 43}
+        codes = [
+            (await client.get(f"{API}/sessions/{sid}", headers=wrong)).status_code
+            for _ in range(60)
+        ]
+        assert codes == [404] * 60
+        assert len(lookups) == 60
+        # Bucket full: 429 before any lookup — a guess and the correct token alike.
+        guess = await client.get(f"{API}/sessions/{sid}", headers=wrong)
+        right = await client.get(f"{API}/sessions/{sid}", headers=_h(created))
+        assert guess.status_code == 429 and right.status_code == 429
+        assert int(right.headers["Retry-After"]) >= 1
+        assert len(lookups) == 60
+        # The window passes: the correct token works again.
+        env.redis.advance(601)
+        assert (await client.get(f"{API}/sessions/{sid}", headers=_h(created))).status_code == 200
 
 
 @pytest.mark.asyncio
@@ -446,6 +471,8 @@ async def test_rate_limits(env: Env) -> None:
             for i in range(6)
         ]
         assert codes == [201] * 5 + [429]
+        # Closing has its own bucket: a visitor at the message limit can still leave.
+        assert (await client.post(f"{API}/sessions/{sid}/end", headers=h)).status_code == 204
     keys = await env.redis.keys("tiqora:chat:rl:*")
     assert any(k.startswith("tiqora:chat:rl:message:") for k in keys)
 
@@ -602,6 +629,129 @@ async def test_upload_daily_budget_503(env: Env) -> None:
             headers=_h(created),
         )
         assert res.status_code == 503 and res.json() == {"detail": "chat_unavailable"}
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_upload_read_limit_413(env: Env) -> None:
+    # Content-Length stays under max_bytes + 64 KiB, so the bounded read itself refuses.
+    env.set_upload_max(MIB)
+    async with _client(env) as client:
+        created = await _start(client)
+        pdf = ("knapp.pdf", b"%PDF-1.4\n" + b"0" * (MIB + 1024), "application/pdf")
+        res = await client.post(
+            f"{API}/sessions/{created['session_id']}/attachments",
+            files={"file": pdf},
+            headers=_h(created),
+        )
+        assert res.status_code == 413
+        assert res.json() == {"detail": "upload_rejected", "errors": {"file": "size"}}
+
+
+async def _budget(env: Env) -> tuple[int, dict[str, int]]:
+    cfg = await env.redis.get(f"tiqora:chat:rl:upload_bytes:cfg{CONFIG}")
+    ips = {
+        k: int(await env.redis.get(k) or 0)
+        for k in await env.redis.keys("tiqora:chat:rl:upload_bytes_ip:*")
+    }
+    return int(cfg or 0), ips
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_upload_budget_charges_only_accepted_files(env: Env) -> None:
+    async with _client(env) as client:
+        created = await _start(client)
+        sid, h = created["session_id"], _h(created)
+        url = f"{API}/sessions/{sid}/attachments"
+        svg = ("x.png", b"<svg onload='alert(1)'/>", "image/png")
+        assert (await client.post(url, files={"file": svg}, headers=h)).status_code == 422
+        assert await _budget(env) == (0, {})
+        png = ("bild.png", PNG_BYTES, "image/png")
+        first = await client.post(url, files={"file": png}, data={"client_id": "u1"}, headers=h)
+        assert first.status_code == 201
+        cfg_total, ips = await _budget(env)
+        assert cfg_total == len(PNG_BYTES) and list(ips.values()) == [len(PNG_BYTES)]
+        assert not [k for k in ips if "127.0.0.1" in k]
+        # An idempotent retry returns the stored line and costs nothing.
+        retry = await client.post(url, files={"file": png}, data={"client_id": "u1"}, headers=h)
+        assert retry.status_code == 201 and retry.json()["seq"] == first.json()["seq"]
+        assert await _budget(env) == (cfg_total, ips)
+        # A closed chat refuses the file and costs nothing.
+        assert (await client.post(f"{API}/sessions/{sid}/end", headers=h)).status_code == 204
+        closed = await client.post(url, files={"file": png}, headers=h)
+        assert closed.status_code == 409
+        assert await _budget(env) == (cfg_total, ips)
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_upload_ip_daily_cap_503(env: Env) -> None:
+    assert min(100 * MIB, UPLOAD_BYTES_PER_CONFIG_DAY // 4) == UPLOAD_BYTES_PER_IP_DAY
+    async with _client(env) as client:
+        created = await _start(client)
+        url = f"{API}/sessions/{created['session_id']}/attachments"
+        png = ("bild.png", PNG_BYTES, "image/png")
+        assert (await client.post(url, files={"file": png}, headers=_h(created))).status_code == 201
+        (ip_key,) = await env.redis.keys("tiqora:chat:rl:upload_bytes_ip:*")
+        await env.redis.set(ip_key, str(UPLOAD_BYTES_PER_IP_DAY), ex=3600)
+        res = await client.post(url, files={"file": png}, headers=_h(created))
+        assert res.status_code == 503 and res.json() == {"detail": "chat_unavailable"}
+        assert res.headers["Retry-After"] == "30"
+
+
+@pytest.mark.asyncio
+@parametrize_db
+@pytest.mark.parametrize("state", ["channel_off", "config_invalid", "config_deleted"])
+async def test_disabled_sessions_keep_reads_and_close(env: Env, state: str) -> None:
+    async with _client(env) as client:
+        created = await _start(client)
+        sid, h = created["session_id"], _h(created)
+        up = await client.post(
+            f"{API}/sessions/{sid}/attachments",
+            files={"file": ("bild.png", PNG_BYTES, "image/png")},
+            headers=h,
+        )
+        assert up.status_code == 201
+        if state == "channel_off":
+            env.switch_channel("0")
+        elif state == "config_invalid":
+            env.sql("UPDATE tiqora_chat_config SET valid = :v WHERE id = :i", v=False, i=CONFIG)
+        else:
+            env.sql("DELETE FROM tiqora_chat_config WHERE id = :i", i=CONFIG)
+        clear_config_cache()
+
+        writes = [
+            await client.post(f"{API}/sessions/{sid}/messages", json={"body": "x"}, headers=h),
+            await client.post(f"{API}/sessions/{sid}/typing", headers=h),
+            await client.post(
+                f"{API}/sessions/{sid}/attachments",
+                files={"file": ("b.png", PNG_BYTES, "image/png")},
+                headers=h,
+            ),
+            await client.post(
+                f"{API}/sessions/{sid}/contact", json={"email": "erika@example.org"}, headers=h
+            ),
+        ]
+        assert [r.status_code for r in writes] == [404] * 4
+        assert {r.text for r in writes} == {'{"detail":"disabled"}'}
+
+        state_out = await client.get(f"{API}/sessions/{sid}", headers=h)
+        assert state_out.status_code == 200
+        expected_label = None if state == "config_deleted" else "Support"
+        assert state_out.json()["topic_label"] == expected_label
+        msgs = await client.get(f"{API}/sessions/{sid}/messages", headers=h)
+        assert [m["seq"] for m in msgs.json()] == [1, 2]
+        download = await client.get(
+            f"{API}/sessions/{sid}/messages/{up.json()['seq']}/attachments/0", headers=h
+        )
+        assert download.status_code == 200 and download.content == PNG_BYTES
+        assert (await client.post(f"{API}/sessions/{sid}/end", headers=h)).status_code == 204
+        ended = (await client.get(f"{API}/sessions/{sid}", headers=h)).json()
+        assert ended["status"] == "ended" and ended["can_send"] is False
+        # Still not an oracle: a wrong token is the usual 404 not_found.
+        wrong = await client.get(f"{API}/sessions/{sid}", headers={"X-Chat-Token": sid + ".x"})
+        assert wrong.status_code == 404 and wrong.json() == {"detail": "not_found"}
 
 
 @pytest.mark.asyncio
