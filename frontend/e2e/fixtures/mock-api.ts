@@ -1,4 +1,5 @@
-import type { Page, Route } from "@playwright/test";
+import { test, type Page, type Route } from "@playwright/test";
+import { createDemoDashboards, resolveDashboards, type DemoDashboards } from "../../src/demo/dashboardsMock";
 import type { ReportRunIn } from "../../src/lib/reportsApi";
 // Reports reuse the demo's pure report data (catalogue definitions + deterministic results).
 import { DEMO_FACTS, DEMO_REPORT_CATALOGUE, demoReport, demoSources, resolveReportRun } from "../../src/demo/reportsMock";
@@ -416,6 +417,22 @@ let ticketProcessState: typeof ticketProcessStateNotInProcess = ticketProcessSta
 
 let authenticated = false;
 
+/**
+ * Stateful dashboards store per test (R-DASH-E2E-STORE): the pages of one test share it, tests do
+ * not - serial tests in one worker would otherwise inherit each other's saves. Seeded with the
+ * default dashboard "Mein Start" plus an empty "Alt" tab.
+ */
+const dashboardStores = new Map<string, DemoDashboards>();
+function dashboardStore(): DemoDashboards {
+  const id = test.info().testId;
+  let store = dashboardStores.get(id);
+  if (!store) {
+    store = createDemoDashboards({ extraTabs: ["Alt"] });
+    dashboardStores.set(id, store);
+  }
+  return store;
+}
+
 async function json(route: Route, status: number, body: unknown) {
   await route.fulfill({
     status,
@@ -438,6 +455,17 @@ export async function mockApi(page: Page) {
     const url = new URL(req.url());
     const path = url.pathname;
     const method = req.method();
+
+    // Dashboards (/agent home page): stateful per test, answered from the request body/query.
+    if (/\/api\/v1\/(dashboards|dashboard-widget-types|admin\/dashboard-templates)(\/|$)/.test(path)) {
+      const hasBody = method !== "GET" && method !== "DELETE";
+      const out = resolveDashboards(dashboardStore(), method, path, hasBody ? req.postDataJSON() : undefined, url.searchParams);
+      if (out) {
+        if (out.status === 204) await route.fulfill({ status: 204 });
+        else await json(route, out.status, out.body);
+        return;
+      }
+    }
 
     // Auth
     if (path.endsWith("/api/v1/auth/methods") && method === "GET") {

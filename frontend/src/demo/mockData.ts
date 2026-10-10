@@ -9,6 +9,7 @@
  * auto-authenticated).
  */
 
+import { resolve as resolveDashboardsDemo } from "./dashboardsMock";
 import { demoCatalogue, demoFacts, demoReport, demoReportingStatus, demoReportJob, demoSources } from "./reportsMock";
 
 export { resolveReportRun } from "./reportsMock";
@@ -1849,6 +1850,9 @@ export function resolveData(path: string, method: string): unknown | undefined {
     if (job) return job;
   }
   if (p.endsWith("/api/v1/jobs")) return [];
+  // Dashboards: reads here, bodies and queries are handled by the MSW handlers (dashboardsMock).
+  const dashboards = resolveDashboardsDemo(method, p);
+  if (dashboards) return dashboards.body;
   // Agent
   if (p.endsWith("/api/v1/queues")) return agentQueues;
   // Reference lookups (flat lists behind name/id joins — e.g. the queue names
