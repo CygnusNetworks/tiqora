@@ -73,8 +73,8 @@ function Editor({
   const previewOn = fieldsQ.isSuccess && ticketFilterErrors(shown.criteria, fields).size === 0;
 
   const countQ = useQuery({
-    queryKey: ["saved-search-editor", "count", shown.criteria],
-    queryFn: ({ signal }) => savedSearchesApi.countTickets(shown.criteria, signal),
+    queryKey: ["saved-search-editor", "count", shown.criteria, isAdmin && shown.includeArchived],
+    queryFn: ({ signal }) => savedSearchesApi.countTickets(shown.criteria, signal, isAdmin && shown.includeArchived),
     enabled: previewOn,
     retry: false,
     staleTime: 30_000,

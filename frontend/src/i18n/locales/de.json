@@ -5578,6 +5578,8 @@
     "saveFailed": "Die Suche konnte nicht gespeichert werden.",
     "listTitle": "Suche",
     "noRight": "Diese Suche darfst du nicht bearbeiten.",
-    "open": "Öffnen"
+    "open": "Öffnen",
+    "countLabel_one": "{{count}} Ticket",
+    "countLabel_other": "{{count}} Tickets"
   }
 }

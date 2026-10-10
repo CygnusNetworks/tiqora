@@ -5570,6 +5570,8 @@
     "saveFailed": "The search could not be saved.",
     "listTitle": "Search",
     "noRight": "You may not edit this search.",
-    "open": "Open"
+    "open": "Open",
+    "countLabel_one": "{{count}} ticket",
+    "countLabel_other": "{{count}} tickets"
   }
 }

@@ -19,6 +19,13 @@ export type SaveViewParams = Partial<ListParams> & {
   limit?: number;
 };
 
+function omitPage<T extends { offset?: number; limit?: number }>(params: T): Omit<T, "offset" | "limit"> {
+  const copy = { ...params };
+  delete copy.offset;
+  delete copy.limit;
+  return copy;
+}
+
 const inputCls =
   "w-full rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent";
 
@@ -45,9 +52,8 @@ export function SaveViewDialog({
   const save = useMutation({
     mutationFn: () => {
       // Sort goes to its own fields; the page (offset, limit) is not part of a search.
-      const { sort, order, offset, limit, ...filter } = listParams;
-      void offset;
-      void limit;
+      const { sort, order, ...rest } = listParams;
+      const filter = omitPage(rest);
       const archived = filter.include_archived === true;
       return savedSearchesApi.create({
         name: name.trim(),

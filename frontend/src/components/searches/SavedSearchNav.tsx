@@ -42,6 +42,7 @@ function SearchRow({
         <span
           className="shrink-0 rounded-full px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-muted"
           data-testid={`sidebar-search-${search.id}-count`}
+          aria-label={t("savedSearches.countLabel", { count })}
         >
           {count}
         </span>

@@ -769,44 +769,44 @@ export function QueuesPage() {
           </div>
 
           <div className="flex items-center gap-2">
-          <Button onClick={() => setSaveViewOpen(true)} data-testid="queues-save-view">
-            {t("savedSearches.saveView")}
-          </Button>
-          <Menu
-            align="right"
-            panelTestId="queue-more-menu"
-            trigger={({ ref, toggleProps }) => (
-              <button
-                ref={ref}
-                type="button"
-                {...toggleProps}
-                aria-label={t("queue.moreActions")}
-                data-testid="queue-more-actions"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-hairline bg-surface text-muted transition-colors duration-100 hover:border-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-              >
-                <MoreIcon className="h-4 w-4" />
-              </button>
-            )}
-          >
-            {isAdmin && (
-              <MenuItem
-                selected={includeArchived}
-                keepOpen
-                testId="queue-show-archived"
-                onSelect={() =>
-                  setSearch({ include_archived: includeArchived ? undefined : true, offset: 0 })
-                }
-              >
-                {t("queue.showArchived")}
+            <Button onClick={() => setSaveViewOpen(true)} data-testid="queues-save-view">
+              {t("savedSearches.saveView")}
+            </Button>
+            <Menu
+              align="right"
+              panelTestId="queue-more-menu"
+              trigger={({ ref, toggleProps }) => (
+                <button
+                  ref={ref}
+                  type="button"
+                  {...toggleProps}
+                  aria-label={t("queue.moreActions")}
+                  data-testid="queue-more-actions"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-hairline bg-surface text-muted transition-colors duration-100 hover:border-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+                >
+                  <MoreIcon className="h-4 w-4" />
+                </button>
+              )}
+            >
+              {isAdmin && (
+                <MenuItem
+                  selected={includeArchived}
+                  keepOpen
+                  testId="queue-show-archived"
+                  onSelect={() =>
+                    setSearch({ include_archived: includeArchived ? undefined : true, offset: 0 })
+                  }
+                >
+                  {t("queue.showArchived")}
+                </MenuItem>
+              )}
+              <MenuItem testId="queue-export-csv" onSelect={() => {
+                  setExportError(null);
+                  void exportCsv();
+                }}>
+                {t("queue.exportCsv")}
               </MenuItem>
-            )}
-            <MenuItem testId="queue-export-csv" onSelect={() => {
-                setExportError(null);
-                void exportCsv();
-              }}>
-              {t("queue.exportCsv")}
-            </MenuItem>
-          </Menu>
+            </Menu>
           </div>
         </div>
 

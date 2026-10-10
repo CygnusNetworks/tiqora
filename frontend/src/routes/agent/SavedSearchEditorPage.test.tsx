@@ -126,7 +126,7 @@ describe("SavedSearchEditorPage", () => {
     await addQueueCondition();
     await user.type(screen.getByTestId("saved-search-editor-name"), "Neu");
     expect(await screen.findByTestId("saved-search-editor-count")).toHaveTextContent("12 Tickets passen");
-    expect(count).toHaveBeenCalledWith(QUEUE_FILTER, expect.anything());
+    expect(count).toHaveBeenCalledWith(QUEUE_FILTER, expect.anything(), false);
     expect(query).toHaveBeenCalledWith(expect.objectContaining({ filter: QUEUE_FILTER, limit: 10 }), expect.anything());
     expect(await screen.findByTestId("ticket-row-101")).toHaveTextContent("Drucker streikt");
     await user.click(screen.getByTestId("saved-search-editor-save"));
@@ -174,11 +174,13 @@ describe("SavedSearchEditorPage", () => {
 
   it("sends the archive switch for an admin", async () => {
     auth.user = { id: 1, is_admin: true, can_share_reports: true };
-    vi.spyOn(savedSearchesApi, "countTickets").mockResolvedValue({ count: 0 });
+    const count = vi.spyOn(savedSearchesApi, "countTickets").mockResolvedValue({ count: 0 });
     vi.spyOn(savedSearchesApi, "queryTickets").mockResolvedValue(PAGE as never);
     const create = vi.spyOn(savedSearchesApi, "create").mockResolvedValue(s({ id: 9 }) as never);
     renderAt("/agent/searches/new");
     await user.click(await screen.findByTestId("saved-search-editor-archived"));
+    // the count follows the switch, so it matches the list
+    await waitFor(() => expect(count).toHaveBeenLastCalledWith({ version: 1 }, expect.anything(), true));
     await user.type(screen.getByTestId("saved-search-editor-name"), "Alles");
     await user.click(screen.getByTestId("saved-search-editor-save"));
     await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({ include_archived: true })));

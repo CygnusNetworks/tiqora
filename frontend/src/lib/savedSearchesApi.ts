@@ -54,9 +54,10 @@ export const savedSearchesApi = {
   queryTickets(body: Partial<TicketQueryIn> & { filter: TicketFilter }, signal?: AbortSignal) {
     return api.request<PaginatedTickets>("POST", "/api/v1/tickets/query", { body, signal });
   },
-  countTickets(filter: TicketFilter, signal?: AbortSignal) {
+  /** `includeArchived` is honoured for admins only (like the list). */
+  countTickets(filter: TicketFilter, signal?: AbortSignal, includeArchived = false) {
     return api.request<{ count: number }>("POST", "/api/v1/ticket-filters/count", {
-      body: { filter },
+      body: includeArchived ? { filter, include_archived: true } : { filter },
       signal,
     });
   },

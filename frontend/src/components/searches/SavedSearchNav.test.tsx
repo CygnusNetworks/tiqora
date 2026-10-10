@@ -47,6 +47,7 @@ describe("SavedSearchNav", () => {
     renderNav();
     expect(await screen.findByTestId("sidebar-search-1")).toHaveTextContent("Meine VIP");
     await waitFor(() => expect(screen.getByTestId("sidebar-search-1-count")).toHaveTextContent("4"));
+    expect(screen.getByTestId("sidebar-search-1-count")).toHaveAttribute("aria-label", "4 Tickets");
     expect(screen.queryByTestId("sidebar-search-2-count")).toBeNull();
     expect(screen.getByTestId("sidebar-search-2")).toHaveAttribute("title", "Anzahl gerade nicht verfügbar");
     expect(screen.getByTestId("sidebar-search-1")).not.toHaveAttribute("title");

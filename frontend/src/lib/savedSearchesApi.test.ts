@@ -14,6 +14,7 @@ it("calls the saved-search, ticket-query and import routes", async () => {
   await savedSearchesApi.znunyPreview();
   await savedSearchesApi.remove(5);
   await savedSearchesApi.countTickets({ version: 1 });
+  await savedSearchesApi.countTickets({ version: 1 }, undefined, true);
   await savedSearchesApi.ticketFilterFields();
   expect(spy.mock.calls.map((c) => [c[0], c[1]])).toEqual([
     ["GET", "/api/v1/saved-searches"],
@@ -24,8 +25,12 @@ it("calls the saved-search, ticket-query and import routes", async () => {
     ["GET", "/api/v1/saved-searches/import/znuny"],
     ["DELETE", "/api/v1/saved-searches/5"],
     ["POST", "/api/v1/ticket-filters/count"],
+    ["POST", "/api/v1/ticket-filters/count"],
     ["GET", "/api/v1/ticket-filters/fields"],
   ]);
   expect(spy.mock.calls[2][2]).toMatchObject({ body: { show_in_sidebar: true, show_count: false } });
+  expect(spy.mock.calls[7][2]).toMatchObject({ body: { filter: { version: 1 } } });
+  expect(spy.mock.calls[7][2]?.body).not.toHaveProperty("include_archived");
+  expect(spy.mock.calls[8][2]).toMatchObject({ body: { filter: { version: 1 }, include_archived: true } });
   expect(spy.mock.calls[4][2]).toMatchObject({ body: { names: ["A"] } });
 });
