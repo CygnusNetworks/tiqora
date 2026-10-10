@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Startseite – Ansicht</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#3b6be8;text-decoration:none}a:hover{color:#2a55c9}
+</style>
+</helmet>
+<div style="min-height: 1060px; background: {{p.bg}}; color: {{p.ink}}; font-family: Inter, 'Segoe UI', system-ui, sans-serif; display: flex; flex-wrap: wrap">
+
+  <nav aria-label="Hauptnavigation" style="flex: 0 0 216px; box-sizing: border-box; padding: 20px 14px; border-right: 1px solid {{p.hair}}; background: {{p.surface}}; display: flex; flex-direction: column; gap: 4px">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px">
+      <div style="width: 28px; height: 28px; border-radius: 8px; background: {{p.accent}}; color: {{p.accentInk}}; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px">t</div>
+      <span style="font-weight: 700; font-size: 16px; letter-spacing: -0.01em">tiqora</span>
+    </div>
+    <sc-for list="{{nav}}" as="n" hint-placeholder-count="7">
+      <a href="#" style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; font-size: 14px; color: {{n.color}}; background: {{n.bg}}; font-weight: {{n.weight}}">
+        <span style="width: 8px; height: 8px; border-radius: 3px; background: {{n.dot}}"></span>{{n.label}}
+      </a>
+    </sc-for>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 28px 32px 40px; display: flex; flex-direction: column; gap: 22px">
+
+    <header style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <h1 style="margin: 0; font-size: 26px; font-weight: 650; letter-spacing: -0.02em">Guten Morgen, Anna</h1>
+        <div role="tablist" aria-label="Dashboards" style="display: flex; flex-wrap: wrap; gap: 6px">
+          <button role="tab" aria-selected="true" style="font: inherit; font-size: 13px; font-weight: 600; padding: 7px 12px; border-radius: 999px; border: 1px solid {{p.accent}}; background: {{p.accentDim}}; color: {{p.ink}}; cursor: pointer">Mein Start</button>
+          <button role="tab" aria-selected="false" style="font: inherit; font-size: 13px; padding: 7px 12px; border-radius: 999px; border: 1px solid {{p.hair}}; background: transparent; color: {{p.muted}}; cursor: pointer">Team Support</button>
+          <button role="tab" aria-selected="false" style="font: inherit; font-size: 13px; padding: 7px 12px; border-radius: 999px; border: 1px solid {{p.hair}}; background: transparent; color: {{p.muted}}; cursor: pointer">Leitstand 2nd Level</button>
+          <button aria-label="Neues Dashboard" style="font: inherit; font-size: 13px; padding: 7px 11px; border-radius: 999px; border: 1px dashed {{p.hair}}; background: transparent; color: {{p.muted}}; cursor: pointer">+</button>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px">
+        <button style="font: inherit; font-size: 13px; padding: 9px 14px; border-radius: 8px; border: 1px solid {{p.hair}}; background: {{p.surface}}; color: {{p.ink}}; cursor: pointer">Teilen</button>
+        <button style="font: inherit; font-size: 13px; font-weight: 600; padding: 9px 16px; border-radius: 8px; border: 0; background: {{p.accent}}; color: {{p.accentInk}}; cursor: pointer">Anpassen</button>
+      </div>
+    </header>
+
+    <section aria-label="Kennzahlen" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px">
+      <sc-for list="{{kpis}}" as="k" hint-placeholder-count="4">
+        <article style="background: {{p.surface}}; border: 1px solid {{p.hair}}; border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; min-width: 0">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px">
+            <h2 style="margin: 0; font-size: 13px; font-weight: 500; color: {{p.muted}}">{{k.label}}</h2>
+            <span style="font-size: 12px; font-weight: 600; color: {{k.deltaColor}}">{{k.delta}}</span>
+          </div>
+          <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 12px">
+            <span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 34px; font-weight: 600; letter-spacing: -0.02em; color: {{k.valueColor}}">{{k.value}}</span>
+            <svg width="96" height="30" viewBox="0 0 96 30" aria-hidden="true"><polyline points="{{k.spark}}" fill="none" stroke="{{k.sparkColor}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>
+          </div>
+          <span style="font-size: 12px; color: {{p.muted}}">{{k.hint}}</span>
+        </article>
+      </sc-for>
+    </section>
+
+    <div style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px">
+
+      <article style="grid-column: span 8; background: {{p.surface}}; border: 1px solid {{p.hair}}; border-radius: 14px; padding: 16px 18px 8px; min-width: 0">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px">
+          <h2 style="margin: 0; font-size: 15px; font-weight: 600">Meine offenen Tickets</h2>
+          <a href="#" style="font-size: 13px; color: {{p.accent}}">Alle 12 anzeigen</a>
+        </div>
+        <div style="overflow-x: auto">
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px">
+            <thead>
+              <tr style="color: {{p.muted}}; text-align: left">
+                <th style="font-weight: 500; padding: 8px 8px 8px 0">Ticket</th>
+                <th style="font-weight: 500; padding: 8px">Kunde</th>
+                <th style="font-weight: 500; padding: 8px">Status</th>
+                <th style="font-weight: 500; padding: 8px; text-align: right">Fällig</th>
+              </tr>
+            </thead>
+            <tbody>
+              <sc-for list="{{tickets}}" as="t" hint-placeholder-count="6">
+                <tr style="border-top: 1px solid {{p.hair}}">
+                  <td style="padding: 10px 8px 10px 0; min-width: 240px">
+                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: {{p.muted}}">{{t.tn}}</div>
+                    <div style="font-weight: 500">{{t.title}}</div>
+                  </td>
+                  <td style="padding: 10px 8px; color: {{p.muted}}; white-space: nowrap">{{t.customer}}</td>
+                  <td style="padding: 10px 8px"><span style="font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 999px; color: {{t.stateColor}}; background: {{t.stateBg}}">{{t.state}}</span></td>
+                  <td style="padding: 10px 8px; text-align: right; white-space: nowrap; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: {{t.dueColor}}">{{t.due}}</td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article style="grid-column: span 4; background: {{p.surface}}; border: 1px solid {{p.hair}}; border-radius: 14px; padding: 16px 18px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; justify-content: space-between; align-items: baseline">
+          <h2 style="margin: 0; font-size: 15px; font-weight: 600">Eskalationen</h2>
+          <span style="font-size: 12px; color: {{p.muted}}">nach Dringlichkeit</span>
+        </div>
+        <sc-for list="{{esc}}" as="e" hint-placeholder-count="3">
+          <a href="#" style="display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 10px; background: {{p.subtle}}; color: {{p.ink}}">
+            <span style="width: 4px; align-self: stretch; border-radius: 2px; background: {{e.color}}"></span>
+            <span style="flex: 1; min-width: 0">
+              <span style="display: block; font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{e.title}}</span>
+              <span style="display: block; font-size: 12px; color: {{p.muted}}">{{e.meta}}</span>
+            </span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: {{e.color}}">{{e.left}}</span>
+          </a>
+        </sc-for>
+      </article>
+
+      <article style="grid-column: span 4; background: {{p.surface}}; border: 1px solid {{p.hair}}; border-radius: 14px; padding: 16px 18px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 600">Queues</h2>
+        <sc-for list="{{queues}}" as="q" hint-placeholder-count="4">
+          <div style="display: flex; flex-direction: column; gap: 5px">
+            <div style="display: flex; justify-content: space-between; font-size: 13px"><span>{{q.name}}</span><span style="font-family: 'JetBrains Mono', monospace; color: {{p.muted}}">{{q.open}} offen · {{q.fresh}} neu</span></div>
+            <div style="height: 6px; border-radius: 3px; background: {{p.subtle}}; overflow: hidden; display: flex"><span style="width: {{q.w}}; background: {{p.accent}}"></span><span style="width: {{q.wn}}; background: {{p.ok}}"></span></div>
+          </div>
+        </sc-for>
+      </article>
+
+      <article style="grid-column: span 4; background: {{p.surface}}; border: 1px solid {{p.hair}}; border-radius: 14px; padding: 16px 18px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 600">Heute im Kalender</h2>
+        <sc-for list="{{agenda}}" as="a" hint-placeholder-count="3">
+          <div style="display: flex; gap: 12px; font-size: 13px; align-items: baseline">
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: {{p.muted}}; width: 44px">{{a.time}}</span>
+            <span style="flex: 1">{{a.what}}</span>
+          </div>
+        </sc-for>
+        <div style="border-top: 1px solid {{p.hair}}; padding-top: 10px; font-size: 13px; display: flex; justify-content: space-between"><span>Erinnerungen fällig</span><span style="font-weight: 600; color: {{p.esc}}">2</span></div>
+      </article>
+
+      <article style="grid-column: span 4; background: {{p.surface}}; border: 1px solid {{p.hair}}; border-radius: 14px; padding: 16px 18px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; justify-content: space-between; align-items: baseline">
+          <h2 style="margin: 0; font-size: 15px; font-weight: 600">Team</h2>
+          <span style="font-size: 12px; color: {{p.muted}}">4 von 6 da</span>
+        </div>
+        <sc-for list="{{team}}" as="m" hint-placeholder-count="5">
+          <div style="display: flex; align-items: center; gap: 10px; font-size: 13px">
+            <span style="position: relative; width: 28px; height: 28px; border-radius: 50%; background: {{p.subtle}}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600">{{m.ini}}<span style="position: absolute; right: -1px; bottom: -1px; width: 9px; height: 9px; border-radius: 50%; border: 2px solid {{p.surface}}; background: {{m.dot}}"></span></span>
+            <span style="flex: 1">{{m.name}}</span>
+            <span style="font-size: 12px; color: {{p.muted}}">{{m.status}}</span>
+          </div>
+        </sc-for>
+      </article>
+
+      <article style="grid-column: span 6; background: {{p.surface}}; border: 1px solid {{p.hair}}; border-radius: 14px; padding: 16px 18px; min-width: 0; display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; justify-content: space-between; align-items: baseline">
+          <h2 style="margin: 0; font-size: 15px; font-weight: 600">Notizen · Team Support</h2>
+          <span style="font-size: 12px; color: {{p.muted}}">geteilt</span>
+        </div>
+        <p style="margin: 0; font-size: 13px; line-height: 1.55">Diese Woche Rufbereitschaft: <strong>Ben</strong>. Wartungsfenster Mailserver am Donnerstag 18–20 Uhr – Kunden mit Vertrag „Premium“ vorab informieren.</p>
+        <ul style="margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.55; color: {{p.muted}}">
+          <li>Neue Vorlage „Rückruf vereinbart“ ist live</li>
+          <li>Telefonzeiten Freitag nur bis 15 Uhr</li>
+        </ul>
+      </article>
+
+      <article style="grid-column: span 6; background: {{p.surface}}; border: 1px solid {{p.hair}}; border-radius: 14px; padding: 16px 18px; min-width: 0; display: flex; flex-direction: column; gap: 8px">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 600">Zuletzt angesehen</h2>
+        <sc-for list="{{recent}}" as="r" hint-placeholder-count="4">
+          <a href="#" style="display: flex; gap: 10px; font-size: 13px; color: {{p.ink}}; padding: 4px 0">
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: {{p.muted}}">{{r.tn}}</span>
+            <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.title}}</span>
+            <span style="font-size: 12px; color: {{p.muted}}">{{r.when}}</span>
+          </a>
+        </sc-for>
+      </article>
+
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark"},"$preview":{"width":1440,"height":1060}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var dark = (this.props.theme ?? 'dark') !== 'light';
+    var p = dark ? {
+      bg: '#0e1015', surface: '#151821', subtle: '#1b1f2b', ink: '#e7eaf2', muted: '#8891a3', hair: '#242a38',
+      accent: '#5b8cff', accentDim: 'rgba(91,140,255,0.14)', accentInk: '#0e1015', danger: '#ef6b65', esc: '#f5a83c', ok: '#3ecf9a',
+      newBg: 'rgba(62,207,154,0.14)', openBg: 'rgba(91,140,255,0.16)', pendBg: 'rgba(167,139,250,0.16)', pend: '#a78bfa'
+    } : {
+      bg: '#f3f5fa', surface: '#ffffff', subtle: '#edf0f7', ink: '#1a1f2c', muted: '#5d6780', hair: '#e1e5ef',
+      accent: '#3b6be8', accentDim: 'rgba(59,107,232,0.10)', accentInk: '#ffffff', danger: '#c2413b', esc: '#b06d10', ok: '#13875d',
+      newBg: 'rgba(19,135,93,0.10)', openBg: 'rgba(59,107,232,0.10)', pendBg: 'rgba(124,92,214,0.10)', pend: '#6d4fcf'
+    };
+    var navItems = ['Start', 'Queues', 'Suche', 'Kunden', 'Berichte', 'Kalender', 'Wissen'];
+    var nav = navItems.map(function (l, i) {
+      return { label: l, color: i === 0 ? p.ink : p.muted, bg: i === 0 ? p.accentDim : 'transparent', weight: i === 0 ? 600 : 400, dot: i === 0 ? p.accent : p.hair };
+    });
+    var kpis = [
+      { label: 'Meine offenen', value: '12', delta: '+2 seit gestern', deltaColor: p.muted, valueColor: p.ink, spark: '2,22 16,20 30,24 44,16 58,18 72,12 94,10', sparkColor: p.accent, hint: 'davon 3 warten auf Kunden' },
+      { label: 'Meine neuen', value: '3', delta: 'ältestes 42 min', deltaColor: p.muted, valueColor: p.ink, spark: '2,24 16,22 30,18 44,22 58,14 72,20 94,16', sparkColor: p.ok, hint: 'heute 9 erhalten' },
+      { label: 'Zum Übernehmen', value: '7', delta: 'Team-Eingang', deltaColor: p.muted, valueColor: p.ink, spark: '2,12 16,16 30,14 44,20 58,18 72,22 94,20', sparkColor: p.accent, hint: 'in 3 Queues' },
+      { label: 'Eskaliert', value: '2', delta: '−1 seit gestern', deltaColor: p.ok, valueColor: p.danger, spark: '2,8 16,10 30,8 44,14 58,16 72,18 94,22', sparkColor: p.danger, hint: 'nächste Frist in 25 min' }
+    ];
+    var tickets = [
+      { tn: '2026100912000231', title: 'VPN-Zugang nach Passwortwechsel gesperrt', customer: 'Beispiel GmbH', state: 'offen', stateColor: p.accent, stateBg: p.openBg, due: 'in 25 min', dueColor: p.danger },
+      { tn: '2026100912000198', title: 'Rechnung Oktober doppelt erhalten', customer: 'Muster AG', state: 'neu', stateColor: p.ok, stateBg: p.newBg, due: 'in 1 h 40', dueColor: p.esc },
+      { tn: '2026100812000874', title: 'Drucker im 2. OG druckt nur leere Seiten', customer: 'Stadtwerke Beispielstadt', state: 'offen', stateColor: p.accent, stateBg: p.openBg, due: 'heute 16:00', dueColor: p.muted },
+      { tn: '2026100812000611', title: 'Neues Postfach für Auszubildende anlegen', customer: 'Beispiel GmbH', state: 'warten', stateColor: p.pend, stateBg: p.pendBg, due: 'Mo 09:00', dueColor: p.muted },
+      { tn: '2026100712000452', title: 'Zertifikat für shop.example.org läuft ab', customer: 'Muster AG', state: 'offen', stateColor: p.accent, stateBg: p.openBg, due: 'morgen', dueColor: p.muted },
+      { tn: '2026100612000390', title: 'Rückfrage zum Wartungsvertrag 2027', customer: 'Kanzlei Beispiel', state: 'warten', stateColor: p.pend, stateBg: p.pendBg, due: '—', dueColor: p.muted }
+    ];
+    var esc = [
+      { title: 'VPN-Zugang nach Passwortwechsel gesperrt', meta: 'Lösungszeit · Beispiel GmbH', left: '25 min', color: p.danger },
+      { title: 'Server-Backup meldet Fehler', meta: 'Erste Antwort · Muster AG', left: '1 h 10', color: p.esc },
+      { title: 'Telefonanlage: Weiterleitung fehlt', meta: 'Update · Kanzlei Beispiel', left: '2 h 05', color: p.esc }
+    ];
+    var queues = [
+      { name: 'Support', open: 38, fresh: 6, w: '62%', wn: '10%' },
+      { name: 'Buchhaltung', open: 9, fresh: 2, w: '18%', wn: '4%' },
+      { name: '2nd Level', open: 14, fresh: 1, w: '26%', wn: '2%' },
+      { name: 'Vertrieb', open: 5, fresh: 3, w: '9%', wn: '6%' }
+    ];
+    var agenda = [
+      { time: '10:00', what: 'Rückruf Beispiel GmbH (Ticket …0231)' },
+      { time: '13:30', what: 'Team-Abstimmung Support' },
+      { time: '15:00', what: 'Vor-Ort-Termin Muster AG' }
+    ];
+    var team = [
+      { ini: 'BK', name: 'Ben Krause', status: 'am Telefon', dot: p.esc },
+      { ini: 'CL', name: 'Clara Lenz', status: 'verfügbar', dot: p.ok },
+      { ini: 'DM', name: 'David Meier', status: 'verfügbar', dot: p.ok },
+      { ini: 'EV', name: 'Eva Vogt', status: 'Urlaub bis Mo', dot: p.hair },
+      { ini: 'FS', name: 'Finn Schulz', status: 'Pause', dot: p.muted }
+    ];
+    var recent = [
+      { tn: '…0231', title: 'VPN-Zugang nach Passwortwechsel gesperrt', when: 'vor 4 min' },
+      { tn: '…0874', title: 'Drucker im 2. OG druckt nur leere Seiten', when: 'vor 22 min' },
+      { tn: '…0452', title: 'Zertifikat für shop.example.org läuft ab', when: 'gestern' },
+      { tn: '…0117', title: 'Lizenzverlängerung Office-Paket', when: 'gestern' }
+    ];
+    return { p: p, nav: nav, kpis: kpis, tickets: tickets, esc: esc, queues: queues, agenda: agenda, team: team, recent: recent };
+  }
+}
+</script>
+</body>
+</html>

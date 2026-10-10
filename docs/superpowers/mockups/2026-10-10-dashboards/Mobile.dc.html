@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Startseite – Smartphone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#3b6be8;text-decoration:none}a:hover{color:#2a55c9}
+</style>
+</helmet>
+<div style="width: 390px; min-height: 1300px; box-sizing: border-box; background: #f3f5fa; color: #1a1f2c; font-family: Inter, 'Segoe UI', system-ui, sans-serif; display: flex; flex-direction: column">
+
+  <header style="display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: #ffffff; border-bottom: 1px solid #e1e5ef">
+    <button aria-label="Menü" style="font: inherit; width: 44px; height: 44px; border-radius: 10px; border: 1px solid #e1e5ef; background: #ffffff; cursor: pointer"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 5h12M3 9h12M3 13h12" stroke="#1a1f2c" stroke-width="1.6" stroke-linecap="round"></path></svg></button>
+    <span style="font-weight: 700; font-size: 16px">Mein Start</span>
+    <button style="font: inherit; font-size: 13px; font-weight: 600; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 0; background: #3b6be8; color: #ffffff; cursor: pointer">Anpassen</button>
+  </header>
+
+  <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px">
+    <h1 style="margin: 4px 0 2px; font-size: 22px; font-weight: 650; letter-spacing: -0.02em">Guten Morgen, Anna</h1>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+      <sc-for list="{{kpis}}" as="k" hint-placeholder-count="4">
+        <article style="background: #ffffff; border: 1px solid #e1e5ef; border-radius: 12px; padding: 12px 14px">
+          <h2 style="margin: 0; font-size: 12px; font-weight: 500; color: #5d6780">{{k.label}}</h2>
+          <div style="font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 600; color: {{k.color}}">{{k.value}}</div>
+        </article>
+      </sc-for>
+    </div>
+
+    <article style="background: #ffffff; border: 1px solid #e1e5ef; border-radius: 12px; padding: 12px 14px">
+      <h2 style="margin: 0 0 6px; font-size: 14px; font-weight: 600">Meine offenen Tickets</h2>
+      <sc-for list="{{tickets}}" as="t" hint-placeholder-count="4">
+        <a href="#" style="display: flex; flex-direction: column; gap: 3px; padding: 10px 0; border-top: 1px solid #edf0f7; color: #1a1f2c">
+          <span style="font-size: 14px; font-weight: 500">{{t.title}}</span>
+          <span style="display: flex; justify-content: space-between; font-size: 12px; color: #5d6780"><span>{{t.customer}}</span><span style="font-family: 'JetBrains Mono', monospace; color: {{t.color}}">{{t.due}}</span></span>
+        </a>
+      </sc-for>
+    </article>
+
+    <article style="background: #ffffff; border: 2px solid #3b6be8; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; justify-content: space-between; align-items: center">
+        <h2 style="margin: 0; font-size: 14px; font-weight: 600">Eskalationen</h2>
+        <span style="font-size: 12px; color: #5d6780">Bearbeiten</span>
+      </div>
+      <div style="display: flex; gap: 8px">
+        <button style="font: inherit; flex: 1; min-height: 44px; font-size: 13px; border-radius: 10px; border: 1px solid #c9d0de; background: #ffffff; color: #1a1f2c; cursor: pointer">↑ Nach oben</button>
+        <button style="font: inherit; flex: 1; min-height: 44px; font-size: 13px; border-radius: 10px; border: 1px solid #c9d0de; background: #ffffff; color: #1a1f2c; cursor: pointer">↓ Nach unten</button>
+        <button aria-label="Einstellungen" style="font: inherit; width: 44px; min-height: 44px; border-radius: 10px; border: 1px solid #c9d0de; background: #ffffff; cursor: pointer">⚙</button>
+      </div>
+      <p style="margin: 0; font-size: 12px; color: #5d6780">Auf schmalen Bildschirmen stehen Widgets untereinander; die Reihenfolge lässt sich hier ändern.</p>
+    </article>
+
+    <article style="background: #ffffff; border: 1px solid #e1e5ef; border-radius: 12px; padding: 12px 14px">
+      <h2 style="margin: 0 0 8px; font-size: 14px; font-weight: 600">Team</h2>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px">
+        <span style="padding: 6px 10px; border-radius: 999px; background: rgba(19,135,93,0.10); color: #13875d">Clara · da</span>
+        <span style="padding: 6px 10px; border-radius: 999px; background: rgba(19,135,93,0.10); color: #13875d">David · da</span>
+        <span style="padding: 6px 10px; border-radius: 999px; background: rgba(176,109,16,0.10); color: #b06d10">Ben · Telefon</span>
+        <span style="padding: 6px 10px; border-radius: 999px; background: #edf0f7; color: #5d6780">Finn · Pause</span>
+      </div>
+    </article>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1300}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var kpis = [
+      { label: 'Meine offenen', value: '12', color: '#1a1f2c' },
+      { label: 'Meine neuen', value: '3', color: '#1a1f2c' },
+      { label: 'Zum Übernehmen', value: '7', color: '#1a1f2c' },
+      { label: 'Eskaliert', value: '2', color: '#c2413b' }
+    ];
+    var tickets = [
+      { title: 'VPN-Zugang nach Passwortwechsel gesperrt', customer: 'Beispiel GmbH', due: 'in 25 min', color: '#c2413b' },
+      { title: 'Rechnung Oktober doppelt erhalten', customer: 'Muster AG', due: 'in 1 h 40', color: '#b06d10' },
+      { title: 'Drucker im 2. OG druckt nur leere Seiten', customer: 'Stadtwerke Beispielstadt', due: 'heute 16:00', color: '#5d6780' },
+      { title: 'Neues Postfach für Auszubildende', customer: 'Beispiel GmbH', due: 'Mo 09:00', color: '#5d6780' }
+    ];
+    return { kpis: kpis, tickets: tickets };
+  }
+}
+</script>
+</body>
+</html>

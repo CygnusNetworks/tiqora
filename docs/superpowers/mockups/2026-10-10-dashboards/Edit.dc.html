@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Startseite – Anpassen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#3b6be8;text-decoration:none}a:hover{color:#2a55c9}
+</style>
+</helmet>
+<div style="min-height: 1060px; background: #f3f5fa; color: #1a1f2c; font-family: Inter, 'Segoe UI', system-ui, sans-serif; display: flex; flex-direction: column">
+
+  <div role="toolbar" aria-label="Bearbeiten" style="position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 24px; background: #1a1f2c; color: #ffffff">
+    <span style="font-size: 14px; font-weight: 600">Mein Start bearbeiten</span>
+    <span style="font-size: 12px; color: #b8c0d4">Entwurf gesichert · 10:42</span>
+    <span style="flex: 1"></span>
+    <button aria-label="Rückgängig" style="font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 8px; border: 1px solid #3a4256; background: transparent; color: #ffffff; cursor: pointer"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4 2 8l4 4M2.5 8H10a4 4 0 0 1 0 8" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+    <button aria-label="Wiederholen" style="font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 8px; border: 1px solid #3a4256; background: transparent; color: #ffffff; cursor: pointer"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 4l4 4-4 4M13.5 8H6a4 4 0 0 0 0 8" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+    <button style="font: inherit; font-size: 13px; padding: 8px 14px; border-radius: 8px; border: 1px solid #3a4256; background: transparent; color: #ffffff; cursor: pointer">Verwerfen</button>
+    <button style="font: inherit; font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 8px; border: 0; background: #5b8cff; color: #0e1015; cursor: pointer">Speichern</button>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; flex: 1">
+
+    <main style="flex: 999 1 640px; min-width: 0; box-sizing: border-box; padding: 24px 28px 40px">
+      <div style="position: relative; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-rows: 64px; gap: 16px; padding: 8px; border-radius: 12px; background-image: linear-gradient(to right, rgba(59,107,232,0.07) 0, rgba(59,107,232,0.07) calc(100% / 12 - 14px), transparent calc(100% / 12 - 14px)); background-size: calc((100% + 16px) / 12) 100%; outline: 1px dashed #c9d3ea">
+
+        <sc-for list="{{widgets}}" as="w" hint-placeholder-count="7">
+          <article style="grid-column: {{w.col}}; grid-row: {{w.row}}; position: relative; background: #ffffff; border: {{w.border}}; border-radius: 14px; padding: 12px 14px; box-shadow: {{w.shadow}}; transform: {{w.transform}}; opacity: {{w.opacity}}; display: flex; flex-direction: column; gap: 8px; min-width: 0">
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span aria-hidden="true" style="cursor: grab; color: #8a93a8; font-size: 14px; letter-spacing: -2px">⋮⋮</span>
+              <h2 style="margin: 0; font-size: 14px; font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{w.title}}</h2>
+              <button aria-label="Einstellungen" style="font: inherit; width: 28px; height: 28px; border-radius: 7px; border: 1px solid #e1e5ef; background: #ffffff; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.2" fill="none" stroke="#5d6780" stroke-width="1.5"></circle><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" stroke="#5d6780" stroke-width="1.5" stroke-linecap="round"></path></svg></button>
+              <button aria-label="Duplizieren" style="font: inherit; width: 28px; height: 28px; border-radius: 7px; border: 1px solid #e1e5ef; background: #ffffff; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="9" height="9" rx="2" fill="none" stroke="#5d6780" stroke-width="1.5"></rect><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5" fill="none" stroke="#5d6780" stroke-width="1.5"></path></svg></button>
+              <button aria-label="Entfernen" style="font: inherit; width: 28px; height: 28px; border-radius: 7px; border: 1px solid #e1e5ef; background: #ffffff; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="#c2413b" stroke-width="1.6" stroke-linecap="round"></path></svg></button>
+            </div>
+            <div style="flex: 1; border-radius: 8px; background: #f3f5fa; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #5d6780; text-align: center; padding: 6px">{{w.body}}</div>
+            <span aria-hidden="true" style="position: absolute; right: 4px; bottom: 4px; width: 12px; height: 12px; border-right: 2px solid #3b6be8; border-bottom: 2px solid #3b6be8; border-radius: 0 0 4px 0"></span>
+          </article>
+        </sc-for>
+
+        <div aria-hidden="true" style="grid-column: 9 / span 4; grid-row: 4 / span 3; border: 2px dashed #3b6be8; border-radius: 14px; background: rgba(59,107,232,0.06)"></div>
+      </div>
+      <p style="margin: 14px 4px 0; font-size: 12px; color: #5d6780">Tastatur: Widget fokussieren, Pfeiltasten verschieben, Umschalt + Pfeiltasten ändern die Größe, Eingabe öffnet die Einstellungen.</p>
+    </main>
+
+    <aside aria-label="Widget hinzufügen" style="flex: 0 1 340px; box-sizing: border-box; border-left: 1px solid #e1e5ef; background: #ffffff; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+      <div style="display: flex; justify-content: space-between; align-items: center">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 650">Widget hinzufügen</h2>
+        <button aria-label="Galerie schließen" style="font: inherit; width: 30px; height: 30px; border-radius: 8px; border: 1px solid #e1e5ef; background: #ffffff; cursor: pointer">×</button>
+      </div>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #5d6780">Suchen
+        <input type="search" placeholder="z. B. Eskalation, Notiz, Queue" style="font: inherit; font-size: 14px; padding: 9px 12px; border-radius: 8px; border: 1px solid #c9d0de; color: #1a1f2c">
+      </label>
+      <sc-for list="{{gallery}}" as="g" hint-placeholder-count="3">
+        <section style="display: flex; flex-direction: column; gap: 8px">
+          <h3 style="margin: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #5d6780">{{g.group}}</h3>
+          <sc-for list="{{g.items}}" as="i" hint-placeholder-count="3">
+            <button style="font: inherit; text-align: left; display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 10px; border: 1px solid #e1e5ef; background: #ffffff; cursor: grab">
+              <span aria-hidden="true" style="width: 34px; height: 34px; flex: 0 0 34px; border-radius: 8px; background: {{i.tint}}; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: {{i.ink}}">{{i.glyph}}</span>
+              <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0">
+                <span style="font-size: 14px; font-weight: 600; color: #1a1f2c">{{i.name}}</span>
+                <span style="font-size: 12px; color: #5d6780">{{i.desc}}</span>
+              </span>
+            </button>
+          </sc-for>
+        </section>
+      </sc-for>
+      <p style="margin: 0; font-size: 12px; color: #5d6780">Ins Raster ziehen oder anklicken – das Widget landet in der ersten freien Lücke.</p>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1060}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var normal = { border: '1px solid #c9d3ea', shadow: 'none', transform: 'none', opacity: '1' };
+    function w(title, col, row, body, extra) {
+      var o = { title: title, col: col, row: row, body: body, border: normal.border, shadow: normal.shadow, transform: normal.transform, opacity: normal.opacity };
+      if (extra) { for (var k in extra) { o[k] = extra[k]; } }
+      return o;
+    }
+    var widgets = [
+      w('Meine offenen', '1 / span 3', '1 / span 2', 'Zähler · 12'),
+      w('Meine neuen', '4 / span 3', '1 / span 2', 'Zähler · 3'),
+      w('Zum Übernehmen', '7 / span 3', '1 / span 2', 'Zähler · 7'),
+      w('Eskaliert', '10 / span 3', '1 / span 2', 'Zähler · 2'),
+      w('Meine offenen Tickets', '1 / span 8', '3 / span 5', 'Ticketliste · gespeicherte Suche „Meine offenen“ · 8 Zeilen'),
+      w('Eskalationen', '9 / span 4', '3 / span 1', 'wird verschoben …', { border: '2px solid #3b6be8', shadow: '0 18px 40px rgba(26,31,44,0.22)', transform: 'translate(-28px, 150px) rotate(-0.6deg)', opacity: '0.96' }),
+      w('Queues', '1 / span 4', '8 / span 3', 'Queue-Übersicht'),
+      w('Team', '5 / span 4', '8 / span 3', 'Team-Anwesenheit')
+    ];
+    var gallery = [
+      { group: 'Tickets', items: [
+        { name: 'Ticketliste', desc: 'Gespeicherte Suche oder eigener Filter', glyph: '≡', tint: 'rgba(59,107,232,0.12)', ink: '#2a55c9' },
+        { name: 'Zähler', desc: 'Eine Zahl mit Trend und Verlauf', glyph: '12', tint: 'rgba(19,135,93,0.12)', ink: '#13875d' },
+        { name: 'Eskalationen', desc: 'Nächste Fristen zuerst', glyph: '!', tint: 'rgba(194,65,59,0.12)', ink: '#c2413b' },
+        { name: 'Queue-Übersicht', desc: 'Offen und neu je Queue', glyph: 'Q', tint: 'rgba(59,107,232,0.12)', ink: '#2a55c9' }
+      ] },
+      { group: 'Für mich', items: [
+        { name: 'Erinnerungen', desc: 'Fällige Wiedervorlagen', glyph: '◷', tint: 'rgba(176,109,16,0.12)', ink: '#b06d10' },
+        { name: 'Kalender', desc: 'Termine von heute', glyph: '31', tint: 'rgba(109,79,207,0.12)', ink: '#6d4fcf' },
+        { name: 'Zuletzt angesehen', desc: 'Schnell zurück zum Ticket', glyph: '↺', tint: 'rgba(93,103,128,0.12)', ink: '#5d6780' }
+      ] },
+      { group: 'Team', items: [
+        { name: 'Team-Anwesenheit', desc: 'Wer ist da, wer telefoniert', glyph: '●', tint: 'rgba(19,135,93,0.12)', ink: '#13875d' },
+        { name: 'Notizen', desc: 'Persönlich oder für das Team', glyph: '✎', tint: 'rgba(176,109,16,0.12)', ink: '#b06d10' },
+        { name: 'Links', desc: 'Wichtige Seiten auf einen Klick', glyph: '↗', tint: 'rgba(93,103,128,0.12)', ink: '#5d6780' }
+      ] }
+    ];
+    return { widgets: widgets, gallery: gallery };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Wallboard Support</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#7ea4ff}a:hover{color:#a9c2ff}
+</style>
+</helmet>
+<div style="width: 1920px; height: 1080px; box-sizing: border-box; padding: 40px 48px; background: #0b0d12; color: #e7eaf2; font-family: Inter, 'Segoe UI', system-ui, sans-serif; display: flex; flex-direction: column; gap: 28px">
+
+  <header style="display: flex; justify-content: space-between; align-items: baseline">
+    <div style="display: flex; align-items: baseline; gap: 20px">
+      <h1 style="margin: 0; font-size: 40px; font-weight: 650; letter-spacing: -0.02em">Support</h1>
+      <span style="font-size: 20px; color: #8891a3">Wallboard · aktualisiert vor 12 s</span>
+    </div>
+    <span style="font-family: 'JetBrains Mono', monospace; font-size: 44px; font-weight: 600">10:42</span>
+  </header>
+
+  <section aria-label="Kennzahlen" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px">
+    <sc-for list="{{tiles}}" as="t" hint-placeholder-count="4">
+      <article style="background: #151821; border: 1px solid #242a38; border-radius: 20px; padding: 26px 30px; display: flex; flex-direction: column; gap: 10px">
+        <h2 style="margin: 0; font-size: 22px; font-weight: 500; color: #8891a3">{{t.label}}</h2>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 96px; line-height: 1; font-weight: 600; letter-spacing: -0.03em; color: {{t.color}}">{{t.value}}</span>
+        <span style="font-size: 20px; color: {{t.subColor}}">{{t.sub}}</span>
+      </article>
+    </sc-for>
+  </section>
+
+  <div style="flex: 1; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 24px; min-height: 0">
+
+    <article style="grid-column: span 7; background: #151821; border: 1px solid #242a38; border-radius: 20px; padding: 26px 30px; display: flex; flex-direction: column; gap: 18px">
+      <h2 style="margin: 0; font-size: 24px; font-weight: 600">Queues</h2>
+      <sc-for list="{{queues}}" as="q" hint-placeholder-count="5">
+        <div style="display: grid; grid-template-columns: 200px 1fr 170px; align-items: center; gap: 20px">
+          <span style="font-size: 22px">{{q.name}}</span>
+          <div style="height: 22px; border-radius: 11px; background: #1b1f2b; overflow: hidden; display: flex">
+            <span style="width: {{q.w}}; background: #5b8cff"></span><span style="width: {{q.wn}}; background: #3ecf9a"></span><span style="width: {{q.we}}; background: #ef6b65"></span>
+          </div>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 22px; text-align: right">{{q.open}} <span style="color: #8891a3">/ {{q.fresh}} neu</span></span>
+        </div>
+      </sc-for>
+      <div style="display: flex; gap: 28px; font-size: 18px; color: #8891a3; margin-top: auto">
+        <span style="display: flex; align-items: center; gap: 8px"><span style="width: 14px; height: 14px; border-radius: 4px; background: #5b8cff"></span>offen</span>
+        <span style="display: flex; align-items: center; gap: 8px"><span style="width: 14px; height: 14px; border-radius: 4px; background: #3ecf9a"></span>neu</span>
+        <span style="display: flex; align-items: center; gap: 8px"><span style="width: 14px; height: 14px; border-radius: 4px; background: #ef6b65"></span>eskaliert</span>
+      </div>
+    </article>
+
+    <article style="grid-column: span 5; background: #151821; border: 1px solid #242a38; border-radius: 20px; padding: 26px 30px; display: flex; flex-direction: column; gap: 16px">
+      <h2 style="margin: 0; font-size: 24px; font-weight: 600">Team</h2>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px">
+        <sc-for list="{{team}}" as="m" hint-placeholder-count="6">
+          <div style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px; background: #1b1f2b">
+            <span style="width: 16px; height: 16px; border-radius: 50%; background: {{m.dot}}"></span>
+            <span style="display: flex; flex-direction: column">
+              <span style="font-size: 22px; font-weight: 600">{{m.name}}</span>
+              <span style="font-size: 17px; color: #8891a3">{{m.status}}</span>
+            </span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="margin-top: auto; padding: 18px 20px; border-radius: 14px; background: rgba(239,107,101,0.12); border: 1px solid rgba(239,107,101,0.4); font-size: 21px">
+        Nächste Frist: <strong>VPN-Zugang gesperrt</strong> · Beispiel GmbH · <span style="font-family: 'JetBrains Mono', monospace; color: #ef6b65; font-weight: 600">25 min</span>
+      </div>
+    </article>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1920,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var tiles = [
+      { label: 'Offen', value: '148', sub: '+6 seit 8 Uhr', color: '#e7eaf2', subColor: '#8891a3' },
+      { label: 'Neu heute', value: '37', sub: '12 noch ohne Besitzer', color: '#3ecf9a', subColor: '#8891a3' },
+      { label: 'Eskaliert', value: '4', sub: '1 überfällig', color: '#ef6b65', subColor: '#ef6b65' },
+      { label: 'Erste Antwort heute', value: '18 min', sub: 'Median · Ziel 30 min', color: '#e7eaf2', subColor: '#3ecf9a' }
+    ];
+    var queues = [
+      { name: 'Support', open: 82, fresh: 19, w: '60%', wn: '14%', we: '2%' },
+      { name: '2nd Level', open: 31, fresh: 4, w: '24%', wn: '3%', we: '1%' },
+      { name: 'Buchhaltung', open: 17, fresh: 6, w: '12%', wn: '4%', we: '0%' },
+      { name: 'Vertrieb', open: 11, fresh: 5, w: '8%', wn: '4%', we: '0%' },
+      { name: 'Technik vor Ort', open: 7, fresh: 3, w: '5%', wn: '2%', we: '1%' }
+    ];
+    var team = [
+      { name: 'Ben Krause', status: 'am Telefon · 6 min', dot: '#f5a83c' },
+      { name: 'Clara Lenz', status: 'verfügbar', dot: '#3ecf9a' },
+      { name: 'David Meier', status: 'verfügbar', dot: '#3ecf9a' },
+      { name: 'Anna Beispiel', status: 'im Chat', dot: '#5b8cff' },
+      { name: 'Finn Schulz', status: 'Pause', dot: '#8891a3' },
+      { name: 'Eva Vogt', status: 'Urlaub', dot: '#3a4256' }
+    ];
+    return { tiles: tiles, queues: queues, team: team };
+  }
+}
+</script>
+</body>
+</html>
