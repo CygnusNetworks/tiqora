@@ -9,7 +9,8 @@ from datetime import datetime, timedelta
 from tiqora.util.cron import CronExpr
 
 MIN_INTERVAL_SECONDS = 30
-_DAILY_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+_VALIDATION_REFERENCE = datetime(2026, 1, 1)
+_DAILY_RE = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,12 +31,19 @@ class Schedule:
                 f"Ungültiger Zeitplan: das Intervall muss mindestens "
                 f"{MIN_INTERVAL_SECONDS} Sekunden betragen"
             )
-        if self.daily_at is not None and not _DAILY_RE.match(self.daily_at):
+        if self.daily_at is not None and not _DAILY_RE.fullmatch(self.daily_at):
             raise ValueError(
                 f"Ungültiger Zeitplan: „{self.daily_at}“ ist keine Uhrzeit im Format HH:MM"
             )
         if self.cron is not None:
-            CronExpr.parse(self.cron)
+            try:
+                CronExpr.parse(self.cron).next_after(_VALIDATION_REFERENCE)
+            except ValueError as exc:
+                if "kein" in str(exc):
+                    raise ValueError(
+                        f"Ungültiger Zeitplan „{self.cron}“: kein gültiger Termin (z. B. 31. Februar)"
+                    ) from exc
+                raise
 
     def describe(self) -> str:
         if self.every_seconds is not None:

@@ -80,3 +80,24 @@ def test_validate_accepts(s: Schedule) -> None:
 )
 def test_describe(s: Schedule, text: str) -> None:
     assert s.describe() == text
+
+
+@pytest.mark.parametrize("cron", ["0 0 31 2 *", "0 0 30 2 *", "0 0 31 4 *"])
+def test_validate_rejects_never_firing_cron(cron: str) -> None:
+    with pytest.raises(ValueError, match="Zeitplan"):
+        Schedule(cron=cron).validate()
+
+
+def test_validate_rejects_trailing_newline_time() -> None:
+    with pytest.raises(ValueError, match="Zeitplan"):
+        Schedule(daily_at="03:00\n").validate()
+
+
+def test_validated_leap_day_cron_next_due_never_raises() -> None:
+    s = Schedule(cron="0 0 29 2 *")
+    s.validate()
+    assert next_due(s, last_run_at=None, created_at=datetime(2026, 3, 1)) == datetime(2028, 2, 29)
+    # century non-leap year: after 2096-02-29 the next one is 2104 (8-year gap, 2100 skipped)
+    assert next_due(s, last_run_at=datetime(2096, 2, 29), created_at=CREATED) == datetime(
+        2104, 2, 29
+    )

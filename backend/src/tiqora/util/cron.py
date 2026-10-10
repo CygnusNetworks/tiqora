@@ -34,8 +34,6 @@ def _parse_part(expr: str, field: str, part: str, low: int, high: int) -> set[in
     step = 1
     if slash:
         step = _number(expr, field, step_text, 1, high)
-        if step < 1:
-            raise _error(expr, f"Schrittweite in {field} muss mindestens 1 sein")
     if base == "*":
         start, end = low, high
     elif "-" in base:
@@ -85,6 +83,8 @@ class CronExpr:
             dow_restricted=fields[4] != "*",
         )
 
+    # "Restricted" means the field text is not exactly "*" (so "*/2" counts as restricted
+    # and, with the other day field restricted too, matches by OR; real Vixie cron differs here).
     def _day_matches(self, day: datetime) -> bool:
         if day.month not in self.months:
             return False

@@ -65,3 +65,12 @@ def test_dom_dow_and_semantics_when_only_one_restricted() -> None:
 def test_invalid(expr: str) -> None:
     with pytest.raises(ValueError, match="Zeitplan"):
         CronExpr.parse(expr)
+
+
+def test_leap_day_century_gap_within_search_bound() -> None:
+    assert CronExpr.parse("0 0 29 2 *").next_after(D(2096, 3, 1)) == D(2104, 2, 29)
+
+
+def test_dow_only_with_dom_star_is_and() -> None:
+    # Monday-only at a month boundary: 2026-11-02 is the first Monday after 2026-10-31
+    assert CronExpr.parse("0 0 * * 1").next_after(D(2026, 10, 31, 12, 0)) == D(2026, 11, 2, 0, 0)
