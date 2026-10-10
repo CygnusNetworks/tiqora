@@ -77,9 +77,11 @@ export const dashboardsApi = {
     body: { settings: Record<string, unknown>; version: number },
   ) {
     return guarded(
-      api.request<DashboardWidgetRow>("PATCH", `${BASE}/${id}/widgets/${widgetId}/settings`, {
-        body,
-      }),
+      api.request<DashboardWidgetRow>(
+        "PATCH",
+        `${BASE}/${id}/widgets/${encodeURIComponent(widgetId)}/settings`,
+        { body },
+      ),
     );
   },
   remove(id: number) {
@@ -94,11 +96,18 @@ export const dashboardsApi = {
   },
   /** All widgets of a dashboard, or only `widgetIds` (one comma-joined `widgets` parameter). */
   data(id: number, widgetIds?: string[], signal?: AbortSignal) {
-    const query = widgetIds && widgetIds.length > 0 ? `?widgets=${widgetIds.join(",")}` : "";
+    const query =
+      widgetIds && widgetIds.length > 0
+        ? `?widgets=${widgetIds.map(encodeURIComponent).join(",")}`
+        : "";
     return api.request<DashboardData>("GET", `${BASE}/${id}/data${query}`, { signal });
   },
   widgetData(id: number, widgetId: string, signal?: AbortSignal) {
-    return api.request<WidgetResult>("GET", `${BASE}/${id}/widgets/${widgetId}/data`, { signal });
+    return api.request<WidgetResult>(
+      "GET",
+      `${BASE}/${id}/widgets/${encodeURIComponent(widgetId)}/data`,
+      { signal },
+    );
   },
   /** Data for unsaved settings (settings drawer, edit mode); writes no history. */
   previewData(key: string, settings: Record<string, unknown>, signal?: AbortSignal) {

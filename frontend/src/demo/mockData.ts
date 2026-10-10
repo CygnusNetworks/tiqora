@@ -2045,7 +2045,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
   }
   if (p.endsWith("/api/v1/jobs")) return [];
   // Dashboards: reads here, bodies and queries are handled by the MSW handlers (dashboardsMock).
-  const dashboards = resolveDashboardsDemo(method, p);
+  const dashboards = method === "GET" ? resolveDashboardsDemo(method, p) : undefined;
   if (dashboards) return dashboards.body;
   // Agent
   if (p.endsWith("/api/v1/queues")) return agentQueues;

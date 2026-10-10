@@ -5427,5 +5427,134 @@
     "safeModeBrowser": "Erweiterungen sind in diesem Browserfenster ausgeschaltet.",
     "pageNotFound": "Diese Seite der Erweiterung gibt es nicht.",
     "widgetsTitle": "Erweiterungen"
+  },
+  "dashboards": {
+    "state": {
+      "loading": "Wird geladen",
+      "retry": "Erneut versuchen",
+      "loadFailed": "Diese Daten konnten nicht geladen werden.",
+      "forbidden": "Dafür fehlt dir die Berechtigung.",
+      "unavailable": "Widget nicht verfügbar",
+      "unavailableHint": "Diese Art von Widget gibt es hier nicht (mehr). Es bleibt gespeichert, bis du es entfernst.",
+      "remove": "Entfernen",
+      "showAll": "Alle {{count}} anzeigen"
+    },
+    "due": {
+      "since": "seit {{duration}}",
+      "in": "in {{duration}}"
+    },
+    "columns": {
+      "ticket": "Ticket",
+      "tn": "Ticketnummer",
+      "title": "Titel",
+      "customer": "Kunde",
+      "state": "Status",
+      "due": "Fällig",
+      "queue": "Queue",
+      "owner": "Besitzer",
+      "priority": "Priorität",
+      "changed": "Geändert",
+      "created": "Erstellt"
+    },
+    "presets": {
+      "mine_open": {
+        "counter": "Meine offenen",
+        "list": "Meine offenen Tickets"
+      },
+      "mine_new": {
+        "counter": "Meine neuen",
+        "list": "Meine neuen Tickets"
+      },
+      "unowned_new": {
+        "counter": "Zum Übernehmen",
+        "list": "Zum Übernehmen"
+      },
+      "escalated": {
+        "counter": "Eskaliert",
+        "list": "Eskalierte Tickets"
+      },
+      "ai_escalated": {
+        "counter": "Von der KI übergeben",
+        "list": "Von der KI übergeben"
+      }
+    },
+    "widgets": {
+      "ticketList": {
+        "title": "Ticketliste",
+        "description": "Tickets einer Auswahl als Tabelle",
+        "empty": "Noch keine Tickets in dieser Suche.",
+        "changeFilter": "Filter ändern"
+      },
+      "counter": {
+        "title": "Kennzahl",
+        "description": "Eine Zahl mit Verlauf, z. B. deine offenen Tickets",
+        "empty": "Keine Zahl vorhanden.",
+        "delta": "{{delta}} seit gestern"
+      },
+      "queueOverview": {
+        "title": "Queues",
+        "description": "Offene und neue Tickets je Queue",
+        "empty": "Keine Queues mit offenen oder neuen Tickets.",
+        "emptyNone": "Keine Queues sichtbar.",
+        "all": "Alle Queues anzeigen",
+        "counts": "{{open}} offen · {{new}} neu"
+      },
+      "escalations": {
+        "title": "Eskalationen",
+        "description": "Überschrittene und nächste Fristen zuerst",
+        "empty": "Keine eskalierten Tickets.",
+        "emptyWithin_one": "Keine Fristen in der nächsten Stunde.",
+        "emptyWithin_other": "Keine Fristen in den nächsten {{count}} Stunden.",
+        "order": "nächste Frist zuerst",
+        "remaining": "noch {{duration}}",
+        "kind": {
+          "first_response": "Erste Antwort",
+          "update": "Aktualisierung",
+          "solution": "Lösungszeit",
+          "escalation": "Eskalation"
+        }
+      },
+      "reminders": {
+        "title": "Erinnerungen fällig",
+        "description": "Wartende Tickets, deren Erinnerung fällig ist",
+        "empty": "Keine fälligen Erinnerungen."
+      },
+      "recentViews": {
+        "title": "Zuletzt angesehen",
+        "description": "Tickets, die du zuletzt geöffnet hast",
+        "empty": "Noch nichts angesehen.",
+        "untitled": "(kein Betreff)"
+      },
+      "calendarAgenda": {
+        "title": "Kalender",
+        "description": "Deine Termine von heute",
+        "empty": "Heute keine Termine.",
+        "emptyDays_one": "Heute keine Termine.",
+        "emptyDays_other": "Keine Termine in den nächsten {{count}} Tagen.",
+        "today": "Heute im Kalender",
+        "days_one": "Heute im Kalender",
+        "days_other": "Die nächsten {{count}} Tage",
+        "open": "Kalender öffnen"
+      },
+      "teamPresence": {
+        "title": "Team",
+        "description": "Wer gerade online ist",
+        "empty": "Gerade ist niemand online.",
+        "online_one": "{{count}} online",
+        "online_other": "{{count}} online",
+        "more_one": "und {{count}} weitere Person",
+        "more_other": "und {{count}} weitere"
+      },
+      "notes": {
+        "title": "Notizen",
+        "description": "Freier Text für dich oder dein Team",
+        "empty": "Noch keine Notiz. In den Einstellungen kannst du Text eintragen."
+      },
+      "links": {
+        "title": "Links",
+        "description": "Wichtige Adressen auf einen Blick",
+        "empty": "Noch keine Links. In den Einstellungen kannst du welche eintragen."
+      }
+    }
   }
 }

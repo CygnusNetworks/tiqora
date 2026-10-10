@@ -44,6 +44,8 @@ export default tseslint.config(
             "greetingKey",
             "usePlugins",
             "usePluginContributions",
+            "useWidgetData",
+            "useWidgetChrome",
           ],
         },
       ],

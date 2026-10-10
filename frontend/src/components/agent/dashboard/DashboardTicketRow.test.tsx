@@ -93,4 +93,37 @@ describe("DashboardTicketRow", () => {
     const link = await screen.findByTestId("dashboard-ticket-42");
     expect(link.getAttribute("href")).toContain("/agent/tickets/42");
   });
+
+  it("keeps today's look by default: comfortable padding and every meta piece", async () => {
+    await renderInRouter(<DashboardTicketRow ticket={ticket} />);
+    const link = await screen.findByTestId("dashboard-ticket-42");
+    expect(link).toHaveClass("py-2.5");
+    expect(link).toHaveAttribute("data-density", "comfortable");
+  });
+
+  it("compact density tightens the row; columns choose which pieces show", async () => {
+    await renderInRouter(
+      <DashboardTicketRow ticket={ticket} density="compact" columns={["title", "state"]} />,
+    );
+    const link = await screen.findByTestId("dashboard-ticket-42");
+    expect(link).toHaveClass("py-1.5");
+    expect(link).not.toHaveClass("py-2.5");
+    expect(link).toHaveTextContent("Printer on fire");
+    expect(link).not.toHaveTextContent("20240601000042");
+    expect(link).not.toHaveTextContent("Level 2");
+    expect(screen.getByTestId("dashboard-ticket-42-state-chip")).toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-ticket-42-priority")).toBeNull();
+  });
+
+  it("can be inert (edit mode) or plain text without a link (preview)", async () => {
+    await renderInRouter(<DashboardTicketRow ticket={ticket} linkMode="inert" />);
+    expect(await screen.findByTestId("dashboard-ticket-42")).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("renders no link at all with linkMode none", async () => {
+    await renderInRouter(<DashboardTicketRow ticket={ticket} linkMode="none" />);
+    const row = await screen.findByTestId("dashboard-ticket-42");
+    expect(row.tagName).not.toBe("A");
+    expect(row).toHaveTextContent("Printer on fire");
+  });
 });

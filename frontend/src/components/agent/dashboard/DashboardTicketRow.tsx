@@ -5,10 +5,14 @@ import type { TicketListItem } from "@/lib/api";
 import { Avatar } from "@/components/ui/Avatar";
 import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
 import { initialsOf } from "@/components/customers/customerFormat";
-import { emailFromAddress, senderDisplayName } from "@/lib/articleChannel";
 import { cn } from "@/lib/cn";
 import { useShowAvatars } from "@/lib/showAvatars";
 import { setTicketNavContext } from "@/lib/ticketNavContext";
+import type { ColumnKey } from "@/dashboard/definitions";
+import { ticketCustomer } from "./ticketCustomer";
+
+/** Whether `key` is shown: no `columns` = today's look (every piece). */
+const shows = (columns: ColumnKey[] | undefined, key: ColumnKey) => !columns || columns.includes(key);
 
 /**
  * A single ticket row for the dashboard work lists: number + title, then a
@@ -17,81 +21,107 @@ import { setTicketNavContext } from "@/lib/ticketNavContext";
  * changed date, an escalation countdown, or a due time. `escalated` adds the
  * red left border used to flag overdue rows in the escalated group/view.
  * With avatars on (AccountMenu), the customer's picture leads the row.
+ *
+ * Dashboard widgets pass `density` (compact = tighter rows), `columns` (which of number, title,
+ * queue, state and priority show; none given = all, today's look) and `linkMode` (`inert` = not a
+ * tab stop while editing, `none` = plain text in previews).
  */
 export function DashboardTicketRow({
   ticket,
   trailing,
   escalated,
+  density = "comfortable",
+  columns,
+  linkMode = "link",
 }: {
   ticket: TicketListItem;
   trailing?: ReactNode;
   escalated?: boolean;
+  density?: "compact" | "comfortable";
+  columns?: ColumnKey[];
+  linkMode?: "link" | "inert" | "none";
 }) {
   const { t } = useTranslation();
   const showAvatars = useShowAvatars();
-  const customerLogin = ticket.customer_user_id || null;
-  const avatarEmail =
-    ticket.customer_email ||
-    (customerLogin?.includes("@") ? customerLogin : null) ||
-    emailFromAddress(ticket.first_from) ||
-    null;
-  const customerLabel =
-    ticket.customer_email ||
-    senderDisplayName(ticket.first_from) ||
-    avatarEmail ||
-    ticket.customer_id ||
-    customerLogin;
-  return (
-    <li className={cn(escalated && "border-l-2 border-danger")}>
-      <Link
-        to="/agent/tickets/$ticketId"
-        params={{ ticketId: String(ticket.id) }}
-        onClick={() =>
-          setTicketNavContext({ label: t("nav.dashboard"), to: "/agent", ids: [ticket.id] })
-        }
-        data-testid={`dashboard-ticket-${ticket.id}`}
-        className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors duration-100 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
-      >
-        {showAvatars && customerLabel && (
-          <span className="flex shrink-0" title={customerLabel}>
-            <Avatar
-              email={avatarEmail}
-              domainFallback={false}
-              initials={initialsOf(customerLabel)}
-              size={20}
-              testId={`dashboard-ticket-${ticket.id}-avatar`}
-            />
+  const { label: customerLabel, avatarEmail } = ticketCustomer(ticket);
+  const rowClass = cn(
+    "flex items-center gap-3 px-4 text-sm transition-colors duration-100",
+    density === "compact" ? "py-1.5" : "py-2.5",
+    linkMode !== "none" &&
+      "hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
+  );
+  const content = (
+    <>
+      {showAvatars && customerLabel && (
+        <span className="flex shrink-0" title={customerLabel}>
+          <Avatar
+            email={avatarEmail}
+            domainFallback={false}
+            initials={initialsOf(customerLabel)}
+            size={20}
+            testId={`dashboard-ticket-${ticket.id}-avatar`}
+          />
+        </span>
+      )}
+      {shows(columns, "tn") && (
+        <span className="shrink-0 font-mono text-xs text-accent">{ticket.tn}</span>
+      )}
+      <span className="min-w-0 flex-1 truncate">
+        {shows(columns, "title") || !shows(columns, "tn") ? ticket.title : null}
+      </span>
+
+      <span className="hidden shrink-0 items-center gap-2.5 sm:flex">
+        {shows(columns, "queue") && ticket.queue_name && (
+          <span
+            className="max-w-[9rem] truncate text-xs text-muted"
+            title={ticket.queue_name}
+          >
+            {ticket.queue_name.includes("::")
+              ? ticket.queue_name.split("::").pop()
+              : ticket.queue_name}
           </span>
         )}
-        <span className="shrink-0 font-mono text-xs text-accent">{ticket.tn}</span>
-        <span className="min-w-0 flex-1 truncate">{ticket.title}</span>
-
-        <span className="hidden shrink-0 items-center gap-2.5 sm:flex">
-          {ticket.queue_name && (
-            <span
-              className="max-w-[9rem] truncate text-xs text-muted"
-              title={ticket.queue_name}
-            >
-              {ticket.queue_name.includes("::")
-                ? ticket.queue_name.split("::").pop()
-                : ticket.queue_name}
-            </span>
-          )}
+        {shows(columns, "state") && (
           <StateChip
             state={ticket.state}
             data-testid={`dashboard-ticket-${ticket.id}-state-chip`}
           />
+        )}
+        {shows(columns, "priority") && (
           <PriorityChip
             priority={ticket.priority}
             priorityId={ticket.priority_id}
             data-testid={`dashboard-ticket-${ticket.id}-priority`}
           />
-        </span>
-
-        {trailing && (
-          <span className="shrink-0 font-mono text-xs tabular-nums text-muted">{trailing}</span>
         )}
-      </Link>
+      </span>
+
+      {trailing && (
+        <span className="shrink-0 font-mono text-xs tabular-nums text-muted">{trailing}</span>
+      )}
+    </>
+  );
+  return (
+    <li className={cn(escalated && "border-l-2 border-danger")}>
+      {linkMode === "none" ? (
+        <div data-testid={`dashboard-ticket-${ticket.id}`} data-density={density} className={rowClass}>
+          {content}
+        </div>
+      ) : (
+        <Link
+          to="/agent/tickets/$ticketId"
+          params={{ ticketId: String(ticket.id) }}
+          tabIndex={linkMode === "inert" ? -1 : undefined}
+          onClick={() =>
+            setTicketNavContext({ label: t("nav.dashboard"), to: "/agent", ids: [ticket.id] })
+          }
+          data-testid={`dashboard-ticket-${ticket.id}`}
+          data-density={density}
+          className={rowClass}
+        >
+          {content}
+        </Link>
+      )}
     </li>
   );
 }

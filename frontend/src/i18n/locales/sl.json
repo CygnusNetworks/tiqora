@@ -5419,5 +5419,134 @@
     "safeModeBrowser": "Extensions are switched off in this browser window.",
     "pageNotFound": "This page of the extension does not exist.",
     "widgetsTitle": "Extensions"
+  },
+  "dashboards": {
+    "state": {
+      "loading": "Loading",
+      "retry": "Try again",
+      "loadFailed": "This data could not be loaded.",
+      "forbidden": "You don't have permission for this.",
+      "unavailable": "Widget not available",
+      "unavailableHint": "This kind of widget is not available here (any more). It stays saved until you remove it.",
+      "remove": "Remove",
+      "showAll": "Show all {{count}}"
+    },
+    "due": {
+      "since": "for {{duration}}",
+      "in": "in {{duration}}"
+    },
+    "columns": {
+      "ticket": "Ticket",
+      "tn": "Ticket number",
+      "title": "Title",
+      "customer": "Customer",
+      "state": "State",
+      "due": "Due",
+      "queue": "Queue",
+      "owner": "Owner",
+      "priority": "Priority",
+      "changed": "Changed",
+      "created": "Created"
+    },
+    "presets": {
+      "mine_open": {
+        "counter": "My open",
+        "list": "My open tickets"
+      },
+      "mine_new": {
+        "counter": "My new",
+        "list": "My new tickets"
+      },
+      "unowned_new": {
+        "counter": "To pick up",
+        "list": "To pick up"
+      },
+      "escalated": {
+        "counter": "Escalated",
+        "list": "Escalated tickets"
+      },
+      "ai_escalated": {
+        "counter": "Handed over by AI",
+        "list": "Handed over by AI"
+      }
+    },
+    "widgets": {
+      "ticketList": {
+        "title": "Ticket list",
+        "description": "Tickets of a selection as a table",
+        "empty": "No tickets in this search yet.",
+        "changeFilter": "Change filter"
+      },
+      "counter": {
+        "title": "Key figure",
+        "description": "A number with its trend, e.g. your open tickets",
+        "empty": "No number available.",
+        "delta": "{{delta}} since yesterday"
+      },
+      "queueOverview": {
+        "title": "Queues",
+        "description": "Open and new tickets per queue",
+        "empty": "No queues with open or new tickets.",
+        "emptyNone": "No queues visible.",
+        "all": "Show all queues",
+        "counts": "{{open}} open · {{new}} new"
+      },
+      "escalations": {
+        "title": "Escalations",
+        "description": "Breached and upcoming deadlines first",
+        "empty": "No escalated tickets.",
+        "emptyWithin_one": "No deadlines within the next hour.",
+        "emptyWithin_other": "No deadlines within the next {{count}} hours.",
+        "order": "next deadline first",
+        "remaining": "{{duration}} left",
+        "kind": {
+          "first_response": "First response",
+          "update": "Update",
+          "solution": "Solution time",
+          "escalation": "Escalation"
+        }
+      },
+      "reminders": {
+        "title": "Reminders due",
+        "description": "Pending tickets whose reminder is due",
+        "empty": "No reminders due."
+      },
+      "recentViews": {
+        "title": "Recently viewed",
+        "description": "Tickets you opened last",
+        "empty": "Nothing viewed yet.",
+        "untitled": "(no subject)"
+      },
+      "calendarAgenda": {
+        "title": "Calendar",
+        "description": "Your appointments today",
+        "empty": "No appointments today.",
+        "emptyDays_one": "No appointments today.",
+        "emptyDays_other": "No appointments in the next {{count}} days.",
+        "today": "Today in the calendar",
+        "days_one": "Today in the calendar",
+        "days_other": "The next {{count}} days",
+        "open": "Open calendar"
+      },
+      "teamPresence": {
+        "title": "Team",
+        "description": "Who is online right now",
+        "empty": "Nobody is online right now.",
+        "online_one": "{{count}} online",
+        "online_other": "{{count}} online",
+        "more_one": "and {{count}} more person",
+        "more_other": "and {{count}} more"
+      },
+      "notes": {
+        "title": "Notes",
+        "description": "Free text for you or your team",
+        "empty": "No note yet. You can add text in the settings."
+      },
+      "links": {
+        "title": "Links",
+        "description": "Important addresses at a glance",
+        "empty": "No links yet. You can add some in the settings."
+      }
+    }
   }
 }

@@ -63,6 +63,13 @@ describe("dashboardsApi", () => {
     expect(lastUrl()).toBe("/api/v1/dashboards/3/data");
   });
 
+  it("encodes widget ids in the batch query and the per-widget paths", async () => {
+    await dashboardsApi.data(3, ["a,b", "c&d"]);
+    expect(lastUrl()).toBe("/api/v1/dashboards/3/data?widgets=a%2Cb,c%26d");
+    await dashboardsApi.widgetData(3, "x/y");
+    expect(lastUrl()).toBe("/api/v1/dashboards/3/widgets/x%2Fy/data");
+  });
+
   it("previewData posts the settings to /dashboard-widget-types/{key}/data", async () => {
     await dashboardsApi.previewData("core.counter", { tone: "ok" });
     expect(lastCall()).toMatchObject({
