@@ -369,17 +369,20 @@ async def get_dashboard(
 async def _lock_own(session: AsyncSession, user_id: int) -> int:
     """Serialise per owner and count the owner's dashboards on the latest committed data.
 
-    The Znuny ``users`` row is locked first: on PostgreSQL a ``FOR UPDATE`` over the
-    dashboard rows alone would not see a row inserted by the transaction we waited for. The
-    locking read of the dashboard rows is a current read on InnoDB (no stale snapshot).
+    Only ``tiqora_dashboard`` rows are locked (never Znuny tables). Statement 1 locks the
+    owner's existing rows, so concurrent creators/deleters queue up (an owner at the limit
+    or at the last-dashboard guard always has rows). Statement 2 counts in a separate
+    statement: PostgreSQL READ COMMITTED takes a fresh snapshot per statement, and the
+    locking read is a current read on InnoDB (REPEATABLE READ), so both see the rows
+    committed by the transaction we waited for. No rows: nothing to lock, nothing to guard.
     """
-    await session.execute(select(Users.id).where(Users.id == user_id).with_for_update())
-    res = await session.execute(
+    stmt = (
         select(TiqoraDashboard.id)
         .where(TiqoraDashboard.owner_user_id == user_id, TiqoraDashboard.kind.in_(_OWNED_KINDS))
         .with_for_update()
     )
-    return len(res.scalars().all())
+    await session.execute(stmt)
+    return len((await session.execute(stmt)).scalars().all())
 
 
 async def _current_version(session: AsyncSession, dashboard_id: int) -> int:
