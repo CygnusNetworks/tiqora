@@ -3109,6 +3109,10 @@
         "deploy_watch": {
           "name": "Deploy watcher",
           "description": "Detects processes and ACLs deployed in Znuny and makes Tiqora use them only after that."
+        },
+        "plugin_events": {
+          "name": "Extensions: pass on ticket changes",
+          "description": "Passes new ticket changes on to the extensions that react to them."
         }
       },
       "takeoverBadge": "Prevzatie",

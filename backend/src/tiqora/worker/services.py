@@ -248,6 +248,20 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         interval_key=KEY_REPORT_FACTS_INTERVAL_SECONDS,
         interval_settings_attr="report_facts_interval_seconds",
     ),
+    # Delivers ticket changes to plugin event subscribers (tiqora.plugins.event_dispatch).
+    # Always on while plugins are loaded; a tick may run a subscriber for its wall-time budget
+    # (MIN_RUN_BUDGET_SECONDS = 30) plus one handler at its maximum timeout (300 s), which the
+    # "stale" threshold has to allow for (pinned in tests/test_plugins_event_dispatch.py).
+    DaemonService(
+        slug="plugin_events",
+        enabled_key=None,
+        default_enabled=True,
+        toggleable=False,
+        schedule_kind="interval",
+        interval_key=None,
+        interval_settings_attr="plugin_events_interval_seconds",
+        tick_timeout_seconds=330,
+    ),
 )
 
 DAEMON_SERVICES_BY_SLUG: dict[str, DaemonService] = {s.slug: s for s in DAEMON_SERVICES}

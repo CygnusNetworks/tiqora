@@ -175,6 +175,16 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
         return await run_report_facts_worker_tick(settings)
 
     from tiqora.extensions import get_registry
+    from tiqora.plugins.event_dispatch import run_plugin_events_tick
+
+    async def plugin_events_tick() -> dict[str, int]:
+        # the registry object is read every tick: a late plugin boot swaps its contents
+        return await run_plugin_events_tick(
+            registry=get_registry(),
+            settings=settings,
+            session_factory=get_session_factory(),
+            stop=stop,
+        )
 
     job_runner = JobRunner(
         session_factory=get_session_factory(), settings=settings, registry=get_registry()
@@ -253,6 +263,13 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             "znuny_session_purge",
             run_znuny_session_purge_tick,
             settings.znuny_session_purge_interval_seconds,
+            None,
+            stop,
+        ),
+        _interval_loop(
+            "plugin_events",
+            plugin_events_tick,
+            settings.plugin_events_interval_seconds,
             None,
             stop,
         ),

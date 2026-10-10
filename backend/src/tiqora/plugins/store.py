@@ -318,3 +318,152 @@ async def reset_plugin(session: AsyncSession, plugin_id: str, *, now: datetime) 
         .values(tripped_at=None, consecutive_failures=0)
     )
     await session.flush()
+
+
+# --- hooks (event subscribers and scheduled tasks) -------------------------------------------
+#
+# The helpers below write with explicit UPDATEs keyed by ``hook_key`` and mirror the change on
+# the passed object, so a hook loaded in one session can be booked in another (the dispatcher
+# commits every subscriber in its own session). They flush only; the caller commits.
+
+
+async def ensure_hook(
+    session: AsyncSession,
+    *,
+    hook_key: str,
+    plugin_id: str,
+    kind: str,
+    initial_cursor: int | None,
+    now: datetime,
+) -> TiqoraPluginHook:
+    """The hook row, created at ``initial_cursor`` when missing.
+
+    A NULL cursor (plugin switched off -> on, R-REENABLE-BACKLOG) is set to
+    ``initial_cursor`` as well, so a re-enabled subscriber starts at the current end of the
+    history. An existing cursor is never moved.
+    """
+    hook = await session.get(TiqoraPluginHook, hook_key)
+    if hook is None:
+        hook = TiqoraPluginHook(
+            hook_key=hook_key,
+            plugin_id=plugin_id,
+            kind=kind,
+            cursor=initial_cursor,
+            consecutive_failures=0,
+            total_failures=0,
+            created_at=now,
+        )
+        try:
+            # savepoint: a concurrent insert must not roll back the caller's other work
+            async with session.begin_nested():
+                session.add(hook)
+            return hook
+        except IntegrityError:
+            hook = (
+                await session.execute(
+                    select(TiqoraPluginHook).where(TiqoraPluginHook.hook_key == hook_key)
+                )
+            ).scalar_one()
+    if hook.cursor is None and initial_cursor is not None:
+        hook.cursor = initial_cursor
+        await session.flush()
+    return hook
+
+
+async def load_hooks(
+    session: AsyncSession, *, plugin_id: str | None = None, kind: str | None = None
+) -> dict[str, TiqoraPluginHook]:
+    stmt = select(TiqoraPluginHook).order_by(TiqoraPluginHook.hook_key)
+    if plugin_id is not None:
+        stmt = stmt.where(TiqoraPluginHook.plugin_id == plugin_id)
+    if kind is not None:
+        stmt = stmt.where(TiqoraPluginHook.kind == kind)
+    return {h.hook_key: h for h in (await session.execute(stmt)).scalars()}
+
+
+async def record_hook_success(
+    session: AsyncSession, hook: TiqoraPluginHook, *, cursor: int | None, now: datetime
+) -> None:
+    """A handled event or a finished task run: failures reset, ``cursor`` stored when given."""
+    values: dict[str, object] = {"consecutive_failures": 0, "last_ok_at": now}
+    if cursor is not None:
+        values["cursor"] = cursor
+    await session.execute(
+        update(TiqoraPluginHook).where(TiqoraPluginHook.hook_key == hook.hook_key).values(values)
+    )
+    await session.flush()
+    hook.consecutive_failures = 0
+    hook.last_ok_at = now
+    if cursor is not None:
+        hook.cursor = cursor
+
+
+async def advance_hook_cursor(
+    session: AsyncSession, hook: TiqoraPluginHook, *, cursor: int
+) -> None:
+    """Move the cursor forward past events the subscriber does not want (nothing else changes).
+
+    Never moves it back, and leaves a NULL cursor alone (the plugin was switched off and on
+    meanwhile; the next tick restarts it at the end of the history).
+    """
+    await session.execute(
+        update(TiqoraPluginHook)
+        .where(
+            TiqoraPluginHook.hook_key == hook.hook_key,
+            TiqoraPluginHook.cursor.is_not(None),
+            TiqoraPluginHook.cursor < cursor,
+        )
+        .values(cursor=cursor)
+    )
+    await session.flush()
+    if hook.cursor is not None and hook.cursor < cursor:
+        hook.cursor = cursor
+
+
+async def record_hook_failure(
+    session: AsyncSession,
+    hook: TiqoraPluginHook,
+    *,
+    error: str,
+    now: datetime,
+    trip_after: int,
+    cursor: int | None = None,
+) -> bool:
+    """Count a failure; opens the circuit breaker at ``trip_after`` consecutive failures.
+
+    Returns True when this failure tripped it. ``cursor`` (optional) also moves the cursor
+    forward past events handled before the failing one in the same run.
+    """
+    key = TiqoraPluginHook.hook_key == hook.hook_key
+    await session.execute(
+        update(TiqoraPluginHook)
+        .where(key)
+        .values(
+            consecutive_failures=TiqoraPluginHook.consecutive_failures + 1,
+            total_failures=TiqoraPluginHook.total_failures + 1,
+            last_error=error[:MAX_ERROR_LEN],
+            last_error_at=now,
+        )
+    )
+    if cursor is not None:
+        await advance_hook_cursor(session, hook, cursor=cursor)
+    consecutive, total, tripped_at = (
+        await session.execute(
+            select(
+                TiqoraPluginHook.consecutive_failures,
+                TiqoraPluginHook.total_failures,
+                TiqoraPluginHook.tripped_at,
+            ).where(key)
+        )
+    ).one()
+    tripped_now = tripped_at is None and consecutive >= trip_after
+    if tripped_now:
+        await session.execute(update(TiqoraPluginHook).where(key).values(tripped_at=now))
+        tripped_at = now
+    await session.flush()
+    hook.consecutive_failures = int(consecutive)
+    hook.total_failures = int(total)
+    hook.last_error = error[:MAX_ERROR_LEN]
+    hook.last_error_at = now
+    hook.tripped_at = tripped_at
+    return tripped_now
