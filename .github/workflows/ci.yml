@@ -45,7 +45,7 @@ jobs:
       - name: Ruff format
         run: uv run ruff format --check src tests
       - name: Mypy
-        run: uv run mypy src/tiqora
+        run: uv run mypy src/tiqora src/tiqora_sdk
 
   # One job runs the whole suite. Both dialects are covered *within* a single
   # run: tests/conftest.py starts its own MariaDB and Postgres testcontainers

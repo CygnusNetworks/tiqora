@@ -8,6 +8,7 @@ from typing import Final
 import structlog
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.routing import APIRoute
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.responses import JSONResponse
 from starlette.routing import BaseRoute, Mount, Router
 from starlette.types import Receive, Scope, Send
@@ -16,6 +17,9 @@ from tiqora.extensions.registry import ExtensionPoint, Registry
 from tiqora.plugins.context import PluginContext
 
 logger = structlog.get_logger(__name__)
+
+ROUTES_REFUSED_PREFIX: Final = "Schnittstellen nicht eingebunden: "
+MAX_REFUSED_LEN: Final = 500
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,14 +75,18 @@ def mount_plugin_routes(app: FastAPI, registry: Registry) -> list[str]:
 
     Authenticated routes depend on ``get_current_user`` (session or API key with the
     ``plugins`` area). Only routes registered with ``public=True`` (which needs the manifest
-    capability ``core.http.public_routes``) skip it. Idempotent per app.
+    capability ``core.http.public_routes``) skip it. Idempotent per app. A plugin whose
+    routes are refused is marked FAILED in this process and listed in
+    ``app.state.plugin_routes_refused`` (``plugin id -> reason``).
     """
     from tiqora.api.deps import get_current_user
-    from tiqora.plugins.state import is_active
+    from tiqora.plugins.state import is_active, mark_failed
 
     router: Router = app.state.plugin_router
     done: set[str] = getattr(app.state, "plugin_routes_mounted", set())
     app.state.plugin_routes_mounted = done
+    refused: dict[str, str] = getattr(app.state, "plugin_routes_refused", {})
+    app.state.plugin_routes_refused = refused
     by_plugin: dict[str, list[PluginRoute]] = {}
     for route in registry.items(PLUGIN_ROUTES):
         by_plugin.setdefault(route.plugin_id, []).append(route)
@@ -106,9 +114,47 @@ def mount_plugin_routes(app: FastAPI, registry: Registry) -> list[str]:
         except RuntimeError as exc:
             # Defence in depth behind the registrar check: never serve an unauthenticated route.
             logger.error("plugin_routes_refused", plugin=plugin_id, error=str(exc))
+            # Not "Aktiv" while every route answers 404: failed in this process; the api
+            # runtime row is booked by ``record_refused_plugin_routes``.
+            reason = f"{ROUTES_REFUSED_PREFIX}{exc}"[:MAX_REFUSED_LEN]
+            refused[plugin_id] = reason
+            mark_failed(plugin_id, reason)
             continue
         router.routes.append(Mount(f"/{plugin_id}", app=sub))
         done.add(plugin_id)
         mounted.append(plugin_id)
     logger.info("plugin_routes_mounted", plugins=mounted)
     return mounted
+
+
+async def record_refused_plugin_routes(
+    app: FastAPI, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """Book the api runtime row of each plugin whose routes were refused as FAILED."""
+    from tiqora.jobs.service import utc_now
+    from tiqora.plugins import store
+    from tiqora.plugins.state import RuntimeState, loaded_plugins
+
+    refused: dict[str, str] = getattr(app.state, "plugin_routes_refused", {})
+    for plugin_id, reason in refused.items():
+        if not store.storable(plugin_id):
+            continue
+        loaded = loaded_plugins().get(plugin_id)
+        try:
+            await store.mark_result(
+                session_factory,
+                plugin_id,
+                "api",
+                state=RuntimeState.FAILED,
+                version=loaded.version if loaded is not None else None,
+                error=reason,
+                now=utc_now(),
+                keep_attempts=True,
+            )
+        except Exception as exc:  # noqa: BLE001 - the row only feeds the admin page
+            logger.warning(
+                "plugin_state_write_failed",
+                plugin=plugin_id,
+                role="api",
+                error=f"{type(exc).__name__}: {exc}"[:300],
+            )

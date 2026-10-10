@@ -2244,6 +2244,7 @@ async def _app_lifespan(app: Any) -> AsyncIterator[None]:
         yield
     finally:
         plugin_retry.cancel()
+        await asyncio.gather(plugin_retry, return_exceptions=True)
         await _mcp_state.aclose()
         _mcp_state = None
         logger.info("tiqora_mcp_stopped")

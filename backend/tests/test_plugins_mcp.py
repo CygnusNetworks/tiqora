@@ -252,6 +252,39 @@ def test_lifespan_binds_plugin_tools() -> None:
     assert re.search(r"registry\s*=\s*await init_registry", src)
 
 
+async def test_lifespan_shutdown_awaits_the_cancelled_retry_task(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No "Task was destroyed but it is pending" after the mcp lifespan ends."""
+    from tiqora.plugins import bootstrap
+
+    finished: list[str] = []
+
+    class FakeState:
+        def __init__(self, settings: Any) -> None:
+            self.session_factory = object()
+
+        async def aclose(self) -> None:
+            return None
+
+    async def init_registry(**kw: Any) -> Registry:
+        return Registry()
+
+    async def retry_plugin_boot(**kw: Any) -> bool:
+        try:
+            await asyncio.sleep(3600)
+        finally:
+            finished.append("retry")
+        return False
+
+    monkeypatch.setattr(mcp_server, "McpState", FakeState)
+    monkeypatch.setattr(bootstrap, "init_registry", init_registry)
+    monkeypatch.setattr(bootstrap, "retry_plugin_boot", retry_plugin_boot)
+    async with mcp_server._app_lifespan(None):
+        await asyncio.sleep(0)  # the retry task starts sleeping
+    assert finished == ["retry"]  # cancelled AND awaited before the lifespan returned
+
+
 def test_sdk_helpers_delegate_to_server() -> None:
     src = Path(inspect.getfile(__import__("tiqora_sdk.mcp", fromlist=["x"]))).read_text()
     assert (

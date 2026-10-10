@@ -106,9 +106,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     registry = await init_registry(
         role="api", settings=settings, session_factory=app.state.session_factory
     )
-    from tiqora.plugins.routes import mount_plugin_routes
+    from tiqora.plugins.routes import mount_plugin_routes, record_refused_plugin_routes
 
     mount_plugin_routes(app, registry)
+    await record_refused_plugin_routes(app, app.state.session_factory)
 
     # Detect OTRS/Znuny schema tier and refuse unknown shapes (with override).
     # Soft-skip only when the DB is unreachable (dev/tests without a peer DB);

@@ -82,6 +82,9 @@ def test_parse_passes_hashes_through(tmp_path: Path) -> None:
         ("crm==1.0 --no-binary", "--hash"),
         ("./src", "Wheel"),
         ("https://example.org/m-1.0-py3-none-any.whl", "name @"),
+        ("crm @ http://example.org/crm-1.0-py3-none-any.whl", "https://"),
+        ("crm @ HTTP://example.org/crm-1.0-py3-none-any.whl", "https://"),
+        ("crm @ file:///tmp/crm-1.0-py3-none-any.whl", "https://"),
     ],
 )
 def test_parse_rejects(tmp_path: Path, line: str, message: str) -> None:

@@ -127,9 +127,9 @@ async def init_registry(
             exc_info=not _late,
         )
         _tables_missing = is_missing_table_error(exc)
+        await _correct_active_rows(session_factory, role, active_written)
         if _late:
             return get_registry()
-        await _correct_active_rows(session_factory, role, active_written)
         set_loaded_plugins([])
         return _finish(_core_only())  # drop anything a half-finished load committed
     _tables_missing = False
@@ -148,26 +148,22 @@ async def init_registry(
 async def _correct_active_rows(
     factory: async_sessionmaker[AsyncSession], role: PluginRole, plugin_ids: list[str]
 ) -> None:
-    """Rows written as active before a boot failure must not claim a plugin runs here."""
-    for pid in plugin_ids:
-        try:
-            await store.mark_result(
-                factory,
-                pid,
-                role,
-                state=RuntimeState.FAILED,
-                version=None,
-                error=BOOT_FAILED_MESSAGE,
-                now=utc_now(),
-                keep_attempts=True,
-            )
-        except Exception as exc:
-            log.warning(
-                "plugin_state_write_failed",
-                plugin=pid,
-                role=role,
-                error=f"{type(exc).__name__}: {exc}"[:300],
-            )
+    """After a core-only fallback no row of this role may claim a plugin runs here.
+
+    Covers the rows this failed attempt wrote as active (``plugin_ids``) and rows an earlier
+    boot left active. Best effort: with the database unreachable nothing can be corrected.
+    """
+    try:
+        await store.fail_active_rows(factory, role, error=BOOT_FAILED_MESSAGE, now=utc_now())
+    except Exception as exc:
+        if is_missing_table_error(exc):
+            return  # nothing stored yet (worker/mcp before the api migrated)
+        log.warning(
+            "plugin_state_write_failed",
+            plugins=plugin_ids,
+            role=role,
+            error=f"{type(exc).__name__}: {exc}"[:300],
+        )
 
 
 async def retry_plugin_boot(

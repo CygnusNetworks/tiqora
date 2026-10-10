@@ -85,17 +85,20 @@ nothing else.
 
 1. Write `plugins.txt` (pinned names or built wheels, optional
    `--hash=sha256:…` per line, at most one `--index-url https://…`; git
-   sources and `--extra-index-url` are rejected). Use hashes in production:
+   sources, `--extra-index-url` and non-https wheel addresses are rejected). Use hashes in production:
    once any line has a hash pip requires hashes for the transitive
    dependencies too.
 2. Generate the build context with the image you run today:
 
    ```bash
-   docker run --rm -v "$PWD:/work" ghcr.io/cygnusnetworks/tiqora:<version> \
+   docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" \
+     ghcr.io/cygnusnetworks/tiqora:<version> \
      tiqora plugins bake /work/plugins.txt --output /work/build
    ```
 
-   (`--base-image <image>` when the image has no release version.)
+   (`--base-image <image>` when the image has no release version. Without
+   `--user` the command runs as the image user `tiqora`, which usually cannot
+   write to the bind-mounted directory: "Fehler: Permission denied".)
 3. `docker build -t tiqora-with-plugins build/`. The last build step runs
    `tiqora plugins verify --import --strict`: a plugin that is incomplete
    (for example `web/index.js` dropped from the wheel by `.gitignore`), cannot

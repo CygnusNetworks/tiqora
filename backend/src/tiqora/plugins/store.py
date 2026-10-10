@@ -264,6 +264,31 @@ async def mark_result(
             return
 
 
+async def fail_active_rows(
+    factory: async_sessionmaker[AsyncSession],
+    role: PluginRole,
+    *,
+    error: str,
+    now: datetime,
+) -> int:
+    """Turn every ACTIVE runtime row of ``role`` into FAILED; returns the number of rows.
+
+    For a core-only fallback: no row of this role may still claim a plugin runs here, whether
+    the failed boot wrote it or an earlier boot did. The crash counter is left alone.
+    """
+    async with factory() as session:
+        result = await session.execute(
+            update(TiqoraPluginRuntime)
+            .where(
+                TiqoraPluginRuntime.role == role,
+                TiqoraPluginRuntime.state == RuntimeState.ACTIVE.value,
+            )
+            .values(state=RuntimeState.FAILED.value, error=error[:MAX_ERROR_LEN], updated_at=now)
+        )
+        await session.commit()
+    return int(getattr(result, "rowcount", 0) or 0)
+
+
 async def set_enabled(
     session: AsyncSession,
     plugin_id: str,

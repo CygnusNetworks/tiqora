@@ -28,6 +28,7 @@ from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.extensions import get_registry, set_registry_for_tests
 from tiqora.jobs.registry import JOB_HANDLERS
+from tiqora.jobs.service import utc_now
 from tiqora.plugins import bootstrap as bootstrap_mod
 from tiqora.plugins import store
 from tiqora.plugins.bootstrap import (
@@ -333,6 +334,62 @@ async def test_unexpected_error_after_a_load_drops_the_partial_registry(
     # the row written as active before the failure is corrected for this role
     (row,) = await runtime_rows(factory, "org.example.hello", role="api")
     assert row.state == "failed" and row.error == bootstrap_mod.BOOT_FAILED_MESSAGE
+
+
+async def test_failed_late_boot_corrects_the_rows_it_wrote_active(
+    fixture_plugins: Installer,
+    factory: async_sessionmaker[AsyncSession],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The late retry failing after plugin 1 loaded must not leave its row "Aktiv"."""
+    fixture_plugins()
+    fixture_plugins(
+        "tq_fixture_slow",
+        plugin_id="org.example.plg49zzz",
+        dist_name="tq-fixture-zzz",
+        manifest_overrides={"id": "org.example.plg49zzz", "short_id": "zzz"},
+    )
+    real = bootstrap_mod.check_compat
+
+    def check(manifest: object, **kw: object) -> str | None:
+        if getattr(manifest, "id", "") == "org.example.plg49zzz":
+            raise RuntimeError("Kompatibilitätsprüfung kaputt")
+        return real(manifest, **kw)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(bootstrap_mod, "check_compat", check)
+    await init_registry(role="worker", settings=settings, session_factory=factory, _late=True)
+    assert "tq_fixture_hello" in sys.modules and loaded_plugins() == {}
+    (row,) = await runtime_rows(factory, "org.example.hello", role="worker")
+    assert row.state == "failed" and row.error == bootstrap_mod.BOOT_FAILED_MESSAGE
+
+
+async def test_failed_boot_clears_active_rows_left_by_an_earlier_boot(
+    factory: async_sessionmaker[AsyncSession],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Core-only fallback: no row of this role may still claim a plugin runs here."""
+    for role in ("api", "worker"):
+        await store.mark_result(
+            factory,
+            "org.example.plg49old",
+            role,  # type: ignore[arg-type]
+            state=RuntimeState.ACTIVE,
+            version="1.0.0",
+            error=None,
+            now=utc_now(),
+        )
+
+    def boom() -> object:
+        raise PermissionError("kein Zugriff")
+
+    monkeypatch.setattr(bootstrap_mod, "discovered_plugins", boom)
+    await init_registry(role="api", settings=settings, session_factory=factory)
+    (api,) = await runtime_rows(factory, "org.example.plg49old", role="api")
+    assert api.state == "failed" and api.error == bootstrap_mod.BOOT_FAILED_MESSAGE
+    (worker,) = await runtime_rows(factory, "org.example.plg49old", role="worker")
+    assert worker.state == "active"  # another role's row is left alone
 
 
 async def test_failing_mark_loading_skips_the_plugin(

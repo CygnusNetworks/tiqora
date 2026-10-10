@@ -105,9 +105,11 @@ def parse_plugins_txt(path: Path) -> PluginsTxt:
         if requirement.startswith((".", "/", "~")):
             raise BakeError(f"{where}: lokale Pfade müssen auf ein gebautes Wheel (.whl) zeigen")
         try:
-            Requirement(requirement)
+            parsed = Requirement(requirement)
         except InvalidRequirement as exc:
             raise BakeError(f"{where}: ungültige Paketangabe „{requirement}“ ({exc})") from None
+        if parsed.url is not None and not parsed.url.startswith("https://"):
+            raise BakeError(f"{where}: Adressen von Wheels müssen mit https:// beginnen")
         lines.append(requirement + suffix)
     return PluginsTxt(lines=lines, wheels=wheels)
 

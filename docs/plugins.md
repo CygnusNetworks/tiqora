@@ -60,7 +60,8 @@ example-crm==2.3.1
 Regeln, die `bake` prüft (Fehlermeldungen sind deutsch):
 
 - Erlaubt sind Paketnamen, gebaute Wheels (lokale Datei oder
-  `name @ https://…whl`). `bake` prüft nur die Schreibweise und erzwingt keine
+  `name @ https://…whl`; Adressen nur mit `https://`, `http://` und `file://`
+  lehnt `bake` ab). `bake` prüft nur die Schreibweise und erzwingt keine
   festen Versionen. Dringend empfohlen: feste Versionen (`name==1.2.3`) und
   `--hash` (siehe unten), damit ein Neubau dasselbe Image ergibt.
 - **Keine Git-Quellen** (`git+https://…`): Das Image enthält kein `git`.
@@ -86,9 +87,14 @@ der Bau dem Paketserver bei jedem Lauf neu.
 einsetzen (gleiche Version wie später das Basis-Image):
 
 ```bash
-docker run --rm -v "$PWD:/work" ghcr.io/cygnusnetworks/tiqora:<version> \
+docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" \
+  ghcr.io/cygnusnetworks/tiqora:<version> \
   tiqora plugins bake /work/plugins.txt --output /work/build
 ```
+
+`--user` lässt den Befehl mit Ihrer Benutzerkennung laufen. Ohne diese Angabe
+läuft er als Benutzer `tiqora` im Container, der in Ihr Verzeichnis meist
+nicht schreiben darf ("Fehler: Permission denied").
 
 Im Ordner `build/` liegen `Dockerfile`, `plugins.txt` und (bei lokalen
 Wheels) `wheels/`. Bei einem Image ohne bekannte Release-Version (zum
@@ -141,7 +147,9 @@ Prozessen, in denen sie läuft, und ihren automatischen Abläufen.
   Ticketänderungen angemeldet ist, beginnt nach dem Wiedereinschalten am
   aktuellen Ende des Verlaufs. Änderungen, die geschehen sind, während sie
   ausgeschaltet war, bekommt sie nicht. ("Ausgeschaltet" heißt "nicht
-  handeln", nicht "Arbeit ansammeln".)
+  handeln", nicht "Arbeit ansammeln".) Das gilt auch, wenn Sie aus- und
+  gleich wieder einschalten, ohne dazwischen neu zu starten: Änderungen aus
+  dieser Zeit bekommt die Erweiterung nicht.
 - **Eine Erweiterung ist in drei Prozessen geladen:** Weboberfläche und
   Schnittstelle (`api`), Hintergrunddienst (`worker`) und KI-Schnittstelle
   (`mcp`). Der Hintergrunddienst führt Ticket-Abonnements, geplante Aufgaben
@@ -565,7 +573,10 @@ handler that raises, or exceeds its timeout, is retried on the next tick; after
 versuchen". Events are never skipped because a handler is failing. One slow
 subscriber stops starting new calls after `max(2 x interval, 30 s)` per tick and
 carries on in the next tick; other subscribers are unaffected. A plugin that is
-switched on again starts at the current end of the history (no backlog).
+switched on again starts at the current end of the history (no backlog). This
+also applies when it is switched off and on again without a worker restart in
+between: while the worker keeps it loaded, events between its old position and
+the moment it was switched on again are not delivered (known limit of phase 1).
 
 Galera note, repeated for developers: *Galera multi-writer: events from rows
 committed late on another write node can be missed; run Galera with a single
@@ -631,7 +642,14 @@ documentation. Rules:
   `permission_engine(session)` from `tiqora_sdk.mcp` (`await
   engine.check(agent_id, queue_id, "ro")`).
 - Clients never see exception text: a failing tool answers "Das Werkzeug ist
-  fehlgeschlagen" and the details go to the log.
+  fehlgeschlagen" and the details go to the log. This includes `SystemExit`
+  and other non-`Exception` errors raised by the tool.
+- **Any MCP key reaches plugin tools.** Every key with MCP access, the legacy
+  `mcp` token included, can call every tool of an active plugin unless the key
+  carries a `tool:` allowlist (and `write=True` tools still need `mcp:rw`).
+  Plugin HTTP routes are stricter: they need an explicit `plugins:ro`/`plugins:rw`
+  grant. Restrict MCP keys with `tool:` entries when a plugin tool must not be
+  open to every MCP client.
 
 ## Frontend
 

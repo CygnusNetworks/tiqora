@@ -21,7 +21,13 @@ from tiqora.plugins.context import make_plugin_context
 from tiqora.plugins.discovery import discover_plugins
 from tiqora.plugins.loader import commit_registrar, import_and_register
 from tiqora.plugins.routes import mount_plugin_routes
-from tiqora.plugins.state import PluginLoadResult, RuntimeState, set_loaded_plugins
+from tiqora.plugins.state import (
+    PluginLoadResult,
+    RuntimeState,
+    is_active,
+    loaded_plugins,
+    set_loaded_plugins,
+)
 
 ROOT = AuthenticatedUser(
     id=1, login="root@localhost", first_name="Root", last_name="Admin", auth_method="session"
@@ -273,6 +279,45 @@ async def test_mount_refuses_unauthenticated_route_in_authenticated_router(
     async with _client(app) as c:
         assert (await c.get(f"{BASE}/raw")).status_code == 404
         assert (await c.post(f"{BASE}/raw")).status_code == 404
+    # the plugin does not stay "Aktiv" in this process while every route answers 404
+    result = loaded_plugins()[PLUGIN_ID]
+    assert result.state is RuntimeState.FAILED and not is_active(PLUGIN_ID)
+    assert (result.error or "").startswith("Schnittstellen nicht eingebunden: ")
+    assert app.state.plugin_routes_refused == {PLUGIN_ID: result.error}
+
+
+async def test_refused_routes_are_booked_as_failed_for_the_api_role(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tiqora.plugins import routes as routes_mod
+
+    calls: list[dict[str, Any]] = []
+
+    async def mark_result(factory: Any, plugin_id: str, role: str, **kw: Any) -> None:
+        calls.append({"factory": factory, "plugin_id": plugin_id, "role": role, **kw})
+
+    monkeypatch.setattr("tiqora.plugins.store.mark_result", mark_result)
+    set_loaded_plugins([PluginLoadResult(PLUGIN_ID, "1.0.0", RuntimeState.ACTIVE, None, ())])
+    app = create_app(Settings(environment="test"))
+    app.state.plugin_routes_refused = {PLUGIN_ID: "Schnittstellen nicht eingebunden: x"}
+    factory = object()
+    await routes_mod.record_refused_plugin_routes(app, factory)  # type: ignore[arg-type]
+    (call,) = calls
+    assert call["factory"] is factory and call["plugin_id"] == PLUGIN_ID and call["role"] == "api"
+    assert call["state"] is RuntimeState.FAILED and call["version"] == "1.0.0"
+    assert call["error"] == "Schnittstellen nicht eingebunden: x"
+    assert call["keep_attempts"] is True
+
+
+def test_lifespan_books_refused_routes() -> None:
+    import inspect
+
+    from tiqora.api import app as app_mod
+
+    src = inspect.getsource(app_mod.lifespan)
+    assert src.index("mount_plugin_routes(app, registry)") < src.index(
+        "await record_refused_plugin_routes(app, app.state.session_factory)"
+    )
 
 
 async def test_routes_added_to_plugin_router_after_mount_are_not_served(
