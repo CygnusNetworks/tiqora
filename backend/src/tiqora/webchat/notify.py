@@ -11,6 +11,11 @@ exist. So the session services only *queue* notifications on the ``AsyncSession`
   ``await db.commit()``. Never call it on an exception path that skipped the commit — it
   would publish nothing then anyway, but the call has no purpose there.
 
+Queue OUTSIDE savepoints: an item queued inside a SAVEPOINT that is rolled back while the
+outer transaction commits is still published (only the outermost commit/rollback is
+tracked). The session service queues only after its SAVEPOINT succeeded; agent-side and
+sweep callers must do the same.
+
 Agent events carry ids only (``tiqora.events.pubsub.publish_chat_event``); visitor data
 never reaches Redis.
 """

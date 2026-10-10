@@ -39,6 +39,7 @@ from tiqora.webchat.notify import (
     queue_agent_event,
     queue_wakeup,
 )
+from tiqora.webchat.prechat import resolve_chat_customer
 from tiqora.webchat.schemas import ChatOfflineIn, ChatSessionCreateIn
 from tiqora.webchat.sessions import (
     PRECHAT_BLOCK_HEADER,
@@ -260,6 +261,18 @@ async def _outbox_count(env: Env, ticket_id: int, event_type: str) -> int:
         )
         or 0
     )
+
+
+async def _customer_recipients(env: Env, ticket_id: int) -> list[str]:
+    from tiqora.worker.notifications import _NotificationRow, _resolve_recipients, _ticket_row
+
+    async with env.factory() as db:
+        ticket = await _ticket_row(db, ticket_id)
+        assert ticket is not None
+        found = await _resolve_recipients(
+            db, _NotificationRow(id=0, name="wc48", items={"Recipients": ["Customer"]}), ticket
+        )
+        return [r.email for r in found if r.kind == "Customer"]
 
 
 async def _chat_row(env: Env, session_id: str) -> TiqoraChatSession:
@@ -844,6 +857,13 @@ async def test_offline_form_creates_ended_session_and_ticket(env: Env) -> None:
         (values, {"email": ""}, "invalid_prechat", {"email": "required"}),
         (values, {"email": "x@y"}, "invalid_prechat", {"email": "email"}),
         (hidden, {}, "disabled", None),
+        # the address only in the mapped prechat field still counts (no overwrite with "")
+        (
+            values,
+            {"email": "", "prechat": {"email": "nope"}},
+            "invalid_prechat",
+            {"email": "email"},
+        ),
     ):
         async with env.factory() as db:
             with pytest.raises(ChatError) as e:
@@ -875,6 +895,8 @@ async def test_set_contact_after_no_agent(env: Env) -> None:
     assert anon.visitor_email is None
     t0 = await _scalar(env, "SELECT customer_user_id FROM ticket WHERE id = :t", t=anon.ticket_id)
     assert t0 is None
+    # anonymous: the only customer address is the visitor's @chat.invalid From -> dropped
+    assert await _customer_recipients(env, anon.ticket_id) == []
     a_from = await _scalar(
         env,
         "SELECT m.a_from FROM article a JOIN article_data_mime m ON m.article_id = a.id"
@@ -909,6 +931,8 @@ async def test_set_contact_after_no_agent(env: Env) -> None:
     t = await _scalar(env, "SELECT customer_user_id FROM ticket WHERE id = :t", t=anon.ticket_id)
     assert t == "Erika@example.org"
     assert (await _history_types(env, anon.ticket_id)).count("CustomerUpdate") == 1
+    # Znuny parity: the typed address (no customer_user row) receives customer notifications
+    assert await _customer_recipients(env, anon.ticket_id) == ["Erika@example.org"]
 
     refusals: list[tuple[TiqoraChatSession, str, Any]] = [
         (anon, "erika@example.org", NOW + timedelta(hours=1)),  # address already given
@@ -1034,3 +1058,32 @@ async def test_services_fit_the_handler_transaction_pattern(env: Env) -> None:
         await flush_chat_notifications(db, r)  # the block rolled back: nothing announced
     assert len(r.published) == 2
     assert (await _chat_row(env, chat.id)).status == "waiting"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+async def test_offline_address_from_prechat_and_missing_default_customer(env: Env) -> None:
+    cfg, values = await _config(env)
+    payload = ChatOfflineIn(
+        key=KEY,
+        origin=ORIGIN,
+        visitor_id=VISITOR,
+        message="Rückruf bitte",
+        prechat={"email": "erika@example.org"},
+    )
+    async with env.factory() as db:
+        await submit_offline(
+            db, env.factory, SysConfig(db), config=cfg, values=values, payload=payload,
+            ctx=CTX, now=NOW,
+        )  # fmt: skip
+        await db.commit()
+        cid = await _scalar(
+            env,
+            "SELECT customer_user_id FROM ticket WHERE queue_id = :q ORDER BY id DESC LIMIT 1",
+            q=QUEUE,
+        )
+        assert cid == "erika@example.org"
+        # a default customer deleted since the config was saved is no customer at all
+        assert await resolve_chat_customer(
+            db, email=None, default_customer_user="wc48-deleted-login"
+        ) == (None, None)

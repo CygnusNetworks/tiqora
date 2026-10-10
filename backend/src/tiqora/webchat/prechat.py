@@ -13,6 +13,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Final
 
+import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +26,8 @@ from tiqora.webchat.text import (
     normalize_email,
     sanitize_message,
 )
+
+logger = structlog.get_logger(__name__)
 
 __all__ = [
     "CHECKBOX_NO",
@@ -222,7 +225,7 @@ async def resolve_chat_customer(
     An address is matched against ``customer_user`` login/email case-insensitively
     (``channels/email/pipeline._resolve_customer``'s rule) → ``(customer_id, login)``,
     otherwise ``(email, email)``. Without an address the config's ``default_customer_user``
-    is used (its ``customer_id`` looked up; ``None`` when that login no longer exists),
+    is used (its ``customer_id`` looked up; a login that no longer exists counts as none),
     else ``(None, None)``. Znuny tables only — no JOIN with ``tiqora_*``.
     """
     if email:
@@ -246,6 +249,9 @@ async def resolve_chat_customer(
                 {"l": default_customer_user},
             )
         ).first()
-        customer_id = str(row[0]) if row is not None and row[0] else None
-        return customer_id, default_customer_user
+        if row is None:
+            # Deleted since the admin saved the config: no dangling customer reference.
+            logger.warning("webchat_default_customer_user_missing")
+            return None, None
+        return (str(row[0]) if row[0] else None), default_customer_user
     return None, None

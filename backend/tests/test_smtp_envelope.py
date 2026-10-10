@@ -307,3 +307,20 @@ async def test_smtp_send_refuses_when_only_invalid_tld_recipients(
         await sender.send(_message(to_addrs="visitor-abc@chat.invalid"))
     assert fake.calls == []
     assert is_permanent_smtp_failure(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_smtp_send_refuses_when_only_the_archive_bcc_is_left(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import aiosmtplib
+
+    fake = _FakeSend()
+    monkeypatch.setattr("tiqora.channels.email.smtp.aiosmtplib.send", fake.send)
+    sender = SmtpMailSender(host="mail.example.org", sendmail_bcc="archive@example.com")
+    with pytest.raises(aiosmtplib.SMTPRecipientsRefused):
+        await sender.send(_message(to_addrs="visitor-abc@chat.invalid"))
+    assert fake.calls == []
+    # a deliverable visible recipient keeps the archive copy
+    await sender.send(_message(to_addrs="visitor-abc@chat.invalid, kunde@example.com"))
+    assert fake.calls[0]["recipients"] == ["kunde@example.com", "archive@example.com"]

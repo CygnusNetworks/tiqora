@@ -234,10 +234,12 @@ class SmtpMailSender:
         use_tls = self._security == "ssl"
         start_tls = True if self._security == "starttls" else False if use_tls else None
         explicit = envelope_recipients(message, self.sendmail_bcc)
-        candidates = explicit if explicit is not None else _header_recipients(message)
+        header = _header_recipients(message)
+        candidates = explicit if explicit is not None else header
         kept = drop_invalid_tld(candidates, context="smtp_send")
         if len(kept) != len(candidates):
-            if not kept:
+            # Only the SendmailBcc archive copy left counts as nothing deliverable too.
+            if not kept or (header and not any(a in kept for a in header)):
                 # Nothing deliverable left: refuse like a mail server would (permanent 5xx),
                 # so callers record a failure instead of "sent" and never retry.
                 raise aiosmtplib.SMTPRecipientsRefused(

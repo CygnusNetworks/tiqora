@@ -85,10 +85,8 @@ from tiqora.webchat.store import (
 )
 from tiqora.webchat.text import (
     CONTROL_CHARS,
-    MAX_EMAIL_LENGTH,
     MessageRejected,
     clean_page_url,
-    normalize_email,
     quoted_display_name,
     sanitize_message,
 )
@@ -328,6 +326,12 @@ async def _ticket_defaults(
     priority_id = topic.priority_id or await _lookup_id(
         db, "ticket_priority", await sysconfig.postmaster_default_priority()
     )
+    if state_id is None or priority_id is None:
+        logger.warning(
+            "webchat_postmaster_default_unresolved",
+            state_found=state_id is not None,
+            priority_found=priority_id is not None,
+        )
     return state_id or 1, priority_id or 3
 
 
@@ -735,7 +739,9 @@ async def submit_offline(
     answers: dict[str, str | bool] = dict(payload.prechat)
     email_field = next((f for f in values.prechat_fields if f.maps_to == "email"), None)
     name_field = next((f for f in values.prechat_fields if f.maps_to == "name"), None)
-    answers[email_field.key if email_field else EMAIL_KEY] = payload.email
+    email_key = email_field.key if email_field else EMAIL_KEY
+    if payload.email or email_key not in answers:
+        answers[email_key] = payload.email
     if name_field is not None and payload.name and not answers.get(name_field.key):
         answers[name_field.key] = payload.name
     prechat = _validate(values.prechat_fields, answers, require_email=True)
@@ -813,14 +819,8 @@ async def set_contact(
     visitor streams. Refusals: ``invalid_prechat`` (``errors.email``), ``not_found``,
     ``contact_not_allowed``.
     """
-    raw = (email or "").strip()
-    if not raw:
-        raise ChatError("invalid_prechat", 422, errors={"email": "required"})
-    if len(raw) > MAX_EMAIL_LENGTH:
-        raise ChatError("invalid_prechat", 422, errors={"email": "too_long"})
-    address = normalize_email(raw)
-    if address is None:
-        raise ChatError("invalid_prechat", 422, errors={"email": "email"})
+    # Same address rule and error codes as the pre-chat / offline form.
+    address = _validate([], {EMAIL_KEY: email or ""}, require_email=True).email
     clean_name = _clean_line(name, MAX_VISITOR_NAME)
 
     locked = await _lock(db, chat.id)
