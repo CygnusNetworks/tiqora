@@ -62,7 +62,7 @@ class ChatRateLimiter:
         if int(count) > limit:
             raise RateLimited(scope, max(1, int(ttl)))
 
-    async def check(self, scope: str, subject: str, *, limit: int) -> None:
+    async def check(self, scope: str, subject: str, *, limit: int, window_seconds: int) -> None:
         """Raise :class:`RateLimited` when the window already holds ``limit`` hits — without
         counting this call. Lets a caller refuse BEFORE expensive work (e.g. the ``auth_fail``
         bucket before a session lookup). Redis errors → :class:`ChatBackendUnavailable`."""
@@ -74,6 +74,13 @@ class ChatRateLimiter:
                 raw, ttl = await pipe.execute()
         except Exception as exc:  # noqa: BLE001 - fail closed on every backend error
             raise ChatBackendUnavailable(str(exc)) from exc
+        if raw is not None and ttl is not None and int(ttl) == -1:
+            # A counter without expiry would refuse forever once full (R-RL-ATOMIC); heal it.
+            try:
+                await self._client.expire(key, window_seconds)
+            except Exception as exc:  # noqa: BLE001 - fail closed on every backend error
+                raise ChatBackendUnavailable(str(exc)) from exc
+            ttl = window_seconds
         if raw is not None and int(raw) >= limit:
             raise RateLimited(scope, max(1, int(ttl or 0)))
 

@@ -98,9 +98,9 @@ from tiqora.webchat.sessions import (
     VisitorContext,
     create_session,
     end_by_visitor,
-    post_visitor_attachment,
     post_visitor_message,
     set_contact,
+    store_visitor_attachment,
     submit_offline,
     touch_visitor_last_seen,
 )
@@ -308,7 +308,9 @@ async def visitor_session(
     IP gets 429 BEFORE any parse or DB lookup — also for a correct token, until the window
     has passed (R-PREAUTH: guessing must neither go on nor cost DB work).
     """
-    await limiter.check(AUTH_FAIL_SCOPE, ip_hash, limit=AUTH_FAIL_LIMIT)
+    await limiter.check(
+        AUTH_FAIL_SCOPE, ip_hash, limit=AUTH_FAIL_LIMIT, window_seconds=AUTH_FAIL_WINDOW
+    )
     parsed = parse_visitor_token(request.headers.get(CHAT_TOKEN_HEADER))
     chat: TiqoraChatSession | None = None
     if parsed is not None and parsed[0] == session_id and _SID_RE.fullmatch(session_id):
@@ -329,7 +331,8 @@ def _fallback_config(chat: TiqoraChatSession) -> CachedConfig:
     """Default values for READS of a session whose config row is gone (R-DISABLED-SESSIONS)."""
     return CachedConfig(
         config=TiqoraChatConfig(id=int(chat.config_id), valid=False),
-        values=ChatConfigValues.model_construct(topics=[]),
+        # A config we no longer know hides agent names (the safe default).
+        values=ChatConfigValues.model_construct(topics=[], show_agent_names=False),
     )
 
 
@@ -400,8 +403,15 @@ async def _check_upload_budgets(redis_client: Any, config_id: int, ip_hash: str)
 async def _spend_upload_budgets(
     redis_client: Any, config_id: int, ip_hash: str, nbytes: int
 ) -> None:
-    """Add an accepted file to both daily counters (fixed 24 h window from the first byte)."""
+    """Add an accepted file to both daily counters, atomically against the caps.
+
+    INCRBY both keys in one MULTI; when either new total is above its cap, both increments
+    are taken back and the caller gets ``ChatBackendUnavailable`` (503) BEFORE its commit, so
+    the file is not stored. A total landing exactly on the cap is the last accepted file
+    (the pre-read check refuses from ``>= cap`` on). Fixed 24 h window from the first byte.
+    """
     keys = _budget_keys(config_id, ip_hash)
+    caps = (UPLOAD_BYTES_PER_CONFIG_DAY, UPLOAD_BYTES_PER_IP_DAY)
     try:
         async with redis_client.pipeline(transaction=True) as pipe:
             for key in keys:
@@ -411,8 +421,17 @@ async def _spend_upload_budgets(
         for key, ttl in zip(keys, results[1::2], strict=True):
             if ttl is None or int(ttl) < 0:
                 await redis_client.expire(key, _DAY)
+        over = any(int(total) > cap for total, cap in zip(results[0::2], caps, strict=True))
+        if over:
+            async with redis_client.pipeline(transaction=True) as pipe:
+                for key in keys:
+                    pipe.incrby(key, -nbytes)
+                await pipe.execute()
     except Exception as exc:  # noqa: BLE001 - fail closed like the rate limiter
         raise ChatBackendUnavailable(str(exc)) from exc
+    if over:
+        logger.warning("webchat_upload_budget_exhausted", config_id=config_id)
+        raise ChatBackendUnavailable("upload budget exhausted")
 
 
 # -- serializers -------------------------------------------------------------------------------
@@ -865,7 +884,6 @@ async def post_chat_attachment(
         )
         ip_hash = request_ip_hash(request, settings)
         await _check_upload_budgets(redis_client, int(cached.config.id), ip_hash)
-        seq_before = int(chat.last_seq)
         try:
             async with request.form(max_files=1, max_fields=3) as form:
                 upload = form.get("file")
@@ -882,7 +900,7 @@ async def post_chat_attachment(
                 client_id = _form_text(form.get("client_id"))
         except StarletteHTTPException as exc:  # malformed multipart, too many parts
             raise ChatError("upload_rejected", 422, errors={"file": "type"}) from exc
-        message = await post_visitor_attachment(
+        message, created = await store_visitor_attachment(
             db,
             SysConfig(db),
             chat=chat,
@@ -893,7 +911,7 @@ async def post_chat_attachment(
             client_id=client_id,
             now=utc_now(),
         )
-        if int(message.seq) > seq_before:
+        if created:
             # R-UPLOAD-BUDGET-IP: only a file the service stored counts (not a rejected
             # type, a closed chat or an idempotent client_id retry). Charged before the
             # commit, so a Redis failure rolls the upload back (fail closed).

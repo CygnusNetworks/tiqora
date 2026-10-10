@@ -86,3 +86,28 @@ async def test_public_backstop_300_per_minute() -> None:
     r.fail = True
     with pytest.raises(ChatBackendUnavailable):
         await check_public_backstop(lim, "c" * 32)
+
+
+@pytest.mark.asyncio
+async def test_check_refuses_without_counting_and_heals_missing_ttl() -> None:
+    fake = FakeRedis()
+    limiter = ChatRateLimiter(fake)
+    await limiter.check("auth_fail", "h", limit=2, window_seconds=600)  # empty: passes
+    key = "tiqora:chat:rl:auth_fail:h"
+    await fake.set(key, "2")  # full and, after a crash, without TTL
+    assert await fake.ttl(key) == -1
+    with pytest.raises(RateLimited) as exc:
+        await limiter.check("auth_fail", "h", limit=2, window_seconds=600)
+    assert exc.value.retry_after == 600
+    assert await fake.ttl(key) == 600
+    assert await fake.get(key) == "2"  # check never counts
+    fake.advance(601)
+    await limiter.check("auth_fail", "h", limit=2, window_seconds=600)
+
+
+@pytest.mark.asyncio
+async def test_check_fails_closed() -> None:
+    fake = FakeRedis()
+    fake.fail = True
+    with pytest.raises(ChatBackendUnavailable):
+        await ChatRateLimiter(fake).check("auth_fail", "h", limit=2, window_seconds=600)

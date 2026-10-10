@@ -113,6 +113,7 @@ __all__ = [
     "post_visitor_attachment",
     "post_visitor_message",
     "set_contact",
+    "store_visitor_attachment",
     "submit_offline",
     "touch_visitor_last_seen",
     "visitor_from_address",
@@ -668,7 +669,37 @@ async def post_visitor_attachment(
     client_id: str | None,
     now: datetime,
 ) -> TiqoraChatMessage:
-    """One upload = one visitor line: the file as article attachment (stored like every
+    """``store_visitor_attachment`` without the ``created`` flag."""
+    message, _created = await store_visitor_attachment(
+        db,
+        sysconfig,
+        chat=chat,
+        values=values,
+        filename=filename,
+        content=content,
+        caption=caption,
+        client_id=client_id,
+        now=now,
+    )
+    return message
+
+
+async def store_visitor_attachment(
+    db: AsyncSession,
+    sysconfig: SysConfig,
+    *,
+    chat: TiqoraChatSession,
+    values: ChatConfigValues,
+    filename: str,
+    content: bytes,
+    caption: str | None,
+    client_id: str | None,
+    now: datetime,
+) -> tuple[TiqoraChatMessage, bool]:
+    """One upload = one visitor line; returns ``(message, created)`` — ``created`` is False
+    for an idempotent ``client_id`` retry that returned the stored line.
+
+    One upload = one visitor line: the file as article attachment (stored like every
     Tiqora attachment, ``article_data_mime_attachment``) + a message listing it.
 
     The type is sniffed from the bytes, the name made safe with the canonical extension
@@ -687,7 +718,7 @@ async def post_visitor_attachment(
     if cid is not None:
         existing = await find_by_client_id(db, locked.id, cid)
         if existing is not None:
-            return existing
+            return existing, False
     if locked.status not in LIVE_STATUSES:
         raise ChatError("session_closed", 409)
     await touch_visitor_last_seen(db, locked, now)
@@ -709,7 +740,7 @@ async def post_visitor_attachment(
     if created:
         queue_wakeup(db, locked.id)
         queue_agent_event(db, _agent_event(locked, "chat_message", queue_id))
-    return message
+    return message, created
 
 
 async def submit_offline(

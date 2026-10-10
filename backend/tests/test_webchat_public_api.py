@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -700,6 +701,82 @@ async def test_upload_ip_daily_cap_503(env: Env) -> None:
         assert res.headers["Retry-After"] == "30"
 
 
+def _stored_uploads(env: Env, session_ids: list[str]) -> tuple[int, int]:
+    """(transcript lines with attachments, article attachment rows) of these sessions."""
+    lines = 0
+    ticket_ids: set[int] = set()
+    for sid in session_ids:
+        rows = env.sql(
+            "SELECT attachments, ticket_id FROM tiqora_chat_message WHERE session_id = :s", s=sid
+        )
+        lines += sum(1 for r in rows if r[0])
+        ticket_ids |= {int(r[1]) for r in rows}
+    files = 0
+    for tid in ticket_ids:
+        files += env.sql(
+            "SELECT COUNT(*) FROM article_data_mime_attachment WHERE article_id IN"
+            " (SELECT id FROM article WHERE ticket_id = :t)",
+            t=tid,
+        )[0][0]
+    return lines, int(files)
+
+
+@pytest.mark.asyncio
+@parametrize_db
+@pytest.mark.parametrize("which", ["ip", "config"])
+async def test_upload_budget_overshoot_is_refused_and_rolled_back(env: Env, which: str) -> None:
+    async with _client(env) as client:
+        created = await _start(client)
+        sid, h = created["session_id"], _h(created)
+        url = f"{API}/sessions/{sid}/attachments"
+        png = ("bild.png", PNG_BYTES, "image/png")
+        assert (await client.post(url, files={"file": png}, headers=h)).status_code == 201
+        (ip_key,) = await env.redis.keys("tiqora:chat:rl:upload_bytes_ip:*")
+        cfg_key = f"tiqora:chat:rl:upload_bytes:cfg{CONFIG}"
+        # Below the cap, so the cheap pre-read check passes; the charge would overshoot.
+        if which == "ip":
+            await env.redis.set(ip_key, str(UPLOAD_BYTES_PER_IP_DAY - 1), ex=3600)
+        else:
+            await env.redis.set(cfg_key, str(UPLOAD_BYTES_PER_CONFIG_DAY - 1), ex=3600)
+        before = (await env.redis.get(cfg_key), await env.redis.get(ip_key))
+        res = await client.post(url, files={"file": png}, headers=h)
+        assert res.status_code == 503 and res.json() == {"detail": "chat_unavailable"}
+        assert (await env.redis.get(cfg_key), await env.redis.get(ip_key)) == before
+        msgs = (await client.get(f"{API}/sessions/{sid}/messages", headers=h)).json()
+        assert [m["seq"] for m in msgs] == [1, 2]
+    assert _stored_uploads(env, [sid]) == (1, 1)
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_concurrent_uploads_never_exceed_ip_cap(env: Env) -> None:
+    fits = 3
+    async with _client(env) as client:
+        a = await _start(client)
+        b = await _start(client, visitor_id="visitor_wc48_" + "c" * 10, client_id="c-c")
+        start = UPLOAD_BYTES_PER_IP_DAY - fits * len(PNG_BYTES)
+
+        async def upload(created: dict[str, Any], i: int) -> int:
+            res = await client.post(
+                f"{API}/sessions/{created['session_id']}/attachments",
+                files={"file": (f"bild{i}.png", PNG_BYTES, "image/png")},
+                headers=_h(created),
+            )
+            return res.status_code
+
+        # The IP counter key (a hash_ip digest) appears with the first accepted upload.
+        first = await upload(a, 0)
+        assert first == 201
+        (ip_key,) = await env.redis.keys("tiqora:chat:rl:upload_bytes_ip:*")
+        await env.redis.set(ip_key, str(start), ex=3600)
+        codes = await asyncio.gather(*(upload(a if i % 2 else b, i) for i in range(1, 9)))
+        assert sorted(codes) == [201] * fits + [503] * (8 - fits)
+        total = int(await env.redis.get(ip_key) or 0)
+        assert total == start + fits * len(PNG_BYTES) <= UPLOAD_BYTES_PER_IP_DAY
+    lines, files = _stored_uploads(env, [a["session_id"], b["session_id"]])
+    assert (lines, files) == (1 + fits, 1 + fits)
+
+
 @pytest.mark.asyncio
 @parametrize_db
 @pytest.mark.parametrize("state", ["channel_off", "config_invalid", "config_deleted"])
@@ -713,6 +790,9 @@ async def test_disabled_sessions_keep_reads_and_close(env: Env, state: str) -> N
             headers=h,
         )
         assert up.status_code == 201
+        env.sql(
+            "UPDATE tiqora_chat_session SET assigned_user_id = :u WHERE id = :s", u=AGENT, s=sid
+        )
         if state == "channel_off":
             env.switch_channel("0")
         elif state == "config_invalid":
@@ -740,6 +820,9 @@ async def test_disabled_sessions_keep_reads_and_close(env: Env, state: str) -> N
         assert state_out.status_code == 200
         expected_label = None if state == "config_deleted" else "Support"
         assert state_out.json()["topic_label"] == expected_label
+        # A config we no longer know hides agent names.
+        expected_name = None if state == "config_deleted" else "Chat"
+        assert state_out.json()["agent_name"] == expected_name
         msgs = await client.get(f"{API}/sessions/{sid}/messages", headers=h)
         assert [m["seq"] for m in msgs.json()] == [1, 2]
         download = await client.get(
