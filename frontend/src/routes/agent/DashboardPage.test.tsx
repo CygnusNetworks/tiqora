@@ -737,6 +737,25 @@ describe("DashboardPage", () => {
       expect(undoButton()).toBeDisabled(); // exactly one step
     });
 
+    it("with prefers-reduced-motion the lifted widget follows the pointer without the tilt", async () => {
+      vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
+      await enterEdit();
+      mockGridRect(1200);
+      firePointer(screen.getByTestId("widget-w-list-handle"), "pointerdown", { clientX: 10, clientY: 10 });
+      firePointer(window, "pointermove", { clientX: 60, clientY: 30 });
+      expect(cellOf("w-list").style.transform).toBe("translate(50px, 20px)");
+      firePointer(window, "pointerup");
+    });
+
+    it("without it the lifted widget is slightly tilted", async () => {
+      await enterEdit();
+      mockGridRect(1200);
+      firePointer(screen.getByTestId("widget-w-list-handle"), "pointerdown", { clientX: 10, clientY: 10 });
+      firePointer(window, "pointermove", { clientX: 60, clientY: 30 });
+      expect(cellOf("w-list").style.transform).toContain("rotate(-0.6deg)");
+      firePointer(window, "pointerup");
+    });
+
     it("Escape during a drag aborts without history", async () => {
       await enterEdit();
       mockGridRect(1200);
@@ -788,6 +807,9 @@ describe("DashboardPage", () => {
       expect(order()).toHaveLength(11);
       expect(order()).not.toContain("w-list");
       expect(screen.getByRole("status")).toHaveTextContent("„Meine offenen Tickets“ entfernt");
+      // focus moves to the next widget (the copy made a moment ago)
+      expect(screen.getByTestId(`widget-${order()[6]}`)).toHaveFocus();
+      expect(order()[6]).not.toBe("w-list-inbox");
       fireEvent.click(within(cellOf("w-esc")).getByRole("button", { name: "Einstellungen" }));
       expect(screen.getByRole("dialog", { name: /Einstellungen/ })).toBeVisible();
       expect(save).not.toHaveBeenCalled();
