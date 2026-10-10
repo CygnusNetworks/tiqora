@@ -10,6 +10,7 @@ from datetime import datetime
 
 import pytest
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 
 from tiqora.db.tiqora.base import TiqoraBase
@@ -24,7 +25,7 @@ _CLEANUP = (
 )
 
 
-def _engine(url: str):
+def _engine(url: str) -> Engine:
     engine = create_engine(url)
     TiqoraBase.metadata.create_all(engine)
     _URLS.add(url)
@@ -92,10 +93,15 @@ def test_tables_columns_and_indexes(url_fixture: str, request: pytest.FixtureReq
         "ix_tiqora_report_owner",
         "ix_tiqora_report_visibility",
     }
-    uniques = {u["name"] for u in insp.get_unique_constraints("tiqora_saved_search")} | {
-        i["name"] for i in insp.get_indexes("tiqora_saved_search") if i.get("unique")
+    uniques = {
+        u["name"]: tuple(u["column_names"])
+        for u in insp.get_unique_constraints("tiqora_saved_search")
+    } | {
+        i["name"]: tuple(i["column_names"])
+        for i in insp.get_indexes("tiqora_saved_search")
+        if i.get("unique")
     }
-    assert "uq_tiqora_saved_search_source" in uniques
+    assert uniques["uq_tiqora_saved_search_source"] == ("owner_user_id", "source", "source_name")
     engine.dispose()
 
 
