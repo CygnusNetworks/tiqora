@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Widget-Einstellungen</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#7ea4ff;text-decoration:none}a:hover{color:#a9c2ff}
+</style>
+</helmet>
+<div style="min-height: 1060px; background: #0e1015; color: #e7eaf2; font-family: Inter, 'Segoe UI', system-ui, sans-serif; display: flex; flex-wrap: wrap">
+
+  <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 28px 32px; display: flex; flex-direction: column; gap: 14px; opacity: 0.55">
+    <h1 style="margin: 0; font-size: 22px; font-weight: 650">Mein Start bearbeiten</h1>
+    <div style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px">
+      <div style="grid-column: span 3; height: 120px; border-radius: 14px; background: #151821; border: 1px solid #242a38"></div>
+      <div style="grid-column: span 3; height: 120px; border-radius: 14px; background: #151821; border: 1px solid #242a38"></div>
+      <div style="grid-column: span 3; height: 120px; border-radius: 14px; background: #151821; border: 1px solid #242a38"></div>
+      <div style="grid-column: span 3; height: 120px; border-radius: 14px; background: #151821; border: 1px solid #242a38"></div>
+      <div style="grid-column: span 8; height: 380px; border-radius: 14px; background: #151821; border: 2px solid #5b8cff"></div>
+      <div style="grid-column: span 4; height: 380px; border-radius: 14px; background: #151821; border: 1px solid #242a38"></div>
+    </div>
+  </main>
+
+  <aside role="dialog" aria-labelledby="settings-title" style="flex: 1 1 460px; max-width: 520px; box-sizing: border-box; background: #151821; border-left: 1px solid #242a38; box-shadow: -24px 0 48px rgba(0,0,0,0.35); display: flex; flex-direction: column">
+    <div style="padding: 20px 24px; border-bottom: 1px solid #242a38; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px">
+      <div>
+        <div style="font-size: 12px; color: #8891a3">Ticketliste</div>
+        <h2 id="settings-title" style="margin: 2px 0 0; font-size: 18px; font-weight: 650">Einstellungen</h2>
+      </div>
+      <button aria-label="Schließen" style="font: inherit; width: 32px; height: 32px; border-radius: 8px; border: 1px solid #242a38; background: transparent; color: #e7eaf2; cursor: pointer">×</button>
+    </div>
+
+    <form style="flex: 1; padding: 20px 24px; display: flex; flex-direction: column; gap: 18px; overflow: auto">
+      <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 500">Titel
+        <input value="Meine offenen Tickets" style="font: inherit; font-size: 14px; font-weight: 400; padding: 9px 12px; border-radius: 8px; border: 1px solid #2f3646; background: #0e1015; color: #e7eaf2">
+      </label>
+
+      <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+        <legend style="font-size: 13px; font-weight: 500; margin-bottom: 8px">Welche Tickets?</legend>
+        <label style="display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 10px; border: 1px solid #5b8cff; background: rgba(91,140,255,0.10); font-size: 13px">
+          <input type="radio" name="src" checked style="margin-top: 2px">
+          <span><span style="display: block; font-weight: 600">Gespeicherte Suche</span><span style="display: block; color: #8891a3; margin-top: 2px">„Meine offenen“ – ändert sich die Suche, ändert sich das Widget mit.</span></span>
+        </label>
+        <label style="display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 10px; border: 1px solid #242a38; font-size: 13px">
+          <input type="radio" name="src" style="margin-top: 2px">
+          <span><span style="display: block; font-weight: 600">Eigener Filter</span><span style="display: block; color: #8891a3; margin-top: 2px">Nur für dieses Widget: Queue, Status, Besitzer …</span></span>
+        </label>
+      </fieldset>
+
+      <fieldset style="border: 0; margin: 0; padding: 0">
+        <legend style="font-size: 13px; font-weight: 500; margin-bottom: 8px">Spalten</legend>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <sc-for list="{{cols}}" as="c" hint-placeholder-count="6">
+            <label style="display: flex; gap: 6px; align-items: center; font-size: 13px; padding: 7px 10px; border-radius: 999px; border: 1px solid {{c.border}}; background: {{c.bg}}">
+              <input type="checkbox" checked="{{c.on}}">{{c.label}}
+            </label>
+          </sc-for>
+        </div>
+      </fieldset>
+
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px">
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 500">Sortierung
+          <select style="font: inherit; font-size: 14px; font-weight: 400; padding: 9px 10px; border-radius: 8px; border: 1px solid #2f3646; background: #0e1015; color: #e7eaf2"><option>Fälligkeit, früheste zuerst</option><option>Zuletzt geändert</option><option>Priorität</option></select>
+        </label>
+        <label style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 500">Anzahl Zeilen
+          <input type="number" value="8" min="1" max="50" style="font: inherit; font-size: 14px; font-weight: 400; padding: 9px 12px; border-radius: 8px; border: 1px solid #2f3646; background: #0e1015; color: #e7eaf2">
+        </label>
+      </div>
+
+      <fieldset style="border: 0; margin: 0; padding: 0">
+        <legend style="font-size: 13px; font-weight: 500; margin-bottom: 8px">Darstellung</legend>
+        <div role="radiogroup" style="display: inline-flex; border: 1px solid #2f3646; border-radius: 9px; overflow: hidden">
+          <label style="font-size: 13px; padding: 8px 14px; background: transparent; color: #8891a3"><input type="radio" name="dens" style="position: absolute; opacity: 0">Kompakt</label>
+          <label style="font-size: 13px; padding: 8px 14px; background: #5b8cff; color: #0e1015; font-weight: 600"><input type="radio" name="dens" checked style="position: absolute; opacity: 0">Bequem</label>
+        </div>
+      </fieldset>
+
+      <section aria-label="Vorschau" style="border: 1px solid #242a38; border-radius: 12px; padding: 12px 14px; background: #0e1015">
+        <div style="font-size: 12px; color: #8891a3; margin-bottom: 8px">Vorschau</div>
+        <sc-for list="{{preview}}" as="r" hint-placeholder-count="3">
+          <div style="display: flex; gap: 10px; font-size: 13px; padding: 7px 0; border-top: 1px solid #1b1f2b">
+            <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.title}}</span>
+            <span style="color: #8891a3">{{r.customer}}</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: {{r.color}}">{{r.due}}</span>
+          </div>
+        </sc-for>
+      </section>
+    </form>
+
+    <div style="padding: 16px 24px; border-top: 1px solid #242a38; display: flex; justify-content: flex-end; gap: 8px">
+      <button style="font: inherit; font-size: 13px; padding: 9px 14px; border-radius: 8px; border: 1px solid #2f3646; background: transparent; color: #e7eaf2; cursor: pointer">Abbrechen</button>
+      <button style="font: inherit; font-size: 13px; font-weight: 600; padding: 9px 16px; border-radius: 8px; border: 0; background: #5b8cff; color: #0e1015; cursor: pointer">Übernehmen</button>
+    </div>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1060}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var cols = [['Ticketnummer', true], ['Titel', true], ['Kunde', true], ['Status', true], ['Fällig', true], ['Queue', false], ['Besitzer', false], ['Priorität', false]].map(function (c) {
+      return { label: c[0], on: c[1], border: c[1] ? '#5b8cff' : '#2f3646', bg: c[1] ? 'rgba(91,140,255,0.10)' : 'transparent' };
+    });
+    var preview = [
+      { title: 'VPN-Zugang nach Passwortwechsel gesperrt', customer: 'Beispiel GmbH', due: 'in 25 min', color: '#ef6b65' },
+      { title: 'Rechnung Oktober doppelt erhalten', customer: 'Muster AG', due: 'in 1 h 40', color: '#f5a83c' },
+      { title: 'Drucker im 2. OG druckt nur leere Seiten', customer: 'Stadtwerke Beispielstadt', due: 'heute 16:00', color: '#8891a3' }
+    ];
+    return { cols: cols, preview: preview };
+  }
+}
+</script>
+</body>
+</html>
