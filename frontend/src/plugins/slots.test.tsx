@@ -16,7 +16,7 @@ import type { FrontendPlugin } from "@/lib/pluginsApi";
 import { DASHBOARD_WIDGETS } from "./dashboardWidgets";
 import { setPluginImporterForTests } from "./loader";
 import { PluginProvider } from "./PluginProvider";
-import { PluginNavItems, PluginTicketPanels, PluginWidgetsSection } from "./slots";
+import { PluginNavItems, PluginTicketPanels } from "./slots";
 
 const { frontend } = vi.hoisted(() => ({ frontend: vi.fn() }));
 vi.mock("@/lib/pluginsApi", () => ({ pluginsApi: { frontend } }));
@@ -40,7 +40,6 @@ const HELLO: FrontendPlugin = helloPlugin({
 });
 
 const HelloPanel = ({ ticketId }: { ticketId: number }) => <p>Ticket {ticketId}</p>;
-const HelloWidget = ({ settings }: { settings: { city: string } }) => <p>Stadt {settings.city}</p>;
 
 function Providers({ children }: { children: ReactNode }) {
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
@@ -153,22 +152,5 @@ describe("PluginTicketPanels", () => {
     render(<Providers><PluginTicketPanels ticketId={7} /></Providers>);
     expect(await screen.findByText("Ticket 7")).toBeInTheDocument();
     expect(await screen.findByText("Erweiterung „Kaputt“ konnte nicht geladen werden.")).toBeInTheDocument();
-  });
-});
-
-describe("PluginWidgetsSection", () => {
-  it("is absent without plugin widgets", async () => {
-    frontend.mockResolvedValue([]);
-    render(<Providers><PluginWidgetsSection /></Providers>);
-    await waitFor(() => expect(frontend).toHaveBeenCalled());
-    expect(screen.queryByTestId("plugin-widgets")).toBeNull();
-  });
-
-  it("lists plugin widgets with their default settings and column span", async () => {
-    setPluginImporterForTests(() => Promise.resolve({ default: { components: { HelloWidget } } }));
-    render(<Providers><PluginWidgetsSection /></Providers>);
-    expect(await screen.findByRole("heading", { name: "Erweiterungen" })).toBeInTheDocument();
-    expect(await screen.findByText("Stadt Bonn")).toBeInTheDocument();
-    expect(screen.getByTestId("plugin-widget-org.example.hello.weather")).toHaveClass("md:col-span-4");
   });
 });

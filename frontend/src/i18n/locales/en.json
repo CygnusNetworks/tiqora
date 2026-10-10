@@ -5425,8 +5425,7 @@
     "slotError": "Extension “{{name}}” could not be loaded.",
     "slotErrorDetails": "Details",
     "safeModeBrowser": "Extensions are switched off in this browser window.",
-    "pageNotFound": "This page of the extension does not exist.",
-    "widgetsTitle": "Extensions"
+    "pageNotFound": "This page of the extension does not exist."
   },
   "dashboards": {
     "state": {
@@ -5557,6 +5556,25 @@
         "description": "Important addresses at a glance",
         "empty": "No links yet. You can add some in the settings."
       }
+    },
+    "tabs": {
+      "label": "Dashboards",
+      "new": "New dashboard",
+      "locked": "Mandatory",
+      "owner": "by {{name}}"
+    },
+    "view": {
+      "customize": "Customize",
+      "share": "Share",
+      "loading": "Loading dashboard",
+      "loadFailed": "The dashboard could not be loaded.",
+      "listFailed": "The dashboards could not be loaded.",
+      "tooSlow": "This is taking too long.",
+      "widgetCrashed": "This widget could not be shown.",
+      "templateBanner": "You are viewing the template “{{name}}”. Changes apply to everyone who gets it through their role.",
+      "lockedHint": "This dashboard is mandatory for your role and cannot be customized.",
+      "empty": "There is nothing on this dashboard yet.",
+      "emptyEdit": "There is nothing on this dashboard yet. Use “Customize” to add widgets."
     }
   }
 }

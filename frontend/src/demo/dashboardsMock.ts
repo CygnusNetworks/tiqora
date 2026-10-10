@@ -296,6 +296,8 @@ const notFound = () => new DemoHttpError(404, { detail: "Nicht gefunden." });
 export interface DemoDashboardsOptions {
   /** Extra personal tabs, e.g. `["Alt"]` for the e2e fixture. */
   extraTabs?: string[];
+  /** Further complete dashboards (tab fields + widgets) after the personal ones. */
+  extraDashboards?: Partial<Dashboard>[];
 }
 
 let widgetCounter = 0;
@@ -330,6 +332,9 @@ export function createDemoDashboards(options: DemoDashboardsOptions = {}) {
 
   add("Mein Start", demoDefaultWidgets());
   for (const name of options.extraTabs ?? []) add(name, []);
+  for (const over of options.extraDashboards ?? []) {
+    dashboards.push(demoDashboard({ ...over, id: nextId++, sort: dashboards.length }));
+  }
   templates = [
     demoTemplate({ id: nextTemplateId++, name: "Support-Team", role_ids: [2], widget_count: 11, sort: 0 }),
   ];
@@ -427,8 +432,35 @@ export function createDemoDashboards(options: DemoDashboardsOptions = {}) {
 
 export type DemoDashboards = ReturnType<typeof createDemoDashboards>;
 
+/**
+ * A dashboard a colleague shared with the demo agent (mockup tab "Team Support"): gallery widgets
+ * that are not on the default, plus the demo plugin's widget (`org.example.demo`, `demo/mockData.ts`),
+ * which reaches the grid through the widget registry like any plugin widget.
+ */
+export function demoTeamDashboard(): Partial<Dashboard> {
+  return {
+    name: "Team Support",
+    kind: "shared",
+    is_owner: false,
+    can_edit: false,
+    can_share: false,
+    owner_name: "Maya Rivera",
+    group_ids: [3],
+    widgets: [
+      widget("demo-t-unowned", "core.counter", [0, 0, 3, 2], { source: preset("unowned_new") }),
+      widget("demo-t-escalated", "core.counter", [3, 0, 3, 2], { source: preset("escalated"), tone: "danger" }),
+      widget("demo-t-plugin", "org.example.demo.hello", [6, 0, 6, 2], {}),
+      widget("demo-t-team", "core.team-presence", [0, 2, 4, 3], { limit: 8 }),
+      widget("demo-t-agenda", "core.calendar-agenda", [4, 2, 4, 3], { days: 1, limit: 6 }),
+      widget("demo-t-notes", "core.notes", [8, 2, 4, 3], {
+        markdown: "**Rufbereitschaft** diese Woche: Jonas Kowalski.\n\nWartungsfenster Mailserver heute ab 18 Uhr.",
+      }),
+    ],
+  };
+}
+
 /** The store of the public demo build (one per page load). */
-export const demoDashboards: DemoDashboards = createDemoDashboards();
+export const demoDashboards: DemoDashboards = createDemoDashboards({ extraDashboards: [demoTeamDashboard()] });
 
 // ---------------------------------------------------------------- HTTP routing
 

@@ -5425,8 +5425,7 @@
     "slotError": "Erweiterung „{{name}}“ konnte nicht geladen werden.",
     "slotErrorDetails": "Details",
     "safeModeBrowser": "Erweiterungen sind in diesem Browserfenster ausgeschaltet.",
-    "pageNotFound": "Diese Seite der Erweiterung gibt es nicht.",
-    "widgetsTitle": "Erweiterungen"
+    "pageNotFound": "Diese Seite der Erweiterung gibt es nicht."
   },
   "dashboards": {
     "state": {
@@ -5557,6 +5556,25 @@
         "description": "Wichtige Adressen auf einen Blick",
         "empty": "Noch keine Links. In den Einstellungen kannst du welche eintragen."
       }
+    },
+    "tabs": {
+      "label": "Dashboards",
+      "new": "Neues Dashboard",
+      "locked": "Verbindlich",
+      "owner": "von {{name}}"
+    },
+    "view": {
+      "customize": "Anpassen",
+      "share": "Teilen",
+      "loading": "Dashboard wird geladen",
+      "loadFailed": "Das Dashboard konnte nicht geladen werden.",
+      "listFailed": "Die Dashboards konnten nicht geladen werden.",
+      "tooSlow": "Das dauert zu lange.",
+      "widgetCrashed": "Dieses Widget konnte nicht angezeigt werden.",
+      "templateBanner": "Du siehst die Vorlage „{{name}}“. Änderungen gelten für alle, die sie über ihre Rolle bekommen.",
+      "lockedHint": "Dieses Dashboard ist für deine Rolle verbindlich und lässt sich nicht anpassen.",
+      "empty": "Auf diesem Dashboard ist noch nichts.",
+      "emptyEdit": "Auf diesem Dashboard ist noch nichts. Mit „Anpassen“ fügst du Widgets hinzu."
     }
   }
 }

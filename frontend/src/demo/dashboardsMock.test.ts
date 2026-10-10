@@ -4,6 +4,7 @@ import {
   demoDashboard,
   demoDefaultWidgets,
   demoTab,
+  demoTeamDashboard,
   demoTemplate,
   demoWidgetData,
   resolve,
@@ -153,5 +154,18 @@ describe("demo widget data", () => {
     for (const key of ["core.recent-views", "core.queue-overview", "core.notes", "core.links", "plugin.x"]) {
       expect(demoWidgetData(key, {})).toBeUndefined();
     }
+  });
+});
+
+describe("public demo store", () => {
+  it("lists 'Mein Start' and the shared 'Team Support' with the demo plugin's widget", () => {
+    const list = resolve("GET", "/api/v1/dashboards")?.body as { id: number; name: string; kind: string; owner_name: string | null }[];
+    expect(list.map((t) => t.name)).toEqual(["Mein Start", "Team Support"]);
+    expect(list[1]).toMatchObject({ kind: "shared", owner_name: "Maya Rivera" });
+    const team = resolve("GET", `/api/v1/dashboards/${list[1].id}`)?.body as { widgets: { type_key: string }[] };
+    expect(team.widgets.map((w) => w.type_key)).toContain("org.example.demo.hello");
+    expect(demoTeamDashboard().widgets).toHaveLength(6);
+    // the e2e fixture store is unchanged by it
+    expect(createDemoDashboards({ extraTabs: ["Alt"] }).list().map((t) => t.name)).toEqual(["Mein Start", "Alt"]);
   });
 });

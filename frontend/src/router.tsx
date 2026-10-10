@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-router";
 import { SetPasswordPage } from "@/routes/SetPasswordPage";
 import { LoginPage } from "@/routes/LoginPage";
-import { DashboardPage } from "@/routes/agent/DashboardPage";
+import { DashboardPage, type DashboardSearch } from "@/routes/agent/DashboardPage";
 import { ReportsPage, type ReportsSearch } from "@/routes/agent/ReportsPage";
 import { ReportViewPage } from "@/routes/agent/ReportViewPage";
 import { validateReportViewSearch } from "@/routes/agent/reportViewSearch";
@@ -201,6 +201,11 @@ const agentLayoutRoute = createRoute({
 const agentIndexRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/",
+  // `?d=<dashboard id>`; the router JSON-parses search values, so "7" arrives as a number.
+  validateSearch: (s: Record<string, unknown>): DashboardSearch => {
+    const raw = typeof s.d === "string" && /^\d+$/.test(s.d) ? Number(s.d) : s.d;
+    return typeof raw === "number" && Number.isSafeInteger(raw) && raw > 0 ? { d: raw } : {};
+  },
   component: DashboardPage,
 });
 

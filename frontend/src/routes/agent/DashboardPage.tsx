@@ -1,565 +1,226 @@
-import { PluginWidgetsSection } from "@/plugins/slots";
-import { useEffect, useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
-import { toBcp47 } from "@/i18n";
-import { api } from "@/lib/api";
-import type { TicketListItem } from "@/lib/api";
 import { useAuth } from "@/auth/AuthContext";
-import { flattenQueues } from "@/components/agent/QueueTree";
-import { QueueShortcutCard } from "@/components/agent/dashboard/QueueShortcutCard";
-import { DashboardTicketRow } from "@/components/agent/dashboard/DashboardTicketRow";
-import { Spinner } from "@/components/ui/Spinner";
-import { formatDateTime } from "@/lib/format";
-import { displayTimeZone } from "@/lib/timeZone";
+import { toBcp47 } from "@/i18n";
+import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { getLastViews } from "@/lib/lastViews";
 import {
-  formatDurationSince,
-  greetingKey,
-  nearestEscalation,
-  selectQueueShortcuts,
-} from "@/dashboard/legacy";
+  dashboardKeys,
+  dashboardsApi,
+  type Dashboard,
+  type DashboardTab,
+  type DashboardWidgetRow,
+} from "@/lib/dashboardsApi";
+import { displayTimeZone } from "@/lib/timeZone";
+import { DashboardGrid } from "@/dashboard/DashboardGrid";
+import { WidgetSkeleton } from "@/dashboard/chrome/WidgetSkeleton";
+import { useDashboardData } from "@/dashboard/data";
+import { greetingKey } from "@/dashboard/legacy";
+import type { EditWidget } from "@/dashboard/model";
+import { DashboardTabs } from "@/dashboard/tabs/DashboardTabs";
+import { useGridBreakpoint } from "@/dashboard/useGridBreakpoint";
+import { useSelectedDashboard } from "@/dashboard/useSelectedDashboard";
+import { registerCoreWidgets } from "@/dashboard/widgets";
 
-/** Which set of tickets the single dashboard list currently shows. "all"
- * renders the grouped view; everything else is a flat filtered list. */
-export type DashboardFilter = "all" | "mine-open" | "mine-new" | "takeover" | "escalated";
-
-const DASHBOARD_FILTER_KEY = "tiqora-dashboard-filter";
-
-function readStoredFilter(): DashboardFilter {
-  if (typeof window === "undefined") return "all";
-  try {
-    const v = window.localStorage.getItem(DASHBOARD_FILTER_KEY);
-    return v === "mine-open" || v === "mine-new" || v === "takeover" || v === "escalated"
-      ? v
-      : "all";
-  } catch {
-    return "all";
-  }
+/** Search params of the home page: `?d=<dashboard id>` opens that dashboard. */
+export interface DashboardSearch {
+  d?: number;
 }
 
-/** Pill filter chip: label + mono count, accent-filled when active. */
-function FilterChip({
-  label,
-  count,
-  active,
-  onClick,
-  testId,
-}: {
-  label: string;
-  count: number;
-  active: boolean;
-  onClick: () => void;
-  testId: string;
-}) {
-  return (
-    <button
-      type="button"
-      data-testid={testId}
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
-        active
-          ? "border-accent bg-accent text-accent-ink"
-          : "border-hairline bg-surface text-ink/80 hover:bg-surface-subtle",
-      )}
-    >
-      <span>{label}</span>
-      <span
-        className={cn(
-          "font-mono text-[12px] tabular-nums",
-          active ? "text-accent-ink/80" : "text-muted",
-        )}
-      >
-        {count}
-      </span>
-    </button>
-  );
+// Once per page load, before the first read of the widget registry (idempotent).
+registerCoreWidgets();
+
+function toEditWidget(row: DashboardWidgetRow): EditWidget {
+  return {
+    id: row.id,
+    type_key: row.type_key,
+    type_version: row.type_version,
+    title_override: row.title_override ?? null,
+    settings: row.settings ?? {},
+    layout: { lg: row.layout.lg, ...(row.layout.md ? { md: row.layout.md } : {}) },
+  };
 }
 
-/** Permanent red banner shown whenever there is at least one escalated
- * ticket; hidden entirely at zero. Its "Anzeigen" action switches the list
- * below to the escalated view without hiding the strip itself. */
-function EscalationStrip({
-  count,
-  oldestEpoch,
-  active,
-  onShow,
-}: {
-  count: number;
-  oldestEpoch: number | null;
-  active: boolean;
-  onShow: () => void;
-}) {
+function tabOf(d: Dashboard): DashboardTab {
+  const { widgets: _widgets, ...tab } = d;
+  return tab;
+}
+
+const notThere = (err: unknown) => err instanceof ApiError && (err.status === 404 || err.status === 403);
+
+const BUTTON =
+  "rounded-lg px-3.5 py-2 text-[13px] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-default";
+
+function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }) {
   const { t } = useTranslation();
-  if (count === 0) return null;
   return (
-    <div
-      data-testid="dashboard-escalation-strip"
-      className={cn(
-        "flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger/30 bg-danger/10 px-4 py-2.5 text-sm text-danger",
-        active && "ring-1 ring-danger",
-      )}
-    >
-      <span className="font-medium">
-        {t("dashboard.escalationStrip", {
-          count,
-          duration: oldestEpoch != null ? formatDurationSince(oldestEpoch) : "—",
-        })}
-      </span>
+    <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+      <span>{message}</span>
       <button
         type="button"
-        onClick={onShow}
-        data-testid="dashboard-escalation-strip-show"
-        className="shrink-0 font-medium hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-danger"
+        onClick={onRetry}
+        className={cn(BUTTON, "border border-hairline bg-surface py-1.5 text-xs font-medium text-ink hover:bg-surface-subtle")}
       >
-        {t("dashboard.escalationShow")}
+        {t("dashboards.state.retry")}
       </button>
     </div>
   );
 }
 
-/** Slim group header used by the grouped ("Alle") ticket list. */
-function GroupHeader({
-  slug,
-  label,
-  count,
-  action,
-}: {
-  slug: string;
-  label: string;
-  count: number;
-  action?: ReactNode;
-}) {
-  return (
-    <div
-      data-testid={`dashboard-group-${slug}`}
-      className="flex items-center justify-between gap-2 bg-surface-subtle px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted"
-    >
-      <span>{label}</span>
-      <span className="flex items-center gap-2">
-        {action}
-        <span className="font-mono text-[11px] normal-case tracking-normal tabular-nums">
-          {count}
-        </span>
-      </span>
-    </div>
-  );
-}
-
-function EmptyRow({ label }: { label: string }) {
-  return <p className="px-4 py-6 text-sm text-muted">{label}</p>;
-}
-
-/** localStorage-backed "recently viewed tickets" strip for the dashboard. */
-function RecentlyViewedSection() {
-  const { t } = useTranslation();
-  const [entries, setEntries] = useState(() => getLastViews());
-  useEffect(() => {
-    // Refresh when the dashboard remounts (e.g. after leaving zoom).
-    setEntries(getLastViews());
-  }, []);
-  if (entries.length === 0) return null;
-  return (
-    <section data-testid="dashboard-last-views" aria-label={t("dashboard.lastViews")}>
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
-        {t("dashboard.lastViews")}
-      </h2>
-      <ul className="flex flex-wrap gap-2">
-        {entries.slice(0, 8).map((e) => (
-          <li key={e.id}>
-            <Link
-              to="/agent/tickets/$ticketId"
-              params={{ ticketId: String(e.id) }}
-              className="inline-flex max-w-xs items-center gap-1.5 rounded-full border border-hairline bg-surface px-3 py-1.5 text-[12.5px] text-ink/90 transition-colors hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-              data-testid={`last-view-${e.id}`}
-            >
-              <span className="font-mono text-[11px] text-muted">{e.tn || `#${e.id}`}</span>
-              <span className="truncate">{e.title || t("dashboard.lastViewsUntitled")}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-/** A group's or a single filter's row list: loading / empty / rows. */
-function DashboardTicketList({
-  items,
-  loading,
-  emptyLabel,
-  trailing,
-  escalated,
-}: {
-  items: TicketListItem[];
-  loading: boolean;
-  emptyLabel: string;
-  trailing: (ticket: TicketListItem) => ReactNode;
-  escalated?: boolean;
-}) {
-  if (loading) return <Spinner />;
-  if (items.length === 0) return <EmptyRow label={emptyLabel} />;
-  return (
-    <ul className="divide-y divide-hairline">
-      {items.map((ticket) => (
-        <DashboardTicketRow
-          key={ticket.id}
-          ticket={ticket}
-          trailing={trailing(ticket)}
-          escalated={escalated}
-        />
-      ))}
-    </ul>
-  );
-}
-
+/**
+ * The agent home page: greeting, the tab row of the agent's dashboards and the widget grid of the
+ * selected one. First visit (no own dashboard yet, R-DASH-FIRST-VISIT) creates "Mein Start".
+ * "Anpassen" (edit mode), "Teilen" and "+" are placeholders here; later tasks wire them.
+ */
 export function DashboardPage() {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
+  const qc = useQueryClient();
+  const { d } = useSearch({ strict: false });
   const locale = toBcp47(i18n.language);
-  const nowSeconds = Date.now() / 1000;
 
-  const [filter, setFilter] = useState<DashboardFilter>(readStoredFilter);
+  const listQ = useQuery({
+    queryKey: dashboardKeys.list(),
+    queryFn: ({ signal }) => dashboardsApi.list(signal),
+  });
+  const tabs = listQ.data;
+  const { selectedId, select, reject } = useSelectedDashboard(tabs, { d });
+
+  // First visit: nobody owns a dashboard yet (the list may hold locked role templates).
+  const ensured = useRef(false);
+  const [ensureFailed, setEnsureFailed] = useState(false);
+  const [ensureAttempt, setEnsureAttempt] = useState(0);
   useEffect(() => {
-    try {
-      window.localStorage.setItem(DASHBOARD_FILTER_KEY, filter);
-    } catch {
-      // best-effort persistence only
-    }
-  }, [filter]);
-  const selectChip = (next: Exclude<DashboardFilter, "all" | "escalated">) =>
-    setFilter((prev) => (prev === next ? "all" : next));
+    if (!tabs || ensured.current || tabs.some((tab) => tab.is_owner)) return;
+    ensured.current = true;
+    dashboardsApi
+      .ensureStart()
+      .then((start) => {
+        qc.setQueryData(dashboardKeys.one(start.id), start);
+        qc.setQueryData<DashboardTab[]>(dashboardKeys.list(), (prev = []) =>
+          prev.some((tab) => tab.id === start.id) ? prev : [tabOf(start), ...prev],
+        );
+        const dIsTab = d != null && d !== start.id && tabs.some((tab) => tab.id === d);
+        if (!dIsTab) select(start.id);
+        void qc.invalidateQueries({ queryKey: dashboardKeys.list(), exact: true });
+      })
+      .catch(() => setEnsureFailed(true));
+  }, [tabs, qc, d, select, ensureAttempt]);
 
-  const queuesQ = useQuery({
-    queryKey: ["queues"],
-    queryFn: () => api.listQueues(),
+  const dashQ = useQuery({
+    queryKey: dashboardKeys.one(selectedId ?? 0),
+    queryFn: ({ signal }) => dashboardsApi.get(selectedId!, signal),
+    enabled: selectedId != null,
+    retry: false,
   });
+  const isTab = selectedId != null && (tabs ?? []).some((tab) => tab.id === selectedId);
+  // An admin's `?d=` that is not a tab and does not exist: fall back to the tabs.
+  useEffect(() => {
+    if (selectedId != null && !isTab && dashQ.isError && notThere(dashQ.error)) reject(selectedId);
+  }, [selectedId, isTab, dashQ.isError, dashQ.error, reject]);
 
-  const summaryQ = useQuery({
-    queryKey: ["tickets", "dashboard-summary"],
-    queryFn: () => api.dashboardSummary(),
-  });
+  const dashboard = dashQ.data && dashQ.data.id === selectedId ? dashQ.data : undefined;
+  const widgets = useMemo(() => (dashboard ? dashboard.widgets.map(toEditWidget) : []), [dashboard]);
+  const { byWidget, refetch } = useDashboardData(dashboard?.id ?? 0, widgets, { enabled: dashboard !== undefined });
 
-  const lockedQ = useQuery({
-    queryKey: ["tickets", "my-locked", user?.id],
-    queryFn: () =>
-      api.listTickets({
-        owner_id: user?.id,
-        state_type: "open",
-        limit: 50,
-        sort: "age",
-        order: "desc",
-      }),
-    enabled: Boolean(user?.id),
-  });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const breakpoint = useGridBreakpoint(containerRef);
 
-  // My new tickets, for both the "Meine neuen" group and its chip filter.
-  const myNewQ = useQuery({
-    queryKey: ["tickets", "my-new", user?.id],
-    queryFn: () =>
-      api.listTickets({
-        owner_id: user?.id,
-        state_type: "new",
-        sort: "age",
-        order: "asc",
-        limit: 50,
-      }),
-    enabled: Boolean(user?.id),
-  });
+  const greeting = t(`dashboard.greeting.${greetingKey()}`, { name: user?.first_name || user?.login || "" });
+  const today = new Intl.DateTimeFormat(locale, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: displayTimeZone(),
+  }).format(new Date());
 
-  // Unclaimed new tickets = still owned by root (owner_id=1), oldest first.
-  const unownedQ = useQuery({
-    queryKey: ["tickets", "unowned-new"],
-    queryFn: () =>
-      api.listTickets({
-        state_type: "new",
-        owner_id: 1,
-        sort: "age",
-        order: "asc",
-        limit: 50,
-      }),
-  });
-
-  // A page of viewable open tickets; already-breached escalations are picked
-  // out client-side (list_tickets has no sort=escalation).
-  const openForEscQ = useQuery({
-    queryKey: ["tickets", "open-page"],
-    queryFn: () => api.listTickets({ state_type: "open", sort: "age", order: "asc", limit: 50 }),
-  });
-
-  // My pending tickets, for the reminders-due widget.
-  const pendingQ = useQuery({
-    queryKey: ["tickets", "my-pending", user?.id],
-    queryFn: () =>
-      api.listTickets({
-        owner_id: user?.id,
-        state_type: "pending",
-        sort: "age",
-        order: "asc",
-        limit: 20,
-      }),
-    enabled: Boolean(user?.id),
-  });
-
-  const flat = flattenQueues(queuesQ.data ?? []);
-  const topQueues = selectQueueShortcuts(flat);
-
-  // Same "breached" definition the backend uses for `escalated`: any
-  // escalation epoch already in the past. Oldest breach first.
-  const escalatedTickets = (openForEscQ.data?.items ?? [])
-    .map((ticket) => ({ ticket, epoch: nearestEscalation(ticket) }))
-    .filter(
-      (x): x is { ticket: TicketListItem; epoch: number } =>
-        x.epoch != null && x.epoch <= nowSeconds,
-    )
-    .sort((a, b) => a.epoch - b.epoch);
-  const escalationEpochById = new Map(escalatedTickets.map((x) => [x.ticket.id, x.epoch]));
-
-  // Reminders due: overdue or due within the next 24h.
-  const remindersDue = (pendingQ.data?.items ?? [])
-    .filter((ticket) => ticket.until_time > 0 && ticket.until_time <= nowSeconds + 86400)
-    .sort((a, b) => a.until_time - b.until_time)
-    .slice(0, 6);
-
-  const summary = summaryQ.data;
-  // "Alle" is the union of the three real chip filters; escalated tickets
-  // aren't counted here since they're not a chip of their own (they may
-  // overlap with any of the three sets and get their own strip/group).
-  const totalCount = (summary?.my_open ?? 0) + (summary?.my_new ?? 0) + (summary?.unowned_new ?? 0);
-  const escalatedCount = summary?.escalated ?? 0;
-  const oldestEscalatedEpoch = escalatedTickets[0]?.epoch ?? null;
-  const unownedTop = (unownedQ.data?.items ?? []).slice(0, 8);
+  let content;
+  if (listQ.isError) {
+    content = <ErrorBox message={t("dashboards.view.listFailed")} onRetry={() => void listQ.refetch()} />;
+  } else if (ensureFailed) {
+    content = (
+      <ErrorBox
+        message={t("dashboards.view.loadFailed")}
+        onRetry={() => {
+          ensured.current = false;
+          setEnsureFailed(false);
+          setEnsureAttempt((n) => n + 1);
+        }}
+      />
+    );
+  } else if (dashQ.isError && !(notThere(dashQ.error) && !isTab)) {
+    content = <ErrorBox message={t("dashboards.view.loadFailed")} onRetry={() => void dashQ.refetch()} />;
+  } else if (!dashboard) {
+    content = (
+      <div aria-label={t("dashboards.view.loading")} className="rounded-[14px] border border-hairline bg-surface px-[18px] py-4">
+        <WidgetSkeleton rows={6} />
+      </div>
+    );
+  } else if (widgets.length === 0) {
+    content = (
+      <p className="rounded-[14px] border border-dashed border-hairline bg-surface px-4 py-8 text-center text-sm text-muted">
+        {dashboard.can_edit ? t("dashboards.view.emptyEdit") : t("dashboards.view.empty")}
+      </p>
+    );
+  } else {
+    content = (
+      <DashboardGrid
+        widgets={widgets}
+        mode="view"
+        breakpoint={breakpoint}
+        dashboardId={dashboard.id}
+        canEdit={dashboard.can_edit}
+        data={byWidget}
+        onRetry={refetch}
+      />
+    );
+  }
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-6" data-testid="dashboard">
-      <div>
-        <h1 className="font-display text-2xl font-semibold text-ink">
-          {t(`dashboard.greeting.${greetingKey()}`, { name: user?.first_name || user?.login || "" })}
-        </h1>
-        <p className="mt-1 text-sm text-muted">
-          {new Intl.DateTimeFormat(locale, {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-            timeZone: displayTimeZone(),
-          }).format(new Date())}
+    <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-8" data-testid="dashboard">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-2.5">
+          <div>
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">{greeting}</h1>
+            <p className="mt-1 text-sm text-muted">{today}</p>
+          </div>
+          {tabs && tabs.length > 0 && <DashboardTabs tabs={tabs} selectedId={selectedId} onSelect={select} />}
+        </div>
+        {dashboard && (dashboard.can_share || dashboard.can_edit) && (
+          <div className="flex gap-2">
+            {dashboard.can_share && (
+              <button
+                type="button"
+                disabled
+                className={cn(BUTTON, "border border-hairline bg-surface text-ink hover:bg-surface-subtle")}
+              >
+                {t("dashboards.view.share")}
+              </button>
+            )}
+            {dashboard.can_edit && (
+              <button type="button" disabled className={cn(BUTTON, "bg-accent px-4 font-semibold text-accent-ink hover:bg-accent/90")}>
+                {t("dashboards.view.customize")}
+              </button>
+            )}
+          </div>
+        )}
+      </header>
+
+      {dashboard?.kind === "template" && dashboard.can_edit && (
+        <p className="rounded-[14px] border border-accent/30 bg-accent/10 px-4 py-2.5 text-sm text-ink">
+          {t("dashboards.view.templateBanner", { name: dashboard.name })}
         </p>
+      )}
+      {dashboard?.kind === "template" && dashboard.locked && !dashboard.can_edit && (
+        <p className="text-sm text-muted">{t("dashboards.view.lockedHint")}</p>
+      )}
+
+      <div ref={containerRef} className="min-w-0">
+        {content}
       </div>
-
-      <div className="space-y-3">
-        <div className="flex flex-wrap gap-2" role="group" aria-label={t("dashboard.filterHeading")}>
-          <FilterChip
-            label={t("dashboard.chipAll")}
-            count={totalCount}
-            active={filter === "all"}
-            onClick={() => setFilter("all")}
-            testId="dashboard-chip-all"
-          />
-          <FilterChip
-            label={t("dashboard.kpiMyOpen")}
-            count={summary?.my_open ?? 0}
-            active={filter === "mine-open"}
-            onClick={() => selectChip("mine-open")}
-            testId="dashboard-chip-mine-open"
-          />
-          <FilterChip
-            label={t("dashboard.kpiMyNew")}
-            count={summary?.my_new ?? 0}
-            active={filter === "mine-new"}
-            onClick={() => selectChip("mine-new")}
-            testId="dashboard-chip-mine-new"
-          />
-          <FilterChip
-            label={t("dashboard.kpiUnownedNew")}
-            count={summary?.unowned_new ?? 0}
-            active={filter === "takeover"}
-            onClick={() => selectChip("takeover")}
-            testId="dashboard-chip-takeover"
-          />
-        </div>
-
-        <EscalationStrip
-          count={escalatedCount}
-          oldestEpoch={oldestEscalatedEpoch}
-          active={filter === "escalated"}
-          onShow={() => setFilter("escalated")}
-        />
-      </div>
-
-      <div
-        className="overflow-hidden rounded-lg border border-hairline bg-surface"
-        data-testid="dashboard-ticket-list"
-      >
-        {filter === "all" && (
-          <div className="divide-y divide-hairline">
-            {escalatedCount > 0 && (
-              <div>
-                <GroupHeader slug="escalated" label={t("dashboard.kpiEscalated")} count={escalatedCount} />
-                <DashboardTicketList
-                  items={escalatedTickets.map((x) => x.ticket)}
-                  loading={openForEscQ.isLoading}
-                  emptyLabel={t("dashboard.escalatedEmpty")}
-                  trailing={(ticket) => (
-                    <span className="text-danger">
-                      {formatDurationSince(escalationEpochById.get(ticket.id) ?? 0)}
-                    </span>
-                  )}
-                  escalated
-                />
-              </div>
-            )}
-            <div>
-              <GroupHeader slug="mine-new" label={t("dashboard.kpiMyNew")} count={summary?.my_new ?? 0} />
-              <DashboardTicketList
-                items={myNewQ.data?.items ?? []}
-                loading={myNewQ.isLoading}
-                emptyLabel={t("dashboard.myNewEmpty")}
-                trailing={(ticket) => formatDateTime(ticket.create_time, locale)}
-              />
-            </div>
-            <div>
-              <GroupHeader slug="mine-open" label={t("dashboard.kpiMyOpen")} count={summary?.my_open ?? 0} />
-              <DashboardTicketList
-                items={lockedQ.data?.items ?? []}
-                loading={lockedQ.isLoading}
-                emptyLabel={t("dashboard.noMyTickets")}
-                trailing={(ticket) => formatDateTime(ticket.change_time, locale)}
-              />
-            </div>
-            <div>
-              <GroupHeader
-                slug="takeover"
-                label={t("dashboard.groupTakeover")}
-                count={summary?.unowned_new ?? 0}
-                action={
-                  (summary?.unowned_new ?? 0) > unownedTop.length ? (
-                    <Link
-                      to="/agent/queues"
-                      search={{ state_type: "new" }}
-                      className="text-[11px] font-medium normal-case tracking-normal text-accent hover:underline"
-                    >
-                      {t("dashboard.viewAll")}
-                    </Link>
-                  ) : undefined
-                }
-              />
-              <DashboardTicketList
-                items={unownedTop}
-                loading={unownedQ.isLoading}
-                emptyLabel={t("dashboard.toPickUpEmpty")}
-                trailing={(ticket) => formatDateTime(ticket.create_time, locale)}
-              />
-            </div>
-          </div>
-        )}
-        {filter === "mine-open" && (
-          <DashboardTicketList
-            items={lockedQ.data?.items ?? []}
-            loading={lockedQ.isLoading}
-            emptyLabel={t("dashboard.noMyTickets")}
-            trailing={(ticket) => formatDateTime(ticket.change_time, locale)}
-          />
-        )}
-        {filter === "mine-new" && (
-          <DashboardTicketList
-            items={myNewQ.data?.items ?? []}
-            loading={myNewQ.isLoading}
-            emptyLabel={t("dashboard.myNewEmpty")}
-            trailing={(ticket) => formatDateTime(ticket.create_time, locale)}
-          />
-        )}
-        {filter === "takeover" && (
-          <DashboardTicketList
-            items={unownedQ.data?.items ?? []}
-            loading={unownedQ.isLoading}
-            emptyLabel={t("dashboard.toPickUpEmpty")}
-            trailing={(ticket) => formatDateTime(ticket.create_time, locale)}
-          />
-        )}
-        {filter === "escalated" && (
-          <DashboardTicketList
-            items={escalatedTickets.map((x) => x.ticket)}
-            loading={openForEscQ.isLoading}
-            emptyLabel={t("dashboard.escalatedEmpty")}
-            trailing={(ticket) => (
-              <span className="text-danger">
-                {formatDurationSince(escalationEpochById.get(ticket.id) ?? 0)}
-              </span>
-            )}
-            escalated
-          />
-        )}
-      </div>
-
-      {/* Recently viewed tickets (localStorage), newest first. */}
-      <RecentlyViewedSection />
-
-      {/* Reminders due — orthogonal to the chips/groups above (due-date driven,
-          not ownership/state driven), kept as its own section. */}
-      <section id="widget-reminders" className="scroll-mt-4" aria-label={t("dashboard.remindersDue")}>
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">
-          {t("dashboard.remindersDue")}
-        </h2>
-        <div className="overflow-hidden rounded-lg border border-hairline bg-surface">
-          {pendingQ.isLoading ? (
-            <Spinner />
-          ) : remindersDue.length === 0 ? (
-            <EmptyRow label={t("dashboard.remindersDueEmpty")} />
-          ) : (
-            <ul className="divide-y divide-hairline">
-              {remindersDue.map((ticket) => {
-                const overdue = ticket.until_time <= nowSeconds;
-                return (
-                  <DashboardTicketRow
-                    key={ticket.id}
-                    ticket={ticket}
-                    trailing={
-                      <span className={cn(overdue && "text-danger")}>
-                        {formatDateTime(new Date(ticket.until_time * 1000), locale)}
-                      </span>
-                    }
-                  />
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      </section>
-
-      {/* Queue shortcuts */}
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">
-            {t("dashboard.queueShortcuts")}
-          </h2>
-          <Link to="/agent/queues" className="text-xs text-accent hover:underline">
-            {t("dashboard.viewAllQueues")}
-          </Link>
-        </div>
-        {queuesQ.isLoading ? (
-          <Spinner />
-        ) : topQueues.length === 0 ? (
-          <p
-            className="rounded-lg border border-dashed border-hairline bg-surface px-4 py-8 text-center text-sm text-muted"
-            data-testid="dashboard-queues-empty"
-          >
-            {t("dashboard.queueShortcutsEmpty")}
-          </p>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {topQueues.map((q) => (
-              <QueueShortcutCard key={q.id} queue={q} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      <PluginWidgetsSection />
     </div>
   );
 }
