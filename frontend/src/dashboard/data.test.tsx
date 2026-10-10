@@ -380,6 +380,14 @@ describe("editDataPlan (R-DASH-PREVIEW-BUDGET)", () => {
     expect([...plan.previewIds]).toEqual([]);
   });
 
+  it("a batch still in flight is reused (no preview); the plan follows once it lands", () => {
+    const loading = editDataPlan(saved, { ...states, a: { status: "loading" } }, [saved[0]], hasData);
+    expect(loading.byWidget.a).toEqual({ status: "loading" });
+    expect(loading.previewIds.size).toBe(0);
+    const landed = editDataPlan(saved, states, [saved[0]], hasData);
+    expect(landed.byWidget.a).toBe(states.a);
+  });
+
   it("a duplicate with the same settings reuses the original's result", () => {
     const plan = editDataPlan(saved, states, [saved[0], { ...saved[0], id: "a-copy" }], hasData);
     expect(plan.byWidget["a-copy"]).toBe(states.a);

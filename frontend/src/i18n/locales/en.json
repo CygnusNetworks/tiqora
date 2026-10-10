@@ -5592,7 +5592,7 @@
       "discardConfirm": "Discard changes",
       "continue": "Keep editing",
       "conflictTitle": "This dashboard has been changed in the meantime",
-      "conflictMessage": "Someone saved it while you were editing. “Reload” shows the new version; your changes stay as a draft and can be restored the next time you choose “Customize”.",
+      "conflictMessage": "It was saved while you were editing it – in another window or by someone else. “Reload” shows the new version. Your changes stay as a draft and can be restored the next time you choose “Customize”. If you save them, they replace the new version completely; they are not merged.",
       "conflictReload": "Reload",
       "keyboardHint": "Keyboard: focus a widget, arrow keys move it, Shift + arrow keys resize it, Enter opens its settings.",
       "phoneHint": "On narrow screens widgets are stacked; you can change their order here.",
@@ -5609,7 +5609,13 @@
       "limitReached": "At most {{count}} widgets are possible.",
       "tooTall": "The layout is too tall.",
       "saveFailed": "The dashboard could not be saved.",
-      "close": "Close"
+      "close": "Close",
+      "restoreOverwrite": "Restore your changes from {{time}} – saving replaces the newer version (as of {{newer}})",
+      "conflictMessageTemplate": "This template was saved while you were editing it – in another window or by another person. “Reload” shows the new version. Your changes stay as a draft and can be restored the next time you choose “Customize”. If you save them, they replace the new version completely – including other people's changes, for everyone who gets the template through their role.",
+      "overwriteTitle": "Replace the newer version?",
+      "overwriteMessage": "You started your changes before a newer version of this dashboard was saved (as of {{newer}}). “Replace and save” replaces that version completely with yours; what was changed there is lost.",
+      "overwriteMessageTemplate": "You started your changes before a newer version of this template was saved (as of {{newer}}). “Replace and save” replaces it completely with yours: other people's changes are lost, for everyone who gets the template through their role.",
+      "overwriteConfirm": "Replace and save"
     }
   }
 }

@@ -29,6 +29,8 @@ export interface EditToolbarProps {
   draftSavedAt: number | null;
   /** `savedAt` of a draft from an earlier session that can be restored. */
   restoreAt: number | null;
+  /** That draft was kept after a save conflict: restoring and saving replaces the newer version seen at this time. */
+  restoreReplacesAt?: number | null;
   onRestore: () => void;
   onDropDraft: () => void;
   canUndo: boolean;
@@ -51,6 +53,7 @@ export const EditToolbar = forwardRef<HTMLDivElement, EditToolbarProps>(function
     name,
     draftSavedAt,
     restoreAt,
+    restoreReplacesAt = null,
     onRestore,
     onDropDraft,
     canUndo,
@@ -82,7 +85,9 @@ export const EditToolbar = forwardRef<HTMLDivElement, EditToolbarProps>(function
       {restoreAt !== null && (
         <span className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={onRestore} className={cn(BTN, OUTLINE, "px-3 py-1.5 text-xs font-medium")}>
-            {t("dashboards.edit.restoreDraft", { time: time(restoreAt) })}
+            {restoreReplacesAt !== null
+              ? t("dashboards.edit.restoreOverwrite", { time: time(restoreAt), newer: time(restoreReplacesAt) })
+              : t("dashboards.edit.restoreDraft", { time: time(restoreAt) })}
           </button>
           <button
             type="button"

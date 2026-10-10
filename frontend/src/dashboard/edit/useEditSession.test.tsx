@@ -66,7 +66,7 @@ test("the draft is written 500 ms after the last change", async () => {
   expect(localStorage.getItem(KEY)).toBeNull();
   await act(() => vi.advanceTimersByTimeAsync(2));
   const stored = JSON.parse(localStorage.getItem(KEY)!);
-  expect(stored).toMatchObject({ baseVersion: 3, name: "Mein Start", savedAt: Date.parse("2026-10-10T08:42:00.500Z") });
+  expect(stored).toMatchObject({ baseVersion: 3, name: "Mein Start", savedAt: Date.parse("2026-10-10T08:42:00.000Z") /* the time of the change */ });
   expect(stored.widgets[0].layout.lg.x).toBe(1);
   expect(result.current.draftSavedAt).toBe(stored.savedAt);
 });
@@ -176,13 +176,56 @@ test("a conflict keeps the session and the draft and reports the current version
   expect(localStorage.getItem(KEY)).not.toBeNull();
 });
 
-test("rebaseDraft writes the session as a draft of the newer version (offered after the reload)", () => {
+test("rebaseDraft keeps the session as a draft of the newer version, marked as replacing it, dated by the change", () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-10T08:42:00Z"));
   const { result } = setup();
   act(() => result.current.dispatch(moveFirst));
+  vi.setSystemTime(new Date("2026-10-10T08:50:00Z"));
   act(() => result.current.rebaseDraft(4));
   const stored = JSON.parse(localStorage.getItem(KEY)!);
   expect(stored.baseVersion).toBe(4);
+  expect(stored.savedAt).toBe(Date.parse("2026-10-10T08:42:00Z"));
+  expect(stored.overwrites).toEqual({ version: 4, at: Date.parse("2026-10-10T08:50:00Z") });
   expect(stored.widgets[0].layout.lg.x).toBe(1);
+});
+
+test("restoring a conflict draft marks the session as replacing the newer version until it is clean again", () => {
+  const widgets = DASH.widgets.map(toEditWidget);
+  widgets[0] = { ...widgets[0], layout: { lg: { x: 1, y: 0, w: 3, h: 2 } } };
+  writeDraft(5, 1, { baseVersion: 3, savedAt: 1, name: "Mein Start", widgets, overwrites: { version: 3, at: 2 } });
+  const { result } = setup();
+  expect(result.current.restoreAvailable?.overwrites).toEqual({ version: 3, at: 2 });
+  expect(result.current.pendingOverwrite).toBeNull();
+  act(() => result.current.restore());
+  expect(result.current.pendingOverwrite).toEqual({ version: 3, at: 2 });
+  act(() => result.current.dispatch({ type: "undo" }));
+  expect(result.current.pendingOverwrite).toBeNull();
+});
+
+test("an offered draft stays offered and stored while the user edits without deciding", async () => {
+  vi.useFakeTimers();
+  writeDraft(5, 1, { baseVersion: 3, savedAt: 1, name: "Entwurf", widgets: [] });
+  const before = localStorage.getItem(KEY);
+  const { result } = setup();
+  act(() => result.current.dispatch(moveFirst));
+  await act(() => vi.advanceTimersByTimeAsync(600));
+  expect(result.current.restoreAvailable?.name).toBe("Entwurf");
+  expect(localStorage.getItem(KEY)).toBe(before);
+  expect(result.current.draftSavedAt).toBeNull();
+});
+
+test("leaving within 500 ms of a change still keeps it as a draft; after discard nothing is kept", () => {
+  const first = setup();
+  act(() => first.result.current.dispatch(moveFirst));
+  first.unmount();
+  expect(JSON.parse(localStorage.getItem(KEY)!).widgets[0].layout.lg.x).toBe(1);
+  localStorage.clear();
+  const second = setup();
+  act(() => second.result.current.dispatch(moveFirst));
+  act(() => second.result.current.discard());
+  second.unmount();
+  expect(localStorage.getItem(KEY)).toBeNull();
 });
 
 test("a 422 with a widget path marks that widget and keeps the message", async () => {

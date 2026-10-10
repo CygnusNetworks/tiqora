@@ -26,10 +26,17 @@ test("write then read the same base version round-trips", () => {
   expect(readDraft(5, 1, 3)).toEqual(draft);
 });
 
-test("a draft of another base version is removed and not offered", () => {
+test("a draft of an older base version is removed and not offered", () => {
   writeDraft(5, 1, draft);
   expect(readDraft(5, 1, 4)).toBeNull();
   expect(localStorage.getItem(KEY)).toBeNull();
+});
+
+test("a draft of a newer base version (reload still running) is kept but not offered", () => {
+  writeDraft(5, 1, { ...draft, baseVersion: 4, overwrites: { version: 4, at: 1 } });
+  expect(readDraft(5, 1, 3)).toBeNull();
+  expect(localStorage.getItem(KEY)).not.toBeNull();
+  expect(readDraft(5, 1, 4)?.overwrites).toEqual({ version: 4, at: 1 });
 });
 
 test.each([
@@ -37,6 +44,7 @@ test.each([
   ["no widgets", JSON.stringify({ baseVersion: 3, savedAt: 1, name: "x" })],
   ["widget without layout", JSON.stringify({ baseVersion: 3, savedAt: 1, name: "x", widgets: [{ id: "a", type_key: "core.notes" }] })],
   ["savedAt missing", JSON.stringify({ baseVersion: 3, name: "x", widgets: [] })],
+  ["broken overwrite marker", JSON.stringify({ baseVersion: 3, savedAt: 1, name: "x", widgets: [], overwrites: { version: "4" } })],
 ])("a malformed entry (%s) is removed", (_label, raw) => {
   localStorage.setItem(KEY, raw);
   expect(readDraft(5, 1, 3)).toBeNull();

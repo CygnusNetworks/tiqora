@@ -23,6 +23,8 @@ export interface EditState {
   lastCoalesce: { key: string; at: number } | null;
   baseVersion: number;
   dirty: boolean;
+  /** The undo history dropped its oldest step (cap): undoing all the way no longer reaches the saved state. */
+  historyTrimmed?: boolean;
 }
 
 type Bp = "lg" | "md";
@@ -62,6 +64,7 @@ function commit(s: EditState, patch: Partial<EditState>, coalesce: { key: string
   return {
     ...s,
     ...patch,
+    historyTrimmed: s.historyTrimmed || s.past.length >= HISTORY_LIMIT,
     past: [...s.past, snap(s)].slice(-HISTORY_LIMIT),
     future: [],
     lastCoalesce: coalesce,
@@ -215,12 +218,15 @@ function reduce(s: EditState, a: EditAction, sizes: SizeLookup): EditState {
     case "undo": {
       const prev = s.past[s.past.length - 1];
       if (!prev) return s;
-      return { ...restore(s, prev, s.past.slice(0, -1), [...s.future, snap(s)]), dirty: s.past.length > 1 };
+      return { ...restore(s, prev, s.past.slice(0, -1), [...s.future, snap(s)]), dirty: s.past.length > 1 || s.historyTrimmed === true };
     }
     case "redo": {
       const next = s.future[s.future.length - 1];
       if (!next) return s;
-      return restore(s, next, [...s.past, snap(s)].slice(-HISTORY_LIMIT), s.future.slice(0, -1));
+      return {
+        ...restore(s, next, [...s.past, snap(s)].slice(-HISTORY_LIMIT), s.future.slice(0, -1)),
+        historyTrimmed: s.historyTrimmed || s.past.length >= HISTORY_LIMIT,
+      };
     }
   }
 }

@@ -958,6 +958,76 @@ describe("DashboardPage", () => {
       expect(stored.widgets[0].layout.lg.x).toBe(1);
     });
 
+    async function conflictThenReload() {
+      // the other save: version 4 with one widget fewer
+      save.mockRejectedValueOnce(new DashboardConflictError("Dieses Dashboard wurde inzwischen geändert.", 4));
+      await enterEdit();
+      moveFirst();
+      dashboards.set(1, demoDashboard({ ...dashboards.get(1)!, version: 4, widgets: DEFAULT_WIDGETS.slice(0, 10) }));
+      fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+      const dialog = await screen.findByRole("alertdialog", { name: /inzwischen geändert/ });
+      expect(dialog).toHaveTextContent("Deine Änderungen bleiben als Entwurf erhalten");
+      expect(dialog).toHaveTextContent("ersetzen sie die neue Fassung dann vollständig");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Neu laden" }));
+      await waitFor(() => expect(order()).toHaveLength(10)); // the newer version is shown
+    }
+
+    it("after a conflict, restoring the kept draft says it replaces the newer version and saving asks first", async () => {
+      await conflictThenReload();
+      fireEvent.click(screen.getByRole("button", { name: "Anpassen" }));
+      const offer = await screen.findByRole("button", { name: /wiederherstellen – ersetzt beim Speichern die neuere Fassung \(Stand \d\d:\d\d\)/ });
+      expect(offer).toHaveTextContent(/^Deine Änderungen von \d\d:\d\d wiederherstellen/);
+      fireEvent.click(offer);
+      expect(order()).toHaveLength(11);
+      fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+      const confirm = screen.getByRole("alertdialog", { name: "Neuere Fassung ersetzen?" });
+      expect(confirm).toHaveTextContent("ersetzt diese Fassung vollständig durch deine");
+      fireEvent.click(within(confirm).getByRole("button", { name: "Weiter bearbeiten" }));
+      expect(save).toHaveBeenCalledTimes(1); // only the conflicting attempt
+      fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+      fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Ersetzen und speichern" }));
+      await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+      expect(save.mock.calls[1][1]).toMatchObject({ version: 4 });
+      expect(save.mock.calls[1][1].widgets).toHaveLength(11);
+      await waitFor(() => expect(screen.queryByRole("toolbar")).toBeNull());
+      expect(localStorage.getItem(KEY)).toBeNull();
+    });
+
+    it("a normal draft restores and saves without the replace question", async () => {
+      localStorage.setItem(
+        KEY,
+        JSON.stringify({ baseVersion: 3, savedAt: Date.parse("2026-10-10T08:42:00Z"), name: "Mein Start", widgets: DEFAULT_WIDGETS.slice(0, 3) }),
+      );
+      await enterEdit();
+      fireEvent.click(screen.getByRole("button", { name: "Entwurf von 10:42 wiederherstellen" }));
+      fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+      await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
+
+    it("for a role template the replace question says that other people's changes go for every role member", async () => {
+      mockDashboard({ version: 3, kind: "template", is_owner: false });
+      await conflictThenReload();
+      fireEvent.click(screen.getByRole("button", { name: "Anpassen" }));
+      fireEvent.click(await screen.findByRole("button", { name: /ersetzt beim Speichern die neuere Fassung/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+      expect(screen.getByRole("alertdialog", { name: "Neuere Fassung ersetzen?" })).toHaveTextContent(
+        "Änderungen anderer gehen verloren, und das gilt für alle, die die Vorlage über ihre Rolle bekommen",
+      );
+      expect(save).toHaveBeenCalledTimes(1);
+    });
+
+    it("opening another dashboard by link ends edit mode (it never opens in edit mode by itself)", async () => {
+      await enterEdit();
+      moveFirst();
+      await act(async () => {
+        await (currentRouter as unknown as { navigate: (o: object) => Promise<void> }).navigate({ to: "/agent", search: { d: 2 } });
+      });
+      await waitFor(() => expect(screen.queryByRole("toolbar")).toBeNull());
+      expect(await screen.findByTestId("widget-t-team")).toBeVisible();
+      expect(JSON.parse(localStorage.getItem(KEY)!).widgets[0].layout.lg.x).toBe(1); // the change is kept as a draft
+    });
+
     it("a 422 with a widget path outlines that widget and opens its settings", async () => {
       save.mockRejectedValue(
         new ApiError(422, { detail: { message: "Der Wert muss zwischen 1 und 50 liegen.", path: "widgets[6].settings.limit" } }, "/api/v1/dashboards/1"),

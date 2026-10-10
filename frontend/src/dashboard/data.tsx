@@ -385,7 +385,8 @@ const contentKey = (w: Pick<EditWidget, "type_key" | "type_version" | "settings"
  * Data of the widgets while editing. A widget with the same type, version and settings as one the
  * view loaded keeps that widget's batch result (moving, resizing, duplicating and undoing never
  * fetch); a new or changed data widget is listed in `previewIds` and fetched through
- * `usePreviewData`. Only finished results (`ok`, `forbidden`) are reused.
+ * `usePreviewData`. Finished results (`ok`, `forbidden`) are reused, and so is a batch still in
+ * flight (`loading`: the plan is recomputed when it lands). `pending` and `error` get one preview.
  */
 export function editDataPlan(
   saved: EditWidget[],
@@ -396,7 +397,9 @@ export function editDataPlan(
   const reusable = new Map<string, WidgetDataState>();
   for (const w of saved) {
     const state = savedStates[w.id];
-    if (state && (state.status === "ok" || state.status === "forbidden")) reusable.set(contentKey(w), state);
+    if (state && (state.status === "ok" || state.status === "forbidden" || state.status === "loading")) {
+      reusable.set(contentKey(w), state);
+    }
   }
   const byWidget: Record<string, WidgetDataState> = {};
   const previewIds = new Set<string>();

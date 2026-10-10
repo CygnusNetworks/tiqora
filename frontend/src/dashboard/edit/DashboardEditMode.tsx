@@ -5,15 +5,13 @@ import type { Dashboard } from "@/lib/dashboardsApi";
 import { useDashboardWidgetDefinitions } from "@/plugins/dashboardWidgets";
 import { DashboardGrid, type EditHandlers } from "../DashboardGrid";
 import { editDataPlan, type WidgetDataState } from "../data";
-import type { Breakpoint, EditWidget } from "../model";
+import { MAX_WIDGETS_PER_DASHBOARD, type Breakpoint, type EditWidget } from "../model";
+import { toBcp47 } from "@/i18n";
+import { formatTimeOfDay } from "@/lib/format";
 import { ConflictDialog } from "./ConflictDialog";
-import { clearDraft } from "./draft";
 import { EditToolbar } from "./EditToolbar";
 import { useEditSession } from "./useEditSession";
 import { WidgetSettingsDialog } from "./WidgetSettingsDialog";
-
-/** Server limit per dashboard (`MAX_WIDGETS_PER_DASHBOARD`). */
-export const MAX_WIDGETS = 40;
 
 /** A new widget id matching the server's `^[A-Za-z0-9_-]{8,36}$`. */
 function newWidgetId(): string {
@@ -48,7 +46,7 @@ export function DashboardEditMode({
   /** After a conflict: leave and load the dashboard again. */
   onReload: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const session = useEditSession(dashboard, userId);
   const { state, dispatch } = session;
   const defs = useDashboardWidgetDefinitions();
@@ -59,6 +57,8 @@ export function DashboardEditMode({
 
   const [settingsFor, setSettingsFor] = useState<{ id: string; title: string } | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [confirmOverwrite, setConfirmOverwrite] = useState(false);
+  const isTemplate = dashboard.kind === "template";
   const [saving, setSaving] = useState(false);
   const gridBoxRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -96,7 +96,7 @@ export function DashboardEditMode({
         if (bp) dispatch({ type: "resize", id, size, bp, ...(via === "keyboard" ? { coalesce: true, now: Date.now() } : {}) });
       },
       onShift: (id, dir) => dispatch({ type: "shift", id, dir }),
-      canDuplicate: state.widgets.length < MAX_WIDGETS,
+      canDuplicate: state.widgets.length < MAX_WIDGETS_PER_DASHBOARD,
       invalidWidgetId: session.invalidWidgetId,
       previewIds: plan.previewIds,
     }),
@@ -104,7 +104,7 @@ export function DashboardEditMode({
   );
 
   // Ctrl/Cmd+Z undoes, Shift+Ctrl/Cmd+Z and Ctrl/Cmd+Y redo — not inside fields or dialogs.
-  const dialogOpen = settingsFor !== null || confirmDiscard || session.conflictVersion !== null;
+  const dialogOpen = settingsFor !== null || confirmDiscard || confirmOverwrite || session.conflictVersion !== null;
   const dialogOpenRef = useRef(dialogOpen);
   dialogOpenRef.current = dialogOpen;
   useEffect(() => {
@@ -120,7 +120,13 @@ export function DashboardEditMode({
     return () => window.removeEventListener("keydown", onKey);
   }, [dispatch]);
 
-  const save = async () => {
+  const save = async (confirmed = false) => {
+    // A restored conflict draft replaces a newer version: say so before sending it.
+    if (session.pendingOverwrite && !confirmed) {
+      setConfirmOverwrite(true);
+      return;
+    }
+    setConfirmOverwrite(false);
     setSaving(true);
     const result = await session.save();
     if (result === "saved") onLeave();
@@ -134,6 +140,7 @@ export function DashboardEditMode({
         name={state.name}
         draftSavedAt={session.draftSavedAt}
         restoreAt={session.restoreAvailable?.savedAt ?? null}
+        restoreReplacesAt={session.restoreAvailable?.overwrites?.at ?? null}
         onRestore={session.restore}
         onDropDraft={session.dropDraft}
         canUndo={state.past.length > 0}
@@ -174,12 +181,26 @@ export function DashboardEditMode({
         cancelLabel={t("dashboards.edit.continue")}
         onCancel={() => setConfirmDiscard(false)}
         onConfirm={() => {
-          clearDraft(userId, dashboard.id);
+          session.discard();
           onLeave();
         }}
       />
+      <ConfirmDialog
+        open={confirmOverwrite}
+        role="alertdialog"
+        variant="danger"
+        title={t("dashboards.edit.overwriteTitle")}
+        message={t(isTemplate ? "dashboards.edit.overwriteMessageTemplate" : "dashboards.edit.overwriteMessage", {
+          newer: session.pendingOverwrite ? formatTimeOfDay(new Date(session.pendingOverwrite.at), toBcp47(i18n.language)) : "",
+        })}
+        confirmLabel={t("dashboards.edit.overwriteConfirm")}
+        cancelLabel={t("dashboards.edit.continue")}
+        onCancel={() => setConfirmOverwrite(false)}
+        onConfirm={() => void save(true)}
+      />
       <ConflictDialog
         open={session.conflictVersion !== null}
+        template={isTemplate}
         onContinue={session.dismissConflict}
         onReload={() => {
           if (session.conflictVersion !== null) session.rebaseDraft(session.conflictVersion);

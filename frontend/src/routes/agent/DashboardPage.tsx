@@ -123,6 +123,10 @@ export function DashboardPage() {
   const { byWidget, refetch } = useDashboardData(dashboard?.id ?? 0, widgets, {
     enabled: dashboard !== undefined && !isEditing,
   });
+  // Another dashboard (e.g. a link with ?d=) never opens in edit mode by itself.
+  useEffect(() => {
+    setEditing(false);
+  }, [selectedId]);
   // Back in view mode the focus returns to "Anpassen".
   const customizeRef = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef(false);

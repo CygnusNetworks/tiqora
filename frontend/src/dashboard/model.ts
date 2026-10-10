@@ -4,6 +4,8 @@ export const GAP = 16;
 export const COLS = { lg: 12, md: 8 } as const;
 /** Backend limit: y + h may not exceed this ("Das Layout ist zu hoch."). */
 export const MAX_ROWS = 1000;
+/** Backend limit of widgets per dashboard (`MAX_WIDGETS_PER_DASHBOARD`). */
+export const MAX_WIDGETS_PER_DASHBOARD = 40;
 /** Backend limit for a single widget height. */
 export const MAX_H = 24;
 

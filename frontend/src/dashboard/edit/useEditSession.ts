@@ -23,10 +23,20 @@ export interface EditSession {
   dispatch: (a: EditAction) => void;
   /** When the last draft write succeeded (null: nothing written, or storage blocked). */
   draftSavedAt: number | null;
-  /** A draft of the same base version from an earlier session (until the first change). */
+  /**
+   * A draft of the same base version from an earlier session, until the user restores or drops it
+   * (while it is undecided nothing is autosaved, so the stored draft stays intact).
+   */
   restoreAvailable: Draft | null;
   restore: () => void;
   dropDraft: () => void;
+  /**
+   * The session holds a restored conflict draft (`Draft.overwrites`): saving replaces a version
+   * that was saved after these changes were started — the page asks before saving.
+   */
+  pendingOverwrite: { version: number; at: number } | null;
+  /** "Verwerfen": remove the draft and end the session without keeping anything. */
+  discard: () => void;
   save: () => Promise<SaveResult>;
   /** Widget named by the last 422 (`widgets[i]…`) and the server's message. */
   invalidWidgetId: string | null;
@@ -36,7 +46,10 @@ export interface EditSession {
   /** Server version after a 409 (the conflict dialog is open while set). */
   conflictVersion: number | null;
   dismissConflict: () => void;
-  /** After a conflict: keep the session as a draft of `version`, so it is offered after the reload. */
+  /**
+   * After a conflict ("Neu laden"): keep the session as a draft of the newer `version`, marked as
+   * overwriting it, so it is offered (with that warning) after the reload. Ends the session.
+   */
   rebaseDraft: (version: number) => void;
 }
 
@@ -80,10 +93,37 @@ export function useEditSession(dashboard: Dashboard, userId: number): EditSessio
   const [invalid, setInvalid] = useState<{ id: string; message: string | null } | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [conflictVersion, setConflictVersion] = useState<number | null>(null);
+  const [overwrite, setOverwrite] = useState<Draft["overwrites"] | null>(null);
+
+  const offeredRef = useRef(offered);
+  offeredRef.current = offered;
+  const overwriteRef = useRef(overwrite);
+  overwriteRef.current = overwrite;
+  /** Saved, discarded or handed over to a conflict draft: nothing is flushed on unmount. */
+  const finished = useRef(false);
+  /** When the session last changed (the draft's `savedAt`). */
+  const changedAt = useRef<number | null>(null);
+  useEffect(() => {
+    if (state.dirty) changedAt.current = Date.now();
+  }, [state.dirty, state.widgets, state.name]);
+
+  const draftOf = useCallback(
+    (s: EditState, baseVersion: number, overwrites: Draft["overwrites"] | null): Draft => ({
+      baseVersion,
+      savedAt: changedAt.current ?? Date.now(),
+      name: s.name,
+      widgets: s.widgets,
+      ...(overwrites ? { overwrites } : {}),
+    }),
+    [],
+  );
 
   // Autosave: 500 ms after the last change; back at the saved state, this session's draft goes.
+  // While an earlier draft is offered and undecided, nothing is written (it would overwrite it).
   const wrote = useRef(false);
+  const undecided = offered !== null;
   useEffect(() => {
+    if (undecided) return;
     if (!state.dirty) {
       if (wrote.current) {
         wrote.current = false;
@@ -93,26 +133,41 @@ export function useEditSession(dashboard: Dashboard, userId: number): EditSessio
       return;
     }
     const timer = setTimeout(() => {
-      const savedAt = Date.now();
-      const draft: Draft = { baseVersion: state.baseVersion, savedAt, name: state.name, widgets: state.widgets };
+      const draft = draftOf(stateRef.current, stateRef.current.baseVersion, overwriteRef.current);
       if (writeDraft(userId, dashboardId, draft)) {
         wrote.current = true;
-        setDraftSavedAt(savedAt);
-        setOffered(null); // the earlier draft is overwritten now
+        setDraftSavedAt(draft.savedAt);
       }
     }, DRAFT_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [state.dirty, state.widgets, state.name, state.baseVersion, userId, dashboardId]);
+  }, [undecided, state.dirty, state.widgets, state.name, state.baseVersion, userId, dashboardId, draftOf]);
+
+  // Leaving without saving or discarding (navigation) keeps the last changes, also those of the
+  // last 500 ms.
+  useEffect(
+    () => () => {
+      const s = stateRef.current;
+      if (finished.current || offeredRef.current || !s.dirty) return;
+      writeDraft(userId, dashboardId, draftOf(s, s.baseVersion, overwriteRef.current));
+    },
+    [userId, dashboardId, draftOf],
+  );
 
   const restore = useCallback(() => {
     if (!offered) return;
     dispatch({ type: "restore", name: offered.name, widgets: offered.widgets });
+    setOverwrite(offered.overwrites ?? null);
     setOffered(null);
   }, [offered]);
 
   const dropDraft = useCallback(() => {
     clearDraft(userId, dashboardId);
     setOffered(null);
+  }, [userId, dashboardId]);
+
+  const discard = useCallback(() => {
+    finished.current = true;
+    clearDraft(userId, dashboardId);
   }, [userId, dashboardId]);
 
   const icon = dashboard.icon ?? null;
@@ -132,6 +187,7 @@ export function useEditSession(dashboard: Dashboard, userId: number): EditSessio
         version: s.baseVersion,
         widgets: s.widgets.map((w) => ({ ...w })),
       });
+      finished.current = true;
       clearDraft(userId, dashboardId);
       wrote.current = false;
       qc.setQueryData(dashboardKeys.one(dashboardId), saved);
@@ -158,20 +214,21 @@ export function useEditSession(dashboard: Dashboard, userId: number): EditSessio
   const dismissConflict = useCallback(() => setConflictVersion(null), []);
   const rebaseDraft = useCallback(
     (version: number) => {
-      const s = stateRef.current;
-      writeDraft(userId, dashboardId, { baseVersion: version, savedAt: Date.now(), name: s.name, widgets: s.widgets });
+      finished.current = true;
+      writeDraft(userId, dashboardId, draftOf(stateRef.current, version, { version, at: Date.now() }));
     },
-    [userId, dashboardId],
+    [userId, dashboardId, draftOf],
   );
 
   return {
     state,
     dispatch,
     draftSavedAt,
-    // superseded by the first change (the autosave overwrites it)
-    restoreAvailable: state.dirty ? null : offered,
+    restoreAvailable: offered,
     restore,
     dropDraft,
+    pendingOverwrite: state.dirty ? (overwrite ?? null) : null,
+    discard,
     save,
     invalidWidgetId: invalid?.id ?? null,
     invalidMessage: invalid?.message ?? null,

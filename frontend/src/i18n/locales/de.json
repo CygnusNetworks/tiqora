@@ -5592,7 +5592,7 @@
       "discardConfirm": "Änderungen verwerfen",
       "continue": "Weiter bearbeiten",
       "conflictTitle": "Dieses Dashboard wurde inzwischen geändert",
-      "conflictMessage": "Jemand hat es gespeichert, während du es bearbeitet hast. „Neu laden“ zeigt die neue Fassung; deine Änderungen bleiben als Entwurf erhalten und lassen sich beim nächsten „Anpassen“ wiederherstellen.",
+      "conflictMessage": "Es wurde gespeichert, während du es bearbeitet hast – in einem anderen Fenster oder von jemand anderem. „Neu laden“ zeigt die neue Fassung. Deine Änderungen bleiben als Entwurf erhalten und lassen sich beim nächsten „Anpassen“ wiederherstellen. Gespeichert ersetzen sie die neue Fassung dann vollständig; sie werden nicht zusammengeführt.",
       "conflictReload": "Neu laden",
       "keyboardHint": "Tastatur: Widget fokussieren, Pfeiltasten verschieben, Umschalt + Pfeiltasten ändern die Größe, Eingabe öffnet die Einstellungen.",
       "phoneHint": "Auf schmalen Bildschirmen stehen Widgets untereinander; die Reihenfolge lässt sich hier ändern.",
@@ -5609,7 +5609,13 @@
       "limitReached": "Es sind höchstens {{count}} Widgets möglich.",
       "tooTall": "Das Layout ist zu hoch.",
       "saveFailed": "Das Dashboard konnte nicht gespeichert werden.",
-      "close": "Schließen"
+      "close": "Schließen",
+      "restoreOverwrite": "Deine Änderungen von {{time}} wiederherstellen – ersetzt beim Speichern die neuere Fassung (Stand {{newer}})",
+      "conflictMessageTemplate": "Diese Vorlage wurde gespeichert, während du sie bearbeitet hast – in einem anderen Fenster oder von einer anderen Person. „Neu laden“ zeigt die neue Fassung. Deine Änderungen bleiben als Entwurf erhalten und lassen sich beim nächsten „Anpassen“ wiederherstellen. Gespeichert ersetzen sie die neue Fassung dann vollständig – auch die Änderungen anderer, für alle, die die Vorlage über ihre Rolle bekommen.",
+      "overwriteTitle": "Neuere Fassung ersetzen?",
+      "overwriteMessage": "Du hast deine Änderungen begonnen, bevor eine neuere Fassung dieses Dashboards gespeichert wurde (Stand {{newer}}). „Ersetzen und speichern“ ersetzt diese Fassung vollständig durch deine; was dort geändert wurde, geht verloren.",
+      "overwriteMessageTemplate": "Du hast deine Änderungen begonnen, bevor eine neuere Fassung dieser Vorlage gespeichert wurde (Stand {{newer}}). „Ersetzen und speichern“ ersetzt sie vollständig durch deine: Änderungen anderer gehen verloren, und das gilt für alle, die die Vorlage über ihre Rolle bekommen.",
+      "overwriteConfirm": "Ersetzen und speichern"
     }
   }
 }

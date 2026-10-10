@@ -33,7 +33,7 @@ import { useDragResize, type DragCommit } from "./edit/useDragResize";
 import { layoutForBreakpoint } from "./layout/breakpoints";
 import { keyToAction } from "./layout/keyboard";
 import { layoutItems, type SizeLookup } from "./layout/session";
-import { COLS, GAP, ROW_H, type Breakpoint, type EditWidget, type LayoutItem, type Rect } from "./model";
+import { COLS, GAP, MAX_WIDGETS_PER_DASHBOARD, ROW_H, type Breakpoint, type EditWidget, type LayoutItem, type Rect } from "./model";
 
 /** Edit-mode callbacks of the grid; every action is optional (a missing handler hides its button). */
 export interface EditHandlers {
@@ -457,7 +457,7 @@ export function DashboardGrid({
         data-testid={`widget-${w.id}-handle`}
         aria-hidden="true"
         onPointerDown={onHandlePointerDown(w.id)}
-        className="-ms-1 shrink-0 cursor-grab touch-none select-none px-1 text-sm tracking-[-2px] text-muted active:cursor-grabbing"
+        className="-my-1.5 -ms-1.5 shrink-0 cursor-grab touch-none select-none px-1.5 py-1.5 text-sm tracking-[-2px] text-muted active:cursor-grabbing"
       >
         ⋮⋮
       </span>
@@ -479,7 +479,7 @@ export function DashboardGrid({
           <button
             type="button"
             aria-label={t("dashboards.edit.duplicate")}
-            title={edit.canDuplicate === false ? t("dashboards.edit.limitReached", { count: 40 }) : t("dashboards.edit.duplicate")}
+            title={edit.canDuplicate === false ? t("dashboards.edit.limitReached", { count: MAX_WIDGETS_PER_DASHBOARD }) : t("dashboards.edit.duplicate")}
             disabled={edit.canDuplicate === false}
             onClick={() => duplicate(w.id)}
             className={ICON_BTN}
@@ -528,12 +528,15 @@ export function DashboardGrid({
           !wide && "flex flex-col gap-2",
         ),
         after: wide ? (
+          // 24 px hit area (touch) around the 12 px corner mark
           <span
             data-testid={`widget-${w.id}-resize`}
             aria-hidden="true"
             onPointerDown={onResizePointerDown(w.id)}
-            className="absolute bottom-1 end-1 z-10 h-3 w-3 cursor-nwse-resize touch-none rounded-ee border-b-2 border-e-2 border-accent"
-          />
+            className="absolute bottom-0 end-0 z-10 flex h-6 w-6 cursor-nwse-resize touch-none items-end justify-end p-1"
+          >
+            <span className="h-3 w-3 rounded-ee border-b-2 border-e-2 border-accent" />
+          </span>
         ) : (
           <PhoneControls
             widgetId={w.id}

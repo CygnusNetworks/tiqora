@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { EditWidget, Rect } from "../model";
-import { createEditReducer, editReducer, initialEditState, layoutItems, type EditAction, type EditState, type WidgetLike } from "./session";
+import { createEditReducer, editReducer, HISTORY_LIMIT, initialEditState, layoutItems, type EditAction, type EditState, type WidgetLike } from "./session";
 
 const COUNTER: WidgetLike = {
   key: "core.counter",
@@ -205,4 +205,17 @@ test("layoutItems gives the reducer's rects and per-type limits", () => {
   expect(items).toEqual([{ id: "a", rect: { x: 9, y: 0, w: 3, h: 2 }, min: [2, 2], max: [4, 3] }]);
   const unknown = layoutItems([w("b")], "md", () => undefined);
   expect(unknown[0]).toMatchObject({ min: [1, 1], max: [8, 24] });
+});
+
+test("after the history cap dropped steps, undoing all the way stays dirty (the saved state is out of reach)", () => {
+  let s = state([w1]);
+  for (let i = 0; i < HISTORY_LIMIT + 5; i++) s = editReducer(s, { type: "rename", name: `n${i}` });
+  expect(s.past).toHaveLength(HISTORY_LIMIT);
+  while (s.past.length > 0) s = editReducer(s, { type: "undo" });
+  expect(s.name).not.toBe("Start");
+  expect(s.dirty).toBe(true);
+  // without the cap, undoing back is clean
+  let t = editReducer(state([w1]), { type: "rename", name: "x" });
+  t = editReducer(t, { type: "undo" });
+  expect(t.dirty).toBe(false);
 });
