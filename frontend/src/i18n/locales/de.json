@@ -5343,5 +5343,10 @@
     "rangeInvalid": "Das Startdatum liegt nach dem Enddatum. Bitte den Zeitraum korrigieren.",
     "deniedTitle": "Kein Zugriff auf Berichte",
     "deniedBody": "Ihr Konto darf die Berichte nicht ansehen. Bitte wenden Sie sich an Ihre Administration."
+  },
+  "plugins": {
+    "slotError": "Erweiterung „{{name}}“ konnte nicht geladen werden.",
+    "slotErrorDetails": "Details",
+    "safeModeBrowser": "Erweiterungen sind in diesem Browserfenster ausgeschaltet."
   }
 }
