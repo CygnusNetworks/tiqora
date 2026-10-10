@@ -9,6 +9,7 @@ import {
   demoTicketFilterFields,
   demoZnunyPreview,
 } from "../../src/demo/savedMock";
+import type { ProcessDialogFormData, TicketProcessState } from "../../src/lib/processApi";
 import type { ReportItem, SavedReportIn, SavedReportUpdateIn } from "../../src/lib/reportsApi";
 import type {
   SavedSearch,
@@ -399,7 +400,32 @@ const activityDialogDetail = {
   submit_button_text: "Submit",
 };
 
-const ticketProcessStateNotInProcess = {
+// The shared dialog form (start dialog and activity dialog answer the same shape).
+const processDialogForm: ProcessDialogFormData = {
+  process_entity_id: "Process-1",
+  activity_dialog_entity_id: "ActivityDialog-1",
+  name: "Set Title",
+  description_short: "Set the title",
+  description_long: "Fill in the ticket title.",
+  submit_button_text: "Submit",
+  submit_advice_text: "",
+  fields: [
+    {
+      name: "Title",
+      kind: "text",
+      label: "Title",
+      required: false,
+      description_short: "Title",
+      description_long: "Ticket title",
+      default: "",
+      options: [],
+    },
+  ],
+};
+
+const ticketProcessStateNotInProcess: TicketProcessState = {
+  can_start: true,
+  process_state: null,
   process_entity_id: null,
   process_name: null,
   activity_entity_id: null,
@@ -408,7 +434,9 @@ const ticketProcessStateNotInProcess = {
   available_transitions_count: 0,
 };
 
-const ticketProcessStateActive = {
+const ticketProcessStateActive: TicketProcessState = {
+  can_start: false,
+  process_state: "Active",
   process_entity_id: "Process-1",
   process_name: "Onboarding",
   activity_entity_id: "Activity-a",
@@ -419,7 +447,9 @@ const ticketProcessStateActive = {
   available_transitions_count: 1,
 };
 
-const ticketProcessStateAfterSubmit = {
+const ticketProcessStateAfterSubmit: TicketProcessState = {
+  can_start: false,
+  process_state: "Active",
   process_entity_id: "Process-1",
   process_name: "Onboarding",
   activity_entity_id: "Activity-b",
@@ -430,7 +460,7 @@ const ticketProcessStateAfterSubmit = {
 
 // Mutated by the /start and /submit handlers below to simulate the ticket
 // moving through the process — reset per-test in mockApi().
-let ticketProcessState: typeof ticketProcessStateNotInProcess = ticketProcessStateNotInProcess;
+let ticketProcessState: TicketProcessState = ticketProcessStateNotInProcess;
 
 let authenticated = false;
 
@@ -1019,6 +1049,14 @@ export async function mockApi(page: Page) {
       });
       return;
     }
+    if (
+      (path.match(/\/api\/v1\/process\/ticket\/\d+\/dialog\/[^/]+\/form$/) ||
+        path.match(/\/api\/v1\/process\/[^/]+\/start-form$/)) &&
+      method === "GET"
+    ) {
+      await json(route, 200, processDialogForm);
+      return;
+    }
     if (path.match(/\/api\/v1\/process\/activity-dialog\/[^/]+$/) && method === "GET") {
       await json(route, 200, activityDialogDetail);
       return;
@@ -1033,6 +1071,17 @@ export async function mockApi(page: Page) {
     }
 
     await json(route, 404, { detail: `No mock for ${method} ${path}` });
+  });
+}
+
+/** German UI copy: the app reads its language from localStorage, not from the browser locale. */
+export async function useGermanUi(page: Page) {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem("tiqora-lang", "de");
+    } catch {
+      /* no storage: English copy */
+    }
   });
 }
 

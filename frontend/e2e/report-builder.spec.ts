@@ -1,16 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { mockApi, loginAsAgent } from "./fixtures/mock-api";
+import { mockApi, loginAsAgent, useGermanUi } from "./fixtures/mock-api";
 
 test.describe("report builder", () => {
   test.beforeEach(async ({ page }) => {
-    // German UI copy: the app reads its language from localStorage.
-    await page.addInitScript(() => {
-      try {
-        localStorage.setItem("tiqora-lang", "de");
-      } catch {
-        /* no storage: English copy */
-      }
-    });
+    await useGermanUi(page);
     await mockApi(page);
     await loginAsAgent(page);
   });
@@ -25,6 +18,7 @@ test.describe("report builder", () => {
     await page.getByTestId("builder-values-add").click();
     await page.getByRole("menuitem", { name: "Tickets", exact: true }).click();
     await expect(page.getByTestId("builder-preview-view")).toBeVisible();
+    await expect(page.getByTestId("builder-preview-view")).toContainText("Telefon42");
     await page.getByTestId("builder-name").fill("Tickets je Kanal");
     await page.getByTestId("builder-save").click();
     await page.getByTestId("save-report-dialog-confirm").click();

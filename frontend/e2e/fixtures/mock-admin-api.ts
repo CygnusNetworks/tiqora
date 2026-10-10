@@ -1,5 +1,6 @@
 import type { Page, Route } from "@playwright/test";
 import { mockApi, loginAsAgent } from "./mock-api";
+import type { AdminProcess, DeployStatus } from "../../src/lib/deployStatusApi";
 
 async function json(route: Route, status: number, body: unknown) {
   await route.fulfill({
@@ -122,6 +123,30 @@ export async function mockAdminApi(page: Page) {
     const url = new URL(req.url());
     const path = url.pathname;
     const method = req.method();
+
+    // Deployed-revision banner of the ProcessManagement / ACL admin pages
+    if (path.endsWith("/api/v1/admin/deploy-status") && method === "GET") {
+      const idle = { pending_changes: 0, revision: null, running_live: true };
+      const status: DeployStatus = { acl: idle, process: idle, can_deploy_from_tiqora: false, ownership_active: false };
+      await json(route, 200, status);
+      return;
+    }
+
+    // ProcessManagement overview (read-only)
+    if (path.endsWith("/api/v1/admin/processes") && method === "GET") {
+      const processes: AdminProcess[] = [
+        {
+          entity_id: "Process-1",
+          name: "Onboarding",
+          state_entity_id: "S1",
+          state_name: "Active",
+          activity_count: 2,
+          start_interfaces: ["AgentInterface"],
+        },
+      ];
+      await json(route, 200, processes);
+      return;
+    }
 
     // Users
     if (path.endsWith("/api/v1/admin/users") && method === "GET") {
