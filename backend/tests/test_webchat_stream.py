@@ -36,6 +36,7 @@ from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.domain.ticket_write_service import ArticleIn, add_article
+from tiqora.webchat import stream as stream_module
 from tiqora.webchat.availability import VISITOR_SEEN_PREFIX, mark_agent_online, set_agent_state
 from tiqora.webchat.config_cache import clear_config_cache
 from tiqora.webchat.hub import ChatHub, get_chat_hub, publish_chat_typing, publish_chat_wake
@@ -476,6 +477,90 @@ async def test_stream_marks_visitor_seen(env: Env) -> None:
             with pytest.raises((asyncio.CancelledError, StopAsyncIteration)):
                 await pending
         await gen.aclose()
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_heartbeat_counts_from_last_bytes_sent(env: Env) -> None:
+    """Fake clock: a byte-less wake right before the deadline never defers the heartbeat."""
+    created = await _start(env)
+    sid = created["session_id"]
+    hub = env.hub()
+    queue = await hub.subscribe(sid)
+    now = [0.0]
+    gen = _stream(env, hub, sid, after=1, queue=queue, clock=lambda: now[0])
+    key = f"{VISITOR_SEEN_PREFIX}{sid}"
+    pending: asyncio.Future[bytes] | None = None
+    try:
+        assert (await _next(gen)).startswith(b"event: session\n")  # bytes at t=0
+        pending = asyncio.ensure_future(anext(gen))
+        # A wake whose re-read finds nothing, just before the deadline: no bytes sent.
+        now[0] = 24.9
+        queue.put_nowait({"type": "wake"})
+        await asyncio.sleep(0.05)
+        assert not pending.done()
+        now[0] = 25.0  # 25 s after the last bytes: the heartbeat is due now, not at ~50 s
+        assert await asyncio.wait_for(pending, timeout=1) == HEARTBEAT_CHUNK
+
+        # The re-read after that heartbeat refreshed the markers (t=25); the next deadline
+        # is t=50 — again not deferred by a byte-less wake just before it.
+        await env.redis.delete(key)
+        pending = asyncio.ensure_future(anext(gen))
+        loop = asyncio.get_running_loop()
+        give_up = loop.time() + 2.0
+        while await env.redis.get(key) is None:
+            assert loop.time() < give_up, "seen marker not refreshed"
+            await asyncio.sleep(0.01)
+        now[0] = 49.9
+        queue.put_nowait({"type": "wake"})
+        await asyncio.sleep(0.05)
+        assert not pending.done()
+        now[0] = 50.0
+        assert await asyncio.wait_for(pending, timeout=1) == HEARTBEAT_CHUNK
+        # Typing is forwarded as soon as it arrives, with no heartbeat in between.
+        queue.put_nowait({"type": "typing", "who": "agent"})
+        assert await _next(gen, timeout=1) == b'event: typing\ndata: {"who": "agent"}\n\n'
+        # A wake that lands exactly on the deadline (bytes last sent at t=50) still yields
+        # the heartbeat at once instead of restarting a full 25 s wait.
+        pending = asyncio.ensure_future(anext(gen))
+        await asyncio.sleep(0.05)
+        now[0] = 75.0
+        queue.put_nowait({"type": "wake"})
+        assert await asyncio.wait_for(pending, timeout=1) == HEARTBEAT_CHUNK
+        pending = None
+    finally:
+        if pending is not None:
+            pending.cancel()
+        await gen.aclose()
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_wake_burst_reads_once(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    created = await _start(env)
+    sid = created["session_id"]
+    reads: list[int] = []
+    original = stream_module._read
+
+    async def counting_read(*args: Any, **kwargs: Any) -> Any:
+        reads.append(1)
+        return await original(*args, **kwargs)
+
+    monkeypatch.setattr(stream_module, "_read", counting_read)
+    hub = env.hub()
+    queue = await hub.subscribe(sid)
+    gen = _stream(env, hub, sid, after=1, queue=queue)
+    try:
+        assert (await _next(gen)).startswith(b"event: session\n")
+        await _add_lines(env, sid, "zwei")
+        for _ in range(5):
+            queue.put_nowait({"type": "wake"})
+        queue.put_nowait({"type": "typing", "who": "agent"})
+        assert (await _next(gen)).startswith(b"event: typing\n")
+        assert (await _next(gen)).startswith(b"id: 2\nevent: message\n")
+    finally:
+        await gen.aclose()
+    assert len(reads) == 2  # connect + ONE re-read for the whole burst
 
 
 # -- stream lifetime and releasing the hub slot ----------------------------------------------------

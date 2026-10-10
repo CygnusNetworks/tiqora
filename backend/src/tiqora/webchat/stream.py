@@ -9,7 +9,7 @@ answers ``text/event-stream`` with these events:
 - ``event: end`` ``{"reason"}`` — the session is ``ended``/``abandoned``/purged; the stream then
   closes and the client stops reconnecting (R-SSE-CAPS e: also right after the replay when
   the session was already over at connect);
-- ``: hb`` — heartbeat after ``STREAM_HEARTBEAT_SECONDS`` without a re-read.
+- ``: hb`` — heartbeat ``STREAM_HEARTBEAT_SECONDS`` after the last bytes sent (then a re-read).
 
 The loop subscribes to the hub FIRST and only then reads ``seq > cursor`` from the DB, so a
 wake published between the read and the wait is already queued. Every read opens its own
@@ -154,11 +154,16 @@ async def visitor_event_stream(
     heartbeat_seconds: float = STREAM_HEARTBEAT_SECONDS,
     queue: asyncio.Queue[dict[str, Any]] | None = None,
     ip_hash: str | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> AsyncGenerator[bytes, None]:
     """SSE chunks for one visitor session (see the module docstring).
 
     The endpoint subscribes before it answers (so a full hub is a 503, not a broken 200) and
     hands over *queue*; without one the generator subscribes itself with *ip_hash*.
+
+    ``: hb`` + re-read are due *heartbeat_seconds* after the last bytes SENT (whatever woke
+    the loop in between, so no silent gap ever exceeds one heartbeat) or after the last
+    refresh of the online markers, whichever comes first (``clock`` is injectable for tests).
     """
     if queue is None:
         queue = await hub.subscribe(session_id, ip_hash=ip_hash)
@@ -166,10 +171,11 @@ async def visitor_event_stream(
         cursor = after_seq
         sent: tuple[str | None, str | None] | None = None
         last_alive = float("-inf")
+        last_sent = clock()
         while True:
             if await request.is_disconnected():
                 return
-            now = time.monotonic()
+            now = clock()
             alive_due = now - last_alive >= heartbeat_seconds
             if alive_due:
                 last_alive = now
@@ -181,6 +187,7 @@ async def visitor_event_stream(
                 return
             for chunk in snap.chunks:
                 yield chunk
+                last_sent = clock()
             cursor = snap.cursor
             if snap.end_reason is not None:
                 yield sse_event(event="end", data={"reason": snap.end_reason})
@@ -190,25 +197,43 @@ async def visitor_event_stream(
                 yield sse_event(
                     event="session", data={"status": snap.status, "agent_name": snap.agent_name}
                 )
-            # Wait for a wake (re-read), typing (forward) or close; the timeout is bounded by
-            # the heartbeat deadline, so markers stay fresh even while typing items flow.
+                last_sent = clock()
+            # Wait for a wake (re-read), typing (forward) or close, bounded by both deadlines.
             while True:
                 if await request.is_disconnected():
                     return
-                remaining = max(0.0, last_alive + heartbeat_seconds - time.monotonic())
-                try:
-                    item = await asyncio.wait_for(queue.get(), timeout=remaining)
-                except TimeoutError:
+                now = clock()
+                if now - last_sent >= heartbeat_seconds or now - last_alive >= heartbeat_seconds:
+                    # One wake-up per deadline: heartbeat, then a re-read that refreshes the
+                    # markers and catches a wake that was published before its commit.
                     yield HEARTBEAT_CHUNK
+                    last_sent = clock()
                     break
+                timeout = min(last_sent, last_alive) + heartbeat_seconds - now
+                try:
+                    item = await asyncio.wait_for(queue.get(), timeout=timeout)
+                except TimeoutError:
+                    continue
                 kind = item.get("type")
                 if kind == CLOSE_ITEM["type"]:
                     return
                 if kind == "typing":
                     yield TYPING_CHUNK
+                    last_sent = clock()
                     continue
-                if kind == "wake":
-                    break
+                if kind != "wake":
+                    continue
+                # Collapse a burst of queued wakes into ONE re-read (typing/close still count).
+                typing = False
+                while not queue.empty():
+                    extra = queue.get_nowait().get("type")
+                    if extra == CLOSE_ITEM["type"]:
+                        return
+                    typing = typing or extra == "typing"
+                if typing:
+                    yield TYPING_CHUNK
+                    last_sent = clock()
+                break
     finally:
         hub.unsubscribe(session_id, queue)
 
