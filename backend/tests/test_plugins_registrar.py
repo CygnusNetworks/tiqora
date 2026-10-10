@@ -283,3 +283,78 @@ def test_internal_point_refused(registrar: PluginRegistrar) -> None:
 
 def _unused(_: Any) -> None:  # keep Any import honest for strict mypy settings
     return None
+
+
+def _sync_handler(ctx: Any, event: Any) -> None:
+    return None
+
+
+class _AsyncCallable:
+    async def __call__(self, ctx: Any, event: Any) -> None:
+        return None
+
+
+class _SyncCallable:
+    def __call__(self, ctx: Any, event: Any) -> None:
+        return None
+
+
+def test_sync_event_handler_rejected(registrar: PluginRegistrar) -> None:
+    with pytest.raises(RegistrationRejected, match="Abonnent „sy“ muss eine async-Funktion"):
+        registrar.on_event("sy", ["TicketCreate"], _sync_handler)
+    with pytest.raises(RegistrationRejected, match="async-Funktion"):
+        registrar.on_event("sc", ["TicketCreate"], _SyncCallable())
+
+
+def test_async_callables_accepted(registrar: PluginRegistrar) -> None:
+    import functools
+
+    registrar.on_event("ac", ["TicketCreate"], _AsyncCallable())
+    registrar.on_event("pa", ["TicketCreate"], functools.partial(on_ticket, 1))
+    assert len(registrar.staged) == 2
+
+
+def test_sync_scheduled_task_rejected(registrar: PluginRegistrar) -> None:
+    def sync_run(ctx: Any) -> None:
+        return None
+
+    with pytest.raises(RegistrationRejected, match="Aufgabe „sy“ muss eine async-Funktion"):
+        registrar.scheduled_task("sy", sync_run, every_seconds=60)  # type: ignore[arg-type]
+
+
+def test_sync_job_handler_rejected(registrar: PluginRegistrar) -> None:
+    def sync_job(ctx: Any, payload: EchoPayload) -> None:
+        return None
+
+    bad = JobHandler(
+        kind="org.example.hello.sy",
+        payload_model=EchoPayload,
+        run=sync_job,
+        title_key="t",  # type: ignore[arg-type]
+    )
+    with pytest.raises(RegistrationRejected, match="Job-Handler „org.example.hello.sy“ muss"):
+        registrar.job_handler(bad)
+
+
+def test_sync_mcp_tool_rejected(registrar: PluginRegistrar) -> None:
+    def sync_tool(ctx: Context, text: str) -> dict[str, str]:
+        return {}
+
+    with pytest.raises(RegistrationRejected, match="async-Funktion"):
+        registrar.mcp_tool("sy", sync_tool, description="x")  # type: ignore[arg-type]
+
+
+def test_mcp_tool_with_unsupported_signature_rejected(registrar: PluginRegistrar) -> None:
+    import threading
+
+    async def varargs(ctx: Context, *args: Any) -> dict[str, str]:
+        return {}
+
+    async def odd_type(ctx: Context, lock: threading.Lock) -> dict[str, str]:
+        return {}
+
+    with pytest.raises(RegistrationRejected, match="hello_va.*Signatur"):
+        registrar.mcp_tool("va", varargs, description="x")
+    with pytest.raises(RegistrationRejected, match="hello_ot.*Signatur"):
+        registrar.mcp_tool("ot", odd_type, description="x")
+    assert len(registrar.staged) == 0

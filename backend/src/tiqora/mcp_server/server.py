@@ -292,6 +292,14 @@ def _get_user_id(ctx: Context) -> int:
     """Extract user_id injected by auth middleware from request state."""
     request: Request | None = getattr(ctx, "request", None)
     if request is None:
+        # FastMCP 4 dropped ``Context.request``; the HTTP request is a dependency now.
+        from fastmcp.server.dependencies import get_http_request
+
+        try:
+            request = get_http_request()
+        except RuntimeError:
+            request = None
+    if request is None:
         raise PermissionError("No request context available")
     uid = getattr(request.state, "user_id", None)
     if uid is None:

@@ -6,6 +6,8 @@ committed all-or-nothing by :func:`tiqora.plugins.loader.commit_registrar`.
 
 from __future__ import annotations
 
+import functools
+import inspect
 import re
 from collections.abc import Awaitable, Callable, Iterable
 from typing import Any, Final
@@ -38,6 +40,20 @@ MAX_TIMEOUT_SECONDS: Final = 300
 
 class RegistrationRejected(ValueError):
     """A registration was refused; the message is German and shown to admins."""
+
+
+def is_async_callable(fn: object) -> bool:
+    """True for ``async def`` functions, partials of them and objects with ``async __call__``."""
+    while isinstance(fn, functools.partial):
+        fn = fn.func
+    if inspect.iscoroutinefunction(fn):
+        return True
+    return callable(fn) and inspect.iscoroutinefunction(getattr(fn, "__call__", None))  # noqa: B004
+
+
+def _require_async(fn: object, what: str) -> None:
+    if not is_async_callable(fn):
+        raise RegistrationRejected(f"{what} muss eine async-Funktion sein (async def)")
 
 
 class PluginRegistrar:
@@ -173,6 +189,7 @@ class PluginRegistrar:
 
         def check() -> None:
             self._check_name(name, "den Abonnenten")
+            _require_async(handler, f"Der Abonnent „{name}“")
             self._check_timeout(timeout_seconds)
             if not names:
                 raise RegistrationRejected("Mindestens ein Ereignis ist nötig")
@@ -204,6 +221,7 @@ class PluginRegistrar:
 
         def check() -> None:
             self._check_name(name, "die Aufgabe")
+            _require_async(run, f"Die Aufgabe „{name}“")
             try:
                 schedule.validate()
             except ValueError as exc:
@@ -222,6 +240,7 @@ class PluginRegistrar:
 
     def job_handler(self, handler: JobHandler) -> None:
         def check() -> None:
+            _require_async(handler.run, f"Der Job-Handler „{handler.kind}“")
             prefix = f"{self.plugin_id}."
             suffix = handler.kind[len(prefix) :]
             if not handler.kind.startswith(prefix) or not NAME_RE.fullmatch(suffix):
@@ -248,6 +267,12 @@ class PluginRegistrar:
             if full in CORE_MCP_TOOL_NAMES:
                 raise RegistrationRejected(f"Werkzeugname „{full}“ ist bereits von Tiqora belegt")
             self._check_timeout(timeout_seconds)
+            from tiqora.plugins.mcp import check_tool_buildable
+
+            try:
+                check_tool_buildable(full, fn, description)
+            except ValueError as exc:
+                raise RegistrationRejected(str(exc)) from exc
 
         item = McpTool(
             name=full,

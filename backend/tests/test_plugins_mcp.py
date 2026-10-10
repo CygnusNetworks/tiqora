@@ -106,9 +106,9 @@ async def test_registers_plugin_tool_on_fresh_server(fixture_plugins: Installer)
     assert register_plugin_mcp_tools(server, _hello_registry(fixture_plugins)) == ["hello_echo"]
     async with Client(server) as client:
         (tool,) = [t for t in await client.list_tools() if t.name == "hello_echo"]
-    assert set(tool.inputSchema["properties"]) == {"text", "times"}
-    assert tool.annotations is not None and tool.annotations.readOnlyHint is True
-    assert "The text to echo." in tool.inputSchema["properties"]["text"].get("description", "")
+    assert set(tool.input_schema["properties"]) == {"text", "times"}
+    assert tool.annotations is not None and tool.annotations.read_only_hint is True
+    assert "The text to echo." in tool.input_schema["properties"]["text"].get("description", "")
 
 
 async def test_tool_call_respects_allowlist(fixture_plugins: Installer) -> None:
@@ -162,8 +162,8 @@ async def test_plugin_exception_is_a_clean_error_and_counts() -> None:
     text = _text(res)
     assert "secret-token-123" not in text and "Traceback" not in text and "/etc" not in text
     assert plugin_mcp_failures(PLUGIN) == before + 1
-    ok = await _call(server, "hello_boom", {})
-    assert ok.is_error and plugin_mcp_failures(PLUGIN) == before + 2
+    again = await _call(server, "hello_boom", {})
+    assert again.is_error and plugin_mcp_failures(PLUGIN) == before + 2
     # a success resets the streak
     server2 = FastMCP("u")
     register_plugin_mcp_tools(server2, _registry(_tool("hello_fine", echo)))
@@ -239,3 +239,26 @@ def test_sdk_helpers_delegate_to_server() -> None:
         and "_get_state().session_factory" in src
         and "PermissionEngine" in src
     )
+
+
+async def test_unbindable_tool_is_skipped_and_healthy_ones_still_bind(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    import threading
+
+    async def varargs(ctx: Context, *args: Any) -> dict[str, str]:
+        return {}
+
+    async def odd_type(ctx: Context, lock: threading.Lock) -> dict[str, str]:
+        return {}
+
+    reg = _registry(
+        _tool("hello_a_varargs", varargs),
+        _tool("hello_b_odd", odd_type),
+        _tool("hello_c_fine", echo),
+    )
+    server = FastMCP("t")
+    assert register_plugin_mcp_tools(server, reg) == ["hello_c_fine"]
+    assert (await _call(server, "hello_c_fine", {"text": "ok"})).data == {"text": "ok"}
+    # not marked as bound, so a later call reports the same failure again instead of lying
+    assert register_plugin_mcp_tools(server, reg) == []

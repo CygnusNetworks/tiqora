@@ -154,6 +154,30 @@ def _make_wrapper(registry: Registry, tool: McpTool) -> Callable[..., Awaitable[
     return wrapper
 
 
+def check_tool_buildable(name: str, fn: Callable[..., Awaitable[Any]], description: str) -> None:
+    """Raise ``ValueError`` (German) when FastMCP cannot turn ``fn`` into a tool.
+
+    Used by the registrar so a plugin with an unusable tool fails to load with a plain reason
+    instead of breaking the MCP process later. Builds the tool on a throwaway server.
+    """
+    from fastmcp import FastMCP
+
+    from tiqora.plugins.registrar import is_async_callable
+
+    if not is_async_callable(fn):
+        raise ValueError(f"Das MCP-Werkzeug „{name}“ muss eine async-Funktion sein")
+    probe = McpTool(
+        name=name, plugin_id="probe", fn=fn, description=description, write=False, timeout_seconds=1
+    )
+    try:
+        FastMCP("probe").tool(name=name, description=description)(_make_wrapper(Registry(), probe))
+    except Exception as exc:  # noqa: BLE001 - FastMCP raises ValueError, pydantic errors, ...
+        raise ValueError(
+            f"Das MCP-Werkzeug „{name}“ hat eine Signatur, die nicht unterstützt wird "
+            f"({type(exc).__name__})"
+        ) from exc
+
+
 def register_plugin_mcp_tools(server: FastMCP, registry: Registry) -> list[str]:
     """Bind the MCP tools of all active plugins to ``server``; returns the new names."""
     bound = _BOUND.setdefault(server, set())
@@ -164,11 +188,20 @@ def register_plugin_mcp_tools(server: FastMCP, registry: Registry) -> list[str]:
         if tool.name in CORE_MCP_TOOL_NAMES:
             log.error("plugin_mcp_tool_name_reserved", plugin_id=tool.plugin_id, tool=tool.name)
             continue
-        server.tool(
-            name=tool.name,
-            description=tool.description,
-            annotations={"readOnlyHint": not tool.write},
-        )(_make_wrapper(registry, tool))
+        try:
+            server.tool(
+                name=tool.name,
+                description=tool.description,
+                annotations={"readOnlyHint": not tool.write},
+            )(_make_wrapper(registry, tool))
+        except Exception as exc:  # noqa: BLE001 - one broken tool must not stop the others
+            log.error(
+                "plugin_mcp_tool_rejected",
+                plugin_id=tool.plugin_id,
+                tool=tool.name,
+                error=f"{type(exc).__name__}: {exc}",
+            )
+            continue
         bound.add(tool.name)
         added.append(tool.name)
     if added:
