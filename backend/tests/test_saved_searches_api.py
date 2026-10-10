@@ -682,9 +682,9 @@ async def test_upsert_imported_creates_then_updates_and_survives_a_race(env: Env
             real_find = store._find_imported
             calls = {"n": 0}
 
-            async def _blind(session: AsyncSession, user_id: int, name: str) -> Any:
+            async def _blind(session: AsyncSession, user_id: int, name: str, **kw: Any) -> Any:
                 calls["n"] += 1
-                return None if calls["n"] == 1 else await real_find(session, user_id, name)
+                return None if calls["n"] == 1 else await real_find(session, user_id, name, **kw)
 
             store._find_imported = _blind  # type: ignore[assignment]
             try:
@@ -709,3 +709,62 @@ async def test_upsert_imported_creates_then_updates_and_survives_a_race(env: Env
         )
         == 1
     )
+
+
+async def test_upsert_imported_race_between_two_open_transactions(env: Env) -> None:
+    """Session B's snapshot predates A's commit (MariaDB REPEATABLE READ): B's plain lookup
+    finds nothing, its insert hits the unique index, the locking re-read must see A's row."""
+    from sqlalchemy import select
+
+    from tiqora.db.tiqora.models import TiqoraSavedSearch
+    from tiqora.filters import Filter
+
+    first = Filter.model_validate(Q210)
+    second = Filter.model_validate(
+        {"where": {"field": "queue_id", "op": "eq", "value": Q_SEARCHER}}
+    )
+    engine = create_async_engine(_to_async_url(env.sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with factory() as a, factory() as b:
+            # both transactions start (consistent snapshot) before either writes
+            await a.execute(select(TiqoraSavedSearch.id).limit(1))
+            await b.execute(select(TiqoraSavedSearch.id).limit(1))
+            sid_a, how_a = await store.upsert_imported(
+                a, SEARCHER, source_name="rep48 Race", criteria=first, include_archived=False
+            )
+            await a.commit()
+            sid_b, how_b = await store.upsert_imported(
+                b, SEARCHER, source_name="rep48 Race", criteria=second, include_archived=True
+            )
+            await b.commit()
+    finally:
+        await engine.dispose()
+    assert how_a == "created" and (sid_b, how_b) == (sid_a, "updated")
+    env.as_user(SEARCHER)
+    item = (await env.client.get(f"/api/v1/saved-searches/{sid_a}")).json()
+    assert item["version"] == 2 and item["include_archived"] is True
+    assert item["criteria"]["where"]["value"] == Q_SEARCHER
+    count_sql = "SELECT COUNT(*) FROM tiqora_saved_search WHERE source_name = 'rep48 Race'"
+    assert _scalar(env.sync_url, count_sql) == 1
+
+
+async def test_counts_still_running_at_the_deadline_are_cancelled(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import asyncio
+    import time
+
+    async def _hang(*_a: Any, **_k: Any) -> int:
+        await asyncio.sleep(60)
+        return 99
+
+    monkeypatch.setattr(saved_searches_api, "count_tickets", _hang)
+    monkeypatch.setattr(store, "COUNTS_DEADLINE_SECONDS", 2)
+    env.as_user(SEARCHER)
+    ids = [(await _create(env, f"rep48 H{i}", show_count=True))["id"] for i in range(2)]
+    started = time.monotonic()
+    counts = await _counts(env)
+    assert counts == {str(ids[0]): None, str(ids[1]): None}
+    assert time.monotonic() - started < 10
+    assert env.cache.store == {}

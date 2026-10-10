@@ -24984,7 +24984,16 @@
             "title": "Changed At",
             "type": "string"
           },
-          "criteria": {},
+          "criteria": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Filter"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "criteria_error": {
             "anyOf": [
               {

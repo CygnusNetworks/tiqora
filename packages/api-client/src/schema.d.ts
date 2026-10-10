@@ -17693,7 +17693,7 @@ export interface components {
              * Format: date-time
              */
             changed_at: string;
-            criteria: unknown;
+            criteria: components["schemas"]["Filter"] | null;
             /** Criteria Error */
             criteria_error: string | null;
             /** Group Ids */

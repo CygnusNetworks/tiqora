@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
     BaseModel,
@@ -65,7 +65,13 @@ class SavedSearchPrefsIn(BaseModel):
 class SavedSearchOut(BaseModel):
     id: int
     name: str
-    criteria: Filter | None
+    # the wrap serializer below hides the type from the schema generator; restate it
+    criteria: Annotated[
+        Filter | None,
+        Field(
+            json_schema_extra={"anyOf": [{"$ref": "#/components/schemas/Filter"}, {"type": "null"}]}
+        ),
+    ]
     criteria_error: str | None
     include_archived: bool
     sort_by: TicketSortKey

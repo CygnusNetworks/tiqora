@@ -9,6 +9,7 @@ answers ``null`` for a search that cannot be counted.
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Annotated, Any, NoReturn, cast
 
@@ -187,6 +188,17 @@ async def create_saved_search(
     return out
 
 
+async def _count_one(
+    session: AsyncSession, user_id: int, search: SavedSearch, admin: bool, seconds: int
+) -> int:
+    assert search.criteria is not None
+    async with statement_timeout(session, seconds):
+        scope = await ticket_query_scope(
+            session, user_id, include_archived=admin and search.include_archived
+        )
+        return await count_tickets(session, search.criteria, scope)
+
+
 async def _sidebar_counts(
     session: AsyncSession,
     user: AuthenticatedUser,
@@ -218,12 +230,11 @@ async def _sidebar_counts(
             continue  # out of time: this and every later search stays null
         seconds = max(1, min(store.COUNT_TIMEOUT_SECONDS, int(remaining)))
         try:
-            async with statement_timeout(session, seconds):
-                scope = await ticket_query_scope(
-                    session, user.id, include_archived=admin and search.include_archived
-                )
-                counts[str(search.id)] = await count_tickets(session, search.criteria, scope)
-        except (FilterError, ValidationError, ReportQueryTimeout):
+            # the deadline is literal: a count still running when it passes is cancelled
+            counts[str(search.id)] = await asyncio.wait_for(
+                _count_one(session, user.id, search, admin, seconds), timeout=remaining
+            )
+        except (FilterError, ValidationError, ReportQueryTimeout, TimeoutError):
             counts[str(search.id)] = None
         except Exception as exc:  # noqa: BLE001
             if not is_timeout_error(exc):

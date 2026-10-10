@@ -425,18 +425,19 @@ async def delete_search(
 
 
 async def _find_imported(
-    session: AsyncSession, user_id: int, source_name: str
+    session: AsyncSession, user_id: int, source_name: str, *, lock: bool = False
 ) -> TiqoraSavedSearch | None:
+    """``lock``: a locking read, which sees the latest committed row even on MariaDB's
+    REPEATABLE READ (a plain SELECT would keep reading the transaction's old snapshot)."""
+    stmt = select(TiqoraSavedSearch).where(
+        TiqoraSavedSearch.owner_user_id == user_id,
+        TiqoraSavedSearch.source == "znuny",
+        TiqoraSavedSearch.source_name == source_name,
+    )
+    if lock:
+        stmt = stmt.with_for_update()
     return (
-        await session.execute(
-            select(TiqoraSavedSearch)
-            .where(
-                TiqoraSavedSearch.owner_user_id == user_id,
-                TiqoraSavedSearch.source == "znuny",
-                TiqoraSavedSearch.source_name == source_name,
-            )
-            .execution_options(populate_existing=True)
-        )
+        await session.execute(stmt.execution_options(populate_existing=True))
     ).scalar_one_or_none()
 
 
@@ -494,7 +495,7 @@ async def upsert_imported(
             session.add(row)
             await session.flush()
     except IntegrityError:
-        raced = await _find_imported(session, user_id, source_name)
+        raced = await _find_imported(session, user_id, source_name, lock=True)
         if raced is None:
             raise
         await _refresh_imported(session, int(raced.id), criteria, include_archived)
