@@ -53,6 +53,7 @@
     "kb": "Wissensdatenbank"
   },
   "sidebar": {
+    "plugins": "Erweiterungen",
     "workspace": "Arbeitsbereich",
     "inbox": "Eingang",
     "myTickets": "Meine Tickets",
@@ -5347,6 +5348,8 @@
   "plugins": {
     "slotError": "Erweiterung „{{name}}“ konnte nicht geladen werden.",
     "slotErrorDetails": "Details",
-    "safeModeBrowser": "Erweiterungen sind in diesem Browserfenster ausgeschaltet."
+    "safeModeBrowser": "Erweiterungen sind in diesem Browserfenster ausgeschaltet.",
+    "pageNotFound": "Diese Seite der Erweiterung gibt es nicht.",
+    "widgetsTitle": "Erweiterungen"
   }
 }

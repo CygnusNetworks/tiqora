@@ -38,6 +38,9 @@ import { appVersion } from "@/lib/appVersion";
 import { SSEProvider } from "@/lib/useSSE";
 import { CallPopup } from "@/components/agent/phone/CallPopup";
 import { NavItem } from "./NavItem";
+import { PluginProvider } from "@/plugins/PluginProvider";
+import { PluginNavItems } from "@/plugins/slots";
+import { useNavGroupHasItems } from "@/plugins/useNavGroupHasItems";
 
 /** Small "Beta" pill rendered next to the Tiqora wordmark. Replaces the old
  * full-width "not production ready" dev ribbon. */
@@ -272,6 +275,7 @@ function QueueNavSection({
 function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const hasPluginGroup = useNavGroupHasItems("plugins");
 
   const queuesQ = useQuery({
     queryKey: ["queues"],
@@ -397,6 +401,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             testId="agent-nav-services"
             onNavigate={onNavigate}
           />
+          <PluginNavItems group="workspace" onNavigate={onNavigate} />
         </NavGroup>
 
         <QueueNavSection
@@ -431,6 +436,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
               onNavigate={onNavigate}
             />
           )}
+          <PluginNavItems group="knowledge" onNavigate={onNavigate} />
         </NavGroup>
 
         {/* Calendar and reports were each a full section wrapping a single
@@ -464,7 +470,19 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             testId="agent-nav-time-accounting"
             onNavigate={onNavigate}
           />
+          <PluginNavItems group="insights" onNavigate={onNavigate} />
         </NavGroup>
+
+        {hasPluginGroup && (
+          <NavGroup
+            id="plugins"
+            title={t("sidebar.plugins")}
+            collapsed={!!collapsedGroups.plugins}
+            onToggle={() => toggleGroup("plugins")}
+          >
+            <PluginNavItems group="plugins" onNavigate={onNavigate} />
+          </NavGroup>
+        )}
       </nav>
 
       {/* Version/git-sha footer — kept after removing the redundant bottom-left user card. */}
@@ -574,6 +592,7 @@ export function AgentShell({ children }: { children: ReactNode }) {
   // agent app — the stream opens once here (SSEProvider) and its connection
   // state feeds the header's ConnectionStatus dot.
   return (
+    <PluginProvider>
     <SSEProvider>
       <div className="flex min-h-screen flex-col bg-bg md:grid md:grid-cols-[216px_1fr]">
         <aside
@@ -640,5 +659,6 @@ export function AgentShell({ children }: { children: ReactNode }) {
         <CallPopup />
       </div>
     </SSEProvider>
+    </PluginProvider>
   );
 }

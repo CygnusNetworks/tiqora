@@ -1,3 +1,4 @@
+import { PluginWidgetsSection } from "@/plugins/slots";
 import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -603,6 +604,8 @@ export function DashboardPage() {
           </div>
         )}
       </section>
+
+      <PluginWidgetsSection />
     </div>
   );
 }

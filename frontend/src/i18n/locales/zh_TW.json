@@ -53,6 +53,7 @@
     "kb": "知識庫"
   },
   "sidebar": {
+    "plugins": "Extensions",
     "workspace": "工作空間",
     "inbox": "收件匣",
     "myTickets": "我的門票",
@@ -5339,6 +5340,8 @@
   "plugins": {
     "slotError": "Extension “{{name}}” could not be loaded.",
     "slotErrorDetails": "Details",
-    "safeModeBrowser": "Extensions are switched off in this browser window."
+    "safeModeBrowser": "Extensions are switched off in this browser window.",
+    "pageNotFound": "This page of the extension does not exist.",
+    "widgetsTitle": "Extensions"
   }
 }

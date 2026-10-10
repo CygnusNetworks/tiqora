@@ -1,5 +1,6 @@
 import { setupWorker } from "msw/browser";
 import { handlers } from "./handlers";
+import { setPluginImporter } from "@/plugins/loader";
 
 /**
  * Boot the MSW worker for the public demo (VITE_DEMO=1) so every /api call is
@@ -10,6 +11,10 @@ import { handlers } from "./handlers";
  * worker script resolves correctly when hosted under a project path.
  */
 export async function startDemo(base: string): Promise<void> {
+  // The demo plugin lives in the bundle; there is no server to import it from.
+  setPluginImporter((url) =>
+    url.includes("/org.example.demo/") ? import("./demoPlugin") : Promise.reject(new Error("unbekannt")),
+  );
   const worker = setupWorker(...handlers);
   await worker.start({
     serviceWorker: { url: `${base}mockServiceWorker.js` },

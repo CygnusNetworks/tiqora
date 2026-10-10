@@ -53,6 +53,7 @@
     "kb": "Base de coñecemento"
   },
   "sidebar": {
+    "plugins": "Extensions",
     "workspace": "Espazo de traballo",
     "inbox": "Caixa de entrada",
     "myTickets": "Os meus billetes",
@@ -5339,6 +5340,8 @@
   "plugins": {
     "slotError": "Extension “{{name}}” could not be loaded.",
     "slotErrorDetails": "Details",
-    "safeModeBrowser": "Extensions are switched off in this browser window."
+    "safeModeBrowser": "Extensions are switched off in this browser window.",
+    "pageNotFound": "This page of the extension does not exist.",
+    "widgetsTitle": "Extensions"
   }
 }

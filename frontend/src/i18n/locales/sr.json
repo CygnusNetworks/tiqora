@@ -53,6 +53,7 @@
     "kb": "База знања"
   },
   "sidebar": {
+    "plugins": "Extensions",
     "workspace": "Радни простор",
     "inbox": "Пријемно сандуче",
     "myTickets": "Моји тикети",
@@ -5339,6 +5340,8 @@
   "plugins": {
     "slotError": "Extension “{{name}}” could not be loaded.",
     "slotErrorDetails": "Details",
-    "safeModeBrowser": "Extensions are switched off in this browser window."
+    "safeModeBrowser": "Extensions are switched off in this browser window.",
+    "pageNotFound": "This page of the extension does not exist.",
+    "widgetsTitle": "Extensions"
   }
 }

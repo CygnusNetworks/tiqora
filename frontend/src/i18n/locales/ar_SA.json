@@ -53,6 +53,7 @@
     "kb": "قاعدة المعرفة"
   },
   "sidebar": {
+    "plugins": "Extensions",
     "workspace": "مساحة العمل",
     "inbox": "البريد الوارد",
     "myTickets": "التذاكر الخاصة بي",
@@ -5339,6 +5340,8 @@
   "plugins": {
     "slotError": "Extension “{{name}}” could not be loaded.",
     "slotErrorDetails": "Details",
-    "safeModeBrowser": "Extensions are switched off in this browser window."
+    "safeModeBrowser": "Extensions are switched off in this browser window.",
+    "pageNotFound": "This page of the extension does not exist.",
+    "widgetsTitle": "Extensions"
   }
 }
