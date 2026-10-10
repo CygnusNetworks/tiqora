@@ -317,7 +317,7 @@ describe("builderState", () => {
     s = builderReducer(three, { type: "removeDimension", target: "columns", index: 0 });
     expect(toDefinition(s)?.visualization?.series_dimension).toBeUndefined();
     // adding a row keeps a last column last
-    s = builderReducer(builderReducer(initialState(), { type: "addDimension", target: "columns", key: "channel" }), { type: "addDimension", target: "rows", key: "queue" });
+    s = builderReducer(builderReducer(builderReducer(initialState(), { type: "setSource", source: "tickets" }), { type: "addDimension", target: "columns", key: "channel" }), { type: "addDimension", target: "rows", key: "queue" });
     s = builderReducer(s, { type: "addMeasure", key: "tickets" });
     s = builderReducer(s, { type: "addDimension", target: "rows", key: "owner" });
     expect(toDefinition(s)?.dimensions?.map((d) => d.key)).toEqual(["queue", "owner", "channel"]);
