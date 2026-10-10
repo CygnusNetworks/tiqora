@@ -60,6 +60,9 @@ CHANNEL_CONFIG_KEYS: Final[dict[str, set[str]]] = {
         "identity_handoff_text",
         "followup_reopen_days",
     },
+    # Web chat: only the master switch ``channel.webchat.enabled``; everything else lives in
+    # ``tiqora_chat_config`` (one row per widget).
+    "webchat": set(),
 }
 
 
@@ -72,7 +75,7 @@ class ChannelDescriptor:
 CHANNELS: ExtensionPoint[ChannelDescriptor] = ExtensionPoint(
     key="core.channels",
     item_key=lambda c: c.key,
-    description="Additional ticket channels (SMS, WhatsApp, phone, Telegram)",
+    description="Additional ticket channels (SMS, WhatsApp, phone, Telegram, web chat)",
 )
 
 
