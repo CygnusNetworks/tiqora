@@ -5,7 +5,7 @@
  */
 import { createElement, useSyncExternalStore, type ComponentType } from "react";
 import type { WidgetCategory, WidgetProps, WidgetSize } from "@tiqora/plugin-sdk";
-import { createExtensionPoint } from "@/extensions/registry";
+import { createExtensionPoint, type ExtensionPoint } from "@/extensions/registry";
 import type { FrontendContribution, FrontendPlugin } from "@/lib/pluginsApi";
 import { PluginBoundary } from "./PluginBoundary";
 import { PluginComponent } from "./PluginComponent";
@@ -45,7 +45,22 @@ export interface WidgetDefinition<S = Record<string, unknown>> {
 // Items with any settings type: a WidgetDefinition<{ city: string }> is not
 // assignable to WidgetDefinition<Record<string, unknown>> under strictFunctionTypes.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const DASHBOARD_WIDGETS = createExtensionPoint<WidgetDefinition<any>>("core.dashboard.widgets", (w) => w.key);
+const point = createExtensionPoint<WidgetDefinition<any>>("core.dashboard.widgets", (w) => w.key);
+
+/** The point itself, except that every change wakes useDashboardWidgetDefinitions
+ * — also for core widgets the dashboards plan registers later. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const DASHBOARD_WIDGETS: ExtensionPoint<WidgetDefinition<any>> = {
+  ...point,
+  register(item, owner) {
+    point.register(item, owner);
+    notify();
+  },
+  clearForTests() {
+    point.clearForTests();
+    notify();
+  },
+};
 
 /** Typed widget definition → an item the point accepts, without casts at the call site. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -108,9 +123,10 @@ function pluginWidget(plugin: FrontendPlugin, c: WidgetContribution): WidgetDefi
  * Register the `dashboard.widget` contributions of these plugins (owner =
  * plugin id). Idempotent: a key the same plugin already registered is
  * skipped; a key owned by someone else is left alone with a warning.
+ * Phase 1 keeps the first registration for the page's lifetime (the list is
+ * fetched once; the point has no replace/unregister yet).
  */
 export function registerPluginWidgets(plugins: FrontendPlugin[]): void {
-  let changed = false;
   for (const plugin of plugins) {
     for (const c of plugin.contributions) {
       if (c.slot !== "dashboard.widget") continue;
@@ -122,10 +138,8 @@ export function registerPluginWidgets(plugins: FrontendPlugin[]): void {
         continue;
       }
       DASHBOARD_WIDGETS.register(pluginWidget(plugin, c), plugin.id);
-      changed = true;
     }
   }
-  if (changed) notify();
 }
 
 /** Every registered widget (core and plugins); re-renders when plugins finished loading. */

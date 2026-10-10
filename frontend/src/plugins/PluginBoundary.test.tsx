@@ -102,6 +102,43 @@ describe("PluginBoundary", () => {
     expect(screen.getByText(/Zeitüberschreitung/)).toBeInTheDocument();
   });
 
+  it("a translation file that never answers also ends in the boundary message", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const withTexts = helloPlugin({ id: "org.example.slowtexts", locales: ["de"] });
+    const hanging = vi.fn(
+      (_url: string, init: RequestInit) =>
+        new Promise<Response>((_, reject) => {
+          init.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+        }),
+    );
+    vi.stubGlobal("fetch", hanging);
+    setPluginImporterForTests(() => Promise.resolve({ default: { components: { Panel: () => <p>Panel</p> } } }));
+    try {
+      render(
+        <PluginBoundary plugin={withTexts}>
+          <PluginComponent plugin={withTexts} name="Panel" props={{}} />
+        </PluginBoundary>,
+      );
+      expect(screen.getByRole("status")).toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(PLUGIN_IMPORT_TIMEOUT_MS + 1);
+      });
+      vi.useRealTimers();
+      expect(await screen.findByText("Erweiterung „Hallo“ konnte nicht geladen werden.")).toBeInTheDocument();
+      expect(screen.queryByText("Panel")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Details" }));
+      expect(screen.getByText(/Zeitüberschreitung/)).toBeInTheDocument();
+      expect(hanging).toHaveBeenCalledWith(
+        "/api/v1/plugins/org.example.slowtexts/assets/1.0.0/i18n/de.json",
+        expect.anything(),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("a load that fails after the spinner showed reaches the boundary; a later mount tries again", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     let calls = 0;

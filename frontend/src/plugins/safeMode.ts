@@ -23,11 +23,12 @@ export function applySafeModeFromUrl(search: string = typeof window === "undefin
 }
 
 export function isPluginSafeMode(): boolean {
+  // This page load asked for it, but storage refused the write/removal.
+  if (memoryOff !== null) return memoryOff;
   try {
     return sessionStorage.getItem(PLUGIN_SAFE_MODE_KEY) === "1";
   } catch {
-    // Blocked storage counts as "not switched off" — unless this very page
-    // load asked for it with ?plugins=off.
-    return memoryOff ?? false;
+    // Blocked storage counts as "not switched off".
+    return false;
   }
 }
