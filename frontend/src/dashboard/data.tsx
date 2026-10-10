@@ -303,7 +303,7 @@ export function useDashboardData(
         const ids = live.current.dataWidgets
           .filter((w) => intervalsOf(live.current.defByKey.get(w.type_key)!).includes(seconds))
           .map((w) => w.id);
-        if (isHidden()) return;
+        // while hidden the engine holds the ids for the one refresh on return
         engineRef.current?.fetchIds(ids);
       }, seconds * 1000);
     });
@@ -360,7 +360,8 @@ export function usePreviewData(
     placeholderData: (previous) => previous,
     retry: false,
   });
-  const refetch = useCallback(() => void query.refetch(), [query]);
+  const queryRefetch = query.refetch;
+  const refetch = useCallback(() => void queryRefetch(), [queryRefetch]);
   if (!active) return { status: "none", refetch };
   if (query.data) return { ...toState(query.data), refetch };
   if (query.isError) return { status: "error", refetch };

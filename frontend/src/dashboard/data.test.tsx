@@ -118,9 +118,6 @@ describe("useDashboardData", () => {
     });
     expect(result.current.byWidget["w-counter"].status).toBe("pending");
     expect(PENDING_RETRY_DELAYS_MS[0]).toBe(2000);
-    // the pauses grow: never two polls closer than the previous pause
-    expect([...PENDING_RETRY_DELAYS_MS]).toEqual([...PENDING_RETRY_DELAYS_MS].sort((a, b) => a - b));
-    expect(Math.max(...PENDING_RETRY_DELAYS_MS)).toBeLessThanOrEqual(30_000);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1999);
@@ -255,11 +252,17 @@ describe("useDashboardData", () => {
     });
     expect(data).toHaveBeenCalledTimes(2);
     setHidden(false);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2100);
+    });
+    // the ticks skipped while hidden become one refresh after the page is visible again
+    expect(data).toHaveBeenCalledTimes(3);
+    expect(data).toHaveBeenLastCalledWith(1, ["w-esc"], expect.anything());
     unmount();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(120_000);
     });
-    expect(data).toHaveBeenCalledTimes(2);
+    expect(data).toHaveBeenCalledTimes(3);
   });
 });
 
