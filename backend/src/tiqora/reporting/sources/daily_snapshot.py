@@ -49,4 +49,5 @@ def daily_snapshot_source() -> ReportSource:
         ),
         time_fields=("snapshot",),
         default_time_field="snapshot",
+        common_fields={"queue": "queue", "state_type": "state_type", "priority": "priority"},
     )

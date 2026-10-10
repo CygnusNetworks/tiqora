@@ -23980,6 +23980,13 @@
       },
       "ReportSourceOut": {
         "properties": {
+          "common_fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Common Fields",
+            "type": "object"
+          },
           "default_time_field": {
             "anyOf": [
               {
@@ -26552,6 +26559,13 @@
       "SourceDimensionOut": {
         "description": "A dimension, or (in ``filter_fields``) a filter-only field of a source.\n\nFilter-only fields have ``kind`` = their filter type, ``labels`` \"none\",\nno ``i18n_values`` / ``options_source`` and ``time_field`` false.",
         "properties": {
+          "enum_values": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Enum Values",
+            "type": "array"
+          },
           "filter_type": {
             "anyOf": [
               {
@@ -26589,6 +26603,13 @@
           "labels": {
             "title": "Labels",
             "type": "string"
+          },
+          "ops": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ops",
+            "type": "array"
           },
           "options_source": {
             "anyOf": [

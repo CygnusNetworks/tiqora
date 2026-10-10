@@ -15,7 +15,7 @@ timeout; a used-up budget answers 504 with a JSON message. Large reports
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Final, Literal, NoReturn, cast
+from typing import Annotated, Any, Literal, NoReturn, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 from fastapi.concurrency import run_in_threadpool
@@ -27,24 +27,15 @@ from tiqora.domain.auth import AuthenticatedUser
 from tiqora.extensions.core import get_registry
 from tiqora.filters import FilterError
 from tiqora.jobs.schemas import JobAccepted
-from tiqora.jobs.service import count_active_jobs, enqueue_job, lock_user_job_quota
+from tiqora.jobs.service import enqueue_job
 from tiqora.permissions.sharing import ShareGroupError
 from tiqora.reporting.access import require_report_access
 from tiqora.reporting.cache import CacheBackend, ReportCache, read_cache_generation
 from tiqora.reporting.catalogue import BUILTIN_REPORTS, BuiltinReport
 from tiqora.reporting.compiler import RunParams
 from tiqora.reporting.definition import DefinitionError, ReportDefinition, validate_definition
-from tiqora.reporting.engine import QueryBudget, estimate_rows, execute_and_store, plan_report
-from tiqora.reporting.jobs import (
-    REPORT_EXPORT_JOB,
-    REPORT_RUN_JOB,
-    TIMEOUT_MESSAGE,
-    ReportExportPayload,
-    ReportRunPayload,
-    RequestError,
-    export_slug,
-    prepare_run,
-)
+from tiqora.reporting.engine import QueryBudget, plan_report
+from tiqora.reporting.jobs import REPORT_EXPORT_JOB, TIMEOUT_MESSAGE, export_slug
 from tiqora.reporting.labels import resolve_labels
 from tiqora.reporting.report_file import (
     ReportFileImportIn,
@@ -53,6 +44,20 @@ from tiqora.reporting.report_file import (
     parse_report_file,
 )
 from tiqora.reporting.rights import ReportRights, report_rights
+from tiqora.reporting.run_service import (
+    EVENTS_INLINE_MAX_DAYS,
+    MAX_ACTIVE_REPORT_JOBS_PER_USER,
+    NOT_FOUND_MESSAGE,
+    ReportExportPayload,
+    RequestError,
+    RunOverrides,
+    TooManyReportJobs,
+    accepted,
+    check_job_limit,
+    enqueue_report_ref,
+    prepare_run,
+    run_report_ref,
+)
 from tiqora.reporting.saved import (
     SAVED_KEY_RE,
     ReportForbidden,
@@ -89,10 +94,7 @@ from tiqora.reporting.state import facts_status
 router = APIRouter(prefix="/reports", tags=["reports"])
 sources_router = APIRouter(prefix="/reporting", tags=["reports"])
 
-#: ``ticket_events`` windows longer than this always run as a job
-EVENTS_INLINE_MAX_DAYS: Final = 366
-#: queued or running report runs + exports one user may have at once (inline runs not counted)
-MAX_ACTIVE_REPORT_JOBS_PER_USER: Final = 3
+__all__ = ["EVENTS_INLINE_MAX_DAYS", "MAX_ACTIVE_REPORT_JOBS_PER_USER"]  # readers' import path
 
 
 async def get_report_cache(redis_client: Annotated[Any, Depends(get_redis)]) -> CacheBackend:
@@ -122,6 +124,8 @@ async def _prepare(
         return await prepare_run(session, user.id, body)
     except RequestError as exc:
         _unprocessable(exc.message, exc.path, exc.status_code)
+    except DefinitionError as exc:
+        _unprocessable(exc.message, exc.path)
 
 
 def _builtin_out(report: BuiltinReport) -> ReportOut:
@@ -163,7 +167,6 @@ def _saved_out(
 
 #: saved-report id in a path: bounded to the database's BIGINT so huge ids are a 422, not a 500
 ReportId = Annotated[int, Path(ge=1, le=2**63 - 1)]
-NOT_FOUND_MESSAGE: Final = "Bericht nicht gefunden."
 
 
 def _store_error(exc: Exception) -> NoReturn:
@@ -209,6 +212,11 @@ async def _owner_names(session: AsyncSession, reports: list[SavedReport]) -> dic
     return await resolve_labels(session, "user", ids) if ids else {}
 
 
+def _ops(src: ReportSource, key: str) -> list[str]:
+    spec = src.filter_spec(key)
+    return sorted(spec.allowed_ops()) if spec is not None else []
+
+
 def _source_out(src: ReportSource) -> ReportSourceOut:
     return ReportSourceOut(
         key=src.key,
@@ -223,6 +231,8 @@ def _source_out(src: ReportSource) -> ReportSourceOut:
                 filter_type=d.filter_type,
                 options_source=d.options_source,
                 time_field=d.key in src.time_fields,
+                ops=_ops(src, d.key),
+                enum_values=list(d.enum_values),
             )
             for d in src.dimensions
         ],
@@ -240,40 +250,20 @@ def _source_out(src: ReportSource) -> ReportSourceOut:
                 filter_type=f.filter_type,
                 options_source=None,
                 time_field=False,
+                ops=_ops(src, f.key),
             )
             for f in src.filter_fields
         ],
         default_time_field=src.default_time_field,
+        common_fields=dict(src.common_fields),
     )
 
 
-async def _check_job_limit(session: AsyncSession, user_id: int) -> None:
-    """429 when the user already has the maximum of report jobs queued or running.
-
-    Must start a fresh transaction (callers roll back first); the user row lock
-    serialises concurrent requests of one user until their enqueue is committed.
-    """
-    await lock_user_job_quota(session, user_id)
-    active = 0
-    for kind in (REPORT_RUN_JOB.kind, REPORT_EXPORT_JOB.kind):
-        # a cancelled report job stops within about a second: it no longer counts
-        active += await count_active_jobs(
-            session, kind=kind, created_by=user_id, include_cancelling=False
-        )
-    if active >= MAX_ACTIVE_REPORT_JOBS_PER_USER:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail={
-                "message": (
-                    f"Es laufen bereits {MAX_ACTIVE_REPORT_JOBS_PER_USER} Berichte im "
-                    "Hintergrund. Bitte warte, bis einer fertig ist."
-                )
-            },
-        )
-
-
-def _accepted(job_id: int, job_status: str) -> JobAccepted:
-    return JobAccepted(job_id=job_id, status="running" if job_status == "running" else "queued")
+def _too_many() -> NoReturn:
+    raise HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail={"message": TooManyReportJobs().message},
+    )
 
 
 @router.get("", response_model=ReportCatalogueOut)
@@ -352,61 +342,33 @@ async def run_report_endpoint(
     # (GDPR erasure, rebuild) after it lets nothing this request computes be found again
     generation = await read_cache_generation(cache_backend)
     reporting = await _access(session, user, settings)
-    definition, params, report_key = await _prepare(session, user, body)
     cache = ReportCache(cache_backend, reporting.cache_seconds, generation=generation)
-    # one shared deadline for every query of this request (estimate included)
-    budget = QueryBudget.inline(reporting)
     try:
-        plan = await plan_report(
+        overrides = RunOverrides.from_run_in(body)
+        outcome = await run_report_ref(
             session,
-            defn=definition,
-            params=params,
             user_id=user.id,
+            report_key=body.report_key,
+            definition=body.definition,
+            overrides=overrides,
             reporting=reporting,
-            compare_previous=body.compare_previous,
+            cache=cache,
+            # one shared deadline for every query of this request (estimate included)
+            budget=QueryBudget.inline(reporting),
+            force_job=body.force_job,
         )
-        if not body.no_cache:
-            hit = await cache.get(plan.cache_key)
-            if hit is not None:
-                return ReportRunOut(
-                    result=hit.model_copy(update={"report_key": report_key, "facts": plan.facts})
-                )
-        window = plan.compiled.window
-        as_job = (
-            body.force_job
-            or (
-                plan.compiled.source.key == "ticket_events"
-                and window is not None
-                and (window.end_date - window.start_date).days + 1 > EVENTS_INLINE_MAX_DAYS
+        if outcome.result is None:
+            job = await enqueue_report_ref(
+                session, user_id=user.id, run=body, extra_filter=outcome.extra_filter
             )
-            or await estimate_rows(session, plan.compiled, reporting=reporting, budget=budget)
-            > reporting.inline_row_threshold
-        )
-        if as_job:
-            # PostgreSQL: the estimate's SET LOCAL statement_timeout (possibly ~1 s near
-            # the deadline) lives until the transaction ends; never let it hit the enqueue
-            await session.rollback()
-            await _check_job_limit(session, user.id)
-            job = await enqueue_job(
-                session,
-                kind=REPORT_RUN_JOB.kind,
-                payload=ReportRunPayload(user_id=user.id, run=body),
-                created_by=user.id,
-            )
-            await session.commit()
-            out = ReportRunOut(job=_accepted(job.id, job.status))
+            out = ReportRunOut(job=job)
             return JSONResponse(
                 status_code=status.HTTP_202_ACCEPTED, content=out.model_dump(mode="json")
             )
-        # the plan above is reused: no second scope/state/compile, no second lookup
-        result = await execute_and_store(
-            session,
-            plan,
-            report_key=report_key,
-            reporting=reporting,
-            cache=None if body.no_cache else cache,
-            budget=budget,
-        )
+    except RequestError as exc:
+        _unprocessable(exc.message, exc.path, exc.status_code)
+    except TooManyReportJobs:
+        _too_many()
     except (DefinitionError, FilterError) as exc:
         _unprocessable(exc.message, exc.path)
     except ReportQueryTimeout:
@@ -414,7 +376,7 @@ async def run_report_endpoint(
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail={"message": TIMEOUT_MESSAGE}
         ) from None
-    return ReportRunOut(result=result)
+    return ReportRunOut(result=outcome.result)
 
 
 @router.post("/export", status_code=status.HTTP_202_ACCEPTED, response_model=JobAccepted)
@@ -442,7 +404,10 @@ async def export_report(
     except (DefinitionError, FilterError) as exc:
         _unprocessable(exc.message, exc.path)
     await session.rollback()
-    await _check_job_limit(session, user.id)
+    try:
+        await check_job_limit(session, user.id)
+    except TooManyReportJobs:
+        _too_many()
     job = await enqueue_job(
         session,
         kind=REPORT_EXPORT_JOB.kind,
@@ -450,7 +415,7 @@ async def export_report(
         created_by=user.id,
     )
     await session.commit()
-    return _accepted(job.id, job.status)
+    return accepted(job.id, job.status)
 
 
 async def _load_for_view(

@@ -238,6 +238,9 @@ class SourceDimensionOut(BaseModel):
     filter_type: str | None
     options_source: str | None
     time_field: bool
+    #: sorted filter operators the field allows; ``[]`` = not filterable
+    ops: list[str] = Field(default_factory=list)
+    enum_values: list[str] = Field(default_factory=list)
 
 
 class SourceMeasureOut(BaseModel):
@@ -254,3 +257,5 @@ class ReportSourceOut(BaseModel):
     measures: list[SourceMeasureOut]
     filter_fields: list[SourceDimensionOut]
     default_time_field: str | None
+    #: dashboard filter key (``COMMON_FILTER_KEYS``) -> field key of this source
+    common_fields: dict[str, str] = Field(default_factory=dict)

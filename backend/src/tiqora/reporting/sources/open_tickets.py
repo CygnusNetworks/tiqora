@@ -100,4 +100,15 @@ def open_tickets_source() -> ReportSource:
         time_fields=("created",),
         default_time_field=None,
         requires_facts=False,
+        common_fields={
+            "queue": "queue",
+            "state_type": "state_type",
+            "priority": "priority",
+            "type": "type",
+            "service": "service",
+            "sla": "sla",
+            "owner": "owner",
+            "customer": "customer",
+            "customer_user": "customer_user",
+        },
     )

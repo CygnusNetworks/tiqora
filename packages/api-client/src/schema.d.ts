@@ -17264,6 +17264,10 @@ export interface components {
         };
         /** ReportSourceOut */
         ReportSourceOut: {
+            /** Common Fields */
+            common_fields?: {
+                [key: string]: string;
+            };
             /** Default Time Field */
             default_time_field: string | null;
             /** Dimensions */
@@ -18048,6 +18052,8 @@ export interface components {
          *     no ``i18n_values`` / ``options_source`` and ``time_field`` false.
          */
         SourceDimensionOut: {
+            /** Enum Values */
+            enum_values?: string[];
             /** Filter Type */
             filter_type: string | null;
             /** I18N Values */
@@ -18060,6 +18066,8 @@ export interface components {
             label_key: string;
             /** Labels */
             labels: string;
+            /** Ops */
+            ops?: string[];
             /** Options Source */
             options_source: string | null;
             /** Time Field */

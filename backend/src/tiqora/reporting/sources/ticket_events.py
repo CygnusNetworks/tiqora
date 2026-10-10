@@ -109,4 +109,11 @@ def ticket_events_source() -> ReportSource:
         time_fields=("occurred",),
         default_time_field="occurred",
         archive_exclusion=lambda ctx: F.c.archived.is_(false()),
+        common_fields={
+            "queue": "ticket_queue",
+            "priority": "ticket_priority",
+            "type": "ticket_type",
+            "customer": "customer",
+            "channel": "channel",
+        },
     )

@@ -46,4 +46,11 @@ def accounted_time_source() -> ReportSource:
         time_fields=("booked",),
         default_time_field="booked",
         requires_facts=False,
+        common_fields={
+            "queue": "queue",
+            "type": "type",
+            "service": "service",
+            "customer": "customer",
+            "customer_user": "customer_user",
+        },
     )

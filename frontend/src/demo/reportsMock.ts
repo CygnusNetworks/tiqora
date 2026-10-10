@@ -152,6 +152,7 @@ export function demoSources(): ReportSource[] {
     key,
     label_key: `reports.sources.${key}`,
     default_time_field: null,
+    common_fields: {},
     dimensions: [],
     filter_fields: [],
     measures: pairs.split(" ").map((pair) => {

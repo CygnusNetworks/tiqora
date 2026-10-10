@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 import tiqora.api.v1.reports as reports_api
 import tiqora.reporting.jobs as report_jobs
+import tiqora.reporting.run_service as run_service
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db
 from tiqora.api.v1.reports import get_report_cache
@@ -503,7 +504,7 @@ async def test_inline_budget_is_shared_by_estimate_and_run(
     env: Env, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     seen: list[QueryBudget | None] = []
-    real_estimate, real_run = reports_api.estimate_rows, reports_api.execute_and_store
+    real_estimate, real_run = run_service.estimate_rows, run_service.execute_and_store
 
     async def estimate(*args: Any, **kwargs: Any) -> int:
         seen.append(kwargs.get("budget"))
@@ -513,8 +514,8 @@ async def test_inline_budget_is_shared_by_estimate_and_run(
         seen.append(kwargs.get("budget"))
         return await real_run(*args, **kwargs)
 
-    monkeypatch.setattr(reports_api, "estimate_rows", estimate)
-    monkeypatch.setattr(reports_api, "execute_and_store", run)
+    monkeypatch.setattr(run_service, "estimate_rows", estimate)
+    monkeypatch.setattr(run_service, "execute_and_store", run)
     resp = await _run(env, {"report_key": "builtin.channel_mix", "time_range": JUNE})
     assert resp.status_code == 200
     assert len(seen) == 2 and seen[0] is not None and seen[0] is seen[1]
@@ -527,7 +528,7 @@ async def test_timeout_is_504(env: Env, monkeypatch: pytest.MonkeyPatch) -> None
     async def slow(*args: Any, **kwargs: Any) -> Any:
         raise ReportQueryTimeout("budget used up")
 
-    monkeypatch.setattr(reports_api, "execute_and_store", slow)
+    monkeypatch.setattr(run_service, "execute_and_store", slow)
     resp = await _run(env, {"report_key": "builtin.channel_mix", "time_range": JUNE})
     assert resp.status_code == 504
     assert resp.json() == {"detail": {"message": TIMEOUT_TEXT}}
@@ -568,18 +569,18 @@ async def test_purge_during_an_inline_run_leaves_no_findable_result(
     rebuild) while it computes makes its stored result unreachable."""
     await env.facts_ready()
     body = {"report_key": "builtin.channel_mix", "time_range": JUNE}
-    real_estimate = reports_api.estimate_rows
+    real_estimate = run_service.estimate_rows
 
     async def estimate_then_purge(*args: Any, **kwargs: Any) -> int:
         rows = await real_estimate(*args, **kwargs)
         env.cache.store[GENERATION_KEY] = "1"  # what purge_report_cache's INCR does
         return rows
 
-    monkeypatch.setattr(reports_api, "estimate_rows", estimate_then_purge)
+    monkeypatch.setattr(run_service, "estimate_rows", estimate_then_purge)
     first = await _run(env, body)
     assert first.status_code == 200 and first.json()["result"]["cached"] is False
     assert any(k.endswith(":g0") for k in env.cache.store)  # stored under the old generation
-    monkeypatch.setattr(reports_api, "estimate_rows", real_estimate)
+    monkeypatch.setattr(run_service, "estimate_rows", real_estimate)
     again = await _run(env, body)
     assert again.json()["result"]["cached"] is False  # not found: computed afresh ...
     third = await _run(env, body)
@@ -591,7 +592,7 @@ async def test_threshold_triggers_job(env: Env, monkeypatch: pytest.MonkeyPatch)
     async def huge(*args: Any, **kwargs: Any) -> int:
         return 10**7
 
-    monkeypatch.setattr(reports_api, "estimate_rows", huge)
+    monkeypatch.setattr(run_service, "estimate_rows", huge)
     resp = await _run(env, {"report_key": "builtin.channel_mix", "time_range": JUNE})
     assert resp.status_code == 202
     assert resp.json()["job"]["job_id"] > 0
@@ -612,7 +613,7 @@ async def test_enqueue_runs_without_the_estimate_statement_timeout(
 ) -> None:
     """PostgreSQL keeps the estimate's ``SET LOCAL statement_timeout`` until the transaction
     ends; the job row must be written in a fresh transaction without it."""
-    real_estimate, real_enqueue = reports_api.estimate_rows, reports_api.enqueue_job
+    real_estimate, real_enqueue = run_service.estimate_rows, run_service.enqueue_job
     timeouts: list[Any] = []
 
     async def estimate(*args: Any, **kwargs: Any) -> int:
@@ -628,8 +629,8 @@ async def test_enqueue_runs_without_the_estimate_statement_timeout(
         timeouts.append((await session.execute(text(sql))).scalar_one())
         return await real_enqueue(session, **kwargs)
 
-    monkeypatch.setattr(reports_api, "estimate_rows", estimate)
-    monkeypatch.setattr(reports_api, "enqueue_job", enqueue)
+    monkeypatch.setattr(run_service, "estimate_rows", estimate)
+    monkeypatch.setattr(run_service, "enqueue_job", enqueue)
     resp = await _run(env, {"report_key": "builtin.channel_mix", "time_range": JUNE})
     assert resp.status_code == 202, resp.text
     assert len(timeouts) == 1
@@ -831,14 +832,14 @@ async def test_concurrent_report_jobs_cannot_overshoot_the_cap(
     env: Env, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Five background runs at once: the user-row lock lets exactly 3 through."""
-    real_count = reports_api.count_active_jobs
+    real_count = run_service.count_active_jobs
 
     async def slow_count(*args: Any, **kwargs: Any) -> int:
         n = await real_count(*args, **kwargs)
         await asyncio.sleep(0.2)  # widen the check-then-insert window
         return n
 
-    monkeypatch.setattr(reports_api, "count_active_jobs", slow_count)
+    monkeypatch.setattr(run_service, "count_active_jobs", slow_count)
     # five planners racing to CREATE the never-committed state row would deadlock in
     # load_state (its documented first-start contract) before reaching the cap
     await env.ensure_state()

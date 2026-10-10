@@ -24,6 +24,7 @@ from tiqora.reporting.definition import (
     validate_definition,
 )
 from tiqora.reporting.filter_sql import compile_conditions
+from tiqora.reporting.run_service import COMMON_FILTER_KEYS, common_filter
 from tiqora.reporting.semantic import REPORT_SOURCES, CompileContext, ReportSource
 from tiqora.reporting.sources import core_report_sources
 from tiqora.reporting.sql import TzSegment
@@ -660,3 +661,47 @@ def test_event_from_to_columns_are_gated_by_kind(dialect: Any) -> None:
     # process_activity / merge values never reach a state-type grouping
     assert "'process_activity'" not in sql("from_state_type")
     assert "'merge'" not in sql("to_state_type")
+
+
+# --- common filters (plan Task 4) -------------------------------------------------------
+
+
+@pytest.mark.parametrize("source", core_report_sources(), ids=lambda s: s.key)
+def test_common_fields_resolve_to_filterable_fields(source: ReportSource) -> None:
+    assert set(source.common_fields) <= set(COMMON_FILTER_KEYS)
+    for key, field in source.common_fields.items():
+        assert source.filter_spec(field) is not None, (source.key, key, field)
+
+
+def test_common_fields_table() -> None:
+    by_key = {s.key: s for s in core_report_sources()}
+    assert by_key["ticket_events"].common_fields["queue"] == "ticket_queue"
+    assert "channel" not in by_key["open_tickets"].common_fields
+    assert set(by_key["daily_snapshot"].common_fields) == {"queue", "state_type", "priority"}
+
+
+def test_common_filter_maps_and_reports_ignored() -> None:
+    src = {s.key: s for s in core_report_sources()}["accounted_time"]
+    flt, ignored = common_filter(src, {"queue": [5], "owner": [7], "channel": [], "bogus": ["x"]})
+    assert ignored == ("bogus", "owner")
+    assert flt is not None
+    assert flt.model_dump(by_alias=True, exclude_none=True)["where"] == {
+        "field": "queue",
+        "op": "in",
+        "value": [5],
+    }
+    assert common_filter(src, {}) == (None, ())
+
+
+def test_common_filter_several_keys_are_anded() -> None:
+    src = {s.key: s for s in core_report_sources()}["tickets"]
+    flt, ignored = common_filter(src, {"queue": [5], "customer": ["c1"]})
+    assert ignored == ()
+    assert flt is not None
+    where = flt.model_dump(by_alias=True, exclude_none=True)["where"]
+    assert where == {
+        "all": [
+            {"field": "customer", "op": "in", "value": ["c1"]},
+            {"field": "queue", "op": "in", "value": [5]},
+        ]
+    }
