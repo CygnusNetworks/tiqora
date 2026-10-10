@@ -5348,7 +5348,14 @@
         "groupsRequired": "Choose at least one group to share with.",
         "parameterFieldUnknown": "This field cannot be used as a filter for this data basis.",
         "duplicateParameter": "This parameter name is already used.",
-        "filterInvalid": "A filter condition is incomplete."
+        "filterInvalid": "A filter condition is incomplete.",
+        "sortInvalid": "The sort order refers to something that is not in the report.",
+        "parameterKeyInvalid": "The parameter name may only use lowercase letters, digits and underscores, and must start with a letter (40 characters at most).",
+        "parameterOpInvalid": "This comparison is not possible for the chosen field.",
+        "parameterValueInvalid": "A value does not fit the chosen field or the allowed values.",
+        "limitInvalid": "The row limit must be between 1 and 10,000.",
+        "topNInvalid": "The top list must have between 1 and 100 entries.",
+        "timeRangeInvalid": "The time range is not valid."
       },
       "viz": {
         "table": "Table",

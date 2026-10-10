@@ -22,7 +22,8 @@ export const MAX_DIMENSIONS = 3;
 export const MAX_MEASURES = 10;
 export const MAX_PARAMETERS = 10;
 
-export type DimensionSlot = { key: string; grain: Grain | null; choices: string[]; topN: number | null };
+/** `date` marks a time dimension: only those carry a grain (backend: grain on other kinds is a 422). */
+export type DimensionSlot = { key: string; grain: Grain | null; choices: string[]; topN: number | null; date?: boolean };
 
 export type BuilderState = {
   name: string;
@@ -106,6 +107,13 @@ function remapChartMeasures(viz: Visualization, map: (i: number) => number | nul
   return { ...viz, chart_measures: next.length > 0 ? next : null };
 }
 
+/** Drops `chart_measures` indexes that point outside the measures (backend: 422). */
+function clampChartMeasures(viz: Visualization, count: number): Visualization {
+  if (!viz.chart_measures) return viz;
+  const kept = viz.chart_measures.filter((i) => Number.isInteger(i) && i >= 0 && i < count);
+  return { ...viz, chart_measures: kept.length > 0 ? kept : null };
+}
+
 export function builderReducer(state: BuilderState, action: BuilderAction): BuilderState {
   switch (action.type) {
     case "setSource": {
@@ -117,20 +125,34 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       if ([...state.rows, ...state.columns].some((d) => d.key === action.key)) return state;
       if (action.target === "columns" && state.columns.length >= 1) return state;
       const isDate = action.date ?? KNOWN_DATE_DIMENSIONS.has(action.key);
-      const slot: DimensionSlot = { key: action.key, grain: isDate ? "day" : null, choices: [], topN: null };
+      const slot: DimensionSlot = { key: action.key, grain: isDate ? "day" : null, choices: [], topN: null, date: isDate };
       return { ...state, [action.target]: [...state[action.target], slot] };
     }
     case "removeDimension": {
       const list = state[action.target];
       if (action.index < 0 || action.index >= list.length) return state;
-      return { ...state, [action.target]: list.filter((_, i) => i !== action.index) };
+      const removed = list[action.index].key;
+      return {
+        ...state,
+        [action.target]: list.filter((_, i) => i !== action.index),
+        sort: state.sort.filter((s) => s.key !== removed),
+      };
     }
     case "moveDimension":
       return { ...state, [action.target]: swap(state[action.target], action.index, action.delta) };
     case "updateDimension": {
       const list = state[action.target];
       if (action.index < 0 || action.index >= list.length) return state;
-      return { ...state, [action.target]: list.map((d, i) => (i === action.index ? { ...d, ...action.patch } : d)) };
+      return {
+        ...state,
+        [action.target]: list.map((d, i) => {
+          if (i !== action.index) return d;
+          const next = { ...d, ...action.patch };
+          // A grain only makes sense on a time dimension.
+          if (!d.date && !KNOWN_DATE_DIMENSIONS.has(d.key)) next.grain = null;
+          return next;
+        }),
+      };
     }
     case "addMeasure":
       if (state.measures.length >= MAX_MEASURES || state.measures.includes(action.key)) return state;
@@ -140,6 +162,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       return {
         ...state,
         measures: state.measures.filter((_, i) => i !== action.index),
+        sort: state.sort.filter((s) => s.key !== state.measures[action.index]),
         visualization: remapChartMeasures(state.visualization, (i) => (i === action.index ? null : i > action.index ? i - 1 : i)),
       };
     }
@@ -164,7 +187,13 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
       };
     case "setVisualization":
       // The series dimension is derived from the columns, never set directly.
-      return { ...state, visualization: { ...state.visualization, ...action.patch, series_dimension: null } };
+      return {
+        ...state,
+        visualization: clampChartMeasures(
+          { ...state.visualization, ...action.patch, series_dimension: null },
+          state.measures.length,
+        ),
+      };
     case "setSort":
       return { ...state, sort: action.sort };
     case "setLimit":
@@ -190,6 +219,7 @@ function slotFromRef(d: DimensionRef): DimensionSlot {
   return {
     key: d.key,
     grain: (d.grain ?? null) as Grain | null,
+    date: d.grain != null || KNOWN_DATE_DIMENSIONS.has(d.key),
     choices: d.choices ? [...d.choices] : [],
     topN: d.top_n ?? null,
   };
@@ -216,11 +246,14 @@ export function fromDefinition(defn: ReportDefinition, meta?: { name?: string; d
     timeField: defn.time_field ?? null,
     timeRange: defn.time_range ?? null,
     timeZone: defn.time_zone ?? null,
-    visualization: {
-      type: viz?.type ?? "table",
-      series_dimension: null,
-      ...(viz?.chart_measures && viz.chart_measures.length > 0 ? { chart_measures: [...viz.chart_measures] } : {}),
-    },
+    visualization: clampChartMeasures(
+      {
+        type: viz?.type ?? "table",
+        series_dimension: null,
+        ...(viz?.chart_measures && viz.chart_measures.length > 0 ? { chart_measures: [...viz.chart_measures] } : {}),
+      },
+      (defn.measures ?? []).length,
+    ),
     sort: defn.sort ? [...defn.sort] : [],
     limit: defn.limit ?? null,
     totals: { grand: false, rows: false, columns: false, ...(defn.totals ?? {}) },
@@ -229,8 +262,8 @@ export function fromDefinition(defn: ReportDefinition, meta?: { name?: string; d
 
 function slotToRef(d: DimensionSlot): DimensionRef {
   const out: DimensionRef = { key: d.key };
-  if (d.grain) out.grain = d.grain;
-  if (d.choices.length > 0) out.choices = d.choices;
+  if (d.grain && (d.date || KNOWN_DATE_DIMENSIONS.has(d.key))) out.grain = d.grain;
+  if (d.choices.length > 0) out.choices = [...d.choices];
   if (d.topN !== null) out.top_n = d.topN;
   return out;
 }
@@ -255,10 +288,10 @@ export function toDefinition(state: BuilderState): ReportDefinition | null {
     sort: state.sort.map((s) => ({ ...s })),
     totals: { ...state.totals },
   };
-  if (state.filter && state.filter.where) out.filter = state.filter;
-  if (state.parameters.length > 0) out.parameters = state.parameters;
+  if (state.filter && state.filter.where) out.filter = structuredClone(state.filter);
+  if (state.parameters.length > 0) out.parameters = structuredClone(state.parameters);
   if (state.timeField) out.time_field = state.timeField;
-  if (state.timeRange) out.time_range = state.timeRange;
+  if (state.timeRange) out.time_range = { ...state.timeRange };
   if (state.timeZone) out.time_zone = state.timeZone;
   if (state.limit !== null) out.limit = state.limit;
   return out;
@@ -321,6 +354,15 @@ export type ValidateMeta = {
   groupsMissing?: boolean;
 };
 
+const PARAMETER_KEY = /^[a-z][a-z0-9_]{0,39}$/;
+
+/** Mirrors the backend `_check_parameter` value rules: ints for id/int fields, strings otherwise, enum members. */
+function parameterValueOk(v: string | number, field: { type: string; enumValues: { value: string }[] }): boolean {
+  if (field.type === "id" || field.type === "int") return typeof v === "number" && Number.isInteger(v);
+  if (typeof v !== "string") return false;
+  return field.type !== "enum" || field.enumValues.some((e) => e.value === v);
+}
+
 // Only keys are looked up; no translation happens here.
 const keyOnly = ((k: string) => k) as unknown as TFunction;
 
@@ -344,19 +386,44 @@ export function validate(state: BuilderState, source: ReportSource | undefined, 
   if (source) {
     const fields = fieldsFromSource(source, keyOnly);
     if (state.filter && ticketFilterErrors(state.filter, fields).size > 0) add("filter", "filterInvalid");
-    const filterable = new Set(fields.map((f) => f.key));
-    const seen = new Set<string>();
-    state.parameters.forEach((p, i) => {
-      if (seen.has(p.key)) add(`parameters.${i}.key`, "duplicateParameter");
-      seen.add(p.key);
-      if (!filterable.has(p.field)) add(`parameters.${i}.field`, "parameterFieldUnknown");
-    });
-  } else {
-    const seen = new Set<string>();
-    state.parameters.forEach((p, i) => {
-      if (seen.has(p.key)) add(`parameters.${i}.key`, "duplicateParameter");
-      seen.add(p.key);
-    });
+  }
+  const byKey = new Map((source ? fieldsFromSource(source, keyOnly) : []).map((f) => [f.key, f]));
+  const seen = new Set<string>();
+  state.parameters.forEach((p, i) => {
+    if (seen.has(p.key)) add(`parameters.${i}.key`, "duplicateParameter");
+    seen.add(p.key);
+    if (!PARAMETER_KEY.test(p.key)) add(`parameters.${i}.key`, "parameterKeyInvalid");
+    if (!source) return;
+    const field = byKey.get(p.field);
+    if (!field) {
+      add(`parameters.${i}.field`, "parameterFieldUnknown");
+      return;
+    }
+    if (!field.ops.includes(p.op ?? "in")) add(`parameters.${i}.op`, "parameterOpInvalid");
+    for (const name of ["allowed_values", "default"] as const) {
+      const bad = (p[name] ?? []).some((v) => !parameterValueOk(v, field));
+      if (bad) add(`parameters.${i}.${name}`, "parameterValueInvalid");
+    }
+    if (p.allowed_values && p.default && p.default.some((v) => !p.allowed_values!.includes(v))) {
+      add(`parameters.${i}.default`, "parameterValueInvalid");
+    }
+  });
+
+  const sortable = new Set([...state.rows, ...state.columns].map((d) => d.key).concat(state.measures));
+  if (state.sort.length > 3 || state.sort.some((s) => !sortable.has(s.key))) add("sort", "sortInvalid");
+  if (state.limit !== null && !(Number.isInteger(state.limit) && state.limit >= 1 && state.limit <= 10_000)) {
+    add("limit", "limitInvalid");
+  }
+  if ([...state.rows, ...state.columns].some((d) => d.topN !== null && !(Number.isInteger(d.topN) && d.topN >= 1 && d.topN <= 100))) {
+    add("dimensions", "topNInvalid");
+  }
+  const tr = state.timeRange;
+  if (tr) {
+    const bad =
+      tr.kind === "absolute"
+        ? !tr.start || !tr.end || tr.end < tr.start
+        : !Number.isInteger(tr.count) || tr.count < 1 || tr.count > 3660;
+    if (bad) add("timeRange", "timeRangeInvalid");
   }
 
   if (meta?.name && state.name.trim() === "") add("name", "nameRequired");

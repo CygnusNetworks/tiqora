@@ -208,4 +208,78 @@ describe("builderState", () => {
     s = builderReducer(s, { type: "removeMeasure", index: 0 });
     expect(toDefinition(s)?.visualization?.chart_measures).toBeUndefined();
   });
+
+  const base = () => fromDefinition({ source: "tickets", dimensions: [{ key: "queue" }], measures: [{ key: "tickets" }, { key: "closed_tickets" }] } as never);
+  const withParam = (param: object) =>
+    builderReducer(base(), { type: "setParameters", parameters: [{ key: "queues", field: "queue", op: "in", ...param }] as never });
+
+  it("prunes sort entries of removed measures and dimensions", () => {
+    let s = builderReducer(base(), { type: "setSort", sort: [{ key: "closed_tickets", direction: "desc" }, { key: "queue", direction: "asc" }] });
+    expect(keys(s)).toEqual([]);
+    s = builderReducer(s, { type: "removeMeasure", index: 1 });
+    expect(toDefinition(s)?.sort).toEqual([{ key: "queue", direction: "asc" }]);
+    s = builderReducer(s, { type: "removeDimension", target: "rows", index: 0 });
+    expect(toDefinition(s)?.sort).toEqual([]);
+  });
+
+  it("reports a sort key the backend would reject", () => {
+    const s = builderReducer(base(), { type: "setSort", sort: [{ key: "nope", direction: "asc" }] });
+    expect(keys(s)).toEqual(["sortInvalid"]);
+    expect(toDefinition(s)).toBeNull();
+  });
+
+  it("parameter key must match the backend pattern", () => {
+    expect(keys(withParam({ key: "Queue" }))).toEqual(["parameterKeyInvalid"]);
+    expect(keys(withParam({ key: "q".repeat(41) }))).toEqual(["parameterKeyInvalid"]);
+    expect(keys(withParam({ key: "queue_2" }))).toEqual([]);
+  });
+
+  it("parameter op must be allowed for the field", () => {
+    expect(keys(withParam({ op: "is_true" }))).toEqual(["parameterOpInvalid"]);
+    expect(keys(withParam({ op: "eq" }))).toEqual([]);
+  });
+
+  it("parameter values are typed like the backend checks them", () => {
+    expect(keys(withParam({ default: ["3"] }))).toEqual(["parameterValueInvalid"]); // id field wants integers
+    expect(keys(withParam({ allowed_values: [1, 2], default: [3] }))).toEqual(["parameterValueInvalid"]); // default not allowed
+    expect(keys(withParam({ allowed_values: [1, 2], default: [2] }))).toEqual([]);
+    const ch = builderReducer(base(), {
+      type: "setParameters",
+      parameters: [{ key: "c", field: "channel", op: "in", allowed_values: ["email", "fax"] }] as never,
+    });
+    expect(keys(ch)).toEqual(["parameterValueInvalid"]); // enum member
+  });
+
+  it("grain is dropped on non-date dimensions and cannot be set by a patch", () => {
+    let s = builderReducer(base(), { type: "updateDimension", target: "rows", index: 0, patch: { grain: "week" } });
+    expect(s.rows[0].grain).toBeNull();
+    s = fromDefinition({ source: "tickets", dimensions: [{ key: "queue", grain: "week" }], measures: [{ key: "tickets" }] } as never);
+    s = { ...s, rows: [{ ...s.rows[0], date: false }] };
+    expect(toDefinition(s)?.dimensions?.[0]).toEqual({ key: "queue" });
+    s = builderReducer(builderReducer(initialState(), { type: "setSource", source: "tickets" }), { type: "addDimension", target: "rows", key: "created" });
+    s = builderReducer(s, { type: "updateDimension", target: "rows", index: 0, patch: { grain: "month" } });
+    expect(s.rows[0].grain).toBe("month");
+  });
+
+  it("drops chart_measures outside the measures on load and patch", () => {
+    let s = fromDefinition({ source: "tickets", measures: [{ key: "tickets" }], visualization: { type: "bar", chart_measures: [0, 4] } } as never);
+    expect(s.visualization.chart_measures).toEqual([0]);
+    s = builderReducer(s, { type: "setVisualization", patch: { chart_measures: [7] } });
+    expect(s.visualization.chart_measures).toBeNull();
+  });
+
+  it("checks limit, top_n and the time range bounds", () => {
+    let s = builderReducer(base(), { type: "setLimit", limit: 20000 });
+    expect(keys(s)).toEqual(["limitInvalid"]);
+    s = builderReducer(s, { type: "setLimit", limit: 50 });
+    s = builderReducer(s, { type: "updateDimension", target: "rows", index: 0, patch: { topN: 101 } });
+    expect(keys(s)).toEqual(["topNInvalid"]);
+    s = builderReducer(s, { type: "updateDimension", target: "rows", index: 0, patch: { topN: 5 } });
+    s = builderReducer(s, { type: "setTime", timeRange: { kind: "relative", unit: "day", count: 4000 } as never });
+    expect(keys(s)).toEqual(["timeRangeInvalid"]);
+    s = builderReducer(s, { type: "setTime", timeRange: { kind: "absolute", start: "2026-02-01", end: "2026-01-01" } as never });
+    expect(keys(s)).toEqual(["timeRangeInvalid"]);
+    s = builderReducer(s, { type: "setTime", timeRange: { kind: "relative", unit: "day", count: 30 } as never });
+    expect(keys(s)).toEqual([]);
+  });
 });
