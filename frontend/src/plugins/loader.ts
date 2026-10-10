@@ -24,6 +24,8 @@ let testImporter: Importer | null = null;
 const cache = new Map<string, Promise<PluginModule>>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const components = new Map<string, LazyExoticComponent<ComponentType<any>>>();
+/** Keys of lazy components whose load failed (see forgetPluginComponents). */
+const failedComponents = new Set<string>();
 
 /** Tests: replace `import()` (null restores it). Also empties the module cache. */
 export function setPluginImporterForTests(importer: Importer | null): void {
@@ -40,6 +42,7 @@ export function setPluginImporter(importer: Importer): void {
 export function clearPluginModuleCacheForTests(): void {
   cache.clear();
   components.clear();
+  failedComponents.clear();
 }
 
 const ASSET_PREFIX = "/api/v1/plugins/";
@@ -150,21 +153,32 @@ export function pluginComponent(
   let component = components.get(key);
   if (!component) {
     component = lazy(() =>
-      Promise.all([loadPluginModule(plugin), prepare?.()]).then(([mod]) => {
-        const found = mod.components[name];
-        if (!found) throw new Error(`Baustein „${name}“ fehlt`);
-        return { default: found };
-      }),
+      Promise.all([loadPluginModule(plugin), prepare?.()])
+        .then(([mod]) => {
+          const found = mod.components[name];
+          if (!found) throw new Error(`Baustein „${name}“ fehlt`);
+          return { default: found };
+        })
+        .catch((err: unknown) => {
+          failedComponents.add(key);
+          throw err;
+        }),
     );
     components.set(key, component);
   }
   return component;
 }
 
-/** After a slot showed an error: the next mount of this plugin version tries again. */
+/**
+ * After a slot showed an error: the next mount of this plugin version tries
+ * the components whose load failed again. Loaded ones stay cached — a new
+ * lazy object would remount (and reset) the plugin's other, working slots.
+ */
 export function forgetPluginComponents(plugin: FrontendPlugin): void {
   const prefix = `${plugin.id}@${plugin.version}:`;
-  for (const key of [...components.keys()]) {
-    if (key.startsWith(prefix)) components.delete(key);
+  for (const key of [...failedComponents]) {
+    if (!key.startsWith(prefix)) continue;
+    components.delete(key);
+    failedComponents.delete(key);
   }
 }

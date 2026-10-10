@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useContext } from "react";
+import { useContext, useEffect, useState } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import i18n from "@/i18n";
 import { helloPlugin } from "@/test/pluginFixtures";
@@ -124,6 +124,41 @@ describe("PluginBoundary", () => {
     render(slot());
     expect(await screen.findByText("Zweiter Versuch")).toBeInTheDocument();
     expect(calls).toBe(2);
+  });
+
+  it("a failing slot does not reset the plugin's working slots", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    let mounts = 0;
+    const Panel = () => {
+      useEffect(() => {
+        mounts += 1;
+      }, []);
+      return <p>Panel geladen</p>;
+    };
+    setPluginImporterForTests(() => Promise.resolve({ default: { components: { Panel } } }));
+    let rerender: () => void = () => {};
+    const Page = () => {
+      const [, setTick] = useState(0);
+      rerender = () => setTick((n) => n + 1);
+      return (
+        <>
+          <PluginBoundary plugin={plugin}>
+            <PluginComponent plugin={plugin} name="Panel" props={{}} />
+          </PluginBoundary>
+          <PluginBoundary plugin={plugin}>
+            <PluginComponent plugin={plugin} name="Nope" props={{}} />
+          </PluginBoundary>
+        </>
+      );
+    };
+    render(<Page />);
+    expect(await screen.findByText("Panel geladen")).toBeInTheDocument();
+    expect(await screen.findByText(/konnte nicht geladen werden/)).toBeInTheDocument();
+    expect(mounts).toBe(1);
+    act(() => rerender());
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.getByText("Panel geladen")).toBeInTheDocument();
+    expect(mounts).toBe(1);
   });
 
   it("provides the plugin instance context to the component", async () => {
