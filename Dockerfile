@@ -137,6 +137,9 @@ ENV PATH="/app/.venv/bin:$PATH" \
     TIQORA_GIT_SHA=$TIQORA_GIT_SHA \
     TIQORA_BUILD_TIME=$TIQORA_BUILD_TIME
 
+# Pins for `tiqora plugins bake`: plugin installs must not move any core dependency.
+RUN python -m tiqora.main plugins constraints > /app/backend/core-constraints.txt
+
 WORKDIR /app/backend
 USER tiqora
 EXPOSE 8000 8001

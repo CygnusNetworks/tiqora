@@ -26,6 +26,7 @@
     "@tanstack/react-query": "^5.64.1",
     "@tanstack/react-router": "^1.97.0",
     "@tiqora/api-client": "workspace:*",
+    "@tiqora/plugin-sdk": "workspace:*",
     "clsx": "^2.1.1",
     "diff": "^9.0.0",
     "dompurify": "^3.4.16",

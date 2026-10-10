@@ -15,6 +15,8 @@ from pathlib import Path
 import pytest
 from sqlalchemy import Connection, create_engine, inspect, text
 
+from tests.plugins.helpers import fixture_plugins  # noqa: F401
+
 # Single source of truth: shipped package data under tiqora.bootstrap.schema.
 from tiqora.bootstrap.schema_loader import (
     load_sql_mysql as _load_sql_mysql,

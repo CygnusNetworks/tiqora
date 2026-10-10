@@ -47,6 +47,12 @@ _RESERVED_PREFIXES: tuple[str, ...] = (
 _ASSET_CACHE = "public, max-age=31536000, immutable"
 _HTML_CACHE = "no-cache"
 
+#: Unhashed runtime shims that plugin bundles import (see
+#: packages/plugin-sdk/src/shared.ts). Real files are served like other root
+#: files (``no-cache``); a missing one is a 404, not the SPA shell — a plugin
+#: built against a newer SDK should fail with a clear "not found".
+_PLUGIN_RUNTIME_PREFIX = "/plugin-runtime"
+
 
 class _ImmutableStaticFiles(StaticFiles):
     """StaticFiles that marks its (content-hashed) responses immutable."""
@@ -93,6 +99,8 @@ def mount_spa(app: FastAPI, cfg: Settings) -> bool:
             candidate = (dist / full_path).resolve()
             if candidate.is_file() and candidate.is_relative_to(dist):
                 return FileResponse(candidate, headers={"Cache-Control": _HTML_CACHE})
+        if path == _PLUGIN_RUNTIME_PREFIX or path.startswith(_PLUGIN_RUNTIME_PREFIX + "/"):
+            raise HTTPException(status_code=404, detail="Not found")
         return FileResponse(index, headers={"Cache-Control": _HTML_CACHE})
 
     logger.info("spa_mounted", dist=str(dist))

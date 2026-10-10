@@ -53,6 +53,7 @@
     "kb": "قاعدة المعرفة"
   },
   "sidebar": {
+    "plugins": "Extensions",
     "workspace": "مساحة العمل",
     "inbox": "البريد الوارد",
     "myTickets": "التذاكر الخاصة بي",
@@ -2756,7 +2757,8 @@
         "agents": "الوكلاء",
         "admin": "واجهة برمجة تطبيقات المشرف",
         "mcp": "خادم MCP",
-        "compat": "واجهة Znuny العامة"
+        "compat": "واجهة Znuny العامة",
+        "plugins": "Extensions"
       }
     },
     "processes": {
@@ -3108,6 +3110,14 @@
         "deploy_watch": {
           "name": "Deploy watcher",
           "description": "Detects processes and ACLs deployed in Znuny and makes Tiqora use them only after that."
+        },
+        "plugin_events": {
+          "name": "Extensions: pass on ticket changes",
+          "description": "Passes new ticket changes on to the extensions that react to them."
+        },
+        "plugin_tasks": {
+          "name": "Extensions: scheduled tasks",
+          "description": "Starts the regular tasks of the extensions."
         }
       },
       "takeoverBadge": "الاستيلاء",
@@ -5326,5 +5336,12 @@
     "rangeInvalid": "The start date is after the end date. Please correct the period.",
     "deniedTitle": "No access to reports",
     "deniedBody": "Your account is not allowed to view reports. Please contact your administrator."
+  },
+  "plugins": {
+    "slotError": "Extension “{{name}}” could not be loaded.",
+    "slotErrorDetails": "Details",
+    "safeModeBrowser": "Extensions are switched off in this browser window.",
+    "pageNotFound": "This page of the extension does not exist.",
+    "widgetsTitle": "Extensions"
   }
 }

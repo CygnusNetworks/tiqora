@@ -1,6 +1,6 @@
 """Migration 20261010_0071 (dashboards) on real databases.
 
-Upgrades from 0067, compares the migrated schema with the ORM metadata (columns, types,
+Upgrades from 0070 (plugins), compares the migrated schema with the ORM metadata (columns, types,
 nullability, indexes, unique constraints, foreign keys), checks that no foreign key leaves
 the ``tiqora_*`` tables, downgrades, upgrades again and (MariaDB) stores payloads over 64 KiB.
 Sync test on purpose: Alembic's env.py runs its own event loop. Leaves the schema at head.
@@ -24,7 +24,7 @@ from tiqora.db.tiqora.base import TiqoraBase
 
 pytestmark = pytest.mark.db
 
-_PREVIOUS = "20261009_0067"
+_PREVIOUS = "20261010_0070"
 _NEW = "20261010_0071"
 _TABLES = {
     "tiqora_dashboard",

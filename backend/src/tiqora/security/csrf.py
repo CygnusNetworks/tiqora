@@ -1,6 +1,6 @@
 """Conservative Origin/Referer CSRF check for cookie-authenticated mutations.
 
-Only applies to state-changing requests on ``/api/v1`` and ``/api/portal`` that
+Only applies to state-changing requests on ``/api/v1``, ``/api/portal`` and ``/api/plugins`` that
 carry a session cookie and are **not** authenticated via ``Authorization``
 (API keys are CSRF-immune). Safe methods and missing cookies are left alone so
 the SPA (same-origin) and non-browser tools keep working (SECURITY M-02).
@@ -20,7 +20,7 @@ from tiqora.config import Settings
 CallNext = Callable[[Request], Awaitable[Response]]
 
 _UNSAFE = frozenset({"POST", "PUT", "PATCH", "DELETE"})
-_PROTECTED_PREFIXES = ("/api/v1", "/api/portal")
+_PROTECTED_PREFIXES = ("/api/v1", "/api/portal", "/api/plugins")
 # Cross-site form POSTs by design: the IdP's browser POST to the SAML ACS / SLS can carry
 # either session cookie and a foreign Origin. Each is authenticated by its XML signature,
 # a Redis-held request id and (ACS) a per-browser cookie, not by the session cookie.

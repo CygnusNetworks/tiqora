@@ -18,6 +18,7 @@ from tiqora.cli.gdpr import add_gdpr_subparser
 from tiqora.cli.migrate import add_migrate_subparser, run_migrate
 from tiqora.cli.openapi import add_openapi_subparser
 from tiqora.cli.ownership import add_ownership_subparser
+from tiqora.cli.plugins import add_plugins_subparser
 from tiqora.cli.report import add_report_subparser
 from tiqora.config import get_settings
 
@@ -45,6 +46,7 @@ def main(argv: list[str] | None = None) -> None:
     add_dev_subparser(sub)
     add_gdpr_subparser(sub)
     add_report_subparser(sub)
+    add_plugins_subparser(sub)
     add_crypto_subparser(sub)
     add_api_key_subparser(sub)
     add_openapi_subparser(sub)
@@ -133,6 +135,13 @@ def main(argv: list[str] | None = None) -> None:
         func = getattr(args, "func", None)
         if func is None:
             sub.choices["report"].print_help()
+            sys.exit(2)
+        exit_code = asyncio.run(func(args))
+        sys.exit(exit_code)
+    elif command == "plugins":
+        func = getattr(args, "func", None)
+        if func is None:
+            sub.choices["plugins"].print_help()
             sys.exit(2)
         exit_code = asyncio.run(func(args))
         sys.exit(exit_code)

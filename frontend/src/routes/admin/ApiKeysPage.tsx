@@ -30,6 +30,7 @@ import {
 } from "@/lib/apiKeyExpiry";
 import {
   API_KEY_AREAS,
+  allReadOnlySelection,
   type AreaLevel,
   type AreaSelection,
   type ScopeMode,
@@ -171,7 +172,7 @@ function ScopesField({
               apply(
                 key,
                 key === "read_only"
-                  ? Object.fromEntries(API_KEY_AREAS.map((a) => [a, "ro"])) as AreaSelection
+                  ? allReadOnlySelection()
                   : key === "unrestricted"
                     ? emptyAreaSelection()
                     : selection,

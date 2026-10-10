@@ -53,6 +53,7 @@
     "kb": "ナレッジベース"
   },
   "sidebar": {
+    "plugins": "Extensions",
     "workspace": "ワークスペース",
     "inbox": "受信箱",
     "myTickets": "自分のチケット",
@@ -2764,7 +2765,8 @@
         "agents": "エージェント",
         "admin": "管理者API",
         "mcp": "MCPサーバー",
-        "compat": "Znuny GenericInterface"
+        "compat": "Znuny GenericInterface",
+        "plugins": "Extensions"
       }
     },
     "processes": {
@@ -3116,6 +3118,14 @@
         "deploy_watch": {
           "name": "Deploy watcher",
           "description": "Detects processes and ACLs deployed in Znuny and makes Tiqora use them only after that."
+        },
+        "plugin_events": {
+          "name": "Extensions: pass on ticket changes",
+          "description": "Passes new ticket changes on to the extensions that react to them."
+        },
+        "plugin_tasks": {
+          "name": "Extensions: scheduled tasks",
+          "description": "Starts the regular tasks of the extensions."
         }
       },
       "takeoverBadge": "乗っ取り",
@@ -5334,5 +5344,12 @@
     "rangeInvalid": "The start date is after the end date. Please correct the period.",
     "deniedTitle": "No access to reports",
     "deniedBody": "Your account is not allowed to view reports. Please contact your administrator."
+  },
+  "plugins": {
+    "slotError": "Extension “{{name}}” could not be loaded.",
+    "slotErrorDetails": "Details",
+    "safeModeBrowser": "Extensions are switched off in this browser window.",
+    "pageNotFound": "This page of the extension does not exist.",
+    "widgetsTitle": "Extensions"
   }
 }

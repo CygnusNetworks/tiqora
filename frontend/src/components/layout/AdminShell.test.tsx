@@ -8,10 +8,12 @@ import {
   createRouter,
   createMemoryHistory,
 } from "@tanstack/react-router";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
 import { AdminShell } from "./AdminShell";
 import { ADMIN_PAGES } from "@/lib/adminSearch";
 
+vi.mock("@/lib/pluginsApi", () => ({ pluginsApi: { frontend: vi.fn().mockResolvedValue([]) } }));
 vi.mock("@/components/agent/AccountMenu", () => ({
   AccountMenu: () => <div data-testid="account-menu-stub" />,
 }));
@@ -51,10 +53,12 @@ async function renderShell(initialPath = "/admin") {
   });
   await router.load();
   render(
-    <I18nextProvider i18n={i18n}>
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      <RouterProvider router={router as any} />
-    </I18nextProvider>,
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <I18nextProvider i18n={i18n}>
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        <RouterProvider router={router as any} />
+      </I18nextProvider>
+    </QueryClientProvider>,
   );
   return router;
 }

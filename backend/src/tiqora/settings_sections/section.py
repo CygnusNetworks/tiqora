@@ -117,4 +117,5 @@ SETTINGS_SECTIONS: ExtensionPoint[SettingsSection] = ExtensionPoint(
     key="core.settings_sections",
     item_key=lambda s: s.key,
     description="Admin settings sections stored in tiqora_settings.",
+    sdk_stable=True,
 )

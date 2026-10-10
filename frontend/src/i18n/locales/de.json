@@ -53,6 +53,7 @@
     "kb": "Wissensdatenbank"
   },
   "sidebar": {
+    "plugins": "Erweiterungen",
     "workspace": "Arbeitsbereich",
     "inbox": "Eingang",
     "myTickets": "Meine Tickets",
@@ -2764,7 +2765,8 @@
         "agents": "Agenten",
         "admin": "Admin-API",
         "mcp": "MCP-Server",
-        "compat": "Znuny GenericInterface"
+        "compat": "Znuny GenericInterface",
+        "plugins": "Erweiterungen"
       }
     },
     "processes": {
@@ -3116,6 +3118,14 @@
         "deploy_watch": {
           "name": "Bereitstellung beobachten",
           "description": "Erkennt in Znuny bereitgestellte Prozesse und ACLs und lässt Tiqora erst dann damit arbeiten."
+        },
+        "plugin_events": {
+          "name": "Erweiterungen: Ticketänderungen weitergeben",
+          "description": "Gibt neue Ticketänderungen an Erweiterungen weiter, die darauf reagieren."
+        },
+        "plugin_tasks": {
+          "name": "Erweiterungen: zeitgesteuerte Aufgaben",
+          "description": "Startet die regelmäßigen Aufgaben der Erweiterungen."
         }
       },
       "takeoverBadge": "Übernahme",
@@ -5334,5 +5344,12 @@
     "rangeInvalid": "Das Startdatum liegt nach dem Enddatum. Bitte den Zeitraum korrigieren.",
     "deniedTitle": "Kein Zugriff auf Berichte",
     "deniedBody": "Ihr Konto darf die Berichte nicht ansehen. Bitte wenden Sie sich an Ihre Administration."
+  },
+  "plugins": {
+    "slotError": "Erweiterung „{{name}}“ konnte nicht geladen werden.",
+    "slotErrorDetails": "Details",
+    "safeModeBrowser": "Erweiterungen sind in diesem Browserfenster ausgeschaltet.",
+    "pageNotFound": "Diese Seite der Erweiterung gibt es nicht.",
+    "widgetsTitle": "Erweiterungen"
   }
 }

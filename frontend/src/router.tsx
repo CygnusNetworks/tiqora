@@ -1,3 +1,4 @@
+import { PluginRoutePage } from "@/routes/agent/PluginRoutePage";
 import {
   Outlet,
   createRootRoute,
@@ -575,6 +576,12 @@ const agentCustomerRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/customers/$login",
   component: CustomerDetailPage,
+});
+
+const agentPluginRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/plugins/$pluginId/$",
+  component: PluginRoutePage,
 });
 
 const agentDialRoute = createRoute({
@@ -1157,6 +1164,7 @@ const routeTree = rootRoute.addChildren([
     agentCustomersRoute,
     agentCustomerRoute,
     agentDialRoute,
+    agentPluginRoute,
   ]),
   portalLoginRoute,
   portalLayoutRoute.addChildren([

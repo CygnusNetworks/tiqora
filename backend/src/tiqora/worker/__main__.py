@@ -175,6 +175,29 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
         return await run_report_facts_worker_tick(settings)
 
     from tiqora.extensions import get_registry
+    from tiqora.plugins.event_dispatch import run_plugin_events_tick
+
+    async def plugin_events_tick() -> dict[str, int]:
+        # the registry object is read every tick: a late plugin boot swaps its contents
+        return await run_plugin_events_tick(
+            registry=get_registry(),
+            settings=settings,
+            session_factory=get_session_factory(),
+            stop=stop,
+        )
+
+    from tiqora.plugins.tasks import MIN_RUN_BUDGET_SECONDS, run_plugin_tasks_tick
+
+    async def plugin_tasks_tick() -> dict[str, int]:
+        # live registry every tick (late plugin boot); a slow task never holds up the others
+        return await run_plugin_tasks_tick(
+            registry=get_registry(),
+            session_factory=get_session_factory(),
+            stop=stop,
+            budget_seconds=float(
+                max(settings.plugin_tasks_interval_seconds * 2, MIN_RUN_BUDGET_SECONDS)
+            ),
+        )
 
     job_runner = JobRunner(
         session_factory=get_session_factory(), settings=settings, registry=get_registry()
@@ -256,6 +279,20 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             None,
             stop,
         ),
+        _interval_loop(
+            "plugin_events",
+            plugin_events_tick,
+            settings.plugin_events_interval_seconds,
+            None,
+            stop,
+        ),
+        _interval_loop(
+            "plugin_tasks",
+            plugin_tasks_tick,
+            settings.plugin_tasks_interval_seconds,
+            None,
+            stop,
+        ),
         _daily_loop("gdpr_retention", run_gdpr_retention_tick, "03:00", stop),
         _daily_loop("gdpr_erasure_purge", run_gdpr_erasure_purge_tick, "03:30", stop),
         _daily_loop("ai_audit_cleanup", run_ai_audit_cleanup_tick, "04:00", stop),
@@ -334,15 +371,28 @@ def run_worker() -> None:
         except NotImplementedError:
             signal.signal(sig, lambda *_: stop.set())
 
-    from tiqora.extensions import get_registry
+    from tiqora.plugins.bootstrap import init_registry
 
-    get_registry()  # fail at boot on a broken registration
+    # Build + freeze the registry (core + enabled plugins) before anything captures it;
+    # a broken core registration fails the boot, a broken plugin never does.
+    loop.run_until_complete(
+        init_registry(role="worker", settings=settings, session_factory=get_session_factory())
+    )
+
+    from tiqora.plugins.bootstrap import retry_plugin_boot
+
+    # Started before the api migrated: wait for the plugin tables, then load plugins late.
+    plugin_retry = loop.create_task(
+        retry_plugin_boot(role="worker", settings=settings, session_factory=get_session_factory())
+    )
 
     logger.info("tiqora_worker_starting", redis_url=settings.redis_url)
     try:
         loop.run_until_complete(_ensure_legacy_schema_at_worker_start())
         loop.run_until_complete(_run_all_loops(stop))
     finally:
+        plugin_retry.cancel()
+        loop.run_until_complete(asyncio.gather(plugin_retry, return_exceptions=True))
         loop.close()
         logger.info("tiqora_worker_stopped")
 

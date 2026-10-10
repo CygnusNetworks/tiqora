@@ -1,0 +1,16 @@
+{
+  "manifest_version": 1,
+  "entry": "index.js",
+  "styles": ["hello.css"],
+  "contributions": [
+    {"slot": "agent.route", "key": "overview", "path": "overview", "component": "HelloPage", "title_key": "page.title"},
+    {"slot": "agent.route", "key": "admin", "path": "admin", "component": "HelloPage", "title_key": "page.title", "admin_only": true},
+    {"slot": "agent.nav", "key": "overview", "route": "overview", "label_key": "nav.overview", "group": "plugins"},
+    {"slot": "agent.nav", "key": "admin", "route": "admin", "label_key": "nav.admin", "group": "plugins", "admin_only": true},
+    {"slot": "ticket.sidebar", "key": "info", "component": "HelloPanel", "title_key": "panel.title", "order": 50},
+    {"slot": "dashboard.widget", "key": "weather", "component": "HelloWidget", "title_key": "widget.title",
+     "category": "other", "size": {"default": [4, 2], "min": [2, 2], "max": [6, 4]},
+     "settings_schema": {"type": "object", "properties": {"city": {"type": "string", "default": "Bonn"}}},
+     "refresh_on": ["ticket_changed"]}
+  ]
+}

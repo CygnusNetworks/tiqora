@@ -25,6 +25,7 @@ import {
 import { cn } from "@/lib/cn";
 import { effectiveTimeZone } from "@/lib/timeZone";
 import { useOptionalAuth } from "@/auth/AuthContext";
+import { PluginProvider } from "@/plugins/PluginProvider";
 
 const GROUP_META: Record<
   AdminPageGroup,
@@ -317,6 +318,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   }, []);
 
   return (
+    <PluginProvider>
     <div className="flex min-h-screen flex-col bg-bg">
       <header className="sticky top-0 z-20 border-b border-hairline bg-surface">
         <div className="flex h-12 items-center gap-3 px-3">
@@ -403,5 +405,6 @@ export function AdminShell({ children }: { children: ReactNode }) {
         onClose={() => setSearchOpen(false)}
       />
     </div>
+    </PluginProvider>
   );
 }

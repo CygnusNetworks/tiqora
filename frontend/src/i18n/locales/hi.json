@@ -53,6 +53,7 @@
     "kb": "ज्ञान का आधार"
   },
   "sidebar": {
+    "plugins": "Extensions",
     "workspace": "कार्यक्षेत्र",
     "inbox": "इनबॉक्स",
     "myTickets": "मेरे टिकट",
@@ -2756,7 +2757,8 @@
         "agents": "एजेंट",
         "admin": "व्यवस्थापक एपीआई",
         "mcp": "एमसीपी सर्वर",
-        "compat": "ज़नुनी जेनेरिकइंटरफ़ेस"
+        "compat": "ज़नुनी जेनेरिकइंटरफ़ेस",
+        "plugins": "Extensions"
       }
     },
     "processes": {
@@ -3108,6 +3110,14 @@
         "deploy_watch": {
           "name": "Deploy watcher",
           "description": "Detects processes and ACLs deployed in Znuny and makes Tiqora use them only after that."
+        },
+        "plugin_events": {
+          "name": "Extensions: pass on ticket changes",
+          "description": "Passes new ticket changes on to the extensions that react to them."
+        },
+        "plugin_tasks": {
+          "name": "Extensions: scheduled tasks",
+          "description": "Starts the regular tasks of the extensions."
         }
       },
       "takeoverBadge": "अधिग्रहण",
@@ -5326,5 +5336,12 @@
     "rangeInvalid": "The start date is after the end date. Please correct the period.",
     "deniedTitle": "No access to reports",
     "deniedBody": "Your account is not allowed to view reports. Please contact your administrator."
+  },
+  "plugins": {
+    "slotError": "Extension “{{name}}” could not be loaded.",
+    "slotErrorDetails": "Details",
+    "safeModeBrowser": "Extensions are switched off in this browser window.",
+    "pageNotFound": "This page of the extension does not exist.",
+    "widgetsTitle": "Extensions"
   }
 }

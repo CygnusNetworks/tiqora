@@ -1,0 +1,21 @@
+manifest_version = 1
+id = "org.example.hello"
+short_id = "hello"
+name = "Hallo-Erweiterung"
+version = "1.0.0"
+publisher = "Example GmbH"
+publisher_id = "org.example"
+description = "Testerweiterung mit allen Erweiterungspunkten der Phase 1."
+license = "MIT"
+homepage = "https://example.org/hello"
+support = "support@example.org"
+categories = ["tickets"]
+entry = "tq_fixture_hello:plugin"
+sdk = ">=0.1,<0.2"
+
+[capabilities]
+extension_points = ["core.settings_sections", "core.http.routes", "core.events.subscribers",
+                    "core.worker.scheduled_tasks", "core.job_handlers", "core.mcp.tools",
+                    "core.http.public_routes"]
+outbound_hosts = ["api.example.org", "*.example.net"]
+frontend_slots = ["agent.nav", "agent.route", "ticket.sidebar", "dashboard.widget"]

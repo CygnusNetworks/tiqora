@@ -20,6 +20,9 @@ def _write_dist(tmp: Path) -> Path:
     (dist / "index.html").write_text("<!doctype html><title>Tiqora SPA</title>", encoding="utf-8")
     (dist / "assets" / "app.js").write_text("console.log('app')", encoding="utf-8")
     (dist / "favicon.svg").write_text("<svg/>", encoding="utf-8")
+    runtime = dist / "plugin-runtime"
+    runtime.mkdir()
+    (runtime / "react.js").write_text("export const useState = 1;", encoding="utf-8")
     return dist
 
 
@@ -73,6 +76,29 @@ def test_cache_headers_bust_index_but_keep_assets(tmp_path: Path) -> None:
     asset = client.get("/assets/app.js")
     assert "immutable" in asset.headers["cache-control"]
     assert "max-age=31536000" in asset.headers["cache-control"]
+
+
+def test_plugin_runtime_shims_served_unhashed_with_revalidation(tmp_path: Path) -> None:
+    """Plugin bundles import /plugin-runtime/<file>.js (unhashed): served as a
+    JS file that revalidates every load, never cached immutably."""
+    client = _app(tmp_path)
+
+    shim = client.get("/plugin-runtime/react.js")
+    assert shim.status_code == 200
+    assert "javascript" in shim.headers["content-type"]
+    assert shim.headers["cache-control"] == "no-cache"
+    assert "useState" in shim.text
+
+
+def test_missing_plugin_runtime_file_is_404_not_spa(tmp_path: Path) -> None:
+    """A shim the host does not ship (plugin built against a newer SDK) must be
+    a clean 404, not index.html with 200 (a confusing MIME error in the browser)."""
+    client = _app(tmp_path)
+
+    for path in ("/plugin-runtime/nope.js", "/plugin-runtime/", "/plugin-runtime"):
+        res = client.get(path)
+        assert res.status_code == 404, path
+        assert "Tiqora SPA" not in res.text
 
 
 def test_api_routes_stay_json_not_spa(tmp_path: Path) -> None:

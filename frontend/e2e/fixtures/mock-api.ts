@@ -467,6 +467,12 @@ export async function mockApi(page: Page) {
       }
     }
 
+    // Plugin list of the agent/admin shells: no plugins installed.
+    if (path.endsWith("/api/v1/plugins/frontend") && method === "GET") {
+      await json(route, 200, []);
+      return;
+    }
+
     // Auth
     if (path.endsWith("/api/v1/auth/methods") && method === "GET") {
       await json(route, 200, {

@@ -71,6 +71,7 @@ def test_path_to_area_mapping() -> None:
     assert path_to_area("/api/v1/auth/me") is None
     assert path_to_area("/znuny-compat/TicketGet") == "compat"
     assert path_to_area("/api/v1/unknown-thing") == "_unknown"
+    assert path_to_area("/api/plugins/org.example.hello/hello") == "plugins"
 
 
 def test_scopes_allow_area_ro_rw() -> None:
@@ -135,7 +136,7 @@ def test_all_areas_read_only_preset() -> None:
     raw = all_areas_read_only_scopes()
     scopes = parse_api_key_scopes(raw)
     assert scopes is not None
-    for area in API_KEY_AREAS:
+    for area in (a for a in API_KEY_AREAS if a != "plugins"):
         assert f"{area}:ro" in scopes
     expanded = expand_scopes(scopes)
     assert expanded is not None
@@ -159,6 +160,11 @@ _UNSCOPED_EXEMPT: frozenset[str] = frozenset(
     {
         # Browser redirect target of the OAuth2 provider (no API key involved).
         "/api/v1/oauth2/callback",
+        # Plugin frontend list and static files: only the SPA (session cookie) uses them;
+        # scoped integration keys have no use for them. Plugin HTTP routes themselves live
+        # under /api/plugins and have the "plugins" area.
+        "/api/v1/plugins/frontend",
+        "/api/v1/plugins/{plugin_id}/assets/{version}/{path}",
     }
 )
 # Prefixes whose routes are deliberately sessions/unrestricted-keys only (R-DASH-APIKEY:
@@ -272,3 +278,30 @@ def test_dashboards_stay_unknown_so_only_sessions_and_unrestricted_keys_get_in()
     for method in ("GET", "PUT", "DELETE"):
         assert scopes_allow(None, method=method, path="/api/v1/dashboards/1")
         assert_scope_allows(None, method=method, path="/api/v1/dashboards/1")
+
+
+def test_plugins_area_scopes() -> None:
+    path = "/api/plugins/org.example.hello/echo"
+    assert not scopes_allow(frozenset({"kb:rw", "tickets:rw"}), method="GET", path=path)
+    assert scopes_allow(frozenset({"plugins:ro"}), method="GET", path=path)
+    assert not scopes_allow(frozenset({"plugins:ro"}), method="POST", path=path)
+    assert scopes_allow(frozenset({"plugins:rw"}), method="POST", path=path)
+    assert scopes_allow(None, method="POST", path=path)
+
+
+def test_read_only_preset_excludes_plugins() -> None:
+    raw = all_areas_read_only_scopes()
+    assert "plugins" not in raw and "kb:ro" in raw
+    path = "/api/plugins/org.example.hello/hello"
+    assert not scopes_allow(parse_api_key_scopes(raw), method="GET", path=path)
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/api/v1/plugins/frontend", "/api/v1/plugins/org.example.hello/assets/1.0.0/web/index.js"],
+)
+def test_scoped_keys_cannot_reach_plugin_frontend_paths(path: str) -> None:
+    """Only the SPA session uses these; a future area mapping must not widen access silently."""
+    for scopes in ({"plugins:rw"}, {"plugins:ro"}, {"read"}, {"write"}, {"kb:ro"}, {"admin:rw"}):
+        assert not scopes_allow(frozenset(scopes), method="GET", path=path), scopes
+    assert scopes_allow(None, method="GET", path=path)

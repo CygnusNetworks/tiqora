@@ -67,6 +67,13 @@ def get_registry() -> Registry:
         return _REGISTRY
 
 
+def install_registry(registry: Registry) -> None:
+    """Make ``registry`` the process-wide registry (called once by ``init_registry``)."""
+    global _REGISTRY
+    with _LOCK:
+        _REGISTRY = registry
+
+
 def set_registry_for_tests(registry: Registry | None) -> None:
     """Replace the cached registry; ``None`` drops it so the next call rebuilds."""
     global _REGISTRY

@@ -138,6 +138,12 @@ jobs:
         run: pnpm --filter tiqora-frontend lint
       - name: Typecheck + build
         run: pnpm --filter tiqora-frontend build
+      # Plugins import React & co. from dist/plugin-runtime/*.js; a dependency
+      # upgrade that breaks those shims would give plugins a second React.
+      - name: Plugin runtime shims
+        run: node frontend/scripts/check-plugin-runtime.mjs
+      - name: Plugin SDK preset
+        run: pnpm --filter @tiqora/plugin-sdk check:preset
       # v8 coverage instrumentation eats into vitest's per-test timeout margin
       # on every run, but only release tags consume the artifact — so run
       # plain vitest on PRs/main and the instrumented variant only on v* tags.

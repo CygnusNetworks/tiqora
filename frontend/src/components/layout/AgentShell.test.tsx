@@ -10,6 +10,7 @@ import {
   createMemoryHistory,
 } from "@tanstack/react-router";
 import i18n from "@/i18n";
+import { helloPlugin, navEntry } from "@/test/pluginFixtures";
 import { AgentShell } from "./AgentShell";
 
 // Header widgets pull in their own api/SSE machinery that's out of scope for
@@ -39,6 +40,9 @@ vi.mock("@/components/agent/OnlineAgentsPopover", () => ({
 vi.mock("@/components/agent/AccountMenu", () => ({
   AccountMenu: () => <div data-testid="account-menu-stub" />,
 }));
+
+const { frontend } = vi.hoisted(() => ({ frontend: vi.fn() }));
+vi.mock("@/lib/pluginsApi", () => ({ pluginsApi: { frontend } }));
 
 const authFlags = vi.hoisted(() => ({ canUseDirectory: false, canViewReports: true }));
 vi.mock("@/auth/AuthContext", () => ({
@@ -106,6 +110,8 @@ async function renderShell(initialEntry = "/agent") {
 
 describe("AgentShell sidebar", () => {
   beforeEach(() => {
+    frontend.mockReset().mockResolvedValue([]);
+    sessionStorage.clear();
     listQueues.mockReset().mockResolvedValue([]);
     myTicketCounts.mockReset().mockResolvedValue({ open: 0, new: 0 });
     dashboardSummary.mockReset().mockResolvedValue({
@@ -118,6 +124,26 @@ describe("AgentShell sidebar", () => {
     window.localStorage.clear();
     authFlags.canUseDirectory = false;
     void i18n.changeLanguage("de");
+  });
+
+  it("shows an Erweiterungen group with plugin entries", async () => {
+    i18n.addResourceBundle("de", "plugin.org.example.hello", { nav: { overview: "Hallo" } }, true, true);
+    frontend.mockResolvedValue([
+      helloPlugin({ locales: [], contributions: [navEntry("overview", "overview")] }),
+    ]);
+    await renderShell();
+    expect(await screen.findByText("Erweiterungen")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Hallo" })).toHaveAttribute(
+      "href",
+      "/agent/plugins/org.example.hello/overview",
+    );
+  });
+
+  it("has no Erweiterungen group without plugin entries", async () => {
+    await renderShell();
+    await screen.findByTestId("agent-sidebar-nav");
+    await waitFor(() => expect(frontend).toHaveBeenCalled());
+    expect(screen.queryByTestId("sidebar-group-plugins-toggle")).toBeNull();
   });
 
   it("shows the customer directory only with its permission", async () => {

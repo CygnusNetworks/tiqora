@@ -1,7 +1,7 @@
 """Create the dashboard tables (dashboards, role/group links, widgets, counter samples).
 
 Revision ID: 20261010_0071
-Revises: 20261009_0067
+Revises: 20261010_0070
 Create Date: 2026-10-10
 
 ``filters``, ``settings`` and ``layout`` hold JSON text, ``MEDIUMTEXT`` on MariaDB.
@@ -18,7 +18,7 @@ from alembic import op
 from sqlalchemy.dialects import mysql
 
 revision: str = "20261010_0071"
-down_revision: str | None = "20261009_0067"
+down_revision: str | None = "20261010_0070"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

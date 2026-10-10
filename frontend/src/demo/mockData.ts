@@ -9,6 +9,7 @@
  * auto-authenticated).
  */
 
+import type { FrontendPlugin } from "@/lib/pluginsApi";
 import { resolve as resolveDashboardsDemo } from "./dashboardsMock";
 import { demoCatalogue, demoFacts, demoReport, demoReportingStatus, demoReportJob, demoSources } from "./reportsMock";
 
@@ -1773,8 +1774,90 @@ const identityLinks = [
   { id: 2, user_kind: "customer", subject: "a1c2e3f4-5b6d-4e7f-8a9b-0c1d2e3f4a5b", user_id: 14, user_login: "kunde@example.org", first_seen: "2026-10-02T12:00:00Z", last_seen: "2026-10-07T16:20:00Z" },
 ];
 
+/** The demo plugin as `GET /api/v1/plugins/frontend` returns it (every defaulted field present). */
+const demoPluginFrontend: FrontendPlugin[] = [
+  {
+    id: "org.example.demo",
+    version: "1.0.0",
+    name: "Demo",
+    asset_base: "/api/v1/plugins/org.example.demo/assets/1.0.0/",
+    entry: "web/index.js",
+    styles: [],
+    locales: ["de", "en"],
+    contributions: [
+      {
+        slot: "agent.nav",
+        key: "overview",
+        label_key: "nav.overview",
+        route: "overview",
+        group: "plugins",
+        icon: "puzzle",
+        order: 100,
+        admin_only: false,
+      },
+      {
+        slot: "agent.route",
+        key: "overview",
+        path: "overview",
+        component: "DemoPage",
+        title_key: "page.title",
+        admin_only: false,
+      },
+      { slot: "ticket.sidebar", key: "info", component: "DemoPanel", title_key: "panel.title", order: 100 },
+      {
+        slot: "dashboard.widget",
+        key: "hello",
+        component: "DemoWidget",
+        version: 1,
+        title_key: "widget.title",
+        description_key: null,
+        category: "other",
+        icon: "puzzle",
+        size: { default: [6, 2], min: [3, 2], max: [12, 6] },
+        settings_schema: null,
+        refresh_on: [],
+        permission: null,
+      },
+    ],
+  },
+];
+const demoPluginTexts = {
+  de: {
+    nav: { overview: "Demo" },
+    page: {
+      title: "Demo-Erweiterung",
+      panelTitle: "Eine Seite aus einer Erweiterung",
+      badge: "Beispiel",
+      body: "Diese Seite kommt aus einer Erweiterung und läuft im normalen Rahmen von Tiqora.",
+      button: "Klick mich",
+      emptyTitle: "Noch nichts los",
+      emptyHint: "Hier könnte Ihre Erweiterung Daten anzeigen.",
+    },
+    panel: { title: "Demo", body: "Die Erweiterung sieht Ticket {{id}}." },
+    widget: { title: "Demo-Kachel", body: "Hallo von der Demo-Erweiterung." },
+  },
+  en: {
+    nav: { overview: "Demo" },
+    page: {
+      title: "Demo extension",
+      panelTitle: "A page from an extension",
+      badge: "Example",
+      body: "This page comes from an extension and runs inside the regular Tiqora frame.",
+      button: "Click me",
+      emptyTitle: "Nothing here yet",
+      emptyHint: "Your extension could show data here.",
+    },
+    panel: { title: "Demo", body: "The extension sees ticket {{id}}." },
+    widget: { title: "Demo tile", body: "Hello from the demo extension." },
+  },
+};
+
 export function resolveData(path: string, method: string): unknown | undefined {
   const p = path;
+  // Plugins: the demo plugin's list entry and its translations (code: src/demo/demoPlugin.tsx).
+  if (p.endsWith("/api/v1/plugins/frontend")) return demoPluginFrontend;
+  if (p.endsWith("/api/v1/plugins/org.example.demo/assets/1.0.0/i18n/de.json")) return demoPluginTexts.de;
+  if (p.endsWith("/api/v1/plugins/org.example.demo/assets/1.0.0/i18n/en.json")) return demoPluginTexts.en;
   // Auth
   if (p.endsWith("/auth/methods")) return {
     password: true, oidc: false, spnego: false, webauthn: true, ldap: false, saml: true,

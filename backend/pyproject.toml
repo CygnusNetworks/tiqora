@@ -38,6 +38,7 @@ dependencies = [
     "qrcode>=8.0",
     "defusedxml>=0.7.1",
     "webauthn>=2",
+    "packaging>=24",
     "phonenumbers>=8.13",
     # Customer avatars / company logos (tiqora.avatars.normalize): decode
     # uploads, Gravatar and favicons (incl. ICO) and re-encode them as PNG.
@@ -115,10 +116,11 @@ build-backend = "hatchling.build"
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/tiqora"]
+packages = ["src/tiqora", "src/tiqora_sdk"]
 
 [tool.hatch.build.targets.wheel.sources]
 "src/tiqora" = "tiqora"
+"src/tiqora_sdk" = "tiqora_sdk"
 
 # The Znuny base-schema SQL under src/tiqora/bootstrap/schema/ (tiqora bootstrap /
 # Docker image) ships via the package tree above — hatch includes non-.py data
@@ -139,7 +141,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-packages = ["tiqora"]
+packages = ["tiqora", "tiqora_sdk"]
 mypy_path = "src"
 warn_unused_ignores = true
 
