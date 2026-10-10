@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
+from sqlalchemy.exc import DBAPIError, IntegrityError, OperationalError
 
 from tests._dashboard_helpers import (
     GROUP_2,
@@ -22,10 +23,11 @@ from tests._dashboard_helpers import (
     Env,
     open_env,
 )
+from tiqora.dashboard import start
 from tiqora.dashboard.defaults import default_widgets
 from tiqora.dashboard.layout import Rect
 from tiqora.dashboard.schemas import DashboardCreateIn, WidgetIn, WidgetLayouts
-from tiqora.dashboard.start import ensure_start
+from tiqora.dashboard.start import ensure_start, is_race_error
 from tiqora.dashboard.store import (
     DashboardConflict,
     DashboardForbidden,
@@ -215,7 +217,10 @@ async def test_concurrent_saves_with_the_same_version_let_one_win(env: Env) -> N
     results = await asyncio.gather(
         env.save(d.id, USER_A, body), env.save(d.id, USER_A, body), return_exceptions=True
     )
-    assert sum(isinstance(r, DashboardConflict) for r in results) == 1
+    conflicts = [r for r in results if isinstance(r, DashboardConflict)]
+    assert len(conflicts) == 1 and len(results) == 2
+    winner = next(r for r in results if not isinstance(r, BaseException))
+    assert conflicts[0].current_version == winner.version == 2  # not a stale snapshot
     assert (await env.get(d.id, USER_A)).version == 2
 
 
@@ -389,3 +394,78 @@ async def test_the_last_dashboard_cannot_be_deleted(env: Env) -> None:
     (left,) = [t for t in await env.list(USER_A) if t.is_owner]
     with pytest.raises(DashboardInvalid):
         await env.delete(left.id, USER_A)
+
+
+# ------------------------------------------------------------------ races
+
+
+async def test_two_creates_at_19_let_exactly_one_through(env: Env) -> None:
+    for i in range(19):
+        await env.make_personal(USER_C, name=f"dash497 r{i}")
+    results = await asyncio.gather(
+        env.create(USER_C, DashboardCreateIn(name="dash497 x1")),
+        env.create(USER_C, DashboardCreateIn(name="dash497 x2")),
+        return_exceptions=True,
+    )
+    assert sum(isinstance(r, DashboardInvalid) for r in results) == 1
+    assert len(await env.count_dashboards(USER_C)) == 20
+
+
+async def test_two_deletes_cannot_remove_the_last_two_dashboards(env: Env) -> None:
+    a = await env.make_personal(USER_C, name="dash497 d1")
+    b = await env.make_personal(USER_C, name="dash497 d2")
+    results = await asyncio.gather(
+        env.delete(a.id, USER_C), env.delete(b.id, USER_C), return_exceptions=True
+    )
+    assert sum(isinstance(r, DashboardInvalid) for r in results) == 1
+    assert len(await env.count_dashboards(USER_C)) == 1
+
+
+def _db_error(orig: BaseException) -> DBAPIError:
+    return OperationalError("stmt", {}, orig)
+
+
+def test_race_errors_are_classified() -> None:
+    class Pg(Exception):
+        sqlstate = "40P01"
+
+    assert is_race_error(IntegrityError("s", {}, Exception("dup")))
+    assert is_race_error(_db_error(Exception(1213, "Deadlock found")))
+    assert is_race_error(_db_error(Exception(1205, "Lock wait timeout")))
+    assert is_race_error(_db_error(Pg()))
+    assert not is_race_error(_db_error(Exception(2013, "Lost connection")))
+    assert not is_race_error(_db_error(Exception("boom")))
+
+
+async def _fail_once(
+    env: Env, monkeypatch: pytest.MonkeyPatch, error: DBAPIError
+) -> tuple[int, Any]:
+    calls = 0
+    real = start.default_widgets
+
+    def flaky(*args: Any, **kw: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise error
+        return real(*args, **kw)
+
+    monkeypatch.setattr(start, "default_widgets", flaky)
+    try:
+        result = await env.run(ensure_start, USER_B)
+    except DBAPIError as exc:
+        result = exc
+    return calls, result
+
+
+async def test_ensure_start_retries_a_deadlock(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls, result = await _fail_once(env, monkeypatch, _db_error(Exception(1213, "Deadlock")))
+    assert calls == 2 and result[1] is True
+
+
+async def test_ensure_start_does_not_retry_other_errors(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls, result = await _fail_once(env, monkeypatch, _db_error(Exception(2013, "gone")))
+    assert calls == 1 and isinstance(result, DBAPIError)
+    assert await env.count_dashboards(USER_B) == []

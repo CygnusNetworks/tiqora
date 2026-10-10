@@ -366,13 +366,31 @@ async def get_dashboard(
 # --------------------------------------------------------------------------- writes
 
 
-async def _count_own(session: AsyncSession, user_id: int) -> int:
+async def _lock_own(session: AsyncSession, user_id: int) -> int:
+    """Serialise per owner and count the owner's dashboards on the latest committed data.
+
+    The Znuny ``users`` row is locked first: on PostgreSQL a ``FOR UPDATE`` over the
+    dashboard rows alone would not see a row inserted by the transaction we waited for. The
+    locking read of the dashboard rows is a current read on InnoDB (no stale snapshot).
+    """
+    await session.execute(select(Users.id).where(Users.id == user_id).with_for_update())
     res = await session.execute(
-        select(func.count())
-        .select_from(TiqoraDashboard)
+        select(TiqoraDashboard.id)
         .where(TiqoraDashboard.owner_user_id == user_id, TiqoraDashboard.kind.in_(_OWNED_KINDS))
+        .with_for_update()
     )
-    return int(res.scalar_one())
+    return len(res.scalars().all())
+
+
+async def _current_version(session: AsyncSession, dashboard_id: int) -> int:
+    """Latest committed version (locking read: InnoDB would serve an old snapshot otherwise)."""
+    res = await session.execute(
+        select(TiqoraDashboard.version).where(TiqoraDashboard.id == dashboard_id).with_for_update()
+    )
+    version = res.scalar_one_or_none()
+    if version is None:
+        raise DashboardNotFound(dashboard_id)
+    return int(version)
 
 
 async def _next_sort(session: AsyncSession, user_id: int) -> int:
@@ -401,7 +419,7 @@ def widget_row(dashboard_id: int, w: WidgetIn, position: int) -> TiqoraDashboard
 async def create_dashboard(
     session: AsyncSession, user_id: int, body: DashboardCreateIn, *, admin: bool
 ) -> DashboardOut:
-    if await _count_own(session, user_id) >= MAX_DASHBOARDS_PER_USER:
+    if await _lock_own(session, user_id) >= MAX_DASHBOARDS_PER_USER:
         raise DashboardInvalid(MSG_LIMIT, "name")
     sources: list[TiqoraDashboardWidget] = []
     if body.copy_from is not None:
@@ -551,10 +569,7 @@ async def save_dashboard(
                         )
                     )
     except DashboardConflict:
-        current = await _load_row(session, dashboard_id)
-        if current is None:
-            raise DashboardNotFound(dashboard_id) from None
-        raise DashboardConflict(current.version) from None
+        raise DashboardConflict(await _current_version(session, dashboard_id)) from None
     except IntegrityError:
         # another save claimed one of the widget ids between our check and the insert
         raise DashboardInvalid(MSG_WIDGET_ID_TAKEN, "widgets") from None
@@ -610,8 +625,7 @@ async def patch_widget_settings(
                 .values(settings=text)
             )
     if conflict:
-        current = await _load_row(session, dashboard_id)
-        raise DashboardConflict(current.version if current else body.version)
+        raise DashboardConflict(await _current_version(session, dashboard_id))
     fresh = await session.execute(
         select(TiqoraDashboardWidget)
         .where(TiqoraDashboardWidget.id == widget_id)
@@ -625,7 +639,7 @@ async def delete_dashboard(
 ) -> None:
     row = await _visible_row(session, dashboard_id, user_id, admin=admin)
     _require_edit(row, user_id, admin=admin)
-    if row.kind in _OWNED_KINDS and await _count_own(session, user_id) <= 1:
+    if row.kind in _OWNED_KINDS and await _lock_own(session, user_id) <= 1:
         raise DashboardInvalid(MSG_LAST, "id")
     for model in (TiqoraDashboardWidget, TiqoraDashboardGroup, TiqoraDashboardRole):
         await session.execute(delete(model).where(model.dashboard_id == dashboard_id))
