@@ -10,7 +10,7 @@ from importlib.metadata import entry_points
 from typing import Any
 
 from tiqora.extensions.registry import Registry
-from tiqora.plugins.context import PluginContext, PluginHttp, PluginTickets
+from tiqora.plugins.context import PluginContext
 from tiqora.plugins.discovery import ENTRY_POINT_GROUP, DiscoveredPlugin
 from tiqora.plugins.registrar import PluginRegistrar, RegistrationRejected
 
@@ -19,10 +19,18 @@ class PluginLoadTimeout(TimeoutError):
     """Importing or registering a plugin took longer than its budget."""
 
 
+def _exit_message(label: str, exc: BaseException) -> str:
+    return (
+        f"Erweiterung {label} wollte den Prozess beenden oder unterbrechen "
+        f"({type(exc).__name__}) und wurde abgewiesen"
+    )
+
+
 async def run_in_daemon_thread[T](
     fn: Callable[[], T],
     *,
     timeout: float,  # noqa: ASYNC109  (signature fixed by the design)
+    label: str = "plugin",
 ) -> T:
     """Run ``fn`` in a daemon thread; abandon the thread after ``timeout`` seconds.
 
@@ -43,16 +51,19 @@ async def run_in_daemon_thread[T](
     def target() -> None:
         try:
             result = fn()
-        except BaseException as exc:
+        except Exception as exc:
             outcome: tuple[T | None, BaseException | None] = (None, exc)
+        except BaseException as exc:  # SystemExit, KeyboardInterrupt: must not escape
+            rejected = RegistrationRejected(_exit_message(label, exc))
+            rejected.__cause__ = exc
+            outcome = (None, rejected)
         else:
             outcome = (result, None)
         # RuntimeError: the event loop is already closed (abandoned import finished late)
         with contextlib.suppress(RuntimeError):
             loop.call_soon_threadsafe(deliver, *outcome)
 
-    name = getattr(fn, "__name__", "plugin")
-    threading.Thread(target=target, name=f"tiqora-plugin-load-{name}", daemon=True).start()
+    threading.Thread(target=target, name=f"tiqora-plugin-load-{label}", daemon=True).start()
     try:
         return await asyncio.wait_for(asyncio.shield(fut), timeout)
     except TimeoutError:
@@ -72,12 +83,19 @@ def import_and_register(plugin: DiscoveredPlugin, context: PluginContext) -> Plu
     ]
     if not matches:
         raise RegistrationRejected("Einstiegspunkt der Erweiterung nicht gefunden")
-    obj: Any = matches[0].load()
-    register = getattr(obj, "register", None)
-    if not callable(register):
-        raise RegistrationRejected("Einstiegspunkt liefert kein Erweiterungsobjekt mit register()")
-    registrar = PluginRegistrar(plugin.manifest, context)
-    register(registrar)
+    try:
+        obj: Any = matches[0].load()
+        register = getattr(obj, "register", None)
+        if not callable(register):
+            raise RegistrationRejected(
+                "Einstiegspunkt liefert kein Erweiterungsobjekt mit register()"
+            )
+        registrar = PluginRegistrar(plugin.manifest, context)
+        register(registrar)
+    except Exception:
+        raise
+    except BaseException as exc:  # sys.exit() / KeyboardInterrupt in plugin code
+        raise RegistrationRejected(_exit_message(plugin.plugin_id, exc)) from exc
     return registrar
 
 
@@ -94,17 +112,6 @@ def commit_registrar(registry: Registry, registrar: PluginRegistrar) -> list[tup
         registry.add(point, item, owner=registrar.plugin_id)
         committed.append((point.key, point.item_key(item)))
     return committed
-
-
-def make_plugin_context(plugin: DiscoveredPlugin) -> PluginContext:
-    if plugin.manifest is None:
-        raise RegistrationRejected("Erweiterung hat kein gültiges Manifest")
-    return PluginContext(
-        plugin_id=plugin.plugin_id,
-        version=plugin.manifest.version,
-        http=PluginHttp(plugin.manifest.capabilities.outbound_hosts),
-        tickets=PluginTickets(),
-    )
 
 
 def dependency_order(

@@ -6,16 +6,12 @@ surface (SDK 0.x minors may still break). Anything not in ``__all__`` is interna
 
 from __future__ import annotations
 
-from typing import Final
+import typing as _t
 
-SDK_VERSION: Final = "0.1.0"
+SDK_VERSION: _t.Final = "0.1.0"
 
 # ruff: noqa: E402  (SDK_VERSION must exist before the imports below, see tiqora.plugins.compat)
-from collections.abc import Awaitable, Callable, Iterable
-from typing import Any, Protocol
-
-from fastapi import APIRouter
-from pydantic import BaseModel
+from collections import abc as _abc
 
 from tiqora.api.deps import CurrentUser as CurrentAgent
 from tiqora.api.deps import DbSession
@@ -32,7 +28,12 @@ from tiqora.plugins.context import (
 from tiqora.plugins.events import EventContext, EventHandler, TicketEvent
 from tiqora.plugins.registrar import RegistrationRejected
 from tiqora.plugins.tasks import TaskContext, TaskRun
-from tiqora.settings_sections.section import SettingsSection
+
+if _t.TYPE_CHECKING:
+    from fastapi import APIRouter
+    from pydantic import BaseModel
+
+    from tiqora.settings_sections.section import SettingsSection
 
 __all__ = [
     "SDK_VERSION",
@@ -62,7 +63,7 @@ __all__ = [
 ]
 
 
-class PluginRegistry(Protocol):
+class PluginRegistry(_t.Protocol):
     """What ``Plugin.register`` receives: stages items; nothing is live until all succeed."""
 
     @property
@@ -78,7 +79,7 @@ class PluginRegistry(Protocol):
     def on_event(
         self,
         name: str,
-        events: Iterable[str],
+        events: _abc.Iterable[str],
         handler: EventHandler,
         *,
         timeout_seconds: int = 30,
@@ -100,7 +101,7 @@ class PluginRegistry(Protocol):
     def mcp_tool(
         self,
         name: str,
-        fn: Callable[..., Awaitable[Any]],
+        fn: _abc.Callable[..., _abc.Awaitable[_t.Any]],
         *,
         description: str,
         write: bool = False,
@@ -108,7 +109,7 @@ class PluginRegistry(Protocol):
     ) -> None: ...
 
 
-class Plugin(Protocol):
+class Plugin(_t.Protocol):
     """The object an entry point of group ``tiqora.plugins`` resolves to."""
 
     def register(self, registry: PluginRegistry) -> None: ...

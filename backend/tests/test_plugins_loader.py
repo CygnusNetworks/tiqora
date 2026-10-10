@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 import threading
 import time
 from pathlib import Path
@@ -13,13 +14,13 @@ from tiqora.channels.registry import CHANNELS
 from tiqora.extensions.core import register_core
 from tiqora.extensions.registry import Registry
 from tiqora.jobs.registry import JOB_HANDLERS, JobHandler
+from tiqora.plugins.context import make_plugin_context
 from tiqora.plugins.discovery import DiscoveredPlugin, discover_plugins
 from tiqora.plugins.loader import (
     PluginLoadTimeout,
     commit_registrar,
     dependency_order,
     import_and_register,
-    make_plugin_context,
     run_in_daemon_thread,
 )
 from tiqora.plugins.manifest import PluginManifest
@@ -155,10 +156,12 @@ async def test_import_timeout_reports_failure(
     started = time.monotonic()
     with pytest.raises(PluginLoadTimeout, match="0.2"):
         await run_in_daemon_thread(
-            lambda: import_and_register(p, make_plugin_context(p)), timeout=0.2
+            lambda: import_and_register(p, make_plugin_context(p)),
+            timeout=0.2,
+            label=p.plugin_id,
         )
     assert time.monotonic() - started < 1.0
-    loaders = [t for t in threading.enumerate() if t.name.startswith("tiqora-plugin-load")]
+    loaders = [t for t in threading.enumerate() if t.name == "tiqora-plugin-load-org.example.slow"]
     assert loaders and all(t.daemon for t in loaders)
     for t in loaders:  # let the abandoned import finish so it does not outlive the test
         t.join(3)
@@ -187,3 +190,45 @@ def test_dependency_order_ignores_missing_and_keeps_independent() -> None:
 
 def _any(_: Any) -> None:
     return None
+
+
+async def test_system_exit_in_thread_becomes_rejection() -> None:
+    def leave() -> None:
+        sys.exit(3)
+
+    with pytest.raises(RegistrationRejected, match="SystemExit") as info:
+        await run_in_daemon_thread(leave, timeout=1, label="org.example.quit")
+    assert "org.example.quit" in str(info.value)
+    assert isinstance(info.value.__cause__, SystemExit)
+
+
+async def test_keyboard_interrupt_in_thread_becomes_rejection() -> None:
+    def interrupt() -> None:
+        raise KeyboardInterrupt
+
+    with pytest.raises(RegistrationRejected, match="KeyboardInterrupt"):
+        await run_in_daemon_thread(interrupt, timeout=1)
+
+
+@pytest.mark.parametrize(
+    ("mode", "exc_name"),
+    [
+        ("import-exit", "SystemExit"),
+        ("import-kbd", "KeyboardInterrupt"),
+        ("register-exit", "SystemExit"),
+        ("register-kbd", "KeyboardInterrupt"),
+    ],
+)
+async def test_plugin_exit_in_import_or_register_is_rejected(
+    fixture_plugins: Installer, monkeypatch: pytest.MonkeyPatch, mode: str, exc_name: str
+) -> None:
+    monkeypatch.setenv("TQ_EXIT_MODE", mode)
+    fixture_plugins("tq_fixture_exits", plugin_id="org.example.exits")
+    (p,) = discover_plugins()
+    with pytest.raises(RegistrationRejected, match=exc_name):
+        await run_in_daemon_thread(
+            lambda: import_and_register(p, make_plugin_context(p)), timeout=2, label=p.plugin_id
+        )
+    # also direct (no thread) so a caller without the thread helper is safe
+    with pytest.raises(RegistrationRejected, match=exc_name):
+        import_and_register(p, make_plugin_context(p))

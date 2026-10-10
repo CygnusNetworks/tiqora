@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 import httpx
@@ -15,6 +15,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.security.outbound import HostResolver, pin_outbound_url
+
+if TYPE_CHECKING:
+    from tiqora.plugins.discovery import DiscoveredPlugin
 
 
 class OutboundHostNotAllowed(PermissionError):
@@ -139,7 +142,7 @@ class PluginTickets:
         return TicketSummary(
             id=int(row[0]),
             tn=str(row[1]),
-            title=str(row[2]),
+            title="" if row[2] is None else str(row[2]),
             queue_id=int(row[3]),
             queue_name=str(row[4]),
             state=str(row[5]),
@@ -187,3 +190,17 @@ class PluginContext:
 def minimal_context(plugin_id: str) -> PluginContext:
     """Fallback context for items staged without one (tests, direct construction)."""
     return PluginContext(plugin_id, "0", http=PluginHttp([]), tickets=PluginTickets())
+
+
+def make_plugin_context(plugin: DiscoveredPlugin) -> PluginContext:
+    """Context for a discovered plugin: its manifest's egress allowlist and version."""
+    if plugin.manifest is None:
+        from tiqora.plugins.registrar import RegistrationRejected  # registrar imports this module
+
+        raise RegistrationRejected("Erweiterung hat kein gültiges Manifest")
+    return PluginContext(
+        plugin_id=plugin.plugin_id,
+        version=plugin.manifest.version,
+        http=PluginHttp(plugin.manifest.capabilities.outbound_hosts),
+        tickets=PluginTickets(),
+    )

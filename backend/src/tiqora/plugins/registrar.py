@@ -153,6 +153,10 @@ class PluginRegistrar:
         *,
         timeout_seconds: int = 30,
     ) -> None:
+        if isinstance(events, str):
+            raise RegistrationRejected(
+                f"Ereignisse für „{name}“ müssen als Liste angegeben werden, nicht als Text"
+            )
         names = frozenset(events)
 
         def check() -> None:

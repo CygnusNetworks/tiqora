@@ -95,3 +95,11 @@ def test_core_mcp_tool_names_cover_server_source() -> None:
     src = Path(server.__file__).read_text()
     names = set(re.findall(r"@mcp\.tool\((?:[^@]*?)\)\n(?:async )?def (\w+)", src))
     assert names == CORE_MCP_TOOL_NAMES
+
+
+def test_no_unexported_public_names() -> None:
+    import tiqora_sdk
+
+    public = {n for n in dir(tiqora_sdk) if not n.startswith("_")}
+    # "annotations" comes from `from __future__`; "mcp" is the helper submodule.
+    assert public <= set(tiqora_sdk.__all__) | {"annotations", "mcp"}

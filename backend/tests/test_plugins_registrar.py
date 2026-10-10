@@ -214,6 +214,12 @@ def test_event_timeout_bounds(registrar: PluginRegistrar, timeout: int) -> None:
         registrar.on_event("nn", ["TicketCreate"], on_ticket, timeout_seconds=timeout)
 
 
+def test_bare_string_events_rejected(registrar: PluginRegistrar) -> None:
+    with pytest.raises(RegistrationRejected, match="Liste"):
+        registrar.on_event("nn", "TicketCreate", on_ticket)  # type: ignore[arg-type]
+    assert registrar.staged == ()
+
+
 def test_empty_events_rejected(registrar: PluginRegistrar) -> None:
     with pytest.raises(RegistrationRejected, match="Ereignis"):
         registrar.on_event("nn", [], on_ticket)
