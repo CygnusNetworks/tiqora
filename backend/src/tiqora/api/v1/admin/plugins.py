@@ -8,16 +8,15 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Final, Literal
+from typing import Final, Literal
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.api.deps import DbSession, get_app_settings
+from tiqora.api.deps import AppSettings, DbSession
 from tiqora.api.v1.admin.deps import AdminUser
-from tiqora.config import Settings
 from tiqora.db.tiqora.models import TiqoraPlugin, TiqoraPluginHook, TiqoraPluginRuntime
 from tiqora.domain.schemas import UtcDateTime
 from tiqora.extensions.core import get_registry
@@ -39,7 +38,12 @@ QUARANTINE_MESSAGE: Final = (
 )
 UNKNOWN_MESSAGE: Final = "Noch nicht gestartet."
 GONE_MESSAGE: Final = "Nicht mehr im Image enthalten"
-_ROLE_LABELS: Final = {"api": "Weboberfläche", "worker": "Hintergrunddienst", "mcp": "MCP-Dienst"}
+SAFE_MODE_MESSAGE: Final = "Abgesicherter Modus: nicht geladen"
+_ROLE_LABELS: Final = {
+    "api": "Weboberfläche und Schnittstelle",
+    "worker": "Hintergrunddienst",
+    "mcp": "KI-Schnittstelle (MCP)",
+}
 
 
 class PluginRuntimeOut(BaseModel):
@@ -128,10 +132,12 @@ def _status_message(
         return compat_problem
     if state == "restart_required":
         return RESTART_MESSAGE
-    if state == "quarantined":
-        return QUARANTINE_MESSAGE
     if state == "unknown":
-        return UNKNOWN_MESSAGE
+        return f"{_ROLE_LABELS['api']}: {UNKNOWN_MESSAGE}"
+    if state == "quarantined":
+        for row in runtime:
+            if row.state == RuntimeState.QUARANTINED.value:
+                return f"{_ROLE_LABELS.get(row.role, row.role)}: {QUARANTINE_MESSAGE}"
     if state == "failed":
         for row in runtime:
             if row.state == RuntimeState.FAILED.value:
@@ -164,6 +170,8 @@ def _build_one(
     row: TiqoraPlugin | None,
     runtime: Sequence[TiqoraPluginRuntime],
     hooks: Sequence[TiqoraPluginHook],
+    *,
+    safe_mode: bool,
 ) -> PluginAdminOut:
     manifest = found.manifest if found is not None else None
     registry = get_registry()
@@ -183,6 +191,9 @@ def _build_one(
             s for r in ordered_rt if r.role != "api" if (s := _runtime_state(r)) is not None
         ],
     )
+    safe_mode_hides = safe_mode and enabled and state not in ("invalid", "incompatible")
+    if safe_mode_hides:  # R-PLUGINS-SAFEMODE-STATUS: nothing is loaded, "Aktiv" would mislead
+        state = "unknown"
 
     capabilities: list[PluginCapabilityOut] = []
     if manifest is not None:
@@ -238,14 +249,16 @@ def _build_one(
         categories=sorted(manifest.categories) if manifest else [],
         enabled=enabled,
         status=state,
-        status_message=_status_message(
+        status_message=SAFE_MODE_MESSAGE
+        if safe_mode_hides
+        else _status_message(
             state, problem=problem, compat_problem=compat_problem, runtime=ordered_rt
         ),
         source=row.source if row is not None else "image",
         installed_at=row.installed_at if row is not None else None,
         runtime=[
             PluginRuntimeOut(
-                role=r.role,  # type: ignore[arg-type]
+                role=r.role,  # type: ignore[arg-type]  # ordered_rt only holds PLUGIN_ROLES
                 state=r.state,
                 version=r.version,
                 error=r.error,
@@ -261,7 +274,7 @@ def _build_one(
     )
 
 
-async def _build_all(session: AsyncSession) -> list[PluginAdminOut]:
+async def _build_all(session: AsyncSession, *, safe_mode: bool) -> list[PluginAdminOut]:
     discovered: Mapping[str, DiscoveredPlugin] = {p.plugin_id: p for p in discovered_plugins()}
     rows = await store.list_plugin_rows(session)
     runtime: dict[str, list[TiqoraPluginRuntime]] = defaultdict(list)
@@ -271,36 +284,39 @@ async def _build_all(session: AsyncSession) -> list[PluginAdminOut]:
     for hook in (await store.load_hooks(session)).values():
         hooks[hook.plugin_id].append(hook)
     out = [
-        _build_one(pid, discovered.get(pid), rows.get(pid), runtime[pid], hooks[pid])
+        _build_one(
+            pid, discovered.get(pid), rows.get(pid), runtime[pid], hooks[pid], safe_mode=safe_mode
+        )
         for pid in sorted(set(discovered) | set(rows))
     ]
     return sorted(out, key=lambda p: (p.name.lower(), p.id))
 
 
-async def _one(session: AsyncSession, plugin_id: str) -> PluginAdminOut:
-    for plugin in await _build_all(session):
+async def _one(session: AsyncSession, plugin_id: str, *, safe_mode: bool) -> PluginAdminOut:
+    for plugin in await _build_all(session, safe_mode=safe_mode):
         if plugin.id == plugin_id:
             return plugin
     raise HTTPException(status.HTTP_404_NOT_FOUND, "Erweiterung nicht gefunden")
 
 
-def _settings(request: Request) -> Settings:
-    return get_app_settings(request)
-
-
 @router.get("", response_model=PluginAdminListOut)
 async def list_plugins(
-    admin: AdminUser, session: DbSession, settings: Annotated[Settings, Depends(_settings)]
+    admin: AdminUser, session: DbSession, settings: AppSettings
 ) -> PluginAdminListOut:
     _ = admin
     return PluginAdminListOut(
-        safe_mode=settings.plugins_safe_mode, plugins=await _build_all(session)
+        safe_mode=settings.plugins_safe_mode,
+        plugins=await _build_all(session, safe_mode=settings.plugins_safe_mode),
     )
 
 
 @router.put("/{plugin_id}/enabled", response_model=PluginAdminOut)
 async def set_plugin_enabled(
-    plugin_id: str, body: PluginEnabledIn, admin: AdminUser, session: DbSession
+    plugin_id: str,
+    body: PluginEnabledIn,
+    admin: AdminUser,
+    session: DbSession,
+    settings: AppSettings,
 ) -> PluginAdminOut:
     found = next((p for p in discovered_plugins() if p.plugin_id == plugin_id), None)
     if found is not None:  # discovered but never booted: make sure the row exists
@@ -310,11 +326,13 @@ async def set_plugin_enabled(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Erweiterung nicht gefunden")
     await session.commit()
     log.info("plugin_enabled_changed", plugin=plugin_id, enabled=body.enabled, by=admin.id)
-    return await _one(session, plugin_id)
+    return await _one(session, plugin_id, safe_mode=settings.plugins_safe_mode)
 
 
 @router.post("/{plugin_id}/reset", response_model=PluginAdminOut)
-async def reset_plugin(plugin_id: str, admin: AdminUser, session: DbSession) -> PluginAdminOut:
+async def reset_plugin(
+    plugin_id: str, admin: AdminUser, session: DbSession, settings: AppSettings
+) -> PluginAdminOut:
     known = any(p.plugin_id == plugin_id for p in discovered_plugins()) or (
         plugin_id in await store.list_plugin_rows(session)
     )
@@ -323,4 +341,4 @@ async def reset_plugin(plugin_id: str, admin: AdminUser, session: DbSession) -> 
     await store.reset_plugin(session, plugin_id, now=utc_now())
     await session.commit()
     log.info("plugin_reset", plugin=plugin_id, by=admin.id)
-    return await _one(session, plugin_id)
+    return await _one(session, plugin_id, safe_mode=settings.plugins_safe_mode)

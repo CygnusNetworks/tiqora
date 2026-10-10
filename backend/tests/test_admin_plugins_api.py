@@ -226,7 +226,7 @@ async def test_quarantined_worker_message(
     )
     p = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
     assert p["status"] == "quarantined"
-    assert p["status_message"].startswith("Beim Start wiederholt abgestürzt")
+    assert p["status_message"].startswith("Hintergrunddienst: Beim Start wiederholt abgestürzt")
 
 
 async def test_never_started_is_unknown(
@@ -240,7 +240,9 @@ async def test_never_started_is_unknown(
         await store.sync_discovered(s, [p], auto_enable=True, now=T0)
         await s.commit()
     got = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
-    assert got["status"] == "unknown" and got["status_message"] == "Noch nicht gestartet."
+    assert got["status"] == "unknown" and (
+        got["status_message"] == "Weboberfläche und Schnittstelle: Noch nicht gestartet."
+    )
     assert got["runtime"] == []
 
 
@@ -311,6 +313,44 @@ async def test_safe_mode_lists_without_import(
     assert body["safe_mode"] is True and [p["id"] for p in body["plugins"]] == [PLUGIN_ID]
     assert body["plugins"][0]["contributions"] == []
     assert "tq_fixture_hello" not in sys.modules
+
+
+async def test_role_labels_follow_ui_wording(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    seeded_runtime: None,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    for role, label in (
+        ("api", "Weboberfläche und Schnittstelle"),
+        ("mcp", "KI-Schnittstelle (MCP)"),
+    ):
+        await store.mark_result(
+            factory,
+            PLUGIN_ID,
+            role,
+            state=RuntimeState.FAILED,
+            version="1.0.0",
+            error="Fehler",
+            now=T0,
+        )
+        p = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+        assert p["status_message"] == f"{label}: Fehler"
+        await store.mark_result(
+            factory, PLUGIN_ID, role, state=RuntimeState.ACTIVE, version="1.0.0", error=None, now=T0
+        )
+
+
+async def test_safe_mode_reports_enabled_plugins_as_unknown(
+    fixture_plugins: Installer, admin_client_safe_mode: AsyncClient, seeded_runtime: None
+) -> None:
+    # the rows still say "active" from the last normal boot
+    body = (await admin_client_safe_mode.get(BASE)).json()
+    p = _by_id(body, PLUGIN_ID)
+    assert body["safe_mode"] is True and p["enabled"] is True
+    assert p["status"] == "unknown"
+    assert p["status_message"] == "Abgesicherter Modus: nicht geladen"
+    assert [r["state"] for r in p["runtime"]] == ["active"]  # last known state stays visible
 
 
 async def test_unknown_plugin_404(admin_client: AsyncClient) -> None:

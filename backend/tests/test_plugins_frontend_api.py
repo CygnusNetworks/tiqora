@@ -139,7 +139,7 @@ async def test_asset_served_with_headers(fixture_plugins: Installer) -> None:
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/javascript")
     assert r.headers["cache-control"] == "private, max-age=31536000, immutable"
     assert r.headers["x-content-type-options"] == "nosniff"
-    assert "content-security-policy" not in r.headers
+    assert r.headers.get("content-security-policy") != "sandbox"  # only SVG is sandboxed
     assert b"definePlugin" in r.content
 
 
@@ -196,3 +196,18 @@ async def test_i18n_asset(fixture_plugins: Installer) -> None:
     async with _client(_make_app(fixture_plugins)) as c:
         r = await c.get(f"{ASSETS}/1.0.0/i18n/de.json")
     assert r.status_code == 200 and r.json()["panel"]["title"] == "Hallo"
+
+
+async def test_symlink_out_of_the_package_is_404(fixture_plugins: Installer, tmp_path: Any) -> None:
+    app = _make_app(fixture_plugins)
+    (plugin,) = discover_plugins()
+    assert plugin.package_dir is not None
+    outside = plugin.package_dir.parent / "outside-secret.json"
+    outside.write_text('{"secret": true}')
+    (plugin.package_dir / "web" / "leak.json").symlink_to(outside)
+    (plugin.package_dir / "i18n" / "fr.json").symlink_to(outside)
+    async with _client(app) as c:
+        for rel in ("web/leak.json", "i18n/fr.json"):
+            r = await c.get(f"{ASSETS}/1.0.0/{rel}")
+            assert r.status_code == 404, rel
+            assert b"secret" not in r.content

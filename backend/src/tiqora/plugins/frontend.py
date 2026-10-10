@@ -10,7 +10,7 @@ from tiqora.plugins.manifest import (
     NavContribution,
     RouteContribution,
 )
-from tiqora.plugins.state import is_active, loaded_plugins
+from tiqora.plugins.state import RuntimeState, loaded_plugins
 
 
 class PluginFrontendOut(BaseModel):
@@ -56,9 +56,9 @@ def frontend_plugins_for(*, is_admin: bool) -> list[PluginFrontendOut]:
     loaded = loaded_plugins()
     out: list[PluginFrontendOut] = []
     for plugin in discovered_plugins():
-        if plugin.manifest is None or not is_active(plugin.plugin_id):
+        result = loaded.get(plugin.plugin_id)  # one snapshot for the state and the version
+        if plugin.manifest is None or result is None or result.state is not RuntimeState.ACTIVE:
             continue
-        result = loaded[plugin.plugin_id]
         if plugin.web_manifest is None and not plugin.locales:
             continue
         web = plugin.web_manifest

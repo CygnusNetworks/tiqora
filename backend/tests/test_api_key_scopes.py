@@ -249,3 +249,14 @@ def test_read_only_preset_excludes_plugins() -> None:
     assert "plugins" not in raw and "kb:ro" in raw
     path = "/api/plugins/org.example.hello/hello"
     assert not scopes_allow(parse_api_key_scopes(raw), method="GET", path=path)
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/api/v1/plugins/frontend", "/api/v1/plugins/org.example.hello/assets/1.0.0/web/index.js"],
+)
+def test_scoped_keys_cannot_reach_plugin_frontend_paths(path: str) -> None:
+    """Only the SPA session uses these; a future area mapping must not widen access silently."""
+    for scopes in ({"plugins:rw"}, {"plugins:ro"}, {"read"}, {"write"}, {"kb:ro"}, {"admin:rw"}):
+        assert not scopes_allow(frozenset(scopes), method="GET", path=path), scopes
+    assert scopes_allow(None, method="GET", path=path)

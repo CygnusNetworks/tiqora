@@ -35,7 +35,7 @@ async def list_frontend_plugins(user: CurrentUser, session: DbSession) -> list[P
     return frontend_plugins_for(is_admin=is_admin)
 
 
-@router.get("/{plugin_id}/assets/{version}/{path:path}", include_in_schema=True)
+@router.get("/{plugin_id}/assets/{version}/{path:path}", response_class=FileResponse)
 async def plugin_asset(plugin_id: str, version: str, path: str, user: CurrentUser) -> FileResponse:
     _ = user
     not_found = HTTPException(status.HTTP_404_NOT_FOUND, "Datei nicht gefunden")
