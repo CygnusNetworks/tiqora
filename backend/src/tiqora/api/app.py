@@ -94,6 +94,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging(settings)
     app.state.session_factory = get_session_factory()
     app.state.redis = redis.from_url(settings.redis_url, decode_responses=True)
+    app.state.chat_hub = None
     logger.info(
         "tiqora_starting",
         version=__version__,
@@ -198,6 +199,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await asyncio.wait_for(reload_task, 5)
         except Exception:  # noqa: BLE001 - timeout (task already cancelled) or task failure
             logger.warning("compat_webservice_reloader_stop_failed", exc_info=True)
+    chat_hub = getattr(app.state, "chat_hub", None)
+    if chat_hub is not None:
+        await chat_hub.aclose()
     redis_client = getattr(app.state, "redis", None)
     if redis_client is not None:
         await redis_client.aclose()
