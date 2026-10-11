@@ -4671,6 +4671,17 @@
       "noCustomerDialogs": "Nessun dialogo cliente disponibile in questo passaggio.",
       "inactive": "This process is switched off. No steps are possible."
     },
+    "path": {
+      "title": "Path so far",
+      "show": "Show path so far",
+      "hide": "Hide path so far",
+      "loading": "Loading path...",
+      "loadError": "Could not load the path.",
+      "empty": "No steps recorded yet.",
+      "current": "Current",
+      "deleted": "(deleted)",
+      "by": "by {{name}}"
+    },
     "start": {
       "title": "Avvia il processo",
       "selectLabel": "Processo",

@@ -4679,6 +4679,17 @@
       "noCustomerDialogs": "In diesem Schritt sind keine Kundendialoge verfügbar.",
       "inactive": "Dieser Prozess ist abgeschaltet. Es sind keine Schritte möglich."
     },
+    "path": {
+      "title": "Bisheriger Weg",
+      "show": "Bisherigen Weg anzeigen",
+      "hide": "Bisherigen Weg ausblenden",
+      "loading": "Weg wird geladen ...",
+      "loadError": "Der Weg konnte nicht geladen werden.",
+      "empty": "Noch keine Schritte aufgezeichnet.",
+      "current": "Aktuell",
+      "deleted": "(gelöscht)",
+      "by": "von {{name}}"
+    },
     "start": {
       "title": "Prozess starten",
       "selectLabel": "Prozess",

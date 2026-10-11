@@ -2175,7 +2175,15 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/calendar/appointments")) return occurrences;
   // Option refresh (dependent selects) and the ticket's process path.
   if (p.match(/\/api\/v1\/process\/.*\/options$/) && method === "POST") return demoProcessOptions(p);
-  if (p.match(/\/api\/v1\/process\/ticket\/\d+\/path$/)) return { process_entity_id: "Process-demo", steps: [] };
+  if (p.match(/\/api\/v1\/process\/ticket\/\d+\/path$/)) return {
+    process_entity_id: "Process-demo",
+    steps: [
+      { activity_entity_id: "Activity-demo-1", activity_name: "Bestellung erfassen", entered_at: "2026-10-05T07:12:00Z", entered_by: 1, entered_by_name: "Anna Beispiel", current: false },
+      { activity_entity_id: "Activity-demo-2", activity_name: "Freigabe prüfen", entered_at: "2026-10-06T09:40:00Z", entered_by: 1, entered_by_name: "Anna Beispiel", current: false },
+      { activity_entity_id: "Activity-demo-3", activity_name: "", entered_at: "2026-10-07T13:05:00Z", entered_by: 2, entered_by_name: "Ben Muster", current: false },
+      { activity_entity_id: "Activity-demo-4", activity_name: "Versand vorbereiten", entered_at: "2026-10-08T10:20:00Z", entered_by: 2, entered_by_name: "Ben Muster", current: true },
+    ],
+  };
   if (p.match(/\/api\/v1\/process\/ticket\/\d+\/state$/)) return processTicketState;
   if (p.match(/\/api\/v1\/process\/ticket\/\d+\/dialog\/[^/]+\/form$/) || p.match(/\/api\/v1\/process\/[^/]+\/start-form$/)) return processDialogForm;
   if (p.match(/\/api\/v1\/process\/ticket\/\d+\/submit$/) && method === "POST") return { activity_changed: true, new_activity_entity_id: null, transition_entity_id: null, unsupported_actions: [], state: processTicketState };

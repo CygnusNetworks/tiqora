@@ -4671,6 +4671,17 @@
       "noCustomerDialogs": "אין דיאלוגי לקוח זמינים בשלב זה.",
       "inactive": "This process is switched off. No steps are possible."
     },
+    "path": {
+      "title": "Path so far",
+      "show": "Show path so far",
+      "hide": "Hide path so far",
+      "loading": "Loading path...",
+      "loadError": "Could not load the path.",
+      "empty": "No steps recorded yet.",
+      "current": "Current",
+      "deleted": "(deleted)",
+      "by": "by {{name}}"
+    },
     "start": {
       "title": "התחל תהליך",
       "selectLabel": "תהליך",

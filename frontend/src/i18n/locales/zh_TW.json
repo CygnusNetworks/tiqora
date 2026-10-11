@@ -4671,6 +4671,17 @@
       "noCustomerDialogs": "此步驟沒有可用的客戶對話。",
       "inactive": "This process is switched off. No steps are possible."
     },
+    "path": {
+      "title": "Path so far",
+      "show": "Show path so far",
+      "hide": "Hide path so far",
+      "loading": "Loading path...",
+      "loadError": "Could not load the path.",
+      "empty": "No steps recorded yet.",
+      "current": "Current",
+      "deleted": "(deleted)",
+      "by": "by {{name}}"
+    },
     "start": {
       "title": "啟動進程",
       "selectLabel": "流程",

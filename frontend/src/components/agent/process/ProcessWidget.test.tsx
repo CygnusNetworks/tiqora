@@ -7,17 +7,18 @@ import { ApiError } from "@tiqora/api-client";
 import { ProcessWidget } from "./ProcessWidget";
 import type { ProcessDialogFormData, ProcessSummary, TicketProcessState } from "@/lib/processApi";
 
-const { listStartable, startForm, enroll, ticketState, dialogForm, submit } = vi.hoisted(() => ({
+const { listStartable, startForm, enroll, ticketState, dialogForm, submit, path } = vi.hoisted(() => ({
   listStartable: vi.fn(),
   startForm: vi.fn(),
   enroll: vi.fn(),
   ticketState: vi.fn(),
   dialogForm: vi.fn(),
   submit: vi.fn(),
+  path: vi.fn(),
 }));
 
 vi.mock("@/lib/processApi", () => ({
-  processApi: { listStartable, startForm, enroll, ticketState, dialogForm, submit },
+  processApi: { listStartable, startForm, enroll, ticketState, dialogForm, submit, path },
 }));
 
 function wrap(ui: React.ReactElement) {
@@ -77,6 +78,36 @@ beforeEach(() => {
 });
 
 describe("ProcessWidget", () => {
+  it("path section is collapsed by default and loads on expand", async () => {
+    ticketState.mockResolvedValue(activeState);
+    path.mockResolvedValue({
+      process_entity_id: "Process-1",
+      steps: [
+        { activity_entity_id: "Activity-1", activity_name: "Collect info", entered_at: "2026-10-01T08:00:00Z", entered_by: 1, entered_by_name: "Ada Example", current: true },
+      ],
+    });
+    wrap(<ProcessWidget ticketId={42} />);
+
+    const toggle = await screen.findByTestId("process-path-toggle");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(path).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("process-path-list")).toBeNull();
+
+    fireEvent.click(toggle);
+    expect(await screen.findByTestId("process-path-list")).toHaveTextContent("Collect info");
+    expect(path).toHaveBeenCalledTimes(1);
+    expect(path.mock.calls[0][0]).toBe(42);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("shows an error line when the path cannot be loaded", async () => {
+    ticketState.mockResolvedValue(activeState);
+    path.mockRejectedValue(new Error("boom"));
+    wrap(<ProcessWidget ticketId={42} />);
+    fireEvent.click(await screen.findByTestId("process-path-toggle"));
+    expect(await screen.findByTestId("process-path-error")).toBeInTheDocument();
+  });
+
   it("renders the start-process affordance when the ticket is not in a process", async () => {
     ticketState.mockResolvedValue(notInProcessState);
     wrap(<ProcessWidget ticketId={42} />);

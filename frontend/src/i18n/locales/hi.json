@@ -4671,6 +4671,17 @@
       "noCustomerDialogs": "इस चरण पर कोई ग्राहक संवाद उपलब्ध नहीं।",
       "inactive": "This process is switched off. No steps are possible."
     },
+    "path": {
+      "title": "Path so far",
+      "show": "Show path so far",
+      "hide": "Hide path so far",
+      "loading": "Loading path...",
+      "loadError": "Could not load the path.",
+      "empty": "No steps recorded yet.",
+      "current": "Current",
+      "deleted": "(deleted)",
+      "by": "by {{name}}"
+    },
     "start": {
       "title": "प्रक्रिया प्रारंभ करें",
       "selectLabel": "प्रक्रिया",
