@@ -11257,6 +11257,8 @@
           "copy_from": {
             "anyOf": [
               {
+                "maximum": 9.223372036854776e+18,
+                "minimum": 1.0,
                 "type": "integer"
               },
               {
@@ -11313,9 +11315,12 @@
         "type": "object"
       },
       "DashboardOrderIn": {
+        "additionalProperties": false,
         "properties": {
           "ids": {
             "items": {
+              "maximum": 9.223372036854776e+18,
+              "minimum": 1.0,
               "type": "integer"
             },
             "maxItems": 20,
@@ -11483,9 +11488,12 @@
         "type": "object"
       },
       "DashboardShareIn": {
+        "additionalProperties": false,
         "properties": {
           "group_ids": {
             "items": {
+              "maximum": 2147483647.0,
+              "minimum": 1.0,
               "type": "integer"
             },
             "maxItems": 50,
@@ -11641,6 +11649,7 @@
           "icon": {
             "anyOf": [
               {
+                "maxLength": 40,
                 "type": "string"
               },
               {
@@ -11662,6 +11671,8 @@
           },
           "role_ids": {
             "items": {
+              "maximum": 2147483647.0,
+              "minimum": 1.0,
               "type": "integer"
             },
             "maxItems": 50,
@@ -30666,7 +30677,7 @@
           },
           "sort": {
             "default": "age",
-            "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending).",
+            "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending) | until (pending reminder time; tickets without one last when ascending).",
             "title": "Sort",
             "type": "string"
           }
@@ -33588,6 +33599,7 @@
         "type": "object"
       },
       "WidgetPreviewIn": {
+        "additionalProperties": false,
         "properties": {
           "settings": {
             "additionalProperties": true,
@@ -33599,6 +33611,7 @@
         "type": "object"
       },
       "WidgetSettingsPatchIn": {
+        "additionalProperties": false,
         "properties": {
           "settings": {
             "additionalProperties": true,
@@ -47288,6 +47301,8 @@
             "name": "template_id",
             "required": true,
             "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Template Id",
               "type": "integer"
             }
@@ -47353,6 +47368,8 @@
             "name": "template_id",
             "required": true,
             "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Template Id",
               "type": "integer"
             }
@@ -70853,6 +70870,8 @@
             "name": "dashboard_id",
             "required": true,
             "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Dashboard Id",
               "type": "integer"
             }
@@ -70918,6 +70937,8 @@
             "name": "dashboard_id",
             "required": true,
             "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Dashboard Id",
               "type": "integer"
             }
@@ -70990,6 +71011,8 @@
             "name": "dashboard_id",
             "required": true,
             "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Dashboard Id",
               "type": "integer"
             }
@@ -71075,6 +71098,8 @@
             "name": "dashboard_id",
             "required": true,
             "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Dashboard Id",
               "type": "integer"
             }
@@ -71167,6 +71192,8 @@
             "name": "dashboard_id",
             "required": true,
             "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Dashboard Id",
               "type": "integer"
             }
@@ -71252,6 +71279,8 @@
             "name": "dashboard_id",
             "required": true,
             "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Dashboard Id",
               "type": "integer"
             }
@@ -71335,6 +71364,8 @@
             "name": "dashboard_id",
             "required": true,
             "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
               "title": "Dashboard Id",
               "type": "integer"
             }
@@ -80570,13 +80601,13 @@
             }
           },
           {
-            "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending).",
+            "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending) | until (pending reminder time; tickets without one last when ascending).",
             "in": "query",
             "name": "sort",
             "required": false,
             "schema": {
               "default": "age",
-              "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending).",
+              "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending) | until (pending reminder time; tickets without one last when ascending).",
               "title": "Sort",
               "type": "string"
             }
@@ -81249,13 +81280,13 @@
             }
           },
           {
-            "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending).",
+            "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending) | until (pending reminder time; tickets without one last when ascending).",
             "in": "query",
             "name": "sort",
             "required": false,
             "schema": {
               "default": "age",
-              "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending).",
+              "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending) | until (pending reminder time; tickets without one last when ascending).",
               "title": "Sort",
               "type": "string"
             }

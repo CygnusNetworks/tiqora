@@ -228,3 +228,21 @@ async def test_list_reports_roles_and_widget_counts_per_template(env: Env) -> No
     got = {t["id"]: t for t in (await env.admin.get(URL)).json()}
     assert sorted(got[a["id"]]["role_ids"]) == [ROLE_1, ROLE_EXTRA]
     assert got[b["id"]]["role_ids"] == [] and got[b["id"]]["widget_count"] == 11
+
+
+async def test_out_of_range_ids_and_long_icon_are_422_not_500(env: Env) -> None:
+    """Template ids beyond BIGINT, role ids beyond INT and a too-long icon (B-I1, B-M1)."""
+    for bad in (2**63, 2**64, 0):
+        r = await env.admin.put(f"{URL}/{bad}", json=_props(), params={"version": 1})
+        assert r.status_code == 422, (bad, r.text)
+        r = await env.admin.delete(f"{URL}/{bad}")
+        assert r.status_code == 422, (bad, r.text)
+    for rid in (2**40, 2**31, 2**63, 0):
+        r = await env.admin.post(URL, json=_props(role_ids=[rid]))
+        assert r.status_code == 422, (rid, r.text)
+    r = await env.admin.post(URL, json=_props(icon="x" * 41))
+    assert r.status_code == 422, r.text
+    tpl = await _create(env, icon="x" * 40)
+    assert tpl["icon"] == "x" * 40
+    r = await env.admin.put(f"{URL}/{tpl['id']}", json=_props(icon="y" * 41), params={"version": 1})
+    assert r.status_code == 422, r.text

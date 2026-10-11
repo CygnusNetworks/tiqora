@@ -480,3 +480,35 @@ async def test_a_shared_dashboard_edit_by_a_viewer_is_403_and_copy_works(env: En
     cp = await b.post("/api/v1/dashboards", json={"name": "dash497 Kopie", "copy_from": d["id"]})
     assert cp.status_code == 201 and cp.json()["is_owner"] is True and cp.json()["id"] != d["id"]
     assert len(cp.json()["widgets"]) == len(d["widgets"])
+
+
+TOO_BIG = (2**63, 2**64, 0, -1)
+
+
+async def test_out_of_range_ids_are_422_not_500(env: Env) -> None:
+    """Ids beyond BIGINT (asyncpg ``DataError``) are refused by validation (B-I1)."""
+    d = await _start(env)
+    c = env.client
+    for bad in TOO_BIG:
+        base = f"/api/v1/dashboards/{bad}"
+        for method, url, body in (
+            ("GET", base, None),
+            ("PUT", base, _save_body(d)),
+            ("DELETE", base, None),
+            ("PUT", f"{base}/share", {"group_ids": []}),
+            ("GET", f"{base}/data", None),
+            ("GET", f"{base}/widgets/wid0000001/data", None),
+            ("PATCH", f"{base}/widgets/wid0000001/settings", {"settings": {}, "version": 1}),
+        ):
+            r = await c.request(method, url, json=body)
+            assert r.status_code == 422, (method, url, r.status_code, r.text)
+        r = await c.post("/api/v1/dashboards", json={"name": "dash497 big", "copy_from": bad})
+        assert r.status_code == 422, (bad, r.text)
+        r = await c.put("/api/v1/dashboards/order", json={"ids": [d["id"], bad]})
+        assert r.status_code == 422, (bad, r.text)
+    for gid in (2**31, 2**63, 0):
+        r = await c.put(f"/api/v1/dashboards/{d['id']}/share", json={"group_ids": [gid]})
+        assert r.status_code == 422, (gid, r.text)
+    # a valid but unknown id is still the constant 404
+    r = await c.get(f"/api/v1/dashboards/{2**63 - 1}")
+    assert r.status_code == 404 and r.json() == NOT_FOUND

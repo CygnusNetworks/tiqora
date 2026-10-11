@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Annotated, Any, Final, NoReturn
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -60,6 +60,8 @@ def get_dashboard_registry() -> Registry:
 
 DashboardRegistry = Annotated[Registry, Depends(get_dashboard_registry)]
 SessionFactory = Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory_dep)]
+#: BIGINT range: a larger id is a 422 here instead of an asyncpg ``DataError`` (500).
+DashboardId = Annotated[int, Path(ge=1, le=2**63 - 1)]
 
 
 def provider_keys(registry: Registry) -> frozenset[str]:
@@ -172,7 +174,9 @@ async def create_dashboard(
 
 
 @router.get("/{dashboard_id}", response_model=DashboardOut)
-async def get_dashboard(dashboard_id: int, session: DbSession, user: CurrentUser) -> DashboardOut:
+async def get_dashboard(
+    dashboard_id: DashboardId, session: DbSession, user: CurrentUser
+) -> DashboardOut:
     try:
         return await store.get_dashboard(
             session, dashboard_id, user.id, admin=await _is_admin(session, user)
@@ -183,7 +187,7 @@ async def get_dashboard(dashboard_id: int, session: DbSession, user: CurrentUser
 
 @router.put("/{dashboard_id}", response_model=DashboardOut)
 async def save_dashboard(
-    dashboard_id: int, body: DashboardSaveIn, session: DbSession, user: CurrentUser
+    dashboard_id: DashboardId, body: DashboardSaveIn, session: DbSession, user: CurrentUser
 ) -> DashboardOut:
     try:
         out = await store.save_dashboard(
@@ -198,7 +202,7 @@ async def save_dashboard(
 
 @router.put("/{dashboard_id}/share", response_model=DashboardOut)
 async def share_dashboard(
-    dashboard_id: int, body: DashboardShareIn, session: DbSession, user: CurrentUser
+    dashboard_id: DashboardId, body: DashboardShareIn, session: DbSession, user: CurrentUser
 ) -> DashboardOut:
     """Share with groups (owner only); ``[]`` unshares. Templates are distributed by role."""
     try:
@@ -217,7 +221,9 @@ async def share_dashboard(
 
 
 @router.delete("/{dashboard_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_dashboard(dashboard_id: int, session: DbSession, user: CurrentUser) -> Response:
+async def delete_dashboard(
+    dashboard_id: DashboardId, session: DbSession, user: CurrentUser
+) -> Response:
     try:
         await store.delete_dashboard(
             session, dashboard_id, user.id, admin=await _is_admin(session, user)
@@ -231,7 +237,7 @@ async def delete_dashboard(dashboard_id: int, session: DbSession, user: CurrentU
 
 @router.patch("/{dashboard_id}/widgets/{widget_id}/settings", response_model=WidgetOut)
 async def patch_widget_settings(
-    dashboard_id: int,
+    dashboard_id: DashboardId,
     widget_id: str,
     body: WidgetSettingsPatchIn,
     session: DbSession,
@@ -274,7 +280,7 @@ async def _visible_widgets(
 
 @router.get("/{dashboard_id}/data", response_model=DashboardDataOut)
 async def dashboard_data(
-    dashboard_id: int,
+    dashboard_id: DashboardId,
     request: Request,
     session: DbSession,
     user: CurrentUser,
@@ -297,7 +303,7 @@ async def dashboard_data(
 
 @router.get("/{dashboard_id}/widgets/{widget_id}/data", response_model=WidgetDataOut)
 async def widget_data(
-    dashboard_id: int,
+    dashboard_id: DashboardId,
     widget_id: str,
     request: Request,
     session: DbSession,

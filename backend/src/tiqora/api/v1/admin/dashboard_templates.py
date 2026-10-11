@@ -9,9 +9,9 @@ copy source (unlocked).
 
 from __future__ import annotations
 
-from typing import NoReturn
+from typing import Annotated, NoReturn
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, HTTPException, Path, Query, Response, status
 
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.deps import AdminUser
@@ -21,6 +21,7 @@ from tiqora.dashboard.schemas import DashboardTemplateIn, DashboardTemplateOut
 router = APIRouter(prefix="/dashboard-templates", tags=["admin:dashboard-templates"])
 
 NOT_FOUND_MESSAGE = "Vorlage nicht gefunden."
+TemplateId = Annotated[int, Path(ge=1, le=2**63 - 1)]
 
 
 async def _fail(session: DbSession, exc: Exception) -> NoReturn:
@@ -59,7 +60,7 @@ async def create_template(
 async def update_template(
     admin: AdminUser,
     session: DbSession,
-    template_id: int,
+    template_id: TemplateId,
     body: DashboardTemplateIn,
     version: int = Query(..., ge=1, description="Optimistic lock: the version last read"),
 ) -> DashboardTemplateOut:
@@ -73,7 +74,9 @@ async def update_template(
 
 
 @router.delete("/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_template(admin: AdminUser, session: DbSession, template_id: int) -> Response:
+async def delete_template(
+    admin: AdminUser, session: DbSession, template_id: TemplateId
+) -> Response:
     _ = admin
     try:
         await store.delete_template(session, template_id)

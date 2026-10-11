@@ -26,6 +26,13 @@ def _widget(i: int) -> dict[str, Any]:
         "//evil.example.org",
         "vbscript:x",
         "\x01javascript:x",
+        "java\tscript:alert(1)",
+        "/\\evil.example",
+        "\\\\evil.example",
+        "///",
+        "///evil.example",
+        "http://",
+        "mailto:",
     ],
 )
 def test_link_url_scheme_whitelist(url: str) -> None:

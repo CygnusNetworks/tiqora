@@ -348,9 +348,22 @@ async def test_reminders_scan_finds_a_due_reminder_behind_older_pending_tickets(
     assert ticket_ids(data) == [TICKETS["a_pending"]] and data["total"] == 1
 
 
-async def test_escalations_total_matches_the_listed_items(env: Env) -> None:
-    data = await data_of(env, USER_A, W("e", "core.escalations", settings={"within_hours": 72}))
-    assert data["total"] == len(data["items"])
+async def test_escalations_total_matches_the_listed_items(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tiqora.dashboard.providers import escalations
+
+    widget = W("e", "core.escalations", settings={"within_hours": 72})
+    full = await data_of(env, USER_A, widget)
+    assert full["total"] == len(full["items"]) >= 1
+    # a listed row without any deadline above 0 is skipped and must leave the total too
+    real = escalations.nearest_deadline
+    skip = full["items"][0]["ticket"]["id"]
+    monkeypatch.setattr(
+        escalations, "nearest_deadline", lambda t: None if t.id == skip else real(t)
+    )
+    out = await data_of(env, USER_A, widget)
+    assert out["total"] == len(out["items"]) == full["total"] - 1
 
 
 async def test_all_day_appointments_belong_to_their_date_in_a_far_zone(env: Env) -> None:

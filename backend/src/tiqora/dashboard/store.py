@@ -381,23 +381,35 @@ async def get_dashboard(
 # --------------------------------------------------------------------------- writes
 
 
-async def _lock_own(session: AsyncSession, user_id: int) -> int:
-    """Serialise per owner and count the owner's dashboards on the latest committed data.
+async def _lock_own(session: AsyncSession, user_id: int) -> list[int]:
+    """Serialise per owner; the owner's dashboard ids on the latest committed data.
 
-    Only ``tiqora_dashboard`` rows are locked (never Znuny tables). Statement 1 locks the
-    owner's existing rows, so concurrent creators/deleters queue up (an owner at the limit
-    or at the last-dashboard guard always has rows). Statement 2 counts in a separate
-    statement: PostgreSQL READ COMMITTED takes a fresh snapshot per statement, and the
-    locking read is a current read on InnoDB (REPEATABLE READ), so both see the rows
-    committed by the transaction we waited for. No rows: nothing to lock, nothing to guard.
+    Every writer of the owner's set (create, delete, ``set_order``) calls this first. Only
+    ``tiqora_dashboard`` rows are locked (never Znuny tables), and they are locked by primary
+    key in ``id`` order (statement 2), so a waiter queues on a primary-key record. Locking
+    through the ``(owner, kind, sort)`` index instead would let a waiter's next-key lock
+    deadlock with a holder that moves ``sort`` values into that gap (``set_order``,
+    MariaDB 1213). Statement 3 re-reads the set as a locking read: PostgreSQL READ COMMITTED
+    takes a fresh snapshot per statement, and a locking read is a current read on InnoDB
+    (REPEATABLE READ), so it sees the rows committed by the transaction we waited for.
+    No rows: nothing to lock, nothing to guard (an owner at the limit or at the
+    last-dashboard guard always has rows). Returns the ids in tab order (``sort``, ``id``).
     """
-    stmt = (
-        select(TiqoraDashboard.id)
-        .where(TiqoraDashboard.owner_user_id == user_id, TiqoraDashboard.kind.in_(_OWNED_KINDS))
-        .with_for_update()
+    owned = select(TiqoraDashboard.id).where(
+        TiqoraDashboard.owner_user_id == user_id, TiqoraDashboard.kind.in_(_OWNED_KINDS)
     )
-    await session.execute(stmt)
-    return len((await session.execute(stmt)).scalars().all())
+    seen = list((await session.execute(owned)).scalars().all())
+    if seen:
+        await session.execute(
+            select(TiqoraDashboard.id)
+            .where(TiqoraDashboard.id.in_(seen))
+            .order_by(TiqoraDashboard.id)
+            .with_for_update()
+        )
+    res = await session.execute(
+        owned.order_by(TiqoraDashboard.sort, TiqoraDashboard.id).with_for_update()
+    )
+    return [int(i) for i in res.scalars().all()]
 
 
 async def _current_version(session: AsyncSession, dashboard_id: int) -> int:
@@ -437,7 +449,7 @@ def widget_row(dashboard_id: int, w: WidgetIn, position: int) -> TiqoraDashboard
 async def create_dashboard(
     session: AsyncSession, user_id: int, body: DashboardCreateIn, *, admin: bool
 ) -> DashboardOut:
-    if await _lock_own(session, user_id) >= MAX_DASHBOARDS_PER_USER:
+    if len(await _lock_own(session, user_id)) >= MAX_DASHBOARDS_PER_USER:
         raise DashboardInvalid(MSG_LIMIT, "name")
     sources: list[TiqoraDashboardWidget] = []
     if body.copy_from is not None:
@@ -670,13 +682,14 @@ async def patch_widget_settings(
     if widget is None:
         raise DashboardNotFound(widget_id)
     _require_edit(row, user_id, admin=admin)
+    # A stale client gets its 409 before any settings check (and without the source queries).
+    if body.version != row.version:
+        raise DashboardConflict(row.version)
     try:
         settings = validate_widget_settings(widget.type_key, body.settings)
     except SettingsError as exc:
         raise DashboardInvalid(exc.message, exc.path) from None
     text = _check_size(settings, "settings")
-    if body.version != row.version:
-        raise DashboardConflict(row.version)
     await validate_source_settings(session, user_id, widget.type_key, settings, path="settings")
 
     async with session.begin_nested():
@@ -709,8 +722,11 @@ async def delete_dashboard(
 ) -> None:
     row = await _visible_row(session, dashboard_id, user_id, admin=admin)
     _require_edit(row, user_id, admin=admin)
-    if row.kind in _OWNED_KINDS and await _lock_own(session, user_id) <= 1:
+    if row.kind in _OWNED_KINDS and len(await _lock_own(session, user_id)) <= 1:
         raise DashboardInvalid(MSG_LAST, "id")
+    if row.kind == "template":
+        # dashboard row before child rows, like a template save or role edit
+        await _current_version(session, dashboard_id)
     for model in (TiqoraDashboardWidget, TiqoraDashboardGroup, TiqoraDashboardRole):
         await session.execute(delete(model).where(model.dashboard_id == dashboard_id))
     await session.execute(delete(TiqoraDashboard).where(TiqoraDashboard.id == dashboard_id))
@@ -759,11 +775,14 @@ async def set_share(
 
 
 async def set_order(session: AsyncSession, user_id: int, ids: Sequence[int]) -> None:
-    """Order the caller's own personal/shared dashboards; any other id is forbidden."""
+    """Order the caller's own personal/shared dashboards; any other id is forbidden.
+
+    Takes the owner lock first, like create and delete: updating the rows one by one in the
+    client's order would otherwise deadlock against them and against a second reorder.
+    """
     if len(set(ids)) != len(ids):
         raise DashboardInvalid("Doppelte Einträge.", "ids")
-    own = await _own_rows(session, user_id)
-    own_ids = [r.id for r in own]
+    own_ids = await _lock_own(session, user_id)
     if not set(ids) <= set(own_ids):
         raise DashboardForbidden(MSG_NOT_EDITABLE)
     ordered = [*ids, *(i for i in own_ids if i not in set(ids))]
@@ -932,6 +951,8 @@ async def delete_template(session: AsyncSession, template_id: int) -> None:
     """Remove the template, its widgets and role rows. Copies users already made keep
     ``source_template_id`` and live on as their own dashboards."""
     await _template_row(session, template_id)
+    # dashboard row before child rows, like a template save or role edit (lock order)
+    await _current_version(session, template_id)
     for model in (TiqoraDashboardWidget, TiqoraDashboardRole, TiqoraDashboardGroup):
         await session.execute(delete(model).where(model.dashboard_id == template_id))
     await session.execute(delete(TiqoraDashboard).where(TiqoraDashboard.id == template_id))

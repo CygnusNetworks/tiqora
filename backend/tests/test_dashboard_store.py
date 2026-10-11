@@ -332,6 +332,8 @@ async def test_patch_widget_settings_checks_rights_and_version(env: Env) -> None
     with pytest.raises(DashboardInvalid) as e:
         await env.patch(d.id, "nnnnnnnn", USER_A, {"markdown": "a" * 5001}, version=d.version + 1)
     assert e.value.path == "settings.markdown"
+    with pytest.raises(DashboardConflict):  # stale AND invalid: the 409 comes first (B-M3)
+        await env.patch(d.id, "nnnnnnnn", USER_A, {"markdown": "a" * 5001}, version=d.version)
     assert (await env.get(d.id, USER_A)).widgets[0].settings == {"markdown": "neu"}
     other = await env.make_personal(USER_A, name="dash497 n2")
     with pytest.raises(DashboardNotFound):  # widget of another dashboard
@@ -420,6 +422,41 @@ async def test_two_deletes_cannot_remove_the_last_two_dashboards(env: Env) -> No
     )
     assert sum(isinstance(r, DashboardInvalid) for r in results) == 1
     assert len(await env.count_dashboards(USER_C)) == 1
+
+
+RACE_ROUNDS = 10
+
+
+async def test_reorder_and_delete_at_once_never_deadlock(env: Env) -> None:
+    """``set_order`` queues at the owner lock like delete does (B-I2): no 1213/40P01."""
+    keep = await env.make_personal(USER_C, name="dash497 o keep")
+    for i in range(RACE_ROUNDS):
+        rows = [(await env.make_personal(USER_C, name=f"dash497 o{i}{k}")).id for k in range(10)]
+        results = await asyncio.gather(
+            env.set_order(USER_C, [*reversed(rows), keep.id]),
+            env.delete(rows[0], USER_C),
+            return_exceptions=True,
+        )
+        db_errors = [r for r in results if isinstance(r, DBAPIError)]
+        assert not db_errors, f"round {i}: {db_errors}"
+        # the delete always succeeds; the reorder either runs first or sees the id gone
+        assert results[1] is None, results
+        assert results[0] is None or isinstance(results[0], DashboardForbidden), results
+        for did in rows[1:]:
+            await env.delete(did, USER_C)
+    assert await env.count_dashboards(USER_C) == [keep.id]
+
+
+async def test_two_reorders_at_once_never_deadlock(env: Env) -> None:
+    ids = [(await env.make_personal(USER_C, name=f"dash497 p{i}")).id for i in range(4)]
+    for i in range(RACE_ROUNDS):
+        results = await asyncio.gather(
+            env.set_order(USER_C, ids),
+            env.set_order(USER_C, list(reversed(ids))),
+            return_exceptions=True,
+        )
+        assert results == [None, None], f"round {i}: {results}"
+        assert [t.id for t in await env.list(USER_C)] in (ids, list(reversed(ids)))
 
 
 def _db_error(orig: BaseException) -> DBAPIError:

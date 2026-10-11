@@ -19920,7 +19920,7 @@ export interface components {
             params?: components["schemas"]["TicketListParams"];
             /**
              * Sort
-             * @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending).
+             * @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending) | until (pending reminder time; tickets without one last when ascending).
              * @default age
              */
             sort: string;
@@ -42036,7 +42036,7 @@ export interface operations {
                 channel?: ("email" | "telegram" | "webchat" | "phone")[] | null;
                 offset?: number;
                 limit?: number;
-                /** @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending). */
+                /** @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending) | until (pending reminder time; tickets without one last when ascending). */
                 sort?: string;
                 order?: string;
                 /** @description Also list archived tickets (admins only; ignored otherwise). */
@@ -42237,7 +42237,7 @@ export interface operations {
                 escalating_within?: number | null;
                 /** @description Repeatable; any of: email (no message on a chat channel, not opened by a phone call), telegram, webchat, phone (first article on the Phone channel and no chat message). Several values match tickets of any of them. */
                 channel?: ("email" | "telegram" | "webchat" | "phone")[] | null;
-                /** @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending). */
+                /** @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending) | until (pending reminder time; tickets without one last when ascending). */
                 sort?: string;
                 order?: string;
                 /** @description Also export archived tickets (admins only; ignored otherwise). */

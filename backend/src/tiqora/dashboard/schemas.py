@@ -25,6 +25,9 @@ MAX_WIDGETS_PER_DASHBOARD: Final = 40
 MAX_DASHBOARDS_PER_USER: Final = 20
 
 _Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+#: Bounded ids: a value outside the column range is a 422, not an asyncpg ``DataError`` (500).
+DashboardIdIn = Annotated[int, Field(ge=1, le=2**63 - 1)]  # tiqora_dashboard.id (BIGINT)
+ZnunyIdIn = Annotated[int, Field(ge=1, le=2**31 - 1)]  # Znuny roles.id / groups.id (INT)
 
 
 class WidgetLayouts(BaseModel):
@@ -90,20 +93,26 @@ class DashboardCreateIn(BaseModel):
 
     name: _Name
     icon: str | None = Field(None, max_length=40)
-    copy_from: int | None = None  # duplicate a visible dashboard (widgets get new ids)
+    copy_from: DashboardIdIn | None = None  # duplicate a visible dashboard (widgets get new ids)
 
 
 class DashboardOrderIn(BaseModel):
-    ids: list[int] = Field(max_length=MAX_DASHBOARDS_PER_USER)
+    model_config = ConfigDict(extra="forbid")
+
+    ids: list[DashboardIdIn] = Field(max_length=MAX_DASHBOARDS_PER_USER)
 
 
 class WidgetSettingsPatchIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     settings: dict[str, Any]
     version: int = Field(ge=1)
 
 
 class DashboardShareIn(BaseModel):
-    group_ids: list[int] = Field(max_length=50)
+    model_config = ConfigDict(extra="forbid")
+
+    group_ids: list[ZnunyIdIn] = Field(max_length=50)
 
 
 class WidgetTypeOut(BaseModel):
@@ -124,6 +133,8 @@ class DashboardDataOut(BaseModel):
 
 
 class WidgetPreviewIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     settings: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -131,8 +142,8 @@ class DashboardTemplateIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: _Name
-    icon: str | None = None
-    role_ids: list[int] = Field(max_length=50)
+    icon: str | None = Field(None, max_length=40)
+    role_ids: list[ZnunyIdIn] = Field(max_length=50)
     locked: bool = False
     sort: int = Field(0, ge=0, le=1000)
 
