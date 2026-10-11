@@ -42,10 +42,12 @@ Deferred/unsupported scope (documented, not silently missing)
   (``GreaterThan`` / ``GreaterThanOrEqual`` / ``LessThan`` /
   ``LessThanOrEqual``) are implemented per Znuny
   ``TransitionValidation::Base``.
-- TransitionAction modules other than the implemented handlers (see
-  ``_ACTION_HANDLERS``) — remaining deferred: ``ExecuteInvoker``,
-  ``Appointment*`` (Create/Update/Remove), ``ConfigItemUpdate``.
-  Unsupported modules are logged and no-op'd, and collected into
+- TransitionAction modules are dispatched through the registry
+  ``tiqora.process.actions.TRANSITION_ACTIONS`` (:func:`resolve_action`); every
+  Znuny module is listed there, but these have no Tiqora handler yet (``run is
+  None``): ``ExecuteInvoker`` (handler owned by the GI requester plan),
+  ``Appointment*`` (Create/Update/Remove), ``ConfigItemUpdate``. Unsupported and
+  unknown modules are logged and no-op'd, and collected into
   ``ActivityDialogSubmitResult.unsupported_actions``.
 - Activity Dialog ``PendingTimeDiff`` is not a dialog field (a transition action's own
   ``PendingTimeDiff`` on ``TicketStateSet`` is honoured).
@@ -91,6 +93,7 @@ from tiqora.domain.ticket_write_service import (
     update_dynamic_field,
     watch_ticket,
 )
+from tiqora.process.actions.registry import module_short_name, resolve_action
 from tiqora.process.actor import ProcessActor
 from tiqora.process.availability import RUNNING_STATES, assert_can_submit
 from tiqora.process.conditions import (
@@ -1095,45 +1098,6 @@ async def _action_ticket_create(
             )
 
 
-_ActionHandler = Callable[[AsyncSession, dict[str, Any], int, int, SysConfig], Awaitable[None]]
-
-_ACTION_HANDLERS: dict[str, _ActionHandler] = {
-    "TicketStateSet": _action_ticket_state_set,
-    "TicketQueueSet": _action_ticket_queue_set,
-    "TicketOwnerSet": _action_ticket_owner_set,
-    "TicketPrioritySet": _action_ticket_priority_set,
-    "TicketTitleSet": _action_ticket_title_set,
-    "TicketCustomerSet": _action_ticket_customer_set,
-    "TicketResponsibleSet": _action_ticket_responsible_set,
-    "TicketLockSet": _action_ticket_lock_set,
-    "DynamicFieldSet": _action_dynamic_field_set,
-    "DynamicFieldRemove": _action_dynamic_field_remove,
-    "DynamicFieldIncrement": _action_dynamic_field_increment,
-    "DynamicFieldPendingTimeSet": _action_dynamic_field_pending_time_set,
-    "TicketArticleCreate": _action_ticket_article_create,
-    "ArticleSend": _action_article_send,
-    "TicketTypeSet": _action_ticket_type_set,
-    "TicketServiceSet": _action_ticket_service_set,
-    "TicketSLASet": _action_ticket_sla_set,
-    "TicketWatchSet": _action_ticket_watch_set,
-    "LinkAdd": _action_link_add,
-    "TicketCreate": _action_ticket_create,
-}
-"""Implemented TransitionAction modules, keyed by the last ``::``-segment of
-``TransitionActionConfig.module``. Remaining deferred modules include
-``ExecuteInvoker``, ``Appointment*``, ``ConfigItemUpdate`` — see
-:func:`execute_transition_action`."""
-
-
-def _module_short_name(module: str) -> str:
-    """Last segment of a Perl-style ``Kernel::System::...::Foo`` module path."""
-    if "::" in module:
-        return module.rsplit("::", 1)[-1]
-    if "." in module:
-        return module.rsplit(".", 1)[-1]
-    return module
-
-
 async def execute_transition_action(
     session: AsyncSession,
     *,
@@ -1163,15 +1127,14 @@ async def execute_transition_action(
     mutated.
     """
     del process_entity_id, activity_entity_id, transition_entity_id  # see docstring
-    module_name = _module_short_name(action.module)
-    handler = _ACTION_HANDLERS.get(module_name)
-    if handler is None:
+    entry = resolve_action(action.module)
+    if entry is None or entry.run is None:
         logger.warning("unsupported ProcessManagement TransitionAction module: %s", action.module)
-        return module_name
+        return module_short_name(action.module)
     config = await replace_action_config(
         action.config, session=session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig
     )
-    await handler(session, config, ticket_id, user_id, sysconfig)
+    await entry.run(session, config, ticket_id, user_id, sysconfig)
     return None
 
 

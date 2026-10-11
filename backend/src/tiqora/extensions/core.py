@@ -55,6 +55,11 @@ def register_core(registry: Registry) -> None:
     for p in core_providers():
         registry.add(DASHBOARD_PROVIDERS, p)
 
+    from tiqora.process.actions.registry import TRANSITION_ACTIONS, core_transition_actions
+
+    for action in core_transition_actions():
+        registry.add(TRANSITION_ACTIONS, action)
+
 
 def get_registry() -> Registry:
     global _REGISTRY
