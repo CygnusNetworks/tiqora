@@ -180,12 +180,15 @@ def build_ssl_context(
             )
         if cert_path:
             ctx.load_cert_chain(
-                str(cert_path), str(key_path) if key_path else None, key_password or None
+                str(cert_path), str(key_path) if key_path else None, key_password or ""
             )
     except (ssl.SSLError, OSError, ValueError) as exc:
         raise EgressError("Zertifikat oder Schlüssel konnte nicht geladen werden.") from exc
     if not verify_hostname:
+        # Znuny parity (REST.pm SSL_verify_mode => 0): the opt-in disables peer verification
+        # entirely, so self-signed and private-CA endpoints work. check_hostname must go first.
         ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
     return ctx
 
 

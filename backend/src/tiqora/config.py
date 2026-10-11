@@ -414,7 +414,9 @@ class Settings(BaseSettings):
     gi_requester_interval_seconds: int = Field(
         default=5, ge=1, validation_alias="TIQORA_GI_REQUESTER_INTERVAL"
     )
-    gi_requester_gap_hold_seconds: int = Field(default=30, ge=0)
+    gi_requester_gap_hold_seconds: int = Field(
+        default=30, ge=0, validation_alias="TIQORA_GI_REQUESTER_GAP_HOLD_SECONDS"
+    )
 
     @field_validator("gi_cert_dirs", mode="before")
     @classmethod

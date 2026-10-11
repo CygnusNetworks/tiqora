@@ -85,6 +85,13 @@ async def test_egress_settings_default_roundtrip_and_isolation(
                 '{"allowed_targets": ["127.0.0.1/32"], "allow_insecure_tls": true}',
             )
             assert await get_egress_settings(session, WS) == WebserviceEgressSettings()
+            # a stored string "false" must not switch the TLS opt-in on
+            await set_setting(
+                session,
+                f"gi.webservice.{WS}.egress",
+                '{"allowed_targets": ["10.0.0.0/8"], "allow_insecure_tls": "false"}',
+            )
+            assert (await get_egress_settings(session, WS)).allow_insecure_tls is False
     finally:
         await engine.dispose()
         _clean(sync_url)

@@ -89,7 +89,7 @@ async def get_egress_settings(session: AsyncSession, ws_id: int) -> WebserviceEg
     try:
         data: Any = json.loads(raw)
         targets = validate_targets([str(t) for t in data.get("allowed_targets", [])])
-        return WebserviceEgressSettings(targets, bool(data.get("allow_insecure_tls", False)))
+        return WebserviceEgressSettings(targets, data.get("allow_insecure_tls") is True)
     except (ValueError, AttributeError, TypeError):
         # A damaged value must not open anything: fall back to the closed default.
         return WebserviceEgressSettings()

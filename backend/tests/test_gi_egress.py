@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
+import ssl
 from pathlib import Path
 
 import httpx
@@ -148,8 +149,10 @@ def test_insecure_tls_needs_opt_in() -> None:
         build_ssl_context(policy=policy(), verify_hostname=False, **args)  # type: ignore[arg-type]
     ctx = build_ssl_context(policy=policy(allow_insecure_tls=True), verify_hostname=False, **args)  # type: ignore[arg-type]
     assert ctx.check_hostname is False
+    assert ctx.verify_mode == ssl.CERT_NONE
     strict = build_ssl_context(policy=policy(), verify_hostname=True, **args)  # type: ignore[arg-type]
     assert strict.check_hostname is True
+    assert strict.verify_mode == ssl.CERT_REQUIRED
 
 
 def test_proxy_host_checked() -> None:
