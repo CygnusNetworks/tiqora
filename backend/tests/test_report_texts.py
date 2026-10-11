@@ -180,6 +180,9 @@ def test_date_buckets() -> None:
     assert format_date_bucket("2026-10-01", "year", de) == "2026"
     assert format_date_bucket("2026-10-11", "day", de) == "11.10.2026"
     assert format_date_bucket("2026-10-11", "day", en) == "10/11/2026"
+    assert format_date_bucket("2026-10-05", "day", en) == "10/05/2026"
+    assert format_date_bucket("2026-03-04", "day", en) == "03/04/2026"
+    assert format_date_bucket("2026-03-04", "day", de) == "04.03.2026"
     assert format_date_bucket("2026-10-11", None, de) == "11.10.2026"
     assert format_date_bucket("garbage", "day", de) == "garbage"
 

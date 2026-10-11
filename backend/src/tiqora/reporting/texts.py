@@ -283,7 +283,7 @@ def format_date_bucket(value: str, grain: Grain | None, texts: ReportTexts) -> s
         return str(day.year)
     if texts.locale == "de":
         return f"{day.day:02d}.{day.month:02d}.{day.year}"
-    return f"{day.month}/{day.day}/{day.year}"
+    return f"{day.month:02d}/{day.day:02d}/{day.year}"
 
 
 @dataclass(frozen=True, slots=True)
