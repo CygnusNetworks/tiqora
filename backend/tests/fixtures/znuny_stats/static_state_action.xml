@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<otrs_stats>
+<Cache>0</Cache>
+<Description>Zustandsänderungen pro Monat.</Description>
+<File>StateAction</File>
+<Format>CSV</Format>
+<Format>Print</Format>
+<Object></Object>
+<ObjectModule>Kernel::System::Stats::Static::StateAction</ObjectModule>
+<Permission>stats</Permission>
+<StatType>static</StatType>
+<SumCol>0</SumCol>
+<SumRow>0</SumRow>
+<Title>rep52 Zustandsaktionen</Title>
+<Valid>1</Valid>
+</otrs_stats>

@@ -216,13 +216,13 @@ delivery_max_attachment_mb: int = Field(15, ge=1, le=50)      # all attachments 
 
 ### D3. Znuny XMLHash (Task 2)
 
-Znuny stores a stat in `xml_storage` as one row per leaf: `xml_type = 'Stats'`, `xml_key = <StatID>`, `xml_content_key` like `[1]{'otrs_stats'}[1]{'UseAsXvalue'}[1]{'SelectedValues'}[2]{'Content'}`, `xml_content_value` = the text (NULL = ''). `XMLHashGet` eval's these as Perl; Tiqora parses them with a tokenizer (never eval). Inside the content-key, `'` and `\` in hash keys are escaped as `\'` and `\\` (verify against `XML.pm` `_XMLHash2D` before implementing; if Znuny does not escape keys, the tokenizer still accepts the escapes).
+Znuny stores a stat in `xml_storage` as one row per leaf: `xml_type = 'Stats'`, `xml_key = <StatID>`, `xml_content_key` like `[1]{'otrs_stats'}[1]{'UseAsXvalue'}[1]{'SelectedValues'}[2]{'Content'}`, `xml_content_value` = the text (NULL = ''). `XMLHashGet` eval's these as Perl; Tiqora parses them with a tokenizer (never eval). Inside the content-key, `'` and `\` in hash keys are escaped as `\'` and `\\` (verified: `_XMLHash2D` does not escape keys, only `XMLHashGet` escapes values; the tokenizer still accepts the escapes).
 
 ```python
 # backend/src/tiqora/reporting/znuny_stats/xml_hash.py
 MAX_STAT_ROWS: Final = 20_000                 # leaves per stat; more -> XmlHashError
 MAX_DEPTH: Final = 12
-MAX_FILE_BYTES: Final = 2_000_000
+MAX_FILE_BYTES: Final = 1_000_000                # ruling 33: base64 ~1.37 MB behind the proxy
 class XmlHashError(ValueError):               # German message for the import report
     def __init__(self, message: str) -> None
 Path_ = list[int | str]
