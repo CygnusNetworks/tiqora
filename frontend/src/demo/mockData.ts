@@ -2173,6 +2173,9 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/kb/assignable-groups")) return [{ id: 2, name: "users" }, { id: 3, name: "support" }];
   if (p.endsWith("/api/v1/calendar/calendars")) return calendars;
   if (p.endsWith("/api/v1/calendar/appointments")) return occurrences;
+  // Option refresh (dependent selects) and the ticket's process path.
+  if (p.match(/\/api\/v1\/process\/.*\/options$/) && method === "POST") return demoProcessOptions(p);
+  if (p.match(/\/api\/v1\/process\/ticket\/\d+\/path$/)) return { process_entity_id: "Process-demo", steps: [] };
   if (p.match(/\/api\/v1\/process\/ticket\/\d+\/state$/)) return processTicketState;
   if (p.match(/\/api\/v1\/process\/ticket\/\d+\/dialog\/[^/]+\/form$/) || p.match(/\/api\/v1\/process\/[^/]+\/start-form$/)) return processDialogForm;
   if (p.match(/\/api\/v1\/process\/ticket\/\d+\/submit$/) && method === "POST") return { activity_changed: true, new_activity_entity_id: null, transition_entity_id: null, unsupported_actions: [], state: processTicketState };
@@ -2394,6 +2397,11 @@ const processTicketState = {
   can_start: false,
 };
 
+// Demo answer of the option refresh: the Priority list shifts with the picked value so the refresh is visible.
+function demoProcessOptions(_path: string): unknown {
+  return { options: { Priority: [{ value: "3", label: "3 normal" }, { value: "4", label: "4 hoch" }, { value: "5", label: "5 sehr hoch" }] } };
+}
+
 const processDialogForm = {
   process_entity_id: "Process-demo",
   activity_dialog_entity_id: "ActivityDialog-demo",
@@ -2403,10 +2411,12 @@ const processDialogForm = {
   submit_button_text: "Freigeben",
   submit_advice_text: "",
   fields: [
-    { name: "Priority", kind: "select", label: "Priority", required: true, description_short: "", description_long: "", default: "3", options: [{ value: "3", label: "3 normal" }, { value: "4", label: "4 hoch" }] },
-    { name: "Article", kind: "article", label: "Article", required: true, description_short: "", description_long: "", default: null, options: [], time_units: "0", uploads: false },
-    { name: "PendingTime", kind: "pending_time", label: "PendingTime", required: false, description_short: "", description_long: "", default: null, options: [], time_units: "0", uploads: false },
-    { name: "Attachments", kind: "unsupported", label: "Attachments", required: false, description_short: "", description_long: "", default: null, options: [], time_units: "0", uploads: false },
+    { name: "Queue", kind: "select", label: "Queue", required: false, description_short: "", description_long: "", default: "2", options: [{ value: "2", label: "Support" }, { value: "3", label: "Sales" }], time_units: "0", uploads: false, refresh_on: [] },
+    { name: "Priority", kind: "select", label: "Priority", required: true, description_short: "", description_long: "", default: "3", options: [{ value: "3", label: "3 normal" }, { value: "4", label: "4 hoch" }], time_units: "0", uploads: false, refresh_on: ["Queue"] },
+    { name: "CustomerUserID", kind: "customer", label: "Customer", required: false, description_short: "", description_long: "", default: null, options: [], time_units: "0", uploads: false, refresh_on: [] },
+    { name: "Article", kind: "article", label: "Article", required: true, description_short: "", description_long: "", default: null, options: [], time_units: "2", uploads: true, refresh_on: [] },
+    { name: "PendingTime", kind: "pending_time", label: "PendingTime", required: false, description_short: "", description_long: "", default: null, options: [], time_units: "0", uploads: false, refresh_on: [] },
+    { name: "Attachments", kind: "ticket_attachments", label: "Attachments", required: false, description_short: "", description_long: "", default: null, options: [{ value: "Article::1::1", label: "#2026100001: Rechnung.pdf (Artikel 1, Anhang 1)" }, { value: "Article::1::2", label: "#2026100001: Lieferschein.pdf (Artikel 1, Anhang 2)" }], time_units: "0", uploads: false, refresh_on: [] },
   ],
 };
 
@@ -2450,6 +2460,7 @@ const portalProcessState = {
 /** Mocks for `/api/portal/process*`; undefined when the path is not a process route. */
 export function demoPortalProcess(pathname: string, method: string): unknown {
   const p = pathname.replace(/\/+$/, "");
+  if (p.endsWith("/options") && method === "POST") return { options: {} };
   if (p.match(/\/api\/portal\/process\/ticket\/\d+\/state$/)) return portalProcessState;
   if (p.match(/\/api\/portal\/process\/ticket\/\d+\/dialog\/[^/]+\/form$/)) return portalDialogForm;
   if (p.match(/\/api\/portal\/process\/[^/]+\/start-form$/)) return portalStartForm;

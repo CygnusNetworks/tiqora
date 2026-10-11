@@ -4722,7 +4722,10 @@
       "PendingTime": "Remind on",
       "ArticleSubject": "Subject",
       "ArticleBody": "Text",
-      "Attachments": "Attachments"
+      "Attachments": "Attachments",
+      "TimeUnits": "Time spent",
+      "ArticleAttachments": "Files",
+      "TicketAttachments": "Attachments from the ticket"
     },
     "form": {
       "unsupported": "This field cannot be filled in here yet.",
@@ -4731,7 +4734,12 @@
       "cancel": "Cancel",
       "loadError": "Could not load the form.",
       "submitError": "Sending failed.",
-      "invalid": "Please check your input. A required field is missing or a value is invalid."
+      "invalid": "Please check your input. A required field is missing or a value is invalid.",
+      "uploadTooLarge": "The files are too large.",
+      "customerSearch": "Search customers",
+      "customerPick": "Choose customer",
+      "attachmentsNone": "The ticket has no attachments.",
+      "optionsRefreshing": "Updating the selection …"
     },
     "lock": {
       "lock": "locked",

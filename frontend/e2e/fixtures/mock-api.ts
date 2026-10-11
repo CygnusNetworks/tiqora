@@ -1115,6 +1115,14 @@ export async function mockApi(page: Page) {
       await json(route, 200, processDialogForm);
       return;
     }
+    if (path.match(/\/api\/v1\/process\/.*\/options$/) && method === "POST") {
+      await json(route, 200, { options: {} });
+      return;
+    }
+    if (path.match(/\/api\/v1\/process\/ticket\/\d+\/path$/) && method === "GET") {
+      await json(route, 200, { process_entity_id: "Process-1", steps: [] });
+      return;
+    }
     if (path.match(/\/api\/v1\/process\/activity-dialog\/[^/]+$/) && method === "GET") {
       await json(route, 200, activityDialogDetail);
       return;

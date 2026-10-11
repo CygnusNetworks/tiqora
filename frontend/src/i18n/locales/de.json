@@ -4722,7 +4722,10 @@
       "PendingTime": "Erinnerung am",
       "ArticleSubject": "Betreff",
       "ArticleBody": "Text",
-      "Attachments": "Anhänge"
+      "Attachments": "Anhänge",
+      "TimeUnits": "Zeitaufwand",
+      "ArticleAttachments": "Dateien",
+      "TicketAttachments": "Anhänge aus dem Ticket"
     },
     "form": {
       "unsupported": "Dieses Feld kann hier noch nicht ausgefüllt werden.",
@@ -4731,7 +4734,12 @@
       "cancel": "Abbrechen",
       "loadError": "Formular konnte nicht geladen werden.",
       "submitError": "Senden fehlgeschlagen.",
-      "invalid": "Bitte prüfen Sie die Eingaben. Ein Pflichtfeld fehlt oder ein Wert ist ungültig."
+      "invalid": "Bitte prüfen Sie die Eingaben. Ein Pflichtfeld fehlt oder ein Wert ist ungültig.",
+      "uploadTooLarge": "Die Dateien sind zu groß.",
+      "customerSearch": "Kunden suchen",
+      "customerPick": "Kunde wählen",
+      "attachmentsNone": "Das Ticket hat keine Anhänge.",
+      "optionsRefreshing": "Auswahl wird aktualisiert …"
     },
     "lock": {
       "lock": "gesperrt",
