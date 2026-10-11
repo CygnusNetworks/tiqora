@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import ctypes
+import functools
 import json
+import threading
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from datetime import timedelta
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from pydantic import BaseModel
@@ -899,3 +902,40 @@ async def test_a_runner_does_not_reclaim_a_job_whose_old_claim_still_runs_here(
     await runner.wait_idle()
     assert runs == [1, 2]
     assert (await _fetch(factory, job_id)).status == "succeeded"
+
+
+async def test_wait_idle_returns_when_a_finished_task_is_still_in_the_active_set() -> None:
+    """A job task that has finished while its ``_forget`` done-callback is still queued.
+
+    ``gather()`` of finished tasks completes without yielding to the event loop (Python
+    3.12+), so a ``wait_idle`` that only re-gathers spins forever and the queued callback
+    never runs. Seen when ``run_once`` awaited a lane query after starting a quick job.
+    """
+    runner = _runner(cast(Any, None), _registry())
+
+    async def quick() -> None:
+        return None
+
+    task = asyncio.create_task(quick())  # built like _start_lane does
+    runner._active[1] = task
+    runner._lanes[1] = "default"
+    task.add_done_callback(functools.partial(runner._forget, 1))
+    await asyncio.sleep(0)  # the task finishes; _forget is queued for the next iteration
+    assert task.done() and 1 in runner._active  # the state the hang needs
+
+    # A busy loop never lets asyncio.wait_for fire: a thread raises in the loop instead.
+    main = threading.get_ident()
+    done = threading.Event()
+
+    def watchdog() -> None:
+        if not done.wait(5):
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(
+                ctypes.c_ulong(main), ctypes.py_object(TimeoutError)
+            )
+
+    threading.Thread(target=watchdog, daemon=True).start()
+    try:
+        await runner.wait_idle()
+    finally:
+        done.set()
+    assert runner.active_count == 0

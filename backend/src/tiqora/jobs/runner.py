@@ -542,6 +542,10 @@ class JobRunner:
     async def wait_idle(self) -> None:
         while self._active:
             await asyncio.gather(*list(self._active.values()), return_exceptions=True)
+            # gather() of tasks that already finished returns without yielding, and their
+            # ``_forget`` done-callbacks only run on the next loop iteration: without this
+            # yield a finished task left in ``_active`` turns this loop into a busy spin.
+            await asyncio.sleep(0)
 
     async def shutdown(self, grace_seconds: float) -> None:
         self._stopping = True
