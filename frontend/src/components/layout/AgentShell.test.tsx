@@ -141,13 +141,14 @@ describe("AgentShell sidebar", () => {
     await renderShell();
     await screen.findByTestId("agent-sidebar-nav");
     await waitFor(() => expect(chatTopics).toHaveBeenCalled());
-    expect(screen.queryByTestId("chat-inbox-trigger")).toBeNull();
+    expect(screen.queryByTestId("chat-inbox-trigger-desktop")).toBeNull();
   });
 
   it("shows the chat inbox button for an agent with chat topics", async () => {
     chatTopics.mockResolvedValue([{ ref: "1:support", label: "Support", queue_id: 1, config_name: "W" }]);
     await renderShell();
-    expect((await screen.findAllByTestId("chat-inbox-trigger")).length).toBeGreaterThan(0);
+    expect(await screen.findByTestId("chat-inbox-trigger-desktop")).toBeInTheDocument();
+    expect(screen.getByTestId("chat-inbox-trigger-mobile")).toBeInTheDocument();
   });
 
   it("shows the customer directory only with its permission", async () => {

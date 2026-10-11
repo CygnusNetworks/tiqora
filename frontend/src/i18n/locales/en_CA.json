@@ -5383,7 +5383,8 @@
         "mine": "My chats",
         "noneMine": "You have no running chats.",
         "newWaiting": "New chat waiting. Waiting chats: {{count}}",
-        "atCapacity": "You already have {{count}} chats."
+        "atCapacity": "You already have {{count}} chats.",
+        "maxInvalid": "Please enter a whole number from {{min}} to {{max}}."
       }
     }
   },

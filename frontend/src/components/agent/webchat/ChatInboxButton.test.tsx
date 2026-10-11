@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vites
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import i18n from "@/i18n";
 import { ChatInboxButton } from "./ChatInboxButton";
-import { renderWithProviders, routeRequests, topics } from "./chatInboxTestUtils";
+import { routeRequests, topics } from "./chatInboxTestUtils";
 
 const { request } = vi.hoisted(() => ({ request: vi.fn() }));
 vi.mock("@/lib/api", async () => {
@@ -21,21 +21,34 @@ beforeAll(() => i18n.changeLanguage("de"));
 afterAll(() => i18n.changeLanguage("en"));
 beforeEach(() => routeRequests(request, {}));
 
+let ring = { pending: 0, topics, ready: true };
+vi.mock("./ChatRingContext", () => ({ useChatRingState: () => ring }));
+
 describe("ChatInboxButton", () => {
   it("badge shows waiting count and the accessible name", () => {
-    renderWithProviders(<ChatInboxButton pending={2} topics={topics} />);
-    expect(screen.getByTestId("chat-inbox-badge")).toHaveTextContent("2");
+    ring = { pending: 2, topics, ready: true };
+    render(<ChatInboxButton />);
+    expect(screen.getByTestId("chat-inbox-badge-desktop")).toHaveTextContent("2");
     expect(screen.getByRole("button", { name: "Chats – 2 wartend" })).toBeInTheDocument();
   });
 
   it("hidden without chat topics", () => {
-    renderWithProviders(<ChatInboxButton pending={0} topics={[]} />);
-    expect(screen.queryByTestId("chat-inbox-trigger")).toBeNull();
+    ring = { pending: 0, topics: [], ready: true };
+    render(<ChatInboxButton />);
+    expect(screen.queryByTestId("chat-inbox-trigger-desktop")).toBeNull();
+  });
+
+  it("uses distinct test ids per header copy", () => {
+    ring = { pending: 0, topics, ready: true };
+    render(<><ChatInboxButton variant="mobile" /><ChatInboxButton /></>);
+    expect(screen.getByTestId("chat-inbox-trigger-mobile")).toBeInTheDocument();
+    expect(screen.getByTestId("chat-inbox-trigger-desktop")).toBeInTheDocument();
   });
 
   it("opens the panel and returns focus to the button on close", () => {
-    renderWithProviders(<ChatInboxButton pending={0} topics={topics} />);
-    const trigger = screen.getByTestId("chat-inbox-trigger");
+    ring = { pending: 0, topics, ready: true };
+    render(<ChatInboxButton />);
+    const trigger = screen.getByTestId("chat-inbox-trigger-desktop");
     fireEvent.click(trigger);
     expect(trigger).toHaveAttribute("aria-expanded", "true");
     fireEvent.click(screen.getByText("close"));
@@ -43,12 +56,17 @@ describe("ChatInboxButton", () => {
     expect(trigger).toHaveFocus();
   });
 
-  it("announces new waiting chats politely, not the initial count", () => {
-    const { rerender } = render(<ChatInboxButton pending={1} topics={topics} />);
-    const live = screen.getByTestId("chat-inbox-live");
+  it("announces chats arriving after load politely, not the ones already waiting", () => {
+    ring = { pending: 0, topics, ready: false };
+    const { rerender } = render(<ChatInboxButton />);
+    const live = screen.getByTestId("chat-inbox-live-desktop");
     expect(live).toHaveAttribute("aria-live", "polite");
+    // First inbox data: 1 chat was already waiting.
+    ring = { pending: 1, topics, ready: true };
+    act(() => rerender(<ChatInboxButton />));
     expect(live).toHaveTextContent("");
-    act(() => rerender(<ChatInboxButton pending={2} topics={topics} />));
+    ring = { pending: 2, topics, ready: true };
+    act(() => rerender(<ChatInboxButton />));
     expect(live).toHaveTextContent("Neuer Chat wartet. Wartende Chats: 2");
   });
 });

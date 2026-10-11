@@ -1,5 +1,5 @@
-import { useEffect, useId, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useId, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { MultiSelectInput } from "@/components/fields/MultiSelectInput";
 import { Switch } from "@/components/ui/Switch";
@@ -23,9 +23,17 @@ async function askNotificationPermissionOnce(): Promise<void> {
   }
 }
 
-function clampMax(n: number): number {
-  if (!Number.isFinite(n)) return MAX_CONCURRENT_MIN;
-  return Math.min(MAX_CONCURRENT_MAX, Math.max(MAX_CONCURRENT_MIN, Math.round(n)));
+type Desired = { available: boolean; topics: string[]; max_concurrent: number };
+
+function toDesired(s: ChatAgentState): Desired {
+  return { available: s.available, topics: s.topics, max_concurrent: s.max_concurrent };
+}
+
+/** The draft as an integer within 1-20, or null when empty / out of range. */
+function parseMax(draft: string): number | null {
+  if (!/^\s*\d+\s*$/.test(draft)) return null;
+  const n = Number(draft);
+  return n >= MAX_CONCURRENT_MIN && n <= MAX_CONCURRENT_MAX ? n : null;
 }
 
 /** Availability switch, topic filter and concurrency limit of the agent's chats. */
@@ -43,24 +51,25 @@ export function ChatAvailabilityForm() {
   });
   const state = stateQ.data;
   const [maxDraft, setMaxDraft] = useState("3");
+  const [maxInvalid, setMaxInvalid] = useState(false);
   const [error, setError] = useState(false);
+  // Saves are queued in order so editing the limit and then clicking the
+  // switch loses neither; `desired` is what the next save sends, `good` the
+  // last state the server confirmed (the target of a rollback).
+  const desired = useRef<Desired | null>(null);
+  const good = useRef<Desired | null>(null);
+  const lastSentMax = useRef<number | null>(null);
+  const inflight = useRef(0);
+  const chain = useRef<Promise<unknown>>(Promise.resolve());
 
   useEffect(() => {
-    if (state) setMaxDraft(String(state.max_concurrent));
+    if (!state || inflight.current > 0) return;
+    good.current = toDesired(state);
+    desired.current = toDesired(state);
+    lastSentMax.current = state.max_concurrent;
+    setMaxDraft(String(state.max_concurrent));
+    setMaxInvalid(false);
   }, [state]);
-
-  const save = useMutation({
-    mutationFn: (next: { available: boolean; topics: string[]; max_concurrent: number }) =>
-      webchatApi.putAgentState(next),
-    onSuccess: (data: ChatAgentState) => {
-      setError(false);
-      qc.setQueryData(chatAgentStateKey, data);
-    },
-    onError: () => {
-      setError(true);
-      void qc.invalidateQueries({ queryKey: chatAgentStateKey });
-    },
-  });
 
   if (!state) {
     return (
@@ -70,19 +79,45 @@ export function ChatAvailabilityForm() {
     );
   }
 
-  const push = (patch: Partial<{ available: boolean; topics: string[]; max_concurrent: number }>) =>
-    save.mutate({
-      available: state.available,
-      topics: state.topics,
-      max_concurrent: state.max_concurrent,
-      ...patch,
-    });
+  const push = (patch: Partial<Desired>) => {
+    const body = { ...(desired.current ?? toDesired(state)), ...patch };
+    desired.current = body;
+    if (patch.max_concurrent !== undefined) lastSentMax.current = patch.max_concurrent;
+    inflight.current += 1;
+    chain.current = chain.current
+      .then(() => webchatApi.putAgentState(body))
+      .then(
+        (data) => {
+          good.current = toDesired(data);
+          setError(false);
+          qc.setQueryData(chatAgentStateKey, data);
+        },
+        () => {
+          // Roll the field back to what the server has and say so.
+          const back = good.current ?? toDesired(state);
+          desired.current = back;
+          lastSentMax.current = back.max_concurrent;
+          setMaxDraft(String(back.max_concurrent));
+          setMaxInvalid(false);
+          setError(true);
+          void qc.invalidateQueries({ queryKey: chatAgentStateKey });
+        },
+      )
+      .finally(() => {
+        inflight.current -= 1;
+      });
+  };
 
   const options = (topicsQ.data ?? []).map((tp) => ({ value: tp.ref, label: tp.label }));
   const commitMax = () => {
-    const next = clampMax(Number(maxDraft));
-    setMaxDraft(String(next));
-    if (next !== state.max_concurrent) push({ max_concurrent: next });
+    const next = parseMax(maxDraft);
+    if (next === null) {
+      setMaxInvalid(true);
+      return;
+    }
+    setMaxInvalid(false);
+    // Enter followed by blur must not send the same value twice.
+    if (next !== lastSentMax.current) push({ max_concurrent: next });
   };
 
   return (
@@ -95,7 +130,6 @@ export function ChatAvailabilityForm() {
           id={`${ids}-available`}
           testId="chat-available-switch"
           checked={state.available}
-          disabled={save.isPending}
           onChange={(on) => {
             if (on) void askNotificationPermissionOnce();
             push({ available: on });
@@ -111,7 +145,6 @@ export function ChatAvailabilityForm() {
           labelId={`${ids}-topics`}
           value={state.topics}
           options={options}
-          disabled={save.isPending}
           onChange={(next) => push({ topics: next })}
         />
         <p className="mt-1 text-[11.5px] text-muted">{t("webchat.agent.inbox.topicsHint")}</p>
@@ -128,7 +161,12 @@ export function ChatAvailabilityForm() {
           min={MAX_CONCURRENT_MIN}
           max={MAX_CONCURRENT_MAX}
           value={maxDraft}
-          onChange={(e) => setMaxDraft(e.target.value)}
+          aria-invalid={maxInvalid || undefined}
+          aria-describedby={maxInvalid ? `${ids}-max-err` : undefined}
+          onChange={(e) => {
+            setMaxDraft(e.target.value);
+            setMaxInvalid(false);
+          }}
           onBlur={commitMax}
           onKeyDown={(e) => {
             if (e.key === "Enter") commitMax();
@@ -136,6 +174,11 @@ export function ChatAvailabilityForm() {
           className="h-8 w-16 rounded border border-hairline bg-surface px-2 text-right text-[13px] tabular-nums text-ink"
         />
       </div>
+      {maxInvalid && (
+        <p id={`${ids}-max-err`} role="alert" className="text-[12px] text-danger" data-testid="chat-max-invalid">
+          {t("webchat.agent.inbox.maxInvalid", { min: MAX_CONCURRENT_MIN, max: MAX_CONCURRENT_MAX })}
+        </p>
+      )}
       {error && (
         <p role="alert" className="text-[12px] text-danger" data-testid="chat-availability-error">
           {t("webchat.agent.actionFailed")}

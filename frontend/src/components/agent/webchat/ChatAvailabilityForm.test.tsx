@@ -53,13 +53,63 @@ describe("ChatAvailabilityForm", () => {
     await waitFor(() => expect(put).toHaveBeenCalled());
   });
 
-  it("clamps the concurrency to 1-20 and saves on blur", async () => {
+  it("shows a validation message instead of saving empty or out-of-range input", async () => {
     renderWithProviders(<ChatAvailabilityForm />);
     const input = await screen.findByTestId("chat-max-concurrent");
     fireEvent.change(input, { target: { value: "99" } });
     fireEvent.blur(input);
+    expect(await screen.findByTestId("chat-max-invalid")).toHaveTextContent("von 1 bis 20");
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    fireEvent.change(input, { target: { value: "" } });
+    fireEvent.blur(input);
+    expect(await screen.findByTestId("chat-max-invalid")).toBeInTheDocument();
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it("saves the limit on blur", async () => {
+    renderWithProviders(<ChatAvailabilityForm />);
+    const input = await screen.findByTestId("chat-max-concurrent");
+    fireEvent.change(input, { target: { value: "7" } });
+    fireEvent.blur(input);
     await waitFor(() =>
-      expect(put).toHaveBeenCalledWith({ available: false, topics: [], max_concurrent: 20 }),
+      expect(put).toHaveBeenCalledWith({ available: false, topics: [], max_concurrent: 7 }),
     );
+  });
+
+  it("Enter followed by blur sends one PUT", async () => {
+    renderWithProviders(<ChatAvailabilityForm />);
+    const input = await screen.findByTestId("chat-max-concurrent");
+    fireEvent.change(input, { target: { value: "5" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.blur(input);
+    await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
+  });
+
+  it("a failed save resets the field to the server value and shows the error", async () => {
+    put.mockRejectedValueOnce(new Error("boom"));
+    renderWithProviders(<ChatAvailabilityForm />);
+    const input = await screen.findByTestId("chat-max-concurrent");
+    fireEvent.change(input, { target: { value: "7" } });
+    fireEvent.blur(input);
+    expect(await screen.findByTestId("chat-availability-error")).toBeInTheDocument();
+    await waitFor(() => expect(input).toHaveValue(3));
+  });
+
+  it("editing the limit then clicking the switch keeps both changes", async () => {
+    let release: () => void = () => undefined;
+    put.mockImplementationOnce(
+      (b) => new Promise((res) => { release = () => res({ ...agentState, ...(b as object) }); }),
+    );
+    renderWithProviders(<ChatAvailabilityForm />);
+    const input = await screen.findByTestId("chat-max-concurrent");
+    fireEvent.change(input, { target: { value: "5" } });
+    fireEvent.blur(input);
+    fireEvent.click(screen.getByTestId("chat-available-switch"));
+    await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
+    release();
+    await waitFor(() =>
+      expect(put).toHaveBeenLastCalledWith({ available: true, topics: [], max_concurrent: 5 }),
+    );
+    expect(put).toHaveBeenCalledTimes(2);
   });
 });

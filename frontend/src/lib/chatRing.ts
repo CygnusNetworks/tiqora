@@ -137,7 +137,7 @@ export function resetChatRing(): void {
  * Keeps the ring context in sync with the agent's availability and topics and
  * returns how many chats are waiting for pickup. Mount once in the agent shell.
  */
-export function useChatRing(): { pending: number; topics: ChatTopicRef[] } {
+export function useChatRing(): { pending: number; topics: ChatTopicRef[]; ready: boolean } {
   const topics = useQuery({
     queryKey: chatTopicsKey,
     queryFn: ({ signal }) => webchatApi.topics(signal),
@@ -169,5 +169,8 @@ export function useChatRing(): { pending: number; topics: ChatTopicRef[] } {
     });
   }, [state.data, topics.data]);
 
-  return { pending: inbox.data?.waiting.length ?? 0, topics: topics.data ?? EMPTY_TOPICS };
+  return { pending: inbox.data?.waiting.length ?? 0, topics: topics.data ?? EMPTY_TOPICS,
+    /** The inbox has loaded: counts from here on are live, not initial. */
+    ready: inbox.isSuccess,
+  };
 }
