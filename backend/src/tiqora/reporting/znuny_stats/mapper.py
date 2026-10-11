@@ -14,6 +14,7 @@ from tiqora.reporting.definition import (
     Visualization,
     validate_definition,
 )
+from tiqora.reporting.znuny_stats import map_more  # noqa: F401  (registers the Task 4 mappers)
 from tiqora.reporting.znuny_stats.mapping_common import (
     DROPPED_ELEMENTS_TICKETS,
     ELEMENT_FIELDS_TICKETS,

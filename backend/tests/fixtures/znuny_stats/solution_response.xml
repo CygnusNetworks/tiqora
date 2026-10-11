@@ -15,7 +15,7 @@
 <UseAsValueSeries Element="PriorityIDs" Fixed="1">
 </UseAsValueSeries>
 <UseAsXvalue Element="KindsOfReporting" Fixed="1">
-<SelectedValues>NumberOfTickets</SelectedValues>
+<SelectedValues>NumberOfTicketsAllOver</SelectedValues>
 <SelectedValues>SolutionAverageAllOver</SelectedValues>
 <SelectedValues>SolutionMaxTimeWorkingTime</SelectedValues>
 <SelectedValues>SolutionMinTime</SelectedValues>

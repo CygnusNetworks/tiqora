@@ -178,14 +178,16 @@ _DROPPED_PREFIXES: Final = (
 _FILE_IDS_REASON: Final = "IDs aus einer Exportdatei – bitte die Auswahl prüfen."
 
 
-def dropped_reason(element: str, table: Mapping[str, str]) -> str:
+def dropped_reason(
+    element: str, table: Mapping[str, str], default: str = "Unbekanntes Element."
+) -> str:
     """Why an element without a field mapping is not taken over."""
     if element in table:
         return table[element]
     for prefix, reason in _DROPPED_PREFIXES:
         if element.startswith(prefix):
             return reason
-    return "Unbekanntes Element."
+    return default
 
 
 def file_ids_unreliable(stat: ZnunyStat, el: StatElement, fmap: FieldMap) -> bool:
@@ -503,6 +505,7 @@ def map_axes(
     issues: list[ImportIssue],
     *,
     skip: Collection[str] = (),
+    default_dropped: str = "Unbekanntes Element.",
 ) -> MappedAxes:
     """Axes, fixed filters, runtime parameters and the period of a dynamic matrix statistic."""
     out = MappedAxes()
@@ -542,7 +545,12 @@ def map_axes(
         fmap = fields.get(el.element)
         if fmap is None:
             issues.append(
-                make_issue(ref, el.element, dropped_reason(el.element, dropped), "dropped")
+                make_issue(
+                    ref,
+                    ", ".join(el.selected) or el.element,
+                    dropped_reason(el.element, dropped, default_dropped),
+                    "dropped",
+                )
             )
             continue
         if fmap.kind == "time":
