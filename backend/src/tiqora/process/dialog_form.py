@@ -58,6 +58,11 @@ from tiqora.domain.field_options import (
 from tiqora.domain.ticket_acl import apply_ticket_acl
 from tiqora.domain.ticket_attribute_relations import apply_attribute_relations_to_field_maps
 from tiqora.process.actor import ProcessActor
+from tiqora.process.attachments_field import (
+    ATTACHMENTS_FIELD,
+    attachment_selection_default,
+    list_ticket_attachment_options,
+)
 from tiqora.process.availability import (
     assert_can_start,
     assert_can_submit,
@@ -173,10 +178,12 @@ def _field_kind(name: str, dynamic_fields: Mapping[str, DynamicField]) -> FieldK
         return "pending_time"
     if name == "CustomerUserID":
         return "customer"
+    if name == ATTACHMENTS_FIELD:
+        return "ticket_attachments"
     df = dynamic_fields.get(name)
     if df is not None:
         return _DF_KINDS.get(df.field_type, "unsupported")
-    return "unsupported"  # Attachments (phase 2, rulings F34), unknown names, unknown DFs
+    return "unsupported"  # unknown names, unknown DFs
 
 
 async def _customer_queues(
@@ -608,6 +615,9 @@ async def build_dialog_form(
     config = dialog.config
     visible = visible_fields(config, actor.interface)
     names = _customer_field_names(visible, agent)
+    if ATTACHMENTS_FIELD in names and (not agent or ticket_id is None):
+        # AgentTicketProcess.pm:1878 `elsif Attachments && $TicketID`: agent and existing ticket.
+        names.remove(ATTACHMENTS_FIELD)
     dynamic_fields = await _load_dynamic_fields(session, names)
     dialog_fields = {name: field_config(config, name) for name in names}
     process_context = {
@@ -667,9 +677,18 @@ async def build_dialog_form(
                 ProcessDialogOptionOut(value="lock", label="lock"),
                 ProcessDialogOptionOut(value="unlock", label="unlock"),
             ]
+        elif kind == "ticket_attachments":
+            assert ticket_id is not None
+            field_options = await list_ticket_attachment_options(
+                session, ticket_id, SysConfig(session)
+            )
         else:
             field_options = options.get(name, [])
         default = _initial_value(name, cfg, df, kind, required, now)
+        if kind == "ticket_attachments":
+            default = await attachment_selection_default(
+                session, ticket_id or 0, SysConfig(session), field_options
+            )
         if name == "PendingTime":
             default = await _pending_time_offset(default, SysConfig(session))
         fields.append(

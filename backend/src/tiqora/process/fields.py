@@ -36,7 +36,11 @@ FIELD_ALIASES: dict[str, str] = {
 # the values fall back to Process::Default* (AgentTicketProcess.pm:5135-5155).
 TICKET_REQUIRED_FIELDS = ("Queue", "State", "Lock", "Priority")
 # CustomerTicketProcess.pm:75
-CUSTOMER_SKIP_FIELDS = frozenset({"Owner", "Responsible", "Lock", "PendingTime", "CustomerID"})
+# ``Attachments`` is not in Znuny's list, but CustomerTicketProcess has no such field at all
+# (it is an agent-only selection of the ticket's existing attachments).
+CUSTOMER_SKIP_FIELDS = frozenset(
+    {"Owner", "Responsible", "Lock", "PendingTime", "CustomerID", "Attachments"}
+)
 
 # Sub-fields of the pseudo-field "Article" that a user may submit; everything else about the
 # article (sender, visibility, channel) comes from the dialog config (:5686-5687).
@@ -202,6 +206,10 @@ def missing_required_fields(
         missing.append("TimeUnits")
     for name in visible_fields(dialog, interface):
         if not field_config(dialog, name).required:
+            continue
+        if name == "Attachments":
+            # AgentTicketProcess.pm:5044 `next DIALOGFIELD if $CurrentField eq 'Attachments'`:
+            # the server never demands a selection.
             continue
         if name == "Article":
             ok = all(is_present(values.get(sub)) for sub in _ARTICLE_INPUT_KEYS)

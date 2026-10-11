@@ -18203,7 +18203,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "text" | "textarea" | "select" | "multiselect" | "boolean" | "date" | "datetime" | "article" | "pending_time" | "customer" | "unsupported";
+            kind: "text" | "textarea" | "select" | "multiselect" | "boolean" | "date" | "datetime" | "article" | "pending_time" | "customer" | "ticket_attachments" | "unsupported";
             /** Label */
             label: string;
             /** Name */

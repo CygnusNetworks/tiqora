@@ -172,6 +172,13 @@ _LINK_ADD = (
     ActionParam("Type", "link_type", required=True),
     ActionParam("State", "text", required=True),
 )
+# ArticleSend.pm:163-200 / TicketArticleCreate.pm:297-330: reuse of the dialog's `Attachments`
+# selection and standard attachments (comma separated names / ids).
+_ARTICLE_ATTACHMENT_PARAMS = (
+    ActionParam("AttachmentsReuse", "bool"),
+    ActionParam("Attachments", "std_attachment", list_value=True),
+    ActionParam("AttachmentIDs", "text"),
+)
 # ArticleSend.pm POD (To/Cc/Bcc: at least one of the three).
 _ARTICLE_SEND = (
     ActionParam("SenderType", "text", required=True, one_of=("SenderType", "SenderTypeID")),
@@ -192,6 +199,7 @@ _ARTICLE_SEND = (
     ActionParam("HistoryComment", "text"),
     ActionParam("NoAgentNotify", "bool"),
     _pair("Queue", "queue"),
+    *_ARTICLE_ATTACHMENT_PARAMS,
     ActionParam("Template", "text", one_of=("Template", "TemplateID")),
     ActionParam("Salutation", "text", one_of=("Salutation", "SalutationID")),
     ActionParam("Signature", "text", one_of=("Signature", "SignatureID")),
@@ -219,6 +227,7 @@ _TICKET_ARTICLE_CREATE = (
     ActionParam("IsVisibleForCustomer", "bool", required=True),
     ActionParam("CommunicationChannel", "text"),
     *_ARTICLE_PAYLOAD,
+    *_ARTICLE_ATTACHMENT_PARAMS,
 )
 # TicketCreate.pm POD + :197-217: Queue/State/Lock/Priority fall back to
 # Process::Default*, so nothing is required; the article is created only when

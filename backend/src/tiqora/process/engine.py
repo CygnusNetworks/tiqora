@@ -101,6 +101,12 @@ from tiqora.domain.ticket_write_service import (
 )
 from tiqora.process.actions.registry import module_short_name, resolve_action
 from tiqora.process.actor import ProcessActor
+from tiqora.process.attachments_field import (
+    ATTACHMENTS_FIELD,
+    collect_action_attachments,
+    encode_attachment_selection,
+    valid_attachment_keys,
+)
 from tiqora.process.availability import RUNNING_STATES, assert_can_submit
 from tiqora.process.conditions import (
     ConditionConfigError,
@@ -663,6 +669,9 @@ async def _action_article_send(
         to_address=_address_list(config.get("To") or config.get("Customer")),
         cc=_address_list(config.get("Cc")),
         bcc=_address_list(config.get("Bcc")),
+        attachments=await collect_action_attachments(
+            session, config, ticket_id=ticket_id, sysconfig=sysconfig, user_id=user_id
+        ),
     )
     await deliver_agent_email_reply(
         session,
@@ -773,6 +782,9 @@ async def _action_ticket_article_create(
         subject=str(config.get("Subject", "")),
         body=str(config.get("Body", "")),
         channel=channel,
+        attachments=await collect_action_attachments(
+            session, config, ticket_id=ticket_id, sysconfig=sysconfig, user_id=user_id
+        ),
     )
     await add_article(
         session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
@@ -1609,7 +1621,7 @@ async def _apply_dialog_field_changes(
     order = dialog_field_order(dialog_config)
     dynamic = [k for k in field_values if k.startswith("DynamicField_")]
     dynamic.sort(key=lambda k: order.index(k) if k in order else len(order))
-    steps = [n for n in order if n in ("Article", "Owner") or n in dynamic]
+    steps = [n for n in order if n in ("Article", "Owner", ATTACHMENTS_FIELD) or n in dynamic]
     steps += [k for k in dynamic if k not in steps]
     if new_ticket:
         steps = dynamic + [n for n in steps if n not in dynamic]
@@ -1634,6 +1646,25 @@ async def _apply_dialog_field_changes(
                     user_id=user_id,
                     sysconfig=sysconfig,
                 )
+            continue
+        if step == ATTACHMENTS_FIELD:
+            # Agent and existing ticket only (AgentTicketProcess.pm:1878, 5513-5545). Znuny sets
+            # the dynamic field only for a non-empty selection; unknown keys are dropped.
+            if sender_type == "agent" and not new_ticket and ATTACHMENTS_FIELD in field_values:
+                keys = await valid_attachment_keys(
+                    session, ticket_id, sysconfig, field_values[ATTACHMENTS_FIELD]
+                )
+                if keys:
+                    await update_dynamic_field(
+                        session,
+                        ticket_id=ticket_id,
+                        field_name=await sysconfig.get_str(
+                            "Process::DynamicFieldProcessManagementAttachment",
+                            "ProcessManagementAttachment",
+                        ),
+                        values=[encode_attachment_selection(keys)],
+                        user_id=user_id,
+                    )
             continue
         if step == "Article":
             await _store_dialog_article(

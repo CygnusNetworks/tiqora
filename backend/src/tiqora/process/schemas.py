@@ -206,6 +206,7 @@ FieldKind = Literal[
     "article",
     "pending_time",
     "customer",
+    "ticket_attachments",
     "unsupported",
 ]
 
