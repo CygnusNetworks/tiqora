@@ -28,8 +28,9 @@ from tiqora.config import Settings
 from tiqora.webchat.config_cache import public_config_cache
 from tiqora.webchat.origins import (
     OriginError,
+    canonical_origin,
+    effective_allowed_origins,
     frame_csp,
-    normalize_origin,
     origin_allowed,
     own_origin,
     preview_request_allowed,
@@ -139,9 +140,10 @@ async def widget_loader(settings: AppSettings, db: DbSession) -> Response:
 
 
 async def _valid_config_allowed(
-    db: AsyncSession, key: str | None, *, preview: bool = False
+    db: AsyncSession, key: str | None, own: str, *, preview: bool = False
 ) -> tuple[bool, list[str]]:
-    """Channel on and *key* names a valid config → (True, allowed origins).
+    """Channel on and *key* names a valid config → (True, allowed origins incl. the portal's own
+    origin when the chat is shown there).
 
     ``preview`` (R-PREVIEW-DRAFT, own origin + own Referer already checked): the channel switch
     is skipped and a disabled or invalid config is found too.
@@ -159,7 +161,7 @@ async def _valid_config_allowed(
         await db.rollback()
     if cached is None:
         return False, []
-    return True, list(cached.values.allowed_origins)
+    return True, effective_allowed_origins(cached.values, own)
 
 
 @router.api_route("/frame", methods=["GET", "HEAD"])
@@ -190,11 +192,11 @@ async def widget_frame(
             return _refused()
     else:
         try:
-            norm_origin = normalize_origin(origin or "")
+            norm_origin = canonical_origin(origin or "")
         except OriginError:
             return _refused()
     try:
-        found, allowed = await _valid_config_allowed(db, k, preview=is_preview)
+        found, allowed = await _valid_config_allowed(db, k, own, preview=is_preview)
     except Exception:  # noqa: BLE001 - never cache or frame an error page
         logger.warning("webchat_frame_config_check_failed", exc_info=True)
         return _unavailable()

@@ -8429,6 +8429,21 @@
         "title": "ChatEndIn",
         "type": "object"
       },
+      "ChatIdentifyIn": {
+        "properties": {
+          "identity": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Identity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "identity"
+        ],
+        "title": "ChatIdentifyIn",
+        "type": "object"
+      },
       "ChatInboxItemOut": {
         "properties": {
           "accepted_at": {
@@ -8779,6 +8794,57 @@
         "title": "ChatOfflineOut",
         "type": "object"
       },
+      "ChatPortalIdentityIn": {
+        "properties": {
+          "key": {
+            "maxLength": 40,
+            "title": "Key",
+            "type": "string"
+          },
+          "origin": {
+            "maxLength": 200,
+            "title": "Origin",
+            "type": "string"
+          },
+          "visitor_id": {
+            "pattern": "^[A-Za-z0-9_-]{16,64}$",
+            "title": "Visitor Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "origin",
+          "visitor_id"
+        ],
+        "title": "ChatPortalIdentityIn",
+        "type": "object"
+      },
+      "ChatPortalIdentityOut": {
+        "properties": {
+          "identity": {
+            "title": "Identity",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "identity",
+          "name"
+        ],
+        "title": "ChatPortalIdentityOut",
+        "type": "object"
+      },
       "ChatPublicConfigOut": {
         "description": "What the widget needs to render; no admin name, ids or queue data.",
         "properties": {
@@ -8807,6 +8873,11 @@
           },
           "online": {
             "title": "Online",
+            "type": "boolean"
+          },
+          "portal_identity": {
+            "default": false,
+            "title": "Portal Identity",
             "type": "boolean"
           },
           "prechat_fields": {
@@ -9017,6 +9088,18 @@
             ],
             "title": "Client Id"
           },
+          "identity": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity"
+          },
           "key": {
             "maxLength": 40,
             "title": "Key",
@@ -9141,6 +9224,17 @@
           "can_send": {
             "title": "Can Send",
             "type": "boolean"
+          },
+          "identified_as": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identified As"
           },
           "last_seq": {
             "title": "Last Seq",
@@ -23133,6 +23227,19 @@
         "title": "PortalTicketCreateResponse",
         "type": "object"
       },
+      "PortalWebchatOut": {
+        "properties": {
+          "public_key": {
+            "title": "Public Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "public_key"
+        ],
+        "title": "PortalWebchatOut",
+        "type": "object"
+      },
       "PostmasterFilterOut": {
         "description": "Grouped by ``f_name`` (Znuny's filter identity is the name, not a single row).",
         "properties": {
@@ -35544,6 +35651,60 @@
         ]
       }
     },
+    "/api/chat/v1/identity/portal": {
+      "post": {
+        "description": "A short-lived assertion for the customer who is logged in to the portal.\n\nThe ONLY public chat endpoint that reads the portal cookie, and only for Tiqora's own\norigin and a chat with ``show_on_portal``. Every refusal (no or pending portal session,\nportal off, chat not on the portal, foreign origin, unknown key) is the same 404.",
+        "operationId": "post_portal_identity_api_chat_v1_identity_portal_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatPortalIdentityIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatPortalIdentityOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Cross-origin request or website not allowed"
+          },
+          "404": {
+            "description": "Unknown, switched off or not yours"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited (Retry-After)"
+          },
+          "503": {
+            "description": "Chat temporarily unavailable (Retry-After)"
+          }
+        },
+        "summary": "Post Portal Identity",
+        "tags": [
+          "webchat-public"
+        ]
+      }
+    },
     "/api/chat/v1/offline": {
       "post": {
         "description": "Offline form: a ticket with the visitor's message (an e-mail address is required).",
@@ -35891,6 +36052,64 @@
           }
         },
         "summary": "Post Chat End",
+        "tags": [
+          "webchat-public"
+        ]
+      }
+    },
+    "/api/chat/v1/sessions/{session_id}/identify": {
+      "post": {
+        "description": "Attach a signed website identity (or portal assertion) to a running chat.\n\n204 also for the same identity again; 422 ``invalid_identity``; 409 ``identity_conflict``\n(the chat already belongs to another verified person) or ``session_closed``.",
+        "operationId": "post_chat_identify_api_chat_v1_sessions__session_id__identify_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatIdentifyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Cross-origin request or website not allowed"
+          },
+          "404": {
+            "description": "Unknown, switched off or not yours"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited (Retry-After)"
+          },
+          "503": {
+            "description": "Chat temporarily unavailable (Retry-After)"
+          }
+        },
+        "summary": "Post Chat Identify",
         "tags": [
           "webchat-public"
         ]
@@ -38707,6 +38926,56 @@
         "summary": "Reply",
         "tags": [
           "portal-tickets"
+        ]
+      }
+    },
+    "/api/portal/webchat": {
+      "get": {
+        "description": "The public key of the valid chat shown on the portal (404 when there is none or the\nweb-chat channel is off).",
+        "operationId": "get_portal_webchat_api_portal_webchat_get",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalWebchatOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Portal Webchat",
+        "tags": [
+          "portal-webchat"
         ]
       }
     },

@@ -204,6 +204,32 @@ async def test_frame_refused_for_foreign_origin(env: Env) -> None:
 
 @pytest.mark.asyncio
 @parametrize_db
+async def test_frame_on_own_origin_only_with_show_on_portal(env: Env) -> None:
+    async with _client(env) as client:
+        off = await client.get(FRAME, params={"k": KEY, "origin": SELF})
+        assert off.status_code == 403 and _csp(off).endswith("frame-ancestors 'none'")
+
+        env.sql("UPDATE tiqora_chat_config SET show_on_portal = :v WHERE id = :i", v=True, i=CONFIG)
+        clear_config_cache()
+        on = await client.get(FRAME, params={"k": KEY, "origin": SELF})
+        assert on.status_code == 200
+        assert _csp(on).endswith(f"frame-ancestors 'self' {SELF}")
+        assert ORIGIN not in _csp(on)
+        # the customer website of the admin's list keeps working, a stranger still does not
+        site = await client.get(FRAME, params={"k": KEY, "origin": ORIGIN})
+        assert site.status_code == 200
+        assert _csp(site).endswith(f"frame-ancestors 'self' {ORIGIN}")
+        evil = await client.get(FRAME, params={"k": KEY, "origin": EVIL})
+        assert evil.status_code == 403
+        # a Referer from another site is still refused for the own origin
+        spoof = await client.get(
+            FRAME, params={"k": KEY, "origin": SELF}, headers={"Referer": f"{EVIL}/x"}
+        )
+        assert spoof.status_code == 403
+
+
+@pytest.mark.asyncio
+@parametrize_db
 async def test_frame_preview_only_from_own_origin(env: Env) -> None:
     async with _client(env) as client:
         ok = await client.get(

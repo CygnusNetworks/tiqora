@@ -41,6 +41,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chat/v1/identity/portal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Portal Identity
+         * @description A short-lived assertion for the customer who is logged in to the portal.
+         *
+         *     The ONLY public chat endpoint that reads the portal cookie, and only for Tiqora's own
+         *     origin and a chat with ``show_on_portal``. Every refusal (no or pending portal session,
+         *     portal off, chat not on the portal, foreign origin, unknown key) is the same 404.
+         */
+        post: operations["post_portal_identity_api_chat_v1_identity_portal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chat/v1/offline": {
         parameters: {
             query?: never;
@@ -155,6 +179,29 @@ export interface paths {
          * @description The visitor closes the chat (idempotent).
          */
         post: operations["post_chat_end_api_chat_v1_sessions__session_id__end_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions/{session_id}/identify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Chat Identify
+         * @description Attach a signed website identity (or portal assertion) to a running chat.
+         *
+         *     204 also for the same identity again; 422 ``invalid_identity``; 409 ``identity_conflict``
+         *     (the chat already belongs to another verified person) or ``session_closed``.
+         */
+        post: operations["post_chat_identify_api_chat_v1_sessions__session_id__identify_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1037,6 +1084,27 @@ export interface paths {
         put?: never;
         /** Reply */
         post: operations["reply_api_portal_tickets__ticket_id__reply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/webchat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portal Webchat
+         * @description The public key of the valid chat shown on the portal (404 when there is none or the
+         *     web-chat channel is off).
+         */
+        get: operations["get_portal_webchat_api_portal_webchat_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -13070,6 +13138,11 @@ export interface components {
              */
             close_ticket: boolean;
         };
+        /** ChatIdentifyIn */
+        ChatIdentifyIn: {
+            /** Identity */
+            identity: string;
+        };
         /** ChatInboxItemOut */
         ChatInboxItemOut: {
             /** Accepted At */
@@ -13177,6 +13250,22 @@ export interface components {
          * @description Empty acknowledgement of the offline form (``{}``).
          */
         ChatOfflineOut: Record<string, never>;
+        /** ChatPortalIdentityIn */
+        ChatPortalIdentityIn: {
+            /** Key */
+            key: string;
+            /** Origin */
+            origin: string;
+            /** Visitor Id */
+            visitor_id: string;
+        };
+        /** ChatPortalIdentityOut */
+        ChatPortalIdentityOut: {
+            /** Identity */
+            identity: string;
+            /** Name */
+            name: string | null;
+        };
         /**
          * ChatPublicConfigOut
          * @description What the widget needs to render; no admin name, ids or queue data.
@@ -13193,6 +13282,11 @@ export interface components {
             offline_mode: "form" | "hide";
             /** Online */
             online: boolean;
+            /**
+             * Portal Identity
+             * @default false
+             */
+            portal_identity: boolean;
             /** Prechat Fields */
             prechat_fields: components["schemas"]["ChatPublicFieldOut"][];
             /** Privacy Url */
@@ -13278,6 +13372,8 @@ export interface components {
         ChatSessionCreateIn: {
             /** Client Id */
             client_id?: string | null;
+            /** Identity */
+            identity?: string | null;
             /** Key */
             key: string;
             /** Language */
@@ -13313,6 +13409,8 @@ export interface components {
             agent_name: string | null;
             /** Can Send */
             can_send: boolean;
+            /** Identified As */
+            identified_as?: string | null;
             /** Last Seq */
             last_seq: number;
             /** Needs Contact */
@@ -18016,6 +18114,11 @@ export interface components {
             /** Ticket Id */
             ticket_id: number;
         };
+        /** PortalWebchatOut */
+        PortalWebchatOut: {
+            /** Public Key */
+            public_key: string;
+        };
         /**
          * PostmasterFilterOut
          * @description Grouped by ``f_name`` (Znuny's filter identity is the name, not a single row).
@@ -22217,6 +22320,67 @@ export interface operations {
             };
         };
     };
+    post_portal_identity_api_chat_v1_identity_portal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatPortalIdentityIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatPortalIdentityOut"];
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     post_offline_form_api_chat_v1_offline_post: {
         parameters: {
             query?: never;
@@ -22544,6 +22708,67 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_chat_identify_api_chat_v1_sessions__session_id__identify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatIdentifyIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             204: {
@@ -24315,6 +24540,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortalReplyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portal_webchat_api_portal_webchat_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalWebchatOut"];
                 };
             };
             /** @description Validation Error */

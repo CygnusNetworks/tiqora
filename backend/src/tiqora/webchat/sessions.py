@@ -66,7 +66,7 @@ from tiqora.jobs.service import utc_now
 from tiqora.webchat.availability import eligible_agent_ids, topic_ref, within_business_hours
 from tiqora.webchat.models import ChatConfigValues, ChatTopic, PrechatField
 from tiqora.webchat.notify import queue_agent_event, queue_wakeup
-from tiqora.webchat.origins import origin_allowed
+from tiqora.webchat.origins import effective_allowed_origins, origin_allowed
 from tiqora.webchat.prechat import (
     CHECKBOX_NO,
     CHECKBOX_YES,
@@ -249,8 +249,11 @@ def _pick_topic(values: ChatConfigValues, key: str | None) -> ChatTopic:
     return topic
 
 
-def _check_origin(origin: str, values: ChatConfigValues) -> None:
-    if not origin_allowed(origin, values.allowed_origins):
+def check_origin(origin: str, values: ChatConfigValues, own: str | None = None) -> None:
+    """``origin`` (403) unless the page origin may use this chat; *own* = Tiqora's own origin,
+    allowed while the chat is shown in the customer portal."""
+    allowed = values.allowed_origins if own is None else effective_allowed_origins(values, own)
+    if not origin_allowed(origin, allowed):
         raise ChatError("origin", 403)
 
 
@@ -578,6 +581,7 @@ async def create_session(
     ctx: VisitorContext,
     now: datetime,
     identity: ResolvedIdentity | None = None,
+    own_origin: str | None = None,
 ) -> tuple[TiqoraChatSession, str, TiqoraChatMessage]:
     """Start a chat: ticket + first visitor article + session row + message ``seq`` 1.
 
@@ -587,7 +591,7 @@ async def create_session(
     (outside business hours or no eligible agent — checked live, not from the 10 s cache).
     *factory* is needed for the ticket-number counter. Queues ``chat_waiting`` + a wake.
     """
-    _check_origin(payload.origin, values)
+    check_origin(payload.origin, values, own_origin)
     _check_visitor_id(payload.visitor_id)
     topic = _pick_topic(values, payload.topic)
     body = _clean_message(payload.message)
@@ -790,6 +794,7 @@ async def submit_offline(
     payload: ChatOfflineIn,
     ctx: VisitorContext,
     now: datetime,
+    own_origin: str | None = None,
 ) -> None:
     """Offline form: a ticket with the visitor's message and an already ``ended`` session row
     (``end_reason`` ``offline_form``; the token is never handed out). The address is
@@ -800,7 +805,7 @@ async def submit_offline(
     """
     if values.offline_mode != "form":
         raise ChatError("disabled", 404)
-    _check_origin(payload.origin, values)
+    check_origin(payload.origin, values, own_origin)
     _check_visitor_id(payload.visitor_id)
     topic = _pick_topic(values, payload.topic)
     body = _clean_message(payload.message)

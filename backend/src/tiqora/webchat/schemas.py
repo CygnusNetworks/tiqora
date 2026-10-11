@@ -31,6 +31,22 @@ class ChatSessionCreateIn(BaseModel):
     client_id: str | None = Field(default=None, max_length=64)
     page_url: str | None = Field(default=None, max_length=MAX_PAGE_URL_LENGTH)
     language: str | None = Field(default=None, max_length=16)
+    identity: str | None = Field(default=None, max_length=4096)
+
+
+class ChatIdentifyIn(BaseModel):
+    identity: str = Field(min_length=1, max_length=4096)
+
+
+class ChatPortalIdentityIn(BaseModel):
+    key: str = Field(max_length=40)
+    origin: str = Field(max_length=200)
+    visitor_id: str = Field(pattern=VISITOR_ID_PATTERN)
+
+
+class ChatPortalIdentityOut(BaseModel):
+    identity: str
+    name: str | None
 
 
 class ChatOfflineIn(BaseModel):
@@ -98,6 +114,7 @@ class ChatPublicConfigOut(BaseModel):
     prechat_fields: list[ChatPublicFieldOut]
     upload: ChatPublicUploadOut
     max_message_length: int
+    portal_identity: bool = False
 
 
 class ChatAttachmentOut(BaseModel):
@@ -134,6 +151,7 @@ class ChatSessionOut(BaseModel):
     can_send: bool
     needs_contact: bool
     last_seq: int
+    identified_as: str | None = None
 
 
 class ChatOfflineOut(BaseModel):
