@@ -26,6 +26,8 @@ from tiqora.identity.env_providers import ensure_env_providers, env_ldap_tls_war
 from tiqora.logging_setup import configure_logging
 from tiqora.webchat.public_api import CHAT_PUBLIC_PREFIX, chat_body_limit_middleware
 from tiqora.webchat.public_api import router as webchat_public_router
+from tiqora.webchat.static import mount_webchat_assets
+from tiqora.webchat.static import router as webchat_static_router
 
 logger = structlog.get_logger(__name__)
 
@@ -324,7 +326,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         csp_header = (
             "Content-Security-Policy" if cfg.csp_enforce else "Content-Security-Policy-Report-Only"
         )
-        response.headers.setdefault(csp_header, _SPA_CSP)
+        # /chat/v1/ (widget frame) sets its own enforced CSP; a Report-Only
+        # frame-ancestors on top would only confuse (C9).
+        if not request.url.path.startswith("/chat/v1/"):
+            response.headers.setdefault(csp_header, _SPA_CSP)
         return response
 
     @app.middleware("http")
@@ -443,6 +448,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "docs": "/docs",
                 "health": "/health",
             }
+
+    app.include_router(webchat_static_router)
+    mount_webchat_assets(app, cfg)
 
     # Must be last: the SPA fallback matches any remaining GET path.
     mount_spa(app, cfg)
