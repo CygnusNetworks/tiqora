@@ -5379,7 +5379,9 @@
       "tooLarge": "The file is too large (at most {{max}}).",
       "type": "This file type is not accepted.",
       "failed": "The file could not be uploaded.",
-      "download": "Download"
+      "download": "Download",
+      "empty": "The file is empty.",
+      "disabled": "Files cannot be sent here."
     },
     "typing": "is typing …",
     "you": "You",
@@ -5411,7 +5413,10 @@
       "generic": "Something went wrong. Please try again.",
       "rateLimited": "Too many messages – please wait a moment.",
       "unavailable": "The chat is not available right now.",
-      "notAllowed": "This chat is not enabled for this website."
+      "notAllowed": "This chat is not enabled for this website.",
+      "bodyTooLarge": "The message is too large.",
+      "network": "No connection – please check your network.",
+      "disabled": "The chat has been closed; you can no longer send messages."
     }
   }
 }

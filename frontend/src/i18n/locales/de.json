@@ -5379,7 +5379,9 @@
       "tooLarge": "Die Datei ist zu groß (höchstens {{max}}).",
       "type": "Diese Dateiart wird nicht angenommen.",
       "failed": "Die Datei konnte nicht hochgeladen werden.",
-      "download": "Herunterladen"
+      "download": "Herunterladen",
+      "empty": "Die Datei ist leer.",
+      "disabled": "Dateien können hier nicht gesendet werden."
     },
     "typing": "schreibt …",
     "you": "Sie",
@@ -5411,7 +5413,10 @@
       "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es noch einmal.",
       "rateLimited": "Zu viele Nachrichten – bitte kurz warten.",
       "unavailable": "Der Chat ist gerade nicht erreichbar.",
-      "notAllowed": "Dieser Chat ist für diese Website nicht freigegeben."
+      "notAllowed": "Dieser Chat ist für diese Website nicht freigegeben.",
+      "bodyTooLarge": "Die Nachricht ist zu groß.",
+      "network": "Keine Verbindung – bitte prüfen Sie Ihr Netz.",
+      "disabled": "Der Chat wurde beendet, Sie können nichts mehr senden."
     }
   }
 }

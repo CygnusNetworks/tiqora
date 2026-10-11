@@ -1,23 +1,32 @@
-/**
- * Chat frame entry (placeholder, Task 14): loads the visitor's language and renders
- * "…". The real views follow in Task 15.
- */
+/** Chat frame entry: reads the query parameters the loader/admin preview passed and renders the app. */
 import { render } from "preact";
-import { isRtl, loadMessages, pickLanguage } from "./i18n";
+import { App, type FrameParams } from "./App";
+import { createChatApi } from "./api";
+import { isRtl, pickLanguage } from "./i18n";
 import { LANGS } from "virtual:webchat-locales";
 
-function Placeholder() {
-  return <div aria-busy="true">…</div>;
+/** Exact http(s) origin (no path, no credentials) or null. */
+function parseOrigin(v: string | null): string | null {
+  if (!v) return null;
+  try {
+    const u = new URL(v);
+    return (u.protocol === "https:" || u.protocol === "http:") && u.origin === v ? u.origin : null;
+  } catch {
+    return null;
+  }
 }
 
-async function start(): Promise<void> {
-  const params = new URLSearchParams(window.location.search);
-  const lang = pickLanguage(params.get("lang") ?? navigator.language, LANGS);
+function start(): void {
+  const q = new URLSearchParams(window.location.search);
+  const lang = pickLanguage(q.get("lang") ?? navigator.language, LANGS);
   document.documentElement.lang = lang.replace("_", "-");
   document.documentElement.dir = isRtl(lang) ? "rtl" : "ltr";
-  await loadMessages(lang).catch(() => undefined);
+  const k = q.get("k") ?? "";
+  const origin = parseOrigin(q.get("origin"));
   const root = document.getElementById("app");
-  if (root) render(<Placeholder />, root);
+  if (!root || !k || !origin) return; // a frame without a valid host origin stays empty and never posts
+  const params: FrameParams = { k, origin, lang, preview: q.get("preview") === "1" };
+  render(<App params={params} api={createChatApi()} />, root);
 }
 
-void start();
+start();
