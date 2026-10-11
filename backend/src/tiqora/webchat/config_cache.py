@@ -95,6 +95,16 @@ class PublicConfigCache:
         self._put("k:" + public_key, value)
         return value
 
+    async def by_key_any(self, db: AsyncSession, public_key: str) -> CachedConfig | None:
+        """The config of *public_key* even when switched off (admin preview, R-PREVIEW-DRAFT)."""
+        found, value = self._get("a:" + public_key)
+        if found:
+            return value
+        row = await load_config_by_key(db, public_key, include_invalid=True)
+        value = _snapshot(row) if row is not None else None
+        self._put("a:" + public_key, value)
+        return value
+
     async def by_id(self, db: AsyncSession, config_id: int) -> CachedConfig | None:
         """The config of an existing session, also when it was switched off since."""
         key = f"i:{config_id}"

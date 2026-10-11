@@ -89,6 +89,17 @@ async def chat_config_validation_handler(request: Request, exc: Exception) -> Re
             loc = loc[1:]
         path = ".".join(loc) or "body"
         msg = str(err.get("msg", ""))
+        ctx = err.get("ctx") or {}
+        if err.get("type") == "origin_invalid":
+            path = f"{path}.{ctx.get('index', 0)}"
+            msg = str(ctx.get("message", msg))
+        elif err.get("type") == "prechat_key_reserved":
+            path = f"{path}.key"
+            msg = f"Der Schlüssel „{ctx.get('key', '')}“ ist reserviert."
+        elif err.get("type") == "prechat_map_duplicate":
+            path = ".".join([*loc, "prechat_fields", str(ctx.get("index", 0)), "maps_to"])
+            what = "E-Mail" if ctx.get("target") == "email" else "Name"
+            msg = f"Nur ein Feld darf in „{what}“ übernommen werden."
         if msg.startswith(_VALUE_ERROR_PREFIX):
             msg = msg[len(_VALUE_ERROR_PREFIX) :]
         errors.setdefault(path, msg)

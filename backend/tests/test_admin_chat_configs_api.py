@@ -231,10 +231,31 @@ async def test_save_time_checks(env: Env) -> None:
         assert list(errs) == ["default_customer_user"]
 
         # pydantic-level errors use the same shape (R-ADMIN-422)
-        errs = await errors_of(allowed_origins=["https://*.example.org"])
-        assert list(errs) == ["allowed_origins"]
-        assert errs["allowed_origins"]
-        assert "Value error" not in errs["allowed_origins"]
+        errs = await errors_of(allowed_origins=["https://ok.example.org", "https://*.example.org"])
+        assert list(errs) == ["allowed_origins.1"]  # per line
+        assert errs["allowed_origins.1"]
+        assert "Value error" not in errs["allowed_origins.1"]
+
+        # R-PRECHAT-KEYS: reserved keys and several email/name fields, per field path
+        def plain(key: str, kind: str = "text", maps: str = "none") -> dict[str, Any]:
+            return {"key": key, "kind": kind, "label": "L", "maps_to": maps}
+
+        errs = await errors_of(prechat_fields=[plain("topic"), plain("message")])
+        assert set(errs) == {"prechat_fields.0.key", "prechat_fields.1.key"}
+        errs = await errors_of(
+            prechat_fields=[
+                plain("mail1", "email", "email"),
+                plain("n1", "text", "name"),
+                plain("mail2", "email", "email"),
+            ]
+        )
+        assert list(errs) == ["prechat_fields.2.maps_to"]
+        assert "E-Mail" in errs["prechat_fields.2.maps_to"]
+        errs = await errors_of(
+            prechat_fields=[plain("n1", "text", "name"), plain("n2", "text", "name")]
+        )
+        assert list(errs) == ["prechat_fields.1.maps_to"]
+        assert "Name" in errs["prechat_fields.1.maps_to"]
 
         # valid references are accepted
         ok = await client.post(

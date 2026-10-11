@@ -235,6 +235,22 @@ async def test_config_refuses_foreign_origin_param_and_disabled_channel(env: Env
         clear_config_cache()
         off = await client.get(f"{API}/config", params={"k": KEY, "origin": ORIGIN})
         assert off.status_code == 404
+        # R-PREVIEW-DRAFT: the own origin still reads it (admin preview before going live) ...
+        own_off = await client.get(f"{API}/config", params={"k": KEY, "origin": SELF})
+        assert own_off.status_code == 200
+        env.sql("UPDATE tiqora_chat_config SET valid = :v WHERE id = :i", v=False, i=CONFIG)
+        clear_config_cache()
+        own_invalid = await client.get(f"{API}/config", params={"k": KEY, "origin": SELF})
+        assert own_invalid.status_code == 200
+        # ... while foreign origins and sessions stay refused, and unknown keys stay unknown
+        foreign = await client.get(f"{API}/config", params={"k": KEY, "origin": ORIGIN})
+        assert foreign.status_code == 404
+        unknown_own = await client.get(
+            f"{API}/config", params={"k": "wc_" + "0" * 32, "origin": SELF}
+        )
+        assert unknown_own.status_code == 404
+        env.sql("UPDATE tiqora_chat_config SET valid = :v WHERE id = :i", v=True, i=CONFIG)
+        clear_config_cache()
         assert (await client.post(f"{API}/sessions", json=CREATE)).status_code == 404
 
 

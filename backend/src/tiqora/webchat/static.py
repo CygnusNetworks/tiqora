@@ -138,14 +138,23 @@ async def widget_loader(settings: AppSettings, db: DbSession) -> Response:
     )
 
 
-async def _valid_config_allowed(db: AsyncSession, key: str | None) -> tuple[bool, list[str]]:
-    """Channel on and *key* names a valid config → (True, allowed origins)."""
+async def _valid_config_allowed(
+    db: AsyncSession, key: str | None, *, preview: bool = False
+) -> tuple[bool, list[str]]:
+    """Channel on and *key* names a valid config → (True, allowed origins).
+
+    ``preview`` (R-PREVIEW-DRAFT, own origin + own Referer already checked): the channel switch
+    is skipped and a disabled or invalid config is found too.
+    """
     if not key:
         return False, []
     try:
-        if not await public_config_cache.channel_enabled(db):
-            return False, []
-        cached = await public_config_cache.by_key(db, key)
+        if preview:
+            cached = await public_config_cache.by_key_any(db, key)
+        else:
+            if not await public_config_cache.channel_enabled(db):
+                return False, []
+            cached = await public_config_cache.by_key(db, key)
     finally:
         await db.rollback()
     if cached is None:
@@ -185,7 +194,7 @@ async def widget_frame(
         except OriginError:
             return _refused()
     try:
-        found, allowed = await _valid_config_allowed(db, k)
+        found, allowed = await _valid_config_allowed(db, k, preview=is_preview)
     except Exception:  # noqa: BLE001 - never cache or frame an error page
         logger.warning("webchat_frame_config_check_failed", exc_info=True)
         return _unavailable()

@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import Final, Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic_core import PydanticCustomError
 
 from tiqora.api.uploads import MAX_ATTACHMENT_BYTES
-from tiqora.webchat.origins import validate_origins
+from tiqora.webchat.origins import OriginError, normalize_origin, validate_origins
 
 MIB: Final = 1024 * 1024
 ALLOWED_UPLOAD_TYPES: Final[tuple[str, ...]] = (
@@ -57,7 +58,10 @@ class PrechatField(BaseModel):
     @model_validator(mode="after")
     def _check(self) -> PrechatField:
         if self.key in RESERVED_FIELD_KEYS:
-            raise ValueError(f"field key '{self.key}' is reserved")
+            # R-PRECHAT-KEYS: the admin handler files this under ``prechat_fields.N.key``.
+            raise PydanticCustomError(
+                "prechat_key_reserved", "field key '{key}' is reserved", {"key": self.key}
+            )
         if (self.kind == "select") != bool(self.options):
             raise ValueError("options are required for select fields and only allowed there")
         values = [o.value for o in self.options]
@@ -137,6 +141,14 @@ class ChatConfigValues(BaseModel):
     @field_validator("allowed_origins")
     @classmethod
     def _origins(cls, value: list[str]) -> list[str]:
+        for index, raw in enumerate(value):
+            try:
+                normalize_origin(raw)
+            except OriginError as exc:
+                # R-ADMIN-422: the admin handler files this under ``allowed_origins.<index>``.
+                raise PydanticCustomError(
+                    "origin_invalid", "{message}", {"message": str(exc), "index": index}
+                ) from exc
         return validate_origins(value)
 
     @field_validator("privacy_url")
@@ -159,6 +171,12 @@ class ChatConfigValues(BaseModel):
         if len(field_keys) != len(set(field_keys)):
             raise ValueError("prechat field keys must be unique")
         for target in ("name", "email"):
-            if sum(1 for f in self.prechat_fields if f.maps_to == target) > 1:
-                raise ValueError(f"at most one prechat field may map to {target}")
+            mapped = [i for i, f in enumerate(self.prechat_fields) if f.maps_to == target]
+            if len(mapped) > 1:
+                # R-PRECHAT-KEYS: reported at the second field, ``prechat_fields.N.maps_to``.
+                raise PydanticCustomError(
+                    "prechat_map_duplicate",
+                    "at most one prechat field may map to {target}",
+                    {"target": target, "index": mapped[1]},
+                )
         return self

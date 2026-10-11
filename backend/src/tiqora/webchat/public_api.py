@@ -547,13 +547,17 @@ async def get_public_config(
             limit=CONFIG_READS_PER_IP_MINUTE,
             window_seconds=60,
         )
-        cached = await _config_by_key(db, k)
+        # R-PREVIEW / R-PREVIEW-DRAFT: Tiqora's own origin (the admin preview frame) may read
+        # the config of a disabled or invalid chat and while the channel switch is off.
+        if _is_own_origin(origin, request, settings):
+            cached = await public_config_cache.by_key_any(db, k)
+            if cached is None:
+                raise ChatError("not_found", 404)
+        else:
+            cached = await _config_by_key(db, k)
+            if not origin_allowed(origin, cached.values.allowed_origins):
+                raise ChatError("origin", 403)
         values = cached.values
-        # R-PREVIEW: Tiqora's own origin may read the (public) config too.
-        if not origin_allowed(origin, values.allowed_origins) and not _is_own_origin(
-            origin, request, settings
-        ):
-            raise ChatError("origin", 403)
         availability = await config_availability(
             db, redis_client, SysConfig(db), config=cached.config, values=values, now=utc_now()
         )

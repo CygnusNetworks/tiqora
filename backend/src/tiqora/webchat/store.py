@@ -58,16 +58,17 @@ async def load_config(db: AsyncSession, config_id: int) -> TiqoraChatConfig | No
     ).scalar_one_or_none()
 
 
-async def load_config_by_key(db: AsyncSession, public_key: str) -> TiqoraChatConfig | None:
-    """The config for *public_key*, only while it is valid (``valid`` true)."""
-    return (
-        await db.execute(
-            select(TiqoraChatConfig).where(
-                TiqoraChatConfig.public_key == public_key,
-                TiqoraChatConfig.valid.is_(True),
-            )
-        )
-    ).scalar_one_or_none()
+async def load_config_by_key(
+    db: AsyncSession, public_key: str, *, include_invalid: bool = False
+) -> TiqoraChatConfig | None:
+    """The config for *public_key*, only while it is valid (``valid`` true).
+
+    ``include_invalid`` is for the admin preview (R-PREVIEW-DRAFT) only.
+    """
+    stmt = select(TiqoraChatConfig).where(TiqoraChatConfig.public_key == public_key)
+    if not include_invalid:
+        stmt = stmt.where(TiqoraChatConfig.valid.is_(True))
+    return (await db.execute(stmt)).scalar_one_or_none()
 
 
 def _default_for(column: str) -> Any:

@@ -236,6 +236,28 @@ async def test_frame_preview_only_from_own_origin(env: Env) -> None:
 
 @pytest.mark.asyncio
 @parametrize_db
+async def test_frame_preview_works_for_disabled_config_and_channel_off(env: Env) -> None:
+    """R-PREVIEW-DRAFT: admins configure before switching on."""
+    params = {"k": KEY, "origin": SELF, "preview": "1"}
+    headers = {"Referer": f"{SELF}/admin/webchat/1"}
+    async with _client(env) as client:
+        env.sql("UPDATE tiqora_chat_config SET valid = :v WHERE id = :i", v=False, i=CONFIG)
+        env.channel_off()
+        clear_config_cache()
+        res = await client.get(FRAME, params=params, headers=headers)
+        assert res.status_code == 200
+        assert _csp(res).endswith("frame-ancestors 'self'")
+        assert ORIGIN not in _csp(res)
+        # the normal branch stays closed, and so do the preview checks
+        assert (await client.get(FRAME, params={"k": KEY, "origin": ORIGIN})).status_code == 404
+        no_ref = await client.get(FRAME, params=params)
+        assert no_ref.status_code == 403
+        unknown = await client.get(FRAME, params={**params, "k": "wc_" + "0" * 32}, headers=headers)
+        assert unknown.status_code == 404
+
+
+@pytest.mark.asyncio
+@parametrize_db
 async def test_unknown_key_or_channel_off_404(env: Env) -> None:
     async with _client(env) as client:
         unknown = await client.get(FRAME, params={"k": "wc_" + "0" * 32, "origin": ORIGIN})
