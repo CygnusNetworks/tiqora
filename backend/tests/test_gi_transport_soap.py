@@ -131,9 +131,8 @@ async def test_soap_post_with_basic_auth_masked() -> None:
     token = base64.b64encode(b"gi51user:gi51-secret").decode()
     assert req.headers["authorization"] == f"Basic {token}"
     assert req.content.decode() == (
-        ENVELOPE_HEAD
-        + f'<Op xmlns="{NS}"><A>1</A><A>2</A><Title>Hallo &amp; &lt;Welt&gt;</Title></Op>'
-        + ENVELOPE_TAIL
+        ENVELOPE_HEAD + f'<namesp1:Op xmlns:namesp1="{NS}"><A>1</A><A>2</A>'
+        "<Title>Hallo &amp; &lt;Welt&gt;</Title></namesp1:Op>" + ENVELOPE_TAIL
     )
     dump = sink.dump()
     assert "gi51-secret" not in dump and token not in dump

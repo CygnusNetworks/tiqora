@@ -29,6 +29,8 @@ from defusedxml.ElementTree import fromstring
 from tiqora.api.compat.mapping.perl import perl_str, perl_truthy
 from tiqora.api.compat.soap import SOAP11_NS, SOAP12_NS, element_to_value
 
+_DEFAULT_PREFIX: Final = "namesp1"
+
 ENVELOPE_HEAD: Final = (
     '<?xml version="1.0" encoding="UTF-8"?>'
     '<soap:Envelope soap:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/" '
@@ -247,7 +249,9 @@ def build_request_envelope(
     """The request envelope (UTF-8). The method element is *operation_request*:
 
     * ``no_namespace`` and a namespace: ``<Op xmlns="ns">``; without one: ``<Op>``;
-    * otherwise ``<Op xmlns="ns">`` or, with *fixed_prefix*, ``<prefix:Op xmlns:prefix="ns">``.
+    * with *fixed_prefix*: ``<prefix:Op xmlns:prefix="ns">``;
+    * otherwise ``<namesp1:Op xmlns:namesp1="ns">`` (SOAP::Lite's default; the data elements
+      carry no namespace; an empty body adds ``xsi:nil="true"``).
     """
     if soap_version != "1.1":
         raise ValueError("only SOAP 1.1 is supported for requests")
@@ -265,8 +269,11 @@ def build_request_envelope(
         method = Element(f"{prefix}:{operation_request}")
         method.set(f"xmlns:{prefix}", ns)
     else:
-        method = Element(operation_request)
-        method.set("xmlns", ns)
+        # SOAP::Lite's default: a prefixed method element, so the data elements stay unqualified.
+        method = Element(f"{_DEFAULT_PREFIX}:{operation_request}")
+        method.set(f"xmlns:{_DEFAULT_PREFIX}", ns)
+        if not body:
+            method.set("xsi:nil", "true")
     for child in body:
         method.append(child)
     xml = tostring(method, encoding="unicode", short_empty_elements=False)

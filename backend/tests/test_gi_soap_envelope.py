@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
 from typing import Any
 from xml.etree.ElementTree import tostring  # noqa: S405 (serialising only)
 
@@ -198,7 +199,13 @@ def test_envelope_namespaces_no_namespace_and_fixed_prefix() -> None:
         return build_request_envelope(**args).decode("utf-8")
 
     assert body  # soap_output yields fresh elements per call
-    assert env() == ENVELOPE_HEAD + f'<Op xmlns="{ns}"><A>1</A></Op>' + ENVELOPE_TAIL
+    assert env() == (
+        ENVELOPE_HEAD + f'<namesp1:Op xmlns:namesp1="{ns}"><A>1</A></namesp1:Op>' + ENVELOPE_TAIL
+    )
+    # semantics: the data element is in no namespace (as with Znuny's SOAP::Lite)
+    parsed = ET.fromstring(env().encode())
+    method = parsed[0][0]
+    assert method.tag == f"{{{ns}}}Op" and [c.tag for c in method] == ["A"]
     assert env(fixed_prefix="ns1") == (
         ENVELOPE_HEAD + f'<ns1:Op xmlns:ns1="{ns}"><A>1</A></ns1:Op>' + ENVELOPE_TAIL
     )
@@ -208,7 +215,11 @@ def test_envelope_namespaces_no_namespace_and_fixed_prefix() -> None:
     assert env(no_namespace=True, namespace=None) == (
         ENVELOPE_HEAD + "<Op><A>1</A></Op>" + ENVELOPE_TAIL
     )
-    assert env(body=[]) == ENVELOPE_HEAD + f'<Op xmlns="{ns}"></Op>' + ENVELOPE_TAIL
+    assert env(body=[]) == (
+        ENVELOPE_HEAD
+        + f'<namesp1:Op xmlns:namesp1="{ns}" xsi:nil="true"></namesp1:Op>'
+        + ENVELOPE_TAIL
+    )
     assert ENVELOPE_HEAD.startswith('<?xml version="1.0" encoding="UTF-8"?><soap:Envelope ')
     assert 'xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"' in ENVELOPE_HEAD
     with pytest.raises(SoapOutputError):
