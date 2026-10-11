@@ -6946,6 +6946,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboards/{dashboard_id}/widgets/{widget_id}/report-job": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Widget Report Job
+         * @description Run a report widget's report in the background (it answered ``deferred``).
+         *
+         *     The job carries the widget's effective run (settings, the dashboard's time range and
+         *     queue narrowing unless pinned) and stores its result under the key the widget reads, so
+         *     the widget's next fetch is answered from the cache. The enqueue commits.
+         */
+        post: operations["widget_report_job_api_v1_dashboards__dashboard_id__widgets__widget_id__report_job_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dashboards/{dashboard_id}/widgets/{widget_id}/settings": {
         parameters: {
             query?: never;
@@ -40803,6 +40827,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WidgetDataOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    widget_report_job_api_v1_dashboards__dashboard_id__widgets__widget_id__report_job_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                dashboard_id: number;
+                widget_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
                 };
             };
             /** @description Validation Error */

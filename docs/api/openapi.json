@@ -74736,6 +74736,92 @@
         ]
       }
     },
+    "/api/v1/dashboards/{dashboard_id}/widgets/{widget_id}/report-job": {
+      "post": {
+        "description": "Run a report widget's report in the background (it answered ``deferred``).\n\nThe job carries the widget's effective run (settings, the dashboard's time range and\nqueue narrowing unless pinned) and stores its result under the key the widget reads, so\nthe widget's next fetch is answered from the cache. The enqueue commits.",
+        "operationId": "widget_report_job_api_v1_dashboards__dashboard_id__widgets__widget_id__report_job_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Dashboard Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "widget_id",
+            "required": true,
+            "schema": {
+              "title": "Widget Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Widget Report Job",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
     "/api/v1/dashboards/{dashboard_id}/widgets/{widget_id}/settings": {
       "patch": {
         "operationId": "patch_widget_settings_api_v1_dashboards__dashboard_id__widgets__widget_id__settings_patch",

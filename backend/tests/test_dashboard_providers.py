@@ -84,13 +84,16 @@ def ticket_ids(data: dict[str, Any]) -> list[int]:
 def test_core_providers_cover_the_data_widgets() -> None:
     assert sorted(p.key for p in core_providers()) == [
         "core.ai-status",
+        "core.backlog-aging",
         "core.calendar-agenda",
         "core.chat-queue",
         "core.counter",
         "core.escalations",
+        "core.heatmap",
         "core.queue-overview",
         "core.reminders",
         "core.report",
+        "core.sla-gauge",
         "core.team-presence",
         "core.ticket-list",
     ]

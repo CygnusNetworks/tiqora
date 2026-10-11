@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Annotated, Any, Final, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
+from pydantic import ValidationError
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -25,8 +26,10 @@ from tiqora.api.deps import (
 )
 from tiqora.config import Settings
 from tiqora.dashboard import start, store
+from tiqora.dashboard.filters import effective_filters
 from tiqora.dashboard.providers import DASHBOARD_PROVIDERS
-from tiqora.dashboard.runner import run_batch, run_widget
+from tiqora.dashboard.providers.report import REPORT_WIDGET_TYPES, report_spec
+from tiqora.dashboard.runner import INVALID_SETTINGS_MESSAGE, run_batch, run_widget
 from tiqora.dashboard.schemas import (
     MAX_WIDGETS_PER_DASHBOARD,
     DashboardCreateIn,
@@ -49,15 +52,33 @@ from tiqora.dashboard.settings_models import (
     validate_widget_settings,
 )
 from tiqora.extensions import Registry, get_registry
+from tiqora.filters import FilterError
+from tiqora.jobs.schemas import JobAccepted
 from tiqora.jobs.service import utc_now
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.permissions.sharing import ShareGroupError
+from tiqora.reporting.access import require_report_access
+from tiqora.reporting.definition import DefinitionError
+from tiqora.reporting.run_service import (
+    RequestError,
+    RunOverrides,
+    TooManyReportJobs,
+    enqueue_report_ref,
+    parse_dimension_choices,
+    prepare_ref,
+)
+from tiqora.reporting.schemas import ReportRunIn
+from tiqora.reporting.settings import load_reporting_settings
 
 router = APIRouter(prefix="/dashboards", tags=["dashboards"])
 widget_types_router = APIRouter(prefix="/dashboard-widget-types", tags=["dashboards"])
 
 NOT_FOUND_MESSAGE: Final = "Dashboard nicht gefunden."
 NO_DATA_MESSAGE: Final = "Dieses Widget hat keine Daten."
+NOT_A_REPORT_MESSAGE: Final = "Dieses Widget zeigt keinen Bericht."
+JOBS_FULL_MESSAGE: Final = (
+    "Es laufen bereits mehrere Berichte im Hintergrund. Bitte warten Sie, bis einer fertig ist."
+)
 CORE_WIDGET_VERSION: Final = 1
 
 
@@ -373,6 +394,83 @@ async def widget_data(
     if out is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, NO_DATA_MESSAGE)
     return out
+
+
+@router.post(
+    "/{dashboard_id}/widgets/{widget_id}/report-job",
+    response_model=JobAccepted,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def widget_report_job(
+    dashboard_id: DashboardId,
+    widget_id: str,
+    session: DbSession,
+    user: CurrentUser,
+    app_settings: Annotated[Settings, Depends(get_app_settings)],
+) -> JobAccepted:
+    """Run a report widget's report in the background (it answered ``deferred``).
+
+    The job carries the widget's effective run (settings, the dashboard's time range and
+    queue narrowing unless pinned) and stores its result under the key the widget reads, so
+    the widget's next fetch is answered from the cache. The enqueue commits.
+    """
+    board = await _visible_dashboard(session, user, dashboard_id)
+    widget = next((w for w in board.widgets if w.id == widget_id), None)
+    if widget is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Widget nicht gefunden.")
+    if widget.type_key not in REPORT_WIDGET_TYPES:
+        raise HTTPException(422, {"message": NOT_A_REPORT_MESSAGE, "path": "widget_id"})
+    try:
+        settings = CORE_WIDGET_SETTINGS[widget.type_key].model_validate(dict(widget.settings))
+    except ValidationError:
+        raise HTTPException(
+            422, {"message": INVALID_SETTINGS_MESSAGE, "path": "settings"}
+        ) from None
+    eff = effective_filters(board.filters, pinned=widget.pinned)
+    spec = report_spec(
+        widget.type_key,
+        settings,
+        {"queue_ids": list(eff.queue_ids), "time_range": eff.time_range},
+    )
+    reporting = await load_reporting_settings(session, app_settings)
+    await require_report_access(session, user.id, reporting)
+    try:
+        run = ReportRunIn(
+            report_key=spec.report_key,
+            definition=spec.definition,
+            time_range=spec.time_range,
+            grain=None,
+            time_zone=None,
+            parameters=dict(spec.parameters),
+            dimension_choices=dict(spec.dimension_choices),
+        )
+        prepared = await prepare_ref(
+            session,
+            user.id,
+            report_key=spec.report_key,
+            definition=spec.definition,
+            overrides=RunOverrides(
+                time_range=spec.time_range,
+                parameters=dict(spec.parameters),
+                dimension_choices=parse_dimension_choices(spec.dimension_choices),
+                common={"queue": list(eff.queue_ids)} if eff.queue_ids else {},
+            ),
+        )
+        return await enqueue_report_ref(
+            session,
+            user_id=user.id,
+            run=run,
+            extra_filter=prepared.params.extra_filter,
+            reporting=reporting,
+        )
+    except RequestError as exc:
+        raise HTTPException(exc.status_code, {"message": exc.message, "path": exc.path}) from None
+    except (DefinitionError, FilterError) as exc:
+        raise HTTPException(422, {"message": exc.message, "path": exc.path}) from None
+    except TooManyReportJobs:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS, {"message": JOBS_FULL_MESSAGE}
+        ) from None
 
 
 @widget_types_router.get("", response_model=list[WidgetTypeOut])

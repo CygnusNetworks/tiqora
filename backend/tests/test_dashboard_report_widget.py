@@ -9,14 +9,15 @@ ADMIN. Tickets: ``recent_q1`` (3 days old) and ``old_q1`` (20 days old) in Q1, `
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from datetime import timedelta
-from typing import Any
+from datetime import datetime, timedelta
+from typing import Any, NamedTuple
 
 import pytest
 from sqlalchemy import create_engine, text
 
+import tiqora.reporting.jobs as report_jobs
 import tiqora.reporting.run_service as run_service
-from tests._dashboard3_helpers import ADMIN, GROUP_1, Q1, Q2, A, B, Env3, open_env3
+from tests._dashboard3_helpers import ADMIN, GROUP_1, GROUP_2, Q1, Q2, A, B, Env3, open_env3
 from tiqora.config import Settings
 from tiqora.dashboard.filters import DashboardFilters
 from tiqora.dashboard.providers import (
@@ -26,16 +27,20 @@ from tiqora.dashboard.providers import (
     core_providers,
 )
 from tiqora.dashboard.providers.report import (
+    SLA_GAUGE_DEFINITION,
     drillable_dimensions,
     effective_time_range,
+    gauge_figures,
+    report_provider,
     run_report_widget,
 )
 from tiqora.dashboard.runner import run_widget
 from tiqora.dashboard.settings_models import ReportWidgetSettings
 from tiqora.extensions import get_registry
 from tiqora.extensions.registry import Registry
+from tiqora.jobs.runner import JobRunner
 from tiqora.jobs.service import utc_now
-from tiqora.reporting.definition import ReportDefinition
+from tiqora.reporting.definition import ReportDefinition, validate_definition
 from tiqora.reporting.facts_store import rebuild_ticket_facts
 from tiqora.reporting.rights import ReportRights
 from tiqora.reporting.saved import SavedReportIn, create_saved_report, delete_saved_report
@@ -565,3 +570,272 @@ async def test_report_provider_leaves_the_session_statement_limit_alone(env: Env
     )
     assert out is not None and out.status == "ok", out
     assert out.data == {"before": 0.0, "after": 0.0}
+
+
+# --- SLA gauge, backlog aging, heatmap -----------------------------------------------------
+
+
+def test_sla_gauge_definition_validates() -> None:
+    validate_definition(SLA_GAUGE_DEFINITION, get_registry())
+    assert [m.key for m in SLA_GAUGE_DEFINITION.measures] == ["sla_met_rate", "tickets"]
+    assert SLA_GAUGE_DEFINITION.dimensions == []
+
+
+def test_all_report_providers_limit_themselves() -> None:
+    assert report_provider().self_limited
+    by_key = {p.key: p for p in core_providers()}
+    for key in ("core.report", "core.sla-gauge", "core.backlog-aging", "core.heatmap"):
+        assert by_key[key].self_limited and by_key[key].timeout_seconds == 8.0
+
+
+def test_gauge_figures_normalise_ratio_to_percent() -> None:
+    def data(rate: Any, tickets: int) -> dict[str, Any]:
+        cols = [{"key": "sla_met_rate"}, {"key": "tickets"}]
+        return {"result": {"columns": cols, "rows": [[rate, tickets]]}}
+
+    assert gauge_figures(data(0.8764, 120)) == (87.6, 120)
+    assert gauge_figures(data(None, 4)) == (None, 4)
+    assert gauge_figures({"result": {"columns": [], "rows": []}}) == (None, 0)
+    assert gauge_figures({"deferred": True}) == (None, 0)
+
+
+async def run_type(
+    env: Env3, uid: int, type_key: str, settings: dict[str, Any], **kw: Any
+) -> dict[str, Any]:
+    kw.setdefault("app_settings", SETTINGS)
+    pinned = bool(kw.pop("pinned", False))
+    out = await run_widget(
+        env.factory, registry(), uid, W("dash3wid", type_key, settings, pinned=pinned), **kw
+    )
+    assert out is not None and out.status == "ok", out
+    assert out.data is not None
+    return out.data
+
+
+def _set_sla(env: Env3, breached: dict[int, bool]) -> None:
+    for tid, hit in breached.items():
+        env.sql(
+            "UPDATE tiqora_report_ticket_fact SET solution_target_minutes = 60,"
+            " solution_breached = :b WHERE ticket_id = :t",
+            b=hit,
+            t=tid,
+        )
+
+
+async def test_sla_gauge_rate_in_percent_and_target(env: Env3) -> None:
+    empty = await run_type(env, A, "core.sla-gauge", {})
+    # no ticket has an SLA target yet: no rate, but the tickets of the window are counted
+    assert empty["rate"] is None and empty["tickets"] == 2 and empty["target"] == 90
+    assert empty["deferred"] is False and empty["report"]["kind"] == "inline"
+
+    _set_sla(env, {T_RECENT_Q1: True, T_OLD_Q1: False, T_RECENT_Q2: False})
+    data = await run_type(env, A, "core.sla-gauge", {"target_percent": 75})
+    # A sees the two Q1 tickets, one of them breached: 50 %, not 0.5
+    assert data["rate"] == 50.0 and data["target"] == 75
+    assert data["definition"]["source"] == "tickets"
+    assert data["result"]["columns"][0]["key"] == "sla_met_rate"
+    # B sees only the Q2 ticket, which met its target
+    assert (await run_type(env, B, "core.sla-gauge", {}))["rate"] == 100.0
+    # the 7-day dashboard range keeps only the recent Q1 ticket, which breached
+    narrow = DashboardFilters(time_range="7d")
+    week = await run_type(env, A, "core.sla-gauge", {}, filters=narrow)
+    assert week["rate"] == 0.0
+    # a pinned gauge keeps its own 30 days; a queue filter narrows
+    pinned = await run_type(env, A, "core.sla-gauge", {}, filters=narrow, pinned=True)
+    assert pinned["rate"] == 50.0
+    q2 = await run_type(env, A, "core.sla-gauge", {}, filters=_queues(Q2))
+    assert q2["rate"] is None and q2["tickets"] == 0  # A cannot read Q2
+    assert data["tickets"] == 2
+
+
+async def test_backlog_aging_rows_capped(env: Env3) -> None:
+    data = await run_type(env, A, "core.backlog-aging", {})
+    assert data["report"]["key"] == "builtin.backlog_aging"
+    assert data["definition"]["source"] == "open_tickets"
+    keys = [c["key"] for c in data["result"]["columns"]]
+    assert keys[0] == "queue" and keys[1:] == [
+        "age_0_1d", "age_1_3d", "age_3_7d", "age_7_30d", "age_30d_plus",
+    ]  # fmt: skip
+    rows = data["result"]["rows"]
+    assert len(rows) == 1 and sum(rows[0][1:]) == 2  # A reads Q1: two open tickets
+    assert rows[0][keys.index("age_7_30d")] == 1  # the 20-day-old one
+    # the dashboard time range does not apply to a snapshot of what is open now
+    week = await run_type(
+        env, A, "core.backlog-aging", {}, filters=DashboardFilters(time_range="7d")
+    )
+    assert week["result"]["rows"] == rows
+    # with read access to both queues, max_rows 1 cuts the list and says so
+    env.sql(
+        "INSERT INTO group_user (user_id, group_id, permission_key,"
+        " create_time, create_by, change_time, change_by)"
+        " VALUES (:u, :g, 'ro', :t, 1, :t, 1)",
+        u=A,
+        g=GROUP_2,
+        t=datetime(2026, 10, 1),
+    )
+    both = await run_type(env, A, "core.backlog-aging", {"max_rows": 8})
+    assert len(both["result"]["rows"]) == 2 and both["result"]["truncated"] is False
+    one = await run_type(env, A, "core.backlog-aging", {"max_rows": 1})
+    assert len(one["result"]["rows"]) == 1 and one["result"]["truncated"] is True
+    assert one["result"]["totals"] == both["result"]["totals"]
+
+
+def heatmap_total(data: dict[str, Any]) -> int:
+    return sum(int(r[-1]) for r in data["result"]["rows"])
+
+
+async def test_heatmap_time_range_setting(env: Env3) -> None:
+    data = await run_type(env, A, "core.heatmap", {})
+    assert data["report"]["key"] == "builtin.created_heatmap"
+    assert data["definition"]["visualization"]["type"] == "heatmap"
+    assert [c["key"] for c in data["result"]["columns"]] == [
+        "created_weekday", "created_hour", "tickets",
+    ]  # fmt: skip
+    assert (
+        heatmap_total(data) == 2
+        and heatmap_total(await run_type(env, A, "core.heatmap", {"time_range": "30d"})) == 2
+    )
+    # the dashboard range wins over the widget's own, unless the widget is pinned
+    narrow = DashboardFilters(time_range="7d")
+    assert heatmap_total(await run_type(env, A, "core.heatmap", {}, filters=narrow)) == 1
+    pinned = await run_type(
+        env, A, "core.heatmap", {"time_range": "30d"}, filters=narrow, pinned=True
+    )
+    assert heatmap_total(pinned) == 2
+    assert heatmap_total(await run_type(env, B, "core.heatmap", {})) == 1
+
+
+# --- background job ------------------------------------------------------------------------
+
+_boards = iter(range(100, 10_000))
+
+
+class Board(NamedTuple):
+    id: int
+    wid: str
+
+
+async def _board(env: Env3, type_key: str, settings: dict[str, Any], **filters: Any) -> Board:
+    d = await env.create_personal(owner=A)
+    widget = {**_report_widget(settings, next(_boards)), "type_key": type_key}
+    r = await env.as_user(A).put(f"/api/v1/dashboards/{d.id}", json=_put_body(d, [widget]))
+    assert r.status_code == 200, r.text
+    if filters:
+        await env.patch_filters(A, d.id, filters, version=r.json()["version"])
+    return Board(d.id, widget["id"])
+
+
+def _job_url(d: Board) -> str:
+    return f"/api/v1/dashboards/{d.id}/widgets/{d.wid}/report-job"
+
+
+async def _run_jobs(env: Env3) -> None:
+    runner = JobRunner(session_factory=env.factory, settings=SETTINGS, registry=get_registry())
+    await runner.run_once()
+    await runner.wait_idle()
+
+
+@pytest.mark.parametrize(
+    ("type_key", "settings", "filters"),
+    [
+        ("core.report", {"report_key": "builtin.channel_mix"}, {}),
+        (
+            "core.report",
+            {"report_key": "builtin.channel_mix"},
+            {"queue_ids": [Q1], "time_range": "7d"},
+        ),
+        ("core.sla-gauge", {}, {"queue_ids": [Q1]}),
+        ("core.heatmap", {"time_range": "30d"}, {}),
+    ],
+)
+async def test_report_job_result_is_served_from_cache(
+    env: Env3,
+    monkeypatch: pytest.MonkeyPatch,
+    type_key: str,
+    settings: dict[str, Any],
+    filters: dict[str, Any],
+) -> None:
+    async with env.factory() as s:  # results are only cached once the report data is ready
+        (await load_state(s)).backfill_status = "done"
+        await s.commit()
+    cache = MemoryCache()
+    monkeypatch.setattr(report_jobs, "cache_backend_from_settings", lambda _s: cache)
+    d = await _board(env, type_key, settings, **filters)
+    board_filters = DashboardFilters(**filters)
+
+    real_estimate = run_service.estimate_rows
+
+    async def huge(*args: Any, **kwargs: Any) -> int:
+        return 10**9
+
+    monkeypatch.setattr(run_service, "estimate_rows", huge)  # a large report: deferred
+    deferred = await run_type(
+        env, A, type_key, settings, filters=board_filters, report_cache_backend=cache
+    )
+    assert deferred["deferred"] is True and "result" not in deferred
+
+    resp = await env.as_user(A).post(_job_url(d))
+    assert resp.status_code == 202, resp.text
+    accepted = resp.json()
+    assert accepted["status"] == "queued" and accepted["job_id"] > 0
+    await _run_jobs(env)
+    row = env.sql("SELECT status FROM tiqora_job WHERE id = :i", i=accepted["job_id"])
+    assert row[0][0] == "succeeded", row
+
+    monkeypatch.setattr(run_service, "estimate_rows", real_estimate)
+    served = await run_type(
+        env, A, type_key, settings, filters=board_filters, report_cache_backend=cache
+    )
+    assert served["deferred"] is False and served["result"]["cached"] is True
+    fresh = await run_type(env, A, type_key, settings, filters=board_filters)
+    assert fresh["result"]["cached"] is False
+    assert served["result"]["rows"] == fresh["result"]["rows"]
+    assert served["result"]["totals"] == fresh["result"]["totals"]
+
+
+async def test_report_job_rejects_non_report_widgets_and_respects_job_cap(env: Env3) -> None:
+    d = await _board(env, "core.ai-status", {})
+    r = await env.as_user(A).post(_job_url(d))
+    assert r.status_code == 422
+    assert r.json()["detail"]["message"] == "Dieses Widget zeigt keinen Bericht."
+    assert env.sql("SELECT COUNT(*) FROM tiqora_job WHERE kind = 'core.report_run'")[0][0] == 0
+
+    missing = await env.as_user(A).post(f"/api/v1/dashboards/{d.id}/widgets/nope/report-job")
+    assert missing.status_code == 404
+
+    rep = await _board(env, "core.report", {"report_key": "builtin.channel_mix"})
+    for n in range(3):
+        resp = await env.as_user(A).post(_job_url(rep))
+        assert resp.status_code == 202, (n, resp.text)
+    over = await env.as_user(A).post(_job_url(rep))
+    assert over.status_code == 429
+    assert over.json()["detail"] == {
+        "message": "Es laufen bereits mehrere Berichte im Hintergrund."
+        " Bitte warten Sie, bis einer fertig ist."
+    }
+    assert env.sql("SELECT COUNT(*) FROM tiqora_job WHERE kind = 'core.report_run'")[0][0] == 3
+
+
+async def test_report_job_needs_report_access_and_a_valid_report(env: Env3) -> None:
+    rep = await _board(env, "core.report", {"report_key": "builtin.channel_mix"})
+    await set_access(env, "stats_group")
+    denied = await env.as_user(A).post(_job_url(rep))
+    assert denied.status_code == 403
+    assert env.sql("SELECT COUNT(*) FROM tiqora_job WHERE kind = 'core.report_run'")[0][0] == 0
+    await set_access(env, "all_agents")
+    # a saved report deleted after the widget was saved: 410 from the seam, no job
+    rid = await save_report(env, "dash3 job gone", CHANNEL_DEF)
+    gone = await _board(env, "core.report", {"report_key": str(rid)})
+    await env.run(
+        delete_saved_report, rid, A, ReportRights(view=True, create=True, share=False, admin=False)
+    )
+    r = await env.as_user(A).post(_job_url(gone))
+    assert r.status_code == 410, r.text
+    assert env.sql("SELECT COUNT(*) FROM tiqora_job WHERE kind = 'core.report_run'")[0][0] == 0
+
+
+async def test_report_job_invisible_dashboard_404(env: Env3) -> None:
+    d = await _board(env, "core.report", {"report_key": "builtin.channel_mix"})
+    r = await env.as_user(B).post(_job_url(d))  # a personal dashboard of A
+    assert r.status_code == 404
+    assert env.sql("SELECT COUNT(*) FROM tiqora_job WHERE kind = 'core.report_run'")[0][0] == 0

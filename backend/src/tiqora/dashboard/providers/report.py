@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping
+from dataclasses import dataclass, field
 from typing import Any, Final
 
 from tiqora.config import get_settings
@@ -33,7 +34,12 @@ from tiqora.dashboard.providers import (
     ProviderForbidden,
     filter_queue_ids,
 )
-from tiqora.dashboard.settings_models import ReportWidgetSettings
+from tiqora.dashboard.settings_models import (
+    BacklogAgingSettings,
+    HeatmapSettings,
+    ReportWidgetSettings,
+    SlaGaugeSettings,
+)
 from tiqora.filters import FilterError
 from tiqora.reporting.access import has_report_access
 from tiqora.reporting.cache import ReportCache, read_cache_generation
@@ -51,6 +57,21 @@ from tiqora.reporting.settings import load_reporting_settings
 MSG_NO_ACCESS: Final = "Für Berichte fehlt Ihnen die Berechtigung."
 MSG_NOT_FOUND: Final = "Diesen Bericht gibt es nicht oder er ist für Sie nicht freigegeben."
 MSG_CANNOT_RUN: Final = "Der Bericht kann nicht ausgeführt werden: "
+
+#: widget types whose data is one report run (and which may start a background job)
+REPORT_WIDGET_TYPES: Final = frozenset(
+    {"core.report", "core.sla-gauge", "core.backlog-aging", "core.heatmap"}
+)
+
+#: inline definition of the SLA gauge: share of tickets with an SLA target that met it
+SLA_GAUGE_DEFINITION: Final = ReportDefinition.model_validate(
+    {
+        "source": "tickets",
+        "dimensions": [],
+        "measures": [{"key": "sla_met_rate"}, {"key": "tickets"}],
+        "visualization": {"type": "kpi"},
+    }
+)
 
 #: seconds of the provider budget kept for serialising the answer
 DEADLINE_MARGIN_SECONDS: Final = 1.5
@@ -170,32 +191,139 @@ async def run_report_widget(
     return data
 
 
-def effective_time_range(ctx: ProviderContext, own: TimeRangePreset | None) -> TimeRange | None:
-    """The dashboard's time range wins; a pinned widget has none, so its own applies."""
-    preset: TimeRangePreset | None = ctx.filters.get("time_range") if ctx.filters else None
+def _range_of(filters: Mapping[str, Any] | None, own: TimeRangePreset | None) -> TimeRange | None:
+    preset: TimeRangePreset | None = filters.get("time_range") if filters else None
     chosen = preset or own
     return report_time_range(chosen) if chosen else None
 
 
-async def run_core_report(ctx: ProviderContext, settings: ReportWidgetSettings) -> dict[str, Any]:
+def effective_time_range(ctx: ProviderContext, own: TimeRangePreset | None) -> TimeRange | None:
+    """The dashboard's time range wins; a pinned widget has none, so its own applies."""
+    return _range_of(ctx.filters, own)
+
+
+@dataclass(frozen=True, slots=True)
+class ReportSpec:
+    """What one report widget runs: the single source for the provider and the job route."""
+
+    report_key: str | None
+    definition: ReportDefinition | None
+    time_range: TimeRange | None
+    parameters: Mapping[str, Any] = field(default_factory=dict)
+    dimension_choices: Mapping[str, str] = field(default_factory=dict)
+    max_rows: int = 10
+    display: str = "auto"
+
+
+def report_spec(type_key: str, settings: Any, filters: Mapping[str, Any] | None) -> ReportSpec:
+    """The report run of a widget; ``filters`` is the widget's (pinned-reduced) dashboard filter.
+
+    Raises ``KeyError`` for a type that is not a report widget.
+    """
+    if type_key == "core.report":
+        return ReportSpec(
+            report_key=settings.report_key,
+            definition=None,
+            time_range=_range_of(filters, settings.time_range),
+            parameters=settings.parameters,
+            dimension_choices=settings.dimension_choices,
+            max_rows=settings.max_rows,
+            display=settings.display,
+        )
+    if type_key == "core.sla-gauge":
+        return ReportSpec(
+            report_key=None,
+            definition=SLA_GAUGE_DEFINITION,
+            time_range=_range_of(filters, settings.time_range),
+            max_rows=1,
+        )
+    if type_key == "core.backlog-aging":
+        # a snapshot of what is open now: the dashboard's time range does not apply
+        return ReportSpec(
+            report_key="builtin.backlog_aging",
+            definition=None,
+            time_range=None,
+            max_rows=settings.max_rows,
+        )
+    if type_key == "core.heatmap":
+        return ReportSpec(
+            report_key="builtin.created_heatmap",
+            definition=None,
+            time_range=_range_of(filters, settings.time_range),
+        )
+    raise KeyError(type_key)
+
+
+async def run_spec(ctx: ProviderContext, spec: ReportSpec) -> dict[str, Any]:
     return await run_report_widget(
         ctx,
-        report_key=settings.report_key,
-        definition=None,
-        time_range=effective_time_range(ctx, settings.time_range),
-        parameters=settings.parameters,
-        dimension_choices=settings.dimension_choices,
-        max_rows=settings.max_rows,
-        display=settings.display,
+        report_key=spec.report_key,
+        definition=spec.definition,
+        time_range=spec.time_range,
+        parameters=spec.parameters,
+        dimension_choices=spec.dimension_choices,
+        max_rows=spec.max_rows,
+        display=spec.display,
+    )
+
+
+def gauge_figures(data: Mapping[str, Any]) -> tuple[float | None, int]:
+    """``(rate in percent, tickets)`` of the SLA gauge's result.
+
+    ``sla_met_rate`` is a ratio (0..1) or ``None`` when no ticket had an SLA target; it is
+    normalised to percent with one decimal. A deferred or empty result gives ``(None, 0)``.
+    """
+    result = data.get("result")
+    if not result or not result["rows"]:
+        return None, 0
+    keys = [c["key"] for c in result["columns"]]
+    row = result["rows"][0]
+    rate = row[keys.index("sla_met_rate")]
+    tickets = row[keys.index("tickets")]
+    return (None if rate is None else round(float(rate) * 100, 1)), int(tickets or 0)
+
+
+async def run_core_report(ctx: ProviderContext, settings: ReportWidgetSettings) -> dict[str, Any]:
+    return await run_spec(ctx, report_spec("core.report", settings, ctx.filters))
+
+
+async def run_sla_gauge(ctx: ProviderContext, settings: SlaGaugeSettings) -> dict[str, Any]:
+    data = await run_spec(ctx, report_spec("core.sla-gauge", settings, ctx.filters))
+    rate, tickets = gauge_figures(data)
+    data.update(rate=rate, tickets=tickets, target=settings.target_percent)
+    return data
+
+
+async def run_backlog_aging(ctx: ProviderContext, settings: BacklogAgingSettings) -> dict[str, Any]:
+    return await run_spec(ctx, report_spec("core.backlog-aging", settings, ctx.filters))
+
+
+async def run_heatmap(ctx: ProviderContext, settings: HeatmapSettings) -> dict[str, Any]:
+    return await run_spec(ctx, report_spec("core.heatmap", settings, ctx.filters))
+
+
+def _provider(key: str, model: Any, run: Any) -> DashboardProvider:
+    return DashboardProvider(
+        key=key,
+        version=1,
+        settings_model=model,
+        run=run,
+        timeout_seconds=8.0,
+        self_limited=True,
     )
 
 
 def report_provider() -> DashboardProvider:
-    return DashboardProvider(
-        key="core.report",
-        version=1,
-        settings_model=ReportWidgetSettings,
-        run=run_core_report,
-        timeout_seconds=8.0,
-        self_limited=True,
-    )
+    return _provider("core.report", ReportWidgetSettings, run_core_report)
+
+
+def sla_gauge_provider() -> DashboardProvider:
+    return _provider("core.sla-gauge", SlaGaugeSettings, run_sla_gauge)
+
+
+def backlog_aging_provider() -> DashboardProvider:
+    return _provider("core.backlog-aging", BacklogAgingSettings, run_backlog_aging)
+
+
+def heatmap_provider() -> DashboardProvider:
+    return _provider("core.heatmap", HeatmapSettings, run_heatmap)

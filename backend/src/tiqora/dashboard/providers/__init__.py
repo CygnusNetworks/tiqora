@@ -89,7 +89,12 @@ def core_providers() -> list[DashboardProvider]:
     from tiqora.dashboard.providers.escalations import escalations_provider
     from tiqora.dashboard.providers.queue_overview import queue_overview_provider
     from tiqora.dashboard.providers.reminders import reminders_provider
-    from tiqora.dashboard.providers.report import report_provider
+    from tiqora.dashboard.providers.report import (
+        backlog_aging_provider,
+        heatmap_provider,
+        report_provider,
+        sla_gauge_provider,
+    )
     from tiqora.dashboard.providers.team_presence import team_presence_provider
     from tiqora.dashboard.providers.ticket_list import ticket_list_provider
 
@@ -104,4 +109,7 @@ def core_providers() -> list[DashboardProvider]:
         chat_queue_provider(),
         ai_status_provider(),
         report_provider(),
+        sla_gauge_provider(),
+        backlog_aging_provider(),
+        heatmap_provider(),
     ]
