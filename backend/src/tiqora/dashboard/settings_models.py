@@ -19,6 +19,8 @@ from pydantic import (
 
 WIDGET_KEY_RE: Final = re.compile(r"^[a-z0-9][a-z0-9._-]{1,118}$")
 MAX_WIDGET_SETTINGS_BYTES: Final = 20_000
+#: bigint column; the saved-searches API bounds its path id the same way
+MAX_SEARCH_ID: Final = 2**63 - 1
 LINK_SCHEMES: Final = ("http", "https", "mailto")
 
 
@@ -63,7 +65,7 @@ class SavedSearchSource(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: Literal["saved_search"] = "saved_search"
-    id: int = Field(ge=1)
+    id: int = Field(ge=1, le=MAX_SEARCH_ID)
 
 
 class FilterSource(BaseModel):

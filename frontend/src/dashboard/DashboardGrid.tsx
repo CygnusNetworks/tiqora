@@ -120,6 +120,7 @@ function GridCell({
   onRetry,
   retry,
   edit,
+  onConfigure,
   cellEdit,
   style,
 }: {
@@ -133,6 +134,8 @@ function GridCell({
   /** Overrides `onRetry(id)` (preview data). */
   retry?: () => void;
   edit?: EditHandlers;
+  /** View mode: the in-tile "choose source" actions (only handed over for dashboards the viewer can edit). */
+  onConfigure?: (id: string) => void;
   cellEdit?: CellEdit;
   style?: CSSProperties;
 }) {
@@ -152,8 +155,8 @@ function GridCell({
   const handle = cellEdit?.chrome.handle;
   const actions = cellEdit?.chrome.actions;
   const chrome = useMemo(
-    () => ({ titleOverride: widget.title_override, canEdit, handle, actions, onConfigure: edit?.onOpenSettings && (() => edit.onOpenSettings?.(id)) }),
-    [widget.title_override, canEdit, handle, actions, edit, id],
+    () => ({ titleOverride: widget.title_override, canEdit, handle, actions, onConfigure: edit?.onOpenSettings ? () => edit.onOpenSettings?.(id) : onConfigure && (() => onConfigure(id)) }),
+    [widget.title_override, canEdit, handle, actions, edit, onConfigure, id],
   );
   const waiting = state.status === "loading" || state.status === "pending";
   const size = { w: rect.w, h: rect.h };
@@ -311,6 +314,7 @@ export function DashboardGrid({
   data,
   onRetry,
   edit,
+  onConfigureWidget,
 }: {
   widgets: EditWidget[];
   mode: "view" | "edit";
@@ -320,6 +324,8 @@ export function DashboardGrid({
   data: Record<string, WidgetDataState>;
   onRetry: (id: string) => void;
   edit?: EditHandlers;
+  /** View mode, editors only: a tile's "Suche wählen" / "Filter ändern" opens that widget's settings in edit mode. */
+  onConfigureWidget?: (id: string) => void;
 }) {
   const { t } = useTranslation();
   const defs = useDashboardWidgetDefinitions();
@@ -595,6 +601,7 @@ export function DashboardGrid({
       canEdit,
       onRetry,
       edit,
+      onConfigure: canEdit ? onConfigureWidget : undefined,
       cellEdit,
       style,
     };

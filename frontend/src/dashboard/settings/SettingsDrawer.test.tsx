@@ -45,7 +45,7 @@ function defOf(key: string): WidgetDefinition {
 }
 
 /** A page with an opener button and a grid behind the drawer. */
-function Page({ widget = listWidget, def, errors, canEditSources, closeOnApply = true }: Props & { closeOnApply?: boolean }) {
+function Page({ widget = listWidget, def, errors, focusSource, closeOnApply = true }: Props & { closeOnApply?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -59,7 +59,7 @@ function Page({ widget = listWidget, def, errors, canEditSources, closeOnApply =
           widget={widget}
           def={def ?? defOf(widget.type_key)}
           errors={errors}
-          canEditSources={canEditSources}
+          focusSource={focusSource}
           onApply={(s, t) => {
             onApply(s, t);
             if (closeOnApply) setOpen(false);
@@ -187,11 +187,10 @@ describe("SettingsDrawer", () => {
     expect(onApply.mock.calls[0][0].source.filter).toEqual(deep);
   });
 
-  it("a viewer who cannot edit the dashboard cannot change the source", async () => {
-    const user = mount({ canEditSources: false });
+  it("opened from a tile's source action, the focus lands on the source section, not the title", async () => {
+    const user = mount({ focusSource: true });
     const { dialog } = await open(user);
-    expect(within(dialog).getByRole("radio", { name: "Eigener Filter" })).toBeDisabled();
-    expect(within(dialog).getByRole("combobox", { name: "Suche oder Ansicht" })).toBeDisabled();
+    await waitFor(() => expect(within(dialog).getByRole("radio", { name: "Gespeicherte Suche" })).toHaveFocus());
   });
 
   it("a server message on the saved search id shows under the search card", async () => {

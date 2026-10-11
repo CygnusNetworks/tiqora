@@ -24,11 +24,13 @@ const int = (minimum: number, maximum: number, dflt: number) => ({
   default: dflt,
 });
 const object = (properties: Record<string, unknown>) => ({ type: "object", properties });
-const presetSource = {
+const ticketSource = {
   type: "object",
   properties: {
     kind: { type: "string", enum: ["preset", "saved_search", "filter"] },
     preset: { type: "string", enum: [...TICKET_PRESETS] },
+    id: { type: "integer", minimum: 1 },
+    filter: { type: "object" },
   },
   default: DEFAULT_SOURCE,
 };
@@ -48,7 +50,7 @@ export const CORE_WIDGETS: WidgetDefinition<any>[] = [
     icon: "list",
     size: { default: [6, 5], min: [4, 3], max: [12, 10] },
     settings: object({
-      source: presetSource,
+      source: ticketSource,
       columns: {
         type: "array",
         items: { type: "string", enum: [...COLUMN_KEYS] },
@@ -73,7 +75,7 @@ export const CORE_WIDGETS: WidgetDefinition<any>[] = [
     icon: "counter",
     size: { default: [3, 2], min: [2, 2], max: [4, 3] },
     settings: object({
-      source: presetSource,
+      source: ticketSource,
       tone: { type: "string", enum: ["neutral", "danger", "ok"], default: "neutral" },
     }),
     data: { endpoint: "core.counter" },

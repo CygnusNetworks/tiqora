@@ -62,6 +62,7 @@ export function DashboardEditMode({
   onLeave,
   onReload,
   galleryHost,
+  initialSettingsFor = null,
 }: {
   dashboard: Dashboard;
   userId: number;
@@ -75,6 +76,8 @@ export function DashboardEditMode({
   onReload: () => void;
   /** Column next to the grid that holds the gallery on wide screens (inline below the grid when absent). */
   galleryHost?: HTMLElement | null;
+  /** Open this widget's settings right away (from a tile's "Suche wählen"), focus in the source section. */
+  initialSettingsFor?: string | null;
 }) {
   const { t, i18n } = useTranslation();
   const session = useEditSession(dashboard, userId);
@@ -85,7 +88,10 @@ export function DashboardEditMode({
     return editDataPlan(savedWidgets, savedData, state.widgets, (key) => hasData.has(key));
   }, [defs, savedWidgets, savedData, state.widgets]);
 
-  const [settingsFor, setSettingsFor] = useState<{ id: string } | null>(null);
+  const [settingsFor, setSettingsFor] = useState<{ id: string } | null>(
+    initialSettingsFor ? { id: initialSettingsFor } : null,
+  );
+  const [focusSource, setFocusSource] = useState(initialSettingsFor !== null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   const isTemplate = dashboard.kind === "template";
@@ -120,7 +126,8 @@ export function DashboardEditMode({
 
   // Entering edit mode puts the focus on the toolbar (announced as "Bearbeiten").
   useEffect(() => {
-    toolbarRef.current?.focus();
+    if (initialSettingsFor === null) toolbarRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on entering
   }, []);
 
   const settingsWidget = settingsFor ? state.widgets.find((w) => w.id === settingsFor.id) : undefined;
@@ -133,6 +140,7 @@ export function DashboardEditMode({
 
   const openSettings = useCallback(
     (id: string) => {
+      setFocusSource(false);
       setSettingsFor({ id });
     },
     [],
@@ -299,7 +307,7 @@ export function DashboardEditMode({
           widget={settingsWidget}
           def={settingsDef}
           errors={settingsErrors}
-          canEditSources={dashboard.can_edit}
+          focusSource={focusSource}
           onApply={(settings, titleOverride) => {
             dispatch({ type: "settings", id: settingsWidget.id, settings, titleOverride });
             setSettingsFor(null);

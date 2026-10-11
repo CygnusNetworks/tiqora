@@ -121,6 +121,12 @@ export function DashboardPage() {
   const widgets = useMemo(() => (dashboard ? dashboard.widgets.map(toEditWidget) : []), [dashboard]);
   const [editing, setEditing] = useState(false);
   const [sharing, setSharing] = useState(false);
+  // A tile's "Suche wählen" / "Filter ändern": edit mode opens with that widget's settings.
+  const [configureId, setConfigureId] = useState<string | null>(null);
+  const configureWidget = useCallback((id: string) => {
+    setConfigureId(id);
+    setEditing(true);
+  }, []);
   const isEditing = editing && dashboard !== undefined && dashboard.can_edit && user != null;
   // While editing nothing is fetched for the view; its last data is reused by the edit grid.
   const { byWidget, refetch } = useDashboardData(dashboard?.id ?? 0, widgets, {
@@ -129,6 +135,7 @@ export function DashboardPage() {
   // Another dashboard (e.g. a link with ?d=) never opens in edit mode by itself.
   useEffect(() => {
     setEditing(false);
+    setConfigureId(null);
   }, [selectedId]);
   // Back in view mode the focus returns to "Anpassen".
   const customizeRef = useRef<HTMLButtonElement>(null);
@@ -141,6 +148,7 @@ export function DashboardPage() {
   const leaveEdit = useCallback(() => {
     returnFocus.current = true;
     setEditing(false);
+    setConfigureId(null);
   }, []);
   const reloadAfterConflict = useCallback(() => {
     if (dashboard) {
@@ -178,6 +186,7 @@ export function DashboardPage() {
         onLeave={leaveEdit}
         onReload={reloadAfterConflict}
         galleryHost={galleryHost}
+        initialSettingsFor={configureId}
       />
     );
   } else if (listQ.isError) {
@@ -224,6 +233,7 @@ export function DashboardPage() {
         canEdit={dashboard.can_edit}
         data={byWidget}
         onRetry={refetch}
+        onConfigureWidget={dashboard.can_edit ? configureWidget : undefined}
       />
     );
   }

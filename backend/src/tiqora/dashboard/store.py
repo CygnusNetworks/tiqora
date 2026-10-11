@@ -675,9 +675,9 @@ async def patch_widget_settings(
     except SettingsError as exc:
         raise DashboardInvalid(exc.message, exc.path) from None
     text = _check_size(settings, "settings")
-    await validate_source_settings(session, user_id, widget.type_key, settings, path="settings")
     if body.version != row.version:
         raise DashboardConflict(row.version)
+    await validate_source_settings(session, user_id, widget.type_key, settings, path="settings")
 
     async with session.begin_nested():
         upd = await session.execute(

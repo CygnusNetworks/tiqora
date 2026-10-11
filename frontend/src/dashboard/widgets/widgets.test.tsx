@@ -398,14 +398,8 @@ describe("core.ticket-list", () => {
     expect(settingsWithDefaults(def, { source: flt }, 1).source).toEqual(flt);
   });
 
-  it("a forbidden tile shows the message and, for editors only, the action 'Suche wählen'", async () => {
-    const onConfigure = vi.fn();
+  it("a forbidden tile shows the message; without an edit handler there is no 'Suche wählen' (the real wiring is tested in DashboardPage)", async () => {
     const state: WidgetDataState = { status: "forbidden", error: "Die Suche gibt es nicht mehr oder ist für Sie nicht freigegeben." };
-    await renderWidget("core.ticket-list", { source: { kind: "saved_search", id: 9 } }, state, "view", { canEdit: true, onConfigure });
-    expect(screen.getByText(/gibt es nicht mehr/)).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Suche wählen" }));
-    expect(onConfigure).toHaveBeenCalledTimes(1);
-    cleanup();
     await renderWidget("core.counter", { source: { kind: "saved_search", id: 9 } }, state);
     expect(screen.getByText(/gibt es nicht mehr/)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Suche wählen" })).toBeNull();

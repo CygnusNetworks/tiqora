@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef } from "react";
+import { useEffect, useId, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { fieldsFromTicketCatalog } from "@/components/filters/filterFields";
@@ -33,12 +33,12 @@ export function SourceFields({
   value,
   onChange,
   errors,
-  canEditSources,
+  focusSource = false,
 }: {
   value: Record<string, unknown>;
   onChange(next: Record<string, unknown>): void;
   errors: Record<string, string>;
-  canEditSources: boolean;
+  focusSource?: boolean;
 }) {
   const { t } = useTranslation();
   const uid = useId();
@@ -47,6 +47,11 @@ export function SourceFields({
   const ownFilter = filter !== null;
   const preset = presetOf(source);
   const searchId = savedSearchIdOf(source);
+  const checkedRadio = useRef<HTMLInputElement>(null);
+  // Before the dialog's own "first field" focus (which skips when focus is already inside).
+  useEffect(() => {
+    if (focusSource) checkedRadio.current?.focus();
+  }, [focusSource]);
   const set = (next: unknown) => onChange({ ...value, source: next });
 
   // What the other card had, so switching back and forth loses nothing.
@@ -95,8 +100,8 @@ export function SourceFields({
           type="radio"
           name={`${uid}-src`}
           aria-label={t("dashboards.settings.ticketList.savedSearch")}
+          ref={ownFilter ? undefined : checkedRadio}
           checked={!ownFilter}
-          disabled={!canEditSources}
           onChange={() => set(lastSearch.current)}
           className="mt-1"
         />
@@ -108,12 +113,12 @@ export function SourceFields({
           <select
             aria-label={t("dashboards.settings.source.pick")}
             value={ownFilter ? "" : selected}
-            disabled={!canEditSources || ownFilter}
+            disabled={ownFilter}
             aria-invalid={errorsFor("search").length > 0 ? true : undefined}
             onChange={(e) => pick(e.target.value)}
             className={cn(FIELD, "mt-2")}
           >
-            {ownFilter && <option value="" />}
+            {ownFilter && <option value="">{t("dashboards.settings.source.ownFilter")}</option>}
             <optgroup label={t("dashboards.settings.ticketList.standard")}>
               {TICKET_PRESETS.map((p: TicketPreset) => (
                 <option key={p} value={`preset:${p}`}>
@@ -159,8 +164,8 @@ export function SourceFields({
           type="radio"
           name={`${uid}-src`}
           aria-label={t("dashboards.settings.source.ownFilter")}
+          ref={ownFilter ? checkedRadio : undefined}
           checked={ownFilter}
-          disabled={!canEditSources}
           onChange={() => set({ kind: "filter", filter: lastFilter.current })}
           className="mt-1"
         />
@@ -174,7 +179,7 @@ export function SourceFields({
               <FilterBuilder
                 fields={fields}
                 value={filter}
-                disabled={!canEditSources || !fieldsQ.isSuccess}
+                disabled={!fieldsQ.isSuccess}
                 onChange={(next) => set({ kind: "filter", filter: next })}
               />
               {errorsFor("filter").map((m) => (

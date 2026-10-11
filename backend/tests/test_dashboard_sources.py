@@ -221,6 +221,22 @@ async def test_patch_checks_the_source_too(env: Env) -> None:
     assert r.status_code == 422 and r.json()["detail"]["path"] == "settings.source.id"
 
 
+async def test_too_large_saved_search_id_is_a_422_not_a_500(env: Env) -> None:
+    huge = saved(2**63)  # beyond bigint: Postgres would raise on the lookup
+    url, body = await save_body_with(env, USER_A, {"kind": "preset", "preset": "mine_open"})
+    r = await env.as_user(USER_A).put(url, json={**body, "widgets": [widget_json(huge)]})
+    assert r.status_code == 422, r.text
+    assert r.json()["detail"]["path"] == "widgets[0].settings.source.id"
+    ok = await env.as_user(USER_A).put(url, json=body)
+    assert ok.status_code == 200, ok.text
+    r = await env.as_user(USER_A).patch(
+        f"{url}/widgets/src00000001/settings",
+        json={"settings": {"source": huge}, "version": ok.json()["version"]},
+    )
+    assert r.status_code == 422, r.text
+    assert r.json()["detail"]["path"] == "settings.source.id"
+
+
 async def test_counter_history_key_for_searches(env: Env) -> None:
     sid = await env.make_saved_search(USER_A, criteria=queue_filter(QUEUE_1))
     await run(env, USER_A, counter(saved(sid)))

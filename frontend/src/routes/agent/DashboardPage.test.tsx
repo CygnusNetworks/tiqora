@@ -24,6 +24,7 @@ import { setDisplayTimeZone } from "@/lib/timeZone";
 import { DASHBOARD_WIDGETS, defineWidget, type WidgetProps } from "@/plugins/dashboardWidgets";
 import { demoDashboard, demoDefaultWidgets, demoTab, demoWidgetData } from "@/demo/dashboardsMock";
 import { makeUser } from "@/test/fireUser";
+import { savedSearchesApi } from "@/lib/savedSearchesApi";
 import { registerCoreWidgets } from "@/dashboard/widgets";
 import { DashboardPage } from "./DashboardPage";
 
@@ -1236,5 +1237,37 @@ describe("DashboardPage", () => {
       fireEvent.keyDown(cellOf("w-counter-1"), { key: "Enter" });
       expect(screen.getByRole("dialog", { name: /Einstellungen/ })).toBeVisible();
     });
+  });
+});
+
+// ---------------------------------------------------------------- source actions of a forbidden tile
+
+describe("DashboardPage: 'Suche wählen' on a tile whose saved search is gone", () => {
+  const GONE = "Die Suche gibt es nicht mehr oder ist für Sie nicht freigegeben.";
+  const listWidget = wire("w-gone", "core.ticket-list", { lg: { x: 0, y: 0, w: 6, h: 5 } }, { source: { kind: "saved_search", id: 9 } });
+
+  function forbidden() {
+    apiMock.data.mockImplementation(async () => ({ widgets: { "w-gone": { status: "forbidden", error: GONE } satisfies WidgetResult } }));
+    vi.spyOn(savedSearchesApi, "list").mockResolvedValue([]);
+    vi.spyOn(savedSearchesApi, "ticketFilterFields").mockResolvedValue([]);
+  }
+
+  it("an editor gets the action in view mode; it enters edit mode with that widget's settings and the focus on the source", async () => {
+    mockDashboard({ widgets: [listWidget], can_edit: true });
+    forbidden();
+    await renderPage();
+    expect(await screen.findByText(GONE)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Suche wählen" }));
+    const dialog = await screen.findByRole("dialog", { name: /Einstellungen/ });
+    expect(screen.getByRole("toolbar", { name: "Bearbeiten" })).toBeVisible();
+    await waitFor(() => expect(within(dialog).getByRole("radio", { name: "Gespeicherte Suche" })).toHaveFocus());
+  });
+
+  it("someone who cannot edit the dashboard sees the message and no action", async () => {
+    mockDashboard({ widgets: [listWidget], can_edit: false });
+    forbidden();
+    await renderPage();
+    expect(await screen.findByText(GONE)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Suche wählen" })).toBeNull();
   });
 });

@@ -63,7 +63,7 @@ export function SettingsDrawer({
   widget,
   def,
   errors,
-  canEditSources = true,
+  focusSource = false,
   onApply,
   onCancel,
 }: {
@@ -71,8 +71,8 @@ export function SettingsDrawer({
   def: WidgetDefinition;
   /** Server (422) messages by path (`settings.limit`); others show as a general message. */
   errors?: Record<string, string>;
-  /** Whether the source of ticket lists and counters may be changed (default: yes). */
-  canEditSources?: boolean;
+  /** Put the focus in the source section on open (the widget was opened from its "Suche wählen" action). */
+  focusSource?: boolean;
   onApply: (settings: Record<string, unknown>, titleOverride: string | null) => void;
   onCancel: () => void;
 }) {
@@ -168,7 +168,7 @@ export function SettingsDrawer({
         </div>
 
         {Editor ? (
-          <Editor value={draft} onChange={change} errors={fieldErrors} canEditSources={canEditSources} />
+          <Editor value={draft} onChange={change} errors={fieldErrors} focusSource={focusSource} />
         ) : adapter ? (
           <SchemaForm
             schema={adapter.schema}

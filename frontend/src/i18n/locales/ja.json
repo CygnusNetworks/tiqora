@@ -5891,18 +5891,7 @@
       "forms": {
         "counter": {
           "fields": {
-            "preset": {
-              "label": "Which tickets?",
-              "options": {
-                "mine_open": "My open",
-                "mine_new": "My new",
-                "unowned_new": "To pick up",
-                "escalated": "Escalated",
-                "ai_escalated": "Handed over by AI"
-              }
-            },
             "tone": {
-              "label": "Colour of the number",
               "options": {
                 "neutral": "Neutral",
                 "danger": "Red (warning)",

@@ -5891,18 +5891,7 @@
       "forms": {
         "counter": {
           "fields": {
-            "preset": {
-              "label": "Welche Tickets?",
-              "options": {
-                "mine_open": "Meine offenen",
-                "mine_new": "Meine neuen",
-                "unowned_new": "Zum Übernehmen",
-                "escalated": "Eskaliert",
-                "ai_escalated": "Von der KI übergeben"
-              }
-            },
             "tone": {
-              "label": "Farbe der Zahl",
               "options": {
                 "neutral": "Neutral",
                 "danger": "Rot (Warnung)",

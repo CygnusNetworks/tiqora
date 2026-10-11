@@ -15,8 +15,8 @@ export interface SettingsEditorProps {
   onChange(next: Record<string, unknown>): void;
   /** Field errors keyed by the field path inside the settings (`limit`, `items.0.url`). */
   errors: Record<string, string>;
-  /** Whether the source (saved search or own filter) may be changed: the viewer can edit the dashboard. */
-  canEditSources: boolean;
+  /** Focus the source section on mount (opened from a tile's "Suche wählen"). */
+  focusSource?: boolean;
 }
 
 export const CORE_SETTINGS_EDITORS: Record<string, ComponentType<SettingsEditorProps>> = {

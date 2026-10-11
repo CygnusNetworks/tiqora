@@ -20,7 +20,7 @@ const SORTS = [
 const LEGEND = "mb-2 text-xs font-medium text-muted";
 
 /** Ticket list: which tickets, columns, sorting, rows and density . */
-export function TicketListSettingsEditor({ value, onChange, errors, canEditSources }: SettingsEditorProps) {
+export function TicketListSettingsEditor({ value, onChange, errors, focusSource }: SettingsEditorProps) {
   const { t } = useTranslation();
   const uid = useId();
   const set = (p: Record<string, unknown>) => onChange({ ...value, ...p });
@@ -42,7 +42,7 @@ export function TicketListSettingsEditor({ value, onChange, errors, canEditSourc
 
   return (
     <div className="space-y-5">
-      <SourceFields value={value} onChange={onChange} errors={errors} canEditSources={canEditSources} />
+      <SourceFields value={value} onChange={onChange} errors={errors} focusSource={focusSource} />
 
       <fieldset className="min-w-0">
         <legend className={LEGEND}>{t("dashboards.settings.ticketList.columns")}</legend>
