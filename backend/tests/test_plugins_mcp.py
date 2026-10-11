@@ -4,7 +4,7 @@ import asyncio
 import inspect
 import re
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -171,12 +171,18 @@ async def test_plugin_exception_is_a_clean_error_and_counts() -> None:
     assert plugin_mcp_failures(PLUGIN) == 0
 
 
-@pytest.mark.parametrize("exc", [SystemExit(2), KeyboardInterrupt(), GeneratorExit()])
-async def test_base_exception_in_plugin_tool_is_a_tool_error(exc: BaseException) -> None:
+@pytest.mark.parametrize(
+    "make_exc",
+    [lambda: SystemExit(2), KeyboardInterrupt, GeneratorExit],
+    ids=["SystemExit", "KeyboardInterrupt", "GeneratorExit"],
+)
+async def test_base_exception_in_plugin_tool_is_a_tool_error(
+    make_exc: Callable[[], BaseException],
+) -> None:
     """sys.exit() & co. in a plugin tool must not end the MCP process (B-I2)."""
 
     async def leave(ctx: Context) -> dict[str, str]:
-        raise exc
+        raise make_exc()  # a fresh instance per run: no traceback carried across tests
 
     server = FastMCP("t")
     register_plugin_mcp_tools(
