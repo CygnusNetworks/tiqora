@@ -158,6 +158,13 @@ FIXED_TEXTS: Final[dict[TextLocale, dict[str, str]]] = {
             "Grund: {reason}\n\n"
             "Bitte prüfen Sie den Zeitplan und setzen Sie ihn danach fort: {link}"
         ),
+        "recurrence.daily": "Täglich um {time}",
+        "recurrence.workdays": "Montag bis Freitag um {time}",
+        "recurrence.weekly": "Jeden {days} um {time}",
+        "recurrence.monthly": "Monatlich am {day}. um {time}",
+        "recurrence.yearly": "Jährlich am {day}. {month} um {time}",
+        "recurrence.clamp": "(in kürzeren Monaten am letzten Tag)",
+        "recurrence.and": "und",
         "quarter": "Q{q} {year}",
         **{f"month.{i}": name for i, name in enumerate(_DE_MONTHS, 1)},
         **{f"weekday.{i}": name for i, name in enumerate(_DE_WEEKDAYS, 1)},
@@ -193,6 +200,13 @@ FIXED_TEXTS: Final[dict[TextLocale, dict[str, str]]] = {
             "Reason: {reason}\n\n"
             "Please check the schedule and resume it afterwards: {link}"
         ),
+        "recurrence.daily": "Daily at {time}",
+        "recurrence.workdays": "Monday to Friday at {time}",
+        "recurrence.weekly": "Every {days} at {time}",
+        "recurrence.monthly": "Monthly on day {day} at {time}",
+        "recurrence.yearly": "Yearly on {month} {day} at {time}",
+        "recurrence.clamp": "(on the last day in shorter months)",
+        "recurrence.and": "and",
         "quarter": "Q{q} {year}",
         **{f"month.{i}": name for i, name in enumerate(_EN_MONTHS, 1)},
         **{f"weekday.{i}": name for i, name in enumerate(_EN_WEEKDAYS, 1)},
