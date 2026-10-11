@@ -902,6 +902,60 @@ class TiqoraJobFile(TiqoraBase):
     __table_args__ = (Index("ix_tiqora_job_file_job", "job_id"),)
 
 
+class TiqoraGiDebugEntry(TiqoraBase):
+    """One GenericInterface communication (Znuny ``gi_debugger_entry`` + Tiqora columns).
+
+    ``webservice_id`` / ``ticket_id`` point into Znuny tables (no FK). ``replay`` is the
+    requester's JSON ``{"invoker", "data", "asynchronous"}`` (event data only, no secrets).
+    ``create_time`` is app-written naive UTC.
+    """
+
+    __tablename__ = "tiqora_gi_debug_entry"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    communication_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    communication_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    remote_ip: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    webservice_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    create_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    ticket_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    replay: Mapped[str | None] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("communication_id", name="uq_tiqora_gi_debug_entry_comm"),
+        Index("ix_tiqora_gi_debug_entry_ws_time", "webservice_id", "create_time"),
+        Index("ix_tiqora_gi_debug_entry_ticket", "ticket_id"),
+        Index("ix_tiqora_gi_debug_entry_time", "create_time"),
+    )
+
+
+class TiqoraGiDebugContent(TiqoraBase):
+    """One debugger line of an entry (Znuny ``gi_debugger_entry_content``); ``content`` is
+    UTF-8 text stored as bytes. Rows go with their entry (``ON DELETE CASCADE``)."""
+
+    __tablename__ = "tiqora_gi_debug_content"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    entry_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "tiqora_gi_debug_entry.id", name="fk_tiqora_gi_debug_content_entry", ondelete="CASCADE"
+        ),
+        nullable=False,
+    )
+    debug_level: Mapped[str] = mapped_column(String(50), nullable=False)
+    subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    content: Mapped[bytes | None] = mapped_column(JOB_FILE_BLOB, nullable=True)
+    create_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        Index("ix_tiqora_gi_debug_content_entry", "entry_id", "id"),
+        Index("ix_tiqora_gi_debug_content_time", "create_time"),
+        Index("ix_tiqora_gi_debug_content_level", "debug_level"),
+    )
+
+
 #: Alias for the deployed-revision ``config`` column (one shared MEDIUMTEXT expression).
 REVISION_CONFIG_TEXT = MEDIUM_TEXT_VARIANT
 
