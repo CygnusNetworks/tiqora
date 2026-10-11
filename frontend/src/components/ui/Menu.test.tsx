@@ -114,4 +114,41 @@ describe("Menu", () => {
     fireEvent.scroll(document.body);
     expect(screen.getByTestId("menu")).toBeInTheDocument();
   });
+
+  it("opened with the keyboard, the first item takes the focus", () => {
+    renderMenu();
+    screen.getByTestId("trigger").focus();
+    fireEvent.keyDown(screen.getByTestId("trigger"), { key: "Enter" });
+    expect(screen.getByTestId("item")).toHaveFocus();
+  });
+
+  it("a disabled item is skipped by the arrows; a soft-disabled one stays focusable but does nothing", () => {
+    const onSelect = vi.fn();
+    render(
+      <Menu
+        panelTestId="menu"
+        trigger={({ ref, toggleProps }) => (
+          <button ref={ref} data-testid="trigger" {...toggleProps}>
+            open
+          </button>
+        )}
+      >
+        <MenuItem testId="a">A</MenuItem>
+        <MenuItem testId="b" disabled>
+          B
+        </MenuItem>
+        <MenuItem testId="c" softDisabled title="Nicht möglich" onSelect={onSelect}>
+          C
+        </MenuItem>
+      </Menu>,
+    );
+    screen.getByTestId("trigger").focus();
+    fireEvent.keyDown(screen.getByTestId("trigger"), { key: "Enter" });
+    fireEvent.keyDown(screen.getByTestId("a"), { key: "ArrowDown" });
+    expect(screen.getByTestId("c")).toHaveFocus();
+    expect(screen.getByTestId("c")).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(screen.getByTestId("c"));
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.getByTestId("menu")).toBeInTheDocument();
+  });
 });

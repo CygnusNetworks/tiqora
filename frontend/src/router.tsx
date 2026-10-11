@@ -111,6 +111,7 @@ import { SubjectConfigPage } from "@/routes/admin/SubjectConfigPage";
 import { SettingsSectionPage } from "@/routes/admin/SettingsSectionPage";
 import { DaemonsPage } from "@/routes/admin/DaemonsPage";
 import { PluginsPage } from "@/routes/admin/PluginsPage";
+import { DashboardTemplatesPage } from "@/routes/admin/DashboardTemplatesPage";
 import { ReportingAdminPage } from "@/routes/admin/ReportingAdminPage";
 import { SystemInfoPage } from "@/routes/admin/SystemInfoPage";
 import { PostmasterFiltersPage } from "@/routes/admin/PostmasterFiltersPage";
@@ -1068,6 +1069,12 @@ const adminReportingRoute = createRoute({
   component: ReportingAdminPage,
 });
 
+const adminDashboardTemplatesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/dashboard-templates",
+  component: DashboardTemplatesPage,
+});
+
 const adminSettingsSectionRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/settings/$section",
@@ -1247,6 +1254,7 @@ const routeTree = rootRoute.addChildren([
     adminDaemonsRoute,
     adminPluginsRoute,
     adminReportingRoute,
+    adminDashboardTemplatesRoute,
     adminSettingsSectionRoute,
     adminSystemRoute,
     adminAiRoute,

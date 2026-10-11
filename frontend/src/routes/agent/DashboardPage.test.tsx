@@ -339,18 +339,14 @@ describe("DashboardPage", () => {
     expect(screen.getByRole("tab", { name: "Mein Start" })).toHaveAttribute("aria-controls", panel.id);
   });
 
-  it("the placeholder buttons look disabled (no hover look, dimmed, not-allowed cursor); 'Anpassen' is live", async () => {
+  it("'Teilen' is still a disabled placeholder (Task 16); '+' and 'Anpassen' are live", async () => {
     await renderPage();
     await screen.findByTestId("dashboard-grid");
-    for (const name of ["Teilen", "Neues Dashboard"]) {
-      const button = screen.getByRole("button", { name });
-      expect(button).toBeVisible();
-      expect(button).toBeDisabled();
-      expect(button).toHaveClass("disabled:opacity-50", "disabled:cursor-not-allowed");
-    }
+    const share = screen.getByRole("button", { name: "Teilen" });
+    expect(share).toBeDisabled();
+    expect(share).toHaveClass("disabled:opacity-50", "disabled:cursor-not-allowed", "disabled:hover:bg-surface");
     expect(screen.getByRole("button", { name: "Anpassen" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Teilen" })).toHaveClass("disabled:hover:bg-surface");
-    expect(screen.getByRole("button", { name: "Neues Dashboard" })).toHaveClass("disabled:hover:text-muted");
+    expect(screen.getByRole("button", { name: "Neues Dashboard" })).toBeEnabled();
   });
 
   it("the remembered dashboard opens on the next visit", async () => {

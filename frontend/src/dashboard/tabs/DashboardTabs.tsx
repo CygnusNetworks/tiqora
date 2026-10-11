@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { LockIcon } from "@/components/ui/icons";
 import type { DashboardTab } from "@/lib/dashboardsApi";
 import { cn } from "@/lib/cn";
+import { TabMenu } from "./TabMenu";
 
 const FOCUS = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
 
@@ -10,25 +11,36 @@ const FOCUS = "focus-visible:outline focus-visible:outline-2 focus-visible:outli
  * The tab row of the home page (WAI-ARIA tabs, manual activation): arrow keys / Home / End move the
  * focus, Enter or Space opens the dashboard. A locked role template carries a lock and the
  * description "Verbindlich"; a dashboard shared with the agent names its owner. The "+" button sits
- * after the tab list; without `onCreate` it is shown but disabled.
+ * after the tab list. Each tab has a "..." menu button next to it (rename, move, copy, delete).
  */
+export interface TabActions {
+  onRename: (tab: DashboardTab) => void;
+  onMove: (tab: DashboardTab, dir: -1 | 1) => void;
+  onDelete: (tab: DashboardTab) => void;
+  onCopy: (tab: DashboardTab) => void;
+}
+
 export function DashboardTabs({
   tabs,
   selectedId,
   onSelect,
   onCreate,
+  actions,
   panelId,
 }: {
   tabs: DashboardTab[];
   selectedId: number | null;
   onSelect: (id: number) => void;
-  onCreate?: () => void;
+  onCreate: () => void;
+  /** The tab menus; without them the tabs carry no menu button. */
+  actions?: TabActions;
   /** Id of the tab panel (the page's content area); tab ids are `<panelId>-tab-<id>`. */
   panelId?: string;
 }) {
   const { t } = useTranslation();
   const baseId = useId();
   const refs = useRef(new Map<number, HTMLButtonElement>());
+  const ownIds = tabs.filter((tab) => tab.is_owner).map((tab) => tab.id);
   const focusable = tabs.some((tab) => tab.id === selectedId) ? selectedId : (tabs[0]?.id ?? null);
 
   const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -56,8 +68,8 @@ export function DashboardTabs({
           const descId = `${baseId}-d${tab.id}`;
           const description = locked ? t("dashboards.tabs.locked") : owner ? t("dashboards.tabs.owner", { name: owner }) : null;
           return (
+            <div key={tab.id} role="presentation" className="inline-flex max-w-full items-center gap-0.5">
             <button
-              key={tab.id}
               ref={(el) => {
                 if (el) refs.current.set(tab.id, el);
                 else refs.current.delete(tab.id);
@@ -93,6 +105,18 @@ export function DashboardTabs({
                 </span>
               )}
             </button>
+            {actions && (
+              <TabMenu
+                tab={tab}
+                index={ownIds.indexOf(tab.id)}
+                count={ownIds.length}
+                onRename={() => actions.onRename(tab)}
+                onMove={(dir) => actions.onMove(tab, dir)}
+                onDelete={() => actions.onDelete(tab)}
+                onCopy={() => actions.onCopy(tab)}
+              />
+            )}
+            </div>
           );
         })}
       </div>
@@ -100,10 +124,9 @@ export function DashboardTabs({
         type="button"
         aria-label={t("dashboards.tabs.new")}
         title={t("dashboards.tabs.new")}
-        disabled={!onCreate}
         onClick={onCreate}
         className={cn(
-          "rounded-full border border-dashed border-hairline px-[11px] py-1.5 text-[13px] leading-none text-muted transition-colors hover:bg-surface-subtle hover:text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted",
+          "rounded-full border border-dashed border-hairline px-[11px] py-1.5 text-[13px] leading-none text-muted transition-colors hover:bg-surface-subtle hover:text-ink",
           FOCUS,
         )}
       >

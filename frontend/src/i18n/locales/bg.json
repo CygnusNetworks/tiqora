@@ -2180,7 +2180,8 @@
       "aiModels": "Модели",
       "identityProviders": "Identity providers",
       "reporting": "Report data",
-      "plugins": "Extensions"
+      "plugins": "Extensions",
+      "dashboardTemplates": "Dashboard templates"
     },
     "table": {
       "id": "ID",
@@ -3496,7 +3497,8 @@
       "identityProviders": "Set up sign-in through Microsoft, Google, SAML or LDAP.",
       "reporting": "Check the state of the report data and have everything recalculated.",
       "settingsReporting": "Reports: time zone, access, cache and limits for results and exports.",
-      "plugins": "Switch installed extensions on or off, check their state and configure them."
+      "plugins": "Switch installed extensions on or off, check their state and configure them.",
+      "dashboardTemplates": "Define home page dashboards per role, optionally binding."
     },
     "types": {
       "title_plural": "Типове тикети",
@@ -4463,6 +4465,45 @@
           "other": "Extends the interface ({{value}})"
         }
       }
+    },
+    "dashboardTemplates": {
+      "title": "Dashboard templates",
+      "subtitle": "What a new dashboard starts with for a role.",
+      "new": "New template",
+      "loadFailed": "The templates could not be loaded.",
+      "empty": "Templates define what a new dashboard starts with for a role. Create the first template.",
+      "columns": {
+        "name": "Name",
+        "roles": "Roles",
+        "locked": "Locked",
+        "widgets": "Widgets",
+        "priority": "Priority",
+        "actions": "Actions"
+      },
+      "yes": "Yes",
+      "no": "No",
+      "noRoles": "No role",
+      "newTitle": "New template",
+      "editTitle": "Edit template",
+      "name": "Name",
+      "nameRequired": "Please enter a name.",
+      "roles": "Roles",
+      "rolesRequired": "Please choose at least one role.",
+      "rolesLoadFailed": "The roles could not be loaded.",
+      "locked": "Binding for the roles (users cannot change it)",
+      "priority": "Priority",
+      "priorityHelp": "If several templates match, the one with the lower value comes first.",
+      "create": "Create",
+      "save": "Save",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "editLayout": "Edit layout",
+      "delete": "Delete",
+      "saveFailed": "The template could not be saved.",
+      "conflict": "This template has been changed in the meantime. Please reload the page and try again.",
+      "deleteTitle": "Delete template \"{{name}}\"?",
+      "deleteMessage": "Dashboards that users already received from this template are kept.",
+      "deleteFailed": "The template could not be deleted."
     }
   },
   "kb": {
@@ -5759,6 +5800,31 @@
           }
         }
       }
+    },
+    "manage": {
+      "newTitle": "New dashboard",
+      "name": "Name",
+      "nameRequired": "Please enter a name.",
+      "copyFrom": "Copy of",
+      "copyNone": "Start empty",
+      "create": "Create",
+      "cancel": "Cancel",
+      "createFailed": "The dashboard could not be created.",
+      "renameTitle": "Rename dashboard",
+      "save": "Save",
+      "renameFailed": "The dashboard could not be renamed.",
+      "conflict": "This dashboard has been changed in the meantime. Please reload the page and try again.",
+      "menu": "Menu for {{name}}",
+      "rename": "Rename",
+      "moveLeft": "Move left",
+      "moveRight": "Move right",
+      "copy": "Copy as my own dashboard",
+      "delete": "Delete",
+      "lastKept": "The last dashboard stays.",
+      "copyName": "{{name}} (copy)",
+      "deleteTitle": "Delete dashboard \"{{name}}\"?",
+      "deleteMessage": "The dashboard and all its widgets will be deleted. This cannot be undone.",
+      "actionFailed": "That did not work. Please try again."
     }
   }
 }

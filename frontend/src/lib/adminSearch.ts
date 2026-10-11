@@ -604,6 +604,14 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     descriptionKey: "admin.pageDescriptions.customerFields",
     keywords: ["platzhalter", "variablen", "customer felder", "placeholder"],
   },
+  {
+    slug: "dashboard-templates",
+    route: "/admin/dashboard-templates",
+    group: "system",
+    nameKey: "admin.nav.dashboardTemplates",
+    descriptionKey: "admin.pageDescriptions.dashboardTemplates",
+    keywords: ["startseite", "vorlage", "dashboard", "widgets", "rolle"],
+  },
 ];
 
 export function adminPagesByGroup(group: AdminPageGroup): AdminPageEntry[] {

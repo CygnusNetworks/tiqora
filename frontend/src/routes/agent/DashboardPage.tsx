@@ -13,7 +13,7 @@ import { useDashboardData } from "@/dashboard/data";
 import { DashboardEditMode } from "@/dashboard/edit/DashboardEditMode";
 import { greetingKey } from "@/dashboard/legacy";
 import { toEditWidget } from "@/dashboard/model";
-import { DashboardTabs } from "@/dashboard/tabs/DashboardTabs";
+import { ManagedDashboardTabs } from "@/dashboard/tabs/ManagedDashboardTabs";
 import { useGridBreakpoint } from "@/dashboard/useGridBreakpoint";
 import { useSelectedDashboard } from "@/dashboard/useSelectedDashboard";
 import { registerCoreWidgets } from "@/dashboard/widgets";
@@ -56,7 +56,8 @@ function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }
  * The agent home page: greeting, the tab row of the agent's dashboards and the widget grid of the
  * selected one. First visit (no own dashboard yet, R-DASH-FIRST-VISIT) creates "Mein Start".
  * "Anpassen" switches to edit mode: the edit toolbar replaces greeting, tabs and header buttons
- * until "Speichern" or "Verwerfen". "Teilen" and "+" are placeholders until Tasks 16 and 15.
+ * until "Speichern" or "Verwerfen". "Teilen" is a placeholder until Task 16; the tabs manage
+ * dashboards themselves (`ManagedDashboardTabs`).
  */
 export function DashboardPage() {
   const { t, i18n } = useTranslation();
@@ -234,7 +235,7 @@ export function DashboardPage() {
             <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">{greeting}</h1>
             <p className="mt-1 text-sm text-muted">{today}</p>
           </div>
-          {tabs && tabs.length > 0 && <DashboardTabs tabs={tabs} selectedId={selectedId} onSelect={onSelect} panelId={panelId} />}
+          {tabs && tabs.length > 0 && <ManagedDashboardTabs tabs={tabs} selectedId={selectedId} onSelect={onSelect} panelId={panelId} />}
         </div>
         {dashboard && (dashboard.can_share || dashboard.can_edit) && (
           <div className="flex gap-2">

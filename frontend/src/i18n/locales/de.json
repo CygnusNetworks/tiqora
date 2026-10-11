@@ -2180,7 +2180,8 @@
       "aiModels": "Modelle",
       "identityProviders": "Identitätsanbieter",
       "reporting": "Berichtsdaten",
-      "plugins": "Erweiterungen"
+      "plugins": "Erweiterungen",
+      "dashboardTemplates": "Dashboard-Vorlagen"
     },
     "table": {
       "id": "ID",
@@ -3504,7 +3505,8 @@
       "identityProviders": "Anmeldung über Microsoft, Google, SAML oder LDAP einrichten.",
       "reporting": "Zustand der Berichtsdaten ansehen und alles neu berechnen lassen.",
       "settingsReporting": "Berichte: Zeitzone, Zugriff, Zwischenspeicher sowie Grenzen für Ergebnisse und Exporte.",
-      "plugins": "Installierte Erweiterungen ein- und ausschalten, Zustand prüfen und einstellen."
+      "plugins": "Installierte Erweiterungen ein- und ausschalten, Zustand prüfen und einstellen.",
+      "dashboardTemplates": "Startseiten je Rolle als Vorlage festlegen, optional verbindlich."
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -4471,6 +4473,45 @@
           "other": "Erweitert die Oberfläche ({{value}})"
         }
       }
+    },
+    "dashboardTemplates": {
+      "title": "Dashboard-Vorlagen",
+      "subtitle": "Womit ein neues Dashboard für eine Rolle startet.",
+      "new": "Neue Vorlage",
+      "loadFailed": "Die Vorlagen konnten nicht geladen werden.",
+      "empty": "Vorlagen legen fest, womit ein neues Dashboard für eine Rolle startet. Legen Sie die erste Vorlage an.",
+      "columns": {
+        "name": "Name",
+        "roles": "Rollen",
+        "locked": "Gesperrt",
+        "widgets": "Widgets",
+        "priority": "Priorität",
+        "actions": "Aktionen"
+      },
+      "yes": "Ja",
+      "no": "Nein",
+      "noRoles": "Keine Rolle",
+      "newTitle": "Neue Vorlage",
+      "editTitle": "Vorlage bearbeiten",
+      "name": "Name",
+      "nameRequired": "Bitte einen Namen eingeben.",
+      "roles": "Rollen",
+      "rolesRequired": "Bitte mindestens eine Rolle wählen.",
+      "rolesLoadFailed": "Die Rollen konnten nicht geladen werden.",
+      "locked": "Für die Rollen verbindlich (Benutzer können sie nicht ändern)",
+      "priority": "Priorität",
+      "priorityHelp": "Bei mehreren passenden Vorlagen kommt die mit dem kleineren Wert zuerst.",
+      "create": "Anlegen",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "edit": "Bearbeiten",
+      "editLayout": "Layout bearbeiten",
+      "delete": "Löschen",
+      "saveFailed": "Die Vorlage konnte nicht gespeichert werden.",
+      "conflict": "Diese Vorlage wurde inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es noch einmal.",
+      "deleteTitle": "Vorlage „{{name}}“ löschen?",
+      "deleteMessage": "Dashboards, die Benutzer bereits aus dieser Vorlage erhalten haben, bleiben bestehen.",
+      "deleteFailed": "Die Vorlage konnte nicht gelöscht werden."
     }
   },
   "kb": {
@@ -5767,6 +5808,31 @@
           }
         }
       }
+    },
+    "manage": {
+      "newTitle": "Neues Dashboard",
+      "name": "Name",
+      "nameRequired": "Bitte einen Namen eingeben.",
+      "copyFrom": "Kopie von",
+      "copyNone": "Leer beginnen",
+      "create": "Anlegen",
+      "cancel": "Abbrechen",
+      "createFailed": "Das Dashboard konnte nicht angelegt werden.",
+      "renameTitle": "Dashboard umbenennen",
+      "save": "Speichern",
+      "renameFailed": "Das Dashboard konnte nicht umbenannt werden.",
+      "conflict": "Dieses Dashboard wurde inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es noch einmal.",
+      "menu": "Menü für {{name}}",
+      "rename": "Umbenennen",
+      "moveLeft": "Nach links",
+      "moveRight": "Nach rechts",
+      "copy": "Als eigenes Dashboard kopieren",
+      "delete": "Löschen",
+      "lastKept": "Das letzte Dashboard bleibt bestehen.",
+      "copyName": "{{name}} (Kopie)",
+      "deleteTitle": "Dashboard „{{name}}“ löschen?",
+      "deleteMessage": "Das Dashboard und alle seine Widgets werden gelöscht. Das lässt sich nicht rückgängig machen.",
+      "actionFailed": "Das hat nicht geklappt. Bitte versuchen Sie es noch einmal."
     }
   }
 }

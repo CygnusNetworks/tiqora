@@ -17,7 +17,7 @@ beforeAll(async () => {
 describe("DashboardTabs", () => {
   it("selects on click and Enter-free activation, arrows only move the focus (wrapping, Home/End)", () => {
     const onSelect = vi.fn();
-    render(<DashboardTabs tabs={TABS} selectedId={2} onSelect={onSelect} />);
+    render(<DashboardTabs tabs={TABS} selectedId={2} onSelect={onSelect} onCreate={() => {}} />);
     const team = screen.getByRole("tab", { name: "Team Support", selected: true });
     expect(team).toHaveAttribute("tabindex", "0");
     expect(screen.getByRole("tab", { name: "Mein Start" })).toHaveAttribute("tabindex", "-1");
@@ -33,24 +33,23 @@ describe("DashboardTabs", () => {
   });
 
   it("with no tab selected (a template opened by link) the first tab is the tab stop", () => {
-    render(<DashboardTabs tabs={TABS} selectedId={9} onSelect={() => {}} />);
+    render(<DashboardTabs tabs={TABS} selectedId={9} onSelect={() => {}} onCreate={() => {}} />);
     expect(screen.queryAllByRole("tab", { selected: true })).toHaveLength(0);
     expect(screen.getByRole("tab", { name: "Mein Start" })).toHaveAttribute("tabindex", "0");
   });
 
-  it("the '+' button is outside the tab list and only active with a handler", () => {
+  it("the '+' button is outside the tab list and always active", () => {
     const onCreate = vi.fn();
-    const { rerender } = render(<DashboardTabs tabs={TABS} selectedId={1} onSelect={() => {}} />);
+    render(<DashboardTabs tabs={TABS} selectedId={1} onSelect={() => {}} onCreate={onCreate} />);
     const plus = screen.getByRole("button", { name: "Neues Dashboard" });
     expect(screen.getByRole("tablist", { name: "Dashboards" })).not.toContainElement(plus);
-    expect(plus).toBeDisabled();
-    rerender(<DashboardTabs tabs={TABS} selectedId={1} onSelect={() => {}} onCreate={onCreate} />);
-    fireEvent.click(screen.getByRole("button", { name: "Neues Dashboard" }));
+    expect(plus).toBeEnabled();
+    fireEvent.click(plus);
     expect(onCreate).toHaveBeenCalledTimes(1);
   });
 
   it("describes locked templates and shared owners without changing the tab names", () => {
-    render(<DashboardTabs tabs={TABS} selectedId={1} onSelect={() => {}} />);
+    render(<DashboardTabs tabs={TABS} selectedId={1} onSelect={() => {}} onCreate={() => {}} />);
     expect(screen.getByRole("tab", { name: "Leitstand" })).toHaveAccessibleDescription("Verbindlich");
     expect(screen.getByRole("tab", { name: "Team Support" })).toHaveAccessibleDescription("von Maya Rivera");
     expect(screen.getByRole("tab", { name: "Mein Start" })).not.toHaveAccessibleDescription();
