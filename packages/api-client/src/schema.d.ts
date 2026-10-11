@@ -7959,6 +7959,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/report-runs/{run_id}/files/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Report Run File
+         * @description A generated file. It holds data selected with the OWNER's permissions: the owner of the
+         *     run and admins may download it; everybody else gets 404.
+         */
+        get: operations["download_report_run_file_api_v1_report_runs__run_id__files__file_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/report-schedules": {
         parameters: {
             query?: never;
@@ -8014,6 +8035,46 @@ export interface paths {
         post?: never;
         /** Delete Report Schedule */
         delete: operations["delete_report_schedule_api_v1_report_schedules__schedule_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-schedules/{schedule_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Report Schedule Now
+         * @description "Jetzt senden": one delivery as a background job; one active manual run per schedule.
+         */
+        post: operations["run_report_schedule_now_api_v1_report_schedules__schedule_id__run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-schedules/{schedule_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Report Schedule Runs
+         * @description Run history, newest first (no e-mail addresses in it).
+         */
+        get: operations["list_report_schedule_runs_api_v1_report_schedules__schedule_id__runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -19933,6 +19994,78 @@ export interface components {
             role_ids?: number[];
             /** User Ids */
             user_ids?: number[];
+        };
+        /** ScheduleRunAccepted */
+        ScheduleRunAccepted: {
+            job: components["schemas"]["JobAccepted"];
+            /** Run Id */
+            run_id: number;
+        };
+        /** ScheduleRunFileOut */
+        ScheduleRunFileOut: {
+            /** Content Type */
+            content_type: string;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Size Bytes */
+            size_bytes: number;
+        };
+        /** ScheduleRunIn */
+        ScheduleRunIn: {
+            /**
+             * Owner Only
+             * @default true
+             */
+            owner_only: boolean;
+        };
+        /**
+         * ScheduleRunOut
+         * @description One delivery of a schedule (run history). ``detail`` / ``error`` hold no addresses.
+         */
+        ScheduleRunOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Detail */
+            detail: string | null;
+            /** Due At */
+            due_at: string | null;
+            /** Error */
+            error: string | null;
+            /** Files */
+            files: components["schemas"]["ScheduleRunFileOut"][];
+            /** Finished At */
+            finished_at: string | null;
+            /** Id */
+            id: number;
+            /** Job Id */
+            job_id: number | null;
+            /** Owner Only */
+            owner_only: boolean;
+            /** Recipient Count */
+            recipient_count: number | null;
+            /** Row Count */
+            row_count: number | null;
+            /**
+             * Run Kind
+             * @enum {string}
+             */
+            run_kind: "schedule" | "manual";
+            /** Schedule Id */
+            schedule_id: number | null;
+            /** Schedule Name */
+            schedule_name: string;
+            /** Started At */
+            started_at: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "succeeded" | "partial" | "failed" | "skipped";
         };
         /** SearchHit */
         SearchHit: {
@@ -43312,6 +43445,42 @@ export interface operations {
             };
         };
     };
+    download_report_run_file_api_v1_report_runs__run_id__files__file_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                run_id: number;
+                file_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_report_schedules_api_v1_report_schedules_get: {
         parameters: {
             query?: {
@@ -43516,6 +43685,82 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_report_schedule_now_api_v1_report_schedules__schedule_id__run_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                schedule_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleRunAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_report_schedule_runs_api_v1_report_schedules__schedule_id__runs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                schedule_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleRunOut"][];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -1,7 +1,8 @@
 """Request and response models of the report-schedule API (plan D11).
 
-The run models (``ReportRunOut``, ``ScheduleRunIn`` ...) belong to the delivery job
-and are added with it.
+The run models are named ``ScheduleRun*``: ``ReportRunOut`` already exists in
+``reporting.schemas`` (the body of ``POST /reports/run``) and would collide in the OpenAPI
+document.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from typing import Annotated, Final, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from tiqora.domain.schemas import UtcDateTime
+from tiqora.jobs.schemas import JobAccepted
 from tiqora.reporting.definition import TimeRange
 from tiqora.reporting.recurrence import Recurrence
 from tiqora.reporting.schemas import ParameterValue, ReportOwnerOut
@@ -195,3 +197,43 @@ class RecurrencePreviewOut(BaseModel):
     #: the next five occurrences
     next_runs: list[UtcDateTime]
     text: str
+
+
+class ScheduleRunIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    #: "Testversand an mich"
+    owner_only: bool = True
+
+
+class ScheduleRunAccepted(BaseModel):
+    run_id: int
+    job: JobAccepted
+
+
+class ScheduleRunFileOut(BaseModel):
+    id: int
+    name: str
+    content_type: str
+    size_bytes: int
+
+
+class ScheduleRunOut(BaseModel):
+    """One delivery of a schedule (run history). ``detail`` / ``error`` hold no addresses."""
+
+    id: int
+    schedule_id: int | None
+    schedule_name: str
+    run_kind: Literal["schedule", "manual"]
+    owner_only: bool
+    status: Literal["queued", "running", "succeeded", "partial", "failed", "skipped"]
+    due_at: UtcDateTime | None
+    created_at: UtcDateTime
+    started_at: UtcDateTime | None
+    finished_at: UtcDateTime | None
+    row_count: int | None
+    recipient_count: int | None
+    detail: str | None
+    error: str | None
+    job_id: int | None
+    files: list[ScheduleRunFileOut]

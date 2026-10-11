@@ -8,7 +8,7 @@ result cache with the same key builder as the API, so the same request asked
 again afterwards is answered inline. The export job never uses the cache and
 caps the rows at ``reporting.export_row_limit``.
 
-Cancelling: while a job computes, :func:`_until_cancelled` polls
+Cancelling: while a job computes, :func:`until_cancelled` polls
 ``cancel_requested`` every :data:`CANCEL_POLL_SECONDS`; a cancel cancels the
 computation. A statement in flight is cut off client-side and its connection is
 invalidated (``engine._fetch``), the next statement never starts, and the job ends
@@ -129,7 +129,7 @@ async def _checked(
     return reporting, definition, params, key
 
 
-async def _until_cancelled[R](ctx: JobContext, work: Awaitable[R]) -> R:
+async def until_cancelled[R](ctx: JobContext, work: Awaitable[R]) -> R:
     """Run ``work``; when the job's cancel is requested meanwhile, cancel it and raise
     :class:`JobCancelled` (the engine invalidates a connection cut off mid-statement)."""
     task = asyncio.ensure_future(work)
@@ -150,6 +150,10 @@ async def _until_cancelled[R](ctx: JobContext, work: Awaitable[R]) -> R:
             task.cancel()
             with contextlib.suppress(BaseException):
                 await task
+
+
+#: the old private name (kept for existing callers and tests)
+_until_cancelled = until_cancelled
 
 
 async def _run(

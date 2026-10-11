@@ -100,6 +100,16 @@ async def configure_notification_context(
     )
 
 
+def usable_sender_email(raw: str | None) -> str | None:
+    """``raw`` when it is a configured address, ``None`` for empty or unresolved values.
+
+    Znuny ships ``NotificationSenderEmail`` as ``znuny@<OTRS_CONFIG_FQDN>``; the tag is
+    never replaced here, so such a value is not an address anybody can send as.
+    """
+    value = (raw or "").strip()
+    return value if value and not _UNRESOLVED_TAG.search(value) else None
+
+
 async def resolve_notification_sender(
     session: AsyncSession, sysconfig: SysConfig, context: PlaceholderContext
 ) -> str | None:
@@ -127,8 +137,7 @@ async def resolve_notification_sender(
     if override_email:
         return formataddr((name, override_email))
 
-    configured = (await sysconfig.get_str("NotificationSenderEmail")).strip()
-    email = configured if configured and not _UNRESOLVED_TAG.search(configured) else ""
+    email = usable_sender_email(await sysconfig.get_str("NotificationSenderEmail")) or ""
     if not email:
         email = (context.queue.get("email") or "").strip()
         if email:

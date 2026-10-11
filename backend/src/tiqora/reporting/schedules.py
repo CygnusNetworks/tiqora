@@ -614,6 +614,10 @@ def _person(first: str | None, last: str | None, user_id: int) -> str:
     return name or f"Agent #{user_id}"
 
 
+#: public name for the delivery job (texts and mails name people the same way)
+person_label = _person
+
+
 async def _users(session: AsyncSession, ids: Sequence[int]) -> dict[int, tuple[str, bool]]:
     """``{id: (label, valid)}`` for the users that exist."""
     if not ids:

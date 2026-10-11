@@ -144,6 +144,7 @@ FIXED_TEXTS: Final[dict[TextLocale, dict[str, str]]] = {
         "mail.footer": (
             "Dieser Bericht wurde mit den Berechtigungen von {owner} erstellt. Zeitplan: {link}"
         ),
+        "mail.link_fallback": "Berichte, Zeitpläne",
         "mail.failed_subject": "Zeitplan „{name}“: Bericht konnte nicht erstellt werden",
         "mail.failed_body": (
             "Guten Tag,\n\n"
@@ -187,6 +188,7 @@ FIXED_TEXTS: Final[dict[TextLocale, dict[str, str]]] = {
         "mail.footer": (
             "This report was created with the permissions of {owner}. Schedule: {link}"
         ),
+        "mail.link_fallback": "Reports, Schedules",
         "mail.failed_subject": "Schedule “{name}”: the report could not be created",
         "mail.failed_body": (
             "Hello,\n\n"
