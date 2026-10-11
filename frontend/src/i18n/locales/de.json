@@ -5632,7 +5632,8 @@
       "limit": "Es sind höchstens {{max}} Widgets möglich.",
       "empty": "Nichts gefunden",
       "clearSearch": "Suche löschen",
-      "added": "„{{title}}“ hinzugefügt"
+      "added": "„{{title}}“ hinzugefügt",
+      "addedAt": "„{{title}}“ hinzugefügt – {{n}} von {{max}} Widgets"
     },
     "settings": {
       "title": "Einstellungen",

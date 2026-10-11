@@ -5624,7 +5624,8 @@
       "limit": "No more than {{max}} widgets are possible.",
       "empty": "Nothing found",
       "clearSearch": "Clear search",
-      "added": "“{{title}}” added"
+      "added": "“{{title}}” added",
+      "addedAt": "“{{title}}” added – {{n}} of {{max}} widgets"
     },
     "settings": {
       "title": "Settings",

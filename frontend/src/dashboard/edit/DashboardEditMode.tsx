@@ -9,6 +9,7 @@ import { DashboardGrid, type EditHandlers } from "../DashboardGrid";
 import { editDataPlan, type WidgetDataState } from "../data";
 import { canUseWidget } from "../definitions";
 import { GalleryPanel } from "../gallery/GalleryPanel";
+import { GALLERY_OVERLAY_MIN, GALLERY_SIDE_MIN, type GalleryPlacement } from "../gallery/placement";
 import { widgetLikeOf, widgetTexts } from "../gallery/galleryModel";
 import { MAX_WIDGETS_PER_DASHBOARD, type Breakpoint, type EditWidget } from "../model";
 import { toBcp47 } from "@/i18n";
@@ -25,20 +26,19 @@ function newWidgetId(): string {
 }
 
 /**
- * Where the gallery sits by window width (not by the grid's container, which shrinks when the
- * panel opens): "side" next to the grid from 1024 px, "overlay" on tablets, none on phones
- * (widgets there are only reordered; the page also drops it while the grid is at the phone breakpoint). Without `matchMedia` (tests) it is "side".
+ * Where the gallery sits, by WINDOW width (see `galleryPlacementForWidth`; never by the grid's
+ * container, which the open panel itself shrinks). Without `matchMedia` (tests) it is "side".
  */
-function useGalleryPlacement(): "side" | "overlay" | "none" {
-  const query = (): "side" | "overlay" | "none" => {
+function useGalleryPlacement(): GalleryPlacement {
+  const query = (): GalleryPlacement => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return "side";
-    if (window.matchMedia("(min-width: 1024px)").matches) return "side";
-    return window.matchMedia("(min-width: 640px)").matches ? "overlay" : "none";
+    if (window.matchMedia(`(min-width: ${GALLERY_SIDE_MIN}px)`).matches) return "side";
+    return window.matchMedia(`(min-width: ${GALLERY_OVERLAY_MIN}px)`).matches ? "overlay" : "none";
   };
   const [placement, setPlacement] = useState(query);
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return;
-    const lists = [window.matchMedia("(min-width: 1024px)"), window.matchMedia("(min-width: 640px)")];
+    const lists = [window.matchMedia(`(min-width: ${GALLERY_SIDE_MIN}px)`), window.matchMedia(`(min-width: ${GALLERY_OVERLAY_MIN}px)`)];
     const update = () => setPlacement(query());
     lists.forEach((l) => l.addEventListener("change", update));
     return () => lists.forEach((l) => l.removeEventListener("change", update));
@@ -95,9 +95,12 @@ export function DashboardEditMode({
 
   // The widget gallery: open at first on wide screens, closed on tablets (it overlays the grid there).
   const viewportPlacement = useGalleryPlacement();
-  const placement = breakpoint === "sm" ? "none" : viewportPlacement;
-  const user = useOptionalAuth()?.user;
+  // A phone-width grid has no gallery, but an OPEN one is never closed because of the grid's own
+  // breakpoint: the open panel shrinks the grid, which would make it flicker open and shut.
   const [galleryChoice, setGalleryChoice] = useState<boolean | null>(null);
+  const placement: GalleryPlacement =
+    viewportPlacement === "none" || (breakpoint === "sm" && galleryChoice !== true) ? "none" : viewportPlacement;
+  const user = useOptionalAuth()?.user;
   const galleryOpen = placement !== "none" && (galleryChoice ?? placement === "side");
   const searchRef = useRef<HTMLInputElement>(null);
   const focusSearch = useRef(false);
@@ -140,14 +143,34 @@ export function DashboardEditMode({
     if (invalidId) openSettings(invalidId);
   }, [invalidId, openSettings]);
 
+  const focusAfterAdd = useRef<string | null>(null);
+  // The newly added widget takes the focus once it is in the grid.
+  useEffect(() => {
+    const id = focusAfterAdd.current;
+    if (!id) return;
+    const cell = Array.from(gridBoxRef.current?.querySelectorAll<HTMLElement>("[data-widget-id]") ?? []).find((el) => el.dataset.widgetId === id);
+    if (!cell) return;
+    focusAfterAdd.current = null;
+    cell.focus();
+  }, [state.widgets]);
+
   const bp = breakpoint === "sm" ? null : breakpoint;
   const stateRef = useRef(state);
   stateRef.current = state;
   const addWidget = useCallback(
     (def: WidgetDefinition, at?: { x: number; y: number }) => {
       if (!bp || stateRef.current.widgets.length >= MAX_WIDGETS_PER_DASHBOARD) return;
-      dispatch({ type: "add", def: widgetLikeOf(def), id: newWidgetId(), ...(at ? { at } : {}), bp });
-      setAdded(t("dashboards.gallery.added", { title: widgetTexts(def, t).title }));
+      const id = newWidgetId();
+      dispatch({ type: "add", def: widgetLikeOf(def), id, ...(at ? { at } : {}), bp });
+      focusAfterAdd.current = id;
+      // The count makes every announcement differ, so adding the same widget twice is read twice.
+      setAdded(
+        t("dashboards.gallery.addedAt", {
+          title: widgetTexts(def, t).title,
+          n: stateRef.current.widgets.length + 1,
+          max: MAX_WIDGETS_PER_DASHBOARD,
+        }),
+      );
     },
     [bp, dispatch, t],
   );

@@ -85,4 +85,13 @@ describe("GalleryPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Galerie schließen" }));
     expect(onClose).toHaveBeenCalledTimes(2);
   });
+
+  it("when the 40th widget disables the focused card, focus moves to the panel's close button", () => {
+    const { rerender } = render(<GalleryPanel widgetCount={39} onAdd={onAdd} onClose={onClose} />);
+    const card = screen.getByRole("button", { name: /Ticketliste/ });
+    card.focus();
+    expect(card).toHaveFocus();
+    rerender(<GalleryPanel widgetCount={40} onAdd={onAdd} onClose={onClose} />);
+    expect(screen.getByRole("button", { name: "Galerie schließen" })).toHaveFocus();
+  });
 });

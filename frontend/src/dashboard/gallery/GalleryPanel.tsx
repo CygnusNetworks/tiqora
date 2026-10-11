@@ -1,4 +1,4 @@
-import { forwardRef, useMemo, useState, type DragEvent, type KeyboardEvent } from "react";
+import { forwardRef, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useOptionalAuth } from "@/auth/AuthContext";
 import { cn } from "@/lib/cn";
@@ -36,7 +36,7 @@ export const GalleryPanel = forwardRef<HTMLInputElement, GalleryPanelProps>(func
   { widgetCount, onAdd, onClose, className },
   searchRef,
 ) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const user = useOptionalAuth()?.user;
   const defs = useDashboardWidgetDefinitions();
   const [query, setQuery] = useState("");
@@ -45,9 +45,20 @@ export const GalleryPanel = forwardRef<HTMLInputElement, GalleryPanelProps>(func
   const canViewReports = user?.can_view_reports ?? false;
   const groups = useMemo(
     () =>
-      buildGallery(defs, query, t, (def) => canUseWidget(def, { is_admin: isAdmin, can_view_reports: canViewReports })),
-    [defs, query, t, isAdmin, canViewReports],
+      buildGallery(defs, query, t, (def) => canUseWidget(def, { is_admin: isAdmin, can_view_reports: canViewReports }), i18n.language),
+    [defs, query, t, i18n.language, isAdmin, canViewReports],
   );
+
+  // Adding the last possible widget disables the focused card: keep the keyboard inside the panel.
+  const panelRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!full) return;
+    const active = document.activeElement;
+    if (!active || active === document.body || (panelRef.current?.contains(active) && (active as HTMLButtonElement).disabled)) {
+      closeRef.current?.focus();
+    }
+  }, [full]);
 
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key !== "Escape" || e.defaultPrevented) return;
@@ -66,6 +77,7 @@ export const GalleryPanel = forwardRef<HTMLInputElement, GalleryPanelProps>(func
 
   return (
     <aside
+      ref={panelRef}
       aria-label={t("dashboards.gallery.title")}
       onKeyDown={onKeyDown}
       className={cn("flex flex-col gap-4 rounded-[14px] border border-hairline bg-surface p-5", className)}
@@ -73,6 +85,7 @@ export const GalleryPanel = forwardRef<HTMLInputElement, GalleryPanelProps>(func
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold text-ink">{t("dashboards.gallery.title")}</h2>
         <button
+          ref={closeRef}
           type="button"
           aria-label={t("dashboards.gallery.close")}
           onClick={onClose}

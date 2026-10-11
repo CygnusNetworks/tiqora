@@ -1143,8 +1143,12 @@ describe("DashboardPage", () => {
         mockDashboard({ widgets: [WIDE] });
         await enterEdit();
         fireEvent.click(within(gallery()).getByRole("button", { name: /Notizen/ }));
+        expect(screen.getByText("„Notizen“ hinzugefügt – 2 von 40 Widgets")).toBeInTheDocument();
         fireEvent.click(within(gallery()).getByRole("button", { name: /Notizen/ }));
+        // the same widget twice is announced twice (different text), and the new widget has the focus
+        expect(screen.getByText("„Notizen“ hinzugefügt – 3 von 40 Widgets")).toBeInTheDocument();
         const added = ids().filter((id) => id !== "w-wide");
+        expect(gcell(added[1])).toHaveFocus();
         expect(added).toHaveLength(2);
         expect(added[0]).toMatch(/^[0-9a-f-]{36}$/);
         expect(added[0]).not.toBe(added[1]);

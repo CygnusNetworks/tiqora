@@ -70,6 +70,7 @@ export function buildGallery(
   query: string,
   t: TFunction,
   canUse: (def: WidgetDefinition) => boolean,
+  locale?: string,
 ): GalleryGroup[] {
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
   const groups = new Map<GalleryGroupId, { def: WidgetDefinition; title: string }[]>(ORDER.map((id) => [id, []]));
@@ -83,7 +84,7 @@ export function buildGallery(
   return ORDER.flatMap((id) => {
     const items = groups.get(id)!;
     if (items.length === 0) return [];
-    items.sort((a, b) => a.title.localeCompare(b.title));
+    items.sort((a, b) => a.title.localeCompare(b.title, locale));
     return [{ id, items: items.map((i) => i.def) }];
   });
 }
