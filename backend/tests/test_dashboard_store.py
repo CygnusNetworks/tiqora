@@ -6,6 +6,7 @@ Seed band 49710-49749 (see ``_dashboard_helpers``); every row is removed again.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import uuid
 from collections.abc import AsyncIterator
 from typing import Any
@@ -459,8 +460,128 @@ async def test_two_reorders_at_once_never_deadlock(env: Env) -> None:
         assert [t.id for t in await env.list(USER_C)] in (ids, list(reversed(ids)))
 
 
+#: Two dashboard owners next to each other in ``ix_tiqora_dashboard_owner`` that no other test
+#: uses, so no delete-marked index entries of earlier tests sit between them (RR-1).
+NEIGHBOUR_A, NEIGHBOUR_B = 49960, 49961
+
+
+async def test_neighbour_owners_create_and_reorder_at_once_never_fail(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two owners next to each other in the owner index (RR-1, MariaDB REPEATABLE READ).
+
+    Both hold their ``_lock_own`` range lock, which covers the gap between A's last and B's
+    first index entry. A's create and B's reorder then both insert into that gap: InnoDB
+    answers 1213 for one of them. The barrier makes this interleaving deterministic; the store
+    retries the loser. PostgreSQL has no gap locks and passes either way.
+    """
+    from tiqora.dashboard import store
+
+    a_ids = [(await env.make_personal(NEIGHBOUR_A, name=f"dash497 na{i}")).id for i in range(2)]
+    # B's tabs start above sort 0 (inserted directly, so no delete-marked entries): the reorder
+    # writes (B, personal, 0, ...) in front of B's first entry, into the gap A's lock covers
+    for i in range(3):
+        env._sql_write(
+            "INSERT INTO tiqora_dashboard (owner_user_id, name, sort, kind, locked, filters,"
+            " version, created_at, changed_at)"
+            " VALUES (:u, :n, :s, 'personal', :f, '{}', 1, :t, :t)",
+            u=NEIGHBOUR_B, n=f"dash497 nb{i}", s=5 + i, f=False, t=env.now,
+        )  # fmt: skip
+    b_ids = await env.count_dashboards(NEIGHBOUR_B)
+
+    real = store._lock_own
+    holding: set[int] = set()
+    both = asyncio.Event()
+
+    calls: list[int] = []
+
+    async def hold_once(session: Any, user_id: int) -> list[int]:
+        out = await real(session, user_id)
+        calls.append(user_id)
+        if user_id not in holding:  # only the first attempt waits for the other owner
+            holding.add(user_id)
+            if len(holding) == 2:
+                both.set()
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(both.wait(), timeout=2)
+        return out
+
+    monkeypatch.setattr(store, "_lock_own", hold_once)
+    results = await asyncio.gather(
+        env.create(NEIGHBOUR_A, DashboardCreateIn(name="dash497 na new")),
+        env.set_order(NEIGHBOUR_B, list(reversed(b_ids))),
+        return_exceptions=True,
+    )
+    assert not [r for r in results if isinstance(r, BaseException)], results
+    assert len(await env.count_dashboards(NEIGHBOUR_A)) == len(a_ids) + 1  # created exactly once
+    assert [t.id for t in await env.list(NEIGHBOUR_B) if t.is_owner] == list(reversed(b_ids))
+    if "mysql" in env.sync_url:  # the interleaving really deadlocked and one side retried
+        assert len(calls) == 3, calls
+
+
 def _db_error(orig: BaseException) -> DBAPIError:
     return OperationalError("stmt", {}, orig)
+
+
+def _race_after_lock(monkeypatch: pytest.MonkeyPatch, *errors: DBAPIError) -> list[int]:
+    """``_lock_own`` that raises ``errors`` (one per call) after really locking; counts calls."""
+    from tiqora.dashboard import store
+
+    real = store._lock_own
+    calls: list[int] = []
+    pending = list(errors)
+
+    async def flaky(session: Any, user_id: int) -> list[int]:
+        out = await real(session, user_id)
+        calls.append(user_id)
+        if pending:
+            raise pending.pop(0)
+        return out
+
+    monkeypatch.setattr(store, "_lock_own", flaky)
+    return calls
+
+
+async def test_owner_set_writes_retry_a_lock_race_once_and_apply_once(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    keep = await env.make_personal(USER_C, name="dash497 rt keep")
+    gone = await env.make_personal(USER_C, name="dash497 rt gone")
+    deadlock = _db_error(Exception(1213, "Deadlock found"))
+
+    calls = _race_after_lock(monkeypatch, deadlock)
+    made = await env.create(USER_C, DashboardCreateIn(name="dash497 rt new"))
+    assert len(calls) == 2
+    assert await env.count_dashboards(USER_C) == [keep.id, gone.id, made.id]  # exactly one
+
+    calls = _race_after_lock(monkeypatch, deadlock)
+    await env.set_order(USER_C, [made.id, gone.id, keep.id])
+    assert len(calls) == 2
+    assert [t.id for t in await env.list(USER_C)] == [made.id, gone.id, keep.id]
+
+    calls = _race_after_lock(monkeypatch, deadlock)
+    await env.delete(gone.id, USER_C)
+    assert len(calls) == 2
+    assert await env.count_dashboards(USER_C) == [keep.id, made.id]
+
+
+async def test_owner_set_writes_give_up_after_three_races_and_never_retry_other_errors(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tiqora.dashboard.store import RACE_ATTEMPTS
+
+    await env.make_personal(USER_C, name="dash497 rt only")
+    deadlock = _db_error(Exception(1213, "Deadlock found"))
+    calls = _race_after_lock(monkeypatch, *([deadlock] * RACE_ATTEMPTS))
+    with pytest.raises(DBAPIError):
+        await env.create(USER_C, DashboardCreateIn(name="dash497 rt x"))
+    assert len(calls) == RACE_ATTEMPTS == 3
+
+    calls = _race_after_lock(monkeypatch, _db_error(Exception(2013, "gone")))
+    with pytest.raises(DBAPIError):
+        await env.create(USER_C, DashboardCreateIn(name="dash497 rt y"))
+    assert len(calls) == 1
+    assert len(await env.count_dashboards(USER_C)) == 1  # neither attempt left a row
 
 
 def test_race_errors_are_classified() -> None:

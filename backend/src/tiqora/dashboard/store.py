@@ -10,18 +10,21 @@ Functions flush but never commit (except where stated); the caller commits.
 
 from __future__ import annotations
 
+import asyncio
 import json
+import random
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any, Final
 
 from pydantic import ValidationError
 from sqlalchemy import delete, func, insert, select, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.dashboard.defaults import default_widgets
 from tiqora.dashboard.layout import Rect, normalize_rects
+from tiqora.dashboard.races import is_race_error
 from tiqora.dashboard.schemas import (
     MAX_DASHBOARDS_PER_USER,
     DashboardCreateIn,
@@ -381,6 +384,34 @@ async def get_dashboard(
 # --------------------------------------------------------------------------- writes
 
 
+#: Attempts of an owner-set write (create, delete, reorder) that loses a lock race.
+RACE_ATTEMPTS: Final = 3
+
+
+async def _retry_races[T](session: AsyncSession, attempt: Callable[[], Awaitable[T]]) -> T:
+    """Run one owner-set write; on a lock race roll back and run the whole unit again.
+
+    On MariaDB (REPEATABLE READ) ``_lock_own`` holds next-key locks on the owner's range of
+    ``ix_tiqora_dashboard_owner``, which include the gap to the neighbouring owner. Two
+    neighbours that both insert into that gap (a create at the end of one range, a reorder
+    to ``sort`` 0 at the start of the other) deadlock: InnoDB rolls one back with 1213 (RR-1).
+    The loser's transaction is gone entirely, so nothing of it is applied twice; the next
+    attempt re-reads everything under the lock (limit, last-dashboard guard, own ids).
+    Like ``ensure_start`` this rolls back the caller's session: call it with no pending work.
+    """
+    for n in range(1, RACE_ATTEMPTS + 1):
+        try:
+            return await attempt()
+        except DBAPIError as exc:
+            if not is_race_error(exc):
+                raise
+            await session.rollback()
+            if n == RACE_ATTEMPTS:
+                raise
+            await asyncio.sleep(random.uniform(0.01, 0.05) * n)  # jitter: no lock-step retry
+    raise AssertionError("unreachable")
+
+
 async def _lock_own(session: AsyncSession, user_id: int) -> list[int]:
     """Serialise per owner; the owner's dashboard ids on the latest committed data.
 
@@ -447,6 +478,15 @@ def widget_row(dashboard_id: int, w: WidgetIn, position: int) -> TiqoraDashboard
 
 
 async def create_dashboard(
+    session: AsyncSession, user_id: int, body: DashboardCreateIn, *, admin: bool
+) -> DashboardOut:
+    """A new personal dashboard (optionally a copy); retried on a lock race (RR-1)."""
+    return await _retry_races(
+        session, lambda: _create_dashboard_once(session, user_id, body, admin=admin)
+    )
+
+
+async def _create_dashboard_once(
     session: AsyncSession, user_id: int, body: DashboardCreateIn, *, admin: bool
 ) -> DashboardOut:
     if len(await _lock_own(session, user_id)) >= MAX_DASHBOARDS_PER_USER:
@@ -720,6 +760,15 @@ async def patch_widget_settings(
 async def delete_dashboard(
     session: AsyncSession, dashboard_id: int, user_id: int, *, admin: bool
 ) -> None:
+    """Delete a dashboard and its rows; retried on a lock race (RR-1)."""
+    await _retry_races(
+        session, lambda: _delete_dashboard_once(session, dashboard_id, user_id, admin=admin)
+    )
+
+
+async def _delete_dashboard_once(
+    session: AsyncSession, dashboard_id: int, user_id: int, *, admin: bool
+) -> None:
     row = await _visible_row(session, dashboard_id, user_id, admin=admin)
     _require_edit(row, user_id, admin=admin)
     if row.kind in _OWNED_KINDS and len(await _lock_own(session, user_id)) <= 1:
@@ -779,9 +828,14 @@ async def set_order(session: AsyncSession, user_id: int, ids: Sequence[int]) -> 
 
     Takes the owner lock first, like create and delete: updating the rows one by one in the
     client's order would otherwise deadlock against them and against a second reorder.
+    Retried on a lock race with a neighbouring owner (RR-1).
     """
     if len(set(ids)) != len(ids):
         raise DashboardInvalid("Doppelte Einträge.", "ids")
+    await _retry_races(session, lambda: _set_order_once(session, user_id, ids))
+
+
+async def _set_order_once(session: AsyncSession, user_id: int, ids: Sequence[int]) -> None:
     own_ids = await _lock_own(session, user_id)
     if not set(ids) <= set(own_ids):
         raise DashboardForbidden(MSG_NOT_EDITABLE)

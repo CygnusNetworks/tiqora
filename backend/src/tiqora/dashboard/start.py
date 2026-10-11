@@ -6,7 +6,7 @@ import uuid
 from typing import Final
 
 from sqlalchemy import select
-from sqlalchemy.exc import DBAPIError, IntegrityError
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.dashboard import store
@@ -15,33 +15,15 @@ from tiqora.dashboard.defaults import (
     DEFAULT_TEMPLATE_VERSION,
     default_widgets,
 )
+from tiqora.dashboard.races import is_race_error
 from tiqora.dashboard.schemas import DashboardOut
 from tiqora.db.tiqora.models import TiqoraDashboard, TiqoraDashboardRole, TiqoraDashboardWidget
 from tiqora.jobs.service import utc_now
 
-__all__ = ["START_NAME", "ensure_start"]
+__all__ = ["START_NAME", "ensure_start", "is_race_error"]
 
 START_NAME: Final = "Mein Start"
 _ATTEMPTS: Final = 3
-
-
-_RETRY_CODES: Final = frozenset({1213, 1205})  # MariaDB: deadlock, lock wait timeout
-_RETRY_STATES: Final = frozenset({"40001", "40P01"})  # PostgreSQL: serialization, deadlock
-
-
-def is_race_error(exc: DBAPIError) -> bool:
-    """Unique violation, deadlock, lock wait timeout or serialization failure."""
-    if isinstance(exc, IntegrityError):
-        return True
-    orig = exc.orig
-    args = getattr(orig, "args", ())
-    if args and isinstance(args[0], int) and args[0] in _RETRY_CODES:
-        return True
-    for source in (orig, getattr(orig, "__cause__", None)):
-        state = getattr(source, "sqlstate", None) or getattr(source, "pgcode", None)
-        if state in _RETRY_STATES:
-            return True
-    return False
 
 
 async def _pick_template(session: AsyncSession, role_ids: list[int]) -> TiqoraDashboard | None:
