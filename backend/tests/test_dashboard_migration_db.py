@@ -120,6 +120,10 @@ def _drop_version_row(sync_url: str) -> None:
         engine.dispose()
 
 
+# Added to the widget table by the phase-2 migration (20261010_0075); this test ends at 0071.
+_PHASE2_WIDGET_COLUMNS = {"pinned", "template_widget_id", "added_in_version"}
+
+
 def _kind(type_: object) -> str:
     """Coarse type family; MariaDB reflects BOOLEAN as TINYINT(1)."""
     affinity = type_._type_affinity  # type: ignore[attr-defined]
@@ -133,8 +137,13 @@ def _assert_matches_orm(engine: Engine) -> None:
     for name in sorted(_TABLES):
         table = TiqoraBase.metadata.tables[name]
         cols = {c["name"]: c for c in insp.get_columns(name)}
-        assert set(cols) == {c.name for c in table.columns}, name
-        for col in table.columns:
+        orm_cols = [
+            c
+            for c in table.columns
+            if not (name == "tiqora_dashboard_widget" and c.name in _PHASE2_WIDGET_COLUMNS)
+        ]
+        assert set(cols) == {c.name for c in orm_cols}, name
+        for col in orm_cols:
             got = cols[col.name]
             ctx = f"{name}.{col.name}"
             assert got["nullable"] == col.nullable, ctx

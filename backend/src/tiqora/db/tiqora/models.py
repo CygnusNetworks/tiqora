@@ -1397,6 +1397,14 @@ class TiqoraDashboardWidget(TiqoraBase):
     layout: Mapped[str] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=False)
     # Phone order (index in the widget list).
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    # True: this widget ignores the dashboard-wide filters.
+    pinned: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    # On a copy: id of the template widget it came from (no FK, the template may go away).
+    template_widget_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    # On a template widget: template version that first contained it (NULL = before phase 2).
+    added_in_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class TiqoraDashboardCounterSample(TiqoraBase):
@@ -1737,3 +1745,62 @@ class TiqoraChatAgentState(TiqoraBase):
         SmallInteger, nullable=False, default=3, server_default="3"
     )
     changed: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class TiqoraDashboardKioskToken(TiqoraBase):
+    """A wallboard link: only the sha256 of the secret is stored; data runs as ``created_by``."""
+
+    __tablename__ = "tiqora_dashboard_kiosk_token"
+    __table_args__ = (
+        UniqueConstraint("token_hash", name="uq_tiqora_dashboard_kiosk_token_hash"),
+        Index("ix_tiqora_dashboard_kiosk_token_creator", "created_by"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    # sha256 hex of the secret
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    # last 4 characters, shown in lists
+    token_hint: Mapped[str] = mapped_column(String(8), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    # Znuny users.id (no FK)
+    created_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    # 15..900 (enforced by the service)
+    rotate_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=60, server_default="60"
+    )
+    show_details: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class TiqoraDashboardKioskItem(TiqoraBase):
+    """A dashboard of a wallboard link, in rotation order."""
+
+    __tablename__ = "tiqora_dashboard_kiosk_item"
+    __table_args__ = (Index("ix_tiqora_dashboard_kiosk_item_dashboard", "dashboard_id"),)
+
+    token_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "tiqora_dashboard_kiosk_token.id",
+            name="fk_tiqora_dashboard_kiosk_item_token",
+            ondelete="CASCADE",
+        ),
+        primary_key=True,
+        autoincrement=False,
+    )
+    dashboard_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "tiqora_dashboard.id",
+            name="fk_tiqora_dashboard_kiosk_item_dashboard",
+            ondelete="CASCADE",
+        ),
+        primary_key=True,
+        autoincrement=False,
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
