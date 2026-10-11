@@ -88,11 +88,20 @@ if TYPE_CHECKING:
     from tiqora.domain.auth import AuthenticatedUser
 
 __all__ = [
+    "FormSelection",
     "build_dialog_form",
     "build_start_form",
     "build_ticket_dialog_form",
     "collect_customer_field_options",
+    "collect_dialog_options",
     "customer_service_map",
+    "dialog_field_names",
+    "is_option_field",
+    "ResolvedDialog",
+    "resolve_start_dialog",
+    "resolve_ticket_dialog",
+    "selectable_queue_ids",
+    "selection_from_values",
 ]
 
 # Znuny's default customer TicketMoveList: every valid queue except the system queues.
@@ -119,6 +128,91 @@ _DF_KINDS: dict[str, FieldKind] = {
 }
 _DF_OPTION_KINDS = frozenset({"select", "multiselect"})
 _CUSTOMER_FIELDS = ("CustomerUserID", "CustomerID")
+_MAX_SELECTION_FIELDS = 200
+
+
+@dataclass(frozen=True)
+class FormSelection:
+    """The values currently entered in a dialog form, as the option lists need them (the ACL
+    context of Znuny's ``AJAXUpdate``): attribute ids, the customer user login and the dynamic
+    field values (name without the ``DynamicField_`` prefix)."""
+
+    queue_id: int | None = None
+    state_id: int | None = None
+    priority_id: int | None = None
+    type_id: int | None = None
+    service_id: int | None = None
+    sla_id: int | None = None
+    customer_user_id: str | None = None
+    dynamic_fields: dict[str, list[str]] = dc_field(default_factory=dict)
+
+    def attribute_ids(self) -> dict[str, int]:
+        """The selected attribute ids, keyed like :func:`ticket_acl_context`."""
+        ids = {
+            "queue_id": self.queue_id,
+            "state_id": self.state_id,
+            "priority_id": self.priority_id,
+            "type_id": self.type_id,
+            "service_id": self.service_id,
+            "sla_id": self.sla_id,
+        }
+        return {k: v for k, v in ids.items() if v is not None}
+
+
+_SELECTION_ID_FIELDS = {
+    "Queue": "queue_id",
+    "State": "state_id",
+    "Priority": "priority_id",
+    "Type": "type_id",
+    "Service": "service_id",
+    "SLA": "sla_id",
+}
+
+
+def _selection_id(raw: Any) -> int | None:
+    if isinstance(raw, (list, tuple)):
+        raw = raw[0] if raw else None
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, int):
+        return raw if raw > 0 else None
+    if isinstance(raw, str) and raw.strip().isdecimal():
+        value = int(raw.strip())
+        return value if value > 0 else None
+    return None
+
+
+def _selection_strings(raw: Any) -> list[str]:
+    items = raw if isinstance(raw, (list, tuple)) else [raw]
+    out: list[str] = []
+    for item in items:
+        if item is None or item == "":
+            continue
+        out.append(("1" if item else "0") if isinstance(item, bool) else str(item))
+    return out
+
+
+def selection_from_values(values: Mapping[str, Any]) -> FormSelection:
+    """Parse the form values (``field_values`` shape: option ids as strings or numbers,
+    dynamic fields as scalars or lists). Whatever does not parse is simply not selected."""
+    ids: dict[str, int] = {}
+    for name, key in _SELECTION_ID_FIELDS.items():
+        parsed = _selection_id(values.get(name))
+        if parsed is not None:
+            ids[key] = parsed
+    customer = values.get("CustomerUserID")
+    login = customer.strip() if isinstance(customer, str) and customer.strip() else None
+    dynamic: dict[str, list[str]] = {}
+    for name, raw in values.items():
+        if len(dynamic) >= _MAX_SELECTION_FIELDS:
+            break
+        if not name.startswith(DF_OPTION_PREFIX) or name == DF_OPTION_PREFIX:
+            continue
+        strings = _selection_strings(raw)
+        if strings:
+            dynamic[name[len(DF_OPTION_PREFIX) :]] = strings
+    return FormSelection(customer_user_id=login, dynamic_fields=dynamic, **ids)
+
 
 # ``Ticket::Frontend::<Action>###StateType`` defaults (ProcessManagement.xml:584-616).
 _DEFAULT_STATE_TYPES: dict[str, tuple[str, ...]] = {
@@ -279,8 +373,12 @@ async def collect_customer_field_options(
     process: Mapping[str, str] | None = None,
     dynamic_fields: Mapping[str, DynamicField] | None = None,
     queue_id: int | None = None,
+    selection: FormSelection | None = None,
 ) -> dict[str, list[ProcessDialogOptionOut]]:
     """Options for the customer interface, keyed by the requested field name.
+
+    *selection* (option refresh): the values currently entered. They are the ACL context
+    (attribute ids, dynamic field values) and the SLA list follows the selected service.
 
     *fields* are ``queue``/``state``/``priority``/``type``/``service``/``sla`` and
     ``DynamicField_<Name>``; each list is filtered with the customer principal and
@@ -308,7 +406,18 @@ async def collect_customer_field_options(
         if "service" in attrs:
             base["service"] = services
         if "sla" in attrs:
-            base["sla"] = await _customer_slas(session, services)
+            sla_services = services
+            if selection is not None and selection.service_id is not None:
+                chosen = selection.service_id
+                sla_services = {chosen: services[chosen]} if chosen in services else {}
+            base["sla"] = await _customer_slas(session, sla_services)
+    selected_ids = selection.attribute_ids() if selection is not None else {}
+    form_checks: dict[str, Any] | None = None
+    if selection is not None and (selected_ids or selection.dynamic_fields):
+        ticket_checks = await ticket_acl_context(session, **selected_ids)
+        for df_name, df_values in selection.dynamic_fields.items():
+            ticket_checks[f"{DF_OPTION_PREFIX}{df_name}"] = list(df_values)
+        form_checks = {"Ticket": ticket_checks}
     acl_maps: dict[str, dict[int, str]] = {}
     for field in (f for f in fields if f in base):
         mapping = base[field]
@@ -321,6 +430,7 @@ async def collect_customer_field_options(
             return_sub_type=FIELD_TO_SUBTYPE[field],
             ticket_id=ticket_id,
             action=actor.frontend_action,
+            checks=form_checks,
             process=process,
             sysconfig=sysconfig,
         )
@@ -330,6 +440,7 @@ async def collect_customer_field_options(
     ids = await _ticket_attribute_ids(session, ticket_id)
     if ticket_id is None and queue_id is not None:
         ids["queue_id"] = queue_id
+    ids.update(selected_ids)
     ticket_ctx = await ticket_acl_context(session, **ids)
     if ticket_ctx:
         acl_maps = await apply_attribute_relations_to_field_maps(
@@ -362,6 +473,7 @@ async def collect_customer_field_options(
             return_sub_type=name,
             ticket_id=ticket_id,
             action=actor.frontend_action,
+            checks=form_checks,
             process=process,
             sysconfig=sysconfig,
         )
@@ -396,9 +508,12 @@ async def _agent_options(
     dialog_fields: Mapping[str, ActivityDialogFieldConfig],
     dynamic_fields: Mapping[str, DynamicField],
     process: Mapping[str, str],
+    selection: FormSelection | None = None,
 ) -> dict[str, list[ProcessDialogOptionOut]]:
     """Options by *dialog field name*, from the wave-0 ACL-filtered source (with the process
-    context, like AgentTicketProcess.pm:4319 passing ``%{$Param{GetParam}}``)."""
+    context, like AgentTicketProcess.pm:4319 passing ``%{$Param{GetParam}}``). *selection*: the
+    values entered so far (option refresh); a selected queue scopes the Owner/Responsible
+    pickers and, like the other selected ids, is part of the ACL context."""
     requested: dict[str, str] = {}  # option-source key -> dialog field name
     for name in names:
         if name in _ATTRIBUTE_KEY:
@@ -423,15 +538,22 @@ async def _agent_options(
             if "state" in requested
             else None
         )
+        context = FieldOptionsContext(
+            action="AgentTicketProcess", ticket_id=ticket_id, queue_id=queue_id
+        )
+        if selection is not None:
+            chosen = selection.attribute_ids()
+            context = context.model_copy(
+                update={
+                    **chosen,
+                    "customer_user_id": selection.customer_user_id,
+                    "dynamic_fields": selection.dynamic_fields,
+                }
+            )
         collected = await collect_field_options(
             session,
             user,
-            FieldOptionsRequest(
-                fields=list(requested),
-                context=FieldOptionsContext(
-                    action="AgentTicketProcess", ticket_id=ticket_id, queue_id=queue_id
-                ),
-            ),
+            FieldOptionsRequest(fields=list(requested), context=context),
             process=process,
             picker_queue_id=picker_queue_id,
             # AgentTicketProcess.pm:6402-6413 -- an existing ticket ignores the setting.
@@ -442,7 +564,133 @@ async def _agent_options(
             out[requested[key]] = [
                 ProcessDialogOptionOut(value=o.value, label=o.label) for o in options
             ]
+        if selection is not None:
+            await _narrow_agent_options(session, out, selection)
     return out
+
+
+async def _narrow_agent_options(
+    session: AsyncSession,
+    options: dict[str, list[ProcessDialogOptionOut]],
+    selection: FormSelection,
+) -> None:
+    """The refresh only narrows the form's lists: the SLAs of the selected service
+    (``SLAList(ServiceID)``) and the services of the selected customer user
+    (``TicketServiceList(CustomerUserID)``, ``customer_service_map``)."""
+    if "SLA" in options and selection.service_id is not None:
+        rows = await session.execute(
+            select(ServiceSla.sla_id).where(ServiceSla.service_id == selection.service_id)
+        )
+        assigned = {str(int(r)) for r in rows.scalars()}
+        options["SLA"] = [o for o in options["SLA"] if o.value in assigned]
+    if "Service" in options and selection.customer_user_id:
+        services = await customer_service_map(
+            session, selection.customer_user_id, SysConfig(session)
+        )
+        keep = {str(i) for i in services}
+        options["Service"] = [o for o in options["Service"] if o.value in keep]
+
+
+async def selectable_queue_ids(
+    session: AsyncSession, actor: ProcessActor, user: AuthenticatedUser | None
+) -> set[int]:
+    """The queues the principal may pick in a dialog form (agent: ``ro``; customer: the create
+    queues) -- what a selected queue of an option refresh must be one of."""
+    if actor.interface == "AgentInterface":
+        if user is None:
+            return set()
+        return set((await base_field_maps(session, user, {"queue"})).get("queue", {}))
+    return set(await _customer_queues(session, actor, SysConfig(session)))
+
+
+def is_option_field(name: str, dynamic_fields: Mapping[str, DynamicField]) -> bool:
+    """Fields whose options the server computes (and the refresh may re-ask)."""
+    return name in _ATTRIBUTE_KEY or (
+        name in dynamic_fields and _field_kind(name, dynamic_fields) in _DF_OPTION_KINDS
+    )
+
+
+async def dialog_field_names(
+    session: AsyncSession,
+    *,
+    actor: ProcessActor,
+    dialog: ActivityDialogNode,
+    ticket_id: int | None,
+) -> tuple[list[str], dict[str, DynamicField]]:
+    """The names of the fields the form shows (in order) and their dynamic field rows."""
+    agent = actor.interface == "AgentInterface"
+    names = _customer_field_names(visible_fields(dialog.config, actor.interface), agent)
+    if ATTACHMENTS_FIELD in names and (not agent or ticket_id is None):
+        # AgentTicketProcess.pm:1878 `elsif Attachments && $TicketID`: agent and existing ticket.
+        names.remove(ATTACHMENTS_FIELD)
+    return names, await _load_dynamic_fields(session, names)
+
+
+async def collect_dialog_options(
+    session: AsyncSession,
+    *,
+    actor: ProcessActor,
+    user: AuthenticatedUser | None,
+    names: Sequence[str],
+    ticket_id: int | None,
+    dialog_fields: Mapping[str, ActivityDialogFieldConfig],
+    dynamic_fields: Mapping[str, DynamicField],
+    process_context: Mapping[str, str],
+    selection: FormSelection | None = None,
+) -> dict[str, list[ProcessDialogOptionOut]]:
+    """The option lists of *names* by dialog field name -- the one code path of the form
+    (*selection* ``None``) and of the option refresh (*selection*: the entered values).
+    Only attribute and select/multiselect dynamic fields have options here."""
+    if actor.interface == "AgentInterface":
+        if user is None:
+            raise ValueError("agent forms need the AuthenticatedUser")
+        return await _agent_options(
+            session,
+            user,
+            names,
+            ticket_id=ticket_id,
+            dialog_fields=dialog_fields,
+            dynamic_fields=dynamic_fields,
+            process=process_context,
+            selection=selection,
+        )
+    default_queue_id = None
+    if ticket_id is None and "Queue" in dialog_fields:
+        default_queue_id = await _default_queue_id(session, dialog_fields["Queue"].default_value)
+    option_names = [n for n in names if is_option_field(n, dynamic_fields)]
+    wanted = [_ATTRIBUTE_KEY.get(n, n) for n in option_names]
+    collected = await collect_customer_field_options(
+        session,
+        actor,
+        wanted,
+        ticket_id,
+        process=process_context,
+        dynamic_fields=dynamic_fields,
+        queue_id=default_queue_id,
+        selection=selection,
+    )
+    return {name: collected.get(_ATTRIBUTE_KEY.get(name, name), []) for name in option_names}
+
+
+def _refresh_on(
+    name: str, names: Sequence[str], dynamic_fields: Mapping[str, DynamicField], agent: bool
+) -> list[str]:
+    """The fields whose change makes the options of *name* stale (plan D7)."""
+    if name in ("Owner", "Responsible"):
+        return ["Queue"] if "Queue" in names else []
+    if name == "SLA":
+        return ["Service"] if "Service" in names else []
+    if name == "Service":
+        return ["CustomerUserID"] if agent and "CustomerUserID" in names else []
+    if is_option_field(name, dynamic_fields):
+        # Any value can appear in an ACL Properties block (Znuny: AJAXUpdatableFields = all).
+        return [
+            other
+            for other in names
+            if other != name
+            and (is_option_field(other, dynamic_fields) or other == "CustomerUserID")
+        ]
+    return []
 
 
 def _customer_field_names(visible: Sequence[str], agent: bool) -> list[str]:
@@ -614,11 +862,9 @@ async def build_dialog_form(
         raise ValueError("agent forms need the AuthenticatedUser")
     config = dialog.config
     visible = visible_fields(config, actor.interface)
-    names = _customer_field_names(visible, agent)
-    if ATTACHMENTS_FIELD in names and (not agent or ticket_id is None):
-        # AgentTicketProcess.pm:1878 `elsif Attachments && $TicketID`: agent and existing ticket.
-        names.remove(ATTACHMENTS_FIELD)
-    dynamic_fields = await _load_dynamic_fields(session, names)
+    names, dynamic_fields = await dialog_field_names(
+        session, actor=actor, dialog=dialog, ticket_id=ticket_id
+    )
     dialog_fields = {name: field_config(config, name) for name in names}
     process_context = {
         "ProcessEntityID": graph.entity_id,
@@ -626,39 +872,16 @@ async def build_dialog_form(
         "ActivityDialogEntityID": dialog.entity_id,
     }
 
-    if agent:
-        assert user is not None
-        options = await _agent_options(
-            session,
-            user,
-            names,
-            ticket_id=ticket_id,
-            dialog_fields=dialog_fields,
-            dynamic_fields=dynamic_fields,
-            process=process_context,
-        )
-    else:
-        default_queue_id = None
-        if ticket_id is None and "Queue" in dialog_fields:
-            default_queue_id = await _default_queue_id(
-                session, dialog_fields["Queue"].default_value
-            )
-        wanted = [_ATTRIBUTE_KEY[n] for n in names if n in _ATTRIBUTE_KEY]
-        wanted += [n for n in names if _field_kind(n, dynamic_fields) in _DF_OPTION_KINDS]
-        collected = await collect_customer_field_options(
-            session,
-            actor,
-            wanted,
-            ticket_id,
-            process=process_context,
-            dynamic_fields=dynamic_fields,
-            queue_id=default_queue_id,
-        )
-        options = {
-            name: collected.get(_ATTRIBUTE_KEY.get(name, name), [])
-            for name in names
-            if name in _ATTRIBUTE_KEY or _field_kind(name, dynamic_fields) in _DF_OPTION_KINDS
-        }
+    options = await collect_dialog_options(
+        session,
+        actor=actor,
+        user=user,
+        names=names,
+        ticket_id=ticket_id,
+        dialog_fields=dialog_fields,
+        dynamic_fields=dynamic_fields,
+        process_context=process_context,
+    )
 
     now = await _load_ticket_now(session, ticket_id, names)
     account_time = perl_truthy(await SysConfig(session).get("Ticket::Frontend::AccountTime"))
@@ -707,6 +930,7 @@ async def build_dialog_form(
                     else "0"
                 ),
                 uploads=kind == "article",
+                refresh_on=_refresh_on(name, names, dynamic_fields, agent),
             )
         )
     return ProcessDialogFormOut(
@@ -721,15 +945,23 @@ async def build_dialog_form(
     )
 
 
-async def build_start_form(
+@dataclass(frozen=True)
+class ResolvedDialog:
+    """A dialog the actor may use, with the activity of its ACL process context."""
+
+    graph: ProcessGraph
+    dialog: ActivityDialogNode
+    activity_entity_id: str | None
+
+
+async def resolve_start_dialog(
     session: AsyncSession,
-    *,
     actor: ProcessActor,
-    user: AuthenticatedUser | None,
+    *,
     process_entity_id: str,
     ticket_id: int | None,
     repository: ProcessRepository,
-) -> ProcessDialogFormOut:
+) -> ResolvedDialog:
     """The start dialog of a process the actor may start (same gate as the start itself:
     :func:`assert_can_start`; *ticket_id* = enroll context)."""
     graph = await assert_can_start(
@@ -741,16 +973,60 @@ async def build_start_form(
     )
     dialog_id = graph.config.start_activity_dialog
     dialog = await repository.get_activity_dialog(dialog_id) if dialog_id else None
-    if dialog is None:  # assert_can_start already demanded it; a race with a redeploy
+    if dialog is None:
+        # assert_can_start already demanded it; a race with a redeploy
         raise ProcessNotFound(process_entity_id)
+    return ResolvedDialog(graph, dialog, graph.config.start_activity)
+
+
+async def resolve_ticket_dialog(
+    session: AsyncSession,
+    actor: ProcessActor,
+    *,
+    ticket_id: int,
+    activity_dialog_entity_id: str,
+    repository: ProcessRepository,
+) -> ResolvedDialog:
+    """A dialog of the ticket's current activity the actor may submit
+    (:func:`assert_can_submit`: running, on the activity, interface, permission, ACLs)."""
+    candidates = await get_ticket_process_candidates(session, ticket_id, repository=repository)
+    if candidates is None:
+        raise TicketNotInProcess(f"ticket {ticket_id} is not in a process")
+    dialog = await assert_can_submit(
+        session,
+        actor,
+        ticket_id=ticket_id,
+        candidates=candidates,
+        activity_dialog_entity_id=activity_dialog_entity_id,
+    )
+    return ResolvedDialog(candidates.process, dialog, candidates.activity_entity_id)
+
+
+async def build_start_form(
+    session: AsyncSession,
+    *,
+    actor: ProcessActor,
+    user: AuthenticatedUser | None,
+    process_entity_id: str,
+    ticket_id: int | None,
+    repository: ProcessRepository,
+) -> ProcessDialogFormOut:
+    """The start dialog of a process the actor may start (:func:`resolve_start_dialog`)."""
+    target = await resolve_start_dialog(
+        session,
+        actor,
+        process_entity_id=process_entity_id,
+        ticket_id=ticket_id,
+        repository=repository,
+    )
     return await build_dialog_form(
         session,
         actor=actor,
         user=user,
-        graph=graph,
-        dialog=dialog,
+        graph=target.graph,
+        dialog=target.dialog,
         ticket_id=ticket_id,
-        activity_entity_id=graph.config.start_activity,
+        activity_entity_id=target.activity_entity_id,
     )
 
 
@@ -764,23 +1040,20 @@ async def build_ticket_dialog_form(
     repository: ProcessRepository,
 ) -> ProcessDialogFormOut:
     """A dialog of the ticket's current activity the actor may submit
-    (:func:`assert_can_submit`: running, on the activity, interface, permission, ACLs)."""
-    candidates = await get_ticket_process_candidates(session, ticket_id, repository=repository)
-    if candidates is None:
-        raise TicketNotInProcess(f"ticket {ticket_id} is not in a process")
-    dialog = await assert_can_submit(
+    (:func:`resolve_ticket_dialog`)."""
+    target = await resolve_ticket_dialog(
         session,
         actor,
         ticket_id=ticket_id,
-        candidates=candidates,
         activity_dialog_entity_id=activity_dialog_entity_id,
+        repository=repository,
     )
     return await build_dialog_form(
         session,
         actor=actor,
         user=user,
-        graph=candidates.process,
-        dialog=dialog,
+        graph=target.graph,
+        dialog=target.dialog,
         ticket_id=ticket_id,
-        activity_entity_id=candidates.activity_entity_id,
+        activity_entity_id=target.activity_entity_id,
     )

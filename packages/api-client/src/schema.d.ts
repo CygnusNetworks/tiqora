@@ -795,6 +795,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portal/process/ticket/{ticket_id}/dialog/{activity_dialog_entity_id}/form/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Ticket Dialog Form Options
+         * @description The option lists of a ticket dialog for the values entered so far (customer principal).
+         */
+        post: operations["refresh_ticket_dialog_form_options_api_portal_process_ticket__ticket_id__dialog__activity_dialog_entity_id__form_options_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portal/process/ticket/{ticket_id}/start": {
         parameters: {
             query?: never;
@@ -887,6 +907,27 @@ export interface paths {
         get: operations["get_start_form_api_portal_process__process_entity_id__start_form_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/process/{process_entity_id}/start-form/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Start Form Options
+         * @description The option lists of the start dialog for the values entered so far, with the customer
+         *     principal. Same gates as ``GET .../start-form``.
+         */
+        post: operations["refresh_start_form_options_api_portal_process__process_entity_id__start_form_options_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7466,6 +7507,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/process/ticket/{ticket_id}/dialog/{activity_dialog_entity_id}/form/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Ticket Dialog Form Options
+         * @description The option lists of a ticket dialog for the values entered so far; 403 when the dialog is
+         *     hidden for this agent, like ``GET .../form``.
+         */
+        post: operations["refresh_ticket_dialog_form_options_api_v1_process_ticket__ticket_id__dialog__activity_dialog_entity_id__form_options_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/process/ticket/{ticket_id}/start": {
         parameters: {
             query?: never;
@@ -7585,6 +7647,27 @@ export interface paths {
         get: operations["get_start_form_api_v1_process__process_entity_id__start_form_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/process/{process_entity_id}/start-form/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Start Form Options
+         * @description The option lists of the start dialog for the values entered so far (Owner follows Queue,
+         *     SLA follows Service, ACLs see the entered values). Same gates as ``GET .../start-form``.
+         */
+        post: operations["refresh_start_form_options_api_v1_process__process_entity_id__start_form_options_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -18210,6 +18293,8 @@ export interface components {
             name: string;
             /** Options */
             options?: components["schemas"]["ProcessDialogOptionOut"][];
+            /** Refresh On */
+            refresh_on?: string[];
             /** Required */
             required: boolean;
             /**
@@ -18253,6 +18338,22 @@ export interface components {
             label: string;
             /** Value */
             value: string;
+        };
+        /** ProcessFormOptionsIn */
+        ProcessFormOptionsIn: {
+            /** Fields */
+            fields?: string[];
+            /** Values */
+            values?: {
+                [key: string]: unknown;
+            };
+        };
+        /** ProcessFormOptionsOut */
+        ProcessFormOptionsOut: {
+            /** Options */
+            options: {
+                [key: string]: components["schemas"]["ProcessDialogOptionOut"][];
+            };
         };
         /**
          * ProcessStartIn
@@ -23823,6 +23924,44 @@ export interface operations {
             };
         };
     };
+    refresh_ticket_dialog_form_options_api_portal_process_ticket__ticket_id__dialog__activity_dialog_entity_id__form_options_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticket_id: number;
+                activity_dialog_entity_id: string;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessFormOptionsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessFormOptionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     start_ticket_process_api_portal_process_ticket__ticket_id__start_post: {
         parameters: {
             query?: never;
@@ -23987,6 +24126,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProcessDialogFormOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_start_form_options_api_portal_process__process_entity_id__start_form_options_post: {
+        parameters: {
+            query?: {
+                ticket_id?: number | null;
+            };
+            header?: never;
+            path: {
+                process_entity_id: string;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessFormOptionsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessFormOptionsOut"];
                 };
             };
             /** @description Validation Error */
@@ -41989,6 +42167,46 @@ export interface operations {
             };
         };
     };
+    refresh_ticket_dialog_form_options_api_v1_process_ticket__ticket_id__dialog__activity_dialog_entity_id__form_options_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                activity_dialog_entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessFormOptionsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessFormOptionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     start_ticket_process_api_v1_process_ticket__ticket_id__start_post: {
         parameters: {
             query?: never;
@@ -42198,6 +42416,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProcessDialogFormOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_start_form_options_api_v1_process__process_entity_id__start_form_options_post: {
+        parameters: {
+            query?: {
+                ticket_id?: number | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                process_entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessFormOptionsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessFormOptionsOut"];
                 };
             };
             /** @description Validation Error */

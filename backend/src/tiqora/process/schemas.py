@@ -232,6 +232,9 @@ class ProcessDialogFieldOut(BaseModel):
     #: kind "article": the submit may carry files in ``field_values.ArticleAttachments``
     #: (a list of ``{filename, content_type, content_base64}``, at most 10).
     uploads: bool = False
+    #: Canonical names of the fields whose change must re-ask this field's options
+    #: (``POST .../options``, plan D7). Empty: the options never depend on another field.
+    refresh_on: list[str] = Field(default_factory=list)
 
 
 class ProcessDialogFormOut(BaseModel):
