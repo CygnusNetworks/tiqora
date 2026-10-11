@@ -170,6 +170,11 @@ jobs:
       - name: Playwright e2e (mocked API)
         if: startsWith(github.ref, 'refs/tags/v')
         run: pnpm --filter tiqora-frontend e2e
+      # Same Chromium as above (both packages resolve one @playwright/test); the widget
+      # e2e needs the dist/ of the "Build webchat widget" step.
+      - name: Playwright e2e (webchat widget, cross-origin)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: pnpm --filter @tiqora/webchat-widget e2e
 
   coverage-badges:
     name: Publish coverage badges
