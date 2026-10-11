@@ -153,6 +153,14 @@ ticketItems.push(
     age_seconds: 600, escalation_time: 0, attachment_count: 0, has_ai_summary: false,
     channel: "webchat", chat_display_name: "Max Beispiel", chat_username: null,
   },
+  {
+    ...ticketItems[0], id: 117, tn: "20260701017", title: "Chat: Erika Musterfrau",
+    ...QROUTE[0], ...STATES[0], ...PRIOS[1], ...OWNERS[1],
+    customer_id: "NORTHWIND", customer_user_id: "e.musterfrau@northwind.example",
+    create_time: "2026-07-21T11:08:00Z", change_time: "2026-07-21T11:08:00Z",
+    age_seconds: 60, escalation_time: 0, attachment_count: 0, has_ai_summary: false,
+    channel: "webchat", chat_display_name: "Erika Musterfrau", chat_username: null,
+  },
 );
 /** Built on demand rather than eagerly: `ai_reply_source` is only known once
  * the article threads below have registered their AI-written articles. */
@@ -723,6 +731,11 @@ registerThread(116, [
     body: "Guten Tag Herr Beispiel, bitte trennen Sie den Router kurz vom Strom und warten Sie 30 Sekunden." }),
   wc({ day: 21, hm: "11:06", sender: "customer",
     body: "Habe ich gemacht, die LED blinkt immer noch rot." }),
+]);
+registerThread(117, [
+  { day: 21, hm: "11:08", sender: "customer", channel: WEBCHAT_CHANNEL_ID, channelName: "WebChat", isHtml: false,
+    subject: "WebChat", from: "Erika Musterfrau", to: "",
+    body: "Guten Tag, ich möchte meinen Tarif wechseln. Wer kann mir dabei helfen?" },
 ]);
 
 // AI subsystem (state-only summary + drafts) for the demo ticket. Static,

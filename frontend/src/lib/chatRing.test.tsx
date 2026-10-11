@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { receiveChatWaiting, resetChatRing, setRingContext } from "./chatRing";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { renderHook, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { receiveChatWaiting, resetChatRing, setRingContext, useChatRing } from "./chatRing";
+import { webchatApi } from "./webchatApi";
 
 let oscillators = 0;
 const notifications: { title: string; opts: NotificationOptions | undefined }[] = [];
@@ -77,5 +81,42 @@ describe("chat ring", () => {
     FakeNotification.permission = "default";
     receiveChatWaiting({ session_id: "b", topic_ref: "1:support" });
     expect(notifications).toHaveLength(1);
+  });
+});
+
+describe("useChatRing", () => {
+  const wrapper = () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    );
+  };
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it("only fetches topics for an agent without chat topics", async () => {
+    const topics = vi.spyOn(webchatApi, "topics").mockResolvedValue([]);
+    const state = vi.spyOn(webchatApi, "getAgentState");
+    const inbox = vi.spyOn(webchatApi, "inbox");
+    const { result } = renderHook(() => useChatRing(), { wrapper: wrapper() });
+    await waitFor(() => expect(topics).toHaveBeenCalledTimes(1));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(state).not.toHaveBeenCalled();
+    expect(inbox).not.toHaveBeenCalled();
+    expect(result.current.pending).toBe(0);
+  });
+
+  it("loads state and inbox once the agent has a topic", async () => {
+    vi.spyOn(webchatApi, "topics").mockResolvedValue([
+      { ref: "1:support", label: "Support", queue_id: 1, config_name: "Website" },
+    ]);
+    vi.spyOn(webchatApi, "getAgentState").mockResolvedValue({
+      available: true, max_concurrent: 3, active_count: 0, topics: [],
+    });
+    vi.spyOn(webchatApi, "inbox").mockResolvedValue({ waiting: [], mine: [] });
+    const { result } = renderHook(() => useChatRing(), { wrapper: wrapper() });
+    await waitFor(() => expect(webchatApi.inbox).toHaveBeenCalled());
+    expect(webchatApi.getAgentState).toHaveBeenCalled();
+    expect(result.current.pending).toBe(0);
   });
 });

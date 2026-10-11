@@ -127,6 +127,7 @@ export function resetChatRing(): void {
   rung.clear();
   audio = null;
   unlocked = false;
+  gestureListening = false;
 }
 
 /**
@@ -134,16 +135,20 @@ export function resetChatRing(): void {
  * returns how many chats are waiting for pickup. Mount once in the agent shell.
  */
 export function useChatRing(): { pending: number } {
-  const state = useQuery({
-    queryKey: chatAgentStateKey,
-    queryFn: ({ signal }) => webchatApi.getAgentState(signal),
-  });
   const topics = useQuery({
     queryKey: chatTopicsKey,
     queryFn: ({ signal }) => webchatApi.topics(signal),
   });
+  // Agents without any chat topic only ever cost the topics request.
+  const isChatAgent = (topics.data?.length ?? 0) > 0;
+  const state = useQuery({
+    queryKey: chatAgentStateKey,
+    enabled: isChatAgent,
+    queryFn: ({ signal }) => webchatApi.getAgentState(signal),
+  });
   const inbox = useQuery({
     queryKey: chatInboxKey,
+    enabled: isChatAgent,
     queryFn: ({ signal }) => webchatApi.inbox(signal),
   });
 

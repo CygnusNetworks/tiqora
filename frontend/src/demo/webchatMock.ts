@@ -30,8 +30,33 @@ const ticketChat116 = {
 };
 
 const configValues = {
-  allowed_origins: ["https://www.example.org"], offline_mode: "form", retention_days: 30,
-  show_agent_names: true, wait_timeout_seconds: 180, topics: [], prechat_fields: [],
+  allowed_origins: ["https://www.example.org"],
+  topics: [
+    { key: "support", label: "Support", queue_id: 1, priority_id: null },
+    { key: "billing", label: "Rechnung & Vertrag", queue_id: 2, priority_id: 3 },
+  ],
+  greeting: "Hallo! Wie können wir Ihnen helfen?",
+  privacy_url: "https://www.example.org/datenschutz",
+  offline_mode: "form",
+  business_calendar: null,
+  default_customer_user: null,
+  retention_days: 30,
+  show_agent_names: true,
+  wait_timeout_seconds: 180,
+  prechat_fields: [
+    { key: "name", kind: "text", label: "Name", required: false, maps_to: "name", options: [], dynamic_field: null },
+    { key: "email", kind: "email", label: "E-Mail", required: false, maps_to: "email", options: [], dynamic_field: null },
+  ],
+  theme: { primary_color: "#2563eb", position: "right", mode: "auto", launcher_label: "Chat" },
+  upload_policy: {
+    enabled: true, max_bytes: 10 * 1024 * 1024,
+    types: ["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf", "text/plain"],
+  },
+  rate_limits: {
+    sessions_per_ip_10min: 5, sessions_per_config_minute: 30, messages_per_session_minute: 30,
+    messages_per_ip_minute: 60, uploads_per_session_10min: 10, offline_per_ip_hour: 3,
+    offline_per_config_hour: 60,
+  },
 };
 const config = {
   id: 1, name: "Website", valid: true, public_key: "demo0000000000000000000000000000",

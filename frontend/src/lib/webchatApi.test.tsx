@@ -59,6 +59,10 @@ describe("webchat demo data", () => {
     expect(resolveWebchatData("/api/v1/chat/inbox", "GET")).toMatchObject({ waiting: [{}], mine: [{ ticket_id: 116 }] });
   });
 
+  it("serves ticket 117 with a visitor article", () => {
+    expect(resolveData("/api/v1/tickets/117/articles", "GET") as unknown[]).toHaveLength(1);
+  });
+
   it("serves ticket 116 as a webchat ticket with three WebChat articles", () => {
     const arts = resolveData("/api/v1/tickets/116/articles", "GET") as { communication_channel_name: string }[];
     expect(arts).toHaveLength(3);
