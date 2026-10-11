@@ -56,6 +56,8 @@ from tiqora.filters import Filter, FilterError
 from tiqora.jobs.service import utc_now
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.permissions.sharing import check_share_groups
+from tiqora.reporting.definition import DefinitionError
+from tiqora.reporting.saved import ReportGone, ReportNotFound, resolve_report_ref
 from tiqora.saved_searches.store import SavedSearchNotFound, get_visible, validate_criteria
 
 __all__ = [
@@ -551,6 +553,25 @@ _SOURCE_TYPES = frozenset({"core.ticket-list", "core.counter"})
 MSG_SEARCH_UNKNOWN = "Die gespeicherte Suche gibt es nicht."
 
 
+MSG_REPORT_UNKNOWN = "Diesen Bericht gibt es nicht oder er ist für Sie nicht freigegeben."
+
+
+async def _validate_report_key(
+    session: AsyncSession, user_id: int, settings: Mapping[str, Any], path: str
+) -> None:
+    """The saver must be able to see the report (same visibility as when the tile runs)."""
+    where = f"{path}.report_key"
+    try:
+        admin = await PermissionEngine(session).is_admin(user_id)
+        await resolve_report_ref(session, str(settings.get("report_key")), user_id, admin=admin)
+    except ReportNotFound:
+        raise DashboardInvalid(MSG_REPORT_UNKNOWN, where) from None
+    except ReportGone as exc:
+        raise DashboardInvalid(f"Der Bericht „{exc.name}“ wurde gelöscht.", where) from None
+    except DefinitionError as exc:
+        raise DashboardInvalid(exc.message, where) from None
+
+
 async def validate_source_settings(
     session: AsyncSession, user_id: int, type_key: str, settings: Mapping[str, Any], *, path: str
 ) -> None:
@@ -560,6 +581,9 @@ async def validate_source_settings(
     prefix of the settings object (``widgets[i].settings`` or ``settings``). The saver must
     be able to see a saved search (same visibility as when the tile runs).
     """
+    if type_key == "core.report":
+        await _validate_report_key(session, user_id, settings, path)
+        return
     if type_key not in _SOURCE_TYPES:
         return
     source = settings.get("source")

@@ -23,6 +23,7 @@ from tiqora.dashboard.providers import (
     DASHBOARD_PROVIDERS,
     DashboardProvider,
     ProviderContext,
+    ProviderError,
     ProviderForbidden,
 )
 from tiqora.dashboard.runner import (
@@ -505,3 +506,27 @@ async def test_runner_hands_settings_cache_and_kiosk_flag_to_the_context() -> No
     got.clear()
     await run_batch(fake_factory, reg, 1, [W("a", "t.rec")], grace=0.0)
     assert got[0].app_settings is None and got[0].kiosk is False
+
+
+async def test_runner_hands_the_provider_its_deadline_on_the_loop_clock() -> None:
+    got: list[tuple[float | None, float]] = []
+
+    async def record(ctx: ProviderContext, settings: Any) -> dict[str, Any]:
+        got.append((ctx.deadline, asyncio.get_running_loop().time()))
+        return {}
+
+    reg = registry_with(provider("t.rec", record, timeout_seconds=7.0))
+    before = asyncio.get_running_loop().time()
+    await run_batch(fake_factory, reg, 1, [W("a", "t.rec")], grace=0.0)
+    deadline, seen_at = got[0]
+    assert deadline is not None and before + 7.0 <= deadline <= seen_at + 7.0
+    got.clear()
+    await run_widget(fake_factory, reg, 1, W("a", "t.rec"), timeout=25.0, grace=0.0)
+    deadline, seen_at = got[0]
+    assert deadline is not None and 24.9 < deadline - seen_at <= 25.0
+
+
+async def test_provider_error_is_an_error_tile_with_its_own_message() -> None:
+    reg = registry_with(provider("t.err", raises(ProviderError("Der Bericht ist kaputt."))))
+    out = await run_batch(fake_factory, reg, 1, [W("a", "t.err")], grace=0.0)
+    assert out["a"].status == "error" and out["a"].error == "Der Bericht ist kaputt."

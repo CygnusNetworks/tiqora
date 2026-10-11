@@ -90,6 +90,7 @@ def test_core_providers_cover_the_data_widgets() -> None:
         "core.escalations",
         "core.queue-overview",
         "core.reminders",
+        "core.report",
         "core.team-presence",
         "core.ticket-list",
     ]

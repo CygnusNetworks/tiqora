@@ -35,6 +35,9 @@ class ProviderContext:
     app_settings: Settings | None = None
     report_cache_backend: Any | None = None
     kiosk: bool = False  # True on the unauthenticated wallboard path
+    #: loop-clock (``loop.time()``) instant at which the runner gives up on this provider;
+    #: ``None`` outside the runner. Report providers bound their queries by it.
+    deadline: float | None = None
 
 
 def filter_queue_ids(ctx: ProviderContext) -> list[int] | None:
@@ -51,6 +54,14 @@ class ProviderForbidden(Exception):  # noqa: N818 - D6 name
         self.message = message
 
 
+class ProviderError(Exception):
+    """The widget cannot run; ``message`` is shown in an error tile (not a permission problem)."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message
+
+
 @dataclass(frozen=True, slots=True)
 class DashboardProvider:
     key: str  # == widget type_key for core widgets
@@ -58,6 +69,10 @@ class DashboardProvider:
     settings_model: type[BaseModel]  # validated copy of the stored settings (defaults applied)
     run: Callable[[ProviderContext, Any], Awaitable[dict[str, Any]]]
     timeout_seconds: float = 5.0  # batch budget
+    #: the provider bounds its own statements (``QueryBudget`` of ``ProviderContext.deadline``);
+    #: the runner then sets no ``statement_timeout`` around it, because the reporting engine
+    #: sets and resets one per statement and its reset would lift the runner's limit on MariaDB
+    self_limited: bool = False
 
 
 DASHBOARD_PROVIDERS: Final = ExtensionPoint[DashboardProvider](
@@ -74,6 +89,7 @@ def core_providers() -> list[DashboardProvider]:
     from tiqora.dashboard.providers.escalations import escalations_provider
     from tiqora.dashboard.providers.queue_overview import queue_overview_provider
     from tiqora.dashboard.providers.reminders import reminders_provider
+    from tiqora.dashboard.providers.report import report_provider
     from tiqora.dashboard.providers.team_presence import team_presence_provider
     from tiqora.dashboard.providers.ticket_list import ticket_list_provider
 
@@ -87,4 +103,5 @@ def core_providers() -> list[DashboardProvider]:
         queue_overview_provider(),
         chat_queue_provider(),
         ai_status_provider(),
+        report_provider(),
     ]

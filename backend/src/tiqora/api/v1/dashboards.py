@@ -329,14 +329,16 @@ async def dashboard_data(
     rows = board.widgets
     if wanted is not None:
         rows = [w for w in rows if w.id in wanted]
+    redis = await _redis_or_none(request)
     results = await run_batch(
         factory,
         registry,
         user.id,
         rows,
-        redis=await _redis_or_none(request),
+        redis=redis,
         filters=board.filters,
         app_settings=app_settings,
+        report_cache_backend=redis,
     )
     return DashboardDataOut(widgets=results, generated_at=utc_now())
 
@@ -357,14 +359,16 @@ async def widget_data(
     widget = next((w for w in board.widgets if w.id == widget_id), None)
     if widget is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Widget nicht gefunden.")
+    redis = await _redis_or_none(request)
     out = await run_widget(
         factory,
         registry,
         user.id,
         widget,
-        redis=await _redis_or_none(request),
+        redis=redis,
         filters=board.filters,
         app_settings=app_settings,
+        report_cache_backend=redis,
     )
     if out is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, NO_DATA_MESSAGE)
@@ -389,6 +393,7 @@ async def preview_widget_data(
     user: CurrentUser,
     factory: SessionFactory,
     registry: DashboardRegistry,
+    app_settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> WidgetDataOut:
     """Data for unsaved settings (settings drawer); runs as the viewer, writes no history."""
     provider = registry.get(DASHBOARD_PROVIDERS, key)
@@ -401,8 +406,16 @@ async def preview_widget_data(
     widget = _PreviewWidget(
         id="preview", type_key=key, type_version=provider.version, settings=settings
     )
+    redis = await _redis_or_none(request)
     out = await run_widget(
-        factory, registry, user.id, widget, redis=await _redis_or_none(request), preview=True
+        factory,
+        registry,
+        user.id,
+        widget,
+        redis=redis,
+        preview=True,
+        app_settings=app_settings,
+        report_cache_backend=redis,
     )
     assert out is not None  # the provider exists
     return out

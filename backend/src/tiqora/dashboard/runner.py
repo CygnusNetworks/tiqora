@@ -42,6 +42,7 @@ from tiqora.dashboard.providers import (
     DASHBOARD_PROVIDERS,
     DashboardProvider,
     ProviderContext,
+    ProviderError,
     ProviderForbidden,
 )
 from tiqora.dashboard.schemas import WidgetDataOut
@@ -201,6 +202,7 @@ async def _unit(
                 app_settings=app_settings,
                 report_cache_backend=report_cache_backend,
                 kiosk=kiosk,
+                deadline=started + budget,
             )
             try:
                 if getattr(session, "bind", None) is not None:
@@ -208,7 +210,14 @@ async def _unit(
                     conn.held = True
                     # whole seconds of what is left: the database aborts before the client
                     seconds = max(1, int(remaining()))
-                    async with statement_timeout(session, seconds):
+                    # a self-limited provider bounds its statements itself (its engine would
+                    # reset a MariaDB session limit to 0 after the first statement)
+                    limit = (
+                        nullcontext()
+                        if provider.self_limited
+                        else statement_timeout(session, seconds)
+                    )
+                    async with limit:
                         try:
                             data = await provider.run(ctx, settings)
                         except asyncio.CancelledError:
@@ -269,6 +278,8 @@ async def _run_one(
         return _pending()
     except ProviderForbidden as exc:
         return WidgetDataOut(status="forbidden", error=exc.message)
+    except ProviderError as exc:
+        return _error(exc.message)
     except ReportQueryTimeout:
         return _pending()
     except Exception as exc:
