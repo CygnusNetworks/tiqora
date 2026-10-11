@@ -9,6 +9,7 @@
  * auto-authenticated).
  */
 
+import { resolveWebchatData } from "./webchatMock";
 import { demoCatalogue, demoFacts, demoReport, demoReportingStatus, demoReportJob, demoSources } from "./reportsMock";
 
 export { resolveReportRun } from "./reportsMock";
@@ -144,6 +145,14 @@ ticketItems.push(
     age_seconds: 1800, escalation_time: 0, attachment_count: 0, has_ai_summary: false,
     channel: "phone",
   },
+  {
+    ...ticketItems[0], id: 116, tn: "20260701016", title: "Chat: Router blinkt rot",
+    ...QROUTE[0], ...STATES[1], ...PRIOS[1], ...OWNERS[0],
+    customer_id: "NORTHWIND", customer_user_id: "m.beispiel@northwind.example",
+    create_time: "2026-07-21T11:02:00Z", change_time: "2026-07-21T11:06:00Z",
+    age_seconds: 600, escalation_time: 0, attachment_count: 0, has_ai_summary: false,
+    channel: "webchat", chat_display_name: "Max Beispiel", chat_username: null,
+  },
 );
 /** Built on demand rather than eagerly: `ai_reply_source` is only known once
  * the article threads below have registered their AI-written articles. */
@@ -185,7 +194,7 @@ function ticketFacets() {
     channels: {
       email: ticketItems.filter((t) => t.channel === "email").length,
       telegram: ticketItems.filter((t) => t.channel === "telegram").length,
-      webchat: 0,
+      webchat: ticketItems.filter((t) => t.channel === "webchat").length,
       phone: ticketItems.filter((t) => t.channel === "phone").length,
     },
   };
@@ -697,6 +706,23 @@ registerThread(115, [
   { day: 21, hm: "10:22", sender: "agent", channel: 2, isHtml: false,
     subject: "Outbound call", from: "Alex Turner", to: "Karen Wu <k.wu@globex.example>",
     body: "Outbound call, 2 min. Confirmed the double capture from the payment provider's retry. Refund of the duplicate triggered, 3–5 business days. Corrected invoice follows by email." },
+]);
+
+// Web chat ticket (116): the visitor's messages come in over the widget. The
+// "WebChat" channel is Tiqora-owned, so its id is installation-specific and the
+// UI keys on the name.
+const WEBCHAT_CHANNEL_ID = 6;
+const wc = (spec: Omit<ArticleSpec, "subject" | "channel" | "channelName" | "isHtml" | "from" | "to">): ArticleSpec => ({
+  ...spec, subject: "WebChat", channel: WEBCHAT_CHANNEL_ID, channelName: "WebChat", isHtml: false,
+  from: spec.sender === "customer" ? "Max Beispiel" : "Alex Turner", to: "",
+});
+registerThread(116, [
+  wc({ day: 21, hm: "11:02", sender: "customer",
+    body: "Hallo, mein Router blinkt seit heute Morgen rot und das Internet ist weg." }),
+  wc({ day: 21, hm: "11:04", sender: "agent",
+    body: "Guten Tag Herr Beispiel, bitte trennen Sie den Router kurz vom Strom und warten Sie 30 Sekunden." }),
+  wc({ day: 21, hm: "11:06", sender: "customer",
+    body: "Habe ich gemacht, die LED blinkt immer noch rot." }),
 ]);
 
 // AI subsystem (state-only summary + drafts) for the demo ticket. Static,
@@ -1774,6 +1800,8 @@ const identityLinks = [
 
 export function resolveData(path: string, method: string): unknown | undefined {
   const p = path;
+  const wcData = resolveWebchatData(p, method);
+  if (wcData !== undefined) return wcData;
   // Auth
   if (p.endsWith("/auth/methods")) return {
     password: true, oidc: false, spnego: false, webauthn: true, ldap: false, saml: true,

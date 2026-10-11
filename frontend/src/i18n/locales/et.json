@@ -5331,6 +5331,11 @@
     "deniedTitle": "No access to reports",
     "deniedBody": "Your account is not allowed to view reports. Please contact your administrator."
   },
+  "webchat": {
+    "agent": {
+      "ringTitle": "New chat waiting"
+    }
+  },
   "webchatWidget": {
     "launcher": {
       "open": "Open chat",

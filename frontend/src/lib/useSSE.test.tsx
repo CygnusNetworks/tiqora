@@ -9,6 +9,38 @@ import {
 } from "./useSSE";
 import { clearNotifications, useNotifications } from "./notificationStore";
 import { getCalls, resetCalls } from "./callPopup";
+import { chatInboxKey, ticketChatKey } from "./webchatApi";
+import { resetChatRing, setRingContext } from "./chatRing";
+
+describe("handleSSEMessage chat events", () => {
+  const chatMsg = (type: string) =>
+    JSON.stringify({ type, session_id: "a", ticket_id: 116, queue_id: 1 });
+
+  it("chat events invalidate inbox and ticket", () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    for (const type of ["chat_message", "chat_assigned", "chat_ended"]) {
+      spy.mockClear();
+      handleSSEMessage(qc, chatMsg(type));
+      expect(spy).toHaveBeenCalledWith({ queryKey: chatInboxKey });
+      expect(spy).toHaveBeenCalledWith({ queryKey: ["tickets", 116] });
+    }
+  });
+
+  it("chat_typing invalidates the ticket chat, chat_waiting only the inbox", () => {
+    const qc = new QueryClient();
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    handleSSEMessage(qc, chatMsg("chat_typing"));
+    expect(spy).toHaveBeenCalledWith({ queryKey: chatInboxKey });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ticketChatKey(116) });
+    spy.mockClear();
+    resetChatRing();
+    setRingContext({ available: false, topics: [] });
+    handleSSEMessage(qc, chatMsg("chat_waiting"));
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith({ queryKey: chatInboxKey });
+  });
+});
 
 describe("handleSSEMessage", () => {
   it("invalidates the tickets cache prefix for ticket_changed", () => {

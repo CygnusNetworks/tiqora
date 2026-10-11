@@ -203,3 +203,10 @@ describe("formatFromAddress / formatToAddresses", () => {
     expect(formatFromAddress(raw)).toBe("Doe, Jane <jane@x.com>");
   });
 });
+
+describe("WebChat channel", () => {
+  it("is conversational with the chat icon", () => {
+    expect(isConversationalChannel("WebChat")).toBe(true);
+    expect(channelIcon("WebChat")).toBe("💬");
+  });
+});
