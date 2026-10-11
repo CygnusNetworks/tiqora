@@ -25331,6 +25331,70 @@
         "title": "Rect",
         "type": "object"
       },
+      "Recurrence": {
+        "additionalProperties": false,
+        "properties": {
+          "day_of_month": {
+            "anyOf": [
+              {
+                "maximum": 31.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Of Month"
+          },
+          "kind": {
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly",
+              "yearly"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "month": {
+            "anyOf": [
+              {
+                "maximum": 12.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Month"
+          },
+          "time": {
+            "title": "Time",
+            "type": "string"
+          },
+          "weekdays": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 7,
+            "title": "Weekdays",
+            "type": "array"
+          },
+          "workdays_only": {
+            "default": false,
+            "title": "Workdays Only",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "time"
+        ],
+        "title": "Recurrence",
+        "type": "object"
+      },
       "RecurrenceIn": {
         "description": "Common RRULE subset: FREQ + INTERVAL + (COUNT xor UNTIL).",
         "properties": {
@@ -25374,6 +25438,53 @@
           "type"
         ],
         "title": "RecurrenceIn",
+        "type": "object"
+      },
+      "RecurrencePreviewIn": {
+        "additionalProperties": false,
+        "properties": {
+          "recurrence": {
+            "$ref": "#/components/schemas/Recurrence"
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Zone"
+          }
+        },
+        "required": [
+          "recurrence"
+        ],
+        "title": "RecurrencePreviewIn",
+        "type": "object"
+      },
+      "RecurrencePreviewOut": {
+        "properties": {
+          "next_runs": {
+            "items": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "title": "Next Runs",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "next_runs",
+          "text"
+        ],
+        "title": "RecurrencePreviewOut",
         "type": "object"
       },
       "RedisStatusOut": {
@@ -26625,6 +26736,493 @@
           }
         },
         "title": "ReportRunOut",
+        "type": "object"
+      },
+      "ReportScheduleIn": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "default": true,
+            "title": "Active",
+            "type": "boolean"
+          },
+          "body": {
+            "default": "",
+            "maxLength": 10000,
+            "title": "Body",
+            "type": "string"
+          },
+          "format": {
+            "default": "pdf",
+            "enum": [
+              "pdf",
+              "xlsx",
+              "csv"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleItemIn"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "language": {
+            "default": "de",
+            "enum": [
+              "de",
+              "en"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "only_if_nonempty": {
+            "default": false,
+            "title": "Only If Nonempty",
+            "type": "boolean"
+          },
+          "recipients": {
+            "$ref": "#/components/schemas/ScheduleRecipientsIn"
+          },
+          "recurrence": {
+            "$ref": "#/components/schemas/Recurrence"
+          },
+          "subject": {
+            "default": "",
+            "maxLength": 250,
+            "title": "Subject",
+            "type": "string"
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Zone"
+          }
+        },
+        "required": [
+          "name",
+          "items",
+          "recurrence",
+          "recipients"
+        ],
+        "title": "ReportScheduleIn",
+        "type": "object"
+      },
+      "ReportScheduleListItemOut": {
+        "description": "Lightweight row of the list (no availability checks, no recipient views).",
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "can_edit": {
+            "title": "Can Edit",
+            "type": "boolean"
+          },
+          "failure_count": {
+            "title": "Failure Count",
+            "type": "integer"
+          },
+          "format": {
+            "enum": [
+              "pdf",
+              "xlsx",
+              "csv"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_owner": {
+            "title": "Is Owner",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleItemSummaryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "last_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "succeeded",
+                  "partial",
+                  "failed",
+                  "skipped"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Status"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run At"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/ReportOwnerOut"
+          },
+          "paused_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused Reason"
+          },
+          "recurrence_text": {
+            "title": "Recurrence Text",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "owner",
+          "is_owner",
+          "can_edit",
+          "items",
+          "format",
+          "recurrence_text",
+          "active",
+          "paused_reason",
+          "next_run_at",
+          "last_run_at",
+          "last_status",
+          "failure_count",
+          "version"
+        ],
+        "title": "ReportScheduleListItemOut",
+        "type": "object"
+      },
+      "ReportScheduleOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "can_edit": {
+            "title": "Can Edit",
+            "type": "boolean"
+          },
+          "changed_at": {
+            "format": "date-time",
+            "title": "Changed At",
+            "type": "string"
+          },
+          "failure_count": {
+            "title": "Failure Count",
+            "type": "integer"
+          },
+          "format": {
+            "enum": [
+              "pdf",
+              "xlsx",
+              "csv"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_owner": {
+            "title": "Is Owner",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "language": {
+            "enum": [
+              "de",
+              "en"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "last_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "succeeded",
+                  "partial",
+                  "failed",
+                  "skipped"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Status"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run At"
+          },
+          "only_if_nonempty": {
+            "title": "Only If Nonempty",
+            "type": "boolean"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/ReportOwnerOut"
+          },
+          "paused_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused Reason"
+          },
+          "recipients": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleRecipientOut"
+            },
+            "title": "Recipients",
+            "type": "array"
+          },
+          "recurrence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Recurrence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recurrence_text": {
+            "title": "Recurrence Text",
+            "type": "string"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "time_zone": {
+            "title": "Time Zone",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "owner",
+          "is_owner",
+          "can_edit",
+          "items",
+          "format",
+          "recurrence",
+          "recurrence_text",
+          "time_zone",
+          "language",
+          "subject",
+          "body",
+          "only_if_nonempty",
+          "active",
+          "paused_reason",
+          "next_run_at",
+          "last_run_at",
+          "last_status",
+          "failure_count",
+          "recipients",
+          "version",
+          "changed_at"
+        ],
+        "title": "ReportScheduleOut",
+        "type": "object"
+      },
+      "ReportScheduleUpdateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "default": true,
+            "title": "Active",
+            "type": "boolean"
+          },
+          "body": {
+            "default": "",
+            "maxLength": 10000,
+            "title": "Body",
+            "type": "string"
+          },
+          "format": {
+            "default": "pdf",
+            "enum": [
+              "pdf",
+              "xlsx",
+              "csv"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleItemIn"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "language": {
+            "default": "de",
+            "enum": [
+              "de",
+              "en"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "only_if_nonempty": {
+            "default": false,
+            "title": "Only If Nonempty",
+            "type": "boolean"
+          },
+          "recipients": {
+            "$ref": "#/components/schemas/ScheduleRecipientsIn"
+          },
+          "recurrence": {
+            "$ref": "#/components/schemas/Recurrence"
+          },
+          "subject": {
+            "default": "",
+            "maxLength": 250,
+            "title": "Subject",
+            "type": "string"
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Zone"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "items",
+          "recurrence",
+          "recipients",
+          "version"
+        ],
+        "title": "ReportScheduleUpdateIn",
         "type": "object"
       },
       "ReportSourceOut": {
@@ -27920,6 +28518,311 @@
           "version"
         ],
         "title": "SavedSearchUpdateIn",
+        "type": "object"
+      },
+      "ScheduleItemIn": {
+        "additionalProperties": false,
+        "properties": {
+          "overrides": {
+            "$ref": "#/components/schemas/ScheduleItemOverrides"
+          },
+          "report_key": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Report Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "report_key"
+        ],
+        "title": "ScheduleItemIn",
+        "type": "object"
+      },
+      "ScheduleItemOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "overrides": {
+            "$ref": "#/components/schemas/ScheduleItemOverrides"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          },
+          "report_key": {
+            "title": "Report Key",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "title_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Key"
+          }
+        },
+        "required": [
+          "report_key",
+          "title",
+          "title_key",
+          "available",
+          "problem",
+          "overrides"
+        ],
+        "title": "ScheduleItemOut",
+        "type": "object"
+      },
+      "ScheduleItemOverrides": {
+        "additionalProperties": false,
+        "properties": {
+          "grain": {
+            "anyOf": [
+              {
+                "enum": [
+                  "day",
+                  "week",
+                  "month",
+                  "quarter",
+                  "year"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grain"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "maxLength": 1000,
+                        "type": "string"
+                      },
+                      {
+                        "type": "integer"
+                      }
+                    ]
+                  },
+                  "maxItems": 1000,
+                  "type": "array"
+                },
+                {
+                  "maxLength": 1000,
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "maxProperties": 10,
+            "propertyNames": {
+              "maxLength": 40
+            },
+            "title": "Parameters",
+            "type": "object"
+          },
+          "time_range": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "absolute": "#/components/schemas/AbsoluteTimeRange",
+                    "relative": "#/components/schemas/RelativeTimeRange"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/RelativeTimeRange"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AbsoluteTimeRange"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Range"
+          }
+        },
+        "title": "ScheduleItemOverrides",
+        "type": "object"
+      },
+      "ScheduleItemSummaryOut": {
+        "description": "The list shows titles only (no per-item rights check, see the list route).",
+        "properties": {
+          "report_key": {
+            "title": "Report Key",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "title_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Key"
+          }
+        },
+        "required": [
+          "report_key",
+          "title",
+          "title_key"
+        ],
+        "title": "ScheduleItemSummaryOut",
+        "type": "object"
+      },
+      "ScheduleRecipientOut": {
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "kind": {
+            "enum": [
+              "user",
+              "group",
+              "role",
+              "email"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "email",
+          "label",
+          "problem"
+        ],
+        "title": "ScheduleRecipientOut",
+        "type": "object"
+      },
+      "ScheduleRecipientsIn": {
+        "additionalProperties": false,
+        "properties": {
+          "emails": {
+            "items": {
+              "maxLength": 250,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Emails",
+            "type": "array"
+          },
+          "group_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 20,
+            "title": "Group Ids",
+            "type": "array"
+          },
+          "role_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 20,
+            "title": "Role Ids",
+            "type": "array"
+          },
+          "user_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 50,
+            "title": "User Ids",
+            "type": "array"
+          }
+        },
+        "title": "ScheduleRecipientsIn",
         "type": "object"
       },
       "SearchHit": {
@@ -34276,6 +35179,11 @@
           "login": {
             "title": "Login",
             "type": "string"
+          },
+          "report_external_recipients": {
+            "default": false,
+            "title": "Report External Recipients",
+            "type": "boolean"
           },
           "sso_logout": {
             "default": false,
@@ -79565,6 +80473,462 @@
         "summary": "List Types",
         "tags": [
           "reference"
+        ]
+      }
+    },
+    "/api/v1/report-schedules": {
+      "get": {
+        "description": "Own schedules (lightweight rows); ``all=true`` lists everybody's, admins only.",
+        "operationId": "list_report_schedules_api_v1_report_schedules_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "all",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "All",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReportScheduleListItemOut"
+                  },
+                  "title": "Response List Report Schedules Api V1 Report Schedules Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Report Schedules",
+        "tags": [
+          "report-schedules"
+        ]
+      },
+      "post": {
+        "operationId": "create_report_schedule_api_v1_report_schedules_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportScheduleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportScheduleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Report Schedule",
+        "tags": [
+          "report-schedules"
+        ]
+      }
+    },
+    "/api/v1/report-schedules/preview-recurrence": {
+      "post": {
+        "description": "The next five occurrences and the German sentence (pure, bounded).",
+        "operationId": "preview_recurrence_api_v1_report_schedules_preview_recurrence_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecurrencePreviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurrencePreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Recurrence",
+        "tags": [
+          "report-schedules"
+        ]
+      }
+    },
+    "/api/v1/report-schedules/{schedule_id}": {
+      "delete": {
+        "operationId": "delete_report_schedule_api_v1_report_schedules__schedule_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "schedule_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Schedule Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Report Schedule",
+        "tags": [
+          "report-schedules"
+        ]
+      },
+      "get": {
+        "operationId": "get_report_schedule_api_v1_report_schedules__schedule_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "schedule_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Schedule Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportScheduleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Report Schedule",
+        "tags": [
+          "report-schedules"
+        ]
+      },
+      "put": {
+        "operationId": "update_report_schedule_api_v1_report_schedules__schedule_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "schedule_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Schedule Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportScheduleUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportScheduleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Report Schedule",
+        "tags": [
+          "report-schedules"
         ]
       }
     },

@@ -7959,6 +7959,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/report-schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Report Schedules
+         * @description Own schedules (lightweight rows); ``all=true`` lists everybody's, admins only.
+         */
+        get: operations["list_report_schedules_api_v1_report_schedules_get"];
+        put?: never;
+        /** Create Report Schedule */
+        post: operations["create_report_schedule_api_v1_report_schedules_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-schedules/preview-recurrence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Recurrence
+         * @description The next five occurrences and the German sentence (pure, bounded).
+         */
+        post: operations["preview_recurrence_api_v1_report_schedules_preview_recurrence_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-schedules/{schedule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Report Schedule */
+        get: operations["get_report_schedule_api_v1_report_schedules__schedule_id__get"];
+        /** Update Report Schedule */
+        put: operations["update_report_schedule_api_v1_report_schedules__schedule_id__put"];
+        post?: never;
+        /** Delete Report Schedule */
+        delete: operations["delete_report_schedule_api_v1_report_schedules__schedule_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reporting/sources": {
         parameters: {
             query?: never;
@@ -18766,6 +18826,27 @@ export interface components {
             /** Y */
             y: number;
         };
+        /** Recurrence */
+        Recurrence: {
+            /** Day Of Month */
+            day_of_month?: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "daily" | "weekly" | "monthly" | "yearly";
+            /** Month */
+            month?: number | null;
+            /** Time */
+            time: string;
+            /** Weekdays */
+            weekdays?: number[];
+            /**
+             * Workdays Only
+             * @default false
+             */
+            workdays_only: boolean;
+        };
         /**
          * RecurrenceIn
          * @description Common RRULE subset: FREQ + INTERVAL + (COUNT xor UNTIL).
@@ -18785,6 +18866,19 @@ export interface components {
             type: string;
             /** Until */
             until?: string | null;
+        };
+        /** RecurrencePreviewIn */
+        RecurrencePreviewIn: {
+            recurrence: components["schemas"]["Recurrence"];
+            /** Time Zone */
+            time_zone?: string | null;
+        };
+        /** RecurrencePreviewOut */
+        RecurrencePreviewOut: {
+            /** Next Runs */
+            next_runs: string[];
+            /** Text */
+            text: string;
         };
         /** RedisStatusOut */
         RedisStatusOut: {
@@ -19160,6 +19254,188 @@ export interface components {
         ReportRunOut: {
             job?: components["schemas"]["JobAccepted"] | null;
             result?: components["schemas"]["ReportResultOut"] | null;
+        };
+        /** ReportScheduleIn */
+        ReportScheduleIn: {
+            /**
+             * Active
+             * @default true
+             */
+            active: boolean;
+            /**
+             * Body
+             * @default
+             */
+            body: string;
+            /**
+             * Format
+             * @default pdf
+             * @enum {string}
+             */
+            format: "pdf" | "xlsx" | "csv";
+            /** Items */
+            items: components["schemas"]["ScheduleItemIn"][];
+            /**
+             * Language
+             * @default de
+             * @enum {string}
+             */
+            language: "de" | "en";
+            /** Name */
+            name: string;
+            /**
+             * Only If Nonempty
+             * @default false
+             */
+            only_if_nonempty: boolean;
+            recipients: components["schemas"]["ScheduleRecipientsIn"];
+            recurrence: components["schemas"]["Recurrence"];
+            /**
+             * Subject
+             * @default
+             */
+            subject: string;
+            /** Time Zone */
+            time_zone?: string | null;
+        };
+        /**
+         * ReportScheduleListItemOut
+         * @description Lightweight row of the list (no availability checks, no recipient views).
+         */
+        ReportScheduleListItemOut: {
+            /** Active */
+            active: boolean;
+            /** Can Edit */
+            can_edit: boolean;
+            /** Failure Count */
+            failure_count: number;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "pdf" | "xlsx" | "csv";
+            /** Id */
+            id: number;
+            /** Is Owner */
+            is_owner: boolean;
+            /** Items */
+            items: components["schemas"]["ScheduleItemSummaryOut"][];
+            /** Last Run At */
+            last_run_at: string | null;
+            /** Last Status */
+            last_status: ("succeeded" | "partial" | "failed" | "skipped") | null;
+            /** Name */
+            name: string;
+            /** Next Run At */
+            next_run_at: string | null;
+            owner: components["schemas"]["ReportOwnerOut"];
+            /** Paused Reason */
+            paused_reason: string | null;
+            /** Recurrence Text */
+            recurrence_text: string;
+            /** Version */
+            version: number;
+        };
+        /** ReportScheduleOut */
+        ReportScheduleOut: {
+            /** Active */
+            active: boolean;
+            /** Body */
+            body: string;
+            /** Can Edit */
+            can_edit: boolean;
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /** Failure Count */
+            failure_count: number;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "pdf" | "xlsx" | "csv";
+            /** Id */
+            id: number;
+            /** Is Owner */
+            is_owner: boolean;
+            /** Items */
+            items: components["schemas"]["ScheduleItemOut"][];
+            /**
+             * Language
+             * @enum {string}
+             */
+            language: "de" | "en";
+            /** Last Run At */
+            last_run_at: string | null;
+            /** Last Status */
+            last_status: ("succeeded" | "partial" | "failed" | "skipped") | null;
+            /** Name */
+            name: string;
+            /** Next Run At */
+            next_run_at: string | null;
+            /** Only If Nonempty */
+            only_if_nonempty: boolean;
+            owner: components["schemas"]["ReportOwnerOut"];
+            /** Paused Reason */
+            paused_reason: string | null;
+            /** Recipients */
+            recipients: components["schemas"]["ScheduleRecipientOut"][];
+            recurrence: components["schemas"]["Recurrence"] | null;
+            /** Recurrence Text */
+            recurrence_text: string;
+            /** Subject */
+            subject: string;
+            /** Time Zone */
+            time_zone: string;
+            /** Version */
+            version: number;
+        };
+        /** ReportScheduleUpdateIn */
+        ReportScheduleUpdateIn: {
+            /**
+             * Active
+             * @default true
+             */
+            active: boolean;
+            /**
+             * Body
+             * @default
+             */
+            body: string;
+            /**
+             * Format
+             * @default pdf
+             * @enum {string}
+             */
+            format: "pdf" | "xlsx" | "csv";
+            /** Items */
+            items: components["schemas"]["ScheduleItemIn"][];
+            /**
+             * Language
+             * @default de
+             * @enum {string}
+             */
+            language: "de" | "en";
+            /** Name */
+            name: string;
+            /**
+             * Only If Nonempty
+             * @default false
+             */
+            only_if_nonempty: boolean;
+            recipients: components["schemas"]["ScheduleRecipientsIn"];
+            recurrence: components["schemas"]["Recurrence"];
+            /**
+             * Subject
+             * @default
+             */
+            subject: string;
+            /** Time Zone */
+            time_zone?: string | null;
+            /** Version */
+            version: number;
         };
         /** ReportSourceOut */
         ReportSourceOut: {
@@ -19587,6 +19863,76 @@ export interface components {
             sort_order: "asc" | "desc";
             /** Version */
             version: number;
+        };
+        /** ScheduleItemIn */
+        ScheduleItemIn: {
+            overrides?: components["schemas"]["ScheduleItemOverrides"];
+            /** Report Key */
+            report_key: string;
+        };
+        /** ScheduleItemOut */
+        ScheduleItemOut: {
+            /** Available */
+            available: boolean;
+            overrides: components["schemas"]["ScheduleItemOverrides"];
+            /** Problem */
+            problem: string | null;
+            /** Report Key */
+            report_key: string;
+            /** Title */
+            title: string | null;
+            /** Title Key */
+            title_key: string | null;
+        };
+        /** ScheduleItemOverrides */
+        ScheduleItemOverrides: {
+            /** Grain */
+            grain?: ("day" | "week" | "month" | "quarter" | "year") | null;
+            /** Parameters */
+            parameters?: {
+                [key: string]: (string | number)[] | string | number | boolean | null;
+            };
+            /** Time Range */
+            time_range?: (components["schemas"]["RelativeTimeRange"] | components["schemas"]["AbsoluteTimeRange"]) | null;
+        };
+        /**
+         * ScheduleItemSummaryOut
+         * @description The list shows titles only (no per-item rights check, see the list route).
+         */
+        ScheduleItemSummaryOut: {
+            /** Report Key */
+            report_key: string;
+            /** Title */
+            title: string | null;
+            /** Title Key */
+            title_key: string | null;
+        };
+        /** ScheduleRecipientOut */
+        ScheduleRecipientOut: {
+            /** Email */
+            email: string | null;
+            /** Id */
+            id: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "user" | "group" | "role" | "email";
+            /** Label */
+            label: string;
+            /** Problem */
+            problem: string | null;
+        };
+        /** ScheduleRecipientsIn */
+        ScheduleRecipientsIn: {
+            /** Emails */
+            emails?: string[];
+            /** Group Ids */
+            group_ids?: number[];
+            /** Role Ids */
+            role_ids?: number[];
+            /** User Ids */
+            user_ids?: number[];
         };
         /** SearchHit */
         SearchHit: {
@@ -21801,6 +22147,11 @@ export interface components {
             last_name: string;
             /** Login */
             login: string;
+            /**
+             * Report External Recipients
+             * @default false
+             */
+            report_external_recipients: boolean;
             /**
              * Sso Logout
              * @default false
@@ -42949,6 +43300,222 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TypeRefOut"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_report_schedules_api_v1_report_schedules_get: {
+        parameters: {
+            query?: {
+                all?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportScheduleListItemOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_report_schedule_api_v1_report_schedules_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportScheduleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportScheduleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_recurrence_api_v1_report_schedules_preview_recurrence_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecurrencePreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurrencePreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_report_schedule_api_v1_report_schedules__schedule_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                schedule_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportScheduleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_report_schedule_api_v1_report_schedules__schedule_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                schedule_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportScheduleUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportScheduleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_report_schedule_api_v1_report_schedules__schedule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                schedule_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

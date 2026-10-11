@@ -231,6 +231,9 @@ def test_reports_and_reporting_map_to_stats() -> None:
         "/api/v1/reports/export",
         "/api/v1/reporting/sources",
         "/api/v1/reporting/status",
+        "/api/v1/report-schedules",
+        "/api/v1/report-schedules/5",
+        "/api/v1/report-runs/5/files/1",
     ):
         assert path_to_area(path) == "stats", path
     ro, rw = frozenset({"stats:ro"}), frozenset({"stats:rw"})

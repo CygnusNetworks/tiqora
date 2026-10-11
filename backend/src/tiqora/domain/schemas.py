@@ -92,6 +92,9 @@ class UserMe(BaseModel):
     # True when the agent may share saved reports with groups / everyone (``rw`` on the
     # ``stats`` group or admin). Implies ``can_create_reports``.
     can_share_reports: bool = False
+    # True when scheduled reports may go to external e-mail addresses
+    # (``reporting.schedule_external_recipients``; the share right is still needed).
+    report_external_recipients: bool = False
 
 
 class UserLanguageUpdate(BaseModel):
