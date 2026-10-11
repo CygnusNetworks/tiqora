@@ -40,7 +40,7 @@ from tiqora.calendar.service import (
     CalendarService,
 )
 from tiqora.db.legacy.calendar import Calendar, CalendarAppointment
-from tiqora.domain.ticket_write_service import update_dynamic_field
+from tiqora.domain.ticket_write_service import InvalidInput, update_dynamic_field
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.util.perl import perl_truthy
 from tiqora.znuny.sysconfig import SysConfig
@@ -58,6 +58,7 @@ _IGNORED_KEYS = (
 )
 _DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$")
 _COMMA_SPLIT_RE = re.compile(r"\s*,\s*")
+_MAX_LEN = 255  # calendar_appointment.title/location are String(255)
 
 
 def _skip(action: str, reason: str) -> None:
@@ -71,6 +72,16 @@ def _text(config: dict[str, Any], key: str) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _too_long(config: dict[str, Any], action: str) -> bool:
+    """Title/Location beyond the column width would raise a DataError after the insert."""
+    for key in ("Title", "Location"):
+        value = _text(config, key)
+        if value is not None and len(value) > _MAX_LEN:
+            _skip(action, f"{key} is longer than {_MAX_LEN} characters")
+            return True
+    return False
 
 
 def _split_list(value: str | None) -> list[str]:
@@ -185,6 +196,11 @@ async def action_appointment_create(
     if start is None or end is None:
         _skip(action, "StartTime/EndTime are not dates")
         return
+    if end < start:
+        _skip(action, "EndTime is before StartTime")
+        return
+    if _too_long(config, action):
+        return
     _warn_ignored(config, action)
     data = AppointmentIn(
         calendar_id=calendar.id,
@@ -203,9 +219,12 @@ async def action_appointment_create(
     field_name = _text(config, "DynamicField_AppointmentID")
     if field_name is not None:
         # AppointmentCreate.pm: ValueSet with UserID 1 (system history entry).
-        await update_dynamic_field(
-            session, ticket_id=ticket_id, field_name=field_name, values=[str(row.id)], user_id=1
-        )
+        try:
+            await update_dynamic_field(
+                session, ticket_id=ticket_id, field_name=field_name, values=[str(row.id)], user_id=1
+            )
+        except InvalidInput as exc:
+            _skip(action, f"DynamicField_AppointmentID {field_name!r} not written: {exc}")
 
 
 async def _appointment(
@@ -239,6 +258,8 @@ async def action_appointment_update(
     row = await _appointment(session, config, action)
     if row is None:
         return
+    if _too_long(config, action):
+        return
     values: dict[str, Any] = {}
     for key, field in (("StartTime", "start_time"), ("EndTime", "end_time")):
         raw = _text(config, key)
@@ -263,6 +284,15 @@ async def action_appointment_update(
         ids = _split_list(_text(config, key))
         if ids:
             values[field] = ",".join(ids)
+    new_start = values.get("start_time", row.start_time)
+    new_end = values.get("end_time", row.end_time)
+    if new_start is not None and new_end is not None:
+        # Stored times are naive UTC; compare like with like.
+        a = new_start.replace(tzinfo=None) if new_start.tzinfo else new_start
+        b = new_end.replace(tzinfo=None) if new_end.tzinfo else new_end
+        if b < a:
+            _skip(action, "EndTime is before StartTime")
+            return
     recurrence = _recurrence(config, zone, action)
     if recurrence is not None:
         values["recurrence"] = recurrence

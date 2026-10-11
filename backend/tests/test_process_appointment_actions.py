@@ -47,7 +47,7 @@ _CLEANUP = (
     "DELETE FROM dynamic_field_value WHERE object_id BETWEEN 891000 AND 891999",
     "DELETE FROM ticket_history WHERE ticket_id BETWEEN 891000 AND 891999",
     "DELETE FROM ticket WHERE id BETWEEN 891000 AND 891999",
-    "DELETE FROM dynamic_field WHERE id = 891030",
+    "DELETE FROM dynamic_field WHERE id IN (891030, 891031)",
     "DELETE FROM pm_process WHERE id BETWEEN 891100 AND 891199",
     "DELETE FROM pm_activity WHERE id BETWEEN 891100 AND 891199",
     "DELETE FROM pm_transition WHERE id BETWEEN 891100 AND 891199",
@@ -131,6 +131,16 @@ def _seed(sync_url: str) -> None:
                 " VALUES (:id, 0, :n, :n, :id, 'Text', 'Ticket', '---', 1, :t, 1, :t, 1)"
             ),
             {"id": DF_ID, "n": DF_NAME, "t": T0},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO dynamic_field (id, internal_field, name, label, field_order,"
+                " field_type, object_type, config, valid_id, create_time, create_by,"
+                " change_time, change_by)"
+                " VALUES (891031, 0, 'AppointmentDateWf3', 'd', 891031, 'Date', 'Ticket', '---',"
+                " 1, :t, 1, :t, 1)"
+            ),
+            {"t": T0},
         )
         for tid, title in ((TICKET, "wf3 direct"), (TICKET_TRANSITION, "wf3 transition")):
             conn.execute(
@@ -484,3 +494,40 @@ async def test_update_via_smart_tag_from_df(env: Env) -> None:
     )
     rows = await env.appointments()
     assert [(r["id"], r["title"]) for r in rows] == [(created, "Updated by tag")]
+
+
+@pytest.mark.db
+async def test_create_df_rejecting_the_id_keeps_appointment_and_does_not_raise(
+    env: Env, caplog: pytest.LogCaptureFixture
+) -> None:
+    config = {**_CREATE, "DynamicField_AppointmentID": "AppointmentDateWf3"}
+    with caplog.at_level(logging.WARNING):
+        assert await env.run("AppointmentCreate", config) is None
+    assert "process_action_appointment_skipped" in caplog.text
+    assert len(await env.appointments()) == 1
+    assert await env.df_value() is None
+
+
+@pytest.mark.db
+async def test_overlong_text_and_inverted_times_are_skipped(
+    env: Env, caplog: pytest.LogCaptureFixture
+) -> None:
+    bad = (
+        {**_CREATE, "Title": "x" * 256},
+        {**_CREATE, "Location": "y" * 256},
+        {**_CREATE, "StartTime": "2026-11-02 11:00", "EndTime": "2026-11-02 10:00"},
+    )
+    for config in bad:
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
+            assert await env.run("AppointmentCreate", config) is None
+        assert "process_action_appointment_skipped" in caplog.text
+    assert await env.appointments() == []
+    await env.run("AppointmentCreate", _CREATE)
+    row_id = (await env.appointments())[0]["id"]
+    for upd in ({"Title": "z" * 256}, {"EndTime": "2026-11-02 07:00"}):
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
+            assert await env.run("AppointmentUpdate", {"AppointmentID": row_id, **upd}) is None
+        assert "process_action_appointment_skipped" in caplog.text
+    assert (await env.appointments())[0]["title"] == "Webinar"
