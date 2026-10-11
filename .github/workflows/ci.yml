@@ -89,8 +89,8 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
-      - name: Install crypto tooling (gpg for PGP tests; openssl is preinstalled)
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gnupg xmlsec1
+      - name: Install crypto and PDF tooling (gpg for PGP tests, Pango for WeasyPrint; openssl is preinstalled)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gnupg xmlsec1 libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 fonts-dejavu-core
       - name: Install dependencies
         run: uv sync --extra dev --extra crypto --extra saml
       # Coverage instrumentation adds wall time to every run; only release
@@ -98,9 +98,13 @@ jobs:
       # on PRs/main and the instrumented variant runs only on v* tags.
       - name: Pytest
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        env:
+          TIQORA_REQUIRE_PDF: "1"
         run: uv run pytest -q
       - name: Pytest (with coverage, for release-tag badge)
         if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TIQORA_REQUIRE_PDF: "1"
         run: uv run pytest -q --cov=tiqora --cov-report=json:coverage.json
       - name: Upload coverage (for release-tag badge)
         if: startsWith(github.ref, 'refs/tags/v')

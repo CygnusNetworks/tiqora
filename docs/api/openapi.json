@@ -25797,7 +25797,8 @@
             "default": "xlsx",
             "enum": [
               "xlsx",
-              "csv"
+              "csv",
+              "pdf"
             ],
             "title": "Format",
             "type": "string"
@@ -25828,6 +25829,18 @@
             "maxItems": 20,
             "title": "Info Lines",
             "type": "array"
+          },
+          "locale": {
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locale"
           },
           "no_cache": {
             "default": false,

@@ -18931,11 +18931,13 @@ export interface components {
              * @default xlsx
              * @enum {string}
              */
-            format: "xlsx" | "csv";
+            format: "xlsx" | "csv" | "pdf";
             /** Grain */
             grain?: ("day" | "week" | "month" | "quarter" | "year") | null;
             /** Info Lines */
             info_lines?: string[];
+            /** Locale */
+            locale?: string | null;
             /**
              * No Cache
              * @default false

@@ -24,7 +24,9 @@ import json
 import re
 from collections.abc import AsyncIterator, Awaitable
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Any, Final
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,6 +46,7 @@ from tiqora.reporting.compiler import RunParams
 from tiqora.reporting.definition import DefinitionError, ReportDefinition
 from tiqora.reporting.engine import run_report
 from tiqora.reporting.export import report_sheet, write_report_csv, write_xlsx_workbook
+from tiqora.reporting.pdf import PdfMeta, PdfUnavailable, ReportSection, write_report_pdf
 from tiqora.reporting.run_service import (
     REPORT_EXPORT_KIND,
     REPORT_RUN_KIND,
@@ -55,6 +58,7 @@ from tiqora.reporting.run_service import (
 from tiqora.reporting.schemas import ReportResultOut, ReportRunIn
 from tiqora.reporting.settings import ReportingSettings, load_reporting_settings
 from tiqora.reporting.sql import ReportQueryTimeout
+from tiqora.reporting.texts import ExportLabels, load_texts
 
 logger = structlog.get_logger(__name__)
 
@@ -69,6 +73,11 @@ RESULT_TOO_LARGE_MESSAGE: Final = (
 )
 XLSX_CONTENT_TYPE: Final = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 CSV_CONTENT_TYPE: Final = "text/csv; charset=utf-8"
+PDF_CONTENT_TYPE: Final = "application/pdf"
+PDF_UNAVAILABLE_MESSAGE: Final = (
+    "PDF-Erstellung ist auf diesem Server nicht verfügbar. "
+    "Bitte wenden Sie sich an einen Administrator."
+)
 _UMLAUTS: Final = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"})
 #: seconds between two looks at ``cancel_requested`` while a report computes
 CANCEL_POLL_SECONDS: float = 1.0
@@ -77,6 +86,13 @@ CANCEL_POLL_SECONDS: float = 1.0
 def export_slug(title: str) -> str:
     """File name stem of an export: ``"Zeit für Kunden"`` -> ``"zeit-fuer-kunden"``."""
     return re.sub(r"[^a-z0-9]+", "-", title.lower().translate(_UMLAUTS)).strip("-") or "bericht"
+
+
+def _local_now(zone: str) -> datetime:
+    try:
+        return datetime.now(ZoneInfo(zone)).replace(tzinfo=None)
+    except (ZoneInfoNotFoundError, ValueError):
+        return datetime.now(UTC).replace(tzinfo=None)
 
 
 @asynccontextmanager
@@ -213,14 +229,36 @@ async def run_export_job(ctx: JobContext, payload: ReportExportPayload) -> dict[
             key=key,
             reporting=reporting,
             timeout_message=EXPORT_TIMEOUT_MESSAGE,
-            row_cap=reporting.export_row_limit,
+            row_cap=reporting.pdf_row_limit if body.format == "pdf" else reporting.export_row_limit,
             use_cache=False,
             compare_previous=body.compare_previous,
         )
+        generated_at = _local_now(params.time_zone)
     rows = len(result.rows)
     await ctx.progress(rows, rows, "Datei wird gespeichert …")
     slug = export_slug(body.title)
-    if body.format == "csv":
+    if body.format == "pdf":
+        texts = load_texts(body.locale)
+        section = ReportSection(
+            title=body.title,
+            result=result,
+            visualization=definition.visualization,
+            labels=ExportLabels(
+                column_labels=body.column_labels,
+                value_labels=body.value_labels,
+                totals_label=body.totals_label,
+            ),
+            info_lines=tuple(body.info_lines),
+            row_limit=reporting.pdf_row_limit,
+        )
+        meta = PdfMeta(title=body.title, generated_at_local=generated_at, owner_line=None)
+        try:
+            # CPU bound: keep the event loop (heartbeats, cancel polling) running
+            pdf = await asyncio.to_thread(write_report_pdf, [section], meta, texts)
+        except PdfUnavailable as exc:
+            raise JobFailed(PDF_UNAVAILABLE_MESSAGE) from exc
+        await ctx.add_file(f"{slug}.pdf", PDF_CONTENT_TYPE, pdf)
+    elif body.format == "csv":
         data = write_report_csv(
             result,
             column_labels=body.column_labels,

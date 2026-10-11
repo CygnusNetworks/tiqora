@@ -60,6 +60,7 @@ def make_result(
     columns: list[ResultColumnOut],
     rows: list[list[Cell]],
     labels: dict[str, dict[str, str]] | None = None,
+    truncated: bool = False,
 ) -> ReportResultOut:
     return ReportResultOut(
         report_key=None,
@@ -69,7 +70,7 @@ def make_result(
         totals=None,
         previous=None,
         row_count=len(rows),
-        truncated=False,
+        truncated=truncated,
         time_window=None,
         generated_at=datetime(2026, 10, 11, tzinfo=UTC),
         cached=False,
