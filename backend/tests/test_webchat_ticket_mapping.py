@@ -8,6 +8,7 @@ A chat line is a plain Znuny article on the ``WebChat`` channel (module
 from __future__ import annotations
 
 import pytest
+import pytest_asyncio
 from pydantic import ValidationError
 from sqlalchemy import create_engine, insert, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -107,8 +108,8 @@ def _restore_webchat_row(url: str, saved: dict[str, object] | None) -> None:
         engine.dispose()
 
 
-@pytest.fixture
-def env(request: pytest.FixtureRequest):  # type: ignore[no-untyped-def]
+@pytest_asyncio.fixture
+async def env(request: pytest.FixtureRequest):  # type: ignore[no-untyped-def]
     """(sync url, async session factory); everything created is removed afterwards."""
     url: str = request.getfixturevalue(request.param)
     engine = create_engine(url)
@@ -124,10 +125,14 @@ def env(request: pytest.FixtureRequest):  # type: ignore[no-untyped-def]
     saved = _stash_webchat_row(url)
     aengine = create_async_engine(_to_async_url(url))
     factory = async_sessionmaker(aengine, class_=AsyncSession, expire_on_commit=False)
-    yield url, factory
-    delete_above_marks(url, marks, first=mark_cleanup_first(marks))
-    _restore_webchat_row(url, saved)
-    _cleanup(url)
+    try:
+        yield url, factory
+    finally:
+        # inside the loop: pooled aiomysql connections must not be closed by GC later
+        await aengine.dispose()
+        delete_above_marks(url, marks, first=mark_cleanup_first(marks))
+        _restore_webchat_row(url, saved)
+        _cleanup(url)
 
 
 async def _ticket(factory: async_sessionmaker[AsyncSession], title: str) -> int:

@@ -90,8 +90,9 @@ class Settings(BaseSettings):
     # Empty → fall back to the first CORS origin (dev) in domain helpers.
     public_base_url: str = Field(default="", validation_alias="TIQORA_PUBLIC_BASE_URL")
     # Web-chat: static widget build served by the api container, and the process-wide
-    # cap on open visitor/agent SSE streams (clamped to RLIMIT_NOFILE - 256 at startup,
-    # see webchat.hub.effective_max_streams).
+    # cap on open VISITOR chat streams (only those subscribe to ChatHub; the agent SSE in
+    # api/v1/events.py is not counted). Clamped to RLIMIT_NOFILE - 256 at startup, see
+    # webchat.hub.effective_max_streams.
     webchat_dist_dir: str = Field(
         default="/app/webchat/dist", validation_alias="TIQORA_WEBCHAT_DIST_DIR"
     )

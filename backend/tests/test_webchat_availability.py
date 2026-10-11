@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
 
 import pytest
+import pytest_asyncio
 from sqlalchemy import create_engine, insert, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -83,8 +84,10 @@ def _add_agent(conn: Any, user_id: int, *, rw: bool) -> None:
         )
 
 
-@pytest.fixture
-def factory(request: pytest.FixtureRequest) -> Iterator[async_sessionmaker[AsyncSession]]:
+@pytest_asyncio.fixture
+async def factory(
+    request: pytest.FixtureRequest,
+) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     url: str = request.getfixturevalue(request.param)
     engine = create_engine(url)
     with engine.begin() as conn:
@@ -112,8 +115,12 @@ def factory(request: pytest.FixtureRequest) -> Iterator[async_sessionmaker[Async
         )
     engine.dispose()
     aengine = create_async_engine(_to_async_url(url))
-    yield async_sessionmaker(aengine, class_=AsyncSession, expire_on_commit=False)
-    _cleanup(url)
+    try:
+        yield async_sessionmaker(aengine, class_=AsyncSession, expire_on_commit=False)
+    finally:
+        # inside the loop: pooled aiomysql connections must not be closed by GC later
+        await aengine.dispose()
+        _cleanup(url)
 
 
 def _session_row(sid: str, user_id: int) -> dict[str, Any]:

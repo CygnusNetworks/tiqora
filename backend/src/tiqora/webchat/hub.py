@@ -1,6 +1,7 @@
 """Per-process fan-out of chat wake-ups: one ``PSUBSCRIBE tiqora:chat:*`` for all SSE streams.
 
-Streams (visitor and agent) subscribe by session id and receive small dict items on a bounded
+Visitor chat streams subscribe by session id (the agent SSE in ``api/v1/events.py`` does not
+use the hub and is not counted by its caps) and receive small dict items on a bounded
 queue. Caps (R-SSE-CAPS): per IP hash ``MAX_PER_IP`` concurrent streams, per session
 ``max_per_session`` (the OLDEST stream of that session is evicted with a close item instead of
 refusing the new one), a process total (``chat_max_streams``, clamped to the file-descriptor

@@ -824,3 +824,88 @@ async def test_agent_chat_api_with_scoped_api_keys(env: Env) -> None:
         res = await client.post(accept)
         assert res.status_code == 200, res.text
     assert (await _chat(env, chat.id)).assigned_user_id == AGENT
+
+
+# -- MCP ticket_reply into a chat (B-M1; docs/api/mcp.md, deployment.md "MCP and chats") -------
+
+
+def _mcp_state(env: Env) -> Any:
+    from unittest.mock import MagicMock
+
+    from tiqora.mcp_server.server import McpState
+
+    settings = MagicMock(spec=Settings)
+    settings.database_url = _to_async_url(env.url)
+    settings.meili_url = "http://localhost:9999"
+    settings.meili_master_key = "key"
+    settings.meili_tickets_index = "tickets"
+    return McpState(settings)
+
+
+async def _mcp_reply(ticket_id: int, body: str) -> Any:
+    from fastmcp import Client
+
+    from tiqora.mcp_server.server import mcp
+
+    async with Client(mcp) as client:
+        result = await client.call_tool(
+            "ticket_reply", {"ticket_id": ticket_id, "body": body, "channel": "webchat"}
+        )
+    data = result.data
+    return json.loads(data) if isinstance(data, str) else data
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("env", ["mariadb_znuny_url"], indirect=True)
+async def test_mcp_ticket_reply_webchat_waiting_active_ended(env: Env) -> None:
+    """MCP ``ticket_reply`` with ``channel="webchat"``: a waiting chat answers
+    ``chat_not_accepted`` (no MCP accept, R-MCP-CHAT-WAITING), an ended one ``chat_not_live``
+    (both store nothing), an active one stores the article AND the agent transcript line —
+    without a Redis wake (the visitor gets it with the next stream heartbeat)."""
+    from unittest.mock import patch
+
+    import tiqora.mcp_server.server as srv
+
+    waiting, _t1 = await _start(env, 27)
+    active, _t2 = await _active(env, 28)
+    ended, _t3 = await _active(env, 29)
+    async with env.factory() as db:
+        await end_by_visitor(db, chat=ended, now=NOW)
+        await db.commit()
+    env.redis.published.clear()
+    before = {
+        c.id: (await _article_count(env, c.ticket_id), await _messages(env, c.id))
+        for c in (waiting, ended)
+    }
+
+    state = _mcp_state(env)
+    srv._mcp_state = state
+    try:
+        with patch("tiqora.mcp_server.server._get_user_id", return_value=AGENT):
+            assert await _mcp_reply(waiting.ticket_id, "Hallo?") == {"error": "chat_not_accepted"}
+            assert await _mcp_reply(ended.ticket_id, "Hallo?") == {"error": "chat_not_live"}
+            ok = await _mcp_reply(active.ticket_id, "Per MCP: bitte neu starten")
+    finally:
+        await state.aclose()
+        srv._mcp_state = None
+
+    for c in (waiting, ended):
+        assert (await _article_count(env, c.ticket_id), await _messages(env, c.id)) == before[c.id]
+    assert (await _chat(env, waiting.id)).status == "waiting"
+
+    assert set(ok) == {"article_id", "ticket_id"}, ok
+    newest = (await _messages(env, active.id))[-1]
+    assert newest["sender"] == "agent"
+    assert newest["body"] == "Per MCP: bitte neu starten"
+    assert newest["article_id"] == ok["article_id"]
+    assert newest["user_id"] == AGENT
+    channel = (
+        await _rows(
+            env,
+            "SELECT c.name FROM article a JOIN communication_channel c"
+            " ON c.id = a.communication_channel_id WHERE a.id = :a",
+            a=ok["article_id"],
+        )
+    )[0][0]
+    assert channel == "WebChat"
+    assert env.redis.published == []  # no wake: MCP has no Redis publisher

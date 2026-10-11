@@ -268,6 +268,32 @@ async def test_save_time_checks(env: Env) -> None:
         )
         assert ok.status_code == 201, ok.text
 
+        # PATCH answers the three pydantic-level types in the same shape (R-ADMIN-422):
+        # the handler strips body/values from the loc on PATCH /{id} too
+        async def patch_errors(**values: Any) -> dict[str, str]:
+            res = await client.patch(
+                f"{BASE}/{ok.json()['id']}", json={"values": _body(**values)["values"]}
+            )
+            assert res.status_code == 422, res.text
+            return dict(res.json()["detail"]["errors"])
+
+        errs = await patch_errors(
+            allowed_origins=["https://ok.example.org", "https://*.example.org"]
+        )
+        assert list(errs) == ["allowed_origins.1"]  # origin_invalid
+        assert errs["allowed_origins.1"] and "Value error" not in errs["allowed_origins.1"]
+        errs = await patch_errors(prechat_fields=[plain("topic")])
+        assert errs == {"prechat_fields.0.key": "Der Schlüssel „topic“ ist reserviert."}
+        errs = await patch_errors(
+            prechat_fields=[plain("mail1", "email", "email"), plain("mail2", "email", "email")]
+        )
+        assert errs == {
+            "prechat_fields.1.maps_to": "Nur ein Feld darf in „E-Mail“ übernommen werden."
+        }
+        unchanged = (await client.get(f"{BASE}/{ok.json()['id']}")).json()
+        assert unchanged["values"]["allowed_origins"] == ["https://www.example.org"]
+        assert [f["key"] for f in unchanged["values"]["prechat_fields"]] == ["extra"]
+
         # duplicate name
         dup = await client.post(BASE, json=_body(name="Ok wc48"))
         assert dup.status_code == 422
@@ -327,5 +353,6 @@ async def test_non_admin_forbidden(env: Env) -> None:
     async with _client(env, PLAIN_ID) as client:
         assert (await client.get(BASE)).status_code == 403
         assert (await client.post(BASE, json=_body())).status_code == 403
+        assert (await client.patch(f"{BASE}/1", json={"name": "Valid wc48"})).status_code == 403
         assert (await client.delete(f"{BASE}/1")).status_code == 403
         assert (await client.post(f"{BASE}/1/rotate-key")).status_code == 403
