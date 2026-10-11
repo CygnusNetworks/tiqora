@@ -68,12 +68,33 @@ export const initial: ChatState = {
   open: false,
 };
 
+/** Whether a new chat (pre-chat or offline form) can be offered; under `offline_mode: hide`
+ * with nobody online there is nothing to show, so an ended chat keeps its transcript. */
+export const canStartNew = (c: ChatPublicConfig | null) => !!c && (c.online || c.offline_mode === "form");
+
 const LIVE = ["waiting", "active"];
 export const isLive = (status: string) => LIVE.includes(status);
 
 /** Highest seq in a list (0 when empty). */
 export const maxSeq = (messages: readonly ChatMessage[]) =>
   messages.reduce((m, x) => (x.seq > m ? x.seq : m), 0);
+
+/**
+ * The stream resume point: the largest S such that every seq in (floor, S] is known.
+ * seq is gapless per session (one row-locked allocator), so a hole means a line the frame
+ * has not seen yet (e.g. an agent reply sent while the stream was down, overtaken by the
+ * POST response of the visitor's own message); resuming above it would skip it. `floor` is
+ * a seq up to which a full server read already covered everything (the restore).
+ */
+export function contiguousSeq(messages: readonly ChatMessage[], floor = 0): number {
+  let s = floor;
+  for (const m of messages) {
+    // messages are sorted by seq (merge keeps them so)
+    if (m.seq === s + 1) s = m.seq;
+    else if (m.seq > s + 1) break;
+  }
+  return s;
+}
 
 /** Merge by seq: a known seq is kept (dedupe), the result is sorted. */
 function merge(have: ChatMessage[], add: ChatMessage[]): ChatMessage[] {
@@ -186,6 +207,7 @@ export function reducer(s: ChatState, a: Action): ChatState {
     case "session-refreshed":
       return s.session ? { ...s, session: a.session } : s;
     case "reset":
+      if (!canStartNew(s.config)) return s; // never an empty panel (T16 M11)
       return {
         ...initial,
         config: s.config,

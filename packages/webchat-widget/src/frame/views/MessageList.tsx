@@ -53,7 +53,7 @@ function AttachmentButton(props: {
   };
   return (
     <button type="button" class="tq-att" onClick={save} title={props.t("upload.download")}>
-      {thumb ? <img src={thumb} alt={a.filename} /> : null}
+      {thumb ? <img src={thumb} alt="" /> : null}
       <span>{a.filename}</span>
     </button>
   );

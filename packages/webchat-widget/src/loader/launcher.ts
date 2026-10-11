@@ -20,10 +20,20 @@ const ICON_CLOSE = "M6 6l12 12M18 6L6 18";
 /**
  * Host CSS isolation: `all: initial` first (an inline !important declaration beats the
  * host's author rules, !important or not, for every property), then the explicit values.
+ * `all` also resets SVG geometry where the browser treats it as CSS (`d` in Chromium and
+ * Firefox), so a reset `<path>` must set `d` again (see `iconPath`).
  */
 export function css(el: HTMLElement | SVGElement, props: Record<string, string>, reset = false): void {
   if (reset) el.style.setProperty("all", "initial", "important");
   for (const [k, v] of Object.entries(props)) el.style.setProperty(k, v, "important");
+}
+
+/** A launcher icon path: reset like everything else, then its geometry and paint explicitly. */
+function iconPath(doc: Document, d: string, props: Record<string, string>): SVGPathElement {
+  const p = doc.createElementNS(SVG_NS, "path");
+  p.setAttribute("d", d); // WebKit draws from the attribute (no CSS `d` there)
+  css(p, { d: `path("${d}")`, opacity: "1", visibility: "visible", ...props }, true);
+  return p;
 }
 
 export function createLauncher(
@@ -62,16 +72,14 @@ export function createLauncher(
   svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("aria-hidden", "true");
   css(svg, { display: "block", width: "26px", height: "26px", overflow: "visible", color: "#fff" }, true);
-  const chat = doc.createElementNS(SVG_NS, "path");
-  chat.setAttribute("d", ICON_CHAT);
-  css(chat, { display: "inline", fill: "currentColor", stroke: "none" }, true);
-  const close = doc.createElementNS(SVG_NS, "path");
-  close.setAttribute("d", ICON_CLOSE);
-  css(
-    close,
-    { display: "none", fill: "none", stroke: "currentColor", "stroke-width": "2.5px", "stroke-linecap": "round" },
-    true,
-  );
+  const chat = iconPath(doc, ICON_CHAT, { display: "inline", fill: "#fff", stroke: "none" });
+  const close = iconPath(doc, ICON_CLOSE, {
+    display: "none",
+    fill: "none",
+    stroke: "#fff",
+    "stroke-width": "2.5px",
+    "stroke-linecap": "round",
+  });
   svg.append(chat, close);
 
   const badge = doc.createElement("span");
@@ -98,8 +106,12 @@ export function createLauncher(
   let unread = 0;
   const paintBadge = () => {
     // The badge only matters while the panel is closed; text is always a text node.
-    badge.textContent = unread > 99 ? "99+" : String(unread);
-    css(badge, { display: unread > 0 && !open ? "block" : "none" });
+    const text = unread > 99 ? "99+" : String(unread);
+    const shown = unread > 0 && !open;
+    badge.textContent = text;
+    css(badge, { display: shown ? "block" : "none" });
+    // The badge is aria-hidden: the count goes into the accessible name (no i18n in the loader).
+    el.setAttribute("aria-label", shown ? `${opts.label} (${text})` : opts.label);
   };
   return {
     el,

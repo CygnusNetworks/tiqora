@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { initial, maxSeq, reducer } from "./state";
+import { contiguousSeq, initial, maxSeq, reducer } from "./state";
 import { cfg, msg } from "./testkit";
 
 describe("reducer", () => {
@@ -21,6 +21,27 @@ describe("reducer", () => {
     expect(s.messages.map((m) => m.seq)).toEqual([1, 2, 3, 4, 5]);
     expect(maxSeq(s.messages)).toBe(5);
     expect(s.view).toBe("chat");
+  });
+
+  it("the resume cursor is the contiguous seq, not the max (F-I2)", () => {
+    const m = (...seqs: number[]) => seqs.map((seq) => msg({ seq }));
+    expect(contiguousSeq([])).toBe(0);
+    expect(contiguousSeq(m(1, 2, 3))).toBe(3);
+    expect(contiguousSeq(m(1, 2, 4, 5))).toBe(2); // seq 3 not seen yet
+    expect(contiguousSeq(m(2, 3))).toBe(0);
+    // a full read covered everything up to the floor (a deleted line leaves no hole there)
+    expect(contiguousSeq(m(1, 3, 4, 6), 4)).toBe(4);
+    expect(contiguousSeq(m(1, 3, 4, 5, 6), 4)).toBe(6);
+  });
+
+  it("a restart under offline_mode hide with nobody online keeps the ended chat (T16 M11)", () => {
+    const session = { agent_name: null, can_send: false, last_seq: 2, needs_contact: false, session_id: "s", status: "ended", topic_label: null };
+    let s = reducer(initial, { type: "session-restored", session, messages: [msg({ seq: 1 })] });
+    s = reducer(s, { type: "config-loaded", config: cfg({ online: false, offline_mode: "hide" }) });
+    expect(s.view).toBe("ended");
+    expect(reducer(s, { type: "reset" })).toBe(s);
+    s = reducer(s, { type: "config-loaded", config: cfg({ online: false, offline_mode: "form" }) });
+    expect(reducer(s, { type: "reset" }).view).toBe("offline");
   });
 
   it("offline config shows the offline form or hides", () => {

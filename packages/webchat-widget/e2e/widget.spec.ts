@@ -31,6 +31,40 @@ async function startChat(page: Page) {
   return frame;
 }
 
+/**
+ * The launcher icon (path `index`: 0 chat bubble, 1 close cross) is really drawn: it has
+ * geometry, wins against the host's `svg path` rules, and the launcher's centre pixel is the
+ * white icon, not the button colour.
+ */
+async function expectIcon(page: Page, index: number) {
+  const path = page.locator("button[aria-controls] svg path").nth(index);
+  const icon = await path.evaluate((el) => {
+    const p = el as SVGPathElement;
+    const c = getComputedStyle(p);
+    const b = p.getBBox();
+    return { w: b.width, h: b.height, display: c.display, opacity: c.opacity, visibility: c.visibility, fill: c.fill, stroke: c.stroke };
+  });
+  expect(icon.w).toBeGreaterThan(10);
+  expect(icon.h).toBeGreaterThan(10);
+  expect(icon).toMatchObject({ display: "inline", opacity: "1", visibility: "visible" });
+  expect(index === 0 ? icon.fill : icon.stroke).toBe("rgb(255, 255, 255)");
+  const box = (await page.locator("button[aria-controls]").boundingBox())!;
+  const shot = await page.screenshot({ clip: { x: box.x + box.width / 2 - 1, y: box.y + box.height / 2 - 1, width: 2, height: 2 } });
+  const rgb = await page.evaluate(async (b64) => {
+    const img = new Image();
+    img.src = "data:image/png;base64," + b64;
+    await img.decode();
+    const c = document.createElement("canvas");
+    c.width = img.width;
+    c.height = img.height;
+    const ctx = c.getContext("2d")!;
+    ctx.drawImage(img, 0, 0);
+    const d = ctx.getImageData(0, 0, 1, 1).data;
+    return [d[0], d[1], d[2]];
+  }, shot.toString("base64"));
+  expect(Math.min(...rgb), `centre pixel ${rgb.join(",")} is not the white icon`).toBeGreaterThan(200);
+}
+
 test.beforeEach(async ({ request }) => {
   await hook(request, "reset");
 });
@@ -71,7 +105,8 @@ test("uploads a PNG and refuses an SVG", async ({ page }) => {
   const frame = await startChat(page);
   const input = frame.locator('input[type="file"]');
   await input.setInputFiles({ name: "pixel.png", mimeType: "image/png", buffer: PNG });
-  const thumb = frame.locator('img[alt="pixel.png"]');
+  // the thumbnail is decorative (alt=""): the button's text already names the file
+  const thumb = frame.locator(".tq-att", { hasText: "pixel.png" }).locator('img[alt=""]');
   await expect(thumb).toBeAttached();
   await expect.poll(() => thumb.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(1);
   await input.setInputFiles({
@@ -80,7 +115,7 @@ test("uploads a PNG and refuses an SVG", async ({ page }) => {
     buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'),
   });
   await expect(frame.getByText("Diese Dateiart wird nicht angenommen.")).toBeVisible();
-  await expect(frame.locator('img[alt="evil.svg"]')).toHaveCount(0);
+  await expect(frame.locator(".tq-att", { hasText: "evil.svg" })).toHaveCount(0);
 });
 
 test("launcher and panel survive hostile host CSS", async ({ page }) => {
@@ -105,9 +140,11 @@ test("launcher and panel survive hostile host CSS", async ({ page }) => {
   const l = await style("button[aria-controls]");
   expect(l).toMatchObject({ opacity: "1", visibility: "visible", transform: "none", filter: "none", position: "fixed", pointer: "auto" });
   expect(l.box).toEqual([view.width - 20 - 56, view.height - 20 - 56, 56, 56]);
+  await expectIcon(page, 0); // the chat bubble is drawn, not an empty disc
   await launcher.click(); // really clickable
   const frame = frameOf(page);
   await expect(frame.getByText("Bevor es losgeht")).toBeVisible();
+  await expectIcon(page, 1); // the close cross replaces it
   const p = await style("#tiqora-chat-panel");
   expect(p).toMatchObject({ opacity: "1", visibility: "visible", transform: "none", filter: "none", position: "fixed" });
   expect(p.box).toEqual([view.width - 20 - 380, view.height - 88 - 600, 380, 600]);

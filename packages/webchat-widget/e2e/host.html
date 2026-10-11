@@ -29,6 +29,13 @@
         left: 0 !important;
         top: 0 !important;
       }
+      /* SVG presentation properties: the launcher's icon must still be drawn. */
+      svg path {
+        d: path("M0 0") !important;
+        fill: transparent !important;
+        stroke: transparent !important;
+        stroke-width: 0 !important;
+      }
     </style>
   </head>
   <body>

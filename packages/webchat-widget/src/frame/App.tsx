@@ -6,7 +6,7 @@ import { createFrameBridge, type FrameBridge } from "./bridge";
 import { isRtl, loadMessages, type Translate } from "./i18n";
 import { SharedChatStream, type SharedStreamOptions } from "./shared-stream";
 import { endReason, type SseEvent } from "./sse";
-import { initial, isLive, maxSeq, reducer } from "./state";
+import { canStartNew, contiguousSeq, initial, isLive, maxSeq, reducer } from "./state";
 import { clearSession, loadSession, saveSession, visitorId, type Store } from "./storage";
 import { applyTheme } from "./theme";
 import { errorText, newClientId } from "./util";
@@ -88,7 +88,10 @@ export function App(props: {
   stateRef.current = state;
   const auth = useRef<{ id: string; token: string } | null>(null);
   const bridgeRef = useRef<FrameBridge | null>(null);
+  // Stream resume cursor (Last-Event-ID and the ended catch-up): the contiguous high-water
+  // mark, never the max — a POST response must not move it past lines the stream missed.
   const seq = useRef(0);
+  const seqFloor = useRef(0);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mainRef = useRef<HTMLElement>(null);
   const readyPosted = useRef(false);
@@ -171,7 +174,9 @@ export function App(props: {
           }
           if (dead) return;
           auth.current = { id: stored.sessionId, token: stored.token };
-          seq.current = maxSeq(all); // resume from what was loaded; replays are deduped
+          // the pages are a full read up to their top: resume from there; replays are deduped
+          seqFloor.current = maxSeq(all);
+          seq.current = seqFloor.current;
           dispatch({ type: "session-restored", session, messages: all });
         } catch (e) {
           if (e instanceof ChatApiError && e.status === 404) clearSession(params.k, props.store);
@@ -213,14 +218,14 @@ export function App(props: {
   useEffect(() => {
     if (!state.open || !t) return;
     const sel =
-      view === "chat" ? ".tq-input:not(:disabled)" : view === "ended" ? ".tq-foot .tq-btn" : view === "prechat" || view === "offline" ? "input,textarea,select" : ".tq-notice";
+      view === "chat" ? ".tq-input:not(:disabled)" : view === "ended" ? ".tq-foot .tq-btn,.tq-foot .tq-notice" : view === "prechat" || view === "offline" ? "input,textarea,select" : ".tq-notice";
     mainRef.current?.querySelector<HTMLElement>(sel)?.focus();
   }, [state.open, view, t]);
 
   // --- persist a monotonic lastSeq (several tabs must never lower it) ---------------
   useEffect(() => {
     const top = maxSeq(state.messages);
-    if (top > seq.current) seq.current = top;
+    seq.current = Math.max(seq.current, contiguousSeq(state.messages, seqFloor.current));
     const a = auth.current;
     if (!live || !a || !top) return;
     const stored = loadSession(params.k, props.store);
@@ -356,9 +361,11 @@ export function App(props: {
       if (live && a) api.end(a.id, a.token).catch((e) => fail(e));
     },
     onRestart: () => {
+      if (!canStartNew(stateRef.current.config)) return;
       if (live) clearSession(params.k, props.store);
       auth.current = null;
       seq.current = 0;
+      seqFloor.current = 0;
       dispatch({ type: "reset" });
     },
     download: async (s, i) => {

@@ -134,6 +134,40 @@ describe("App", () => {
     expect(loadSession("wc_key", store)?.lastSeq).toBe(8);
   });
 
+  it("an own send during a stream outage does not skip the agent reply sent meanwhile (F-I2)", async () => {
+    const store = memStore();
+    saveSession("wc_key", { sessionId: "sid1", token: "tok1", lastSeq: 4 }, store);
+    const server = [
+      msg({ seq: 1, sender: "visitor", body: "Hilfe" }),
+      msg({ seq: 2, sender: "agent", body: "Hallo" }),
+      msg({ seq: 3, sender: "visitor", body: "Router blinkt" }),
+      msg({ seq: 4, sender: "agent", body: "Moment" }),
+    ];
+    const send = vi.fn(async (_i: string, _t: string, body: string, clientId: string) => {
+      const m = msg({ seq: server.length + 1, sender: "visitor", body, client_id: clientId });
+      server.push(m);
+      return m;
+    });
+    const api = fakeApi({ messages: vi.fn(async () => server.slice(0, 4)), send });
+    const { container, stream } = await mount({ api, store });
+    expect(stream.made[0].o.lastSeq()).toBe(4);
+    // the stream is down; the agent answers (seq 5), then the visitor sends (POST → seq 6)
+    server.push(msg({ seq: 5, sender: "agent", body: "Bitte neu starten" }));
+    const ta = container.querySelector("textarea") as HTMLTextAreaElement;
+    input(ta, "Noch da?");
+    keydown(ta, "Enter");
+    await flush();
+    expect(container.textContent).toContain("Noch da?");
+    // reconnect: the server replays everything after Last-Event-ID
+    const resume = stream.made[0].o.lastSeq();
+    expect(resume).toBe(4);
+    for (const m of server.filter((x) => x.seq > resume)) stream.emit("message", m, String(m.seq));
+    expect(byText(container, ".tq-bubble", "Bitte neu starten")).toBeTruthy();
+    expect(container.querySelectorAll(".tq-msg")).toHaveLength(6); // nothing doubled
+    expect(stream.made[0].o.lastSeq()).toBe(6);
+    expect(loadSession("wc_key", store)?.lastSeq).toBe(6);
+  });
+
   it("a stale 404 session is dropped and the pre-chat form shows", async () => {
     const store = memStore();
     saveSession("wc_key", { sessionId: "gone", token: "t", lastSeq: 1 }, store);
@@ -231,6 +265,21 @@ describe("App", () => {
     await flush();
     expect(api.contact).toHaveBeenCalledWith("sid1", "tok1", "e@example.org", null);
     expect(container.textContent).toContain("Danke, wir antworten per E-Mail.");
+  });
+
+  it("an ended chat under offline_mode hide offers no restart into an empty panel (T16 M11)", async () => {
+    const store = memStore();
+    saveSession("wc_key", { sessionId: "sid1", token: "tok1", lastSeq: 1 }, store);
+    const api = fakeApi({
+      config: vi.fn(async () => cfg({ online: false, offline_mode: "hide" })),
+      session: vi.fn(async () => ({ agent_name: null, can_send: false, last_seq: 1, needs_contact: false, session_id: "sid1", status: "ended", topic_label: null })),
+      messages: vi.fn(async () => [msg({ seq: 1, sender: "visitor", body: "Hallo" })]),
+    });
+    const { container } = await mount({ api, store });
+    expect(container.textContent).toContain("Hallo");
+    expect(container.textContent).not.toContain("Neuen Chat starten");
+    expect(container.querySelector(".tq-foot .tq-notice")?.textContent).toBe("Gerade ist niemand im Chat");
+    expect(loadSession("wc_key", store)?.sessionId).toBe("sid1");
   });
 
   it("Escape asks the host to close; unread is reported while closed", async () => {

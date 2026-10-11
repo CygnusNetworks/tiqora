@@ -1,6 +1,6 @@
 import type { JSX } from "preact";
 import type { Translate } from "../i18n";
-import { isLive, type ChatState } from "../state";
+import { canStartNew, isLive, type ChatState } from "../state";
 import { Composer } from "./Composer";
 import { MessageList } from "./MessageList";
 
@@ -49,13 +49,13 @@ export function ChatView(props: { state: ChatState; t: Translate; h: ChatHandler
       )}
       {props.ended ? (
         <div class="tq-foot">
-          <button
-            class="tq-btn"
-            type="button"
-            onClick={h.onRestart}
-          >
-            {t("ended.restart")}
-          </button>
+          {canStartNew(config) ? (
+            <button class="tq-btn" type="button" onClick={h.onRestart}>
+              {t("ended.restart")}
+            </button>
+          ) : (
+            <p class="tq-notice" tabIndex={-1}>{t("offline.title")}</p>
+          )}
         </div>
       ) : (
         config && (

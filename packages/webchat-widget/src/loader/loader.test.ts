@@ -83,8 +83,10 @@ describe("launcher", () => {
     expect(l.el.style.width).toBe("56px");
     l.setUnread(2);
     expect(l.el.textContent).toContain("2");
+    expect(l.el.getAttribute("aria-label")).toBe("Chat öffnen (2)"); // the badge is aria-hidden
     l.setOpen(true);
     expect(l.el.getAttribute("aria-expanded")).toBe("true");
+    expect(l.el.getAttribute("aria-label")).toBe("Chat öffnen");
     l.el.click();
     expect(onClick).toHaveBeenCalledTimes(1);
   });
