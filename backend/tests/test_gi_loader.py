@@ -169,7 +169,7 @@ async def test_unparsable_requester_logged_and_skipped(
             raise MappingError("boom")
         return real(config, huge_xml=huge_xml)
 
-    monkeypatch.setattr(loader, "parse_requester", flaky)  # type: ignore[attr-defined]
+    monkeypatch.setattr(loader, "parse_requester", flaky)
     engine = create_engine(sync_url)
     with engine.begin() as conn:
         insert_webservice(
@@ -233,7 +233,7 @@ async def test_unexpected_error_in_one_row_does_not_block_others(
             raise RuntimeError("unexpected")
         return real(config, huge_xml=huge_xml)
 
-    monkeypatch.setattr(loader, "parse_requester", explode)  # type: ignore[attr-defined]
+    monkeypatch.setattr(loader, "parse_requester", explode)
     engine = create_engine(sync_url)
     with engine.begin() as conn:
         insert_webservice(
