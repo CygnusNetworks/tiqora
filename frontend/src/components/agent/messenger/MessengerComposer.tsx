@@ -487,7 +487,7 @@ export function MessengerComposer({
           rows={1}
           value={body}
           data-testid="tg-composer-input"
-          aria-label={t("ticket.telegram.composer.inputLabel")}
+          aria-label={t(adapter.inputLabelKey)}
           placeholder={t("ticket.telegram.composer.placeholder", { name })}
           onChange={onChange}
           onKeyDown={onKeyDown}

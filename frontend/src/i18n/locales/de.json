@@ -5364,7 +5364,13 @@
       "atCapacity": "Sie haben bereits die maximale Zahl gleichzeitiger Chats.",
       "actionFailed": "Das hat nicht geklappt. Bitte versuchen Sie es erneut.",
       "chatEnded": "Der Chat ist beendet – bitte per E-Mail antworten.",
-      "noVisitorEmail": "Der Besucher hat keine E-Mail-Adresse hinterlassen."
+      "noVisitorEmail": "Der Besucher hat keine E-Mail-Adresse hinterlassen.",
+      "composer": {
+        "inputLabel": "Chat-Nachricht"
+      },
+      "notWaiting": "Dieser Chat wartet nicht mehr auf Annahme.",
+      "forbidden": "Dazu haben Sie keine Berechtigung.",
+      "invalidRecipient": "Adressen mit der Endung .invalid sind keine echten E-Mail-Adressen und werden nicht angeschrieben."
     }
   },
   "webchatWidget": {

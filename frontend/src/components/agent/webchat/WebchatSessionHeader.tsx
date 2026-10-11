@@ -15,6 +15,16 @@ function initialsOf(name: string): string {
   return (words[0] ?? "?").slice(0, 2).toUpperCase();
 }
 
+function actionError(err: unknown, t: (k: string) => string): string {
+  const code = errorCode(err);
+  if (code === "already_taken") return t("webchat.agent.alreadyTaken");
+  if (code === "at_capacity") return t("webchat.agent.atCapacity");
+  if (code === "not_waiting") return t("webchat.agent.notWaiting");
+  if (code === "chat_not_live") return t("webchat.agent.chatEnded");
+  if (err instanceof ApiError && err.status === 403) return t("webchat.agent.forbidden");
+  return t("webchat.agent.actionFailed");
+}
+
 function errorCode(err: unknown): string | null {
   if (!(err instanceof ApiError) || err.detail === null || typeof err.detail !== "object") return null;
   const d = (err.detail as { detail?: unknown }).detail;
@@ -58,14 +68,7 @@ export function WebchatSessionHeader({ ticketId }: { ticketId: number }) {
     onMutate: () => setMessage(null),
     onSuccess: refresh,
     onError: (err) => {
-      const code = errorCode(err);
-      setMessage(
-        code === "already_taken"
-          ? t("webchat.agent.alreadyTaken")
-          : code === "at_capacity"
-            ? t("webchat.agent.atCapacity")
-            : t("webchat.agent.actionFailed"),
-      );
+      setMessage(actionError(err, t));
       // The inbox and this header must show who has the chat now.
       refresh();
     },
@@ -74,8 +77,8 @@ export function WebchatSessionHeader({ ticketId }: { ticketId: number }) {
     mutationFn: (v: { sid: string; closeTicket: boolean }) => webchatApi.end(v.sid, v.closeTicket),
     onMutate: () => setMessage(null),
     onSuccess: refresh,
-    onError: () => {
-      setMessage(t("webchat.agent.actionFailed"));
+    onError: (err) => {
+      setMessage(actionError(err, t));
       refresh();
     },
   });
@@ -115,7 +118,8 @@ export function WebchatSessionHeader({ ticketId }: { ticketId: number }) {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
           <span
-            aria-hidden
+            role="img"
+            aria-label={chat.visitor_online ? t("webchat.agent.online") : t("webchat.agent.offline")}
             data-testid="webchat-online-dot"
             data-online={chat.visitor_online ? "true" : "false"}
             title={chat.visitor_online ? t("webchat.agent.online") : t("webchat.agent.offline")}

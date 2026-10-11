@@ -673,6 +673,11 @@ export function ReplyDialog({
             </p>
           ) : (
             <>
+              {hasInvalidTld && (
+                <p className="text-xs text-danger" role="alert" data-testid="reply-invalid-tld">
+                  {t("webchat.agent.invalidRecipient")}
+                </p>
+              )}
               {noVisitorEmail && (
                 <p
                   className="rounded border border-hairline bg-surface-subtle/60 px-2 py-1 text-xs text-muted"

@@ -11,6 +11,8 @@ import { ticketChatKey, useTicketChat, webchatApi } from "@/lib/webchatApi";
 export type MessengerChannelAdapter = {
   channel: "telegram" | "webchat";
   maxMessageLength: number;
+  /** i18n key of the textarea's accessible name. */
+  inputLabelKey: string;
   supportsButtons: boolean;
   supportsQuote: boolean;
   metaQueryKey: (ticketId: number) => readonly unknown[];
@@ -27,6 +29,7 @@ export type MessengerChannelAdapter = {
 export const telegramAdapter: MessengerChannelAdapter = {
   channel: "telegram",
   maxMessageLength: 4096,
+  inputLabelKey: "ticket.telegram.composer.inputLabel",
   supportsButtons: true,
   supportsQuote: true,
   metaQueryKey: telegramChatKey,
@@ -45,6 +48,7 @@ export const telegramAdapter: MessengerChannelAdapter = {
 export const webchatAdapter: MessengerChannelAdapter = {
   channel: "webchat",
   maxMessageLength: 4000,
+  inputLabelKey: "webchat.agent.composer.inputLabel",
   supportsButtons: false,
   supportsQuote: false,
   metaQueryKey: ticketChatKey,

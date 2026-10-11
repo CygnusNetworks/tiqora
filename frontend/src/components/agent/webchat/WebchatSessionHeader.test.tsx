@@ -101,6 +101,18 @@ describe("WebchatSessionHeader", () => {
     expect(await screen.findByText(/maximale Zahl gleichzeitiger Chats/)).toBeInTheDocument();
   });
 
+  it("explains a refused accept (403 and not_waiting)", async () => {
+    accept.mockRejectedValueOnce(new ApiError(403, { detail: "forbidden" }, "/x"));
+    mount();
+    fireEvent.click(await screen.findByTestId("webchat-accept"));
+    expect(await screen.findByText("Dazu haben Sie keine Berechtigung.")).toBeInTheDocument();
+  });
+
+  it("the online dot has an accessible name", async () => {
+    mount();
+    expect(await screen.findByRole("img", { name: "Besucher online" })).toBeInTheDocument();
+  });
+
   it("an active chat can be ended and the ticket closed", async () => {
     ticketChat.mockResolvedValue({ ...base, status: "active", assigned_name: "Alex Turner", waiting_since: null });
     mount();

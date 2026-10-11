@@ -102,6 +102,11 @@ describe("MessengerComposer with the web chat adapter", () => {
     expect(screen.queryByTitle(/Buttons unter der Nachricht/)).toBeNull();
   });
 
+  it("labels the textarea as a chat message, not a Telegram one", async () => {
+    const input = await mount();
+    expect(input).toHaveAttribute("aria-label", "Chat-Nachricht");
+  });
+
   it("names the visitor in the placeholder and counts to 4000", async () => {
     const input = await mount();
     await waitFor(() => expect(input.placeholder).toContain("Max Beispiel"));
