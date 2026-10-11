@@ -420,7 +420,21 @@ chat whose rate limits are raised (`sessions_per_config_minute` 300, `sessions_p
 `TIQORA_CHAT_MAX_STREAMS` at least N, and `TIQORA_TRUSTED_PROXIES=0.0.0.0/0` so the script's distinct
 `X-Forwarded-For` values count as separate visitors.
 
-SIZING_RESULTS
+Measured on 2026-10-11 against the local stack (`docker-compose.local.yml`, one `tiqora-api` container with a
+single uvicorn process, OrbStack on a laptop; MariaDB, Redis and the worker alongside; memory from
+`docker stats`, since the API runs in a container). Each run created N sessions at 4 to 5 per second and held the
+streams for 3 minutes (one run of 20 streams for 30 s beforehand):
+
+| Streams held | Errors | API memory (RSS) | API CPU while holding |
+|---|---|---|---|
+| idle (after a 20-stream warm-up) | | 232 MiB | 0.2 % |
+| 200 | 0 | 255 MiB | about 7 % |
+| 500 | 0 | 306 MiB | about 7 % |
+
+That is roughly 0.15 MiB per open stream, with every heartbeat (every 25 s) re-reading the DB per stream. Memory
+is not returned after the streams close. These numbers are for orientation only; they come from one laptop and
+idle streams (no messages). Plan for one `tiqora-api` process per roughly 500 open streams (the default
+`TIQORA_CHAT_MAX_STREAMS`), and raise the file-descriptor limit before raising the cap.
 
 Each open stream is one asyncio task and one socket; it does not hold a database connection while idle (every
 heartbeat opens a short session). Redis carries only wake and typing markers.
