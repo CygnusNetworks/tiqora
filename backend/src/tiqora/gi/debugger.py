@@ -73,6 +73,10 @@ class GiDebugger:
         self.communication_id: str = communication_id or secrets.token_hex(16)
         self.ticket_id: int | None = None
 
+    def add_secrets(self, *values: str) -> None:
+        """Mask *values* in every later line (secrets only known during a call, e.g. a token)."""
+        self._secrets = (*self._secrets, *(v for v in values if isinstance(v, str)))
+
     def _limit(self) -> int:
         if self._max_content_bytes is not None:
             return self._max_content_bytes

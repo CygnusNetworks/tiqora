@@ -129,3 +129,35 @@ def test_xml_in_rejects_entities() -> None:
 def test_xml_in_does_not_expand_internal_entities() -> None:
     xml = b'<!DOCTYPE r [<!ENTITY y "EXPANDED">]><R><a>&y;</a></R>'
     assert "EXPANDED" not in str(xml_in(xml))
+
+
+def test_xml_out_no_root_and_attributes_like_rest_transport() -> None:
+    # REST transport: XMLout(NoAttr => 0, RootName => undef, AttrIndent => 1)
+    out = xml_out(
+        {
+            "Title": "Hi & <b>",
+            "Ticket": {"Number": "1", "Q": "2", "Sub": {"x": "y"}},
+            "L": ["a", "b"],
+        },
+        no_attr=False,
+        root_name=None,
+    )
+    assert out == (
+        "  <L>a</L>\n"
+        "  <L>b</L>\n"
+        '  <Ticket Number="1"\n'
+        '          Q="2">\n'
+        '    <Sub x="y" />\n'
+        "  </Ticket>\n"
+        "  <Title>Hi &amp; &lt;b&gt;</Title>\n"
+    )
+    # content key is the text content, empty hash is an empty element, -keys are skipped
+    assert xml_out(
+        {"A": {"content": "t", "k": "v", "-skip": "z"}, "B": {}}, no_attr=False, root_name=None
+    ) == ('  <A k="v">t</A>\n  <B></B>\n')
+    # with a root name and attributes on, scalars of the root hash are attributes too
+    assert xml_out({"a": "1"}, no_attr=False) == '<RootElement a="1" />\n'
+    # defaults are unchanged
+    assert xml_out({"a": "1"}) == "<RootElement>\n  <a>1</a>\n</RootElement>\n"
+    with pytest.raises(XmlSimpleError):
+        xml_out(["x"], no_attr=False, root_name=None)

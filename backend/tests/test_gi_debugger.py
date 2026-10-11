@@ -118,3 +118,13 @@ async def test_ticket_id_and_replay_travel_with_the_rows() -> None:
     assert row.replay == replay and row.ticket_id == 42
     assert row.name == "SendTicket" and row.remote_ip == "198.51.100.7"
     assert row.communication_type == "Requester" and row.webservice_id == 1
+
+
+async def test_add_secrets_masks_later_lines_only() -> None:
+    sink = MemorySink()
+    d = _debugger(sink)
+    await d.debug("before gi51-token-late", "gi51-token-late")
+    d.add_secrets("gi51-token-late", 7)  # type: ignore[arg-type]  # non-strings are ignored
+    await d.error("after gi51-token-late", {"k": "x gi51-token-late"})
+    assert sink.rows[0].summary == "before gi51-token-late"
+    assert "gi51-token-late" not in sink.rows[1].summary + sink.rows[1].content

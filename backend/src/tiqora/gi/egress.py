@@ -218,7 +218,7 @@ def client(
     *,
     policy: EgressPolicy,
     ssl_context: ssl.SSLContext | None,
-    proxy: str | None,
+    proxy: str | httpx.Proxy | None,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> httpx.AsyncClient:
     return httpx.AsyncClient(
