@@ -749,7 +749,7 @@ Limits you must know:
 | `agent.route` | `path` (`a-z0-9-` segments), `component`, `title_key`, `admin_only` | `{ path, subPath }` | `/agent/plugins/<id>/<path>` |
 | `agent.nav` | `route` (key of an `agent.route` of the same plugin), `label_key`, `icon` (`book calendar chart clock inbox mail puzzle search server shield user`), `group` (`workspace knowledge insights plugins`), `order`, `admin_only` | none (rendered by the host) | Sidebar |
 | `ticket.sidebar` | `component`, `title_key` (reserved: phase 1 draws no host frame or title, so the component draws its own, for example with `Panel`), `order` | `{ ticketId }` | Ticket view, below the process widget |
-| `dashboard.widget` | `component`, `title_key`, `description_key`, `version`, `category` (`tickets reports team ai itsm other`), `icon`, `size` (`{"default": [w, h], "min": [w, h], "max": [w, h]}` in a 12-column grid), `settings_schema`, `refresh_on`, `permission` | `WidgetProps<S>` | Section "Erweiterungen" of the dashboard |
+| `dashboard.widget` | `component`, `title_key`, `description_key`, `version`, `category` (`tickets reports team ai itsm other`), `icon`, `size` (`{"default": [w, h], "min": [w, h], "max": [w, h]}` in a 12-column grid), `settings_schema`, `refresh_on`, `permission` | `WidgetProps<S>` | Dashboard widget gallery (under its `category`); agents place it on a dashboard |
 
 `subPath` is the rest of the URL below the route's `path`. Treat it as
 untrusted input. A sub path with `.` or `..` segments (also percent-encoded)
