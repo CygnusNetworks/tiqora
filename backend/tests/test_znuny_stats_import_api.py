@@ -11,6 +11,7 @@ broken content key). Saved rows are deleted again by owner (the admin's by ``cop
 from __future__ import annotations
 
 import base64
+import time
 from collections.abc import AsyncIterator, Generator
 from typing import Any
 
@@ -22,11 +23,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from tests.test_znuny_stats_map_matrix import FIX
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db
+from tiqora.api.v1 import reports as reports_api
 from tiqora.api.v1.reports import get_report_cache
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.auth import AuthenticatedUser
-from tiqora.reporting.settings import REPORTING_SECTION
+from tiqora.reporting.engine import QueryBudget
+from tiqora.reporting.settings import REPORTING_SECTION, ReportingSettings
+from tiqora.reporting.sql import ReportQueryTimeout
+from tiqora.reporting.znuny_stats.reader import list_stat_ids_page, load_stats
 from tiqora.settings_sections.store import save_section_values
 
 pytestmark = pytest.mark.db
@@ -383,7 +388,7 @@ async def test_reimport_keeps_sharing_and_search_name(env: Env) -> None:
     assert {i["action"] for i in again["imported"]} == {"updated"}
     after = (await env.client.get(f"/api/v1/reports/{rid}")).json()
     assert after["visibility"] == "all" and after["name"] == "rep52 Matrix"
-    assert after["version"] > rep["version"] + 0
+    assert after["version"] == rep["version"] + 2  # share bump, then the re-import's update
     search = (await env.client.get(f"/api/v1/saved-searches/{sid}")).json()
     assert search["name"] == "rep52 mein Name"
 
@@ -464,3 +469,40 @@ async def test_route_order_and_scope(env: Env) -> None:
     assert (await env.client.get(URL)).status_code == 200
     # a saved report still resolves through /{report_key}
     assert (await env.client.get("/api/v1/reports/builtin.nope")).status_code == 404
+
+
+def _spent_budget() -> QueryBudget:
+    """An inline budget whose shared deadline has already passed."""
+    return QueryBudget(per_query_seconds=60, deadline=time.monotonic() - 1)
+
+
+async def test_reader_honours_spent_budget(env: Env) -> None:
+    async with env.factory() as session:
+        with pytest.raises(ReportQueryTimeout):
+            await load_stats(session, [52080], budget=_spent_budget())
+        with pytest.raises(ReportQueryTimeout):
+            await list_stat_ids_page(session, budget=_spent_budget())
+        ids, _more = await list_stat_ids_page(
+            session, budget=QueryBudget.inline(ReportingSettings())
+        )
+        assert 52080 in ids
+        stats, errors, _truncated = await load_stats(
+            session, [52080], budget=QueryBudget.inline(ReportingSettings())
+        )
+        assert [s.stat_id for s in stats] == [52080] and not errors
+
+
+async def test_import_routes_answer_504_when_budget_is_spent(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        reports_api.QueryBudget, "inline", classmethod(lambda *_a, **_k: _spent_budget())
+    )
+    preview = await env.client.get(URL)
+    assert preview.status_code == 504, preview.text
+    assert "zu lange" in preview.text
+    applied = await env.client.post(f"{URL}/apply", json={"stat_ids": [52080]})
+    assert applied.status_code == 504, applied.text
+    monkeypatch.undo()
+    saved = await env.client.get("/api/v1/reports")
+    assert all(r.get("copied_from") != "znuny.stat.52080" for r in saved.json().get("items", []))

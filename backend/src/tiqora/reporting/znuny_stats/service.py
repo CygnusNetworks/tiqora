@@ -20,6 +20,7 @@ from tiqora.db.tiqora.models import TiqoraReport, TiqoraSavedSearch
 from tiqora.extensions.registry import Registry
 from tiqora.jobs.service import utc_now
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.reporting.engine import QueryBudget
 from tiqora.reporting.rights import ReportRights
 from tiqora.reporting.run_service import RequestError
 from tiqora.reporting.saved import (
@@ -207,11 +208,13 @@ def _errors_out(errors: Sequence[StatLoadError], *, admin: bool) -> list[StatLoa
     return [StatLoadErrorOut(stat_id=None, message=message)]
 
 
-async def preview_db(session: AsyncSession, user_id: int) -> ZnunyStatsPreviewOut:
+async def preview_db(
+    session: AsyncSession, user_id: int, *, budget: QueryBudget | None = None
+) -> ZnunyStatsPreviewOut:
     admin = await _is_admin(session, user_id)
     groups = None if admin else await PermissionEngine(session).groups_for_permission(user_id, "ro")
-    ids, more = await list_stat_ids_page(session, permission_group_ids=groups)
-    stats, errors, truncated = await load_stats(session, ids)
+    ids, more = await list_stat_ids_page(session, permission_group_ids=groups, budget=budget)
+    stats, errors, truncated = await load_stats(session, ids, budget=budget)
     visible = await visible_stat_ids(session, user_id, admin=admin, stats=stats)
     stats = [s for s in stats if s.stat_id in visible]
     mappings = await _map_all(session, user_id, stats, admin=admin)
@@ -342,6 +345,7 @@ async def apply_import(
     body: ZnunyStatsApplyIn,
     *,
     registry: Registry,
+    budget: QueryBudget | None = None,
 ) -> ZnunyStatsApplyOut:
     """Store the selected statistics as private reports / saved searches (one commit)."""
     if not rights.create:
@@ -359,7 +363,7 @@ async def apply_import(
         stats = [_parse_file(raw, "file_content_base64")]
     else:
         wanted = sorted(set(body.stat_ids))
-        loaded, errors, _truncated = await load_stats(session, wanted)
+        loaded, errors, _truncated = await load_stats(session, wanted, budget=budget)
         visible = await visible_stat_ids(session, user_id, admin=admin, stats=loaded)
         stats = [s for s in loaded if s.stat_id in visible]
         messages = {e.stat_id: e.message if admin else _NOT_FOUND for e in errors}

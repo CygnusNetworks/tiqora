@@ -334,13 +334,26 @@ async def import_report_file(
     return parsed
 
 
+def _import_timeout() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+        detail={
+            "message": "Das Lesen der Znuny-Statistiken hat zu lange gedauert. "
+            "Bitte versuchen Sie es später erneut."
+        },
+    )
+
+
 @router.get("/import/znuny", response_model=ZnunyStatsPreviewOut)
 async def preview_znuny_stats(
     user: CurrentUser, session: DbSession, settings: AppSettings
 ) -> ZnunyStatsPreviewOut:
     """Znuny statistics the agent may run, mapped to Tiqora reports; saves nothing."""
-    await _access(session, user, settings)
-    return await preview_db(session, user.id)
+    reporting = await _access(session, user, settings)
+    try:
+        return await preview_db(session, user.id, budget=QueryBudget.inline(reporting))
+    except ReportQueryTimeout:
+        raise _import_timeout() from None
 
 
 @router.post("/import/znuny/file", response_model=ZnunyStatsPreviewOut)
@@ -364,7 +377,17 @@ async def apply_znuny_stats(
     reporting = await _access(session, user, settings)
     rights = await report_rights(session, user.id, reporting)
     try:
-        return await apply_import(session, user.id, rights, body, registry=get_registry())
+        return await apply_import(
+            session,
+            user.id,
+            rights,
+            body,
+            registry=get_registry(),
+            budget=QueryBudget.inline(reporting),
+        )
+    except ReportQueryTimeout:
+        await session.rollback()
+        raise _import_timeout() from None
     except RequestError as exc:
         _unprocessable(exc.message, exc.path, exc.status_code)
     except SavedSearchInvalid as exc:
