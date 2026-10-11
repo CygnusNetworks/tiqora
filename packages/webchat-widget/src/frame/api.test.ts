@@ -66,6 +66,8 @@ describe("chat api", () => {
     await a.messages("s", "t", 5);
     expect(calls[0].url).toBe("/api/chat/v1/config?k=wc%20key&origin=https%3A%2F%2Fh.example");
     expect(calls[1].url).toBe("/api/chat/v1/sessions/s/messages?after=5&limit=200");
+    await a.messages("s", "t", Number.NaN);
+    expect(calls[2].url).toContain("after=0&");
     expect(a.streamUrl("s")).toBe("/api/chat/v1/sessions/s/stream");
     const up = api(j(201, { seq: 2 }));
     await up.a.upload("s", "t", new File(["x"], "a.txt"), "cid");

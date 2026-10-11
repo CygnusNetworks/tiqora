@@ -102,7 +102,7 @@ export function createChatApi(opts: { base?: string; fetchImpl?: typeof fetch } 
     createSession: (body: Schemas["ChatSessionCreateIn"]) => json<ChatSessionCreated>("/sessions", post(body)),
     session: (id: string, token: string) => json<ChatSession>(sid(id), undefined, token),
     messages: (id: string, token: string, after: number) =>
-      json<ChatMessage[]>(`${sid(id)}/messages?after=${Math.max(0, Math.trunc(after))}&limit=200`, undefined, token),
+      json<ChatMessage[]>(`${sid(id)}/messages?after=${Number.isFinite(after) ? Math.max(0, Math.trunc(after)) : 0}&limit=200`, undefined, token),
     send: (id: string, token: string, body: string, clientId: string) =>
       json<ChatMessage>(`${sid(id)}/messages`, post({ body, client_id: clientId }), token),
     typing: (id: string, token: string) => none(`${sid(id)}/typing`, { method: "POST" }, token),

@@ -1,4 +1,4 @@
-import type { JSX } from "preact";
+import { Fragment, type JSX } from "preact";
 import { linkify } from "../linkify";
 
 /** Message text as text nodes; http(s) URLs become links, "\n" becomes <br>. No HTML sinks. */
@@ -7,7 +7,7 @@ export function MessageText(props: { text: string }): JSX.Element {
   return (
     <span class="tq-text">
       {lines.map((line, i) => (
-        <>
+        <Fragment key={i}>
           {i > 0 && <br />}
           {linkify(line).map((p) =>
             p.kind === "link" ? (
@@ -18,7 +18,7 @@ export function MessageText(props: { text: string }): JSX.Element {
               p.text
             ),
           )}
-        </>
+        </Fragment>
       ))}
     </span>
   );

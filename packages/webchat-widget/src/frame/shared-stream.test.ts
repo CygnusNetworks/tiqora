@@ -160,4 +160,124 @@ describe("SharedChatStream", () => {
     expect(calls).toEqual(["x"]);
     s.stop();
   });
+
+  it("falls back to a direct stream when the lock request is refused", async () => {
+    const w = world();
+    const calls: string[] = [];
+    const t = tab(w, calls, "a", () => sse(""));
+    const refuse = {
+      request: () => Promise.reject(new DOMException("denied", "SecurityError")),
+    };
+    const s = new SharedChatStream({
+      sessionId: "sid",
+      url: "/x",
+      token: "t",
+      lastSeq: () => 0,
+      onEvent: (e) => t.events.push(e),
+      onState: (st) => t.states.push(st),
+      fetchImpl: (async () => {
+        calls.push("direct");
+        return sse('id: 1\nevent: message\ndata: {}\n\n');
+      }) as typeof fetch,
+      locks: refuse,
+      openChannel: (n) => w.openChannel(n),
+    });
+    s.start();
+    await tick();
+    expect(calls).toEqual(["direct"]);
+    expect(t.events).toHaveLength(1);
+    s.stop();
+  });
+
+  it("falls back to a direct stream when the lock request throws or the channel cannot be opened", async () => {
+    const w = world();
+    for (const variant of ["throws", "channel"] as const) {
+      const calls: string[] = [];
+      const s = new SharedChatStream({
+        sessionId: "sid",
+        url: "/x",
+        token: "t",
+        lastSeq: () => 0,
+        onEvent: () => undefined,
+        onState: () => undefined,
+        fetchImpl: (async () => {
+          calls.push("direct");
+          return sse("");
+        }) as typeof fetch,
+        locks:
+          variant === "throws"
+            ? {
+                request: () => {
+                  throw new Error("boom");
+                },
+              }
+            : w.locks,
+        openChannel:
+          variant === "channel"
+            ? () => {
+                throw new DOMException("denied", "SecurityError");
+              }
+            : (n) => w.openChannel(n),
+      });
+      s.start();
+      await tick();
+      expect(calls).toEqual(["direct"]);
+      s.stop();
+    }
+  });
+
+  it("stop() while waiting for the lock is silent (no fallback stream)", async () => {
+    const w = world();
+    const calls: string[] = [];
+    const a = tab(w, calls, "a", () => sse(""));
+    const b = tab(w, calls, "b", () => sse(""));
+    a.s.start();
+    b.s.start();
+    await tick();
+    b.s.stop();
+    await tick();
+    expect(calls).toEqual(["a"]);
+    a.s.stop();
+  });
+
+  it("a late joiner learns the leader state and the last session event", async () => {
+    const w = world();
+    const calls: string[] = [];
+    const a = tab(w, calls, "a", () =>
+      sse('event: session\ndata: {"status":"active","agent_name":"Max"}\n\n'),
+    );
+    const b = tab(w, calls, "b", () => sse(""));
+    a.s.start();
+    await tick();
+    expect(a.states).toContain("live");
+    b.s.start(); // joins later, nothing changes on the leader afterwards
+    await tick();
+    expect(b.states.at(-1)).toBe("live");
+    expect(b.events.map((e) => e.event)).toEqual(["session"]);
+    expect(calls).toEqual(["a"]);
+    a.s.stop();
+    b.s.stop();
+  });
+
+  it("never relays the token and ignores malformed relay messages", async () => {
+    const w = world();
+    const seen: unknown[] = [];
+    const spy = w.openChannel("tiqora-chat:stream:sid");
+    spy.onmessage = (m) => seen.push(m.data);
+    const calls: string[] = [];
+    const a = tab(w, calls, "a", () => sse('id: 1\nevent: message\ndata: {"seq":1}\n\n'));
+    const b = tab(w, calls, "b", () => sse(""));
+    a.s.start();
+    b.s.start();
+    await tick();
+    expect(JSON.stringify(seen)).not.toContain('"t":"t"');
+    expect(JSON.stringify(seen)).not.toContain("token");
+    const before = b.events.length;
+    spy.postMessage({ t: "event", e: { id: 5, event: "message", data: "x" } });
+    spy.postMessage({ t: "state", s: "bogus" });
+    spy.postMessage("junk");
+    expect(b.events).toHaveLength(before);
+    a.s.stop();
+    b.s.stop();
+  });
 });

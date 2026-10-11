@@ -65,15 +65,21 @@ export type ChatStreamOptions = {
   fetchImpl?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
   random?: () => number;
+  /** No bytes (heartbeat comments included) for this long: abort and reconnect. Server heartbeat is 25 s. */
+  idleMs?: number;
 };
 
 const BACKOFF_MS = [1000, 2000, 5000, 10000, 30000];
 const MAX_RETRY_AFTER_MS = 120_000;
+const IDLE_MS = 70_000;
+const STABLE_MS = 10_000;
 const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export class ChatStream {
   private ctl: AbortController | null = null;
   private stopped = true;
+  /** Run generation: a restarted stream must never share the loop of an older run. */
+  private gen = 0;
   private state: StreamState | null = null;
   private attempt = 0;
 
@@ -84,11 +90,12 @@ export class ChatStream {
     this.stopped = false;
     this.attempt = 0;
     this.setState("connecting");
-    void this.run();
+    void this.run(++this.gen);
   }
 
   stop(): void {
     this.stopped = true;
+    this.gen++;
     this.ctl?.abort();
     this.setState("closed");
   }
@@ -100,20 +107,31 @@ export class ChatStream {
   }
 
   private close(): void {
-    this.stopped = true;
-    this.ctl?.abort();
-    this.setState("closed");
+    this.stop();
   }
 
-  private async run(): Promise<void> {
+  private async run(gen: number): Promise<void> {
     const doFetch = this.o.fetchImpl ?? ((...a: Parameters<typeof fetch>) => fetch(...a));
     const sleep = this.o.sleep ?? defaultSleep;
     const random = this.o.random ?? Math.random;
-    while (!this.stopped) {
+    const idleMs = this.o.idleMs ?? IDLE_MS;
+    const dead = () => gen !== this.gen;
+    while (!dead()) {
       let wait: number | null = null;
       const ctl = new AbortController();
       this.ctl = ctl;
+      let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      // Idle watchdog: re-armed by every chunk; on expiry the connection is dropped.
+      const arm = () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          ctl.abort();
+          reader?.cancel().catch(() => undefined);
+        }, idleMs);
+      };
       try {
+        arm();
         const res = await doFetch(this.o.url, {
           headers: {
             "X-Chat-Token": this.o.token,
@@ -121,23 +139,32 @@ export class ChatStream {
             "Last-Event-ID": String(this.o.lastSeq()),
           },
           cache: "no-store",
+          credentials: "omit",
           signal: ctl.signal,
         });
-        if (this.stopped) return;
-        if (res.status === 404 || res.status === 403) return this.close();
+        if (dead()) return;
+        if (res.status === 404 || res.status === 403) {
+          void res.body?.cancel().catch(() => undefined);
+          return this.close();
+        }
         if (res.status === 429 || res.status === 503) {
+          void res.body?.cancel().catch(() => undefined);
           const s = Number(res.headers.get("Retry-After"));
           wait = Math.min(Number.isFinite(s) && s > 0 ? s * 1000 : 30_000, MAX_RETRY_AFTER_MS);
         } else if (!res.ok || !res.body) {
+          void res.body?.cancel().catch(() => undefined);
           if (res.status >= 400 && res.status < 500 && res.status !== 408) return this.close();
         } else {
           this.setState("live");
-          if (await this.read(res.body.getReader())) return;
+          reader = res.body.getReader();
+          if (await this.read(reader, arm, gen)) return;
         }
       } catch {
-        if (this.stopped) return;
+        if (dead()) return;
+      } finally {
+        clearTimeout(timer);
       }
-      if (this.stopped) return;
+      if (dead()) return;
       this.setState("reconnecting");
       if (wait === null) {
         const base = BACKOFF_MS[Math.min(this.attempt, BACKOFF_MS.length - 1)];
@@ -149,14 +176,28 @@ export class ChatStream {
   }
 
   /** Pumps the body; resolves true when the stream ended for good (`end` event). */
-  private async read(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<boolean> {
+  private async read(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    arm: () => void,
+    gen: number,
+  ): Promise<boolean> {
     const parse = createSseParser();
     const dec = new TextDecoder("utf-8");
+    const since = Date.now();
     for (;;) {
       const { done, value } = await reader.read();
-      if (done) return false;
+      if (gen !== this.gen) return true;
+      if (done) {
+        // a connection that stayed up for a while is healthy: reconnect without escalating
+        if (Date.now() - since >= STABLE_MS) this.attempt = 0;
+        return false;
+      }
+      arm();
       for (const e of parse(dec.decode(value, { stream: true }))) {
-        this.attempt = 0;
+        // only real messages count as progress: the connect-time `session` event arrives
+        // even on a link that drops right after (or an evicted stream), which must not
+        // reset the backoff
+        if (e.event === "message") this.attempt = 0;
         try {
           this.o.onEvent(e);
         } catch {
