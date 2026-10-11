@@ -9,6 +9,7 @@ import {
 } from "./mockData";
 import { resolve as resolveDashboards } from "./dashboardsMock";
 import { setDemoFactsBuilding } from "./reportsMock";
+import { demoReportFile, resolveSavedRequest } from "./savedMock";
 import type { ReportRunIn } from "@/lib/reportsApi";
 
 /**
@@ -25,6 +26,13 @@ function syncDemoFacts(): void {
   } catch {
     // no storage (private mode): keep the current state
   }
+}
+
+const CREATE_ROUTES = new Set(["*/api/v1/reports", "*/api/v1/saved-searches"]);
+
+/** The demo ticket list `POST /tickets/query` pages through (the same one `GET /tickets` serves). */
+function savedTicketPage(): { items: unknown[] } {
+  return resolveData("/api/v1/tickets", "GET") as { items: unknown[] };
 }
 
 /**
@@ -104,6 +112,42 @@ export const handlers = [
     // A long range runs in the background, like on a real server.
     return HttpResponse.json(out, { status: out.job ? 202 : 200 });
   }),
+  // Report file download (JSON or YAML) of a built-in or saved report.
+  http.get("*/api/v1/reports/:key/file", ({ request, params }) => {
+    const format = new URL(request.url).searchParams.get("format") === "yaml" ? "yaml" : "json";
+    const file = demoReportFile(decodeURIComponent(String(params.key)), format);
+    if (!file) return new HttpResponse(null, { status: 404 });
+    return new HttpResponse(file.body, {
+      headers: {
+        "content-type": file.contentType,
+        "content-disposition": `attachment; filename="${file.filename}"`,
+      },
+    });
+  }),
+  // Saved reports/searches and the structured ticket query: the writes carry a body that
+  // resolveData never sees, so these handlers feed it to the in-memory demo store.
+  ...(["post", "put", "delete"] as const).flatMap((verb) =>
+    [
+      "*/api/v1/reports",
+      "*/api/v1/reports/import-file",
+      "*/api/v1/reports/:id",
+      "*/api/v1/saved-searches",
+      "*/api/v1/saved-searches/import/znuny",
+      "*/api/v1/saved-searches/:id",
+      "*/api/v1/saved-searches/:id/prefs",
+      "*/api/v1/tickets/query",
+      "*/api/v1/ticket-filters/count",
+    ].map((route) =>
+      http[verb](route, async ({ request }) => {
+        const text = await request.text();
+        const body = text ? (JSON.parse(text) as unknown) : undefined;
+        const out = resolveSavedRequest(request.method, new URL(request.url).pathname, body, savedTicketPage());
+        if (out === undefined) return undefined; // not a saved route/id: the catch-all answers
+        if (out === null) return new HttpResponse(null, { status: 204 });
+        return HttpResponse.json(out as never, { status: verb === "post" && CREATE_ROUTES.has(route) ? 201 : 200 });
+      }),
+    ),
+  ),
   // Report export download: a tiny XLSX-typed body (declared before the CSV catch-all below).
   http.get(
     "*/api/v1/jobs/9201/files/*",

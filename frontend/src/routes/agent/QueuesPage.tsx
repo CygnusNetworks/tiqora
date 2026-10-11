@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
 import { api, type MutationRequest, type TicketListChannel, type TicketListItem } from "@/lib/api";
@@ -43,6 +43,7 @@ import { fieldOptionsApi } from "@/lib/fieldOptionsApi";
 import { useAgentOptions } from "@/lib/agentOptions";
 import { apiErrorMessage } from "@/lib/avatarApi";
 import { JobDialog } from "@/components/jobs/JobDialog";
+import { SaveViewDialog, type SaveViewParams } from "@/components/searches/SaveViewDialog";
 import { priorityLabel } from "@/lib/priority";
 import { stateLabel } from "@/lib/status";
 
@@ -249,6 +250,8 @@ export function QueuesPage() {
   const [applying, setApplying] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [status, setStatus] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [saveViewOpen, setSaveViewOpen] = useState(false);
+  const [savedView, setSavedView] = useState<{ id: number; name: string } | null>(null);
 
   const clearSelection = () => {
     setSelected(new Set());
@@ -672,6 +675,12 @@ export function QueuesPage() {
         onClose={() => setExportJobId(null)}
         testId="queue-export-job"
       />
+      <SaveViewDialog
+        open={saveViewOpen}
+        onClose={() => setSaveViewOpen(false)}
+        listParams={{ ...filterParams, sort, order } as SaveViewParams}
+        onSaved={(saved) => setSavedView({ id: saved.id, name: saved.name })}
+      />
       <div className="min-w-0 flex-1 space-y-3 p-3">
         <div>
           <div className="flex flex-wrap items-center gap-2.5">
@@ -759,41 +768,46 @@ export function QueuesPage() {
             })}
           </div>
 
-          <Menu
-            align="right"
-            panelTestId="queue-more-menu"
-            trigger={({ ref, toggleProps }) => (
-              <button
-                ref={ref}
-                type="button"
-                {...toggleProps}
-                aria-label={t("queue.moreActions")}
-                data-testid="queue-more-actions"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-hairline bg-surface text-muted transition-colors duration-100 hover:border-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-              >
-                <MoreIcon className="h-4 w-4" />
-              </button>
-            )}
-          >
-            {isAdmin && (
-              <MenuItem
-                selected={includeArchived}
-                keepOpen
-                testId="queue-show-archived"
-                onSelect={() =>
-                  setSearch({ include_archived: includeArchived ? undefined : true, offset: 0 })
-                }
-              >
-                {t("queue.showArchived")}
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setSaveViewOpen(true)} data-testid="queues-save-view">
+              {t("savedSearches.saveView")}
+            </Button>
+            <Menu
+              align="right"
+              panelTestId="queue-more-menu"
+              trigger={({ ref, toggleProps }) => (
+                <button
+                  ref={ref}
+                  type="button"
+                  {...toggleProps}
+                  aria-label={t("queue.moreActions")}
+                  data-testid="queue-more-actions"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-hairline bg-surface text-muted transition-colors duration-100 hover:border-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+                >
+                  <MoreIcon className="h-4 w-4" />
+                </button>
+              )}
+            >
+              {isAdmin && (
+                <MenuItem
+                  selected={includeArchived}
+                  keepOpen
+                  testId="queue-show-archived"
+                  onSelect={() =>
+                    setSearch({ include_archived: includeArchived ? undefined : true, offset: 0 })
+                  }
+                >
+                  {t("queue.showArchived")}
+                </MenuItem>
+              )}
+              <MenuItem testId="queue-export-csv" onSelect={() => {
+                  setExportError(null);
+                  void exportCsv();
+                }}>
+                {t("queue.exportCsv")}
               </MenuItem>
-            )}
-            <MenuItem testId="queue-export-csv" onSelect={() => {
-                setExportError(null);
-                void exportCsv();
-              }}>
-              {t("queue.exportCsv")}
-            </MenuItem>
-          </Menu>
+            </Menu>
+          </div>
         </div>
 
         {exportError && (
@@ -986,6 +1000,20 @@ export function QueuesPage() {
               </span>
             )}
           </div>
+        )}
+
+        {savedView && (
+          <p className="text-xs font-medium text-green" role="status" data-testid="queues-view-saved">
+            {t("savedSearches.saveViewDone", { name: savedView.name })}{" "}
+            <Link
+              to="/agent/searches/$searchId"
+              params={{ searchId: String(savedView.id) }}
+              search={{}}
+              className="text-accent underline"
+            >
+              {t("savedSearches.open")}
+            </Link>
+          </p>
         )}
 
         <TicketTable

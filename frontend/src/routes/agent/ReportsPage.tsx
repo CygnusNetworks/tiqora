@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Link, useSearch } from "@tanstack/react-router";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "@/auth/AuthContext";
+import { downloadUrl } from "@/components/customers/vcardExport";
 import { FactsBanner } from "@/components/reports/FactsBanner";
 import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
 import { filterRange, rangeInvalid, toRunIn, type ReportFilterState } from "@/components/reports/reportFilter";
@@ -10,15 +12,23 @@ import { RunState } from "@/components/reports/RunState";
 import { ReportView } from "@/components/reports/ReportView";
 import { cellLabel, formatMeasure, OTHER_KEY, toSeries } from "@/components/reports/reportFormat";
 import { useReportRun } from "@/components/reports/useReportRun";
+import { Badge } from "@/components/ui/Badge";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Menu, MenuItem, MenuSeparator } from "@/components/ui/Menu";
 import { Spinner } from "@/components/ui/Spinner";
+import { Switch } from "@/components/ui/Switch";
 import { Tabs } from "@/components/ui/Tabs";
 import { cn } from "@/lib/cn";
 import { dateRangeForPreset } from "@/lib/dateRanges";
 import {
+  reportDescription,
   reportErrorMessage,
+  reportTitle,
   reportsApi,
   type BuiltinReport,
+  isBuiltinReport,
   type Grain,
+  type ReportItem,
   type ReportResult,
   type ReportRunIn,
 } from "@/lib/reportsApi";
@@ -189,6 +199,124 @@ function agentRows(owned: ReportResult | undefined, activity: ReportResult | und
   });
 }
 
+const copyCls =
+  "text-xs text-muted hover:text-ink hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent";
+
+/** One saved report: title, owner, who it is shared with, and its menu. A broken one only shows why and can be deleted. */
+function SavedCard({
+  report,
+  mine,
+  canCreate,
+  onDelete,
+}: {
+  report: ReportItem;
+  mine: boolean;
+  canCreate: boolean;
+  onDelete: (report: ReportItem) => void;
+}) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const id = `reports-saved-card-${report.id}`;
+  const title = reportTitle(report, t);
+  const broken = report.definition == null;
+  const canEdit = !report.read_only && canCreate && !broken;
+  // An owner may always delete their own report, also without the save right (R-OWNDELETE).
+  const canDelete = !report.read_only || mine;
+  const target =
+    report.visibility === "all"
+      ? t("reports.share.all")
+      : report.visibility === "groups"
+        ? t("reports.share.groups")
+        : mine
+          ? t("reports.share.private")
+          : t("reports.saved.privateOther");
+  return (
+    <li className="min-w-0" data-testid={id}>
+      <div className="flex h-full flex-col gap-2 rounded-lg border border-hairline bg-surface p-3">
+        <div className="flex items-start justify-between gap-2">
+          <h4 className="min-w-0 break-words text-sm font-medium text-ink">{title}</h4>
+          {(!broken || canDelete) && (
+            <Menu
+              panelTestId={`${id}-menu-panel`}
+              trigger={({ ref, toggleProps }) => (
+                <button
+                  type="button"
+                  ref={ref}
+                  {...toggleProps}
+                  aria-label={t("reports.saved.actions", { name: title })}
+                  data-testid={`${id}-menu`}
+                  className="shrink-0 rounded-md px-1.5 py-0.5 text-sm leading-none text-muted transition-colors hover:bg-surface-subtle hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                >
+                  <span aria-hidden>⋯</span>
+                </button>
+              )}
+            >
+              {canEdit && (
+                <MenuItem
+                  testId={`${id}-edit`}
+                  onSelect={() => void navigate({ to: "/agent/reports/$reportKey/edit", params: { reportKey: report.key } })}
+                >
+                  {t("reports.saved.edit")}
+                </MenuItem>
+              )}
+              {canCreate && !broken && (
+                <MenuItem
+                  testId={`${id}-copy`}
+                  onSelect={() => void navigate({ to: "/agent/reports/new", search: { from: report.key } })}
+                >
+                  {t("reports.saved.copy")}
+                </MenuItem>
+              )}
+              {!broken && (
+                <>
+                  <MenuItem testId={`${id}-json`} onSelect={() => downloadUrl(reportsApi.fileUrl(report.key, "json"))}>
+                    {t("reports.saved.exportJson")}
+                  </MenuItem>
+                  <MenuItem testId={`${id}-yaml`} onSelect={() => downloadUrl(reportsApi.fileUrl(report.key, "yaml"))}>
+                    {t("reports.saved.exportYaml")}
+                  </MenuItem>
+                </>
+              )}
+              {canDelete && (
+                <>
+                  {!broken && <MenuSeparator />}
+                  <MenuItem testId={`${id}-delete`} danger onSelect={() => onDelete(report)}>
+                    {t("reports.saved.delete")}
+                  </MenuItem>
+                </>
+              )}
+            </Menu>
+          )}
+        </div>
+        {broken ? (
+          <p className="text-xs text-danger" data-testid={`${id}-error`}>
+            {report.definition_error ?? t("reports.saved.broken")}
+          </p>
+        ) : (
+          <p className="line-clamp-3 text-xs text-muted">{reportDescription(report, t)}</p>
+        )}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {report.owner && <Badge tone="muted">{t("reports.saved.owner", { name: report.owner.name })}</Badge>}
+          <Badge tone={report.visibility === "private" ? "default" : "accent"}>
+            {report.visibility === "private" ? target : t("reports.saved.sharedWith", { target })}
+          </Badge>
+        </div>
+        {!broken && (
+          <Link
+            to="/agent/reports/$reportKey"
+            params={{ reportKey: report.key }}
+            className="mt-auto pt-1 text-xs font-medium text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            data-testid={`${id}-open`}
+            aria-label={`${t("reports.saved.open")}: ${title}`}
+          >
+            {t("reports.saved.open")}
+          </Link>
+        )}
+      </div>
+    </li>
+  );
+}
+
 /** `/agent/reports`: the overview (key figures, trends, open tickets, agents) and the report catalogue. */
 function ReportsPageContent() {
   const { t, i18n } = useTranslation();
@@ -197,11 +325,34 @@ function ReportsPageContent() {
   const [filter, setFilter] = useState<ReportFilterState>(initialFilter);
   const [openTab, setOpenTab] = useState<OpenNowTab>("queue");
 
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const canCreate = user?.can_create_reports === true;
+  const isAdmin = user?.is_admin === true;
+  const [showAll, setShowAll] = useState(false);
+  const [toDelete, setToDelete] = useState<ReportItem | null>(null);
+
   const catalogueQ = useQuery({
-    queryKey: ["reports", "catalogue"],
-    queryFn: ({ signal }) => reportsApi.catalogue(signal),
+    queryKey: ["reports", "catalogue", { all: showAll }],
+    queryFn: ({ signal }) => reportsApi.catalogue(signal, { all: showAll }),
+    placeholderData: keepPreviousData,
   });
-  const reports = useMemo(() => catalogueQ.data?.reports ?? [], [catalogueQ.data]);
+  const removeM = useMutation({
+    mutationFn: (id: number) => reportsApi.remove(id),
+    onSuccess: async () => {
+      setToDelete(null);
+      await queryClient.invalidateQueries({ queryKey: ["reports", "catalogue"] });
+    },
+  });
+  const reports = useMemo(() => (catalogueQ.data?.reports ?? []).filter(isBuiltinReport), [catalogueQ.data]);
+  const savedReports = useMemo(
+    () => (catalogueQ.data?.reports ?? []).filter((r) => r.kind === "saved" && r.id != null),
+    [catalogueQ.data],
+  );
+  const isMine = (r: ReportItem) => user?.id !== undefined && r.owner?.user_id === user.id;
+  const mineReports = savedReports.filter(isMine);
+  const sharedReports = savedReports.filter((r) => !isMine(r));
   const byKey = useMemo(() => new Map(reports.map((r) => [r.key, r])), [reports]);
   const blocked = rangeInvalid(filter);
   const grain = overviewGrain(filter);
@@ -241,9 +392,28 @@ function ReportsPageContent() {
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6" data-testid="reports-page">
-      <div>
-        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">{t("reports.title")}</h1>
-        <p className="mt-1 text-sm text-muted">{t("reports.subtitle")}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">{t("reports.title")}</h1>
+          <p className="mt-1 text-sm text-muted">{t("reports.subtitle")}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          {isAdmin && (
+            <label className="inline-flex items-center gap-2 text-sm text-ink" title={t("reports.saved.allAdminHint")}>
+              <Switch testId="reports-all-toggle" checked={showAll} onChange={setShowAll} />
+              {t("reports.saved.allAdmin")}
+            </label>
+          )}
+          {canCreate && (
+            <Link
+              to="/agent/reports/new"
+              className="inline-flex items-center rounded-md border border-transparent bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink transition-colors hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              data-testid="reports-new"
+            >
+              {t("reports.saved.newReport")}
+            </Link>
+          )}
+        </div>
       </div>
 
       <FactsBanner facts={catalogueQ.data?.facts} />
@@ -351,6 +521,31 @@ function ReportsPageContent() {
             </OverviewCard>
           </section>
 
+          {removeM.isError && (
+            <p className="text-sm text-danger" role="alert" data-testid="reports-delete-error">
+              {reportErrorMessage(removeM.error, t("reports.saved.deleteFailed"))}
+            </p>
+          )}
+          {(
+            [
+              ["mine", mineReports],
+              ["shared", sharedReports],
+            ] as const
+          ).map(([group, items]) =>
+            items.length === 0 ? null : (
+              <section key={group} className="space-y-2" aria-labelledby={`reports-saved-${group}-heading`} data-testid={`reports-saved-${group}`}>
+                <h2 id={`reports-saved-${group}-heading`} className="font-display text-lg font-semibold text-ink">
+                  {t(`reports.saved.${group}`)}
+                </h2>
+                <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {items.map((r) => (
+                    <SavedCard key={r.key} report={r} mine={group === "mine"} canCreate={canCreate} onDelete={setToDelete} />
+                  ))}
+                </ul>
+              </section>
+            ),
+          )}
+
           <section className="space-y-5" aria-labelledby="reports-catalogue-heading" data-testid="reports-catalogue">
             <h2 id="reports-catalogue-heading" className="font-display text-lg font-semibold text-ink">
               {t("reports.allReports")}
@@ -379,17 +574,33 @@ function ReportsPageContent() {
                   </h3>
                   <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {items.map((r) => (
-                      <li key={r.key} className="min-w-0">
+                      <li key={r.key} className="flex min-w-0 flex-col">
                         <Link
                           to="/agent/reports/$reportKey"
                           params={{ reportKey: r.key }}
-                          className="flex h-full flex-col gap-1 rounded-lg border border-hairline bg-surface p-3 transition-colors hover:border-accent/60 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+                          className={cn(
+                            "flex h-full flex-col gap-1 rounded-lg border border-hairline bg-surface p-3 transition-colors hover:border-accent/60 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+                            canCreate && "rounded-b-none border-b-0",
+                          )}
                           data-testid={`reports-card-${r.key}`}
                           title={t(r.description_key)}
                         >
                           <span className="text-sm font-medium text-ink">{t(r.title_key)}</span>
                           <span className="line-clamp-3 text-xs text-muted">{t(r.description_key)}</span>
                         </Link>
+                        {canCreate && (
+                          <div className="rounded-b-lg border border-t-0 border-hairline bg-surface px-3 pb-2">
+                            <button
+                              type="button"
+                              className={copyCls}
+                              data-testid={`reports-card-${r.key}-copy`}
+                              aria-label={`${t("reports.saved.copy")}: ${t(r.title_key)}`}
+                              onClick={() => void navigate({ to: "/agent/reports/new", search: { from: r.key } })}
+                            >
+                              {t("reports.saved.copy")}
+                            </button>
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -399,6 +610,16 @@ function ReportsPageContent() {
           </section>
         </>
       )}
+      <ConfirmDialog
+        open={toDelete !== null}
+        title={t("reports.saved.deleteTitle")}
+        message={t("reports.saved.deleteConfirm", { name: toDelete ? reportTitle(toDelete, t) : "" })}
+        confirmLabel={t("reports.saved.delete")}
+        variant="danger"
+        pending={removeM.isPending}
+        onCancel={() => setToDelete(null)}
+        onConfirm={() => toDelete?.id != null && removeM.mutate(toDelete.id)}
+      />
     </div>
   );
 }

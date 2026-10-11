@@ -305,3 +305,64 @@ def test_scoped_keys_cannot_reach_plugin_frontend_paths(path: str) -> None:
     for scopes in ({"plugins:rw"}, {"plugins:ro"}, {"read"}, {"write"}, {"kb:ro"}, {"admin:rw"}):
         assert not scopes_allow(frozenset(scopes), method="GET", path=path), scopes
     assert scopes_allow(None, method="GET", path=path)
+
+
+def test_saved_report_routes_and_share_groups_scopes() -> None:
+    """Saved-report CRUD and files fall under ``stats``; share groups under ``tickets``."""
+    for path in (
+        "/api/v1/reports/12",
+        "/api/v1/reports/12/file",
+        "/api/v1/reports/import-file",
+    ):
+        assert path_to_area(path) == "stats", path
+    assert path_to_area("/api/v1/reference/share-groups") == "tickets"
+    ro, rw = frozenset({"stats:ro"}), frozenset({"stats:rw"})
+    assert scopes_allow(ro, method="GET", path="/api/v1/reports/12/file")
+    for method, path in (
+        ("POST", "/api/v1/reports"),
+        ("PUT", "/api/v1/reports/12"),
+        ("DELETE", "/api/v1/reports/12"),
+    ):
+        assert not scopes_allow(ro, method=method, path=path), (method, path)
+        assert scopes_allow(rw, method=method, path=path), (method, path)
+    assert scopes_allow(
+        frozenset({"tickets:ro"}), method="GET", path="/api/v1/reference/share-groups"
+    )
+    assert not scopes_allow(ro, method="GET", path="/api/v1/reference/share-groups")
+
+
+def test_tickets_query_is_a_post_and_needs_tickets_rw() -> None:
+    # POST /tickets/query only reads, but like POST /ticket-filters/count it is a POST:
+    # a read-only key cannot call it (R-APIKEY), a tickets:rw key can.
+    path = "/api/v1/tickets/query"
+    assert path_to_area(path) == "tickets"
+    assert not scopes_allow(frozenset({"tickets:ro"}), method="POST", path=path)
+    assert not scopes_allow(frozenset({"read"}), method="POST", path=path)
+    assert scopes_allow(frozenset({"tickets:rw"}), method="POST", path=path)
+    assert scopes_allow(frozenset({"tickets:ro"}), method="GET", path="/api/v1/tickets")
+
+
+def test_saved_searches_map_to_tickets_and_writes_need_rw() -> None:
+    # R-APIKEY: list/get/counts read, create/update/prefs/delete write (prefs is a PUT).
+    base = "/api/v1/saved-searches"
+    for path in (base, base + "/counts", base + "/5", base + "/5/prefs"):
+        assert path_to_area(path) == "tickets", path
+    assert scopes_allow(frozenset({"tickets:ro"}), method="GET", path=base + "/counts")
+    for method, path in (
+        ("POST", base),
+        ("PUT", base + "/5"),
+        ("PUT", base + "/5/prefs"),
+        ("DELETE", base + "/5"),
+    ):
+        assert not scopes_allow(frozenset({"tickets:ro"}), method=method, path=path), path
+        assert scopes_allow(frozenset({"tickets:rw"}), method=method, path=path), path
+    assert not scopes_allow(frozenset({"kb:rw"}), method="GET", path=base)
+
+
+def test_znuny_import_preview_reads_and_apply_writes() -> None:
+    # R-APIKEY: the preview only reads Znuny, applying creates saved searches
+    path = "/api/v1/saved-searches/import/znuny"
+    assert path_to_area(path) == "tickets"
+    assert scopes_allow(frozenset({"tickets:ro"}), method="GET", path=path)
+    assert not scopes_allow(frozenset({"tickets:ro"}), method="POST", path=path)
+    assert scopes_allow(frozenset({"tickets:rw"}), method="POST", path=path)

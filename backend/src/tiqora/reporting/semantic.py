@@ -9,8 +9,8 @@ The compiler builds each expression once per compile.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -115,6 +115,9 @@ class ReportSource:
     #: (``accounted_time``: historical totals; ``daily_snapshot``: stocks per day;
     #: ``open_tickets`` drops archived tickets always in ``base_where`` like the dashboard).
     archive_exclusion: BoolFn | None = None
+    #: dashboard filter key (``run_service.COMMON_FILTER_KEYS``) -> this source's filterable
+    #: field key; a key a source does not list cannot be applied to it
+    common_fields: Mapping[str, str] = field(default_factory=dict)
 
     def dimension(self, key: str) -> Dimension | None:
         for d in self.dimensions:

@@ -219,4 +219,16 @@ def tickets_source() -> ReportSource:
         time_fields=("created", "closed", "first_response"),
         default_time_field="created",
         archive_exclusion=lambda ctx: F.c.archived.is_(false()),
+        common_fields={
+            "queue": "queue",
+            "state_type": "state_type",
+            "priority": "priority",
+            "type": "type",
+            "service": "service",
+            "sla": "sla",
+            "owner": "owner",
+            "customer": "customer",
+            "customer_user": "customer_user",
+            "channel": "channel",
+        },
     )

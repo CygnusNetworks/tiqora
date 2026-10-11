@@ -258,8 +258,21 @@ class JobRunner:
                 session, older_than=utc_now() - timedelta(days=cfg.retention_days)
             )
             await session.commit()
+        await self._purge_deleted_reports()
         self._last_purge = now
         return purged
+
+    async def _purge_deleted_reports(self) -> None:
+        """Hard-delete saved reports soft-deleted > 90 days ago (R-OWNDELETE)."""
+        # lazy import: reporting imports the jobs package
+        from tiqora.reporting.saved import purge_deleted_reports
+
+        try:
+            async with self._factory() as session:
+                await purge_deleted_reports(session)
+                await session.commit()
+        except Exception:  # noqa: BLE001 — retention must never stop the runner
+            logger.warning("saved_report_purge_failed", exc_info=True)
 
     def _lane_kinds(self) -> dict[str, list[str]]:
         """Kinds of every lane except ``default`` (which takes all other kinds)."""

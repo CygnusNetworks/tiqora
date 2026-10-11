@@ -1,0 +1,47 @@
+{
+  "id": [
+    "eq",
+    "in",
+    "neq",
+    "not_in"
+  ],
+  "string": [
+    "contains",
+    "eq",
+    "in",
+    "is_empty",
+    "is_not_empty",
+    "neq",
+    "not_in",
+    "starts_with"
+  ],
+  "int": [
+    "between",
+    "eq",
+    "gt",
+    "gte",
+    "in",
+    "lt",
+    "lte",
+    "neq"
+  ],
+  "datetime": [
+    "after",
+    "before",
+    "between",
+    "is_empty",
+    "is_not_empty",
+    "older_than",
+    "within_last"
+  ],
+  "bool": [
+    "is_false",
+    "is_true"
+  ],
+  "enum": [
+    "eq",
+    "in",
+    "neq",
+    "not_in"
+  ]
+}

@@ -144,7 +144,11 @@ _DF_TYPES: dict[str, tuple[str, Any]] = {
     "Date": ("datetime", DynamicFieldValue.value_date),
     "DateTime": ("datetime", DynamicFieldValue.value_date),
 }
-_DF_OPTION_TYPES = frozenset({"Dropdown", "Multiselect"})
+#: Znuny dynamic field types the filter catalogue supports.
+SUPPORTED_DF_TYPES = frozenset(_DF_TYPES)
+#: Dynamic field types whose values come from a configured option list.
+DF_OPTION_TYPES = frozenset({"Dropdown", "Multiselect"})
+_DF_OPTION_TYPES = DF_OPTION_TYPES
 
 
 @dataclass(frozen=True, slots=True)

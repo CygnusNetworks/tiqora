@@ -5,16 +5,33 @@ from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
+    Column,
     Integer,
     LargeBinary,
+    MetaData,
     Numeric,
     SmallInteger,
     String,
+    Table,
+    Text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
 from tiqora.db.legacy.base import LegacyBase
 from tiqora.db.legacy.types import LegacyDateTime as DateTime
+
+#: Znuny table `search_profile` (key-less: no primary key, so no ORM class). Read-only for
+#: Tiqora - the Znuny import reads an agent's saved ticket searches, nothing ever writes it.
+#: Own ``MetaData``: never part of ``LegacyBase.metadata`` (no create_all, no drift checks).
+SEARCH_PROFILE = Table(
+    "search_profile",
+    MetaData(),
+    Column("login", String(200)),
+    Column("profile_name", String(200)),
+    Column("profile_type", String(30)),
+    Column("profile_key", Text),
+    Column("profile_value", Text),
+)
 
 
 class FormDraft(LegacyBase):

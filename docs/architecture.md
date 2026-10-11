@@ -546,6 +546,34 @@ are replaced by a catalogue of 25 built-in reports over typed sources.
   (stacked bar, area, donut, heatmap, KPI with sparkline/delta, pivot with sticky
   headers). `/agent/stats` redirects there.
 
+- **Saved reports** (`reporting/saved.py`, table `tiqora_report` + `tiqora_report_group`,
+  `api/v1/reports.py`): a user-built `ReportDefinition` stored as JSON, with owner,
+  visibility (`private`, `groups`, `all`), optimistic `version` and soft delete
+  (purged by the worker after 90 days, `jobs/runner.py`). Rights come from
+  `rights.py::report_rights`, one `queue_permissions` evaluation per call (view /
+  create / share / admin; also feeds `/auth/me`). A report key is either
+  `builtin.<name>` or the decimal id of a saved report; `saved.resolve_report_ref`
+  turns both into a definition. `report_file.py` reads and writes the JSON/YAML
+  report files.
+- **Run service** (`reporting/run_service.py`): the one place that runs a report by
+  reference or inline, in the viewer's scope, with runtime parameters, cache and the
+  inline-or-job decision. `enqueue_report_ref` queues the same run as a
+  `core.report_run` job (private result). It is the seam for other modules: a
+  dashboard tile runs a saved report through it with an extra filter instead of
+  building its own job kind.
+- **Saved searches** (`saved_searches/`, tables `tiqora_saved_search`,
+  `_group`, `_pref`, `api/v1/saved_searches.py`): `store.py` holds CRUD, sharing,
+  per-user sidebar prefs and the per-user cap; `/saved-searches/counts` counts the
+  first 15 sidebar entries under one deadline and caches per viewer for 30 s.
+  Criteria are the generic `Filter` of `filters/`. `znuny_reader.py` (read-only
+  select on `search_profile`) and `znuny_import.py` (pure mapper) implement the
+  Znuny profile import. `POST /api/v1/tickets/query` (`api/v1/tickets.py`) lists the
+  tickets for a `Filter` in the caller's scope and backs the saved-search page.
+- **Builder UI**: `/agent/reports/new` and `/agent/reports/$reportKey/edit`
+  (`routes/agent/ReportBuilderPage.tsx`, three panes with live preview; the
+  report viewer `ReportViewPage.tsx` has the runtime parameter controls), `/agent/searches/...` for saved searches and
+  the editor.
+
 ### Dashboards
 
 - **Widget data** (`dashboard/runner.py`): each widget's provider runs as the viewer in its own

@@ -10,8 +10,13 @@ import { SetPasswordPage } from "@/routes/SetPasswordPage";
 import { LoginPage } from "@/routes/LoginPage";
 import { DashboardPage, type DashboardSearch } from "@/routes/agent/DashboardPage";
 import { ReportsPage, type ReportsSearch } from "@/routes/agent/ReportsPage";
+import { ReportBuilderPage } from "@/routes/agent/ReportBuilderPage";
+import { validateReportBuilderSearch } from "@/routes/agent/reportBuilderSearch";
 import { ReportViewPage } from "@/routes/agent/ReportViewPage";
 import { validateReportViewSearch } from "@/routes/agent/reportViewSearch";
+import { SavedSearchPage } from "@/routes/agent/SavedSearchPage";
+import { SavedSearchEditorPage } from "@/routes/agent/SavedSearchEditorPage";
+import { validateSavedSearchSearch } from "@/routes/agent/savedSearchSearch";
 import { QueuesPage, type QueuesSearch } from "@/routes/agent/QueuesPage";
 import { TicketZoomPage } from "@/routes/agent/TicketZoomPage";
 import { SearchPage, type SearchSearch } from "@/routes/agent/SearchPage";
@@ -491,11 +496,47 @@ const agentReportsRoute = createRoute({
   component: ReportsPage,
 });
 
+// Static segment first: "new" is never read as a report key.
+const agentReportNewRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/reports/new",
+  validateSearch: validateReportBuilderSearch,
+  component: ReportBuilderPage,
+});
+
+// A built-in key is redirected to /reports/new?from=<key> by the page.
+const agentReportEditRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/reports/$reportKey/edit",
+  component: ReportBuilderPage,
+});
+
 const agentReportViewRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/reports/$reportKey",
   validateSearch: validateReportViewSearch,
   component: ReportViewPage,
+});
+
+// Static segment first: "new" is never read as a search id.
+const agentSearchNewRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/searches/new",
+  component: SavedSearchEditorPage,
+});
+
+const agentSearchEditRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/searches/$searchId/edit",
+  component: SavedSearchEditorPage,
+});
+
+// Consumed by the dashboards later: keep the path.
+const agentSearchViewRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/searches/$searchId",
+  validateSearch: validateSavedSearchSearch,
+  component: SavedSearchPage,
 });
 
 const agentCalendarRoute = createRoute({
@@ -1175,7 +1216,12 @@ const routeTree = rootRoute.addChildren([
     agentSettingsRoute,
     agentStatsRoute,
     agentReportsRoute,
+    agentReportNewRoute,
+    agentReportEditRoute,
     agentReportViewRoute,
+    agentSearchNewRoute,
+    agentSearchEditRoute,
+    agentSearchViewRoute,
     agentCalendarRoute,
     agentTemplatesRoute,
     agentServicesRoute,

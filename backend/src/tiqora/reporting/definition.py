@@ -247,6 +247,11 @@ def _check_parameter(src: ReportSource, p: ReportParameter, path: str) -> None:
                 )
             if spec.type == "enum" and v not in spec.enum_values:
                 raise DefinitionError(f"„{v}“ ist kein erlaubter Wert.", path=f"{path}.{name}[{j}]")
+    if p.op == "eq" and p.default is not None and len(p.default) > 1:
+        raise DefinitionError(
+            f"Für „{p.field}“ ist bei „{p.op}“ nur ein Vorgabewert möglich.",
+            path=f"{path}.default",
+        )
     if p.allowed_values is not None and p.default is not None:
         for j, v in enumerate(p.default):
             if v not in p.allowed_values:

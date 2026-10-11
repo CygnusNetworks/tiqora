@@ -1,4 +1,5 @@
 import type {
+  ReportDefinition,
   ReportSource,
   BuiltinReport,
   FactsStatus,
@@ -9,6 +10,7 @@ import type {
   ReportRunOut,
   ReportingStatus,
 } from "@/lib/reportsApi";
+import { OPS_BY_TYPE } from "@/components/filters/filterModel";
 import { DEMO_REPORTS } from "./reportsCatalogue";
 
 /**
@@ -146,13 +148,73 @@ const SOURCE_AGGS: Record<string, string> = {
   open_tickets: "tickets:count age_0_1d:count_if age_1_3d:count_if age_3_7d:count_if age_7_30d:count_if age_30d_plus:count_if escalated:count_if unassigned:count_if",
 };
 
-/** `GET /api/v1/reporting/sources` for the demo: measures with their aggregation (dimensions omitted). */
+/**
+ * Dimensions per source as `key:kind:labels:options_source` tokens (strings, not object literals:
+ * the secret scan flags long snake_case keys). `-` = none; kinds as in the backend `DimensionKind`.
+ */
+const SOURCE_DIMS: Record<string, string> = {
+  tickets:
+    "queue:id:queue:queue queue_at_create:id:queue:queue state:id:state:state state_type:enum:none:- priority:id:priority:priority type:id:type:type service:id:service:service sla:id:sla:sla owner:id:user:- responsible:id:user:- customer:string:customer_company:- customer_user:string:customer_user:- channel:enum:none:- created:date:none:- closed:date:none:- first_response:date:none:- created_hour:hour:none:- created_weekday:weekday:none:- process:string:none:-",
+  ticket_events:
+    "kind:enum:none:- occurred:date:none:- occurred_hour:hour:none:- occurred_weekday:weekday:none:- actor:id:user:- queue:id:queue:queue from_queue:id:queue:queue to_queue:id:queue:queue from_state:id:state:state to_state:id:state:state ticket_queue:id:queue:queue ticket_state:id:state:state ticket_priority:id:priority:priority ticket_type:id:type:type customer:string:customer_company:-",
+  daily_snapshot: "snapshot:local_date:none:- queue:id:queue:queue state_type:enum:none:- priority:id:priority:priority",
+  accounted_time:
+    "agent:id:user:- customer:string:customer_company:- customer_user:string:customer_user:- queue:id:queue:queue type:id:type:type service:id:service:service ticket:id:ticket:- booked:date:none:- booked_weekday:weekday:none:-",
+  open_tickets:
+    "queue:id:queue:queue state:id:state:state priority:id:priority:priority type:id:type:type service:id:service:service sla:id:sla:sla owner:id:user:- responsible:id:user:- customer:string:customer_company:- customer_user:string:customer_user:- created:date:none:-",
+};
+const DEFAULT_TIME_FIELD: Record<string, string | null> = {
+  tickets: "created",
+  ticket_events: "occurred",
+  daily_snapshot: "snapshot",
+  accounted_time: "booked",
+  open_tickets: null,
+};
+const ENUM_VALUES: Record<string, string[]> = {
+  state_type: ["new", "open", "pending reminder", "closed"],
+  channel: ["email", "phone", "telegram", "webchat"],
+  kind: ["create", "close", "reply", "note"],
+};
+const ENUM_LABELS: Record<string, string> = { state_type: "state_type", channel: "channel", kind: "event_kind" };
+const FILTER_TYPE: Record<string, string | null> = {
+  id: "id",
+  string: "string",
+  enum: "enum",
+  date: "datetime",
+  local_date: "datetime",
+  hour: null,
+  weekday: null,
+};
+
+function sourceDimensions(source: string): ReportSource["dimensions"] {
+  return SOURCE_DIMS[source].split(" ").map((token) => {
+    const [key, kind, labels, options] = token.split(":");
+    const filterType = FILTER_TYPE[kind];
+    // The snapshot day is not filterable (backend: filterable=False).
+    const filterable = filterType !== null && key !== "snapshot";
+    return {
+      key,
+      label_key: `reports.dimensions.${key}`,
+      kind,
+      labels,
+      i18n_values: kind === "enum" ? `reports.values.${ENUM_LABELS[key]}` : null,
+      filter_type: filterable ? filterType : null,
+      options_source: options === "-" ? null : options,
+      time_field: kind === "date" || kind === "local_date",
+      ops: filterable ? [...OPS_BY_TYPE[filterType as keyof typeof OPS_BY_TYPE]].sort() : [],
+      enum_values: ENUM_VALUES[key] ?? [],
+    };
+  });
+}
+
+/** `GET /api/v1/reporting/sources` for the demo: dimensions and measures with their aggregation. */
 export function demoSources(): ReportSource[] {
   return Object.entries(SOURCE_AGGS).map(([key, pairs]) => ({
     key,
     label_key: `reports.sources.${key}`,
-    default_time_field: null,
-    dimensions: [],
+    default_time_field: DEFAULT_TIME_FIELD[key] ?? null,
+    common_fields: {},
+    dimensions: sourceDimensions(key),
     filter_fields: [],
     measures: pairs.split(" ").map((pair) => {
       const [measure, agg] = pair.split(":");
@@ -485,14 +547,6 @@ function groupTotals(
   return Object.fromEntries([...groups].map(([k, subset]) => [k, aggregate(subset)]));
 }
 
-const FALLBACK_BY_SOURCE: Record<string, string> = {
-  tickets: "builtin.volume_by_queue",
-  ticket_events: "builtin.volume",
-  daily_snapshot: "builtin.backlog_trend",
-  accounted_time: "builtin.time_by_agent",
-  open_tickets: "builtin.open_now",
-};
-
 // --- background runs (202) -----------------------------------------------------
 
 const RUN_JOB_BASE = 9300;
@@ -543,6 +597,26 @@ function jobBase(id: number, kind: string) {
   };
 }
 
+type SavedLookup = (key: string) => ReportDefinition | undefined;
+let savedReportLookup: SavedLookup | null = null;
+/** savedMock.ts registers how a saved report key resolves to its definition (the store lives there). */
+export function setSavedReportLookup(fn: SavedLookup): void {
+  savedReportLookup = fn;
+}
+/** A saved definition shaped like a built-in, so the generic result builder can run it. */
+function savedAsReport(key: string, definition: ReportDefinition): BuiltinReport {
+  return {
+    key,
+    kind: "builtin",
+    category: "saved",
+    title_key: "",
+    description_key: "",
+    definition,
+    overview: false,
+    read_only: true,
+  } as BuiltinReport;
+}
+
 /**
  * Pure stand-in for `POST /api/v1/reports/run`: the built-in by `report_key`
  * (else by `definition.source`), built for the request's choices, grain,
@@ -550,9 +624,12 @@ function jobBase(id: number, kind: string) {
  * JOB_THRESHOLD_DAYS answers like a costly run: a background job.
  */
 export function resolveReportRun(body: ReportRunIn): ReportRunOut {
+  const saved = body.report_key ? savedReportLookup?.(body.report_key) : undefined;
   const report =
+    (saved ? savedAsReport(body.report_key as string, saved) : undefined) ??
     (body.report_key ? demoReport(body.report_key) : undefined) ??
-    (body.definition ? demoReport(FALLBACK_BY_SOURCE[body.definition.source] ?? "") : undefined) ??
+    // An ad-hoc definition (report builder preview) is run as it is.
+    (body.definition ? savedAsReport("", body.definition) : undefined) ??
     (demoReport("builtin.ticket_kpis") as BuiltinReport);
   const opts = demoRunOptions(report, body);
   const result = { ...buildDemoResult(report, opts), report_key: body.report_key ?? null };

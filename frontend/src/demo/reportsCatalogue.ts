@@ -1,5 +1,8 @@
 import type { BuiltinReport } from "@/lib/reportsApi";
 
+/** What the 25 literals below spell out; `builtinReport` adds the fields every entry shares. */
+type BuiltinBase = Pick<BuiltinReport, "key" | "category" | "title_key" | "description_key" | "definition" | "overview">;
+
 /** The 25 built-in reports as `GET /api/v1/reports` serves them (definitions mirror
  * `backend/src/tiqora/reporting/catalogue.py`). */
 // m() and d() build the measure and dimension references: the pre-commit secret scan
@@ -7,7 +10,7 @@ import type { BuiltinReport } from "@/lib/reportsApi";
 const m = (name: string) => ({ ["key"]: name });
 const d = (name: string, rest: object) => ({ ["key"]: name, ...rest });
 
-export const DEMO_REPORTS: BuiltinReport[] = [
+const BUILTIN_BASE: (BuiltinBase & { read_only: true })[] = [
   {
     key: "builtin.ticket_kpis",
     category: "overview",
@@ -992,3 +995,22 @@ export const DEMO_REPORTS: BuiltinReport[] = [
     read_only: true,
   },
 ];
+
+/** A built-in as `GET /api/v1/reports` serves it: the saved-report fields are empty. */
+export const builtinReport = (b: BuiltinBase): BuiltinReport => ({
+  ...b,
+  kind: "builtin",
+  id: null,
+  read_only: true,
+  group_ids: [],
+  name: null,
+  description: null,
+  definition_error: null,
+  owner: null,
+  visibility: null,
+  version: null,
+  copied_from: null,
+  changed_at: null,
+});
+
+export const DEMO_REPORTS: BuiltinReport[] = BUILTIN_BASE.map(builtinReport);

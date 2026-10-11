@@ -3,6 +3,23 @@ import { createDemoDashboards, resolveDashboards, type DemoDashboards } from "..
 import type { ReportRunIn } from "../../src/lib/reportsApi";
 // Reports reuse the demo's pure report data (catalogue definitions + deterministic results).
 import { DEMO_FACTS, DEMO_REPORT_CATALOGUE, demoReport, demoSources, resolveReportRun } from "../../src/demo/reportsMock";
+import {
+  DEMO_SHARE_GROUPS,
+  demoSavedReports,
+  demoSavedSearches,
+  demoTicketFilterFields,
+  demoZnunyPreview,
+} from "../../src/demo/savedMock";
+import type { ProcessDialogFormData, TicketProcessState } from "../../src/lib/processApi";
+import type { ReportItem, SavedReportIn, SavedReportUpdateIn } from "../../src/lib/reportsApi";
+import type {
+  SavedSearch,
+  SavedSearchIn,
+  SavedSearchPrefsIn,
+  SavedSearchUpdateIn,
+  ZnunyImportPreview,
+  ZnunyImportResult,
+} from "../../src/lib/savedSearchesApi";
 
 const user = {
   id: 1,
@@ -16,6 +33,8 @@ const user = {
   is_admin: true,
   // The reports nav entry and routes need this (the server decides: reporting.access).
   can_view_reports: true,
+  can_create_reports: true,
+  can_share_reports: true,
 };
 
 const queues = [
@@ -382,7 +401,32 @@ const activityDialogDetail = {
   submit_button_text: "Submit",
 };
 
-const ticketProcessStateNotInProcess = {
+// The shared dialog form (start dialog and activity dialog answer the same shape).
+const processDialogForm: ProcessDialogFormData = {
+  process_entity_id: "Process-1",
+  activity_dialog_entity_id: "ActivityDialog-1",
+  name: "Set Title",
+  description_short: "Set the title",
+  description_long: "Fill in the ticket title.",
+  submit_button_text: "Submit",
+  submit_advice_text: "",
+  fields: [
+    {
+      name: "Title",
+      kind: "text",
+      label: "Title",
+      required: false,
+      description_short: "Title",
+      description_long: "Ticket title",
+      default: "",
+      options: [],
+    },
+  ],
+};
+
+const ticketProcessStateNotInProcess: TicketProcessState = {
+  can_start: true,
+  process_state: null,
   process_entity_id: null,
   process_name: null,
   activity_entity_id: null,
@@ -391,7 +435,9 @@ const ticketProcessStateNotInProcess = {
   available_transitions_count: 0,
 };
 
-const ticketProcessStateActive = {
+const ticketProcessStateActive: TicketProcessState = {
+  can_start: false,
+  process_state: "Active",
   process_entity_id: "Process-1",
   process_name: "Onboarding",
   activity_entity_id: "Activity-a",
@@ -402,7 +448,9 @@ const ticketProcessStateActive = {
   available_transitions_count: 1,
 };
 
-const ticketProcessStateAfterSubmit = {
+const ticketProcessStateAfterSubmit: TicketProcessState = {
+  can_start: false,
+  process_state: "Active",
   process_entity_id: "Process-1",
   process_name: "Onboarding",
   activity_entity_id: "Activity-b",
@@ -413,7 +461,7 @@ const ticketProcessStateAfterSubmit = {
 
 // Mutated by the /start and /submit handlers below to simulate the ticket
 // moving through the process — reset per-test in mockApi().
-let ticketProcessState: typeof ticketProcessStateNotInProcess = ticketProcessStateNotInProcess;
+let ticketProcessState: TicketProcessState = ticketProcessStateNotInProcess;
 
 let authenticated = false;
 
@@ -433,6 +481,83 @@ function dashboardStore(): DemoDashboards {
   return store;
 }
 
+// --- saved reports / saved searches: in-memory per test (reset in mockApi) ------------------
+// The seed rows are the demo's pure data; the store and its mutations live here so no test sees
+// another test's writes.
+const ME = { user_id: 1, name: "Ada Agent" };
+let savedReports: ReportItem[] = [];
+let nextReportId = 103;
+let savedSearches: SavedSearch[] = [];
+let nextSearchId = 14;
+let znunyImported = new Set<string>();
+
+/** Znuny preview of the e2e: the demo's two profiles plus one that maps to nothing. */
+function znunyPreview(): ZnunyImportPreview {
+  const demo = demoZnunyPreview().profiles;
+  return {
+    profiles: [
+      ...demo.map((p) => ({ ...p, existing_id: znunyImported.has(p.name) ? 1 : null })),
+      {
+        name: "Volltext",
+        criteria: { version: 1 },
+        include_archived: false,
+        existing_id: null,
+        importable: false,
+        partial: false,
+        unmapped: [{ key: "Fulltext", value: "Drucker", reason: "Volltextsuche wird nicht unterstützt." }],
+      },
+    ],
+  };
+}
+
+function resetSavedStore(): void {
+  savedReports = demoSavedReports();
+  nextReportId = 103;
+  savedSearches = demoSavedSearches();
+  nextSearchId = 14;
+  znunyImported = new Set();
+}
+
+function applyReportBody(r: ReportItem, body: SavedReportIn | SavedReportUpdateIn): ReportItem {
+  return {
+    ...r,
+    name: body.name,
+    description: body.description,
+    definition: body.definition,
+    visibility: body.visibility,
+    group_ids: body.visibility === "groups" ? (body.group_ids ?? []) : [],
+    copied_from: body.copied_from ?? r.copied_from ?? null,
+  };
+}
+
+function listParamCriteria(listParams: SavedSearchIn["list_params"]): SavedSearch["criteria"] {
+  const stateType = listParams?.state_type;
+  if (typeof stateType !== "string" || stateType === "") return { version: 1 };
+  return { version: 1, where: { all: [{ field: "state_type", op: "in", value: [stateType] }] } };
+}
+
+function newSearch(body: SavedSearchIn): SavedSearch {
+  return {
+    ...demoSavedSearches()[0],
+    id: nextSearchId++,
+    name: body.name,
+    criteria: body.criteria ?? listParamCriteria(body.list_params),
+    group_ids: body.group_ids ?? [],
+    include_archived: body.include_archived,
+    show_in_sidebar: body.show_in_sidebar,
+    show_count: body.show_count,
+    sort_by: body.sort_by,
+    sort_order: body.sort_order,
+    owner: ME,
+    is_owner: true,
+    can_edit: true,
+    position: savedSearches.length + 1,
+    source: "tiqora",
+    source_name: null,
+    version: 1,
+  };
+}
+
 async function json(route: Route, status: number, body: unknown) {
   await route.fulfill({
     status,
@@ -449,6 +574,7 @@ export async function mockApi(page: Page) {
   authenticated = false;
   kbArticleFull = initialKbArticle();
   ticketProcessState = ticketProcessStateNotInProcess;
+  resetSavedStore();
 
   await page.route("**/api/v1/**", async (route) => {
     const req = route.request();
@@ -713,15 +839,162 @@ export async function mockApi(page: Page) {
       return;
     }
 
-    // Reports (/agent/reports): catalogue, one definition, runs answered from the request body.
+    // Reports (/agent/reports): catalogue + saved reports, one definition, runs answered from the request body.
     if (path.endsWith("/api/v1/reports") && method === "GET") {
-      await json(route, 200, DEMO_REPORT_CATALOGUE);
+      await json(route, 200, { ...DEMO_REPORT_CATALOGUE, reports: [...DEMO_REPORT_CATALOGUE.reports, ...savedReports] });
+      return;
+    }
+    if (path.endsWith("/api/v1/reports") && method === "POST") {
+      const id = nextReportId++;
+      const made = applyReportBody(
+        { ...demoSavedReports()[0], key: String(id), id, owner: ME, version: 1, copied_from: null },
+        req.postDataJSON() as SavedReportIn,
+      );
+      savedReports = [...savedReports, made];
+      await json(route, 201, made);
       return;
     }
     if (path.endsWith("/api/v1/reports/run") && method === "POST") {
-      await json(route, 200, resolveReportRun(req.postDataJSON() as ReportRunIn));
+      const body = req.postDataJSON() as ReportRunIn;
+      const saved = savedReports.find((r) => r.key === body.report_key);
+      // A saved key runs as its stored definition (the demo resolver only knows built-ins).
+      const run = saved?.definition ? { ...body, report_key: undefined, definition: saved.definition } : body;
+      await json(route, 200, resolveReportRun(run));
       return;
     }
+    const savedReportAt = path.match(/\/api\/v1\/reports\/(\d+)$/);
+    if (savedReportAt) {
+      const found = savedReports.find((r) => r.key === savedReportAt[1]);
+      if (!found) {
+        await json(route, 404, { detail: "Bericht nicht gefunden." });
+        return;
+      }
+      if (method === "GET") {
+        await json(route, 200, found);
+        return;
+      }
+      if (method === "PUT") {
+        const next = { ...applyReportBody(found, req.postDataJSON() as SavedReportUpdateIn), version: (found.version ?? 1) + 1 };
+        savedReports = savedReports.map((r) => (r.key === found.key ? next : r));
+        await json(route, 200, next);
+        return;
+      }
+      if (method === "DELETE") {
+        savedReports = savedReports.filter((r) => r.key !== found.key);
+        await route.fulfill({ status: 204, body: "" });
+        return;
+      }
+    }
+    if (path.endsWith("/api/v1/reference/share-groups") && method === "GET") {
+      await json(route, 200, DEMO_SHARE_GROUPS);
+      return;
+    }
+
+    // Saved searches, the structured ticket query and the filter helpers.
+    if (path.endsWith("/api/v1/saved-searches") && method === "GET") {
+      await json(route, 200, savedSearches);
+      return;
+    }
+    if (path.endsWith("/api/v1/saved-searches") && method === "POST") {
+      const made = newSearch(req.postDataJSON() as SavedSearchIn);
+      savedSearches = [...savedSearches, made];
+      await json(route, 201, made);
+      return;
+    }
+    if (path.endsWith("/api/v1/saved-searches/counts") && method === "GET") {
+      const counts: Record<string, number> = {};
+      for (const s of savedSearches) if (s.show_in_sidebar && s.show_count) counts[String(s.id)] = 5;
+      await json(route, 200, { counts });
+      return;
+    }
+    if (path.endsWith("/api/v1/saved-searches/import/znuny") && method === "GET") {
+      await json(route, 200, znunyPreview());
+      return;
+    }
+    if (path.endsWith("/api/v1/saved-searches/import/znuny") && method === "POST") {
+      const names = (req.postDataJSON() as { names: string[] }).names;
+      const result: ZnunyImportResult = { created: [], updated: [], skipped: [] };
+      for (const name of names) {
+        const profile = znunyPreview().profiles.find((p) => p.name === name);
+        if (!profile || !profile.importable) {
+          result.skipped.push({ name, reason: "Nichts übernehmbar." });
+          continue;
+        }
+        const made: SavedSearch = {
+          ...newSearch({
+            name,
+            criteria: profile.criteria,
+            include_archived: profile.include_archived,
+            show_in_sidebar: false,
+            show_count: false,
+            sort_by: "changed",
+            sort_order: "desc",
+          }),
+          source: "znuny",
+          source_name: name,
+        };
+        savedSearches = [...savedSearches, made];
+        znunyImported.add(name);
+        result.created.push(made.id);
+      }
+      await json(route, 200, result);
+      return;
+    }
+    const searchAt = path.match(/\/api\/v1\/saved-searches\/(\d+)(\/prefs)?$/);
+    if (searchAt) {
+      const id = Number(searchAt[1]);
+      const found = savedSearches.find((s) => s.id === id);
+      if (!found) {
+        await json(route, 404, { detail: "Suche nicht gefunden." });
+        return;
+      }
+      if (method === "GET") {
+        await json(route, 200, found);
+        return;
+      }
+      let next: SavedSearch | null = null;
+      if (method === "PUT" && searchAt[2]) {
+        const prefs = req.postDataJSON() as SavedSearchPrefsIn;
+        next = { ...found, show_in_sidebar: prefs.show_in_sidebar, show_count: prefs.show_count, position: prefs.position ?? found.position };
+      } else if (method === "PUT") {
+        const body = req.postDataJSON() as SavedSearchUpdateIn;
+        next = {
+          ...found,
+          name: body.name,
+          criteria: body.criteria ?? found.criteria,
+          group_ids: body.group_ids ?? [],
+          include_archived: body.include_archived,
+          show_in_sidebar: body.show_in_sidebar,
+          show_count: body.show_count,
+          sort_by: body.sort_by,
+          sort_order: body.sort_order,
+          version: found.version + 1,
+        };
+      } else if (method === "DELETE") {
+        savedSearches = savedSearches.filter((s) => s.id !== id);
+        await route.fulfill({ status: 204, body: "" });
+        return;
+      }
+      if (next) {
+        const updated = next;
+        savedSearches = savedSearches.map((s) => (s.id === id ? updated : s));
+        await json(route, 200, updated);
+        return;
+      }
+    }
+    if (path.endsWith("/api/v1/tickets/query") && method === "POST") {
+      await json(route, 200, tickets);
+      return;
+    }
+    if (path.endsWith("/api/v1/ticket-filters/count") && method === "POST") {
+      await json(route, 200, { count: tickets.items.length });
+      return;
+    }
+    if (path.endsWith("/api/v1/ticket-filters/fields") && method === "GET") {
+      await json(route, 200, demoTicketFilterFields());
+      return;
+    }
+
     if (path.endsWith("/api/v1/reports/export") && method === "POST") {
       await json(route, 202, { job_id: 9201, status: "queued" });
       return;
@@ -810,6 +1083,14 @@ export async function mockApi(page: Page) {
       });
       return;
     }
+    if (
+      (path.match(/\/api\/v1\/process\/ticket\/\d+\/dialog\/[^/]+\/form$/) ||
+        path.match(/\/api\/v1\/process\/[^/]+\/start-form$/)) &&
+      method === "GET"
+    ) {
+      await json(route, 200, processDialogForm);
+      return;
+    }
     if (path.match(/\/api\/v1\/process\/activity-dialog\/[^/]+$/) && method === "GET") {
       await json(route, 200, activityDialogDetail);
       return;
@@ -824,6 +1105,17 @@ export async function mockApi(page: Page) {
     }
 
     await json(route, 404, { detail: `No mock for ${method} ${path}` });
+  });
+}
+
+/** German UI copy: the app reads its language from localStorage, not from the browser locale. */
+export async function useGermanUi(page: Page) {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem("tiqora-lang", "de");
+    } catch {
+      /* no storage: English copy */
+    }
   });
 }
 

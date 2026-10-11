@@ -146,3 +146,33 @@ def test_identity_metadata_xml_fits_large_documents_on_mariadb() -> None:
         Path(__file__).parent.parent / "alembic/versions_tiqora/20261009_0065_identity_providers.py"
     ).read_text()
     assert migration.count('with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb")') == 2
+
+
+def test_saved_report_link_ids_do_not_generate_ids() -> None:
+    """``report_id`` / ``saved_search_id`` mirror the parent row's id; being half of a
+    composite key they must never turn into ``AUTO_INCREMENT`` / ``SERIAL``."""
+    from tiqora.db.tiqora.models import (
+        TiqoraReportGroup,
+        TiqoraSavedSearchGroup,
+        TiqoraSavedSearchPref,
+    )
+
+    for model, column in (
+        (TiqoraReportGroup, "report_id"),
+        (TiqoraSavedSearchGroup, "saved_search_id"),
+        (TiqoraSavedSearchPref, "saved_search_id"),
+    ):
+        assert model.__table__.c[column].autoincrement is False
+        assert "AUTO_INCREMENT" not in _column_ddl(model.__table__, column, mysql.dialect())
+        for marker in ("SERIAL", "GENERATED"):
+            assert marker not in _column_ddl(model.__table__, column, postgresql.dialect())
+
+
+def test_saved_report_json_columns_fit_large_documents_on_mariadb() -> None:
+    from tiqora.db.tiqora.models import TiqoraReport, TiqoraSavedSearch
+
+    assert "MEDIUMTEXT" in _column_ddl(TiqoraReport.__table__, "definition", mysql.dialect())
+    assert "MEDIUMTEXT" in _column_ddl(TiqoraSavedSearch.__table__, "criteria", mysql.dialect())
+    assert "MEDIUMTEXT" not in _column_ddl(
+        TiqoraReport.__table__, "definition", postgresql.dialect()
+    )

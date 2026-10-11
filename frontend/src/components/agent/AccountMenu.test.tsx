@@ -18,6 +18,8 @@ const { logout, navigate, setTheme, authUser } = vi.hoisted(() => ({
     email: "jane@example.com",
     is_admin: false as boolean,
     can_view_reports: true,
+    can_create_reports: true,
+    can_share_reports: true,
   },
 }));
 

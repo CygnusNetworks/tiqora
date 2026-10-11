@@ -11,9 +11,11 @@
 
 import type { FrontendPlugin, PluginAdminList } from "@/lib/pluginsApi";
 import { resolve as resolveDashboardsDemo } from "./dashboardsMock";
+import { resolveSavedRequest } from "./savedMock";
 import { demoCatalogue, demoFacts, demoReport, demoReportingStatus, demoReportJob, demoSources } from "./reportsMock";
 
 export { resolveReportRun } from "./reportsMock";
+export { resolveSavedRequest } from "./savedMock";
 
 function page<T>(items: T[]) {
   return { items, total: items.length, page: 1, page_size: 500 };
@@ -33,6 +35,8 @@ export const demoUser = {
   can_use_customer_directory: true,
   can_edit_customers: true,
   can_view_reports: true,
+  can_create_reports: true,
+  can_share_reports: true,
   email: "alex.turner@example.com",
   time_zone: null,
   default_time_zone: "Europe/Berlin",
@@ -2026,6 +2030,12 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/tickets/export-jobs") && method === "POST") return { job_id: 9101, status: "queued" };
   if (p.endsWith("/api/v1/jobs/9101/cancel") && method === "POST") return { ...demoExportJob, status: "cancelled" };
   if (p.endsWith("/api/v1/jobs/9101")) return demoExportJob;
+  // Saved reports and searches: only GETs are answered here; the writes carry a body and go through
+  // the MSW handlers (handlers.ts), the only place that mutates the in-memory store.
+  if (method === "GET") {
+    const saved = resolveSavedRequest("GET", p, undefined);
+    if (saved !== undefined) return saved;
+  }
   // Reports: `POST /reports/run` needs the body, so the MSW handler answers it (resolveReportRun).
   if (p.endsWith("/api/v1/reports/export") && method === "POST") return { job_id: 9201, status: "queued" };
   if (p.endsWith("/api/v1/reports") && method === "GET") return demoCatalogue();
@@ -2055,6 +2065,24 @@ export function resolveData(path: string, method: string): unknown | undefined {
     return agentQueues.flatMap((q) => [q, ...q.children]).map((q) => ({ id: q.id, name: q.name }));
   if (p.endsWith("/api/v1/reference/states")) return STATES.map((s) => ({ id: s.state_id, name: s.state, type_name: s.state_type }));
   if (p.endsWith("/api/v1/reference/priorities")) return PRIOS.map((x) => ({ id: x.priority_id, name: x.priority }));
+  // Pickers of the ticket filter (saved searches): ticket types, services and SLAs.
+  if (p.endsWith("/api/v1/reference/types"))
+    return [
+      { id: 1, name: "Incident" },
+      { id: 2, name: "Service Request" },
+      { id: 3, name: "Change Request" },
+    ];
+  if (p.endsWith("/api/v1/reference/services"))
+    return [
+      { id: 1, name: "E-Mail" },
+      { id: 2, name: "VPN" },
+      { id: 3, name: "Arbeitsplatz" },
+    ];
+  if (p.endsWith("/api/v1/reference/slas"))
+    return [
+      { id: 1, name: "Standard (8x5)" },
+      { id: 2, name: "Premium (24x7)" },
+    ];
   if (p.endsWith("/api/v1/reference/agents")) return OWNERS.map((o) => ({ id: o.owner_id, login: o.owner_login, name: o.owner_name }));
   if (p.endsWith("/api/v1/tickets/dashboard-summary")) return { my_open: 9, my_new: 3, unowned_new: 5, escalated: 6 };
   if (p.endsWith("/api/v1/tickets") && method === "GET") return ticketListPage();

@@ -7450,6 +7450,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reference/share-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Share Groups
+         * @description Groups the agent may share a report / search / dashboard with (admin: every valid group).
+         */
+        get: operations["list_share_groups_api_v1_reference_share_groups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reference/slas": {
         parameters: {
             query?: never;
@@ -7579,11 +7599,17 @@ export interface paths {
         };
         /**
          * List Reports
-         * @description The built-in reports (catalogue order) and the readiness of the report data.
+         * @description Built-in reports (catalogue order), then the saved reports the viewer may open (by name).
+         *
+         *     ``all=true`` additionally lists other people's private reports; admins only.
          */
         get: operations["list_reports_api_v1_reports_get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Report
+         * @description Save a report; ``visibility`` other than ``private`` needs the share right.
+         */
+        post: operations["create_report_api_v1_reports_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7613,6 +7639,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/import-file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Report File
+         * @description Parse and validate a report file (JSON or YAML); saves nothing.
+         */
+        post: operations["import_report_file_api_v1_reports_import_file_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/run": {
         parameters: {
             query?: never;
@@ -7636,6 +7682,37 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/{report_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Report
+         * @description Replace a saved report completely (every field is written).
+         *
+         *     ``version`` is the optimistic lock (409 with ``current_version``). The stored sharing
+         *     may be kept or narrowed without the share right; widening it needs that right.
+         */
+        put: operations["update_report_api_v1_reports__report_id__put"];
+        post?: never;
+        /**
+         * Delete Report
+         * @description Soft-delete a saved report (its owner always may, admins any).
+         *
+         *     No report-access check: after ``reporting.access`` changed to
+         *     ``stats_group`` an owner without view right can still remove their own reports;
+         *     reports they cannot see stay 404, the store allows only owner and admin.
+         */
+        delete: operations["delete_report_api_v1_reports__report_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/{report_key}": {
         parameters: {
             query?: never;
@@ -7643,9 +7720,159 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Report */
+        /**
+         * Get Report
+         * @description A built-in report (404 for an unknown key) or a saved one by id.
+         *
+         *     Unknown and invisible saved reports are both 404; a deleted one is 410.
+         */
         get: operations["get_report_api_v1_reports__report_key__get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{report_key}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Report File
+         * @description The report as a JSON / YAML file (built-ins: the report key is the name).
+         */
+        get: operations["download_report_file_api_v1_reports__report_key__file_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saved-searches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Saved Searches
+         * @description Own searches and those shared with a group the caller holds ``ro`` on.
+         */
+        get: operations["list_saved_searches_api_v1_saved_searches_get"];
+        put?: never;
+        /**
+         * Create Saved Search
+         * @description Save a search from ``criteria`` or from the queue list's ``list_params``.
+         *
+         *     ``group_ids`` shares it with groups the caller holds ``ro`` on (admins: any valid group).
+         */
+        post: operations["create_saved_search_api_v1_saved_searches_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saved-searches/counts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Saved Search Counts
+         * @description Ticket counts for the caller's sidebar entries that show a count (viewer's scope).
+         *
+         *     Only entries with both settings on are counted, then the first
+         *     ``MAX_SIDEBAR_COUNTS`` by position. Cached 30 s per viewer; clients should not poll
+         *     faster than every 60 s.
+         */
+        get: operations["saved_search_counts_api_v1_saved_searches_counts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saved-searches/import/znuny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Znuny Import
+         * @description The caller's saved ticket searches from Znuny, as they would be imported.
+         *
+         *     Read-only on the Znuny tables. A profile with ``unmapped`` entries imports only partly
+         *     (``partial``): clients should not preselect it.
+         */
+        get: operations["preview_znuny_import_api_v1_saved_searches_import_znuny_get"];
+        put?: never;
+        /**
+         * Apply Znuny Import
+         * @description Import the named profiles as private saved searches; a re-import updates in place.
+         *
+         *     Per name: unknown -> skipped, nothing mappable or invalid criteria -> skipped (reason
+         *     given), otherwise created or updated (keyed by profile name). One commit at the end.
+         */
+        post: operations["apply_znuny_import_api_v1_saved_searches_import_znuny_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saved-searches/{search_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Saved Search */
+        get: operations["get_saved_search_api_v1_saved_searches__search_id__get"];
+        /**
+         * Update Saved Search
+         * @description Replace a search completely (owner or admin). ``version`` is the optimistic lock (409).
+         *
+         *     Sharing groups already stored may stay without being checked again; added ones must be
+         *     groups the caller may share with. The caller's sidebar settings are not part of this call.
+         */
+        put: operations["update_saved_search_api_v1_saved_searches__search_id__put"];
+        post?: never;
+        /** Delete Saved Search */
+        delete: operations["delete_saved_search_api_v1_saved_searches__search_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/saved-searches/{search_id}/prefs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Saved Search Prefs
+         * @description The caller's own sidebar entry, count badge and position for a search they can see.
+         */
+        put: operations["set_saved_search_prefs_api_v1_saved_searches__search_id__prefs_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -8100,6 +8327,29 @@ export interface paths {
         get: operations["new_ticket_default_queue_api_v1_tickets_new_default_queue_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/query": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Query Tickets
+         * @description Tickets matching ``filter`` inside the caller's ``ro`` queues.
+         *
+         *     Queues the caller cannot read never match (no error that reveals them).
+         *     Needs ``tickets:rw`` for API keys like every POST.
+         */
+        post: operations["query_tickets_api_v1_tickets_query_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -12034,25 +12284,6 @@ export interface components {
             state_id?: number | null;
             /** To Address */
             to_address: string;
-        };
-        /** BuiltinReportOut */
-        BuiltinReportOut: {
-            /** Category */
-            category: string;
-            definition: components["schemas"]["ReportDefinition"];
-            /** Description Key */
-            description_key: string;
-            /** Key */
-            key: string;
-            /** Overview */
-            overview: boolean;
-            /**
-             * Read Only
-             * @default true
-             */
-            read_only: boolean;
-            /** Title Key */
-            title_key: string;
         };
         /** CalendarOut */
         CalendarOut: {
@@ -17600,7 +17831,7 @@ export interface components {
         ReportCatalogueOut: {
             facts: components["schemas"]["FactsStatusOut"];
             /** Reports */
-            reports: components["schemas"]["BuiltinReportOut"][];
+            reports: components["schemas"]["ReportOut"][];
         };
         /** ReportDefinition */
         ReportDefinition: {
@@ -17694,6 +17925,90 @@ export interface components {
                     [key: string]: string;
                 };
             };
+        };
+        /** ReportFileImportIn */
+        ReportFileImportIn: {
+            /** Content */
+            content: string;
+        };
+        /**
+         * ReportFileOut
+         * @description The export / import file.
+         */
+        ReportFileOut: {
+            definition: components["schemas"]["ReportDefinition"];
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Format
+             * @default tiqora-report
+             * @constant
+             */
+            format: "tiqora-report";
+            /**
+             * Format Version
+             * @default 1
+             * @constant
+             */
+            format_version: 1;
+            /** Name */
+            name: string;
+        };
+        /**
+         * ReportOut
+         * @description A catalogue entry: a built-in report or a saved one.
+         */
+        ReportOut: {
+            /** Category */
+            category?: string | null;
+            /** Changed At */
+            changed_at?: string | null;
+            /** Copied From */
+            copied_from?: string | null;
+            definition: components["schemas"]["ReportDefinition"] | null;
+            /** Definition Error */
+            definition_error?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Description Key */
+            description_key?: string | null;
+            /** Group Ids */
+            group_ids?: number[];
+            /** Id */
+            id?: number | null;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "builtin" | "saved";
+            /** Name */
+            name?: string | null;
+            /**
+             * Overview
+             * @default false
+             */
+            overview: boolean;
+            owner?: components["schemas"]["ReportOwnerOut"] | null;
+            /** Read Only */
+            read_only: boolean;
+            /** Title Key */
+            title_key?: string | null;
+            /** Version */
+            version?: number | null;
+            /** Visibility */
+            visibility?: ("private" | "groups" | "all") | null;
+        };
+        /** ReportOwnerOut */
+        ReportOwnerOut: {
+            /** Name */
+            name: string;
+            /** User Id */
+            user_id: number;
         };
         /**
          * ReportParameter
@@ -17804,6 +18119,10 @@ export interface components {
         };
         /** ReportSourceOut */
         ReportSourceOut: {
+            /** Common Fields */
+            common_fields?: {
+                [key: string]: string;
+            };
             /** Default Time Field */
             default_time_field: string | null;
             /** Dimensions */
@@ -18030,6 +18349,201 @@ export interface components {
              */
             valid_id: number;
         };
+        /** SavedReportIn */
+        SavedReportIn: {
+            /** Copied From */
+            copied_from?: string | null;
+            definition: components["schemas"]["ReportDefinition"];
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Group Ids */
+            group_ids?: number[];
+            /** Name */
+            name: string;
+            /**
+             * Visibility
+             * @default private
+             * @enum {string}
+             */
+            visibility: "private" | "groups" | "all";
+        };
+        /**
+         * SavedReportUpdateIn
+         * @description PUT is a full replace (every field is written); ``version`` is the optimistic lock.
+         */
+        SavedReportUpdateIn: {
+            /** Copied From */
+            copied_from?: string | null;
+            definition: components["schemas"]["ReportDefinition"];
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Group Ids */
+            group_ids?: number[];
+            /** Name */
+            name: string;
+            /** Version */
+            version: number;
+            /**
+             * Visibility
+             * @default private
+             * @enum {string}
+             */
+            visibility: "private" | "groups" | "all";
+        };
+        /** SavedSearchCountsOut */
+        SavedSearchCountsOut: {
+            /** Counts */
+            counts: {
+                [key: string]: number | null;
+            };
+        };
+        /**
+         * SavedSearchIn
+         * @description Exactly one of ``criteria`` / ``list_params`` ("Ansicht speichern" sends the latter).
+         */
+        SavedSearchIn: {
+            criteria?: components["schemas"]["Filter"] | null;
+            /** Group Ids */
+            group_ids?: number[];
+            /**
+             * Include Archived
+             * @default false
+             */
+            include_archived: boolean;
+            list_params?: components["schemas"]["TicketListParams"] | null;
+            /** Name */
+            name: string;
+            /**
+             * Show Count
+             * @default false
+             */
+            show_count: boolean;
+            /**
+             * Show In Sidebar
+             * @default true
+             */
+            show_in_sidebar: boolean;
+            /**
+             * Sort By
+             * @default age
+             * @enum {string}
+             */
+            sort_by: "age" | "created" | "changed" | "tn" | "title" | "priority" | "activity" | "deadline";
+            /**
+             * Sort Order
+             * @default desc
+             * @enum {string}
+             */
+            sort_order: "asc" | "desc";
+        };
+        /** SavedSearchOut */
+        SavedSearchOut: {
+            /** Can Edit */
+            can_edit: boolean;
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            criteria: components["schemas"]["Filter"] | null;
+            /** Criteria Error */
+            criteria_error: string | null;
+            /** Group Ids */
+            group_ids: number[];
+            /** Id */
+            id: number;
+            /** Include Archived */
+            include_archived: boolean;
+            /** Is Owner */
+            is_owner: boolean;
+            /** Name */
+            name: string;
+            owner: components["schemas"]["ReportOwnerOut"];
+            /** Position */
+            position: number;
+            /** Show Count */
+            show_count: boolean;
+            /** Show In Sidebar */
+            show_in_sidebar: boolean;
+            /**
+             * Sort By
+             * @enum {string}
+             */
+            sort_by: "age" | "created" | "changed" | "tn" | "title" | "priority" | "activity" | "deadline";
+            /**
+             * Sort Order
+             * @enum {string}
+             */
+            sort_order: "asc" | "desc";
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "tiqora" | "znuny";
+            /** Source Name */
+            source_name: string | null;
+            /** Version */
+            version: number;
+        };
+        /** SavedSearchPrefsIn */
+        SavedSearchPrefsIn: {
+            /** Position */
+            position?: number | null;
+            /** Show Count */
+            show_count: boolean;
+            /** Show In Sidebar */
+            show_in_sidebar: boolean;
+        };
+        /**
+         * SavedSearchUpdateIn
+         * @description PUT is a full replace of the search itself (name, criteria, sorting, sharing).
+         *
+         *     ``version`` is the optimistic lock. ``show_in_sidebar`` / ``show_count`` are ignored here;
+         *     the caller's own display settings are changed with ``PUT /saved-searches/{id}/prefs``.
+         */
+        SavedSearchUpdateIn: {
+            criteria?: components["schemas"]["Filter"] | null;
+            /** Group Ids */
+            group_ids?: number[];
+            /**
+             * Include Archived
+             * @default false
+             */
+            include_archived: boolean;
+            list_params?: components["schemas"]["TicketListParams"] | null;
+            /** Name */
+            name: string;
+            /**
+             * Show Count
+             * @default false
+             */
+            show_count: boolean;
+            /**
+             * Show In Sidebar
+             * @default true
+             */
+            show_in_sidebar: boolean;
+            /**
+             * Sort By
+             * @default age
+             * @enum {string}
+             */
+            sort_by: "age" | "created" | "changed" | "tn" | "title" | "priority" | "activity" | "deadline";
+            /**
+             * Sort Order
+             * @default desc
+             * @enum {string}
+             */
+            sort_order: "asc" | "desc";
+            /** Version */
+            version: number;
+        };
         /** SearchHit */
         SearchHit: {
             /**
@@ -18183,6 +18697,13 @@ export interface components {
             values: {
                 [key: string]: unknown;
             };
+        };
+        /** ShareGroupOut */
+        ShareGroupOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
         };
         /** SignKeyOptionOut */
         SignKeyOptionOut: {
@@ -18555,6 +19076,8 @@ export interface components {
          *     no ``i18n_values`` / ``options_source`` and ``time_field`` false.
          */
         SourceDimensionOut: {
+            /** Enum Values */
+            enum_values?: string[];
             /** Filter Type */
             filter_type: string | null;
             /** I18N Values */
@@ -18567,6 +19090,8 @@ export interface components {
             label_key: string;
             /** Labels */
             labels: string;
+            /** Ops */
+            ops?: string[];
             /** Options Source */
             options_source: string | null;
             /** Time Field */
@@ -19808,6 +20333,41 @@ export interface components {
             process_state?: string | null;
         };
         /**
+         * TicketQueryIn
+         * @description List the tickets matching a filter (same page shape as ``GET /tickets``).
+         */
+        TicketQueryIn: {
+            filter: components["schemas"]["Filter"];
+            /**
+             * Include Archived
+             * @description Also list archived tickets (admins only; ignored otherwise).
+             * @default false
+             */
+            include_archived: boolean;
+            /**
+             * Limit
+             * @default 50
+             */
+            limit: number;
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
+            /**
+             * Order
+             * @default desc
+             * @enum {string}
+             */
+            order: "asc" | "desc";
+            /**
+             * Sort
+             * @default age
+             * @enum {string}
+             */
+            sort: "age" | "created" | "changed" | "tn" | "title" | "priority" | "activity" | "deadline";
+        };
+        /**
          * TicketSearchHitOut
          * @description Compact ticket hit for agent link/merge pickers.
          */
@@ -19990,6 +20550,15 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** UnmappedOut */
+        UnmappedOut: {
+            /** Key */
+            key: string;
+            /** Reason */
+            reason: string;
+            /** Value */
+            value: string;
+        };
         /** UserCreate */
         UserCreate: {
             /** Email */
@@ -20041,6 +20610,11 @@ export interface components {
             /** Avatar Url */
             avatar_url?: string | null;
             /**
+             * Can Create Reports
+             * @default false
+             */
+            can_create_reports: boolean;
+            /**
              * Can Edit Customers
              * @default false
              */
@@ -20050,6 +20624,11 @@ export interface components {
              * @default false
              */
             can_edit_templates: boolean;
+            /**
+             * Can Share Reports
+             * @default false
+             */
+            can_share_reports: boolean;
             /**
              * Can Use Customer Directory
              * @default false
@@ -20472,6 +21051,48 @@ export interface components {
             key: string;
             /** Version */
             version: number;
+        };
+        /** ZnunyImportIn */
+        ZnunyImportIn: {
+            /** Names */
+            names: string[];
+        };
+        /** ZnunyImportPreviewOut */
+        ZnunyImportPreviewOut: {
+            /** Profiles */
+            profiles: components["schemas"]["ZnunyProfilePreviewOut"][];
+        };
+        /** ZnunyImportResultOut */
+        ZnunyImportResultOut: {
+            /** Created */
+            created: number[];
+            /** Skipped */
+            skipped: components["schemas"]["ZnunyImportSkippedOut"][];
+            /** Updated */
+            updated: number[];
+        };
+        /** ZnunyImportSkippedOut */
+        ZnunyImportSkippedOut: {
+            /** Name */
+            name: string;
+            /** Reason */
+            reason: string;
+        };
+        /** ZnunyProfilePreviewOut */
+        ZnunyProfilePreviewOut: {
+            criteria: components["schemas"]["Filter"];
+            /** Existing Id */
+            existing_id: number | null;
+            /** Importable */
+            importable: boolean;
+            /** Include Archived */
+            include_archived: boolean;
+            /** Name */
+            name: string;
+            /** Partial */
+            partial: boolean;
+            /** Unmapped */
+            unmapped: components["schemas"]["UnmappedOut"][];
         };
     };
     responses: never;
@@ -39763,6 +40384,39 @@ export interface operations {
             };
         };
     };
+    list_share_groups_api_v1_reference_share_groups_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShareGroupOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_slas_api_v1_reference_slas_get: {
         parameters: {
             query?: {
@@ -39977,7 +40631,9 @@ export interface operations {
     };
     list_reports_api_v1_reports_get: {
         parameters: {
-            query?: never;
+            query?: {
+                all?: boolean;
+            };
             header?: {
                 authorization?: string | null;
             };
@@ -39995,6 +40651,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReportCatalogueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_report_api_v1_reports_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedReportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOut"];
                 };
             };
             /** @description Validation Error */
@@ -40032,6 +40725,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_report_file_api_v1_reports_import_file_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportFileImportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportFileOut"];
                 };
             };
             /** @description Validation Error */
@@ -40091,6 +40821,78 @@ export interface operations {
             };
         };
     };
+    update_report_api_v1_reports__report_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                report_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedReportUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_report_api_v1_reports__report_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                report_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_report_api_v1_reports__report_key__get: {
         parameters: {
             query?: never;
@@ -40112,7 +40914,363 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BuiltinReportOut"];
+                    "application/json": components["schemas"]["ReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_report_file_api_v1_reports__report_key__file_get: {
+        parameters: {
+            query?: {
+                format?: "json" | "yaml";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                report_key: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_saved_searches_api_v1_saved_searches_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSearchOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_saved_search_api_v1_saved_searches_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedSearchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    saved_search_counts_api_v1_saved_searches_counts_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSearchCountsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_znuny_import_api_v1_saved_searches_import_znuny_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZnunyImportPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_znuny_import_api_v1_saved_searches_import_znuny_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZnunyImportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZnunyImportResultOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_saved_search_api_v1_saved_searches__search_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                search_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_saved_search_api_v1_saved_searches__search_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                search_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedSearchUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_saved_search_api_v1_saved_searches__search_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                search_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_saved_search_prefs_api_v1_saved_searches__search_id__prefs_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                search_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedSearchPrefsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedSearchOut"];
                 };
             };
             /** @description Validation Error */
@@ -41174,6 +42332,48 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    query_tickets_api_v1_tickets_query_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TicketQueryIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedTickets"];
+                };
+            };
+            /** @description Invalid filter (`detail.message`, `detail.path`). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The query took too long (`detail.message`); narrow the filter. */
+            504: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

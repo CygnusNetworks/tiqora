@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
@@ -11,6 +11,8 @@ import {
 } from "@tanstack/react-router";
 import i18n from "@/i18n";
 import type { TicketListItem } from "@/lib/api";
+import { savedSearchesApi } from "@/lib/savedSearchesApi";
+import { savedSearch } from "@/components/searches/searchTestUtils";
 import { QueuesPage } from "./QueuesPage";
 
 const authUser = vi.hoisted(() => ({
@@ -1004,5 +1006,51 @@ describe("QueuesPage status segments and flag chips", () => {
       expect.objectContaining({ escalating_within: expect.any(Number) }),
     );
     expect(screen.queryByTestId("ticket-table-pinned-head")).toBeNull();
+  });
+
+  describe("save view", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    async function saveView(name: string) {
+      fireEvent.click(await screen.findByTestId("queues-save-view"));
+      fireEvent.change(screen.getByTestId("save-view-name"), { target: { value: name } });
+      fireEvent.click(screen.getByTestId("save-view-confirm"));
+    }
+
+    it("saves the current view with its list params", async () => {
+      const create = vi.spyOn(savedSearchesApi, "create").mockResolvedValue(savedSearch({ id: 3, name: "Wartend ohne Bearbeiter" }));
+      await renderQueuesPage({ queue_id: "4", state_type: "pending", unassigned: "true" });
+      await saveView("Wartend ohne Bearbeiter");
+      await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Wartend ohne Bearbeiter",
+          list_params: expect.objectContaining({ queue_id: 4, state_type: "pending", unassigned: true }),
+        }),
+      );
+      // the page is not part of a search
+      const sent = create.mock.calls[0][0].list_params as Record<string, unknown>;
+      expect(sent).not.toHaveProperty("offset");
+      expect(sent).not.toHaveProperty("limit");
+      const note = await screen.findByTestId("queues-view-saved");
+      expect(note).toHaveTextContent("Wartend ohne Bearbeiter");
+      expect(note.querySelector("a")).toHaveAttribute("href", "/agent/searches/3");
+    });
+
+    it("posts a sort the backend knows when the list is sorted by owner", async () => {
+      const create = vi.spyOn(savedSearchesApi, "create").mockResolvedValue(savedSearch({ id: 3 }));
+      await renderQueuesPage({ queue_id: "4", sort: "owner", order: "asc" });
+      await saveView("Nach Besitzer");
+      await waitFor(() => expect(create).toHaveBeenCalled());
+      expect(create.mock.calls[0][0]).toMatchObject({ sort_by: "activity", sort_order: "asc" });
+    });
+
+    it("keeps a sort the backend has as it is", async () => {
+      const create = vi.spyOn(savedSearchesApi, "create").mockResolvedValue(savedSearch({ id: 3 }));
+      await renderQueuesPage({ sort: "changed", order: "desc" });
+      await saveView("Zuletzt geändert");
+      await waitFor(() => expect(create).toHaveBeenCalled());
+      expect(create.mock.calls[0][0]).toMatchObject({ sort_by: "changed", sort_order: "desc" });
+    });
   });
 });

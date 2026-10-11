@@ -86,6 +86,12 @@ class UserMe(BaseModel):
     # True when the agent may open reports — the rule of ``require_report_access``
     # (``reporting.access``: every agent, or admins + ``ro`` on the ``stats`` group).
     can_view_reports: bool = False
+    # True when the agent may save reports (private ones with ``reporting.access =
+    # all_agents``; with ``stats_group``: ``rw`` on the group). Implies ``can_view_reports``.
+    can_create_reports: bool = False
+    # True when the agent may share saved reports with groups / everyone (``rw`` on the
+    # ``stats`` group or admin). Implies ``can_create_reports``.
+    can_share_reports: bool = False
 
 
 class UserLanguageUpdate(BaseModel):
@@ -680,3 +686,10 @@ class PortalReplyResponse(BaseModel):
 class PortalAttachmentUploadResponse(BaseModel):
     article_id: int
     attachment_ids: list[int]
+
+
+#: Sort keys of ``POST /tickets/query``; must equal ``TicketService._SORT_COLUMNS`` minus the
+#: service-only ``until`` (dashboard reminders widget).
+TicketSortKey = Literal[
+    "age", "created", "changed", "tn", "title", "priority", "activity", "deadline"
+]

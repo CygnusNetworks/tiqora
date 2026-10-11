@@ -21,13 +21,15 @@ test.describe("ticket process widget", () => {
     // force the option click past the portal's entrance animation.
     await page.getByTestId("process-start-select").click();
     await page.getByTestId("process-start-select-menu-option-Process-1").click({ force: true });
+    await page.getByTestId("process-start-next").click();
+    await expect(page.getByTestId("process-start-form")).toBeVisible();
     await page.getByTestId("process-start-submit").click();
 
     await expect(page.getByTestId("process-widget-activity-name")).toHaveText("Collect info");
     await page.getByTestId("process-dialog-button-ActivityDialog-1").click();
     await expect(page.getByTestId("process-dialog-form")).toBeVisible();
 
-    await page.getByTestId("process-field-Title-input").fill("Updated via e2e");
+    await page.getByTestId("process-field-Title").fill("Updated via e2e");
     await page.getByTestId("process-dialog-submit").click();
 
     await expect(page.getByTestId("process-widget-activity-name")).toHaveText("Done");

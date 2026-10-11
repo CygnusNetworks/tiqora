@@ -330,6 +330,19 @@ escalation settings (working minutes stay as built), a change of
 `reporting.time_zone` (earlier daily snapshots keep the old zone), and direct SQL.
 Rebuild the report data afterwards.
 
+
+### Report builder and saved searches
+
+No new service, container or environment variable: saved reports, saved searches
+and the Znuny profile import run inside the API (the 90-day purge of deleted reports
+runs in the existing worker). The Alembic migration `20261010_0068` adds the
+`tiqora_report*` and `tiqora_saved_search*` tables (`tiqora migrate upgrade`). Nothing needs
+configuring; the existing `reporting.access` setting also decides who may save
+and share: `all_agents` lets every agent save private reports and see shared ones,
+sharing needs `rw` on the Znuny `stats` group (or admin); `stats_group` requires `ro`
+on that group to view and `rw` to save. Long runs (builder preview, saved report
+runs) use the job system, so the same one-worker and 90 s nginx notes apply.
+
 ## Reverse proxy sketch
 
 ```

@@ -24,7 +24,7 @@ from tiqora.db.tiqora.base import TiqoraBase
 
 pytestmark = pytest.mark.db
 
-_PREVIOUS = "20261009_0067"
+_PREVIOUS = "20261010_0068"
 _PLUGINS = "20261010_0070"
 _TABLES = ("tiqora_plugin", "tiqora_plugin_runtime", "tiqora_plugin_hook")
 

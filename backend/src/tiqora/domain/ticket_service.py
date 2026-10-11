@@ -648,10 +648,30 @@ class TicketService:
             channel=channel,
             include_archived=include_archived,
         )
+        return await self.page_from_stmt(
+            user_id, stmt, offset=offset, limit=limit, sort=sort, order=order
+        )
+
+    async def page_from_stmt(
+        self,
+        user_id: int,
+        stmt: Select[tuple[Ticket]] | None,
+        *,
+        offset: int = 0,
+        limit: int = 50,
+        sort: str = "age",
+        order: str = "desc",
+    ) -> PaginatedTickets:
+        """Count, order, page and enrich a permission-scoped ticket select.
+
+        ``stmt`` must already be limited to the caller's queues (``None`` = empty
+        result). Shared by :meth:`list_tickets` and ``POST /tickets/query`` so both
+        answer the same page shape.
+        """
         if stmt is None:
             return PaginatedTickets(items=[], total=0, offset=offset, limit=limit)
 
-        count_stmt = select(func.count()).select_from(stmt.subquery())
+        count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
         total = int((await self._session.execute(count_stmt)).scalar_one())
 
         ordered = self._order_by(stmt, sort, order)

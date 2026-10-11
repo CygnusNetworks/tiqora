@@ -1,7 +1,7 @@
 """Create tiqora_plugin, tiqora_plugin_runtime and tiqora_plugin_hook (plugin system state).
 
 Revision ID: 20261010_0070
-Revises: 20261009_0067
+Revises: 20261010_0068
 Create Date: 2026-10-10
 
 ``id`` / ``plugin_id`` / ``hook_key`` are ``VARCHAR(190)`` (utf8mb4 index limit on MariaDB).
@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "20261010_0070"
-down_revision: str | None = "20261009_0067"
+down_revision: str | None = "20261010_0068"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
