@@ -3111,6 +3111,14 @@
           "name": "Report data upkeep",
           "description": "Keeps the report data (ticket facts and daily open-ticket snapshots) up to date continuously."
         },
+        "report_scheduler": {
+          "name": "Report schedules",
+          "description": "Sends the scheduled reports by e-mail when they are due."
+        },
+        "report_runs_purge": {
+          "name": "Clean up report runs",
+          "description": "Deletes the run history of scheduled reports, including the generated files, after the retention period."
+        },
         "webchat_sweep": {
           "name": "Web chat housekeeping",
           "description": "Ends chats nobody answered in time, closes chats whose visitor has left and deletes old chat transcripts after the retention period."

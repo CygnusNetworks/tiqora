@@ -17,6 +17,7 @@ from tiqora.db.engine import get_session_factory
 from tiqora.deployed.watcher import run_deploy_watch_tick
 from tiqora.domain.settings_store import (
     KEY_REPORT_FACTS_INTERVAL_SECONDS,
+    KEY_REPORT_SCHEDULER_INTERVAL_SECONDS,
     KEY_WEBCHAT_SWEEP_INTERVAL_SECONDS,
     get_setting_int,
 )
@@ -34,6 +35,10 @@ from tiqora.worker.pending_check import run_pending_check_tick
 from tiqora.worker.poller import poll_once
 from tiqora.worker.postmaster import run_postmaster_tick
 from tiqora.worker.report_facts import run_report_facts_worker_tick
+from tiqora.worker.report_scheduler import (
+    run_report_runs_purge_tick,
+    run_report_scheduler_worker_tick,
+)
 from tiqora.worker.smime_customer_renew import run_smime_customer_renew_tick
 from tiqora.worker.status import record_tick_status, seconds_until_daily
 from tiqora.worker.telegram_poller import run_telegram_poller_tick
@@ -179,6 +184,9 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
     async def report_facts_tick() -> dict[str, int]:
         return await run_report_facts_worker_tick(settings)
 
+    async def report_scheduler_tick() -> dict[str, int]:
+        return await run_report_scheduler_worker_tick(settings)
+
     async def webchat_sweep_tick() -> dict[str, int]:
         return await run_webchat_worker_tick(settings)
 
@@ -281,6 +289,13 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             stop,
         ),
         _interval_loop(
+            "report_scheduler",
+            report_scheduler_tick,
+            settings.report_scheduler_interval_seconds,
+            KEY_REPORT_SCHEDULER_INTERVAL_SECONDS,
+            stop,
+        ),
+        _interval_loop(
             "webchat_sweep",
             webchat_sweep_tick,
             settings.webchat_sweep_interval_seconds,
@@ -313,6 +328,7 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
         _daily_loop("ai_audit_cleanup", run_ai_audit_cleanup_tick, "04:00", stop),
         _daily_loop("smime_customer_renew", run_smime_customer_renew_tick, "02:02", stop),
         _daily_loop("identity_metadata", run_identity_metadata_refresh_tick, "04:30", stop),
+        _daily_loop("report_runs_purge", run_report_runs_purge_tick, "03:45", stop),
         job_runner.run_forever(stop, poll_seconds=settings.jobs_poll_interval_seconds),
     )
 

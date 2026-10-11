@@ -36,6 +36,9 @@ from tiqora.domain.settings_store import (
     KEY_POSTMASTER_INTERVAL_SECONDS,
     KEY_REPORT_FACTS_ENABLED,
     KEY_REPORT_FACTS_INTERVAL_SECONDS,
+    KEY_REPORT_RUNS_PURGE_ENABLED,
+    KEY_REPORT_SCHEDULER_ENABLED,
+    KEY_REPORT_SCHEDULER_INTERVAL_SECONDS,
     KEY_SMIME_CUSTOMER_RENEW_ENABLED,
     KEY_TELEGRAM_POLLER_ENABLED,
     KEY_TELEGRAM_POLLER_INTERVAL_SECONDS,
@@ -249,6 +252,25 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         schedule_kind="interval",
         interval_key=KEY_REPORT_FACTS_INTERVAL_SECONDS,
         interval_settings_attr="report_facts_interval_seconds",
+    ),
+    # Queues the delivery job of every due report schedule (tiqora.reporting.scheduler).
+    DaemonService(
+        slug="report_scheduler",
+        enabled_key=KEY_REPORT_SCHEDULER_ENABLED,
+        default_enabled=True,
+        toggleable=True,
+        schedule_kind="interval",
+        interval_key=KEY_REPORT_SCHEDULER_INTERVAL_SECONDS,
+        interval_settings_attr="report_scheduler_interval_seconds",
+    ),
+    # Deletes report runs (and their files) past the retention of the reporting settings.
+    DaemonService(
+        slug="report_runs_purge",
+        enabled_key=KEY_REPORT_RUNS_PURGE_ENABLED,
+        default_enabled=True,
+        toggleable=True,
+        schedule_kind="daily",
+        daily_at="03:45",
     ),
     # Delivers ticket changes to plugin event subscribers (tiqora.plugins.event_dispatch).
     # Always on while plugins are loaded; a tick may run a subscriber for its wall-time budget

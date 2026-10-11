@@ -3119,6 +3119,14 @@
           "name": "Berichtsdaten aktuell halten",
           "description": "Hält die Auswertungsdaten für Berichte (Ticketdaten und tägliche Bestände offener Tickets) laufend aktuell."
         },
+        "report_scheduler": {
+          "name": "Berichtszeitpläne versenden",
+          "description": "Versendet die geplanten Berichte per E-Mail, sobald sie fällig sind."
+        },
+        "report_runs_purge": {
+          "name": "Berichtsläufe aufräumen",
+          "description": "Löscht den Verlauf der geplanten Berichte samt erzeugter Dateien nach Ablauf der Aufbewahrungsfrist."
+        },
         "webchat_sweep": {
           "name": "Web-Chat aufräumen",
           "description": "Beendet Chats, die niemand rechtzeitig beantwortet hat, schließt Chats, deren Besucher gegangen ist, und löscht alte Chat-Verläufe nach Ablauf der Aufbewahrungsfrist."

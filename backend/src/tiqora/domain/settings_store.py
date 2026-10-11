@@ -152,6 +152,12 @@ KEY_TELEGRAM_POLLER_INTERVAL_SECONDS = "daemon.telegram_poller.interval_seconds"
 KEY_REPORT_FACTS_ENABLED = "daemon.report_facts.enabled"
 KEY_REPORT_FACTS_INTERVAL_SECONDS = "daemon.report_facts.interval_seconds"
 
+# Report schedules (wave 3): the scheduler loop queues due deliveries, the purge applies
+# the run-history retention. Default ON (they only write tiqora_* tables).
+KEY_REPORT_SCHEDULER_ENABLED = "daemon.report_scheduler.enabled"
+KEY_REPORT_SCHEDULER_INTERVAL_SECONDS = "daemon.report_scheduler.interval_seconds"
+KEY_REPORT_RUNS_PURGE_ENABLED = "daemon.report_runs_purge.enabled"
+
 # Web chat sweep (waiting timeouts, idle chats, retention). Default ON: it only writes
 # tiqora_chat_* rows.
 KEY_WEBCHAT_SWEEP_ENABLED = "daemon.webchat_sweep.enabled"
