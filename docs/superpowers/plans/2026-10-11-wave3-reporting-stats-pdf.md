@@ -290,7 +290,8 @@ class StatLoadError:
     message: str                                  # German
 async def list_stat_ids(session: AsyncSession) -> list[int]
     # SELECT DISTINCT xml_key FROM xml_storage WHERE xml_type = 'Stats'; non-numeric keys skipped; sorted; capped
-async def load_stats(session: AsyncSession, stat_ids: Sequence[int]) -> tuple[list[ZnunyStat], list[StatLoadError]]
+async def load_stats(session: AsyncSession, stat_ids: Sequence[int], *, row_budget: int = MAX_TOTAL_ROWS) -> tuple[list[ZnunyStat], list[StatLoadError], bool]  # third value: truncated (row budget hit); leaves counted per chunk first
+async def list_stat_ids(session: AsyncSession, *, permission_group_ids: Collection[int] | None = None) -> list[int]  # non-admins: Permission leaves filter BEFORE the 500 cap (F10); the inline statement timeout (QueryBudget.inline) is applied by the Task 5 caller
     # one SELECT xml_key, xml_content_key, xml_content_value ... WHERE xml_type='Stats' AND xml_key IN (:keys as str)
     # (chunked by 200); per stat build_xml_hash + stat_from_xml_hash; XmlHashError -> StatLoadError, others continue
 async def load_stat_lookups(session: AsyncSession, user_id: int) -> StatLookups     # D5

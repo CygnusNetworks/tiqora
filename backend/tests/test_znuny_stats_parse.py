@@ -17,6 +17,7 @@ from tiqora.reporting.znuny_stats.model import stat_from_xml_hash
 from tiqora.reporting.znuny_stats.reader import list_stat_ids, load_stats
 from tiqora.reporting.znuny_stats.xml_hash import (
     MAX_FILE_BYTES,
+    MAX_STAT_ROWS,
     XmlHashError,
     build_xml_hash,
     parse_content_key,
@@ -100,6 +101,14 @@ def test_elements_from_db_rows() -> None:
     assert (x.use, x.element, x.fixed, x.selected) == ("x", "CreateTime", True, ("Month",))
     assert dict(x.time) == {"TimeRelativeUnit": "Month", "TimeRelativeCount": "12"}
     assert (r.use, r.element, r.fixed, r.selected) == ("restriction", "QueueIDs", False, ("4", "5"))
+
+
+def test_row_cap_and_non_ascii_digit_key() -> None:
+    rows = [(f"{BASE}{{'Foo'}}[{i}]{{'Content'}}", "x") for i in range(1, MAX_STAT_ROWS + 2)]
+    with pytest.raises(XmlHashError):
+        build_xml_hash(rows)
+    with pytest.raises(XmlHashError):
+        parse_content_key("[1]{'a'}[\u00b2]{'b'}")
 
 
 def test_conflicting_paths_raise() -> None:
@@ -196,7 +205,7 @@ def test_file_rejects_entities_and_wrong_root() -> None:
 
 # ------------------------------------------------------------------ DB reader
 
-LO_KEYS = ("52022", "52023", "52024", "rep52x")
+LO_KEYS = ("52022", "52023", "52024", "52025", "rep52x")
 
 
 def _to_async_url(sync_url: str) -> str:
@@ -235,6 +244,12 @@ def _seed(sync_url: str) -> None:
             {"k": key, "ck": f"{BASE}{{'UseAsXvalue'}}[1]{{'Element'}}", "v": "StateIDs"},
             {"k": key, "ck": f"{BASE}{{'Description'}}[1]{{'Content'}}", "v": None},
         ]
+    rows.append({"k": "52022", "ck": f"{BASE}{{'Permission'}}[1]{{'Content'}}", "v": "7"})
+    rows.append({"k": "52023", "ck": f"{BASE}{{'Permission'}}[1]{{'Content'}}", "v": "8"})
+    rows += [
+        {"k": "52025", "ck": f"{BASE}{{'Foo'}}[{i}]{{'Content'}}", "v": "x"}
+        for i in range(1, MAX_STAT_ROWS + 2)
+    ]
     rows += [
         {"k": "52024", "ck": f"{BASE}{{'Title'}}[1]{{'Content'}}", "v": "rep52 broken"},
         {"k": "52024", "ck": "[1]{'otrs_stats'", "v": "x"},
@@ -262,7 +277,19 @@ async def test_load_stats_from_xml_storage(
             ids = await list_stat_ids(session)
             assert {52022, 52023, 52024} <= set(ids)
             assert ids == sorted(ids)
-            stats, errors = await load_stats(session, [52022, 52023, 52024])
+            stats, errors, truncated = await load_stats(session, [52022, 52023, 52024])
+            assert truncated is False
+            only_one = await list_stat_ids(session, permission_group_ids=[7])
+            assert 52022 in only_one and 52023 not in only_one and "rep52x" not in only_one
+            assert await list_stat_ids(session, permission_group_ids=[]) == []
+            _s, err_budget, trunc = await load_stats(session, [52022, 52023], row_budget=4)
+            assert trunc is True and _s == [] and err_budget == []
+            part, _e, trunc = await load_stats(session, [52022, 52023], row_budget=5)
+            assert [s.stat_id for s in part] == [52022] and trunc is True
+            _s, err_big, _t = await load_stats(session, [52025])
+            assert [e.message for e in err_big] == ["Die Statistik ist zu groß, um sie zu lesen."]
+            _s, err_missing, _t = await load_stats(session, [52029])
+            assert "nicht gefunden" in err_missing[0].message
         assert [(s.stat_id, s.origin, s.import_key) for s in stats] == [
             (52022, "db", "znuny.stat.52022"),
             (52023, "db", "znuny.stat.52023"),
