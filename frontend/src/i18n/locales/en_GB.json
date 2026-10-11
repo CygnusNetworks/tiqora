@@ -3113,6 +3113,10 @@
           "name": "Report data upkeep",
           "description": "Keeps the report data (ticket facts and daily open-ticket snapshots) up to date continuously."
         },
+        "webchat_sweep": {
+          "name": "Web chat housekeeping",
+          "description": "Ends chats nobody answered in time, closes chats whose visitor has left and deletes old chat transcripts after the retention period."
+        },
         "deploy_watch": {
           "name": "Deploy watcher",
           "description": "Detects processes and ACLs deployed in Znuny and makes Tiqora use them only after that."

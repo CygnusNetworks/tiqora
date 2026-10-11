@@ -41,6 +41,8 @@ from tiqora.domain.settings_store import (
     KEY_TELEGRAM_POLLER_INTERVAL_SECONDS,
     KEY_UNLOCK_TIMEOUT_ENABLED,
     KEY_UNLOCK_TIMEOUT_INTERVAL_SECONDS,
+    KEY_WEBCHAT_SWEEP_ENABLED,
+    KEY_WEBCHAT_SWEEP_INTERVAL_SECONDS,
 )
 from tiqora.jobs.runner import STATUS_EVERY_SECONDS
 
@@ -247,6 +249,16 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         schedule_kind="interval",
         interval_key=KEY_REPORT_FACTS_INTERVAL_SECONDS,
         interval_settings_attr="report_facts_interval_seconds",
+    ),
+    # Ends unanswered and abandoned web chats and purges old ones (retention).
+    DaemonService(
+        slug="webchat_sweep",
+        enabled_key=KEY_WEBCHAT_SWEEP_ENABLED,
+        default_enabled=True,
+        toggleable=True,
+        schedule_kind="interval",
+        interval_key=KEY_WEBCHAT_SWEEP_INTERVAL_SECONDS,
+        interval_settings_attr="webchat_sweep_interval_seconds",
     ),
 )
 

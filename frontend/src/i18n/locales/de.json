@@ -3113,6 +3113,10 @@
           "name": "Berichtsdaten aktuell halten",
           "description": "Hält die Auswertungsdaten für Berichte (Ticketdaten und tägliche Bestände offener Tickets) laufend aktuell."
         },
+        "webchat_sweep": {
+          "name": "Web-Chat aufräumen",
+          "description": "Beendet Chats, die niemand rechtzeitig beantwortet hat, schließt Chats, deren Besucher gegangen ist, und löscht alte Chat-Verläufe nach Ablauf der Aufbewahrungsfrist."
+        },
         "deploy_watch": {
           "name": "Bereitstellung beobachten",
           "description": "Erkennt in Znuny bereitgestellte Prozesse und ACLs und lässt Tiqora erst dann damit arbeiten."

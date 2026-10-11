@@ -477,6 +477,12 @@ class Settings(BaseSettings):
         default=60, validation_alias="TIQORA_REPORT_FACTS_INTERVAL"
     )
 
+    # Web chat sweep (waiting timeout, idle chats, retention). ``daemon.webchat_sweep.enabled``
+    # (default ON) switches it off; this is only the poll interval.
+    webchat_sweep_interval_seconds: int = Field(
+        default=15, validation_alias="TIQORA_WEBCHAT_SWEEP_INTERVAL"
+    )
+
     # AI worker (tiqora-ai-worker, separate process/compose service — see
     # ~/TIQORA_LLM_PLAN.md §3.0/§3.4). ``daemon.ai_worker.enabled``
     # (default OFF) is the takeover switch; this is only the tick cadence.
