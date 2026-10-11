@@ -37,6 +37,7 @@ __all__ = [
     "MAX_TEXTAREA_LENGTH",
     "PrechatInvalid",
     "PrechatResult",
+    "free_text_customer_id",
     "resolve_chat_customer",
     "validate_prechat",
 ]
@@ -49,6 +50,8 @@ CHECKBOX_NO: Final = "Nein"
 EMAIL_KEY: Final = "email"
 #: Values beyond this are rejected as too long before any cleaning work is done.
 _HARD_CAP: Final = 20_000
+#: ``ticket.customer_id`` is VARCHAR(150); a longer free-text id would raise a DataError.
+MAX_CUSTOMER_ID_LENGTH: Final = 150
 
 
 @dataclass(frozen=True, slots=True)
@@ -222,6 +225,14 @@ def validate_prechat(
     )
 
 
+def free_text_customer_id(value: str | None) -> str | None:
+    """``value`` as a free-text ``ticket.customer_id``, or None when it does not fit the
+    column (the customer user id, VARCHAR(250), still carries it)."""
+    if value and len(value) <= MAX_CUSTOMER_ID_LENGTH:
+        return value
+    return None
+
+
 async def resolve_chat_customer(
     db: AsyncSession, *, email: str | None, default_customer_user: str | None
 ) -> tuple[str | None, str | None]:
@@ -245,8 +256,8 @@ async def resolve_chat_customer(
             )
         ).first()
         if row is not None:
-            return (str(row[1]) if row[1] else email), str(row[0])
-        return email, email
+            return (str(row[1]) if row[1] else free_text_customer_id(email)), str(row[0])
+        return free_text_customer_id(email), email
     if default_customer_user:
         row = (
             await db.execute(

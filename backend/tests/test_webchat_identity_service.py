@@ -37,12 +37,15 @@ from tiqora.webchat.identity import (
     sign_identity_token,
 )
 from tiqora.webchat.models import ChatConfigValues, PrechatField
+from tiqora.webchat.prechat import resolve_chat_customer
+from tiqora.webchat.public_api import _needs_contact
 from tiqora.webchat.schemas import ChatSessionCreateIn
 from tiqora.webchat.sessions import (
     ChatError,
     VisitorContext,
     create_session,
     end_by_visitor,
+    set_contact,
     submit_offline,
 )
 from tiqora.webchat.store import config_values, get_chat_session, load_config
@@ -507,6 +510,68 @@ async def test_identify_without_email_drops_typed_address(env: Env) -> None:
     assert row is not None
     assert row.identity_source == "website" and row.visitor_email is None
     assert info.visitor_email_verified is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+async def test_identified_chat_without_email_offers_no_contact(env: Env) -> None:
+    """R-NOTIFY b: a typed contact address must not become "verified" on an identified chat
+    and must not replace the customer the identity set."""
+    sub_only = await _resolve(env, _claims(sub="wc54-unknown-sub"))
+    chat = await _start(env, identity=sub_only)
+    assert chat.visitor_email is None and chat.identity_source == "website"
+    ticket_id = int(chat.ticket_id)
+    async with env.factory() as db:
+        await db.execute(
+            text(
+                "UPDATE tiqora_chat_session SET status = 'ended', end_reason = 'no_agent',"
+                " ended_at = :t WHERE id = :s"
+            ),
+            {"t": NOW, "s": chat.id},
+        )
+        await db.commit()
+    before = await _ticket(env, ticket_id)
+    assert before == ("wc54-unknown-sub", "wc54-unknown-sub")
+    updates = await _customer_updates(env, ticket_id)
+    later = NOW + timedelta(hours=1)
+
+    async with env.factory() as db:
+        row = await get_chat_session(db, chat.id)
+        assert row is not None
+        assert _needs_contact(row, later) is False
+        with pytest.raises(ChatError) as excinfo:
+            await set_contact(
+                db, SysConfig(db), chat=row, name=None, email="typed@example.org", now=later
+            )
+        await db.rollback()
+    assert (excinfo.value.code, excinfo.value.http_status) == ("contact_not_allowed", 409)
+    assert await _ticket(env, ticket_id) == before
+    assert await _customer_updates(env, ticket_id) == updates
+    async with env.factory() as db:
+        row = await get_chat_session(db, chat.id)
+        info = await ticket_chat_info(db, env.redis, ticket_id=ticket_id, user_id=AGENT)
+    assert row is not None and row.visitor_email is None
+    assert row.customer_user_login == "wc54-unknown-sub"
+    assert info.visitor_email_verified is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+async def test_long_free_text_id_does_not_become_customer_id(env: Env) -> None:
+    """ticket.customer_id is VARCHAR(150): a longer free-text id stays only in the customer
+    user id (VARCHAR(250)) instead of failing the ticket write."""
+    long_sub = "wc54-" + "s" * 175
+    resolved = await _resolve(env, _claims(sub=long_sub))
+    assert (resolved.customer_id, resolved.customer_user_login) == (None, long_sub)
+    chat = await _start(env, identity=resolved)
+    assert await _ticket(env, int(chat.ticket_id)) == (None, long_sub)
+
+    long_email = "wc54-" + "m" * 150 + "@example.org"
+    async with env.factory() as db:
+        resolved_chat = await resolve_chat_customer(
+            db, email=long_email, default_customer_user=None
+        )
+    assert resolved_chat == (None, long_email)
 
 
 @pytest.mark.asyncio

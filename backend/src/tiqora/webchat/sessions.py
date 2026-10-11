@@ -114,6 +114,7 @@ __all__ = [
     "create_session",
     "current_queue_id",
     "end_by_visitor",
+    "lock_session",
     "post_visitor_attachment",
     "post_visitor_message",
     "set_contact",
@@ -397,7 +398,9 @@ async def touch_visitor_last_seen(db: AsyncSession, chat: TiqoraChatSession, now
     return False
 
 
-async def _lock(db: AsyncSession, session_id: str) -> TiqoraChatSession:
+async def lock_session(db: AsyncSession, session_id: str) -> TiqoraChatSession:
+    """The session row ``FOR UPDATE`` (R-LOCK-ORDER: before any ticket row); ``not_found``
+    when missing or purged."""
     locked = await get_chat_session(db, session_id, for_update=True)
     if locked is None or locked.purged_at is not None:
         raise ChatError("not_found", 404)
@@ -651,7 +654,7 @@ async def post_visitor_message(
     """
     text_body = _clean_message(body, key="body")
     cid = _clean_client_id(client_id)
-    locked = await _lock(db, chat.id)
+    locked = await lock_session(db, chat.id)
     if cid is not None:
         existing = await find_by_client_id(db, locked.id, cid)
         if existing is not None:
@@ -748,7 +751,7 @@ async def store_visitor_attachment(
         raise ChatError("upload_rejected", status, errors={"file": exc.code}) from exc
     caption_text = _clean_caption(caption)
     cid = _clean_client_id(client_id)
-    locked = await _lock(db, chat.id)
+    locked = await lock_session(db, chat.id)
     if cid is not None:
         existing = await find_by_client_id(db, locked.id, cid)
         if existing is not None:
@@ -853,7 +856,7 @@ async def end_by_visitor(db: AsyncSession, *, chat: TiqoraChatSession, now: date
     """The visitor closes the chat: ``ended`` / ``visitor`` / ``ended_at``, system line
     ``visitor_left``, wake + ``chat_ended``. Idempotent: an already closed chat is left
     alone. Refusal: ``not_found``."""
-    locked = await _lock(db, chat.id)
+    locked = await lock_session(db, chat.id)
     if locked.status not in LIVE_STATUSES:
         return
     queue_id = await current_queue_id(db, locked)
@@ -879,7 +882,8 @@ async def set_contact(
 
     Allowed for ``CONTACT_WINDOW_SECONDS`` after ``ended_at`` when the chat is
     ``ended``/``abandoned`` with end reason ``no_agent``/``idle``/``visitor`` and no address
-    was given yet. Sets ``visitor_email``/``visitor_name`` and the ticket customer
+    was given yet. Identified chats (``identity_source`` set) are refused even without an
+    address. Sets ``visitor_email``/``visitor_name`` and the ticket customer
     (``set_customer``: ``CustomerUpdate`` history, same matching as a new chat); wakes the
     visitor streams. Refusals: ``invalid_prechat`` (``errors.email``), ``not_found``,
     ``contact_not_allowed``.
@@ -888,7 +892,7 @@ async def set_contact(
     address = _validate([], {EMAIL_KEY: email or ""}, require_email=True).email
     clean_name = _clean_line(name, MAX_VISITOR_NAME)
 
-    locked = await _lock(db, chat.id)
+    locked = await lock_session(db, chat.id)
     ended_at = locked.ended_at
     if (
         locked.status not in _CONTACT_STATUSES
@@ -896,6 +900,9 @@ async def set_contact(
         or ended_at is None
         or (now - ended_at).total_seconds() >= CONTACT_WINDOW_SECONDS
         or locked.visitor_email
+        # An identified chat keeps its verified customer; a typed address would show as
+        # verified (R-NOTIFY b) and replace the ticket customer.
+        or locked.identity_source is not None
     ):
         raise ChatError("contact_not_allowed", 409)
     customer_id, customer_user = await resolve_chat_customer(

@@ -445,6 +445,7 @@ def _needs_contact(chat: TiqoraChatSession, now: datetime) -> bool:
         and ended_at is not None
         and (now - ended_at).total_seconds() < CONTACT_WINDOW_SECONDS
         and not chat.visitor_email
+        and chat.identity_source is None  # identified: the verified customer stays
     )
 
 

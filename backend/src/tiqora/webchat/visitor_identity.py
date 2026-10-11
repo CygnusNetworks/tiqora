@@ -37,7 +37,8 @@ from tiqora.webchat.identity import (
 )
 from tiqora.webchat.models import ChatConfigValues
 from tiqora.webchat.notify import queue_wakeup
-from tiqora.webchat.sessions import SYSTEM_USER_ID, ChatError, _lock
+from tiqora.webchat.prechat import free_text_customer_id
+from tiqora.webchat.sessions import SYSTEM_USER_ID, ChatError, lock_session
 from tiqora.webchat.store import LIVE_STATUSES
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -170,7 +171,7 @@ async def resolve_identity(
     return ResolvedIdentity(
         source=claims.source,
         customer_user_login=free_text,
-        customer_id=free_text,
+        customer_id=free_text_customer_id(free_text),
         email=email,
         name=claims.name,
         known_customer=False,
@@ -222,7 +223,7 @@ async def identify_session(
     the anonymous / typed one (it equals the chat's ``customer_user_login`` from before).
     """
     del sysconfig  # kept for the service signature; the customer write needs no SysConfig
-    locked = await _lock(db, chat.id)  # R-LOCK-ORDER step 2
+    locked = await lock_session(db, chat.id)  # R-LOCK-ORDER step 2
     if locked.status not in LIVE_STATUSES:
         raise ChatError("session_closed", 409)
     if locked.identity_source is not None:
