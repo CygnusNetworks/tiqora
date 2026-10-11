@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import random
 import uuid
 from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -23,6 +24,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.dashboard.defaults import default_widgets
+from tiqora.dashboard.filters import DashboardFilters
 from tiqora.dashboard.layout import Rect, normalize_rects
 from tiqora.dashboard.races import is_race_error
 from tiqora.dashboard.schemas import (
@@ -69,7 +71,9 @@ __all__ = [
     "list_templates",
     "list_visible",
     "patch_widget_settings",
+    "dashboard_filters",
     "save_dashboard",
+    "set_filters",
     "validate_source_settings",
     "validate_sources",
     "set_order",
@@ -77,6 +81,8 @@ __all__ = [
     "update_template",
     "user_role_ids",
 ]
+
+_log = logging.getLogger(__name__)
 
 _OWNED_KINDS: Final = ("personal", "shared")
 MSG_NOT_EDITABLE: Final = "Dieses Dashboard können Sie nicht bearbeiten."
@@ -268,6 +274,15 @@ async def _tabs_for(
     ]
 
 
+def dashboard_filters(row: TiqoraDashboard) -> DashboardFilters:
+    """The stored dashboard filters; ``'{}'`` or an unreadable value reads as empty."""
+    try:
+        return DashboardFilters.model_validate_json(row.filters or "{}")
+    except ValidationError:
+        _log.warning("dashboard %s: unreadable filters, treated as empty", row.id)
+        return DashboardFilters()
+
+
 def _widget_out(w: TiqoraDashboardWidget) -> WidgetOut:
     return WidgetOut(
         id=w.id,
@@ -276,6 +291,7 @@ def _widget_out(w: TiqoraDashboardWidget) -> WidgetOut:
         title_override=w.title_override,
         settings=json.loads(w.settings or "{}"),
         layout=WidgetLayouts.model_validate(json.loads(w.layout)),
+        pinned=bool(w.pinned),
     )
 
 
@@ -295,7 +311,7 @@ async def dashboard_out(
     """Full ``DashboardOut`` for a row the caller is already allowed to see."""
     (tab,) = await _tabs_for(session, [row], user_id, admin=admin)
     widgets = [_widget_out(w) for w in await _widgets(session, row.id)]
-    return DashboardOut(**tab.model_dump(), widgets=widgets)
+    return DashboardOut(**tab.model_dump(), widgets=widgets, filters=dashboard_filters(row))
 
 
 async def _own_rows(session: AsyncSession, user_id: int) -> list[TiqoraDashboard]:
@@ -474,6 +490,7 @@ def widget_row(dashboard_id: int, w: WidgetIn, position: int) -> TiqoraDashboard
         settings=dump_json(w.settings),
         layout=_layout_text(w.layout),
         position=position,
+        pinned=w.pinned,
     )
 
 
@@ -492,9 +509,11 @@ async def _create_dashboard_once(
     if len(await _lock_own(session, user_id)) >= MAX_DASHBOARDS_PER_USER:
         raise DashboardInvalid(MSG_LIMIT, "name")
     sources: list[TiqoraDashboardWidget] = []
+    filters = "{}"
     if body.copy_from is not None:
         src = await _visible_row(session, body.copy_from, user_id, admin=admin)
         sources = await _widgets(session, src.id)
+        filters = dashboard_filters(src).model_dump_json()
     now = utc_now()
     row = TiqoraDashboard(
         owner_user_id=user_id,
@@ -503,7 +522,7 @@ async def _create_dashboard_once(
         sort=await _next_sort(session, user_id),
         kind="personal",
         locked=False,
-        filters="{}",
+        filters=filters,
         version=1,
         created_at=now,
         changed_at=now,
@@ -521,6 +540,7 @@ async def _create_dashboard_once(
                 settings=w.settings,
                 layout=w.layout,
                 position=i,
+                pinned=w.pinned,
             )
         )
     await session.flush()
@@ -644,6 +664,11 @@ async def save_dashboard(
                     icon=body.icon,
                     version=TiqoraDashboard.version + 1,
                     changed_at=utc_now(),
+                    **(
+                        {"filters": body.filters.model_dump_json()}
+                        if body.filters is not None
+                        else {}
+                    ),
                 )
             )
             if res.rowcount == 0:  # type: ignore[attr-defined]
@@ -673,6 +698,7 @@ async def save_dashboard(
                     "settings": settings_text,
                     "layout": _layout_text(w.layout),
                     "position": pos,
+                    "pinned": w.pinned,
                 }
                 if w.id in existing:
                     await session.execute(
@@ -695,6 +721,52 @@ async def save_dashboard(
         # another save claimed one of the widget ids between our check and the insert
         raise DashboardInvalid(MSG_WIDGET_ID_TAKEN, "widgets") from None
 
+    fresh = await _load_row(session, dashboard_id)
+    assert fresh is not None
+    return await dashboard_out(session, fresh, user_id, admin=admin)
+
+
+async def set_filters(
+    session: AsyncSession,
+    dashboard_id: int,
+    user_id: int,
+    filters: DashboardFilters,
+    version: int,
+    *,
+    admin: bool,
+) -> DashboardOut:
+    """Store the dashboard-wide filters (same rights and optimistic lock as a save).
+
+    Retried on a lock race, which rolls back the caller's session: call it with no pending work.
+    """
+    return await _retry_races(
+        session, lambda: _set_filters_once(session, dashboard_id, user_id, filters, version, admin)
+    )
+
+
+async def _set_filters_once(
+    session: AsyncSession,
+    dashboard_id: int,
+    user_id: int,
+    filters: DashboardFilters,
+    version: int,
+    admin: bool,
+) -> DashboardOut:
+    row = await _visible_row(session, dashboard_id, user_id, admin=admin)
+    _require_edit(row, user_id, admin=admin)
+    if version != row.version:
+        raise DashboardConflict(row.version)
+    res = await session.execute(
+        update(TiqoraDashboard)
+        .where(TiqoraDashboard.id == dashboard_id, TiqoraDashboard.version == version)
+        .values(
+            filters=filters.model_dump_json(),
+            version=TiqoraDashboard.version + 1,
+            changed_at=utc_now(),
+        )
+    )
+    if res.rowcount == 0:  # type: ignore[attr-defined]
+        raise DashboardConflict(await _current_version(session, dashboard_id))
     fresh = await _load_row(session, dashboard_id)
     assert fresh is not None
     return await dashboard_out(session, fresh, user_id, admin=admin)

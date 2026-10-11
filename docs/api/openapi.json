@@ -12553,6 +12553,62 @@
         "title": "DashboardDataOut",
         "type": "object"
       },
+      "DashboardFilters": {
+        "additionalProperties": false,
+        "description": "Filters stored on a dashboard and applied to its filter-aware widgets.",
+        "properties": {
+          "queue_ids": {
+            "items": {
+              "maximum": 2147483647.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            "maxItems": 50,
+            "title": "Queue Ids",
+            "type": "array"
+          },
+          "time_range": {
+            "anyOf": [
+              {
+                "enum": [
+                  "today",
+                  "7d",
+                  "30d",
+                  "90d",
+                  "this_month",
+                  "last_month"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Range"
+          }
+        },
+        "title": "DashboardFilters",
+        "type": "object"
+      },
+      "DashboardFiltersIn": {
+        "additionalProperties": false,
+        "properties": {
+          "filters": {
+            "$ref": "#/components/schemas/DashboardFilters"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "filters",
+          "version"
+        ],
+        "title": "DashboardFiltersIn",
+        "type": "object"
+      },
       "DashboardOrderIn": {
         "additionalProperties": false,
         "properties": {
@@ -12582,6 +12638,9 @@
           "can_share": {
             "title": "Can Share",
             "type": "boolean"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/DashboardFilters"
           },
           "group_ids": {
             "items": {
@@ -12652,6 +12711,16 @@
             ],
             "title": "Source Template Id"
           },
+          "template_update": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TemplateUpdateHint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -12686,6 +12755,16 @@
       "DashboardSaveIn": {
         "additionalProperties": false,
         "properties": {
+          "filters": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DashboardFilters"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "icon": {
             "anyOf": [
               {
@@ -31225,6 +31304,35 @@
         "title": "TemplateOut",
         "type": "object"
       },
+      "TemplateUpdateHint": {
+        "description": "A newer version of the source template has widgets this copy lacks (Task 8 fills it).",
+        "properties": {
+          "new_widget_count": {
+            "title": "New Widget Count",
+            "type": "integer"
+          },
+          "template_id": {
+            "title": "Template Id",
+            "type": "integer"
+          },
+          "template_name": {
+            "title": "Template Name",
+            "type": "string"
+          },
+          "template_version": {
+            "title": "Template Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "template_id",
+          "template_name",
+          "template_version",
+          "new_widget_count"
+        ],
+        "title": "TemplateUpdateHint",
+        "type": "object"
+      },
       "TicketAclActionsOut": {
         "description": "Zoom menu entries the ticket's ACLs leave available (in ``ZOOM_ACTIONS`` order).",
         "properties": {
@@ -35023,6 +35131,11 @@
           "layout": {
             "$ref": "#/components/schemas/WidgetLayouts"
           },
+          "pinned": {
+            "default": false,
+            "title": "Pinned",
+            "type": "boolean"
+          },
           "settings": {
             "additionalProperties": true,
             "title": "Settings",
@@ -35096,6 +35209,11 @@
           "layout": {
             "$ref": "#/components/schemas/WidgetLayouts"
           },
+          "pinned": {
+            "default": false,
+            "title": "Pinned",
+            "type": "boolean"
+          },
           "settings": {
             "additionalProperties": true,
             "title": "Settings",
@@ -35137,6 +35255,16 @@
       "WidgetPreviewIn": {
         "additionalProperties": false,
         "properties": {
+          "filters": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DashboardFilters"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "settings": {
             "additionalProperties": true,
             "title": "Settings",
@@ -74343,6 +74471,93 @@
           }
         },
         "summary": "Dashboard Data",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboards/{dashboard_id}/filters": {
+      "patch": {
+        "description": "Set the dashboard-wide filters (same rights and version lock as the save).",
+        "operationId": "patch_filters_api_v1_dashboards__dashboard_id__filters_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Dashboard Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DashboardFiltersIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Filters",
         "tags": [
           "dashboards"
         ]

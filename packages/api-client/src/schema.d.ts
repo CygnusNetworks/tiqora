@@ -6886,6 +6886,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboards/{dashboard_id}/filters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch Filters
+         * @description Set the dashboard-wide filters (same rights and version lock as the save).
+         */
+        patch: operations["patch_filters_api_v1_dashboards__dashboard_id__filters_patch"];
+        trace?: never;
+    };
     "/api/v1/dashboards/{dashboard_id}/share": {
         parameters: {
             query?: never;
@@ -14340,6 +14360,22 @@ export interface components {
                 [key: string]: components["schemas"]["WidgetDataOut"];
             };
         };
+        /**
+         * DashboardFilters
+         * @description Filters stored on a dashboard and applied to its filter-aware widgets.
+         */
+        DashboardFilters: {
+            /** Queue Ids */
+            queue_ids?: number[];
+            /** Time Range */
+            time_range?: ("today" | "7d" | "30d" | "90d" | "this_month" | "last_month") | null;
+        };
+        /** DashboardFiltersIn */
+        DashboardFiltersIn: {
+            filters: components["schemas"]["DashboardFilters"];
+            /** Version */
+            version: number;
+        };
         /** DashboardOrderIn */
         DashboardOrderIn: {
             /** Ids */
@@ -14351,6 +14387,7 @@ export interface components {
             can_edit: boolean;
             /** Can Share */
             can_share: boolean;
+            filters?: components["schemas"]["DashboardFilters"];
             /** Group Ids */
             group_ids: number[];
             /** Icon */
@@ -14374,6 +14411,7 @@ export interface components {
             sort: number;
             /** Source Template Id */
             source_template_id: number | null;
+            template_update?: components["schemas"]["TemplateUpdateHint"] | null;
             /** Version */
             version: number;
             /** Widgets */
@@ -14381,6 +14419,7 @@ export interface components {
         };
         /** DashboardSaveIn */
         DashboardSaveIn: {
+            filters?: components["schemas"]["DashboardFilters"] | null;
             /** Icon */
             icon?: string | null;
             /** Name */
@@ -20571,6 +20610,20 @@ export interface components {
             text: string;
         };
         /**
+         * TemplateUpdateHint
+         * @description A newer version of the source template has widgets this copy lacks (Task 8 fills it).
+         */
+        TemplateUpdateHint: {
+            /** New Widget Count */
+            new_widget_count: number;
+            /** Template Id */
+            template_id: number;
+            /** Template Name */
+            template_name: string;
+            /** Template Version */
+            template_version: number;
+        };
+        /**
          * TicketAclActionsOut
          * @description Zoom menu entries the ticket's ACLs leave available (in ``ZOOM_ACTIONS`` order).
          */
@@ -21956,6 +22009,11 @@ export interface components {
             /** Id */
             id: string;
             layout: components["schemas"]["WidgetLayouts"];
+            /**
+             * Pinned
+             * @default false
+             */
+            pinned: boolean;
             /** Settings */
             settings?: {
                 [key: string]: unknown;
@@ -21983,6 +22041,11 @@ export interface components {
             /** Id */
             id: string;
             layout: components["schemas"]["WidgetLayouts"];
+            /**
+             * Pinned
+             * @default false
+             */
+            pinned: boolean;
             /** Settings */
             settings?: {
                 [key: string]: unknown;
@@ -21999,6 +22062,7 @@ export interface components {
         };
         /** WidgetPreviewIn */
         WidgetPreviewIn: {
+            filters?: components["schemas"]["DashboardFilters"] | null;
             /** Settings */
             settings?: {
                 [key: string]: unknown;
@@ -40625,6 +40689,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DashboardDataOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_filters_api_v1_dashboards__dashboard_id__filters_patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                dashboard_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardFiltersIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardOut"];
                 };
             };
             /** @description Validation Error */

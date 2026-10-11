@@ -7,6 +7,7 @@ from typing import Annotated, Any, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
+from tiqora.dashboard.filters import DashboardFilters
 from tiqora.dashboard.layout import Rect
 from tiqora.dashboard.settings_models import MAX_WIDGET_SETTINGS_BYTES, WIDGET_KEY_RE
 from tiqora.domain.schemas import UtcDateTime
@@ -46,6 +47,8 @@ class WidgetIn(BaseModel):
     title_override: str | None = Field(None, max_length=200)
     settings: dict[str, Any] = Field(default_factory=dict)
     layout: WidgetLayouts
+    #: True: this widget ignores the dashboard-wide filters
+    pinned: bool = False
 
 
 class WidgetOut(WidgetIn):
@@ -68,8 +71,20 @@ class DashboardTabOut(BaseModel):
     source_template_id: int | None
 
 
+class TemplateUpdateHint(BaseModel):
+    """A newer version of the source template has widgets this copy lacks (Task 8 fills it)."""
+
+    template_id: int
+    template_name: str
+    template_version: int
+    new_widget_count: int
+
+
 class DashboardOut(DashboardTabOut):
     widgets: list[WidgetOut]  # in phone order
+    filters: DashboardFilters = Field(default_factory=DashboardFilters)
+    #: set only by ``GET /dashboards/{id}`` for an editable template copy
+    template_update: TemplateUpdateHint | None = None
 
 
 class DashboardSaveIn(BaseModel):
@@ -79,6 +94,8 @@ class DashboardSaveIn(BaseModel):
     icon: str | None = Field(None, max_length=40)
     version: int = Field(ge=1)
     widgets: list[WidgetIn] = Field(max_length=MAX_WIDGETS_PER_DASHBOARD)
+    #: ``None`` keeps the stored dashboard filters
+    filters: DashboardFilters | None = None
 
     @model_validator(mode="after")
     def _unique_widget_ids(self) -> DashboardSaveIn:
@@ -86,6 +103,13 @@ class DashboardSaveIn(BaseModel):
         if len(set(ids)) != len(ids):
             raise ValueError("Widget-IDs müssen eindeutig sein.")
         return self
+
+
+class DashboardFiltersIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    filters: DashboardFilters
+    version: int = Field(ge=1)
 
 
 class DashboardCreateIn(BaseModel):
@@ -136,6 +160,8 @@ class WidgetPreviewIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     settings: dict[str, Any] = Field(default_factory=dict)
+    #: the open dashboard's filters (they only narrow)
+    filters: DashboardFilters | None = None
 
 
 class DashboardTemplateIn(BaseModel):

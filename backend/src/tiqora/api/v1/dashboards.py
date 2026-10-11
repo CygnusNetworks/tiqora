@@ -24,6 +24,7 @@ from tiqora.dashboard.schemas import (
     MAX_WIDGETS_PER_DASHBOARD,
     DashboardCreateIn,
     DashboardDataOut,
+    DashboardFiltersIn,
     DashboardOrderIn,
     DashboardOut,
     DashboardSaveIn,
@@ -192,6 +193,27 @@ async def save_dashboard(
     try:
         out = await store.save_dashboard(
             session, dashboard_id, user.id, body, admin=await _is_admin(session, user)
+        )
+        await session.commit()
+    except _STORE_ERRORS as exc:
+        await session.rollback()
+        _raise_http(exc)
+    return out
+
+
+@router.patch("/{dashboard_id}/filters", response_model=DashboardOut)
+async def patch_filters(
+    dashboard_id: DashboardId, body: DashboardFiltersIn, session: DbSession, user: CurrentUser
+) -> DashboardOut:
+    """Set the dashboard-wide filters (same rights and version lock as the save)."""
+    try:
+        out = await store.set_filters(
+            session,
+            dashboard_id,
+            user.id,
+            body.filters,
+            body.version,
+            admin=await _is_admin(session, user),
         )
         await session.commit()
     except _STORE_ERRORS as exc:

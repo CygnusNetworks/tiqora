@@ -46,7 +46,7 @@ export function demoTab(over: Partial<DashboardTab> = {}): DashboardTab {
 
 /** A complete dashboard; overrides win (the tab fields plus `widgets`). */
 export function demoDashboard(over: Partial<Dashboard> = {}): Dashboard {
-  return { ...demoTab(), widgets: [], ...over };
+  return { ...demoTab(), widgets: [], filters: { queue_ids: [], time_range: null }, ...over };
 }
 
 /** A complete role template; overrides win. */
@@ -68,7 +68,7 @@ function widget(
   settings: Settings,
   title_override: string | null = null,
 ): DashboardWidgetRow {
-  return { id, type_key, type_version: 1, title_override, settings, layout: { lg: { x, y, w, h } } };
+  return { id, type_key, type_version: 1, title_override, settings, layout: { lg: { x, y, w, h } }, pinned: false };
 }
 
 const preset = (name: string) => ({ kind: "preset", preset: name });

@@ -89,7 +89,7 @@ const DEFAULT_TYPES_IN_ORDER = DEFAULT_WIDGETS.map((w) => w.type_key);
 const DEFAULT_DASHBOARD = demoDashboard({ id: 1, name: "Mein Start", widgets: DEFAULT_WIDGETS });
 
 function wire(id: string, type_key: string, layout: DashboardWidgetRow["layout"], settings = {}): DashboardWidgetRow {
-  return { id, type_key, type_version: 1, title_override: null, settings, layout };
+  return { id, type_key, type_version: 1, title_override: null, settings, layout, pinned: false };
 }
 
 const SHARED = demoDashboard({
@@ -932,6 +932,7 @@ describe("DashboardPage", () => {
         title_override: null,
         settings: DEFAULT_WIDGETS[0].settings,
         layout: { lg: { x: 1, y: 0, w: 3, h: 2 } },
+        pinned: false,
       });
       expect(localStorage.getItem(KEY)).toBeNull();
       expect(cellOf("w-counter-1").style.gridColumn).toBe("2 / span 3");
@@ -1095,6 +1096,7 @@ describe("DashboardPage", () => {
         title_override: null,
         settings: { a: 1 },
         layout: { lg: { x: 0, y: 0, w: 4, h: 2 } },
+        pinned: false,
       });
     });
 
