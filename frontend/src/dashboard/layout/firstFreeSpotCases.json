@@ -1,0 +1,13 @@
+{
+  "_comment": "Cross-check fixture for firstFreeSpot (grid.ts) vs first_free_spot (backend/src/tiqora/dashboard/layout.py). rects are [x, y, w, h]; expected is [x, y]. The backend suite (test_dashboard_layout.py) parametrises over this file.",
+  "cases": [
+    { "name": "empty grid", "cols": 12, "rects": [], "w": 4, "h": 2, "expected": [0, 0] },
+    { "name": "full first row", "cols": 12, "rects": [[0, 0, 12, 2]], "w": 3, "h": 1, "expected": [0, 2] },
+    { "name": "gap too narrow", "cols": 12, "rects": [[0, 0, 5, 2], [8, 0, 4, 2]], "w": 4, "h": 1, "expected": [0, 2] },
+    { "name": "gap exactly wide enough", "cols": 12, "rects": [[0, 0, 5, 2], [8, 0, 4, 2]], "w": 3, "h": 1, "expected": [5, 0] },
+    { "name": "full width widget", "cols": 12, "rects": [[0, 0, 3, 1]], "w": 12, "h": 1, "expected": [0, 1] },
+    { "name": "tall item at x = 0", "cols": 12, "rects": [[0, 0, 3, 6]], "w": 4, "h": 2, "expected": [3, 0] },
+    { "name": "gap too short", "cols": 12, "rects": [[0, 0, 4, 1], [0, 1, 12, 1]], "w": 3, "h": 2, "expected": [0, 2] },
+    { "name": "narrow grid", "cols": 6, "rects": [[0, 0, 4, 1]], "w": 3, "h": 1, "expected": [0, 1] }
+  ]
+}

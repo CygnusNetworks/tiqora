@@ -17,6 +17,14 @@ from pydantic import (
     field_validator,
 )
 
+from tiqora.dashboard.filters import TimeRangePreset
+from tiqora.reporting.schemas import (
+    MAX_DIMENSION_CHOICES,
+    MAX_RUN_PARAMETERS,
+    ParameterValue,
+    _ColumnKey,
+)
+
 WIDGET_KEY_RE: Final = re.compile(r"^[a-z0-9][a-z0-9._-]{1,118}$")
 MAX_WIDGET_SETTINGS_BYTES: Final = 20_000
 #: bigint column; the saved-searches API bounds its path id the same way
@@ -178,6 +186,47 @@ class LinksSettings(_Strict):
     items: list[LinkItem] = Field(default_factory=list, max_length=12)
 
 
+REPORT_KEY_RE: Final = r"^(builtin\.[a-z0-9_]{1,60}|[1-9][0-9]{0,18})$"
+
+
+class ReportWidgetSettings(_Strict):
+    """``core.report``: a saved or built-in report as a tile."""
+
+    report_key: str = Field(pattern=REPORT_KEY_RE)
+    #: ``None`` = the report's own range
+    time_range: TimeRangePreset | None = None
+    parameters: dict[Annotated[str, Field(max_length=40)], ParameterValue] = Field(
+        default_factory=dict, max_length=MAX_RUN_PARAMETERS
+    )
+    #: dimension index ("0".."9") -> dimension key, as in ``ReportRunIn``
+    dimension_choices: dict[Annotated[str, Field(pattern=r"^[0-9]$")], _ColumnKey] = Field(
+        default_factory=dict, max_length=MAX_DIMENSION_CHOICES
+    )
+    display: Literal["auto", "table"] = "auto"
+    max_rows: int = Field(10, ge=1, le=50)
+
+
+class SlaGaugeSettings(_Strict):
+    time_range: TimeRangePreset = "30d"
+    target_percent: int = Field(90, ge=50, le=100)
+
+
+class BacklogAgingSettings(_Strict):
+    max_rows: int = Field(8, ge=1, le=15)
+
+
+class HeatmapSettings(_Strict):
+    time_range: Literal["30d", "90d"] = "90d"
+
+
+class ChatQueueSettings(_Strict):
+    limit: int = Field(5, ge=1, le=10)
+
+
+class AiStatusSettings(_Strict):
+    pass
+
+
 CORE_WIDGET_SETTINGS: Final[dict[str, type[BaseModel]]] = {
     "core.ticket-list": TicketListSettings,
     "core.counter": CounterSettings,
@@ -189,6 +238,12 @@ CORE_WIDGET_SETTINGS: Final[dict[str, type[BaseModel]]] = {
     "core.team-presence": TeamPresenceSettings,
     "core.notes": NotesSettings,
     "core.links": LinksSettings,
+    "core.report": ReportWidgetSettings,
+    "core.sla-gauge": SlaGaugeSettings,
+    "core.backlog-aging": BacklogAgingSettings,
+    "core.heatmap": HeatmapSettings,
+    "core.chat-queue": ChatQueueSettings,
+    "core.ai-status": AiStatusSettings,
 }
 
 

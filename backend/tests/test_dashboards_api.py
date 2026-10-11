@@ -254,12 +254,14 @@ async def test_other_users_keep_their_own_start(env: Env) -> None:
     assert [t["id"] for t in (await env.client.get("/api/v1/dashboards")).json()] == [b["id"]]
 
 
-async def test_widget_types_lists_ten_core_keys(env: Env) -> None:
+async def test_widget_types_lists_core_keys(env: Env) -> None:
     r = await env.client.get("/api/v1/dashboard-widget-types")
     assert r.status_code == 200
     types = r.json()
     keys = [t["key"] for t in types]
-    assert keys == sorted(keys) and len(keys) == 10 and "core.ticket-list" in keys
+    assert keys == sorted(keys) and len(keys) == 16 and "core.ticket-list" in keys
+    assert {"core.report", "core.sla-gauge", "core.backlog-aging", "core.heatmap"} <= set(keys)
+    assert {"core.chat-queue", "core.ai-status"} <= set(keys)
     assert all(t["version"] == 1 and isinstance(t["has_data"], bool) for t in types)
     assert (await env.anon.get("/api/v1/dashboard-widget-types")).status_code == 401
 

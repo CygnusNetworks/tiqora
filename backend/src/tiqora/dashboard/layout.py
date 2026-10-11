@@ -54,3 +54,23 @@ def normalize_rects(items: Sequence[tuple[str, Rect]], *, cols: int = GRID_COLS)
         if y + h > MAX_ROWS:
             raise SettingsError("Das Layout ist zu hoch.", path="widgets")
     return {wid: Rect(x=x, y=y, w=w, h=h) for wid, (x, y, w, h) in out.items()}
+
+
+def first_free_spot(
+    rects: Sequence[Rect], w: int, h: int, *, cols: int = GRID_COLS
+) -> tuple[int, int]:
+    """First ``(x, y)`` where a ``w`` x ``h`` rect fits without colliding.
+
+    Same scan as the frontend ``firstFreeSpot``: ``y`` from 0, ``x`` from 0 to
+    ``cols - w``, first free cell wins. Always terminates at the latest directly
+    below the lowest rect.
+    """
+    width = max(1, min(w, cols))
+    bottom = max((r.y + r.h for r in rects), default=0)
+    for y in range(bottom + 1):
+        for x in range(cols - width + 1):
+            if not any(
+                x < r.x + r.w and r.x < x + width and y < r.y + r.h and r.y < y + h for r in rects
+            ):
+                return x, y
+    return 0, bottom
