@@ -89,7 +89,23 @@ class CalendarService:
     async def create_appointment(self, user_id: int, data: AppointmentIn) -> CalendarAppointment:
         cal = await self._calendar_or_404(data.calendar_id)
         await self._require_group_permission(user_id, cal.group_id, "rw")
+        return await self._insert_appointment(cal, user_id, data)
 
+    async def create_appointment_unchecked(
+        self, user_id: int, data: AppointmentIn
+    ) -> CalendarAppointment:
+        """Create an appointment without a permission check.
+
+        For the process transition action ``AppointmentCreate``: Znuny's
+        ``Appointment.pm`` ``AppointmentCreate`` checks no calendar permission
+        (only ``AppointmentDelete`` does, ``Appointment.pm:1548-1560``).
+        """
+        cal = await self._calendar_or_404(data.calendar_id)
+        return await self._insert_appointment(cal, user_id, data)
+
+    async def _insert_appointment(
+        self, cal: Calendar, user_id: int, data: AppointmentIn
+    ) -> CalendarAppointment:
         now = datetime.now(UTC).replace(tzinfo=None)
         row = CalendarAppointment(
             calendar_id=cal.id,
@@ -177,7 +193,24 @@ class CalendarService:
         row = await self._appointment_or_404(appointment_id)
         cal = await self._calendar_or_404(row.calendar_id)
         await self._require_group_permission(user_id, cal.group_id, "rw")
+        await self._delete_row(row, user_id, occurrence)
 
+    async def delete_appointment_unchecked(
+        self, user_id: int, appointment_id: int, *, occurrence: datetime | None = None
+    ) -> None:
+        """Delete an appointment without the ``rw`` check of :meth:`delete_appointment`.
+
+        The caller has already checked the permission itself. The process action
+        ``AppointmentRemove`` needs ``create`` or ``rw`` (``Appointment.pm:1548-1560``),
+        which is weaker than the ``rw`` this service demands.
+        """
+        row = await self._appointment_or_404(appointment_id)
+        await self._delete_row(row, user_id, occurrence)
+
+    async def _delete_row(
+        self, row: CalendarAppointment, user_id: int, occurrence: datetime | None
+    ) -> None:
+        appointment_id = row.id
         if occurrence is not None and row.recur_type:
             excluded = parse_exclude_list(row.recur_exclude)
             occ_naive = to_utc_naive(occurrence)

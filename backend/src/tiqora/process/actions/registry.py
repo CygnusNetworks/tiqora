@@ -302,6 +302,7 @@ _CONFIG_ITEM_UPDATE = (
 def core_transition_actions() -> list[TransitionActionModule]:
     """Every Znuny transition action module, with Tiqora's handler where one exists."""
     from tiqora.process import engine
+    from tiqora.process.actions import appointments
 
     def m(
         name: str, run: ActionHandler | None, params: tuple[ActionParam, ...]
@@ -345,10 +346,9 @@ def core_transition_actions() -> list[TransitionActionModule]:
         m("TicketWatchSet", engine._action_ticket_watch_set, _TICKET_WATCH_SET),
         m("LinkAdd", engine._action_link_add, _LINK_ADD),
         m("TicketCreate", engine._action_ticket_create, _TICKET_CREATE),
-        # Appointment*: handlers come with plan Task 2.
-        m("AppointmentCreate", None, _APPOINTMENT_CREATE),
-        m("AppointmentUpdate", None, _APPOINTMENT_UPDATE),
-        m("AppointmentRemove", None, _APPOINTMENT_REMOVE),
+        m("AppointmentCreate", appointments.action_appointment_create, _APPOINTMENT_CREATE),
+        m("AppointmentUpdate", appointments.action_appointment_update, _APPOINTMENT_UPDATE),
+        m("AppointmentRemove", appointments.action_appointment_remove, _APPOINTMENT_REMOVE),
         # ExecuteInvoker: the handler is owned by the GI plan
         # (``tiqora/gi/process_action.py``, not on this branch yet); the process merge sets
         # ``run`` here (cross-plan ruling). No own implementation in tiqora.process.
