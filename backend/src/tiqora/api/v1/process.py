@@ -34,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.deps import CurrentUser, DbSession
 from tiqora.db.engine import get_session_factory
+from tiqora.domain.attachments_in import AttachmentInvalid, AttachmentTooLarge
 from tiqora.domain.ticket_write_service import (
     InvalidInput,
     _ticket_must_exist,  # noqa: PLC2701 -- deliberate reuse
@@ -105,6 +106,10 @@ def _map_exc(exc: Exception) -> HTTPException:
         ),
     ):
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    if isinstance(exc, AttachmentTooLarge):
+        return HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail=str(exc))
+    if isinstance(exc, AttachmentInvalid):
+        return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
     if isinstance(exc, (RequiredFieldMissing, UnresolvedFieldValue, InvalidInput)):
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return HTTPException(status_code=500, detail="Internal error")
@@ -114,6 +119,8 @@ def _map_exc(exc: Exception) -> HTTPException:
 # Both mutating endpoints catch this single tuple so a newly-raised process
 # exception can never be handled by one endpoint but escape another as a 500.
 _MAPPED_ERRORS: tuple[type[Exception], ...] = (
+    AttachmentTooLarge,
+    AttachmentInvalid,
     WriteTicketNotFound,
     ProcessPermissionDenied,
     ProcessNotFound,

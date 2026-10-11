@@ -224,6 +224,13 @@ class ProcessDialogFieldOut(BaseModel):
     description_long: str = ""
     default: Any = None
     options: list[ProcessDialogOptionOut] = Field(default_factory=list)
+    #: kind "article" only: booked time. "0" = no time field (also whenever
+    #: ``Ticket::Frontend::AccountTime`` is off or on the customer interface), "1" = optional,
+    #: "2" = required (``AgentTicketProcess.pm:3067-3082``).
+    time_units: Literal["0", "1", "2"] = "0"
+    #: kind "article": the submit may carry files in ``field_values.ArticleAttachments``
+    #: (a list of ``{filename, content_type, content_base64}``, at most 10).
+    uploads: bool = False
 
 
 class ProcessDialogFormOut(BaseModel):

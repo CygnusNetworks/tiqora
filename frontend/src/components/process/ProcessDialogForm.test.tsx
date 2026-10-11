@@ -5,7 +5,14 @@ import i18n from "@/i18n";
 import type { ProcessDialogFormData } from "@/lib/processApi";
 import { ProcessDialogForm } from "./ProcessDialogForm";
 
-const base = { description_short: "", description_long: "", default: null, options: [] };
+const base = {
+  description_short: "",
+  description_long: "",
+  default: null,
+  options: [],
+  time_units: "0" as const,
+  uploads: false,
+};
 const form: ProcessDialogFormData = {
   process_entity_id: "P",
   activity_dialog_entity_id: "AD",

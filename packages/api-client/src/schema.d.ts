@@ -18212,6 +18212,17 @@ export interface components {
             options?: components["schemas"]["ProcessDialogOptionOut"][];
             /** Required */
             required: boolean;
+            /**
+             * Time Units
+             * @default 0
+             * @enum {string}
+             */
+            time_units: "0" | "1" | "2";
+            /**
+             * Uploads
+             * @default false
+             */
+            uploads: boolean;
         };
         /**
          * ProcessDialogFormOut

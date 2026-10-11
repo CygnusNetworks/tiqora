@@ -62,13 +62,16 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from pydantic import ValidationError
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.channels.email.placeholder import PlaceholderContext
+from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.legacy.queue import Queue, Service, Sla
 from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketType
 from tiqora.db.legacy.user import Users
+from tiqora.domain.attachments_in import ArticleAttachmentIn, AttachmentInvalid, decode_attachments
 from tiqora.domain.dynamic_field_values import load_ticket_dynamic_field
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
@@ -76,6 +79,7 @@ from tiqora.domain.ticket_write_service import (
     _state_type_name,  # noqa: PLC2701
     _ticket_must_exist,  # noqa: PLC2701
     add_article,
+    add_time_accounting,
     assign_owner,
     assign_responsible,
     change_priority,
@@ -124,6 +128,7 @@ from tiqora.process.fields import (
     effective_field_values,
     is_present,
     missing_required_fields,
+    time_units_mode,
 )
 from tiqora.process.graph import ProcessRepository
 from tiqora.process.smart_tags import (
@@ -1577,6 +1582,12 @@ async def _apply_dialog_field_changes(
         t = await _ticket_must_exist(session, ticket_id)
         customer_id = field_values.get("CustomerID", t.get("customer_id"))
         customer_user_id = field_values.get("CustomerUserID", t.get("customer_user_id"))
+        if "CustomerID" in field_values and not is_present(customer_id):
+            # An agent picked a customer user and left the company empty: Znuny's agent screens
+            # fill it with the customer user's UserCustomerID through AJAX (D6).
+            picked = str(customer_user_id or "").strip()
+            if picked:
+                customer_id = await customer_id_of_user(session, picked)
         # AgentTicketProcess.pm:5770-5783: no TicketCustomerSet when CustomerID and
         # CustomerUser both equal the ticket's (Perl ``eq``: undef compares as "").
         unchanged = str(customer_id or "") == str(t.get("customer_id") or "") and str(
@@ -1647,6 +1658,36 @@ async def _apply_dialog_field_changes(
         )
 
 
+async def customer_id_of_user(session: AsyncSession, login: str) -> str | None:
+    """``UserCustomerID`` of the customer user *login* (``None`` for an unknown login)."""
+    return (
+        await session.execute(select(CustomerUser.customer_id).where(CustomerUser.login == login))
+    ).scalar_one_or_none()
+
+
+#: Files per dialog submit; the reply dialog (``useChatAttachments.MAX_ATTACHMENTS``) allows the
+#: same number (rulings F33).
+MAX_DIALOG_ATTACHMENTS = 10
+
+
+def _decode_dialog_attachments(raw: Any) -> list[tuple[str, str, bytes]]:
+    """``ArticleAttachments`` (list of ``{filename, content_type, content_base64}``) -> files.
+
+    Raises :class:`AttachmentInvalid` (422) / ``AttachmentTooLarge`` (413) from the domain layer;
+    the routes map them."""
+    if raw is None or raw == []:
+        return []
+    if not isinstance(raw, list):
+        raise AttachmentInvalid("ArticleAttachments must be a list")
+    if len(raw) > MAX_DIALOG_ATTACHMENTS:
+        raise AttachmentInvalid(f"at most {MAX_DIALOG_ATTACHMENTS} attachments per submit")
+    try:
+        items = [ArticleAttachmentIn.model_validate(item) for item in raw]
+    except ValidationError as exc:
+        raise AttachmentInvalid(f"invalid attachment: {exc.errors()[0]['msg']}") from None
+    return decode_attachments(items)
+
+
 async def _store_dialog_article(
     session: AsyncSession,
     *,
@@ -1668,6 +1709,13 @@ async def _store_dialog_article(
         or not is_present(field_values.get("Subject"))
         or not is_present(field_values.get("Body"))
     ):
+        if is_present(field_values.get("ArticleAttachments")):
+            # Files belong to the article (AgentTicketProcess.pm:5701-5707): no article, no files.
+            logger.warning(
+                "process dialog uploads ignored: ticket %s gets no article (Subject and Body "
+                "are both required)",
+                ticket_id,
+            )
         return
     cfg = article_cfg.config
     channel_raw = str(cfg.get("CommunicationChannel") or cfg.get("ArticleType") or "note").lower()
@@ -1685,6 +1733,7 @@ async def _store_dialog_article(
         else:
             history_type = TYPE_WEB_REQUEST_CUSTOMER if new_ticket else TYPE_FOLLOW_UP
         history_comment = "%%"
+    attachments = _decode_dialog_attachments(field_values.get("ArticleAttachments"))
     article = ArticleIn(
         sender_type=sender_type,
         is_visible_for_customer=perl_truthy(cfg.get("IsVisibleForCustomer", 0)),
@@ -1693,10 +1742,28 @@ async def _store_dialog_article(
         channel=_ARTICLE_CHANNEL_MAP.get(channel_raw, "note"),
         history_type_override=history_type,
         history_comment_override=history_comment,
+        attachments=attachments,
     )
-    await add_article(
+    article_id = await add_article(
         session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
     )
+    # Time accounting after the article, with its id (AgentTicketProcess.pm:5716-5723). A
+    # Perl-false value (empty, "0") books nothing; the field exists for agents only and only
+    # while Ticket::Frontend::AccountTime is on.
+    mode = time_units_mode(
+        dialog_config,
+        "AgentInterface" if sender_type == "agent" else "CustomerInterface",
+        account_time=perl_truthy(await sysconfig.get("Ticket::Frontend::AccountTime")),
+    )
+    time_units = field_values.get("TimeUnits")
+    if mode != "0" and perl_truthy(time_units):
+        await add_time_accounting(
+            session,
+            ticket_id=ticket_id,
+            article_id=article_id,
+            time_unit=time_units if isinstance(time_units, int | float) else str(time_units),
+            user_id=user_id,
+        )
 
 
 async def _ensure_required_lock(
@@ -1812,7 +1879,11 @@ async def _resolve_dialog_pending_time(
 
 
 def dialog_values_and_missing(
-    dialog: ActivityDialogConfig, field_values: Mapping[str, Any], actor: ProcessActor
+    dialog: ActivityDialogConfig,
+    field_values: Mapping[str, Any],
+    actor: ProcessActor,
+    *,
+    account_time: bool = True,
 ) -> tuple[dict[str, Any], list[str]]:
     """Effective dialog values and the ``Display: 2`` fields still missing (PendingTime included).
 
@@ -1824,7 +1895,9 @@ def dialog_values_and_missing(
     if actor.interface == "CustomerInterface":
         values["CustomerUserID"] = actor.customer_user_login
         values["CustomerID"] = actor.customer_id
-    return values, missing_required_fields(dialog, values, actor.interface)
+    return values, missing_required_fields(
+        dialog, values, actor.interface, account_time=account_time
+    )
 
 
 async def apply_activity_dialog(
@@ -1847,7 +1920,10 @@ async def apply_activity_dialog(
     dynamic fields right after creating the ticket, and a customer's article is a web request
     instead of a follow-up).
     """
-    values, missing = dialog_values_and_missing(dialog, field_values, actor)
+    account_time = perl_truthy(await sysconfig.get("Ticket::Frontend::AccountTime"))
+    values, missing = dialog_values_and_missing(
+        dialog, field_values, actor, account_time=account_time
+    )
     customer_filled = actor.interface == "CustomerInterface"
     # PendingTime is only required (and only read) when the target state is a pending one.
     pending_required = "PendingTime" in missing

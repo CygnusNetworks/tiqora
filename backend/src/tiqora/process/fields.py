@@ -8,10 +8,11 @@ dialog's ``DefaultValue`` applies; a dynamic field without default is set to emp
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Literal
 
 from tiqora.process.actor import Interface
 from tiqora.process.config import ActivityDialogConfig, ActivityDialogFieldConfig
+from tiqora.util.perl import perl_truthy
 
 DISPLAY_HIDDEN = "0"
 DISPLAY_OPTIONAL = "1"
@@ -40,6 +41,10 @@ CUSTOMER_SKIP_FIELDS = frozenset({"Owner", "Responsible", "Lock", "PendingTime",
 # Sub-fields of the pseudo-field "Article" that a user may submit; everything else about the
 # article (sender, visibility, channel) comes from the dialog config (:5686-5687).
 _ARTICLE_INPUT_KEYS = ("Subject", "Body")
+# Extra inputs that belong to the article but never decide whether it is stored: booked time
+# (``TimeUnits``) and uploads (``ArticleAttachments``, a list of ``ArticleAttachmentIn`` dicts).
+_ARTICLE_EXTRA_KEYS = ("TimeUnits", "ArticleAttachments")
+TimeUnitsMode = Literal["0", "1", "2"]
 
 __all__ = [
     "CUSTOMER_SKIP_FIELDS",
@@ -54,6 +59,7 @@ __all__ = [
     "field_config",
     "is_present",
     "missing_required_fields",
+    "time_units_mode",
     "normalize_field_values",
     "visible_fields",
 ]
@@ -93,11 +99,12 @@ def visible_fields(dialog: ActivityDialogConfig, interface: Interface) -> list[s
 
 
 def normalize_field_values(raw: Mapping[str, Any]) -> dict[str, Any]:
-    """Canonical field names; ``"Article": {"Subject", "Body"}`` flattened to top-level keys."""
+    """Canonical field names; ``"Article": {"Subject", "Body", "TimeUnits", "ArticleAttachments"}``
+    flattened to top-level keys."""
     out: dict[str, Any] = {}
     for key, value in raw.items():
         if key == "Article" and isinstance(value, Mapping):
-            for sub in _ARTICLE_INPUT_KEYS:
+            for sub in (*_ARTICLE_INPUT_KEYS, *_ARTICLE_EXTRA_KEYS):
                 if sub in value:
                     out[sub] = value[sub]
             continue
@@ -121,7 +128,7 @@ def effective_field_values(
     visible = visible_fields(dialog, interface)
     values: dict[str, Any] = {name: normalized[name] for name in visible if name in normalized}
     if "Article" in visible:
-        for sub in _ARTICLE_INPUT_KEYS:
+        for sub in (*_ARTICLE_INPUT_KEYS, *_ARTICLE_EXTRA_KEYS):
             if sub in normalized:
                 values[sub] = normalized[sub]
     for name in dialog_field_order(dialog):
@@ -149,15 +156,50 @@ def is_present(value: Any) -> bool:
     return True
 
 
+def time_units_mode(
+    dialog: ActivityDialogConfig, interface: Interface, *, account_time: bool
+) -> TimeUnitsMode:
+    """How the ``Article`` field handles booked time: ``"0"`` no time field, ``"1"`` optional,
+    ``"2"`` required.
+
+    ``AgentTicketProcess.pm:3067-3082`` shows the field only when ``Ticket::Frontend::AccountTime``
+    is on and the field's ``TimeUnits`` config is truthy; ``== 2`` marks it required. Other
+    truthy values (Znuny renders the star but only validates ``== 2``) count as optional here.
+    ``CustomerTicketProcess`` has no time units at all. Divergence: Znuny validates ``== 2`` even
+    with AccountTime off, which would make the dialog unsubmittable; Tiqora then asks for nothing.
+    """
+    if interface != "AgentInterface" or not account_time:
+        return "0"
+    if "Article" not in visible_fields(dialog, interface):
+        return "0"
+    raw = field_config(dialog, "Article").config.get("TimeUnits")
+    if not perl_truthy(raw):
+        return "0"
+    try:
+        return "2" if float(str(raw).strip()) == 2 else "1"
+    except ValueError:
+        return "1"
+
+
 def missing_required_fields(
-    dialog: ActivityDialogConfig, values: Mapping[str, Any], interface: Interface
+    dialog: ActivityDialogConfig,
+    values: Mapping[str, Any],
+    interface: Interface,
+    *,
+    account_time: bool = True,
 ) -> list[str]:
     """Visible fields with ``Display: '2'`` that have no value.
 
     ``Article`` needs BOTH Subject and Body (Znuny stores the article only when both are set,
-    ``AgentTicketProcess.pm:5576``).
+    ``AgentTicketProcess.pm:5576``). With ``TimeUnits: 2`` on the article field (and
+    *account_time*), ``TimeUnits`` is required as well and reported by that name
+    (``AgentTicketProcess.pm:5069-5081``: a Perl-false value such as ``0`` is missing).
     """
     missing: list[str] = []
+    if time_units_mode(dialog, interface, account_time=account_time) == "2" and not (
+        perl_truthy(values.get("TimeUnits")) and is_present(values.get("TimeUnits"))
+    ):
+        missing.append("TimeUnits")
     for name in visible_fields(dialog, interface):
         if not field_config(dialog, name).required:
             continue

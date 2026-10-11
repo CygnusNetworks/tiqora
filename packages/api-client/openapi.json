@@ -23626,6 +23626,21 @@
           "required": {
             "title": "Required",
             "type": "boolean"
+          },
+          "time_units": {
+            "default": "0",
+            "enum": [
+              "0",
+              "1",
+              "2"
+            ],
+            "title": "Time Units",
+            "type": "string"
+          },
+          "uploads": {
+            "default": false,
+            "title": "Uploads",
+            "type": "boolean"
           }
         },
         "required": [

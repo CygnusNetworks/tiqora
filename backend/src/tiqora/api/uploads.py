@@ -23,8 +23,10 @@ from fastapi import HTTPException, UploadFile, status
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-#: Largest single attachment accepted from an agent or a portal customer.
-MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
+from tiqora.domain.attachments_in import MAX_ATTACHMENT_BYTES
+
+# Largest single attachment accepted from an agent or a portal customer: defined in the domain
+# layer (``decode_attachments`` needs it), re-exported here.
 
 #: Headroom over MAX_ATTACHMENT_BYTES for multipart framing and other form
 #: fields, so the middleware never rejects a request the endpoint would accept.

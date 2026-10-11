@@ -64,7 +64,7 @@ const dialogDetail: ProcessDialogFormData = {
   submit_button_text: "Submit",
   submit_advice_text: "",
   fields: [
-    { name: "Title", kind: "text", label: "Title", required: true, description_short: "", description_long: "", default: null, options: [] },
+    { name: "Title", kind: "text", label: "Title", required: true, description_short: "", description_long: "", default: null, options: [], time_units: "0", uploads: false },
   ],
 };
 

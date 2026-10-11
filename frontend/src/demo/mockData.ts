@@ -2404,9 +2404,9 @@ const processDialogForm = {
   submit_advice_text: "",
   fields: [
     { name: "Priority", kind: "select", label: "Priority", required: true, description_short: "", description_long: "", default: "3", options: [{ value: "3", label: "3 normal" }, { value: "4", label: "4 hoch" }] },
-    { name: "Article", kind: "article", label: "Article", required: true, description_short: "", description_long: "", default: null, options: [] },
-    { name: "PendingTime", kind: "pending_time", label: "PendingTime", required: false, description_short: "", description_long: "", default: null, options: [] },
-    { name: "Attachments", kind: "unsupported", label: "Attachments", required: false, description_short: "", description_long: "", default: null, options: [] },
+    { name: "Article", kind: "article", label: "Article", required: true, description_short: "", description_long: "", default: null, options: [], time_units: "0", uploads: false },
+    { name: "PendingTime", kind: "pending_time", label: "PendingTime", required: false, description_short: "", description_long: "", default: null, options: [], time_units: "0", uploads: false },
+    { name: "Attachments", kind: "unsupported", label: "Attachments", required: false, description_short: "", description_long: "", default: null, options: [], time_units: "0", uploads: false },
   ],
 };
 
@@ -2414,7 +2414,7 @@ const processDialogForm = {
 // Customer-shaped: the server drops Owner/Responsible/Lock/PendingTime/CustomerID/CustomerUserID
 // for customers (CustomerTicketProcess), so these forms carry only title, article and a queue pick.
 const portalField = (name: string, kind: string, extra: Record<string, unknown> = {}) => ({
-  name, kind, label: name, required: false, description_short: "", description_long: "", default: null, options: [], ...extra,
+  name, kind, label: name, required: false, description_short: "", description_long: "", default: null, options: [], time_units: "0", uploads: false, ...extra,
 });
 
 const portalStartForm = {

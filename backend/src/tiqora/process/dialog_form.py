@@ -65,7 +65,7 @@ from tiqora.process.availability import (
 )
 from tiqora.process.config import ActivityDialogFieldConfig
 from tiqora.process.exceptions import ProcessNotFound, TicketNotInProcess
-from tiqora.process.fields import field_config, visible_fields
+from tiqora.process.fields import field_config, time_units_mode, visible_fields
 from tiqora.process.graph import ActivityDialogNode, ProcessGraph, ProcessRepository
 from tiqora.process.schemas import (
     FieldKind,
@@ -651,6 +651,7 @@ async def build_dialog_form(
         }
 
     now = await _load_ticket_now(session, ticket_id, names)
+    account_time = perl_truthy(await SysConfig(session).get("Ticket::Frontend::AccountTime"))
     fields: list[ProcessDialogFieldOut] = []
     for name in names:
         cfg = dialog_fields[name]
@@ -681,6 +682,12 @@ async def build_dialog_form(
                 description_long=cfg.description_long,
                 default=default,
                 options=field_options,
+                time_units=(
+                    time_units_mode(config, actor.interface, account_time=account_time)
+                    if kind == "article"
+                    else "0"
+                ),
+                uploads=kind == "article",
             )
         )
     return ProcessDialogFormOut(

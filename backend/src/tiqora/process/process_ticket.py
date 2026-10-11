@@ -27,7 +27,6 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.ticket import TicketLockType, TicketPriority, TicketState
 from tiqora.domain.ticket_write_service import TicketIn, assign_owner, create_ticket
@@ -45,6 +44,7 @@ from tiqora.process.engine import (
     _resolve_type_id,  # noqa: PLC2701
     _resolve_user_id,  # noqa: PLC2701
     apply_activity_dialog,
+    customer_id_of_user,
     dialog_values_and_missing,
     run_transitions,
     start_process,
@@ -59,6 +59,7 @@ from tiqora.process.fields import canonical_field_name, is_present, visible_fiel
 from tiqora.process.graph import ActivityDialogNode, ProcessGraph, ProcessRepository
 from tiqora.process.smart_tags import render_ticketless
 from tiqora.process.ticket_state import get_ticket_process_state
+from tiqora.util.perl import perl_truthy
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = logging.getLogger(__name__)
@@ -103,11 +104,17 @@ async def _start_dialog(
 
 
 def _assert_required(
-    dialog: ActivityDialogNode, field_values: Mapping[str, Any], actor: ProcessActor
+    dialog: ActivityDialogNode,
+    field_values: Mapping[str, Any],
+    actor: ProcessActor,
+    *,
+    account_time: bool,
 ) -> dict[str, Any]:
     """Effective values; raise for a missing ``Display: 2`` field (PendingTime depends on the
     target state and is checked by :func:`apply_activity_dialog`)."""
-    values, missing = dialog_values_and_missing(dialog.config, field_values, actor)
+    values, missing = dialog_values_and_missing(
+        dialog.config, field_values, actor, account_time=account_time
+    )
     missing = [n for n in missing if n != "PendingTime"]
     if missing:
         raise RequiredFieldMissing(f"required activity dialog field missing: {', '.join(missing)}")
@@ -218,11 +225,7 @@ async def _customer(
     customer_user = str(values.get("CustomerUserID") or "").strip() or None
     customer_id = str(values.get("CustomerID") or "").strip() or None
     if customer_user and not customer_id:
-        customer_id = (
-            await session.execute(
-                select(CustomerUser.customer_id).where(CustomerUser.login == customer_user)
-            )
-        ).scalar_one_or_none()
+        customer_id = await customer_id_of_user(session, customer_user)
     return customer_id, customer_user
 
 
@@ -244,7 +247,8 @@ async def create_process_ticket(
         session, actor, process_entity_id=process_entity_id, ticket_id=None, repository=repository
     )
     dialog = await _start_dialog(graph, repository, process_entity_id)
-    values = _assert_required(dialog, field_values, actor)
+    account_time = perl_truthy(await sysconfig.get("Ticket::Frontend::AccountTime"))
+    values = _assert_required(dialog, field_values, actor, account_time=account_time)
 
     queue_id = await _resolve_required(
         session,
@@ -413,7 +417,8 @@ async def enroll_ticket(
     dialog = await _start_dialog(graph, repository, process_entity_id)
     if await get_ticket_process_state(session, ticket_id) is not None:
         raise TicketAlreadyInProcess(ticket_id)
-    _assert_required(dialog, field_values, actor)
+    account_time = perl_truthy(await sysconfig.get("Ticket::Frontend::AccountTime"))
+    _assert_required(dialog, field_values, actor, account_time=account_time)
     await start_process(
         session,
         ticket_id=ticket_id,

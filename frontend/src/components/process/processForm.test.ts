@@ -14,7 +14,14 @@ import {
 } from "./processForm";
 
 const t = i18n.getFixedT("de");
-const base = { description_short: "", description_long: "", default: null, options: [] };
+const base = {
+  description_short: "",
+  description_long: "",
+  default: null,
+  options: [],
+  time_units: "0" as const,
+  uploads: false,
+};
 const form: ProcessDialogFormData = {
   process_entity_id: "P",
   activity_dialog_entity_id: "AD",

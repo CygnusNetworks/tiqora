@@ -57,6 +57,8 @@ const startFormData: ProcessDialogFormData = {
       description_long: "",
       default: null,
       options: [],
+      time_units: "0",
+      uploads: false,
     },
   ],
 };

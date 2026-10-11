@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.portal.deps import CurrentCustomer, DbSession
 from tiqora.db.engine import get_session_factory
+from tiqora.domain.attachments_in import AttachmentInvalid, AttachmentTooLarge
 from tiqora.domain.portal_ticket_service import (
     PORTAL_SYSTEM_USER_ID,
     PortalTicketAccessDenied,
@@ -89,12 +90,18 @@ def _map_exc(exc: Exception) -> HTTPException:
         ),
     ):
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    if isinstance(exc, AttachmentTooLarge):
+        return HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail=str(exc))
+    if isinstance(exc, AttachmentInvalid):
+        return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
     if isinstance(exc, (RequiredFieldMissing, UnresolvedFieldValue, InvalidInput)):
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return HTTPException(status_code=500, detail="Internal error")
 
 
 _MAPPED = (
+    AttachmentTooLarge,
+    AttachmentInvalid,
     WriteTicketNotFound,
     PortalTicketNotFound,
     PortalTicketAccessDenied,

@@ -22,7 +22,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.attachment_response import safe_attachment_response
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession, RedisDep
-from tiqora.api.uploads import MAX_ATTACHMENT_BYTES
 from tiqora.api.v1.ai import AiToolTraceOut, parse_tool_trace
 from tiqora.channels.email.outbound_reply import OutboundMailError
 from tiqora.channels.phone.service import PhoneCallIn
@@ -31,6 +30,12 @@ from tiqora.channels.telegram.outbound import TelegramDeliveryError
 from tiqora.crypto.compose import EmailSecurityIn
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.article_html import render_article_body
+from tiqora.domain.attachments_in import (
+    ArticleAttachmentIn,
+    AttachmentInvalid,
+    AttachmentTooLarge,
+)
+from tiqora.domain.attachments_in import decode_attachments as _decode_attachments
 from tiqora.domain.customer_link import ResolvedCustomerLink, resolve_customer_link
 from tiqora.domain.new_ticket_queue import (
     NewTicketScreen,
@@ -106,12 +111,6 @@ from tiqora.znuny.sysconfig import SysConfig
 # ---------------------------------------------------------------------------
 # Write schemas
 # ---------------------------------------------------------------------------
-
-
-class ArticleAttachmentIn(BaseModel):
-    filename: str = Field(min_length=1, max_length=250)
-    content_type: str = "application/octet-stream"
-    content_base64: str
 
 
 class TicketCreateRequest(BaseModel):
@@ -1703,24 +1702,16 @@ async def create_ticket(
 
 def decode_attachments(items: list[ArticleAttachmentIn]) -> list[tuple[str, str, bytes]]:
     """Base64-decode request attachments; 422 on bad data, 413 over the limit."""
-    out: list[tuple[str, str, bytes]] = []
-    total = 0
-    for item in items:
-        try:
-            content = base64.b64decode(item.content_base64, validate=True)
-        except (binascii.Error, ValueError):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail=f"attachment {item.filename!r} is not valid base64",
-            ) from None
-        total += len(content)
-        if total > MAX_ATTACHMENT_BYTES:
-            raise HTTPException(
-                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                detail="attachments exceed the upload limit",
-            )
-        out.append((item.filename, item.content_type, content))
-    return out
+    try:
+        return _decode_attachments(items)
+    except AttachmentInvalid as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+        ) from None
+    except AttachmentTooLarge as exc:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail=str(exc)
+        ) from None
 
 
 @router.post(
