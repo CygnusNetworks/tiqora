@@ -7,15 +7,20 @@ from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from typing import Final
 
-from sqlalchemy import bindparam, text
+from sqlalchemy import bindparam, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.db.legacy.queue import Queue
+from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketStateType
+from tiqora.db.legacy.user import PermissionGroups, Users
+from tiqora.reporting.znuny_stats.mapping_common import StatLookups
 from tiqora.reporting.znuny_stats.model import ZnunyStat, stat_from_xml_hash
 from tiqora.reporting.znuny_stats.xml_hash import (
     MAX_STAT_ROWS,
     XmlHashError,
     build_xml_hash,
 )
+from tiqora.saved_searches.znuny_reader import load_lookups
 
 MAX_PREVIEW_STATS: Final = 500
 _CHUNK: Final = 200
@@ -121,3 +126,34 @@ async def load_stats(
             except XmlHashError as exc:
                 errors.append(StatLoadError(stat_id, exc.message))
     return stats, errors, truncated
+
+
+async def load_stat_lookups(session: AsyncSession, user_id: int) -> StatLookups:
+    """Name -> id maps for file imports, state types and the agent's zone (one query per table).
+
+    Queue names are the full names as Znuny stores them (``Parent::Child``), casefolded.
+    Only valid queues, users and groups qualify; states and priorities are all listed because a
+    stat may name an invalid one. No JOIN with ``tiqora_*`` tables.
+    """
+
+    async def names(model_id: object, model_name: object, *where: object) -> dict[str, int]:
+        stmt = select(model_id, model_name).where(*where)  # type: ignore[call-overload]
+        return {str(n).casefold(): int(i) for i, n in (await session.execute(stmt)).all()}
+
+    state_types = {
+        int(i): str(n)
+        for i, n in (await session.execute(select(TicketStateType.id, TicketStateType.name))).all()
+    }
+    search = await load_lookups(session, user_id)
+    return StatLookups(
+        state_type_names=state_types,
+        queue_ids_by_name=await names(Queue.id, Queue.name, Queue.valid_id == 1),
+        state_ids_by_name=await names(TicketState.id, TicketState.name),
+        priority_ids_by_name=await names(TicketPriority.id, TicketPriority.name),
+        user_ids_by_login=await names(Users.id, Users.login, Users.valid_id == 1),
+        group_ids_by_name=await names(
+            PermissionGroups.id, PermissionGroups.name, PermissionGroups.valid_id == 1
+        ),
+        default_time_zone=search.time_zone,
+        search=search,
+    )

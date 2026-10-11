@@ -382,7 +382,7 @@ def map_stat(stat: ZnunyStat, lookups: StatLookups, *, is_admin: bool) -> StatMa
 | `CustomerID`, `CustomerIDRaw` | `customer` | string | `*` → dropped |
 | `CustomerUserLogin`, `CustomerUserLoginRaw`, `CustomerUserID` | `customer_user` | string | `*` → dropped |
 | `CreateTime` | `created` | time | |
-| `CloseTime` | `closed` | time | |
+| `CloseTime`, `CloseTime2` | `closed` | time | `CloseTime2` is the solution-time objects' period (ruling 5) |
 | `SearchInArchive` | — | — | `NotArchivedTickets`/empty → nothing; `ArchivedTickets`/`AllTickets` → dropped "Archivierte Tickets werden in Berichten nicht mitgezählt." |
 | `ChangeTime`, `LastChangeTime`, `PendingUntilTime`, `EscalationTime`, `EscalationResponseTime`, `EscalationUpdateTime`, `EscalationSolutionTime` | — | — | dropped "Dieses Zeitfeld gibt es in den Berichtsdaten nicht." |
 | `LockIDs`, `Title`, `CreatedStateIDs`, `CreatedPriorityIDs`, `CreatedUserIDs`, `MIMEBase_*` | — | — | dropped "Wird in Berichten nicht unterstützt." |
