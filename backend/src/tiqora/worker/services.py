@@ -193,6 +193,15 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         schedule_kind="daily",
         daily_at="04:00",
     ),
+    # Deletes GenericInterface debugger rows past gi.debugger.retention_days (always on).
+    DaemonService(
+        slug="gi_debug_cleanup",
+        enabled_key=None,
+        default_enabled=True,
+        toggleable=False,
+        schedule_kind="daily",
+        daily_at="03:02",
+    ),
     # Job runner (tiqora.jobs.runner): always on; records its status at most every
     # STATUS_EVERY_SECONDS, which the "stale" threshold has to allow for.
     DaemonService(

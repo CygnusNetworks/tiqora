@@ -28,6 +28,7 @@ from tiqora.worker.escalation import run_escalation_tick
 from tiqora.worker.gdpr_erasure_purge import run_gdpr_erasure_purge_tick
 from tiqora.worker.gdpr_retention import run_gdpr_retention_tick
 from tiqora.worker.generic_agent import run_generic_agent_tick
+from tiqora.worker.gi_debug_cleanup import run_gi_debug_cleanup
 from tiqora.worker.notifications import run_notifications_tick
 from tiqora.worker.outbox_drain import drain_outbox
 from tiqora.worker.pending_check import run_pending_check_tick
@@ -311,6 +312,7 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
         _daily_loop("gdpr_retention", run_gdpr_retention_tick, "03:00", stop),
         _daily_loop("gdpr_erasure_purge", run_gdpr_erasure_purge_tick, "03:30", stop),
         _daily_loop("ai_audit_cleanup", run_ai_audit_cleanup_tick, "04:00", stop),
+        _daily_loop("gi_debug_cleanup", run_gi_debug_cleanup, "03:02", stop),
         _daily_loop("smime_customer_renew", run_smime_customer_renew_tick, "02:02", stop),
         _daily_loop("identity_metadata", run_identity_metadata_refresh_tick, "04:30", stop),
         job_runner.run_forever(stop, poll_seconds=settings.jobs_poll_interval_seconds),

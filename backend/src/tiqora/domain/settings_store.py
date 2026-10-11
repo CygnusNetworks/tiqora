@@ -124,6 +124,9 @@ KEY_AI_TRIAGE_WATERMARK = "daemon.ai_worker.triage_watermark"
 # admin-editable within [1, 365] (tiqora.ai.audit.MIN/MAX_RETENTION_DAYS).
 KEY_AI_AUDIT_RETENTION_DAYS = "ai.audit.retention_days"
 KEY_AI_AUDIT_CLEANUP_ENABLED = "daemon.ai_audit_cleanup.enabled"
+# GenericInterface debugger (tiqora.gi.debug_store): days a tiqora_gi_debug_entry is kept
+# before the daily gi_debug_cleanup service deletes it. Default 14, minimum 1.
+KEY_GI_DEBUG_RETENTION_DAYS = "gi.debugger.retention_days"
 # Znuny RenewCustomerSMIMECertificates (tiqora.worker.smime_customer_renew).
 # Default ON like the Znuny cron task; the job itself only acts when SMIME and
 # SMIME::FetchFromCustomer are enabled, and is idempotent next to Znuny's.

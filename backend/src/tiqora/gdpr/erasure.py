@@ -45,6 +45,7 @@ from tiqora.domain.ticket_write_service import SEARCH_REINDEX_EVENT, _emit_event
 from tiqora.gdpr.audit import record_audit
 from tiqora.gdpr.gate import require_write_gate
 from tiqora.gdpr.saved_criteria import SAVED_CRITERIA_TABLES, scrub_saved_criteria
+from tiqora.gi.debug_store import delete_debug_entries_for_tickets
 from tiqora.reporting.cache import purge_report_cache_at
 from tiqora.znuny.cache_invalidation import invalidate_cache_type, invalidate_ticket_cache
 from tiqora.znuny.sessions import delete_customer_sessions
@@ -2056,6 +2057,13 @@ async def run_erasure(
             company_to_new if mode == "delete" else None,
             backup=_backup_saved,
         )
+
+        # GenericInterface debugger lines hold payloads of these tickets (customer names,
+        # addresses). Debug logs are disposable, so they go in every mode, without backup.
+        if ticket_ids:
+            gi_debug_deleted = await delete_debug_entries_for_tickets(session, ticket_ids)
+            if gi_debug_deleted:
+                counts["gi_debug_entries_deleted"] = gi_debug_deleted
 
         await _refresh_report_facts(session, report_ticket_ids)
 

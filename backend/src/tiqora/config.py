@@ -393,6 +393,12 @@ class Settings(BaseSettings):
         default=True, validation_alias="TIQORA_COMPAT_SESSION_WRITE_ZNUNY"
     )
 
+    # GenericInterface debugger: longest content a single debugger line keeps (bytes; Znuny
+    # ResponseLoggingMaxSize). Longer content is cut with a note.
+    gi_debug_max_content_bytes: int = Field(
+        default=200 * 1024, ge=1024, validation_alias="TIQORA_GI_DEBUG_MAX_CONTENT_BYTES"
+    )
+
     # How often every API process polls gi_webservice_config for changes made in
     # Znuny (rename / disable / edit) so compat webservices reload without a restart.
     compat_webservice_reload_seconds: int = Field(
