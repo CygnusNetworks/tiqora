@@ -9,7 +9,8 @@
  *   assets/webchat-locale-*.js, one of which is fetched on every frame start)
  *   <= 40 960 B.
  *
- * Every file is gzipped on its own (that is how the browser fetches them).
+ * Every file is gzipped on its own (that is how the browser fetches them), at level 6
+ * (zlib's default, close to what servers use on the fly; level 9 would flatter the sizes).
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -24,7 +25,7 @@ const LOCALE_PREFIX = "webchat-locale-";
 const dist = join(dirname(fileURLToPath(import.meta.url)), "..", "dist");
 const errors = [];
 
-const gz = (rel) => gzipSync(readFileSync(join(dist, rel)), { level: 9 }).length;
+const gz = (rel) => gzipSync(readFileSync(join(dist, rel)), { level: 6 }).length;
 const fmt = (n) => `${n.toLocaleString("en-US")} B`;
 
 function fail(message) {

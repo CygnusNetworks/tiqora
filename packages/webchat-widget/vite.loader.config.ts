@@ -12,7 +12,8 @@ export default defineConfig({
       name: "TiqoraChatLoader",
       fileName: () => "loader.js",
     },
-    outDir: "dist",
+    // Absolute, so a build started from another cwd cannot empty some other dist/.
+    outDir: fileURLToPath(new URL("dist", import.meta.url)),
     emptyOutDir: true,
     target: "es2018",
   },

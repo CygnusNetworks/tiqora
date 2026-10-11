@@ -6,9 +6,9 @@
   "scripts": {
     "postinstall": "pnpm --filter @tiqora/api-client build",
     "dev": "pnpm --filter tiqora-frontend dev",
-    "build": "pnpm --filter @tiqora/api-client build && pnpm --filter tiqora-frontend build",
-    "lint": "pnpm --filter tiqora-frontend lint",
-    "test": "pnpm --filter tiqora-frontend test",
+    "build": "pnpm --filter @tiqora/api-client build && pnpm --filter tiqora-frontend build && pnpm --filter @tiqora/webchat-widget build",
+    "lint": "pnpm --filter tiqora-frontend lint && pnpm --filter @tiqora/webchat-widget lint",
+    "test": "pnpm --filter tiqora-frontend test && pnpm --filter @tiqora/webchat-widget test",
     "e2e": "pnpm --filter tiqora-frontend e2e",
     "generate:api": "pnpm --filter @tiqora/api-client generate"
   },

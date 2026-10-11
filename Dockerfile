@@ -20,8 +20,12 @@ ARG VITE_APP_VERSION=""
 ARG VITE_GIT_SHA=""
 ENV VITE_APP_VERSION=$VITE_APP_VERSION \
     VITE_GIT_SHA=$VITE_GIT_SHA
+# Only what `pnpm install` needs before the install, so source edits keep the
+# install layer cached: the manifests, plus api-client in full (the root postinstall
+# builds it from its openapi.json).
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY packages/ ./packages/
+COPY packages/api-client/ ./packages/api-client/
+COPY packages/webchat-widget/package.json ./packages/webchat-widget/
 COPY frontend/package.json ./frontend/
 RUN corepack enable \
     && corepack prepare --activate \
@@ -29,8 +33,11 @@ RUN corepack enable \
 COPY frontend/ ./frontend/
 RUN pnpm --filter tiqora-frontend build
 # Web-chat widget (loader.js, frame.html, assets/). Needs frontend/ for its texts
-# (webchatWidget.* in the locale files); its build ends with the gzip size budget.
-RUN pnpm --filter @tiqora/webchat-widget build
+# (webchatWidget.* in the locale files); its build ends with the gzip size budget,
+# which reads dist/.vite/manifest.json -- dropped afterwards, nothing serves it.
+COPY packages/webchat-widget/ ./packages/webchat-widget/
+RUN pnpm --filter @tiqora/webchat-widget build \
+    && rm -rf packages/webchat-widget/dist/.vite
 
 # ---------- Python deps ----------
 # Base: python:*-slim-bookworm (Debian 12). gssapi (kerberos extra) needs
