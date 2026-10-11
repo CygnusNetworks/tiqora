@@ -676,6 +676,8 @@ async def set_share(
     if row.kind == "template":
         raise DashboardForbidden(MSG_TEMPLATE_SHARE)
     _require_edit(row, user_id, admin=admin)
+    # Serialise concurrent share changes on this dashboard row (a vanished row is a clean 404).
+    await _current_version(session, dashboard_id)
     wanted = await check_share_groups(session, user_id, group_ids)
     async with session.begin_nested():
         await session.execute(

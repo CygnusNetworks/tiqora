@@ -34,9 +34,12 @@ export function ShareDialog({ dashboard, onClose }: { dashboard: DashboardTab; o
   });
   const needle = search.trim().toLocaleLowerCase();
   const groups = (groupsQ.data ?? []).filter((g) => !needle || g.name.toLocaleLowerCase().includes(needle));
-  const canSave = !pending && (mode === "me" || picked.size > 0);
+  // Groups the owner may no longer share with have no checkbox: they drop out of the selection.
+  const chosen = [...picked].filter((id) => !groupsQ.data || groupsQ.data.some((g) => g.id === id));
+  const canSave = !pending && (mode === "me" || chosen.length > 0);
 
   const toggle = (id: number) => {
+    setError(null);
     setPicked((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -50,7 +53,7 @@ export function ShareDialog({ dashboard, onClose }: { dashboard: DashboardTab; o
     setPending(true);
     setError(null);
     try {
-      const wanted = mode === "me" ? [] : [...picked].sort((a, b) => a - b);
+      const wanted = mode === "me" ? [] : chosen.sort((a, b) => a - b);
       const saved: Dashboard = await dashboardsApi.share(dashboard.id, wanted);
       qc.setQueryData(dashboardKeys.one(saved.id), saved);
       const { widgets: _widgets, ...tab } = saved;
@@ -85,7 +88,10 @@ export function ShareDialog({ dashboard, onClose }: { dashboard: DashboardTab; o
         <div role="radiogroup" aria-label={t("dashboards.share.title")} className="space-y-2">
           {(["me", "groups"] as const).map((m) => (
             <label key={m} className="flex items-center gap-2 text-sm text-ink">
-              <input type="radio" name={`${ids}-mode`} checked={mode === m} onChange={() => setMode(m)} />
+              <input type="radio" name={`${ids}-mode`} checked={mode === m} onChange={() => {
+                  setError(null);
+                  setMode(m);
+                }} />
               {m === "me" ? t("dashboards.share.onlyMe") : t("dashboards.share.groups")}
             </label>
           ))}
@@ -116,7 +122,7 @@ export function ShareDialog({ dashboard, onClose }: { dashboard: DashboardTab; o
                 </label>
               ))}
             </div>
-            {picked.size === 0 && <p className="text-xs text-muted">{t("dashboards.share.pickOne")}</p>}
+            {chosen.length === 0 && <p className="text-xs text-muted">{t("dashboards.share.pickOne")}</p>}
             {error && (
               <p role="alert" className="text-sm text-danger">
                 {error}

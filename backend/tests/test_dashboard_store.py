@@ -512,3 +512,32 @@ async def test_set_share_refuses_foreign_groups_viewers_and_templates(env: Env) 
     tpl = await env.make_template(name="dash497 tpl st", role_ids=[ROLE_1], locked=False)
     with pytest.raises(DashboardForbidden, match="Rollen"):
         await env.run(set_share, tpl.id, 1, [GROUP_1], admin=True)
+
+
+async def test_concurrent_share_changes_leave_exactly_one_request_s_groups(env: Env) -> None:
+    from tiqora.dashboard.store import set_share
+
+    for gid in (GROUP_1, GROUP_2):
+        env._sql_write(
+            "INSERT INTO group_user (user_id, group_id, permission_key,"
+            " create_time, create_by, change_time, change_by)"
+            " SELECT :u, :g, 'ro', :t, 1, :t, 1 WHERE NOT EXISTS"
+            " (SELECT 1 FROM group_user WHERE user_id = :u AND group_id = :g"
+            " AND permission_key = 'ro')",
+            u=USER_A,
+            g=gid,
+            t=env.now,
+        )
+    d = await env.make_personal(USER_A, name="dash497 share race")
+    results = await asyncio.gather(
+        env.run(set_share, d.id, USER_A, [GROUP_1], admin=False),
+        env.run(set_share, d.id, USER_A, [GROUP_2], admin=False),
+        env.run(set_share, d.id, USER_A, [], admin=False),
+        return_exceptions=True,
+    )
+    assert not [r for r in results if isinstance(r, BaseException)], results
+    final = await env.get(d.id, USER_A)
+    assert final.group_ids in ([GROUP_1], [GROUP_2], [])
+    assert final.kind == ("shared" if final.group_ids else "personal")
+    assert await env.count_rows("tiqora_dashboard_group", dashboard_id=d.id) == len(final.group_ids)
+    assert final.version == d.version + 3

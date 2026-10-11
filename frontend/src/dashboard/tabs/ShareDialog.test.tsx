@@ -90,6 +90,13 @@ describe("ShareDialog", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("a preselected group the owner may no longer share with is dropped, not sent", async () => {
+    renderDialog(demoDashboard({ ...d, kind: "shared", group_ids: [2, 99] }));
+    await screen.findByRole("checkbox", { name: "Support", checked: true });
+    await user.click(screen.getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(api.share).toHaveBeenCalledWith(1, [2]));
+  });
+
   it("the viewer-scope note is shown", async () => {
     renderDialog(demoDashboard({ ...d, kind: "shared", group_ids: [2] }));
     expect(await screen.findByText(/nur Tickets aus Queues, die sie selbst lesen dürfen/)).toBeVisible();
