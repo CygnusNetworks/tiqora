@@ -16,7 +16,10 @@ def set_sysconfig_rows(conn: Any, base_id: int, settings: dict[str, Any]) -> Non
     for table in ("sysconfig_modified", "sysconfig_default"):
         conn.execute(text(f"DELETE FROM {table} WHERE id BETWEEN {base_id} AND {base_id + 9}"))
     for i, (name, value) in enumerate(settings.items()):
-        enc = yaml_encode_effective(value)
+        # PostgreSQL stores TEXT: a bytes bind would be written as a hex string.
+        enc: bytes | str = yaml_encode_effective(value)
+        if conn.dialect.name == "postgresql":
+            enc = enc.decode("utf-8")
         conn.execute(
             text(
                 "INSERT INTO sysconfig_default (id, name, description, navigation,"
