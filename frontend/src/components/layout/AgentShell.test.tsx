@@ -63,6 +63,22 @@ vi.mock("@/lib/api", async () => {
   return { ...actual, api: { listQueues, myTicketCounts, dashboardSummary } };
 });
 
+const { chatTopics } = vi.hoisted(() => ({ chatTopics: vi.fn() }));
+vi.mock("@/lib/webchatApi", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/webchatApi")>("@/lib/webchatApi");
+  return {
+    ...actual,
+    webchatApi: {
+      ...actual.webchatApi,
+      topics: chatTopics,
+      getAgentState: vi
+        .fn()
+        .mockResolvedValue({ available: false, max_concurrent: 3, active_count: 0, topics: [] }),
+      inbox: vi.fn().mockResolvedValue({ waiting: [], mine: [] }),
+    },
+  };
+});
+
 async function renderShell(initialEntry = "/agent") {
   const rootRoute = createRootRoute({
     component: () => (
@@ -115,9 +131,23 @@ describe("AgentShell sidebar", () => {
       escalated: 0,
       ai_escalated: 0,
     });
+    chatTopics.mockReset().mockResolvedValue([]);
     window.localStorage.clear();
     authFlags.canUseDirectory = false;
     void i18n.changeLanguage("de");
+  });
+
+  it("hides the chat inbox button without chat topics", async () => {
+    await renderShell();
+    await screen.findByTestId("agent-sidebar-nav");
+    await waitFor(() => expect(chatTopics).toHaveBeenCalled());
+    expect(screen.queryByTestId("chat-inbox-trigger")).toBeNull();
+  });
+
+  it("shows the chat inbox button for an agent with chat topics", async () => {
+    chatTopics.mockResolvedValue([{ ref: "1:support", label: "Support", queue_id: 1, config_name: "W" }]);
+    await renderShell();
+    expect((await screen.findAllByTestId("chat-inbox-trigger")).length).toBeGreaterThan(0);
   });
 
   it("shows the customer directory only with its permission", async () => {

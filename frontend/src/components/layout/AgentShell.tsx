@@ -16,6 +16,8 @@ import { ConnectionStatus } from "@/components/agent/ConnectionStatus";
 import { AccountMenu } from "@/components/agent/AccountMenu";
 import { OnlineAgentsPopover } from "@/components/agent/OnlineAgentsPopover";
 import { TimeZoneHint } from "@/components/agent/TimeZoneHint";
+import { ChatInboxButton } from "@/components/agent/webchat/ChatInboxButton";
+import { useChatRing } from "@/lib/chatRing";
 import { effectiveTimeZone } from "@/lib/timeZone";
 import {
   AddressBookIcon,
@@ -649,7 +651,9 @@ function HeaderControls({
   onHelp,
   logoutTestId,
   searchFill = false,
+  chat,
 }: {
+  chat: ReturnType<typeof useChatRing>;
   onHelp: () => void;
   logoutTestId: string;
   /** Let the search bar grow into the available header width (desktop). */
@@ -669,6 +673,7 @@ function HeaderControls({
       <div className="mx-0.5 flex items-center gap-0.5">
         <ConnectionStatus />
         <OnlineAgentsPopover />
+        <ChatInboxButton pending={chat.pending} topics={chat.topics} />
         <NotificationBell />
         <HeaderIconButton onClick={onHelp} label={t("shortcuts.title")} testId="header-help">
           <HelpIcon className="text-[18px]" />
@@ -685,6 +690,8 @@ export function AgentShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [helpOpen, setHelpOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // The only owner of the web chat ring context and inbox/topic queries.
+  const chat = useChatRing();
   // Part of the page key: a changed display zone re-renders every date.
   const timeZone = effectiveTimeZone(useAuth().user?.time_zone);
 
@@ -752,11 +759,12 @@ export function AgentShell({ children }: { children: ReactNode }) {
               <BetaPill />
             </Link>
             <div className="ml-auto">
-              <HeaderControls onHelp={() => setHelpOpen(true)} logoutTestId="logout-btn" />
+              <HeaderControls chat={chat} onHelp={() => setHelpOpen(true)} logoutTestId="logout-btn" />
             </div>
           </header>
           <div className="hidden items-center border-b border-hairline bg-surface px-4 py-1.5 md:flex">
             <HeaderControls
+              chat={chat}
               onHelp={() => setHelpOpen(true)}
               logoutTestId="logout-btn-desktop"
               searchFill

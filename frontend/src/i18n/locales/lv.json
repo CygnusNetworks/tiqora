@@ -5362,7 +5362,21 @@
       },
       "notWaiting": "This chat is no longer waiting to be accepted.",
       "forbidden": "You do not have permission to do that.",
-      "invalidRecipient": "Addresses ending in .invalid are placeholders and are never mailed."
+      "invalidRecipient": "Addresses ending in .invalid are placeholders and are never mailed.",
+      "inbox": {
+        "title": "Chats",
+        "buttonLabel": "Chats – {{count}} waiting",
+        "accepting": "Accept chats",
+        "topics": "Topics",
+        "topicsHint": "With no selection you take every topic.",
+        "maxConcurrent": "At most at the same time",
+        "waiting": "Waiting chats",
+        "noneWaiting": "No chats in the queue.",
+        "mine": "My chats",
+        "noneMine": "You have no running chats.",
+        "newWaiting": "New chat waiting. Waiting chats: {{count}}",
+        "atCapacity": "You already have {{count}} chats."
+      }
     }
   },
   "webchatWidget": {

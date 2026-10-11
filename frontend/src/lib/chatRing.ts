@@ -15,6 +15,7 @@ import {
   chatInboxKey,
   chatTopicsKey,
   webchatApi,
+  type ChatTopicRef,
 } from "./webchatApi";
 
 export type RingContext = {
@@ -29,6 +30,8 @@ const TONE_HZ = 880;
 const TONE_MS = 120;
 const TONE_GAP_MS = 80;
 const MAX_REMEMBERED_SESSIONS = 200;
+
+const EMPTY_TOPICS: ChatTopicRef[] = [];
 
 let context: RingContext = { available: false, topics: [] };
 const rung = new Set<string>();
@@ -134,7 +137,7 @@ export function resetChatRing(): void {
  * Keeps the ring context in sync with the agent's availability and topics and
  * returns how many chats are waiting for pickup. Mount once in the agent shell.
  */
-export function useChatRing(): { pending: number } {
+export function useChatRing(): { pending: number; topics: ChatTopicRef[] } {
   const topics = useQuery({
     queryKey: chatTopicsKey,
     queryFn: ({ signal }) => webchatApi.topics(signal),
@@ -166,5 +169,5 @@ export function useChatRing(): { pending: number } {
     });
   }, [state.data, topics.data]);
 
-  return { pending: inbox.data?.waiting.length ?? 0 };
+  return { pending: inbox.data?.waiting.length ?? 0, topics: topics.data ?? EMPTY_TOPICS };
 }

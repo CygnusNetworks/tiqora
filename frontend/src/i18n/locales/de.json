@@ -5370,7 +5370,21 @@
       },
       "notWaiting": "Dieser Chat wartet nicht mehr auf Annahme.",
       "forbidden": "Dazu haben Sie keine Berechtigung.",
-      "invalidRecipient": "Adressen mit der Endung .invalid sind keine echten E-Mail-Adressen und werden nicht angeschrieben."
+      "invalidRecipient": "Adressen mit der Endung .invalid sind keine echten E-Mail-Adressen und werden nicht angeschrieben.",
+      "inbox": {
+        "title": "Chats",
+        "buttonLabel": "Chats – {{count}} wartend",
+        "accepting": "Chats annehmen",
+        "topics": "Themen",
+        "topicsHint": "Ohne Auswahl nehmen Sie alle Themen an.",
+        "maxConcurrent": "Gleichzeitig höchstens",
+        "waiting": "Wartende Chats",
+        "noneWaiting": "Keine Chats in der Warteschlange.",
+        "mine": "Meine Chats",
+        "noneMine": "Sie haben keine laufenden Chats.",
+        "newWaiting": "Neuer Chat wartet. Wartende Chats: {{count}}",
+        "atCapacity": "Sie haben bereits {{count}} Chats."
+      }
     }
   },
   "webchatWidget": {

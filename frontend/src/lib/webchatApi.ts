@@ -107,3 +107,10 @@ export function isChatLive(chat: TicketChat | null | undefined): boolean {
 export function isInvalidTldAddress(email: string): boolean {
   return /\.invalid$/i.test(email.trim().replace(/^.*<|>$/g, "").trim());
 }
+
+/** Backend error code of a chat action (`{"detail": "at_capacity"}`), if any. */
+export function chatErrorCode(err: unknown): string | null {
+  if (!(err instanceof ApiError) || err.detail === null || typeof err.detail !== "object") return null;
+  const d = (err.detail as { detail?: unknown }).detail;
+  return typeof d === "string" ? d : null;
+}
