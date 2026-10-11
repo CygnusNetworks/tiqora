@@ -23769,6 +23769,73 @@
         "title": "ProcessFormOptionsOut",
         "type": "object"
       },
+      "ProcessPathOut": {
+        "properties": {
+          "process_entity_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Entity Id"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/ProcessPathStepOut"
+            },
+            "title": "Steps",
+            "type": "array"
+          }
+        },
+        "required": [
+          "process_entity_id",
+          "steps"
+        ],
+        "title": "ProcessPathOut",
+        "type": "object"
+      },
+      "ProcessPathStepOut": {
+        "properties": {
+          "activity_entity_id": {
+            "title": "Activity Entity Id",
+            "type": "string"
+          },
+          "activity_name": {
+            "title": "Activity Name",
+            "type": "string"
+          },
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "entered_at": {
+            "format": "date-time",
+            "title": "Entered At",
+            "type": "string"
+          },
+          "entered_by": {
+            "title": "Entered By",
+            "type": "integer"
+          },
+          "entered_by_name": {
+            "title": "Entered By Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "activity_entity_id",
+          "activity_name",
+          "entered_at",
+          "entered_by",
+          "entered_by_name",
+          "current"
+        ],
+        "title": "ProcessPathStepOut",
+        "type": "object"
+      },
       "ProcessStartIn": {
         "description": "Body of ``POST /api/v1/process/ticket/{ticket_id}/start`` (enroll through the start\ndialog: ``field_values`` are the dialog's fields, like a dialog submit).",
         "properties": {
@@ -77648,6 +77715,81 @@
           }
         },
         "summary": "Refresh Ticket Dialog Form Options",
+        "tags": [
+          "process"
+        ]
+      }
+    },
+    "/api/v1/process/ticket/{ticket_id}/path": {
+      "get": {
+        "description": "The activities the ticket has been through so far, oldest first (empty outside a process).",
+        "operationId": "get_ticket_path_api_v1_process_ticket__ticket_id__path_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessPathOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ticket Path",
         "tags": [
           "process"
         ]

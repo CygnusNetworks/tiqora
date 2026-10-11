@@ -12,6 +12,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from tiqora.process.path import ProcessPathOut, ProcessPathStepOut
+
+__all__ = ["ProcessPathOut", "ProcessPathStepOut"]
+
 
 class ProcessSummaryOut(BaseModel):
     """One row from :meth:`tiqora.process.graph.ProcessRepository.list_processes`."""

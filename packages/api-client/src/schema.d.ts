@@ -7528,6 +7528,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/process/ticket/{ticket_id}/path": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ticket Path
+         * @description The activities the ticket has been through so far, oldest first (empty outside a process).
+         */
+        get: operations["get_ticket_path_api_v1_process_ticket__ticket_id__path_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/process/ticket/{ticket_id}/start": {
         parameters: {
             query?: never;
@@ -18354,6 +18374,31 @@ export interface components {
             options: {
                 [key: string]: components["schemas"]["ProcessDialogOptionOut"][];
             };
+        };
+        /** ProcessPathOut */
+        ProcessPathOut: {
+            /** Process Entity Id */
+            process_entity_id: string | null;
+            /** Steps */
+            steps: components["schemas"]["ProcessPathStepOut"][];
+        };
+        /** ProcessPathStepOut */
+        ProcessPathStepOut: {
+            /** Activity Entity Id */
+            activity_entity_id: string;
+            /** Activity Name */
+            activity_name: string;
+            /** Current */
+            current: boolean;
+            /**
+             * Entered At
+             * Format: date-time
+             */
+            entered_at: string;
+            /** Entered By */
+            entered_by: number;
+            /** Entered By Name */
+            entered_by_name: string;
         };
         /**
          * ProcessStartIn
@@ -42194,6 +42239,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProcessFormOptionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ticket_path_api_v1_process_ticket__ticket_id__path_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessPathOut"];
                 };
             };
             /** @description Validation Error */

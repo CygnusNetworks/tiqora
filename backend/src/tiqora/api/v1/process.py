@@ -73,6 +73,7 @@ from tiqora.process.form_options import (
     refresh_ticket_dialog_options,
 )
 from tiqora.process.graph import ProcessRepository
+from tiqora.process.path import load_process_path
 from tiqora.process.process_ticket import create_process_ticket, enroll_ticket
 from tiqora.process.schemas import (
     ActivityDialogDetailOut,
@@ -86,6 +87,7 @@ from tiqora.process.schemas import (
     ProcessActivityOut,
     ProcessDetailOut,
     ProcessDialogFormOut,
+    ProcessPathOut,
     ProcessStartIn,
     ProcessSummaryOut,
     TicketProcessStateOut,
@@ -358,6 +360,18 @@ async def get_ticket_state(
     return await _ticket_process_state_out(
         session, ticket_id, ProcessActor.agent(user.id), ProcessRepository(session)
     )
+
+
+@router.get("/ticket/{ticket_id}/path", response_model=ProcessPathOut)
+async def get_ticket_path(ticket_id: int, user: CurrentUser, session: DbSession) -> ProcessPathOut:
+    """The activities the ticket has been through so far, oldest first (empty outside a process)."""
+    try:
+        await _assert_ticket_permission(
+            session, ticket_id=ticket_id, user_id=user.id, permission="ro"
+        )
+    except (WriteTicketNotFound, ProcessPermissionDenied) as exc:
+        raise _map_exc(exc) from exc
+    return await load_process_path(session, ticket_id)
 
 
 @router.get(
