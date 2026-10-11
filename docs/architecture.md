@@ -613,7 +613,7 @@ User guide: [dashboards.md](dashboards.md).
   `core.dashboard.widgets` (frontend, `plugins/dashboardWidgets.ts`; core widgets and plugin widgets
   register into the same point and show up in the gallery). Plugin widget settings labels use the
   plugin namespace `plugin.<id>` with key `widget.<key>.fields.<field>.label`.
-- **Widget data** (`dashboard/runner.py`) (`dashboard/runner.py`): each widget's provider runs as the viewer in its own
+- **Widget data** (`dashboard/runner.py`): each widget's provider runs as the viewer in its own
   session, but at most four per request at once and, process-wide, at most half the engine's
   pool size (overflow not counted) across all batches, single-widget fetches and previews,
   because many agents opening the home page at once would otherwise take the whole connection

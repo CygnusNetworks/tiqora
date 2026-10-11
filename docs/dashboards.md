@@ -87,7 +87,10 @@ installieren Sie das Plugin wieder, ist das Widget zurück.
 ### Teilen
 
 **Teilen** legt fest, welche Gruppen ein Dashboard sehen dürfen („Nur ich“ oder „Mit Gruppen“).
-Die Mitglieder sehen das Dashboard schreibgeschützt und können es als eigenes kopieren.
+Die Mitglieder sehen das Dashboard schreibgeschützt und können es als eigenes kopieren. Tickets
+sehen sie nur aus Queues, die sie selbst lesen dürfen. Titel, Notizen und Filtereinstellungen der
+Widgets sehen alle Mitglieder. Haben Sie für ein Widget eine eigene gespeicherte Suche gewählt, die
+ein Mitglied nicht sehen darf, zeigt das Widget diesem Mitglied „… ist für Sie nicht freigegeben“.
 
 ### Berechtigungen
 
@@ -133,10 +136,13 @@ einer neueren Fassung fragt Tiqora ausdrücklich nach, weil das alle betroffenen
 
 ### Grenzen
 
-Ein Dashboard fasst höchstens 40 Widgets. Der Verlauf einer Kennzahl beginnt, wenn ein Benutzer
-ein Dashboard mit dieser Kennzahl zum ersten Mal öffnet: Tiqora speichert je Benutzer, Kennzahl und
-Tag (UTC) einen Wert, zeigt die letzten 14 Tage als Verlauf und die Veränderung gegenüber 7 Tagen
-zuvor. Werte, die älter als 35 Tage sind, werden gelöscht.
+Jeder Benutzer kann höchstens 20 eigene Dashboards anlegen (Vorlagen und mit ihm geteilte zählen
+nicht mit). Ein Dashboard fasst höchstens 40 Widgets, eine Ticketliste höchstens acht Spalten.
+
+Der Verlauf einer Kennzahl beginnt, wenn ein Benutzer ein Dashboard mit dieser Kennzahl zum ersten
+Mal öffnet: Tiqora speichert je Benutzer, Kennzahl und Tag (UTC) einen Wert, zeigt die letzten
+14 Tage als Verlauf und die Veränderung gegenüber 7 Tagen zuvor. Werte, die älter als 35 Tage sind,
+werden gelöscht.
 
 ## Für Entwickler
 
@@ -156,8 +162,12 @@ Die Architektur (Tabellen, Provider, Datenendpunkt, Layout-Engine) steht in
   `backend/src/tiqora/dashboard/providers/`) lädt die Daten eines Widgets für den ansehenden Benutzer
   und wird in `register_core` am Erweiterungspunkt `core.dashboard.providers` eingetragen. Sein
   Schlüssel entspricht dem Typ-Schlüssel des Widgets (`core.<name>`); die Einstellungen prüft ein
-  Pydantic-Modell. Ein Provider darf nur lesen und committet nie selbst; er wirft `ProviderForbidden`,
-  wenn die Berechtigung fehlt.
+  Pydantic-Modell. Ein Provider liest Ticketdaten nur, schreibt höchstens eigene `tiqora_*`-Hilfsdaten
+  (etwa den Tageswert einer Kennzahl) und committet nie selbst; er wirft `ProviderForbidden`, wenn
+  die Berechtigung fehlt.
 - **Dashboards per API.** `GET /api/v1/dashboards` (Reiter), `GET/PUT /api/v1/dashboards/{id}`,
   `GET /api/v1/dashboards/{id}/data` (alle Widgets in einem Aufruf). Jede Speicherung trägt die
-  gelesene `version`; bei Abweichung antwortet der Server mit 409.
+  gelesene `version`; bei Abweichung antwortet der Server mit 409. Die Dashboard-Routen stehen nur
+  angemeldeten Sitzungen und API-Schlüsseln ohne Bereichsbeschränkung offen; ein API-Schlüssel mit
+  Bereichen (Scopes) erhält 403. Die Vorlagen verwaltet `/api/v1/admin/dashboard-templates` (Bereich
+  `admin`).
