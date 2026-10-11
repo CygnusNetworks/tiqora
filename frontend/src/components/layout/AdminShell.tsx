@@ -25,6 +25,7 @@ import {
 import { cn } from "@/lib/cn";
 import { effectiveTimeZone } from "@/lib/timeZone";
 import { useOptionalAuth } from "@/auth/AuthContext";
+import { PluginProvider } from "@/plugins/PluginProvider";
 
 const GROUP_META: Record<
   AdminPageGroup,
@@ -53,6 +54,8 @@ const EXACT_ACTIVE_ROUTES = new Set(
 /** Group of the admin page whose route is the longest prefix of *pathname*
  * — `/admin/ai/queues/5` resolves to the `ai-queues` page, not `ai`. */
 function groupForPath(pathname: string): AdminPageGroup | null {
+  // Plugin settings forms are reached from the extensions page (system group).
+  if (pathname.startsWith("/admin/settings/plugins.")) return "system";
   let best: { group: AdminPageGroup; len: number } | null = null;
   for (const page of ADMIN_PAGES) {
     if (pathname === page.route || pathname.startsWith(`${page.route}/`)) {
@@ -317,6 +320,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   }, []);
 
   return (
+    <PluginProvider>
     <div className="flex min-h-screen flex-col bg-bg">
       <header className="sticky top-0 z-20 border-b border-hairline bg-surface">
         <div className="flex h-12 items-center gap-3 px-3">
@@ -403,5 +407,6 @@ export function AdminShell({ children }: { children: ReactNode }) {
         onClose={() => setSearchOpen(false)}
       />
     </div>
+    </PluginProvider>
   );
 }

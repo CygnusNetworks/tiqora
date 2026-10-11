@@ -585,8 +585,7 @@ visible unmodified to a co-running OTRS/Znuny peer (6.0–7.3) and vice versa.
 the same `permission_groups` table as queues, so `PermissionEngine.
 groups_for_permission()` gates calendar/appointment access exactly like queue
 access (`ro` to view, `rw` to create/edit/delete); `calendar_appointment_
-plugin` (Znuny's per-appointment plugin JSON blob) is not mapped — Tiqora has
-no plugin system.
+plugin` (Znuny's per-appointment plugin JSON blob) is not mapped (Znuny calendar plugins are Perl).
 
 Simplifications vs. Znuny's Perl `Kernel::System::Calendar::Appointment`:
 
@@ -697,10 +696,75 @@ Points are declared next to the feature that owns them, never in
 registered (imports happen inside the function, no import-time side effects);
 `get_registry()` builds, registers and freezes the process-wide registry once.
 A duplicate key raises `DuplicateExtensionError`, adding after freeze raises
-`RegistryFrozenError`. Every point is `sdk_stable=False` for now; a later
-plugin loader will call the same `registry.add(point, item, owner="<plugin id>")`.
+`RegistryFrozenError`. Points are `sdk_stable=False` unless a plugin may
+use them; the plugin loader (below) calls the same
+`registry.add(point, item, owner="<plugin id>")`.
 Admin view: `GET /api/v1/admin/extensions`. The frontend has a counterpart,
 `frontend/src/extensions/registry.ts` (e.g. the `FIELD_KINDS` point).
+
+**Plugins** (`tiqora.plugins`, `tiqora_sdk`; user guide: [plugins.md](plugins.md)).
+Tier-1 extensions are Python distributions with an entry point in group
+`tiqora.plugins`, a `tiqora-plugin.toml` manifest and optionally a built
+frontend (`web/`, `i18n/`). They run in-process with full trust, and are
+installed only by baking them into the image (`tiqora plugins bake`).
+
+- *Discovery* (`discovery.py`): reads entry points and package files, never
+  imports plugin code; yields `DiscoveredPlugin` with the parsed manifest, web
+  manifest, locales and a German `problem` when the package is unusable.
+- *Bootstrap* (`bootstrap.init_registry`, called by api, worker and mcp before
+  anything captures `get_registry()`; the ai-worker does not): builds the core
+  registry, then for each enabled, compatible plugin in dependency order
+  (`requires`) imports it in a daemon thread with a timeout
+  (`TIQORA_PLUGINS_IMPORT_TIMEOUT_SECONDS`, total `..._BOOT_BUDGET_SECONDS`),
+  calls `register(registrar)`, and commits the staged items atomically with the
+  plugin as owner. Then the registry is frozen and installed. Every failure
+  after `register_core` ends in a core-only or partial registry and a log line;
+  a broken plugin never blocks startup. A worker/mcp that boots before the
+  tables exist retries (`retry_plugin_boot`) and swaps plugin items into the
+  still core-only registry in place.
+- *Registrar* (`registrar.py`): the object `register()` talks to. It checks, in
+  order, that the point is `sdk_stable`, declared in the manifest, the name or
+  namespace rule, bounds, and duplicates, then stages the item together with
+  the plugin's `PluginContext` (settings, outbound-allowlisted HTTP, read-only
+  ticket access). Nothing is live until `commit_registrar`.
+- *Points a plugin can use*: `SETTINGS_SECTIONS` (`plugins.<id>`), `PLUGIN_ROUTES`
+  (`core.http.routes`, mounted per active plugin as a sub-app under
+  `/api/plugins/<id>/` with `get_current_user` attached; the API-key area
+  `plugins` gates scoped keys), `EVENT_SUBSCRIBERS`, `SCHEDULED_TASKS`,
+  `JOB_HANDLERS` (kind `<plugin id>.<name>`), `MCP_TOOLS` (`<short_id>_<name>`,
+  bound to FastMCP with the core allowlist and `mcp:rw` gates), plus four
+  frontend slots declared in `web/manifest.json`.
+- *Process roles*: the **api** serves routes, asset files and the frontend list;
+  the **worker** runs two extra tick loops (`plugin_events`, `plugin_tasks`; see
+  `worker/services.py`) and the job runner; **mcp** binds the tools. Each
+  process loads plugins on its own and records the result per role.
+- *State* (Tiqora-owned tables): `tiqora_plugin` (installed rows, the on/off
+  switch), `tiqora_plugin_runtime` (per plugin and role: state, boot attempts,
+  last error), `tiqora_plugin_hook` (cursor, failure counter and circuit
+  breaker of every event subscriber and scheduled task).
+- *Safe mode and quarantine*: `TIQORA_PLUGINS_SAFE_MODE` imports no plugin
+  code; `TIQORA_PLUGINS_DISABLED` skips plugins by id. `mark_loading` is written
+  before an import; a plugin whose boot dies three times in a row (attempts not
+  reset by a completed load) is quarantined until an admin retries. The admin
+  page (`/api/v1/admin/plugins`) summarises the roles into one status.
+- *History follower* (`events.py`, `event_dispatch.py`): ticket events come from
+  `ticket_history` (Znuny and Tiqora writes alike), mapped to Znuny event names.
+  A `GapTracker` holds delivery back at missing auto-increment ids for
+  `TIQORA_PLUGIN_EVENTS_GAP_HOLD_SECONDS` (aware of `auto_increment_increment`
+  and offset), then skips them. Each subscriber has its own cursor, saved after
+  every handled matching event (at-least-once, `event.id` is the idempotency
+  key); five consecutive failures open its circuit breaker.
+- *Frontend*: `GET /api/v1/plugins/frontend` lists the plugins that are active
+  in the api process; `PluginProvider` (agent and admin shell only) loads each
+  plugin's module on demand with `import()` from
+  `/api/v1/plugins/<id>/assets/<version>/web/…`, inside a `PluginBoundary`.
+  `?plugins=off` (sessionStorage) disables all of this per tab. Plugin bundles
+  import React, React Query, the router, react-i18next and
+  `@tiqora/plugin-sdk` from **runtime shims** (`/plugin-runtime/<name>.js`,
+  emitted by the host build, unhashed, `no-cache`, 404 when missing) that
+  re-export the SPA's own module instances, so there is one React and no
+  import map is needed. The CSP stays `script-src 'self'`, `connect-src 'self'`;
+  it is the only browser-side control and enforced only in production.
 
 **Settings sections** (`tiqora.settings_sections`). A `SettingsSection` binds a
 Pydantic model (every field has a default) to `tiqora_settings` rows under the
@@ -942,5 +1006,5 @@ Mounted at `/znuny-compat` in the main API process (same `tiqora-api`).
 
 ## Non-goals (V1)
 
-- Znuny package manager / OPM marketplace (except the small TiqoraSync addon)
+- Znuny package manager (OPM): Perl packages cannot run; Tiqora has its own plugin system ([plugins.md](plugins.md)) (except the small TiqoraSync addon)
 - Shipping any Znuny source code in this repository

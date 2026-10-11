@@ -8,10 +8,12 @@ import {
   createRouter,
   createMemoryHistory,
 } from "@tanstack/react-router";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
 import { AdminShell } from "./AdminShell";
 import { ADMIN_PAGES } from "@/lib/adminSearch";
 
+vi.mock("@/lib/pluginsApi", () => ({ pluginsApi: { frontend: vi.fn().mockResolvedValue([]) } }));
 vi.mock("@/components/agent/AccountMenu", () => ({
   AccountMenu: () => <div data-testid="account-menu-stub" />,
 }));
@@ -51,15 +53,22 @@ async function renderShell(initialPath = "/admin") {
   });
   await router.load();
   render(
-    <I18nextProvider i18n={i18n}>
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      <RouterProvider router={router as any} />
-    </I18nextProvider>,
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <I18nextProvider i18n={i18n}>
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        <RouterProvider router={router as any} />
+      </I18nextProvider>
+    </QueryClientProvider>,
   );
   return router;
 }
 
 describe("AdminShell", () => {
+  it("keeps a plugin settings form in the system group", async () => {
+    await renderShell("/admin/settings/plugins.org.example.demo");
+    expect(screen.getByTestId("admin-nav-plugins")).toBeInTheDocument();
+  });
+
   it("renders the icon rail with one button per group and only the active group's pages", async () => {
     await renderShell("/admin/queues");
     expect(screen.getByTestId("admin-nav-rail")).toBeInTheDocument();

@@ -11285,6 +11285,117 @@
         "title": "DashboardSummary",
         "type": "object"
       },
+      "DashboardWidgetContribution": {
+        "properties": {
+          "category": {
+            "default": "other",
+            "enum": [
+              "tickets",
+              "reports",
+              "team",
+              "ai",
+              "itsm",
+              "other"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "component": {
+            "title": "Component",
+            "type": "string"
+          },
+          "description_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Key"
+          },
+          "icon": {
+            "default": "puzzle",
+            "title": "Icon",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "permission": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Permission"
+          },
+          "refresh_on": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Refresh On",
+            "type": "array"
+          },
+          "settings_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settings Schema"
+          },
+          "size": {
+            "$ref": "#/components/schemas/WidgetSize",
+            "default": {
+              "default": [
+                4,
+                3
+              ],
+              "max": [
+                12,
+                8
+              ],
+              "min": [
+                2,
+                2
+              ]
+            }
+          },
+          "slot": {
+            "const": "dashboard.widget",
+            "title": "Slot",
+            "type": "string"
+          },
+          "title_key": {
+            "title": "Title Key",
+            "type": "string"
+          },
+          "version": {
+            "default": 1,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "slot",
+          "component",
+          "title_key"
+        ],
+        "title": "DashboardWidgetContribution",
+        "type": "object"
+      },
       "DatastoresOut": {
         "properties": {
           "database": {
@@ -17917,6 +18028,61 @@
         "title": "NamedRefOut",
         "type": "object"
       },
+      "NavContribution": {
+        "properties": {
+          "admin_only": {
+            "default": false,
+            "title": "Admin Only",
+            "type": "boolean"
+          },
+          "group": {
+            "default": "plugins",
+            "enum": [
+              "workspace",
+              "knowledge",
+              "insights",
+              "plugins"
+            ],
+            "title": "Group",
+            "type": "string"
+          },
+          "icon": {
+            "default": "puzzle",
+            "title": "Icon",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label_key": {
+            "title": "Label Key",
+            "type": "string"
+          },
+          "order": {
+            "default": 100,
+            "title": "Order",
+            "type": "integer"
+          },
+          "route": {
+            "title": "Route",
+            "type": "string"
+          },
+          "slot": {
+            "const": "agent.nav",
+            "title": "Slot",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "slot",
+          "route",
+          "label_key"
+        ],
+        "title": "NavContribution",
+        "type": "object"
+      },
       "NewProcessTicketIn": {
         "description": "Body of ``POST /api/v1/process/tickets``: start dialog values of a new process ticket.",
         "properties": {
@@ -20416,6 +20582,501 @@
           }
         },
         "title": "PlaceholderFieldUpdate",
+        "type": "object"
+      },
+      "PluginAdminListOut": {
+        "properties": {
+          "plugins": {
+            "items": {
+              "$ref": "#/components/schemas/PluginAdminOut"
+            },
+            "title": "Plugins",
+            "type": "array"
+          },
+          "safe_mode": {
+            "title": "Safe Mode",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "safe_mode",
+          "plugins"
+        ],
+        "title": "PluginAdminListOut",
+        "type": "object"
+      },
+      "PluginAdminOut": {
+        "properties": {
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/PluginCapabilityOut"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/PluginContributionOut"
+            },
+            "title": "Contributions",
+            "type": "array"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "homepage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Homepage"
+          },
+          "hooks": {
+            "items": {
+              "$ref": "#/components/schemas/PluginHookOut"
+            },
+            "title": "Hooks",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "installed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installed At"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "publisher": {
+            "title": "Publisher",
+            "type": "string"
+          },
+          "runtime": {
+            "items": {
+              "$ref": "#/components/schemas/PluginRuntimeOut"
+            },
+            "title": "Runtime",
+            "type": "array"
+          },
+          "settings_section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settings Section"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "disabled",
+              "failed",
+              "quarantined",
+              "incompatible",
+              "invalid",
+              "restart_required",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "status_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Message"
+          },
+          "support": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Support"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "version",
+          "publisher",
+          "description",
+          "license",
+          "homepage",
+          "support",
+          "categories",
+          "enabled",
+          "status",
+          "status_message",
+          "source",
+          "installed_at",
+          "runtime",
+          "hooks",
+          "capabilities",
+          "contributions",
+          "settings_section"
+        ],
+        "title": "PluginAdminOut",
+        "type": "object"
+      },
+      "PluginCapabilityOut": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "extension_point",
+              "outbound_host",
+              "frontend_slot"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "value"
+        ],
+        "title": "PluginCapabilityOut",
+        "type": "object"
+      },
+      "PluginContributionOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "point_key": {
+            "title": "Point Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "point_key",
+          "key"
+        ],
+        "title": "PluginContributionOut",
+        "type": "object"
+      },
+      "PluginEnabledIn": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "PluginEnabledIn",
+        "type": "object"
+      },
+      "PluginFrontendOut": {
+        "properties": {
+          "asset_base": {
+            "title": "Asset Base",
+            "type": "string"
+          },
+          "contributions": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "agent.nav": "#/components/schemas/NavContribution",
+                  "agent.route": "#/components/schemas/RouteContribution",
+                  "dashboard.widget": "#/components/schemas/DashboardWidgetContribution",
+                  "ticket.sidebar": "#/components/schemas/TicketSidebarContribution"
+                },
+                "propertyName": "slot"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/NavContribution"
+                },
+                {
+                  "$ref": "#/components/schemas/RouteContribution"
+                },
+                {
+                  "$ref": "#/components/schemas/TicketSidebarContribution"
+                },
+                {
+                  "$ref": "#/components/schemas/DashboardWidgetContribution"
+                }
+              ]
+            },
+            "title": "Contributions",
+            "type": "array"
+          },
+          "entry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "locales": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Locales",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "styles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Styles",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "version",
+          "asset_base",
+          "entry",
+          "styles",
+          "locales",
+          "contributions"
+        ],
+        "title": "PluginFrontendOut",
+        "type": "object"
+      },
+      "PluginHookOut": {
+        "properties": {
+          "consecutive_failures": {
+            "title": "Consecutive Failures",
+            "type": "integer"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "event",
+              "task"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "last_error_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error At"
+          },
+          "last_ok_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Ok At"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "schedule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule"
+          },
+          "total_failures": {
+            "title": "Total Failures",
+            "type": "integer"
+          },
+          "tripped": {
+            "title": "Tripped",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "name",
+          "schedule",
+          "tripped",
+          "consecutive_failures",
+          "total_failures",
+          "last_error",
+          "last_error_at",
+          "last_ok_at",
+          "last_run_at"
+        ],
+        "title": "PluginHookOut",
+        "type": "object"
+      },
+      "PluginRuntimeOut": {
+        "properties": {
+          "boot_attempts": {
+            "title": "Boot Attempts",
+            "type": "integer"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "role": {
+            "enum": [
+              "api",
+              "worker",
+              "mcp"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "role",
+          "state",
+          "version",
+          "error",
+          "boot_attempts",
+          "updated_at"
+        ],
+        "title": "PluginRuntimeOut",
         "type": "object"
       },
       "PortalArticleOut": {
@@ -24561,6 +25222,45 @@
           }
         },
         "title": "RoleUpdate",
+        "type": "object"
+      },
+      "RouteContribution": {
+        "properties": {
+          "admin_only": {
+            "default": false,
+            "title": "Admin Only",
+            "type": "boolean"
+          },
+          "component": {
+            "title": "Component",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "slot": {
+            "const": "agent.route",
+            "title": "Slot",
+            "type": "string"
+          },
+          "title_key": {
+            "title": "Title Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "slot",
+          "path",
+          "component",
+          "title_key"
+        ],
+        "title": "RouteContribution",
         "type": "object"
       },
       "SalutationOut": {
@@ -30565,6 +31265,40 @@
         "title": "TicketSearchHitOut",
         "type": "object"
       },
+      "TicketSidebarContribution": {
+        "properties": {
+          "component": {
+            "title": "Component",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "order": {
+            "default": 100,
+            "title": "Order",
+            "type": "integer"
+          },
+          "slot": {
+            "const": "ticket.sidebar",
+            "title": "Slot",
+            "type": "string"
+          },
+          "title_key": {
+            "title": "Title Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "slot",
+          "component",
+          "title_key"
+        ],
+        "title": "TicketSidebarContribution",
+        "type": "object"
+      },
       "TicketTypeCreate": {
         "properties": {
           "name": {
@@ -32136,6 +32870,66 @@
           "processed"
         ],
         "title": "WhatsAppWebhookResponse",
+        "type": "object"
+      },
+      "WidgetSize": {
+        "properties": {
+          "default": {
+            "default": [
+              4,
+              3
+            ],
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Default",
+            "type": "array"
+          },
+          "max": {
+            "default": [
+              12,
+              8
+            ],
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Max",
+            "type": "array"
+          },
+          "min": {
+            "default": [
+              2,
+              2
+            ],
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Min",
+            "type": "array"
+          }
+        },
+        "title": "WidgetSize",
         "type": "object"
       },
       "ZnunyImportIn": {
@@ -51371,6 +52165,229 @@
         "summary": "Refresh Token",
         "tags": [
           "admin:oauth2"
+        ]
+      }
+    },
+    "/api/v1/admin/plugins": {
+      "get": {
+        "operationId": "list_plugins_api_v1_admin_plugins_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginAdminListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Plugins",
+        "tags": [
+          "admin:plugins"
+        ]
+      }
+    },
+    "/api/v1/admin/plugins/{plugin_id}/enabled": {
+      "put": {
+        "operationId": "set_plugin_enabled_api_v1_admin_plugins__plugin_id__enabled_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginEnabledIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginAdminOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Plugin Enabled",
+        "tags": [
+          "admin:plugins"
+        ]
+      }
+    },
+    "/api/v1/admin/plugins/{plugin_id}/reset": {
+      "post": {
+        "operationId": "reset_plugin_api_v1_admin_plugins__plugin_id__reset_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginAdminOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset Plugin",
+        "tags": [
+          "admin:plugins"
         ]
       }
     },
@@ -70641,6 +71658,160 @@
         "summary": "Dial",
         "tags": [
           "phone"
+        ]
+      }
+    },
+    "/api/v1/plugins/frontend": {
+      "get": {
+        "operationId": "list_frontend_plugins_api_v1_plugins_frontend_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PluginFrontendOut"
+                  },
+                  "title": "Response List Frontend Plugins Api V1 Plugins Frontend Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Frontend Plugins",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/v1/plugins/{plugin_id}/assets/{version}/{path}": {
+      "get": {
+        "operationId": "plugin_asset_api_v1_plugins__plugin_id__assets__version___path__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Plugin Asset",
+        "tags": [
+          "plugins"
         ]
       }
     },

@@ -9,6 +9,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { TicketHeader } from "@/components/agent/TicketHeader";
 import { ArticleMasterDetail } from "@/components/agent/ArticleMasterDetail";
 import { HistoryTable } from "@/components/agent/HistoryTable";
+import { PluginTicketPanels } from "@/plugins/slots";
 import { PresenceBar } from "@/components/agent/PresenceBar";
 import { ProcessWidget } from "@/components/agent/process/ProcessWidget";
 import { AiPanel } from "@/components/agent/AiPanel";
@@ -188,6 +189,7 @@ export function TicketZoomPage() {
         startOpen={processStartOpen}
         onStartOpenChange={setProcessStartOpen}
       />
+      <PluginTicketPanels ticketId={ticketId} />
       <PresenceBar ticketId={ticketId} selfUserId={user?.id} />
       {tab === "articles" ? (
         <ArticleMasterDetail

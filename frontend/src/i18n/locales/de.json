@@ -53,6 +53,7 @@
     "kb": "Wissensdatenbank"
   },
   "sidebar": {
+    "plugins": "Erweiterungen",
     "workspace": "Arbeitsbereich",
     "inbox": "Eingang",
     "myTickets": "Meine Tickets",
@@ -2179,7 +2180,8 @@
       "smime": "S/MIME",
       "aiModels": "Modelle",
       "identityProviders": "Identitätsanbieter",
-      "reporting": "Berichtsdaten"
+      "reporting": "Berichtsdaten",
+      "plugins": "Erweiterungen"
     },
     "table": {
       "id": "ID",
@@ -2765,7 +2767,8 @@
         "agents": "Agenten",
         "admin": "Admin-API",
         "mcp": "MCP-Server",
-        "compat": "Znuny GenericInterface"
+        "compat": "Znuny GenericInterface",
+        "plugins": "Erweiterungen"
       }
     },
     "processes": {
@@ -3117,6 +3120,14 @@
         "deploy_watch": {
           "name": "Bereitstellung beobachten",
           "description": "Erkennt in Znuny bereitgestellte Prozesse und ACLs und lässt Tiqora erst dann damit arbeiten."
+        },
+        "plugin_events": {
+          "name": "Erweiterungen: Ticketänderungen weitergeben",
+          "description": "Gibt neue Ticketänderungen an Erweiterungen weiter, die darauf reagieren."
+        },
+        "plugin_tasks": {
+          "name": "Erweiterungen: zeitgesteuerte Aufgaben",
+          "description": "Startet die regelmäßigen Aufgaben der Erweiterungen."
         }
       },
       "takeoverBadge": "Übernahme",
@@ -3493,7 +3504,8 @@
       "settingsJobs": "Hintergrundaufgaben wie Exporte: wie viele gleichzeitig laufen und wie lange Ergebnisse bleiben.",
       "identityProviders": "Anmeldung über Microsoft, Google, SAML oder LDAP einrichten.",
       "reporting": "Zustand der Berichtsdaten ansehen und alles neu berechnen lassen.",
-      "settingsReporting": "Berichte: Zeitzone, Zugriff, Zwischenspeicher sowie Grenzen für Ergebnisse und Exporte."
+      "settingsReporting": "Berichte: Zeitzone, Zugriff, Zwischenspeicher sowie Grenzen für Ergebnisse und Exporte.",
+      "plugins": "Installierte Erweiterungen ein- und ausschalten, Zustand prüfen und einstellen."
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -4386,6 +4398,80 @@
       "ownership": "Tiqora stellt Änderungen selbst bereit (Znuny ist abgeschaltet).",
       "deployNow": "Bereitstellen",
       "deployFailed": "Bereitstellen fehlgeschlagen."
+    },
+    "plugins": {
+      "description": "Erweiterungen ergänzen Tiqora um zusätzliche Funktionen. Sie werden mit dem Tiqora-Image ausgeliefert; hier schalten Sie sie ein oder aus.",
+      "trustNote": "Erweiterungen laufen innerhalb von Tiqora mit vollem Zugriff. Die Angaben unten zeigen, was eine Erweiterung vorgibt zu tun – das ist keine Absicherung. Schalten Sie nur Erweiterungen ein, denen Sie vertrauen.",
+      "loadError": "Die Erweiterungen konnten nicht geladen werden.",
+      "actionError": "Die Änderung konnte nicht gespeichert werden.",
+      "safeMode": "Abgesicherter Modus: Tiqora wurde ohne Erweiterungen gestartet. Schalter wirken erst, wenn Tiqora wieder normal gestartet wird.",
+      "browserOff": "In diesem Browser-Tab sind Erweiterungen ausgeschaltet (?plugins=off). Mit ?plugins=on werden sie wieder geladen.",
+      "empty": "Es sind keine Erweiterungen installiert.",
+      "version": "Version {{version}}",
+      "publisher": "von {{publisher}}",
+      "settings": "Einstellungen",
+      "retry": "Erneut versuchen",
+      "details": "Details",
+      "hideDetails": "Details ausblenden",
+      "status": {
+        "active": "Aktiv",
+        "disabled": "Ausgeschaltet",
+        "failed": "Fehler",
+        "quarantined": "Übersprungen",
+        "incompatible": "Nicht kompatibel",
+        "invalid": "Ungültig",
+        "restart_required": "Neustart nötig",
+        "unknown": "Unbekannt"
+      },
+      "processes": {
+        "title": "Wo die Erweiterung läuft",
+        "process": "Dienst",
+        "state": "Zustand",
+        "version": "Version",
+        "error": "Fehler",
+        "roles": {
+          "api": "Weboberfläche und Schnittstelle",
+          "worker": "Hintergrunddienst",
+          "mcp": "KI-Schnittstelle (MCP)"
+        },
+        "states": {
+          "loading": "Startet",
+          "active": "Aktiv",
+          "failed": "Fehler",
+          "quarantined": "Übersprungen",
+          "disabled": "Ausgeschaltet",
+          "incompatible": "Nicht kompatibel",
+          "invalid": "Ungültig"
+        }
+      },
+      "hooks": {
+        "title": "Automatische Abläufe",
+        "onTicketChange": "bei Ticketänderungen",
+        "stopped": "Angehalten nach {{count}} Fehlern",
+        "lastError": "Letzter Fehler"
+      },
+      "capabilities": {
+        "title": "Was diese Erweiterung angibt",
+        "none": "Keine Angaben.",
+        "host": "Ruft {{host}} auf",
+        "point": {
+          "events": "Reagiert auf Ticketänderungen",
+          "routes": "Stellt eigene Schnittstellen bereit (nur mit Anmeldung)",
+          "public_routes": "Bietet öffentlich erreichbare Schnittstellen an (ohne Anmeldung)",
+          "mcp_tools": "Ergänzt die KI-Schnittstelle (MCP) um Werkzeuge",
+          "scheduled_tasks": "Führt geplante Aufgaben im Hintergrund aus",
+          "builtin_reports": "Liefert fertige Berichte",
+          "report_sources": "Liefert Datenquellen für Berichte",
+          "other": "Nutzt den Erweiterungspunkt {{value}}"
+        },
+        "slot": {
+          "nav": "Fügt einen Menüpunkt hinzu",
+          "route": "Fügt eine eigene Seite hinzu",
+          "ticket_sidebar": "Zeigt ein Feld in der Ticketansicht",
+          "widget": "Zeigt eine Kachel im Dashboard",
+          "other": "Erweitert die Oberfläche ({{value}})"
+        }
+      }
     }
   },
   "kb": {
@@ -5494,6 +5580,13 @@
       "alwaysOn": "Immer an (Vorgabe des Berichts)",
       "privateOther": "Privat"
     }
+  },
+  "plugins": {
+    "slotError": "Erweiterung „{{name}}“ konnte nicht geladen werden.",
+    "slotErrorDetails": "Details",
+    "safeModeBrowser": "Erweiterungen sind in diesem Browserfenster ausgeschaltet.",
+    "pageNotFound": "Diese Seite der Erweiterung gibt es nicht.",
+    "widgetsTitle": "Erweiterungen"
   },
   "filters": {
     "all": "Alle Bedingungen müssen zutreffen",

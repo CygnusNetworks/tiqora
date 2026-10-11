@@ -42,6 +42,8 @@ export default tseslint.config(
             "selectQueueShortcuts",
             "formatDurationSince",
             "greetingKey",
+            "usePlugins",
+            "usePluginContributions",
           ],
         },
       ],
@@ -50,5 +52,12 @@ export default tseslint.config(
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
     },
+  },
+  {
+    // The plugin SDK runtime is a fixed export surface (hooks, constants and
+    // components side by side, pinned by runtime.test.ts) — not a module that
+    // fast refresh can hot-swap.
+    files: ["src/plugins/sdkRuntime.tsx"],
+    rules: { "react-refresh/only-export-components": "off" },
   },
 );

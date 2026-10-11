@@ -296,6 +296,22 @@ set the worker's poll cadence once a function is turned on. See
 [`../parallel-operation.md`](../parallel-operation.md) for how/when to flip
 those flags.
 
+### Plugins
+
+Plugins are baked into the image (see [deployment.md](../deployment.md#erweiterungen-einbauen-plugins)
+and [plugins.md](../plugins.md)); use the same image for api, worker and mcp.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `TIQORA_PLUGINS_SAFE_MODE` | `false` | `1`: no plugin code is imported (api, worker, mcp). |
+| `TIQORA_PLUGINS_DISABLED` | *(empty)* | Comma-separated plugin ids to skip. |
+| `TIQORA_PLUGINS_AUTO_ENABLE` | `true` | New plugins start switched on. |
+| `TIQORA_PLUGINS_IMPORT_TIMEOUT_SECONDS` | `20` | Import limit per plugin (1-300). |
+| `TIQORA_PLUGINS_BOOT_BUDGET_SECONDS` | `60` | Total import time per process start (1-3600). |
+| `TIQORA_PLUGIN_EVENTS_INTERVAL_SECONDS` | `5` | Worker tick for plugin ticket events (5-300). |
+| `TIQORA_PLUGIN_EVENTS_GAP_HOLD_SECONDS` | `60` | Hold for a missing `ticket_history` id (5-3600). |
+| `TIQORA_PLUGIN_TASKS_INTERVAL_SECONDS` | `15` | Worker tick for scheduled plugin tasks (5-300). |
+
 ## Volumes
 
 | Volume | Mounted by | Contents |

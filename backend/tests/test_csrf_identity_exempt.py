@@ -91,3 +91,19 @@ def test_backchannel_logout_without_cookies_needs_no_exemption() -> None:
 def test_single_session_cookie_logout_is_checked() -> None:
     req = _req("POST", "/api/v1/auth/logout", {"tiqora_session": "a"})
     assert csrf_check_required(req, SETTINGS) is True
+
+
+def test_plugin_routes_are_csrf_protected() -> None:
+    from tiqora.security import csrf
+
+    assert "/api/plugins" in csrf._PROTECTED_PREFIXES
+    cookie = {"tiqora_session": "a"}
+    assert csrf_check_required(
+        _req("POST", "/api/plugins/org.example.hello/echo", cookie), SETTINGS
+    )
+    assert not csrf_check_required(
+        _req("GET", "/api/plugins/org.example.hello/hello", cookie), SETTINGS
+    )
+    # no cookie -> nothing to forge (public routes, API keys)
+    assert not csrf_check_required(_req("POST", "/api/plugins/org.example.hello/ping"), SETTINGS)
+    assert not origin_allowed(_req("POST", "/api/plugins/org.example.hello/echo", cookie), SETTINGS)

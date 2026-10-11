@@ -355,6 +355,15 @@ export function CalendarIcon(props: IconProps) {
   );
 }
 
+/** Puzzle piece — extensions (plugins). */
+export function PuzzleIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M10 4.5a1.8 1.8 0 0 1 3.6 0V6h3.4a1 1 0 0 1 1 1v3.4h-1.5a1.8 1.8 0 0 0 0 3.6H18V17.4a1 1 0 0 1-1 1h-3.4v-1.5a1.8 1.8 0 0 0-3.6 0v1.5H6.6a1 1 0 0 1-1-1V14h1.5a1.8 1.8 0 0 0 0-3.6H5.6V7a1 1 0 0 1 1-1H10z" />
+    </Icon>
+  );
+}
+
 /** Three bars — statistics. */
 export function ChartIcon(props: IconProps) {
   return (

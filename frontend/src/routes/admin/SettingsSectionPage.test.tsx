@@ -4,11 +4,21 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { ApiError } from "@/lib/api";
+import { helloPlugin } from "@/test/pluginFixtures";
 import { SettingsSectionPage } from "./SettingsSectionPage";
 
 let currentSection = "jobs";
 vi.mock("@tanstack/react-router", () => ({
   useParams: () => ({ section: currentSection }),
+}));
+
+const ensurePluginI18n = vi.fn();
+let pluginList: ReturnType<typeof helloPlugin>[] = [];
+vi.mock("@/plugins/PluginProvider", () => ({
+  usePlugins: () => ({ plugins: pluginList, ready: true, safeMode: false }),
+}));
+vi.mock("@/plugins/i18n", () => ({
+  ensurePluginI18n: (...a: unknown[]) => ensurePluginI18n(...a),
 }));
 
 const get = vi.fn();
@@ -57,6 +67,8 @@ function renderPage() {
 describe("SettingsSectionPage", () => {
   beforeEach(() => {
     currentSection = "jobs";
+    pluginList = [];
+    ensurePluginI18n.mockReset();
     get.mockReset();
     put.mockReset();
     get.mockResolvedValue(jobsSection);
@@ -129,5 +141,51 @@ describe("SettingsSectionPage", () => {
     expect(await screen.findByTestId("admin-settings-load-error")).toHaveTextContent(
       "The settings could not be loaded.",
     );
+  });
+
+  const helloSection = {
+    key: "plugins.org.example.hello",
+    title_key: "plugin.org.example.hello:settings.title",
+    i18n_prefix: "plugin.org.example.hello:settings",
+    json_schema: {
+      properties: { greeting: { default: "Hallo", title: "Greeting", type: "string" } },
+      title: "HelloSettings",
+      type: "object",
+    },
+    values: { greeting: "Hallo" },
+    secrets_set: [],
+  };
+
+  it("waits for the plugin's translations before showing its form", async () => {
+    currentSection = "plugins.org.example.hello";
+    const hello = helloPlugin();
+    pluginList = [hello];
+    get.mockResolvedValue(helloSection);
+    let release: () => void = () => {};
+    ensurePluginI18n.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          release = () => {
+            i18n.addResourceBundle("de", "plugin.org.example.hello", { settings: { fields: { greeting: { label: "Begrüßung" } } } }, true, true);
+            resolve();
+          };
+        }),
+    );
+    await i18n.changeLanguage("de");
+    renderPage();
+    await waitFor(() => expect(ensurePluginI18n).toHaveBeenCalledWith(hello, "de"));
+    await waitFor(() => expect(get).toHaveBeenCalled());
+    expect(screen.queryByTestId("schema-form-greeting")).toBeNull();
+    release();
+    expect(await screen.findByTestId("schema-form-greeting-label")).toHaveTextContent("Begrüßung");
+  });
+
+  it("renders a plugin section with schema titles when the plugin is not in the list", async () => {
+    currentSection = "plugins.org.example.gone";
+    pluginList = [];
+    get.mockResolvedValue({ ...helloSection, key: "plugins.org.example.gone" });
+    renderPage();
+    expect(await screen.findByTestId("schema-form-greeting")).toBeInTheDocument();
+    expect(ensurePluginI18n).not.toHaveBeenCalled();
   });
 });

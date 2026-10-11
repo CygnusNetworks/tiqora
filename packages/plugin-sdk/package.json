@@ -1,0 +1,24 @@
+{
+  "name": "@tiqora/plugin-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Types, runtime surface and Vite preset for Tiqora frontend plugins",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vite": "./src/vite.ts",
+    "./shared": "./src/shared.ts"
+  },
+  "scripts": {
+    "check:preset": "vite build -c test-plugin/vite.config.ts && node scripts/check-preset.mjs"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.0"
+  }
+}

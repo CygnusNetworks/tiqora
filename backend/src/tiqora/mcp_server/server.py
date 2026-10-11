@@ -51,6 +51,7 @@ All fully async — NO sync DB calls, requests, or time.sleep anywhere.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
@@ -290,6 +291,14 @@ mcp = FastMCP(
 def _get_user_id(ctx: Context) -> int:
     """Extract user_id injected by auth middleware from request state."""
     request: Request | None = getattr(ctx, "request", None)
+    if request is None:
+        # FastMCP 4 dropped ``Context.request``; the HTTP request is a dependency now.
+        from fastmcp.server.dependencies import get_http_request
+
+        try:
+            request = get_http_request()
+        except RuntimeError:
+            request = None
     if request is None:
         raise PermissionError("No request context available")
     uid = getattr(request.state, "user_id", None)
@@ -2212,10 +2221,30 @@ async def _app_lifespan(app: Any) -> AsyncIterator[None]:
     global _mcp_state
     settings = get_settings()
     _mcp_state = McpState(settings)
+    from tiqora.plugins.bootstrap import init_registry
+
+    registry = await init_registry(
+        role="mcp", settings=settings, session_factory=_mcp_state.session_factory
+    )
+    from tiqora.plugins.bootstrap import retry_plugin_boot
+    from tiqora.plugins.mcp import register_plugin_mcp_tools
+
+    register_plugin_mcp_tools(mcp, registry)
+
+    session_factory = _mcp_state.session_factory
+
+    async def _retry_and_bind() -> None:
+        # A late plugin boot swaps the registry content in place; bind the new tools then.
+        if await retry_plugin_boot(role="mcp", settings=settings, session_factory=session_factory):
+            register_plugin_mcp_tools(mcp, registry)
+
+    plugin_retry = asyncio.create_task(_retry_and_bind())
     logger.info("tiqora_mcp_started", database=settings.database_url[:30])
     try:
         yield
     finally:
+        plugin_retry.cancel()
+        await asyncio.gather(plugin_retry, return_exceptions=True)
         await _mcp_state.aclose()
         _mcp_state = None
         logger.info("tiqora_mcp_stopped")

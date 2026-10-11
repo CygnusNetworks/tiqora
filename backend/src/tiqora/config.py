@@ -470,6 +470,28 @@ class Settings(BaseSettings):
         default=60, validation_alias="TIQORA_REPORT_FACTS_INTERVAL"
     )
 
+    # Plugin system (see tiqora.plugins). Safe mode imports no plugin code at all; the
+    # disabled list and the boot budget are the operator's way out of a broken plugin.
+    plugins_safe_mode: bool = Field(default=False, validation_alias="TIQORA_PLUGINS_SAFE_MODE")
+    plugins_disabled: str = Field(default="", validation_alias="TIQORA_PLUGINS_DISABLED")
+    plugins_auto_enable: bool = Field(default=True, validation_alias="TIQORA_PLUGINS_AUTO_ENABLE")
+    plugins_import_timeout_seconds: int = Field(
+        default=20, ge=1, le=300, validation_alias="TIQORA_PLUGINS_IMPORT_TIMEOUT_SECONDS"
+    )
+    # Total time all plugin imports of one process start may take (R-BOOT-BUDGET).
+    plugins_boot_budget_seconds: int = Field(
+        default=60, ge=1, le=3600, validation_alias="TIQORA_PLUGINS_BOOT_BUDGET_SECONDS"
+    )
+    plugin_events_interval_seconds: int = Field(
+        default=5, ge=5, le=300, validation_alias="TIQORA_PLUGIN_EVENTS_INTERVAL_SECONDS"
+    )
+    plugin_events_gap_hold_seconds: int = Field(
+        default=60, ge=5, le=3600, validation_alias="TIQORA_PLUGIN_EVENTS_GAP_HOLD_SECONDS"
+    )
+    plugin_tasks_interval_seconds: int = Field(
+        default=15, ge=5, le=300, validation_alias="TIQORA_PLUGIN_TASKS_INTERVAL_SECONDS"
+    )
+
     # AI worker (tiqora-ai-worker, separate process/compose service — see
     # ~/TIQORA_LLM_PLAN.md §3.0/§3.4). ``daemon.ai_worker.enabled``
     # (default OFF) is the takeover switch; this is only the tick cadence.
@@ -522,6 +544,11 @@ class Settings(BaseSettings):
     customer_smime_cert_column: str = Field(
         default="", validation_alias="TIQORA_CUSTOMER_SMIME_CERT_COLUMN"
     )
+
+    @property
+    def plugins_disabled_ids(self) -> frozenset[str]:
+        """Plugin ids from ``TIQORA_PLUGINS_DISABLED`` (comma list, blanks dropped)."""
+        return frozenset(p.strip() for p in self.plugins_disabled.split(",") if p.strip())
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -4,8 +4,8 @@ Storage remains the ``tiqora_api_key.scopes`` CSV column. Empty/NULL means
 unrestricted (full privileges of the bound user). Tokens:
 
 * ``*`` — unrestricted
-* ``read`` — legacy: every REST area as ``:ro``
-* ``write`` — legacy: every REST area as ``:rw``
+* ``read`` — legacy: every REST area as ``:ro`` (not mcp/compat/plugins)
+* ``write`` — legacy: every REST area as ``:rw`` (not mcp/compat/plugins)
 * ``mcp`` — legacy: ``mcp:rw``
 * ``<area>:ro`` / ``<area>:rw`` — area-level access
 
@@ -35,12 +35,16 @@ API_KEY_AREAS: tuple[str, ...] = (
     "admin",
     "mcp",
     "compat",
+    "plugins",
 )
 
 API_KEY_AREAS_SET: frozenset[str] = frozenset(API_KEY_AREAS)
 
-# Areas expanded by legacy ``read`` / ``write`` (not mcp/compat unless explicit).
-_REST_AREAS: tuple[str, ...] = tuple(a for a in API_KEY_AREAS if a not in ("mcp", "compat"))
+# Areas expanded by legacy ``read`` / ``write`` (not mcp/compat/plugins: those need an explicit
+# grant, so existing integration keys never gain access to plugin code).
+_REST_AREAS: tuple[str, ...] = tuple(
+    a for a in API_KEY_AREAS if a not in ("mcp", "compat", "plugins")
+)
 
 _LEGACY_TOKENS: frozenset[str] = frozenset({"read", "write", "mcp", "*"})
 
@@ -80,6 +84,8 @@ _PATH_PREFIX_TO_AREA: tuple[tuple[str, str], ...] = (
     ("/api/v1/agents", "agents"),
     ("/api/v1/sse", "events"),
     ("/znuny-compat", "compat"),
+    # Plugin routes (third-party code) mount outside /api/v1; they need an explicit grant.
+    ("/api/plugins", "plugins"),
 )
 
 # Prefixes whose area is held by several features: any one of them grants access
@@ -159,8 +165,11 @@ def normalize_scopes(raw: str | None) -> str | None:
 
 
 def all_areas_read_only_scopes() -> str:
-    """CSV granting :ro on every catalog area (admin 'read-only' preset)."""
-    return ",".join(f"{a}:ro" for a in API_KEY_AREAS)
+    """CSV granting :ro on every catalog area except plugins (admin 'read-only' preset).
+
+    Plugin access is always an explicit opt-in (``plugins:ro`` / ``plugins:rw``).
+    """
+    return ",".join(f"{a}:ro" for a in API_KEY_AREAS if a != "plugins")
 
 
 def expand_scopes(scopes: frozenset[str] | None) -> dict[str, ScopeLevel] | None:
