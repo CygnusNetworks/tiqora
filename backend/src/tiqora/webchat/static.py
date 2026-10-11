@@ -41,7 +41,7 @@ logger = structlog.get_logger(__name__)
 
 ASSETS_URL_PATH: Final = "/chat/v1/assets"
 _ASSET_CACHE: Final = "public, max-age=31536000, immutable"
-_NONE_CSP: Final = "default-src 'none'; frame-ancestors 'none'"
+NONE_CSP: Final = "default-src 'none'; frame-ancestors 'none'"
 
 router = APIRouter(
     prefix="/chat/v1",
@@ -64,7 +64,7 @@ def _refusal(status: int, text: str) -> Response:
         text,
         status_code=status,
         headers={
-            "Content-Security-Policy": _NONE_CSP,
+            "Content-Security-Policy": NONE_CSP,
             "Cache-Control": "no-store",
             "X-Robots-Tag": "noindex",
         },
@@ -77,6 +77,19 @@ def _not_found() -> Response:
 
 def _refused() -> Response:
     return _refusal(403, "Dieser Chat darf auf dieser Website nicht eingebunden werden.")
+
+
+def _unavailable() -> Response:
+    """DB outage: never cached, never framed, retry soon."""
+    return PlainTextResponse(
+        "Chat vorübergehend nicht verfügbar.",
+        status_code=503,
+        headers={
+            "Content-Security-Policy": NONE_CSP,
+            "Cache-Control": "no-store",
+            "Retry-After": "30",
+        },
+    )
 
 
 def _read_cached(path: Path) -> bytes | None:
@@ -97,7 +110,7 @@ def _read_cached(path: Path) -> bytes | None:
     return data
 
 
-@router.get("/loader.js")
+@router.api_route("/loader.js", methods=["GET", "HEAD"])
 async def widget_loader(settings: AppSettings, db: DbSession) -> Response:
     """The host-page loader script (cacheable for 5 minutes)."""
     path = _dist(settings) / "loader.js"
@@ -108,7 +121,7 @@ async def widget_loader(settings: AppSettings, db: DbSession) -> Response:
         await db.rollback()
     except Exception:  # noqa: BLE001 - a DB outage must not turn into a cacheable answer
         logger.warning("webchat_loader_channel_check_failed", exc_info=True)
-        return Response("Chat vorübergehend nicht verfügbar.", status_code=503)
+        return _unavailable()
     if not enabled:
         return _not_found()
     try:
@@ -127,7 +140,7 @@ async def widget_loader(settings: AppSettings, db: DbSession) -> Response:
 
 async def _valid_config_allowed(db: AsyncSession, key: str | None) -> tuple[bool, list[str]]:
     """Channel on and *key* names a valid config → (True, allowed origins)."""
-    if not key or len(key) > 40:
+    if not key:
         return False, []
     try:
         if not await public_config_cache.channel_enabled(db):
@@ -140,7 +153,7 @@ async def _valid_config_allowed(db: AsyncSession, key: str | None) -> tuple[bool
     return True, list(cached.values.allowed_origins)
 
 
-@router.get("/frame")
+@router.api_route("/frame", methods=["GET", "HEAD"])
 async def widget_frame(
     request: Request,
     settings: AppSettings,
@@ -175,11 +188,7 @@ async def widget_frame(
         found, allowed = await _valid_config_allowed(db, k)
     except Exception:  # noqa: BLE001 - never cache or frame an error page
         logger.warning("webchat_frame_config_check_failed", exc_info=True)
-        return Response(
-            "Chat vorübergehend nicht verfügbar.",
-            status_code=503,
-            headers={"Cache-Control": "no-store", "Retry-After": "30"},
-        )
+        return _unavailable()
     if not found:
         return _not_found()
     try:
@@ -200,6 +209,7 @@ async def widget_frame(
             "Content-Security-Policy": csp,
             "Cache-Control": "no-store",
             "X-Robots-Tag": "noindex",
+            "Cross-Origin-Resource-Policy": "cross-origin",
             "Referrer-Policy": "same-origin",
             "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
         },
@@ -207,7 +217,10 @@ async def widget_frame(
 
 
 class _AssetFiles(StaticFiles):
-    """Content-hashed widget assets: immutable for a year."""
+    """Content-hashed widget assets: immutable for a year.
+
+    Assumes (as Vite does) that everything under ``assets/`` has a content-hashed name.
+    """
 
     async def get_response(self, path: str, scope: Scope) -> Response:
         response = await super().get_response(path, scope)

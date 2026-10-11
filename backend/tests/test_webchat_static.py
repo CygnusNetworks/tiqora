@@ -138,7 +138,7 @@ async def test_loader_served_with_cache_and_corp(env: Env) -> None:
     assert res.headers["cache-control"] == "public, max-age=300"
     assert res.headers["cross-origin-resource-policy"] == "cross-origin"
     assert "content-security-policy-report-only" not in res.headers
-    assert "content-security-policy" not in res.headers
+    assert res.headers["content-security-policy"].endswith("frame-ancestors 'none'")
 
 
 @pytest.mark.asyncio
@@ -316,3 +316,87 @@ async def test_report_only_csp_stays_on_other_paths(env: Env) -> None:
     async with _client(env) as client:
         res = await client.get("/health")
     assert "content-security-policy-report-only" in res.headers
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_head_returns_headers_without_body(env: Env) -> None:
+    async with _client(env) as client:
+        frame = await client.head(FRAME, params={"k": KEY, "origin": ORIGIN})
+        loader = await client.head("/chat/v1/loader.js")
+    assert frame.status_code == 200 and frame.content == b""
+    assert _csp(frame).endswith("frame-ancestors 'self' https://www.example.org")
+    assert "x-frame-options" not in frame.headers
+    assert frame.headers["cache-control"] == "no-store"
+    assert loader.status_code == 200 and loader.content == b""
+    assert loader.headers["cache-control"] == "public, max-age=300"
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_non_frame_answers_under_chat_are_never_frameable(env: Env) -> None:
+    async with _client(env) as client:
+        unknown = await client.get("/chat/v1/unknown")
+        too_long = await client.get(FRAME, params={"k": KEY, "origin": ORIGIN, "preview": "10"})
+        asset = await client.get("/chat/v1/assets/app-abc123.js")
+    for res in (unknown, too_long, asset):
+        assert _csp(res).endswith("frame-ancestors 'none'")
+    assert "content-security-policy-report-only" not in unknown.headers
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_public_base_url_wins_over_forged_host(env: Env) -> None:
+    base = "https://help.example.com"
+    async with _client(env, public_base_url=base) as client:
+        res = await client.get(
+            FRAME, params={"k": KEY, "origin": ORIGIN}, headers={"Host": "evil.example"}
+        )
+        assert res.status_code == 200
+        assert f"connect-src {base}/api/chat/v1/;" in _csp(res)
+        assert "evil.example" not in _csp(res)
+        ok = await client.get(
+            FRAME,
+            params={"k": KEY, "origin": base, "preview": "1"},
+            headers={"Host": "evil.example", "Referer": f"{base}/admin/webchat/1"},
+        )
+        assert ok.status_code == 200 and _csp(ok).endswith("frame-ancestors 'self'")
+        forged = await client.get(
+            FRAME,
+            params={"k": KEY, "origin": "http://evil.example", "preview": "1"},
+            headers={"Host": "evil.example", "Referer": "http://evil.example/x"},
+        )
+        assert forged.status_code == 403
+
+
+class _NoDbSession:
+    """Opening is free (dependency wiring); any real use fails the test."""
+
+    async def __aenter__(self) -> _NoDbSession:
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        return None
+
+    def __getattr__(self, name: str) -> Any:
+        raise AssertionError(f"DB touched before the backstop: {name}")
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_backstop_runs_before_any_db_access(env: Env) -> None:
+    app = create_app(Settings(environment="test", webchat_dist_dir=str(env.dist)))
+    app.state.session_factory = _NoDbSession
+    app.dependency_overrides[get_redis] = lambda: env.redis
+    async with AsyncClient(transport=ASGITransport(app=app), base_url=SELF) as client:
+        warm = await client.get(FRAME, params={"k": KEY, "origin": "javascript:x"})
+        assert warm.status_code == 403  # pure refusal, no DB needed
+        keys = [k for k in env.redis._data if ":public:" in k]
+        assert keys
+        for k in keys:
+            env.redis._data[k] = "300"
+        res = await client.get(FRAME, params={"k": KEY, "origin": ORIGIN})
+        assert res.status_code == 429
+        env.redis.fail = True
+        down = await client.get(FRAME, params={"k": KEY, "origin": ORIGIN})
+        assert down.status_code == 503
