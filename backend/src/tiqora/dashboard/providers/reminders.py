@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC
 from typing import Any
 
-from tiqora.dashboard.providers import DashboardProvider, ProviderContext
+from tiqora.dashboard.providers import DashboardProvider, ProviderContext, filter_queue_ids
 from tiqora.dashboard.settings_models import RemindersSettings
 from tiqora.domain.ticket_service import TicketService
 
@@ -24,6 +24,7 @@ async def run_reminders(ctx: ProviderContext, settings: RemindersSettings) -> di
         sort="until",
         order="asc",
         limit=_SCAN_LIMIT,
+        queue_ids=filter_queue_ids(ctx),
     )
     due = sorted((t for t in page.items if 0 < t.until_time <= horizon), key=lambda t: t.until_time)
     items = [

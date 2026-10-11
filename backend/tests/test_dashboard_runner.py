@@ -54,6 +54,7 @@ class W:
     type_key: str
     settings: dict[str, Any] = field(default_factory=dict)
     type_version: int = 1
+    pinned: bool = False
 
 
 Run = Callable[[ProviderContext, Any], Awaitable[dict[str, Any]]]
@@ -258,7 +259,8 @@ async def test_settings_defaults_are_applied_and_viewer_context_is_passed() -> N
     await run_batch(fake_factory, reg, 49790, [W("a", "t.lim")])
     out = await run_widget(fake_factory, reg, 49791, W("b", "t.lim"), preview=True)
     assert out is not None and out.status == "ok"
-    assert seen == [(49790, 8, False, {}), (49791, 8, True, {})]
+    empty = {"queue_ids": [], "time_range": None}  # no dashboard filters: the empty form
+    assert seen == [(49790, 8, False, empty), (49791, 8, True, empty)]
 
 
 # --- sessions ----------------------------------------------------------------------------
@@ -443,3 +445,63 @@ async def test_waiting_for_the_engine_cap_counts_against_the_budget() -> None:
     assert time.monotonic() - started < 0.7
     assert (await hogging).status == "ok"  # type: ignore[union-attr]
     assert ran == ["hog"]
+
+
+# --- dashboard filters ---------------------------------------------------------------------
+
+
+async def test_filters_reach_the_provider_and_pinned_widgets_get_none() -> None:
+    from tiqora.dashboard.filters import DashboardFilters
+
+    seen: dict[str, dict[str, Any]] = {}
+
+    async def record(ctx: ProviderContext, settings: Any) -> dict[str, Any]:
+        seen[settings.tag] = dict(ctx.filters)
+        return {}
+
+    reg = registry_with(provider("t.rec", record))
+    flt = DashboardFilters(queue_ids=[7, 3, 3], time_range="30d")
+    widgets = [
+        W("a", "t.rec", {"tag": "free"}),
+        W("b", "t.rec", {"tag": "pinned"}, pinned=True),
+    ]
+    out = await run_batch(fake_factory, reg, 1, widgets, filters=flt, grace=0.0)
+    assert out["a"].status == out["b"].status == "ok"
+    assert seen["free"] == {"queue_ids": [3, 7], "time_range": "30d"}
+    assert seen["pinned"] == {"queue_ids": [], "time_range": None}
+
+    seen.clear()
+    single = await run_widget(
+        fake_factory, reg, 1, W("c", "t.rec", {"tag": "one"}), filters=flt, grace=0.0
+    )
+    assert single is not None and single.status == "ok"
+    assert seen["one"] == {"queue_ids": [3, 7], "time_range": "30d"}
+    seen.clear()
+    await run_batch(fake_factory, reg, 1, [W("d", "t.rec", {"tag": "none"})], grace=0.0)
+    assert seen["none"] == {"queue_ids": [], "time_range": None}
+
+
+async def test_runner_hands_settings_cache_and_kiosk_flag_to_the_context() -> None:
+    got: list[ProviderContext] = []
+
+    async def record(ctx: ProviderContext, settings: Any) -> dict[str, Any]:
+        got.append(ctx)
+        return {}
+
+    reg = registry_with(provider("t.rec", record))
+    sentinel, cache = object(), object()
+    await run_batch(
+        fake_factory,
+        reg,
+        1,
+        [W("a", "t.rec")],
+        app_settings=sentinel,  # type: ignore[arg-type]
+        report_cache_backend=cache,
+        kiosk=True,
+        grace=0.0,
+    )
+    assert got[0].app_settings is sentinel and got[0].report_cache_backend is cache
+    assert got[0].kiosk is True
+    got.clear()
+    await run_batch(fake_factory, reg, 1, [W("a", "t.rec")], grace=0.0)
+    assert got[0].app_settings is None and got[0].kiosk is False

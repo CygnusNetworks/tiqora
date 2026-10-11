@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.config import Settings
 from tiqora.extensions.registry import ExtensionPoint
 
 FORBIDDEN_MESSAGE: Final = "Dafür fehlt Ihnen die Berechtigung."
@@ -26,9 +27,20 @@ class ProviderContext:
     user_id: int  # the viewer
     session: AsyncSession  # own session per provider run (never the request's)
     now: datetime  # naive UTC
-    filters: Mapping[str, Any] = field(default_factory=dict)  # {} in phase 1
+    #: ``{"queue_ids": [...], "time_range": ...}`` of the dashboard, already reduced to the
+    #: empty filters for pinned widgets; ``{}`` outside a dashboard run
+    filters: Mapping[str, Any] = field(default_factory=dict)
     redis: Redis | None = None
     preview: bool = False  # True only for the settings preview: never write history
+    app_settings: Settings | None = None
+    report_cache_backend: Any | None = None
+    kiosk: bool = False  # True on the unauthenticated wallboard path
+
+
+def filter_queue_ids(ctx: ProviderContext) -> list[int] | None:
+    """The dashboard's queue narrowing, ``None`` when there is none."""
+    ids = ctx.filters.get("queue_ids") if ctx.filters else None
+    return list(ids) if ids else None
 
 
 class ProviderForbidden(Exception):  # noqa: N818 - D6 name

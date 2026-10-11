@@ -16,7 +16,14 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Res
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.api.deps import CurrentUser, DbSession, get_redis, get_session_factory_dep
+from tiqora.api.deps import (
+    CurrentUser,
+    DbSession,
+    get_app_settings,
+    get_redis,
+    get_session_factory_dep,
+)
+from tiqora.config import Settings
 from tiqora.dashboard import start, store
 from tiqora.dashboard.providers import DASHBOARD_PROVIDERS
 from tiqora.dashboard.runner import run_batch, run_widget
@@ -84,6 +91,7 @@ class _PreviewWidget:
     type_key: str
     type_version: int
     settings: dict[str, Any]
+    pinned: bool = False
 
 
 def _widget_ids(raw: str | None) -> set[str] | None:
@@ -281,10 +289,10 @@ async def patch_widget_settings(
     return out
 
 
-async def _visible_widgets(
+async def _visible_dashboard(
     session: DbSession, user: CurrentUser, dashboard_id: int
-) -> list[WidgetOut]:
-    """The widgets of a dashboard the caller may see; frees the request's connection.
+) -> DashboardOut:
+    """The dashboard (widgets and filters) the caller may see; frees the request's connection.
 
     Providers open their own sessions, so the request session must not keep a pooled
     connection while they run.
@@ -297,7 +305,7 @@ async def _visible_widgets(
         _raise_http(exc)
     finally:
         await session.rollback()
-    return out.widgets
+    return out
 
 
 @router.get("/{dashboard_id}/data", response_model=DashboardDataOut)
@@ -308,6 +316,7 @@ async def dashboard_data(
     user: CurrentUser,
     factory: SessionFactory,
     registry: DashboardRegistry,
+    app_settings: Annotated[Settings, Depends(get_app_settings)],
     widgets: Annotated[str | None, Query(max_length=2000)] = None,
 ) -> DashboardDataOut:
     """Data of the dashboard's widgets (``widgets`` = comma list of ids; default all).
@@ -316,10 +325,19 @@ async def dashboard_data(
     out of time is ``pending``. Ids that are not on this dashboard are ignored.
     """
     wanted = _widget_ids(widgets)
-    rows = await _visible_widgets(session, user, dashboard_id)
+    board = await _visible_dashboard(session, user, dashboard_id)
+    rows = board.widgets
     if wanted is not None:
         rows = [w for w in rows if w.id in wanted]
-    results = await run_batch(factory, registry, user.id, rows, redis=await _redis_or_none(request))
+    results = await run_batch(
+        factory,
+        registry,
+        user.id,
+        rows,
+        redis=await _redis_or_none(request),
+        filters=board.filters,
+        app_settings=app_settings,
+    )
     return DashboardDataOut(widgets=results, generated_at=utc_now())
 
 
@@ -332,13 +350,22 @@ async def widget_data(
     user: CurrentUser,
     factory: SessionFactory,
     registry: DashboardRegistry,
+    app_settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> WidgetDataOut:
     """One widget's data with the longer single-widget budget (25 s)."""
-    rows = await _visible_widgets(session, user, dashboard_id)
-    widget = next((w for w in rows if w.id == widget_id), None)
+    board = await _visible_dashboard(session, user, dashboard_id)
+    widget = next((w for w in board.widgets if w.id == widget_id), None)
     if widget is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Widget nicht gefunden.")
-    out = await run_widget(factory, registry, user.id, widget, redis=await _redis_or_none(request))
+    out = await run_widget(
+        factory,
+        registry,
+        user.id,
+        widget,
+        redis=await _redis_or_none(request),
+        filters=board.filters,
+        app_settings=app_settings,
+    )
     if out is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, NO_DATA_MESSAGE)
     return out
