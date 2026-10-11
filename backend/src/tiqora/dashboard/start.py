@@ -66,6 +66,7 @@ async def _template_copies(session: AsyncSession, template_id: int) -> list[Tiqo
             layout=w.layout,
             position=i,
             pinned=bool(w.pinned),
+            template_widget_id=w.id,
         )
         for i, w in enumerate(res.scalars().all())
     ]

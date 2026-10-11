@@ -31304,6 +31304,30 @@
         "title": "TemplateOut",
         "type": "object"
       },
+      "TemplateUpdateApplyIn": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "merge",
+              "dismiss"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "action",
+          "version"
+        ],
+        "title": "TemplateUpdateApplyIn",
+        "type": "object"
+      },
       "TemplateUpdateHint": {
         "description": "A newer version of the source template has widgets this copy lacks (Task 8 fills it).",
         "properties": {
@@ -31331,6 +31355,38 @@
           "new_widget_count"
         ],
         "title": "TemplateUpdateHint",
+        "type": "object"
+      },
+      "TemplateUpdateOut": {
+        "description": "The widgets a merge would add to a template copy, already placed.",
+        "properties": {
+          "template_id": {
+            "title": "Template Id",
+            "type": "integer"
+          },
+          "template_name": {
+            "title": "Template Name",
+            "type": "string"
+          },
+          "template_version": {
+            "title": "Template Version",
+            "type": "integer"
+          },
+          "widgets": {
+            "items": {
+              "$ref": "#/components/schemas/WidgetOut"
+            },
+            "title": "Widgets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "template_id",
+          "template_name",
+          "template_version",
+          "widgets"
+        ],
+        "title": "TemplateUpdateOut",
         "type": "object"
       },
       "TicketAclActionsOut": {
@@ -74645,6 +74701,168 @@
           }
         },
         "summary": "Share Dashboard",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboards/{dashboard_id}/template-update": {
+      "get": {
+        "description": "Widgets the source template gained since the copy; 404 when there are none.",
+        "operationId": "get_template_update_api_v1_dashboards__dashboard_id__template_update_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Dashboard Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateUpdateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Template Update",
+        "tags": [
+          "dashboards"
+        ]
+      },
+      "post": {
+        "description": "Take over the new template widgets (``merge``) or hide the offer (``dismiss``).",
+        "operationId": "post_template_update_api_v1_dashboards__dashboard_id__template_update_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Dashboard Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateUpdateApplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Template Update",
         "tags": [
           "dashboards"
         ]

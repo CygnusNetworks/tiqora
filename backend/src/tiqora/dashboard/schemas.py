@@ -87,6 +87,22 @@ class DashboardOut(DashboardTabOut):
     template_update: TemplateUpdateHint | None = None
 
 
+class TemplateUpdateOut(BaseModel):
+    """The widgets a merge would add to a template copy, already placed."""
+
+    template_id: int
+    template_name: str
+    template_version: int
+    widgets: list[WidgetOut]
+
+
+class TemplateUpdateApplyIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: Literal["merge", "dismiss"]
+    version: int = Field(ge=1)
+
+
 class DashboardSaveIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

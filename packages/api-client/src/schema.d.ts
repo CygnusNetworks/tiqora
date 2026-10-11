@@ -6926,6 +6926,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboards/{dashboard_id}/template-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Template Update
+         * @description Widgets the source template gained since the copy; 404 when there are none.
+         */
+        get: operations["get_template_update_api_v1_dashboards__dashboard_id__template_update_get"];
+        put?: never;
+        /**
+         * Post Template Update
+         * @description Take over the new template widgets (``merge``) or hide the offer (``dismiss``).
+         */
+        post: operations["post_template_update_api_v1_dashboards__dashboard_id__template_update_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dashboards/{dashboard_id}/widgets/{widget_id}/data": {
         parameters: {
             query?: never;
@@ -20633,6 +20657,16 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** TemplateUpdateApplyIn */
+        TemplateUpdateApplyIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "merge" | "dismiss";
+            /** Version */
+            version: number;
+        };
         /**
          * TemplateUpdateHint
          * @description A newer version of the source template has widgets this copy lacks (Task 8 fills it).
@@ -20646,6 +20680,20 @@ export interface components {
             template_name: string;
             /** Template Version */
             template_version: number;
+        };
+        /**
+         * TemplateUpdateOut
+         * @description The widgets a merge would add to a template copy, already placed.
+         */
+        TemplateUpdateOut: {
+            /** Template Id */
+            template_id: number;
+            /** Template Name */
+            template_name: string;
+            /** Template Version */
+            template_version: number;
+            /** Widgets */
+            widgets: components["schemas"]["WidgetOut"][];
         };
         /**
          * TicketAclActionsOut
@@ -40781,6 +40829,80 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["DashboardShareIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_template_update_api_v1_dashboards__dashboard_id__template_update_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                dashboard_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateUpdateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_template_update_api_v1_dashboards__dashboard_id__template_update_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                dashboard_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateUpdateApplyIn"];
             };
         };
         responses: {

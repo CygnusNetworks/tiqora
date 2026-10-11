@@ -512,10 +512,13 @@ async def _create_dashboard_once(
         raise DashboardInvalid(MSG_LIMIT, "name")
     sources: list[TiqoraDashboardWidget] = []
     filters = "{}"
+    from_template: TiqoraDashboard | None = None
     if body.copy_from is not None:
         src = await _visible_row(session, body.copy_from, user_id, admin=admin)
         sources = await _widgets(session, src.id)
         filters = dashboard_filters(src).model_dump_json()
+        if src.kind == "template":
+            from_template = src
     now = utc_now()
     row = TiqoraDashboard(
         owner_user_id=user_id,
@@ -525,6 +528,8 @@ async def _create_dashboard_once(
         kind="personal",
         locked=False,
         filters=filters,
+        source_template_id=from_template.id if from_template is not None else None,
+        source_template_version=from_template.version if from_template is not None else None,
         version=1,
         created_at=now,
         changed_at=now,
@@ -543,6 +548,7 @@ async def _create_dashboard_once(
                 layout=w.layout,
                 position=i,
                 pinned=w.pinned,
+                template_widget_id=w.id if from_template is not None else None,
             )
         )
     await session.flush()
@@ -734,6 +740,9 @@ async def save_dashboard(
                         .values(**values)
                     )
                 else:
+                    if row.kind == "template":
+                        # E8: the template version that first contained this widget
+                        values["added_in_version"] = body.version + 1
                     await session.execute(
                         insert(TiqoraDashboardWidget).values(
                             id=w.id, dashboard_id=dashboard_id, **values

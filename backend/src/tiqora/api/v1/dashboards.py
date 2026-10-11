@@ -25,7 +25,7 @@ from tiqora.api.deps import (
     get_session_factory_dep,
 )
 from tiqora.config import Settings
-from tiqora.dashboard import start, store
+from tiqora.dashboard import start, store, template_update
 from tiqora.dashboard.filters import effective_filters
 from tiqora.dashboard.providers import DASHBOARD_PROVIDERS
 from tiqora.dashboard.providers.report import REPORT_WIDGET_TYPES, report_spec
@@ -40,6 +40,8 @@ from tiqora.dashboard.schemas import (
     DashboardSaveIn,
     DashboardShareIn,
     DashboardTabOut,
+    TemplateUpdateApplyIn,
+    TemplateUpdateOut,
     WidgetDataOut,
     WidgetOut,
     WidgetPreviewIn,
@@ -208,11 +210,53 @@ async def get_dashboard(
     dashboard_id: DashboardId, session: DbSession, user: CurrentUser
 ) -> DashboardOut:
     try:
-        return await store.get_dashboard(
+        out = await store.get_dashboard(
+            session, dashboard_id, user.id, admin=await _is_admin(session, user)
+        )
+        if out.source_template_id is not None and out.can_edit:
+            hint = await template_update.update_hint(session, out.id, user.id)
+            if hint is not None:
+                out = out.model_copy(update={"template_update": hint})
+        return out
+    except _STORE_ERRORS as exc:
+        _raise_http(exc)
+
+
+@router.get("/{dashboard_id}/template-update", response_model=TemplateUpdateOut)
+async def get_template_update(
+    dashboard_id: DashboardId, session: DbSession, user: CurrentUser
+) -> TemplateUpdateOut:
+    """Widgets the source template gained since the copy; 404 when there are none."""
+    try:
+        return await template_update.preview_update(
             session, dashboard_id, user.id, admin=await _is_admin(session, user)
         )
     except _STORE_ERRORS as exc:
         _raise_http(exc)
+
+
+@router.post("/{dashboard_id}/template-update", response_model=DashboardOut)
+async def post_template_update(
+    dashboard_id: DashboardId,
+    body: TemplateUpdateApplyIn,
+    session: DbSession,
+    user: CurrentUser,
+) -> DashboardOut:
+    """Take over the new template widgets (``merge``) or hide the offer (``dismiss``)."""
+    try:
+        out = await template_update.apply_update(
+            session,
+            dashboard_id,
+            user.id,
+            body.action,
+            body.version,
+            admin=await _is_admin(session, user),
+        )
+        await session.commit()
+    except _STORE_ERRORS as exc:
+        await session.rollback()
+        _raise_http(exc)
+    return out
 
 
 @router.put("/{dashboard_id}", response_model=DashboardOut)
