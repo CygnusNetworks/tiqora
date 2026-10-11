@@ -86,6 +86,10 @@ export function useTicketChat(ticketId: number, enabled: boolean): UseQueryResul
     queryKey: ticketChatKey(ticketId),
     enabled,
     retry: false,
+    // "schreibt …" and the online dot have no clearing event (the server markers expire
+    // after 6 s): poll while the visitor types, slowly while the chat is live.
+    refetchInterval: (q) =>
+      q.state.data?.visitor_typing ? 6000 : isChatLive(q.state.data) ? 30_000 : false,
     queryFn: async ({ signal }) => {
       try {
         return await webchatApi.ticketChat(ticketId, signal);

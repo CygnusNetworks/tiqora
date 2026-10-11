@@ -184,7 +184,11 @@ export function TicketHeaderActions({
   // A web chat with a live session does the same; an ended one is answered
   // by e-mail through the dialog.
   const isWebchatTicket = dominantChannel(articles) === "WebChat";
-  const webchatLive = isChatLive(useTicketChat(ticketId, isWebchatTicket).data);
+  const webchatChatQ = useTicketChat(ticketId, isWebchatTicket);
+  const webchatLive = isChatLive(webchatChatQ.data);
+  // Chat state still loading: neither the composer nor the e-mail dialog is known to be
+  // right yet, so the reply button waits (a live chat must not get the e-mail dialog).
+  const webchatLoading = isWebchatTicket && webchatChatQ.isPending;
 
   const isLocked = Boolean(ticket.lock && ticket.lock.toLowerCase() !== "unlock");
 
@@ -285,7 +289,7 @@ export function TicketHeaderActions({
             <Button
               variant="primary"
               size="sm"
-              disabled={!canNote || !replyTarget}
+              disabled={!canNote || !replyTarget || webchatLoading}
               data-testid="ticket-actions-reply"
               data-has-draft={headerHasDraft ? "true" : undefined}
               className={cn(ai?.draftsButton && "rounded-r-none")}

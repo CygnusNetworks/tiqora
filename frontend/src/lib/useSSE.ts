@@ -110,11 +110,15 @@ export function handleSSEMessage(queryClient: QueryClient, raw: string): void {
     message.type === "chat_typing" ||
     message.type === "chat_ended"
   ) {
+    if (message.type === "chat_typing") {
+      // Typing never changes the inbox: refetching it here would make every chat agent of
+      // the queue GET /chat/inbox every 2 s per typing visitor. Only the header refreshes.
+      void queryClient.invalidateQueries({ queryKey: ticketChatKey(message.ticket_id) });
+      return;
+    }
     void queryClient.invalidateQueries({ queryKey: chatInboxKey });
     if (message.type === "chat_waiting") {
       receiveChatWaiting(message);
-    } else if (message.type === "chat_typing") {
-      void queryClient.invalidateQueries({ queryKey: ticketChatKey(message.ticket_id) });
     } else {
       void queryClient.invalidateQueries({ queryKey: ["tickets", message.ticket_id] });
     }

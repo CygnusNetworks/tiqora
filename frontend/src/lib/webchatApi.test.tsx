@@ -45,6 +45,26 @@ describe("webchatApi", () => {
     expect(result.current.data).toBeNull();
   });
 
+  it("useTicketChat polls while the visitor types, slowly while live, never when ended (F-M1)", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const w = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    );
+    const chat = { status: "active", visitor_typing: true, visitor_online: true };
+    vi.spyOn(api, "request").mockResolvedValue(chat as never);
+    const { result } = renderHook(() => useTicketChat(9, true), { wrapper: w });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    const query = qc.getQueryCache().find({ queryKey: ticketChatKey(9) })!;
+    const interval = (query.options as { refetchInterval?: unknown }).refetchInterval as (q: typeof query) => number | false;
+    expect(interval(query)).toBe(6000);
+    query.setData({ ...chat, visitor_typing: false });
+    expect(interval(query)).toBe(30_000);
+    query.setData({ ...chat, visitor_typing: false, status: "ended" });
+    expect(interval(query)).toBe(false);
+    query.setData(null);
+    expect(interval(query)).toBe(false);
+  });
+
   it("useTicketChat surfaces other errors", async () => {
     vi.spyOn(api, "request").mockRejectedValue(new ApiError(500, "boom", "/x"));
     const { result } = renderHook(() => useTicketChat(9, true), { wrapper: wrapper() });

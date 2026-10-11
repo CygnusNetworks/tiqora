@@ -45,8 +45,12 @@ export function ArticleQuickActions({
   // A live web chat answers in the messenger composer like Telegram; an
   // ended one falls back to the e-mail dialog (no reply-all there either).
   const isWebchat = channelNameOf(article) === "WebChat";
-  const webchatLive = isChatLive(useTicketChat(ticketId, isWebchat).data);
+  const chatQ = useTicketChat(ticketId, isWebchat);
+  const webchatLive = isChatLive(chatQ.data);
   const messengerReply = isTelegram || (isWebchat && webchatLive);
+  // Until the chat state is known the right reply surface is not: wait instead of
+  // opening the e-mail dialog on what may be a live chat.
+  const chatLoading = isWebchat && chatQ.isPending;
   // The backend knows our system addresses: false = reply-all would reach
   // nobody beyond the plain reply, so it is offered greyed out.
   const replyAllUseful = article.reply_all_available !== false;
@@ -64,7 +68,7 @@ export function ArticleQuickActions({
         <Button
           size="sm"
           variant="primary"
-          disabled={!canNote}
+          disabled={!canNote || chatLoading}
           data-testid={replyTestId}
           data-has-draft={hasDraft ? "true" : undefined}
           title={compact ? (hasDraft ? t("ticket.draftResume") : t("ticket.reply")) : undefined}
