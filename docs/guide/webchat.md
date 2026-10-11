@@ -79,7 +79,10 @@ das Formular.
 **Schutz**
 
 - **Begrenzungen**: schützen den Chat vor Missbrauch, zum Beispiel **Neue Chats pro Adresse (10 Min.)** oder
-  **Nachrichten pro Chat (pro Minute)**. Die Standardwerte passen für die meisten Websites.
+  **Nachrichten pro Chat (pro Minute)**. Die Standardwerte passen für die meisten Websites. Jeder neue Chat und jede
+  Offline-Nachricht legt ein Ticket an; bis zu Sperrlisten und weiterem Spam-Schutz (Phase 2) begrenzen nur diese
+  Werte, wie viele Tickets anonyme Besucher anlegen können (**Neue Chats gesamt (pro Minute)**, Standard 30, und
+  **Nachrichtenformulare gesamt (pro Stunde)**, Standard 60).
 - **Datei-Uploads**: **Datei-Uploads erlauben**, **Höchstgröße (MB)** und **Erlaubte Dateiarten** (PNG, JPEG,
   GIF, WebP, PDF, Textdatei). Andere Dateiarten, etwa Office-Dokumente oder Archive, lassen sich nicht freigeben.
 - **Aufbewahrung Chatverlauf (Tage)**: Danach werden der Chatverlauf gelöscht und die Besucherdaten entfernt; Anhänge bleiben am Ticket; das Ticket

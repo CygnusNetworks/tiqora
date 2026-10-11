@@ -774,9 +774,12 @@ Chats created by Tiqora's web chat show in Znuny's ticket view like internal-not
 Znuny's own `Chat` backend stores lines in `article_data_otrs_chat` without attachments). This is expected, not a
 bug. Znuny's own chat engine is not used.
 
-- `Admin::CommunicationChannel::Sync` drops channel rows that have no `CommunicationChannel###...` registration,
-  exactly as it does for the Telegram, SMS and WhatsApp rows today; Tiqora re-creates the row on the next chat
-  write. Registering `WebChat` in TiqoraSync is a follow-up.
+- The `WebChat` row is unregistered (no `CommunicationChannel###...` setting) and has `package_name` `Tiqora`.
+  `Admin::CommunicationChannel::Sync` deletes such a row only while no article uses it: `ChannelDrop` bails out as
+  soon as any article references the channel (its DROP TABLE branch is dead code in Znuny 6.5.22). Tiqora
+  re-creates a deleted row on the next chat write. Since 99fa0b43 the row's `channel_data` is YAML with empty
+  `ArticleDataTables`. The golden test runs `Admin::CommunicationChannel::Sync` after a chat article and asserts
+  that the row and the article survive. Registering `WebChat` in TiqoraSync is a follow-up.
 - Web chat tickets are created with the Postmaster default state and priority and owner/creator user 1, not with
   the `CustomerTicketMessage` defaults or `CustomerPanelUserID`, and they never trigger Znuny's web-ticket
   auto-response (`AutoResponseForWebTickets`, a Perl boolean that would have to be read with `get_bool` if it

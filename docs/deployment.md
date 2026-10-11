@@ -355,12 +355,13 @@ needed for routing, because `/chat/` and `/api/chat/` go to `tiqora-api` like th
 |---|---|
 | `TIQORA_PUBLIC_BASE_URL` (e.g. `https://helpdesk.example.org`) | Tiqora derives its own origin from it. Without it the origin comes from the `Host` header, which behind a TLS-terminating proxy is `http://helpdesk.example.org`: every chat start is then refused as cross-origin, the admin preview is refused, and the iframe's `connect-src` is built from whatever `Host` a request carries. Set it in production. |
 | `TIQORA_TRUSTED_PROXIES` and `TIQORA_FORWARDED_ALLOW_IPS` | The proxy addresses. Without them the real visitor address is not seen, so every visitor shares the proxy's rate-limit and stream-cap buckets (a handful of visitors then block everyone). |
+| `TIQORA_SESSION_COOKIE_SAMESITE` stays `lax` (default) or `strict`, never `none` | The chat frame is served from the same origin as the agent app. With `SameSite=None` an agent's or admin's session cookie would also travel with requests made from inside the frame on a customer's site, and the frame CSP's `connect-src <own>/api/chat/v1/` would be the only barrier left against a frame XSS calling `/api/v1` as that agent (for example during the admin preview). |
 
 Optional:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `TIQORA_CHAT_MAX_STREAMS` | `500` | Process-wide cap on open SSE streams (visitors and agents). Clamped to the file-descriptor limit minus 256. Beyond it new streams get `503` + `Retry-After`. |
+| `TIQORA_CHAT_MAX_STREAMS` | `500` | Process-wide cap on open visitor chat streams. The agents' own event stream (`/api/v1/events`) is not counted, but it also holds a connection and a file descriptor. Clamped to the file-descriptor limit minus 256. Beyond it new visitor streams get `503` + `Retry-After`. |
 | `TIQORA_WEBCHAT_DIST_DIR` | `/app/webchat/dist` | Where the built widget lives (set by the image). |
 | `TIQORA_WEBCHAT_SWEEP_INTERVAL` | `15` | Sweep interval in seconds. |
 
@@ -433,8 +434,8 @@ streams for 3 minutes (one run of 20 streams for 30 s beforehand):
 
 That is roughly 0.15 MiB per open stream, with every heartbeat (every 25 s) re-reading the DB per stream. Memory
 stayed at the peak (about 307 MiB) after the 500 streams closed. These numbers are for orientation only; they come from one laptop and
-idle streams (no messages). Plan for one `tiqora-api` process per roughly 500 open streams (the default
-`TIQORA_CHAT_MAX_STREAMS`), and raise the file-descriptor limit before raising the cap.
+idle streams (no messages). Plan for one `tiqora-api` process per roughly 500 open visitor streams (the default
+`TIQORA_CHAT_MAX_STREAMS`; agent event streams come on top), and raise the file-descriptor limit before raising the cap.
 
 Each open stream is one asyncio task and one socket; it does not hold a database connection while idle (every
 heartbeat opens a short session). Redis carries only wake and typing markers.
