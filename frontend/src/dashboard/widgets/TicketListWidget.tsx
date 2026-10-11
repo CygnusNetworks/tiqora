@@ -16,10 +16,11 @@ import { WidgetFrame, useWidgetChrome, type FrameLink } from "../chrome/WidgetFr
 import { WidgetDataBody, WidgetEmpty } from "../chrome/WidgetDataBody";
 import { TicketLink } from "../chrome/TicketLink";
 import { DueText } from "./DueText";
-import { presetOf, presetQueueSearch, type PresetSource } from "./presets";
+import { ChooseSourceAction } from "./SourceAction";
+import { presetOf, presetQueueSearch, savedSearchIdOf, type TicketSource } from "./presets";
 
 export interface TicketListSettings {
-  source: PresetSource;
+  source: TicketSource;
   columns: ColumnKey[];
   sort: "age" | "changed" | "priority" | "deadline";
   order: "asc" | "desc";
@@ -130,9 +131,14 @@ export function TicketListWidget({ settings, size, mode }: WidgetProps<TicketLis
   const items = Array.isArray(data?.items) ? data.items : [];
   const total = typeof data?.total === "number" ? data.total : items.length;
   const search = preset ? presetQueueSearch(preset, auth?.user?.id) : null;
+  const searchId = savedSearchIdOf(settings.source);
   const more = status === "ok" && total > items.length;
-  const link: FrameLink | undefined =
-    more && search ? { label: t("dashboards.state.showAll", { count: total }), to: "/agent/queues", search } : undefined;
+  const showAll = t("dashboards.state.showAll", { count: total });
+  // A preset links to the queue view that lists exactly its tickets, a saved search to its own
+  // page; an own filter has no page to go to.
+  let link: FrameLink | undefined;
+  if (more && search) link = { label: showAll, to: "/agent/queues", search };
+  else if (more && searchId !== null) link = { label: showAll, to: "/agent/searches/$searchId", params: { searchId: String(searchId) } };
   const cols = tableColumns(settings.columns);
   const navIds = items.map((x) => x.id);
   const density = settings.density === "compact" ? "compact" : "comfortable";
@@ -143,14 +149,14 @@ export function TicketListWidget({ settings, size, mode }: WidgetProps<TicketLis
       title={preset ? t(`dashboards.presets.${preset}.list`) : t("dashboards.widgets.ticketList.title")}
       link={link}
       actions={
-        more && !search ? (
+        more && !link ? (
           <span className="shrink-0 text-xs text-muted">{t("dashboards.state.total", { count: total })}</span>
         ) : undefined
       }
       mode={mode}
       testId="ticket-list-widget"
     >
-      <WidgetDataBody<TicketListData> h={size.h}>
+      <WidgetDataBody<TicketListData> h={size.h} forbiddenAction={<ChooseSourceAction mode={mode} />}>
         {() =>
           items.length === 0 ? (
             <WidgetEmpty

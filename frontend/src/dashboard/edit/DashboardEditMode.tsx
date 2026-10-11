@@ -299,6 +299,7 @@ export function DashboardEditMode({
           widget={settingsWidget}
           def={settingsDef}
           errors={settingsErrors}
+          canEditSources={dashboard.can_edit}
           onApply={(settings, titleOverride) => {
             dispatch({ type: "settings", id: settingsWidget.id, settings, titleOverride });
             setSettingsFor(null);

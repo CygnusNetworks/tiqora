@@ -12,9 +12,12 @@ import { skeletonRows } from "./mode";
  */
 export function WidgetDataBody<T>({
   h,
+  forbiddenAction,
   children,
 }: {
   h: number;
+  /** Offered under the "forbidden" message (e.g. "Suche wählen" for editors). */
+  forbiddenAction?: ReactNode;
   children: (data: T | undefined) => ReactNode;
 }) {
   const { t } = useTranslation();
@@ -22,7 +25,7 @@ export function WidgetDataBody<T>({
   if (status === "loading" || status === "pending") return <WidgetSkeleton rows={skeletonRows(h)} />;
   if (status === "error")
     return <WidgetError message={error || t("dashboards.state.loadFailed")} onRetry={refetch} />;
-  if (status === "forbidden") return <WidgetForbidden message={error || t("dashboards.state.forbidden")} />;
+  if (status === "forbidden") return <WidgetForbidden message={error || t("dashboards.state.forbidden")} action={forbiddenAction} />;
   return <>{children(status === "ok" ? data : undefined)}</>;
 }
 

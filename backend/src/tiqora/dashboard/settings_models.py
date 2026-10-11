@@ -7,7 +7,15 @@ import re
 from collections.abc import Mapping
 from typing import Annotated, Any, Final, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Discriminator,
+    Field,
+    Tag,
+    ValidationError,
+    field_validator,
+)
 
 WIDGET_KEY_RE: Final = re.compile(r"^[a-z0-9][a-z0-9._-]{1,118}$")
 MAX_WIDGET_SETTINGS_BYTES: Final = 20_000
@@ -49,8 +57,39 @@ class PresetSource(BaseModel):
     )
 
 
-# Task 17 widens this to PresetSource | SavedSearchSource | FilterSource.
-type TicketSource = PresetSource
+class SavedSearchSource(BaseModel):
+    """A saved search; read as the **viewer** (not the dashboard owner) when the tile runs."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["saved_search"] = "saved_search"
+    id: int = Field(ge=1)
+
+
+class FilterSource(BaseModel):
+    """An own filter (wave-0 ``Filter`` JSON); checked against the ticket fields on save."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["filter"] = "filter"
+    filter: dict[str, Any]
+
+
+def _source_kind(value: Any) -> str:
+    """Discriminator; a missing ``kind`` means a preset (the default source)."""
+    if isinstance(value, Mapping):
+        return str(value.get("kind", "preset"))
+    return str(getattr(value, "kind", "preset"))
+
+
+_SOURCE_TAGS: Final = frozenset({"preset", "saved_search", "filter"})
+
+type TicketSource = Annotated[
+    Annotated[PresetSource, Tag("preset")]
+    | Annotated[SavedSearchSource, Tag("saved_search")]
+    | Annotated[FilterSource, Tag("filter")],
+    Discriminator(_source_kind),
+]
 
 type TicketColumn = Literal[
     "tn", "title", "customer", "state", "due", "queue", "owner", "priority", "changed", "created"
@@ -84,7 +123,7 @@ class TicketListSettings(_Strict):
 
 
 class CounterSettings(_Strict):
-    source: PresetSource = Field(default_factory=PresetSource)
+    source: TicketSource = Field(default_factory=PresetSource)
     tone: Literal["neutral", "danger", "ok"] = "neutral"
 
 
@@ -197,6 +236,9 @@ def validate_widget_settings(type_key: str, settings: Mapping[str, Any]) -> dict
         return model.model_validate(settings).model_dump(mode="json")
     except ValidationError as exc:
         first = exc.errors()[0]
-        loc = ".".join(str(p) for p in first["loc"])
+        parts = [str(p) for p in first["loc"]]
+        if len(parts) > 1 and parts[0] == "source" and parts[1] in _SOURCE_TAGS:
+            del parts[1]  # the union tag is no field of the settings
+        loc = ".".join(parts)
         path = f"settings.{loc}" if loc else "settings"
         raise SettingsError(_message_de(model, first), path=path) from None

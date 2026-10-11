@@ -27,7 +27,7 @@ const object = (properties: Record<string, unknown>) => ({ type: "object", prope
 const presetSource = {
   type: "object",
   properties: {
-    kind: { type: "string", enum: ["preset"] },
+    kind: { type: "string", enum: ["preset", "saved_search", "filter"] },
     preset: { type: "string", enum: [...TICKET_PRESETS] },
   },
   default: DEFAULT_SOURCE,

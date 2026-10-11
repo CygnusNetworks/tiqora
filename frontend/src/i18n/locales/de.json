@@ -5756,7 +5756,8 @@
         "title": "Links",
         "description": "Wichtige Adressen auf einen Blick",
         "empty": "Noch keine Links. In den Einstellungen kannst du welche eintragen."
-      }
+      },
+      "chooseSearch": "Suche wählen"
     },
     "tabs": {
       "label": "Dashboards",
@@ -5967,6 +5968,17 @@
             }
           }
         }
+      },
+      "source": {
+        "pick": "Suche oder Ansicht",
+        "mine": "Meine Suchen",
+        "shared": "Mit mir geteilt",
+        "gone": "Suche nicht mehr verfügbar",
+        "ownFilter": "Eigener Filter",
+        "ownFilterHint": "Bedingungen auf Ticketfeldern kombinieren, nur für dieses Widget."
+      },
+      "counter": {
+        "tone": "Farbe"
       }
     },
     "manage": {

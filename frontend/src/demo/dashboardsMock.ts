@@ -196,6 +196,11 @@ const presetOf = (settings: Settings): string => {
   const source = settings.source as { kind?: string; preset?: string } | undefined;
   return source?.kind === "preset" && source.preset && source.preset in PRESET_ITEMS ? source.preset : "mine_open";
 };
+/** Saved searches and own filters answer with the open tickets (the demo has no query engine). */
+const customSource = (settings: Settings): boolean => {
+  const kind = (settings.source as { kind?: string } | undefined)?.kind;
+  return kind === "saved_search" || kind === "filter";
+};
 const limitOf = (settings: Settings, fallback: number): number =>
   typeof settings.limit === "number" ? settings.limit : fallback;
 
@@ -223,11 +228,11 @@ function escalationItems(): { ticket: Item; epoch: number; kind: EscalationKind 
 export function demoWidgetData(key: string, settings: Settings = {}): WidgetResult | undefined {
   switch (key) {
     case "core.counter": {
-      const c = COUNTERS[presetOf(settings)];
+      const c = COUNTERS[customSource(settings) ? "mine_open" : presetOf(settings)];
       return { status: "ok", data: { value: c.value, delta: c.delta, spark: [...c.spark] } };
     }
     case "core.ticket-list": {
-      const all = PRESET_ITEMS[presetOf(settings)];
+      const all = PRESET_ITEMS[customSource(settings) ? "mine_open" : presetOf(settings)];
       return { status: "ok", data: { items: all.slice(0, limitOf(settings, 8)), total: all.length } };
     }
     case "core.escalations": {

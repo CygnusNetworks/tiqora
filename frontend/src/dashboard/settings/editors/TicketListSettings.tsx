@@ -2,9 +2,9 @@ import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { cn } from "@/lib/cn";
-import { COLUMN_KEYS, TICKET_PRESETS, type ColumnKey } from "../../definitions";
-import { presetOf } from "../../widgets/presets";
+import { COLUMN_KEYS, type ColumnKey } from "../../definitions";
 import type { SettingsEditorProps } from "../registry";
+import { FIELD, SourceFields } from "./SourceFields";
 
 /** The eight column chips of the settings mockup; stored columns outside it stay visible. */
 const CHIP_COLUMNS: readonly ColumnKey[] = ["tn", "title", "customer", "state", "due", "queue", "owner", "priority"];
@@ -17,16 +17,14 @@ const SORTS = [
   { id: "age:desc", sort: "age", order: "desc", key: "ageDesc" },
 ] as const;
 
-const FIELD = "w-full rounded border border-hairline bg-surface px-2 py-1 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-accent";
 const LEGEND = "mb-2 text-xs font-medium text-muted";
 
-/** Ticket list: which tickets, columns, sorting, rows and density (Task 17 adds filters and saved searches). */
+/** Ticket list: which tickets, columns, sorting, rows and density . */
 export function TicketListSettingsEditor({ value, onChange, errors, canEditSources }: SettingsEditorProps) {
   const { t } = useTranslation();
   const uid = useId();
   const set = (p: Record<string, unknown>) => onChange({ ...value, ...p });
 
-  const preset = presetOf(value.source) ?? "mine_open";
   const columns = (Array.isArray(value.columns) ? value.columns : []).filter((c): c is ColumnKey =>
     (COLUMN_KEYS as readonly unknown[]).includes(c),
   );
@@ -44,31 +42,7 @@ export function TicketListSettingsEditor({ value, onChange, errors, canEditSourc
 
   return (
     <div className="space-y-5">
-      <fieldset className="min-w-0">
-        <legend className={LEGEND}>{t("dashboards.settings.ticketList.which")}</legend>
-        <label className="flex items-start gap-3 rounded-lg border border-accent bg-accent/10 p-3 text-sm">
-          <input type="radio" name={`${uid}-src`} checked readOnly className="mt-1" />
-          <span className="min-w-0 flex-1">
-            <span className="block font-semibold text-ink">{t("dashboards.settings.ticketList.savedSearch")}</span>
-            <span className="mt-0.5 block text-xs text-muted">{t("dashboards.settings.ticketList.savedSearchHint")}</span>
-            <select
-              aria-label={t("dashboards.settings.ticketList.savedSearch")}
-              value={preset}
-              disabled={!canEditSources}
-              onChange={(e) => set({ source: { kind: "preset", preset: e.target.value } })}
-              className={cn(FIELD, "mt-2")}
-            >
-              <optgroup label={t("dashboards.settings.ticketList.standard")}>
-                {TICKET_PRESETS.map((p) => (
-                  <option key={p} value={p}>
-                    {t(`dashboards.presets.${p}.counter`)}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-          </span>
-        </label>
-      </fieldset>
+      <SourceFields value={value} onChange={onChange} errors={errors} canEditSources={canEditSources} />
 
       <fieldset className="min-w-0">
         <legend className={LEGEND}>{t("dashboards.settings.ticketList.columns")}</legend>

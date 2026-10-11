@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 /** Error tile of one widget; "Erneut versuchen" refetches only this widget. */
@@ -18,10 +19,11 @@ export function WidgetError({ message, onRetry }: { message: string; onRetry: ()
 }
 
 /** The viewer may not see this widget's data; no retry (it would answer the same). */
-export function WidgetForbidden({ message }: { message: string }) {
+export function WidgetForbidden({ message, action }: { message: string; action?: ReactNode }) {
   return (
-    <div className="flex h-full items-center text-sm text-muted">
+    <div className="flex h-full flex-col items-start justify-center gap-2 text-sm text-muted">
       <p>{message}</p>
+      {action}
     </div>
   );
 }

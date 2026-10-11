@@ -43,7 +43,8 @@ export interface QueueLinkSearch {
 /** The accent link right of the title ("Alle 12 anzeigen"). */
 export type FrameLink =
   | { label: string; to: "/agent/queues"; search?: QueueLinkSearch }
-  | { label: string; to: "/agent/calendar" };
+  | { label: string; to: "/agent/calendar" }
+  | { label: string; to: "/agent/searches/$searchId"; params: { searchId: string } };
 
 const LINK_CLASS =
   "shrink-0 text-sm text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
@@ -55,6 +56,12 @@ function HeaderLink({ link, mode }: { link: FrameLink; mode: WidgetMode }) {
   if (link.to === "/agent/calendar")
     return (
       <Link to="/agent/calendar" tabIndex={tabIndex} className={cn(LINK_CLASS, inert)}>
+        {link.label}
+      </Link>
+    );
+  if (link.to === "/agent/searches/$searchId")
+    return (
+      <Link to="/agent/searches/$searchId" params={link.params} tabIndex={tabIndex} className={cn(LINK_CLASS, inert)}>
         {link.label}
       </Link>
     );

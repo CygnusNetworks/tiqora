@@ -15,6 +15,7 @@ import uuid
 from collections.abc import Mapping, Sequence
 from typing import Any, Final
 
+from pydantic import ValidationError
 from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,9 +47,11 @@ from tiqora.db.tiqora.models import (
     TiqoraDashboardRole,
     TiqoraDashboardWidget,
 )
+from tiqora.filters import Filter, FilterError
 from tiqora.jobs.service import utc_now
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.permissions.sharing import check_share_groups
+from tiqora.saved_searches.store import SavedSearchNotFound, get_visible, validate_criteria
 
 __all__ = [
     "DashboardConflict",
@@ -64,6 +67,8 @@ __all__ = [
     "list_visible",
     "patch_widget_settings",
     "save_dashboard",
+    "validate_source_settings",
+    "validate_sources",
     "set_order",
     "set_share",
     "update_template",
@@ -470,6 +475,56 @@ async def create_dashboard(
     return await dashboard_out(session, row, user_id, admin=admin)
 
 
+_SOURCE_TYPES = frozenset({"core.ticket-list", "core.counter"})
+MSG_SEARCH_UNKNOWN = "Die gespeicherte Suche gibt es nicht."
+
+
+async def validate_source_settings(
+    session: AsyncSession, user_id: int, type_key: str, settings: Mapping[str, Any], *, path: str
+) -> None:
+    """Second validation pass (needs the database): own filters and saved searches.
+
+    ``settings`` are already validated by :func:`validate_widget_settings`; ``path`` is the
+    prefix of the settings object (``widgets[i].settings`` or ``settings``). The saver must
+    be able to see a saved search (same visibility as when the tile runs).
+    """
+    if type_key not in _SOURCE_TYPES:
+        return
+    source = settings.get("source")
+    if not isinstance(source, Mapping):
+        return
+    kind = source.get("kind")
+    if kind == "filter":
+        where = f"{path}.source.filter"
+        try:
+            flt = Filter.model_validate(source["filter"])
+        except ValidationError as exc:
+            first = exc.errors()[0]
+            loc = ".".join(str(p) for p in first["loc"])
+            raise DashboardInvalid(
+                "Der Filter ist ungültig.", f"{where}.{loc}".rstrip(".")
+            ) from None
+        try:
+            await validate_criteria(session, flt)
+        except FilterError as exc:
+            raise DashboardInvalid(exc.message, f"{where}.{exc.path}") from None
+    elif kind == "saved_search":
+        try:
+            await get_visible(session, int(source["id"]), user_id, admin=False)
+        except SavedSearchNotFound:
+            raise DashboardInvalid(MSG_SEARCH_UNKNOWN, f"{path}.source.id") from None
+
+
+async def validate_sources(
+    session: AsyncSession, user_id: int, widgets: Sequence[WidgetIn]
+) -> None:
+    """:func:`validate_source_settings` for every widget of a save body."""
+    for i, w in enumerate(widgets):
+        await validate_source_settings(
+            session, user_id, w.type_key, w.settings, path=f"widgets[{i}].settings"
+        )
+
+
 def _prepare_widgets(body: DashboardSaveIn) -> list[tuple[WidgetIn, str]]:
     """Normalise layouts, validate settings; returns (widget, settings_json)."""
     try:
@@ -510,6 +565,7 @@ async def save_dashboard(
     if body.version != row.version:
         raise DashboardConflict(row.version)
     prepared = _prepare_widgets(body)
+    await validate_sources(session, user_id, [w for w, _ in prepared])
 
     ids = [w.id for w, _ in prepared]
     if ids:
@@ -619,6 +675,7 @@ async def patch_widget_settings(
     except SettingsError as exc:
         raise DashboardInvalid(exc.message, exc.path) from None
     text = _check_size(settings, "settings")
+    await validate_source_settings(session, user_id, widget.type_key, settings, path="settings")
     if body.version != row.version:
         raise DashboardConflict(row.version)
 

@@ -132,7 +132,7 @@ async function renderWidget(
     </WidgetChromeProvider>
   );
   const rootRoute = createRootRoute({ component: () => ui });
-  const children = ["/agent/tickets/$ticketId", "/agent/queues", "/agent/calendar"].map((path) =>
+  const children = ["/agent/tickets/$ticketId", "/agent/queues", "/agent/calendar", "/agent/searches/$searchId"].map((path) =>
     createRoute({ getParentRoute: () => rootRoute, path }),
   );
   const router = createRouter({
@@ -380,6 +380,41 @@ describe("core.ticket-list", () => {
     cleanup();
     await renderWidget("core.ticket-list", preset("escalated"), { status: "ok", data: { items: rows(8), total: 9 } });
     expect(screen.getByText("9 insgesamt")).toBeVisible();
+  });
+
+  it("'Alle 12 anzeigen' of a saved-search list links to /agent/searches/<id>; an own filter has no link", async () => {
+    await renderWidget("core.ticket-list", { source: { kind: "saved_search", id: 9 }, limit: 8 }, { status: "ok", data: { items: rows(8), total: 12 } });
+    expect(screen.getByText("Alle 12 anzeigen").closest("a")).toHaveAttribute("href", "/agent/searches/9");
+    cleanup();
+    await renderWidget("core.ticket-list", { source: { kind: "filter", filter: { version: 1 } }, limit: 8 }, { status: "ok", data: { items: rows(8), total: 12 } });
+    expect(screen.queryByText("Alle 12 anzeigen")).toBeNull();
+    expect(screen.getByText("12 insgesamt")).toBeVisible();
+  });
+
+  it("keeps a saved-search or filter source instead of resetting it to the default preset", async () => {
+    const def = DASHBOARD_WIDGETS.get("core.ticket-list")!;
+    expect(settingsWithDefaults(def, { source: { kind: "saved_search", id: 9 } }, 1).source).toEqual({ kind: "saved_search", id: 9 });
+    const flt = { kind: "filter", filter: { version: 1 } };
+    expect(settingsWithDefaults(def, { source: flt }, 1).source).toEqual(flt);
+  });
+
+  it("a forbidden tile shows the message and, for editors only, the action 'Suche wählen'", async () => {
+    const onConfigure = vi.fn();
+    const state: WidgetDataState = { status: "forbidden", error: "Die Suche gibt es nicht mehr oder ist für Sie nicht freigegeben." };
+    await renderWidget("core.ticket-list", { source: { kind: "saved_search", id: 9 } }, state, "view", { canEdit: true, onConfigure });
+    expect(screen.getByText(/gibt es nicht mehr/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Suche wählen" }));
+    expect(onConfigure).toHaveBeenCalledTimes(1);
+    cleanup();
+    await renderWidget("core.counter", { source: { kind: "saved_search", id: 9 } }, state);
+    expect(screen.getByText(/gibt es nicht mehr/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Suche wählen" })).toBeNull();
+  });
+
+  it("a counter on a saved search is titled by the type, not by a preset", async () => {
+    await renderWidget("core.counter", { source: { kind: "saved_search", id: 9 } }, { status: "ok", data: { value: 4, delta: null, spark: [] } });
+    expect(screen.getByRole("heading", { name: "Kennzahl" })).toBeVisible();
+    expect(screen.getByText("4")).toBeVisible();
   });
 
   it("titles itself after the preset unless the host overrides it", async () => {

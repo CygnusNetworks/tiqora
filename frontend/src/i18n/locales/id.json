@@ -5748,7 +5748,8 @@
         "title": "Links",
         "description": "Important addresses at a glance",
         "empty": "No links yet. You can add some in the settings."
-      }
+      },
+      "chooseSearch": "Choose search"
     },
     "tabs": {
       "label": "Dashboards",
@@ -5959,6 +5960,17 @@
             }
           }
         }
+      },
+      "source": {
+        "pick": "Search or view",
+        "mine": "My searches",
+        "shared": "Shared with me",
+        "gone": "Search no longer available",
+        "ownFilter": "Own filter",
+        "ownFilterHint": "Combine conditions on ticket fields, only for this widget."
+      },
+      "counter": {
+        "tone": "Colour"
       }
     },
     "manage": {

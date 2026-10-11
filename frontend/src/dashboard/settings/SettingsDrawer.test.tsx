@@ -10,6 +10,8 @@ import type { EditWidget } from "../model";
 import { registerCoreWidgets } from "../widgets";
 import { SettingsDrawer } from "./SettingsDrawer";
 import { makeUser } from "@/test/fireUser";
+import { demoSavedSearches, demoTicketFilterFields } from "@/demo/savedMock";
+import { savedSearchesApi } from "@/lib/savedSearchesApi";
 
 
 const listWidget: EditWidget = {
@@ -43,7 +45,7 @@ function defOf(key: string): WidgetDefinition {
 }
 
 /** A page with an opener button and a grid behind the drawer. */
-function Page({ widget = listWidget, def, errors, closeOnApply = true }: Props & { closeOnApply?: boolean }) {
+function Page({ widget = listWidget, def, errors, canEditSources, closeOnApply = true }: Props & { closeOnApply?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -57,6 +59,7 @@ function Page({ widget = listWidget, def, errors, closeOnApply = true }: Props &
           widget={widget}
           def={def ?? defOf(widget.type_key)}
           errors={errors}
+          canEditSources={canEditSources}
           onApply={(s, t) => {
             onApply(s, t);
             if (closeOnApply) setOpen(false);
@@ -99,6 +102,8 @@ beforeEach(() => {
   onApply.mockClear();
   onCancel.mockClear();
   preview = vi.spyOn(dashboardsApi, "previewData").mockResolvedValue(okList());
+  vi.spyOn(savedSearchesApi, "list").mockResolvedValue(demoSavedSearches());
+  vi.spyOn(savedSearchesApi, "ticketFilterFields").mockResolvedValue(demoTicketFilterFields());
 });
 afterEach(() => {
   cleanup();
@@ -118,24 +123,82 @@ describe("SettingsDrawer", () => {
     expect(within(dialog).getByRole("button", { name: "Schließen" })).toBeVisible();
   });
 
-  it("ticket list: one saved-search card with the five standard views, no own-filter card yet", async () => {
+  it("ticket list: a saved-search card (standard views, then the user's searches, grouped) and an own-filter card", async () => {
     const user = mount();
     const { dialog } = await open(user);
-    expect(within(dialog).getByRole("radio", { name: /Gespeicherte Suche/ })).toBeChecked();
-    expect(within(dialog).queryByText("Eigener Filter")).toBeNull();
-    const select = within(dialog).getByRole("combobox", { name: "Gespeicherte Suche" });
-    const group = select.querySelector("optgroup");
-    expect(group).toHaveAttribute("label", "Standard");
-    expect(Array.from(group!.querySelectorAll("option")).map((o) => o.textContent)).toEqual([
+    expect(within(dialog).getByRole("radio", { name: "Gespeicherte Suche" })).toBeChecked();
+    expect(within(dialog).getByRole("radio", { name: "Eigener Filter" })).not.toBeChecked();
+    const select = within(dialog).getByRole("combobox", { name: "Suche oder Ansicht" });
+    const standard = within(dialog).getByRole("group", { name: "Standard" });
+    expect(Array.from(standard.querySelectorAll("option")).map((o) => o.textContent)).toEqual([
       "Meine offenen",
       "Meine neuen",
       "Zum Übernehmen",
       "Eskaliert",
       "Von der KI übergeben",
     ]);
+    expect(await within(dialog).findByRole("group", { name: "Meine Suchen" })).toBeVisible();
+    expect(within(dialog).getByRole("option", { name: "Meine offenen Tickets" })).toBeVisible();
+    expect(select).toHaveValue("preset:mine_open");
     await user.selectOptions(select, "Eskaliert");
     await user.click(applyBtn());
     expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ source: { kind: "preset", preset: "escalated" } }), "Meine offenen Tickets");
+  });
+
+  it("picking one of the user's saved searches stores its id and marks it selected", async () => {
+    const user = mount();
+    const { dialog } = await open(user);
+    await within(dialog).findByRole("option", { name: "Meine offenen Tickets" });
+    await user.selectOptions(within(dialog).getByRole("combobox", { name: "Suche oder Ansicht" }), "Meine offenen Tickets");
+    expect(within(dialog).getByRole("combobox", { name: "Suche oder Ansicht" })).toHaveValue("search:11");
+    await user.click(applyBtn());
+    expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ source: { kind: "saved_search", id: 11 } }), "Meine offenen Tickets");
+  });
+
+  it("'Eigener Filter' shows the FilterBuilder with ticket fields and updates settings and preview", async () => {
+    const user = mount();
+    const { dialog } = await open(user);
+    await user.click(within(dialog).getByRole("radio", { name: "Eigener Filter" }));
+    expect(within(dialog).getByTestId("filter-builder")).toBeVisible();
+    await waitFor(() => expect(within(dialog).getByTestId("filter-builder-add-condition")).not.toBeDisabled());
+    await user.click(within(dialog).getByTestId("filter-builder-add-condition"));
+    await user.click(within(dialog).getByTestId("filter-builder-row-0-field"));
+    await user.click(await screen.findByRole("option", { name: "Titel" }));
+    await user.type(within(dialog).getByTestId("filter-builder-row-0-value"), "VPN");
+    await waitFor(() =>
+      expect(preview).toHaveBeenLastCalledWith("core.ticket-list", expect.objectContaining({ source: expect.objectContaining({ kind: "filter" }) }), expect.anything()),
+      { timeout: 3000 },
+    );
+    await user.click(applyBtn());
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: { kind: "filter", filter: { version: 1, where: { all: [{ field: "title", op: "eq", value: "VPN" }] } } },
+      }),
+      "Meine offenen Tickets",
+    );
+  });
+
+  it("a filter the builder cannot show is displayed read-only and saved unchanged", async () => {
+    const deep = { version: 1, where: { all: [{ any: [{ all: [{ field: "tn", op: "eq", value: "1" }] }] }] } };
+    const user = mount({ widget: widgetOf("core.ticket-list", { source: { kind: "filter", filter: deep } }) });
+    const { dialog } = await open(user);
+    expect(await within(dialog).findByText(/zu komplex/)).toBeVisible();
+    await user.click(applyBtn());
+    expect(onApply.mock.calls[0][0].source.filter).toEqual(deep);
+  });
+
+  it("a viewer who cannot edit the dashboard cannot change the source", async () => {
+    const user = mount({ canEditSources: false });
+    const { dialog } = await open(user);
+    expect(within(dialog).getByRole("radio", { name: "Eigener Filter" })).toBeDisabled();
+    expect(within(dialog).getByRole("combobox", { name: "Suche oder Ansicht" })).toBeDisabled();
+  });
+
+  it("a server message on the saved search id shows under the search card", async () => {
+    const user = mount({ widget: widgetOf("core.ticket-list", { source: { kind: "saved_search", id: 99 } }), errors: { "settings.source.id": "Die gespeicherte Suche gibt es nicht." } });
+    const { dialog } = await open(user);
+    expect(within(dialog).getByText("Die gespeicherte Suche gibt es nicht.")).toBeVisible();
+    expect(await within(dialog).findByRole("option", { name: "Suche nicht mehr verfügbar" })).toBeDisabled();
   });
 
   it("ticket list: columns are chips (one stays), sort combos map to sort+order, rows clamp to 1..50, density radio", async () => {
@@ -249,13 +312,13 @@ describe("SettingsDrawer", () => {
     expect(onApply).toHaveBeenCalledWith(expect.anything(), null);
   });
 
-  it("a generated form for the other core widgets (counter maps the flat preset onto source)", async () => {
+  it("the counter editor offers the same sources and the tone select", async () => {
     const user = mount({ widget: widgetOf("core.counter", { source: { kind: "preset", preset: "mine_new" }, tone: "ok" }) });
     const { dialog } = await open(user);
-    expect(within(dialog).getByTestId("schema-form")).toBeVisible();
-    expect(within(dialog).getByText("Welche Tickets?")).toBeVisible();
-    await user.click(within(dialog).getByTestId("schema-form-preset"));
-    await user.click(await screen.findByTestId("schema-form-preset-menu-option-escalated"));
+    expect(within(dialog).getByRole("radio", { name: "Gespeicherte Suche" })).toBeChecked();
+    expect(within(dialog).getByRole("radio", { name: "Eigener Filter" })).toBeVisible();
+    expect(within(dialog).getByLabelText("Farbe")).toHaveValue("ok");
+    await user.selectOptions(within(dialog).getByRole("combobox", { name: "Suche oder Ansicht" }), "Eskaliert");
     await user.click(applyBtn());
     expect(onApply).toHaveBeenCalledWith({ source: { kind: "preset", preset: "escalated" }, tone: "ok" }, null);
   });

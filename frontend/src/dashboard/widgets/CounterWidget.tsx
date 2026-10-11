@@ -5,10 +5,11 @@ import { useWidgetData } from "../data";
 import { WidgetFrame } from "../chrome/WidgetFrame";
 import { WidgetDataBody } from "../chrome/WidgetDataBody";
 import { Sparkline } from "../chrome/Sparkline";
-import { FEWER_IS_BETTER, presetOf, type PresetSource } from "./presets";
+import { ChooseSourceAction } from "./SourceAction";
+import { FEWER_IS_BETTER, isCustomSource, presetOf, type TicketSource } from "./presets";
 
 export interface CounterSettings {
-  source: PresetSource;
+  source: TicketSource;
   tone: "neutral" | "danger" | "ok";
 }
 
@@ -32,13 +33,14 @@ function signed(n: number): string {
 export function CounterWidget({ settings, size, mode }: WidgetProps<CounterSettings>) {
   const { t } = useTranslation();
   const { status, data } = useWidgetData<CounterData>();
-  const preset = presetOf(settings.source) ?? "mine_open";
+  // Saved searches and own filters have no preset: the tile is named by its title override or the type.
+  const preset = isCustomSource(settings.source) ? null : (presetOf(settings.source) ?? "mine_open");
   const tone = settings.tone in VALUE_TONE ? settings.tone : "neutral";
   const delta = status === "ok" && typeof data?.delta === "number" ? data.delta : null;
-  const deltaGood = delta != null && delta < 0 && FEWER_IS_BETTER.has(preset);
+  const deltaGood = delta != null && delta < 0 && preset !== null && FEWER_IS_BETTER.has(preset);
   return (
     <WidgetFrame
-      title={t(`dashboards.presets.${preset}.counter`)}
+      title={preset ? t(`dashboards.presets.${preset}.counter`) : t("dashboards.widgets.counter.title")}
       variant="kpi"
       mode={mode}
       testId="counter-widget"
@@ -53,7 +55,7 @@ export function CounterWidget({ settings, size, mode }: WidgetProps<CounterSetti
         )
       }
     >
-      <WidgetDataBody<CounterData> h={size.h}>
+      <WidgetDataBody<CounterData> h={size.h} forbiddenAction={<ChooseSourceAction mode={mode} />}>
         {(d) => (
           <div className="flex h-full items-end justify-between gap-3">
             <span

@@ -63,6 +63,7 @@ export function SettingsDrawer({
   widget,
   def,
   errors,
+  canEditSources = true,
   onApply,
   onCancel,
 }: {
@@ -70,6 +71,8 @@ export function SettingsDrawer({
   def: WidgetDefinition;
   /** Server (422) messages by path (`settings.limit`); others show as a general message. */
   errors?: Record<string, string>;
+  /** Whether the source of ticket lists and counters may be changed (default: yes). */
+  canEditSources?: boolean;
   onApply: (settings: Record<string, unknown>, titleOverride: string | null) => void;
   onCancel: () => void;
 }) {
@@ -165,7 +168,7 @@ export function SettingsDrawer({
         </div>
 
         {Editor ? (
-          <Editor value={draft} onChange={change} errors={fieldErrors} canEditSources />
+          <Editor value={draft} onChange={change} errors={fieldErrors} canEditSources={canEditSources} />
         ) : adapter ? (
           <SchemaForm
             schema={adapter.schema}

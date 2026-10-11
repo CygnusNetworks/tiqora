@@ -1,11 +1,11 @@
 /**
- * Which settings UI a widget type gets: the three bespoke core editors, or a `SchemaForm` over the
+ * Which settings UI a widget type gets: the four bespoke core editors (ticket list, counter, links, notes), or a `SchemaForm` over the
  * definition's `settingsSchema` (every other core widget and every plugin widget).
  */
 import type { ComponentType } from "react";
 import type { JsonSchema } from "@/components/fields/jsonSchema";
 import type { WidgetDefinition } from "@/plugins/dashboardWidgets";
-import { COUNTER_FORM_SCHEMA, counterFromSettings, counterToSettings } from "../definitions";
+import { CounterSettingsEditor } from "./editors/CounterSettings";
 import { LinksSettingsEditor } from "./editors/LinksSettings";
 import { NotesSettingsEditor } from "./editors/NotesSettings";
 import { TicketListSettingsEditor } from "./editors/TicketListSettings";
@@ -15,12 +15,13 @@ export interface SettingsEditorProps {
   onChange(next: Record<string, unknown>): void;
   /** Field errors keyed by the field path inside the settings (`limit`, `items.0.url`). */
   errors: Record<string, string>;
-  /** Whether sources beyond the built-in views may be chosen (Task 17 widens this). */
+  /** Whether the source (saved search or own filter) may be changed: the viewer can edit the dashboard. */
   canEditSources: boolean;
 }
 
 export const CORE_SETTINGS_EDITORS: Record<string, ComponentType<SettingsEditorProps>> = {
   "core.ticket-list": TicketListSettingsEditor,
+  "core.counter": CounterSettingsEditor,
   "core.links": LinksSettingsEditor,
   "core.notes": NotesSettingsEditor,
 };
@@ -50,14 +51,6 @@ const identity = {
 
 /** The generated form of a widget type, or null when it has no settings schema (title only). */
 export function formAdapterFor(def: Pick<WidgetDefinition, "key" | "owner" | "ns" | "settingsSchema">): FormAdapter | null {
-  if (def.key === "core.counter") {
-    return {
-      schema: COUNTER_FORM_SCHEMA as JsonSchema,
-      i18nPrefix: "dashboards.settings.forms.counter",
-      toForm: counterFromSettings,
-      fromForm: counterToSettings,
-    };
-  }
   if (!def.settingsSchema) return null;
   const schema = def.settingsSchema as JsonSchema;
   if (def.owner === "core") {

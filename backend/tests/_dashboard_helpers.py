@@ -94,7 +94,16 @@ _P = {
     "chi": 49809,
 }
 _OWN = "(owner_user_id BETWEEN :dlo AND :dhi OR name LIKE 'dash497%')"
+#: dynamic field of the Task 17 tests (``df.dash497Df``)
+DYN_FIELD_ID = 49910
 _CLEANUP = (
+    "DELETE FROM tiqora_saved_search_pref WHERE saved_search_id IN"
+    " (SELECT id FROM tiqora_saved_search WHERE owner_user_id BETWEEN :dlo AND :dhi)",
+    "DELETE FROM tiqora_saved_search_group WHERE saved_search_id IN"
+    " (SELECT id FROM tiqora_saved_search WHERE owner_user_id BETWEEN :dlo AND :dhi)",
+    "DELETE FROM tiqora_saved_search WHERE owner_user_id BETWEEN :dlo AND :dhi",
+    "DELETE FROM dynamic_field_value WHERE field_id = 49910",
+    "DELETE FROM dynamic_field WHERE id = 49910",
     "DELETE FROM tiqora_dashboard_counter_sample WHERE user_id BETWEEN :dlo AND :dhi",
     f"DELETE FROM tiqora_dashboard_widget WHERE dashboard_id IN"
     f" (SELECT id FROM tiqora_dashboard WHERE {_OWN})",
@@ -505,6 +514,49 @@ class Env:
             c=cal, u=f"dash497-{uuid.uuid4().hex}", ti=title, s=start,
             e=start + timedelta(hours=hours), t=now, ad=int(all_day),
         )  # fmt: skip
+
+    async def make_saved_search(
+        self,
+        owner: int,
+        *,
+        criteria: dict[str, Any] | None = None,
+        criteria_raw: str | None = None,
+        shared_groups: Sequence[int] = (),
+        name: str = "dash497 search",
+    ) -> int:
+        """A saved search of ``owner`` (stored JSON ``criteria_raw`` wins, to fake a broken one)."""
+        raw = criteria_raw if criteria_raw is not None else json.dumps(criteria)
+        self._sql_write(
+            "INSERT INTO tiqora_saved_search (owner_user_id, name, criteria, include_archived,"
+            " sort_by, sort_order, source, version, created_at, changed_at)"
+            " VALUES (:o, :n, :c, :ia, 'age', 'desc', 'tiqora', 1, :t, :t)",
+            o=owner, n=name, c=raw, ia=False, t=now,
+        )  # fmt: skip
+        sid = int(
+            self._sql("SELECT MAX(id) FROM tiqora_saved_search WHERE owner_user_id = :o", o=owner)[
+                0
+            ][0]
+        )
+        for gid in shared_groups:
+            self._sql_write(
+                "INSERT INTO tiqora_saved_search_group (saved_search_id, group_id) VALUES (:s, :g)",
+                s=sid, g=gid,
+            )  # fmt: skip
+        return sid
+
+    def make_dynamic_field(self) -> None:
+        """Ticket text field ``dash497Df`` (``df.dash497Df``); removed by ``cleanup_world``."""
+        self._sql_write(
+            "INSERT INTO dynamic_field (id, internal_field, name, label, field_order,"
+            " field_type, object_type, config, valid_id,"
+            " create_time, create_by, change_time, change_by)"
+            " VALUES (:id, 0, 'dash497Df', 'dash497Df', 1, 'Text', 'Ticket', '---', 1,"
+            " :t, 1, :t, 1)",
+            id=DYN_FIELD_ID, t=now,
+        )  # fmt: skip
+
+    def invalidate_dynamic_field(self) -> None:
+        self._sql_write("UPDATE dynamic_field SET valid_id = 2 WHERE id = :i", i=DYN_FIELD_ID)
 
     def _sql_write(self, sql: str, **params: Any) -> None:
         engine = create_engine(self.sync_url)
