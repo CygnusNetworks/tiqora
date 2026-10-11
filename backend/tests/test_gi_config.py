@@ -115,7 +115,7 @@ def test_error_handling_priority_order_and_missing_keys() -> None:
     mods = {
         "a": {
             "Type": "RequestRetry",
-            "InvokerFilter": "SendTicket",
+            "InvokerFilter": ["SendTicket"],
             "StopAfterMatch": "all",
             "ErrorStageFilter": ["RequestPrepare", "ResponseMap"],
             "ErrorMessageContentFilter": "timeout",
@@ -175,3 +175,38 @@ def test_missing_requester_section() -> None:
 )
 def test_is_ticket_event(event: str, ok: bool) -> None:
     assert is_ticket_event(event) is ok
+
+
+def test_scalar_filters_mean_no_filter() -> None:
+    mods = {"a": {"Type": "RequestRetry", "InvokerFilter": "Other", "ErrorStageFilter": "X"}}
+    cfg = requester_config(invokers={"X": {"Type": "Ticket::Generic"}}, error_handling=mods)
+    cfg["Requester"]["ErrorHandlingPriority"] = ["a"]
+    m = parse_requester(cfg, huge_xml=False).error_handling[0]
+    assert m.invoker_filter == () and m.error_stage_filter == ()
+
+
+@pytest.mark.parametrize(
+    "condition",
+    [
+        None,
+        {},
+        {"ConditionLinking": "and", "Condition": None},
+        {"ConditionLinking": "and", "Condition": {}},
+    ],
+)
+def test_event_with_empty_inner_condition_has_no_condition(condition: Any) -> None:
+    inv = {"Type": "Ticket::Generic", "Events": [{"Event": "TicketCreate", "Condition": condition}]}
+    r = parse_requester(requester_config(invokers={"X": inv}), huge_xml=False)
+    ev = r.invokers["X"].events
+    assert [e.event for e in ev] == ["TicketCreate"] and ev[0].condition is None
+
+
+def test_event_with_real_condition_is_kept() -> None:
+    cond = {"ConditionLinking": "and", "Condition": {"1": {"Type": "and", "Fields": {}}}}
+    inv = {"Type": "Ticket::Generic", "Events": [{"Event": "TicketCreate", "Condition": cond}]}
+    r = parse_requester(requester_config(invokers={"X": inv}), huge_xml=False)
+    assert r.invokers["X"].events[0].condition == cond
+
+
+def test_debug_threshold_is_case_insensitive() -> None:
+    assert parse_debugger({"Debugger": {"DebugThreshold": "Debug"}}).threshold == "debug"

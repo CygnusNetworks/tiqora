@@ -94,10 +94,10 @@ def _str_or_none(value: Any) -> str | None:
 
 
 def _str_list(value: Any) -> tuple[str, ...]:
-    if value is None:
+    # ErrorHandling.pm:202/211 only filters on IsArrayRefWithData; a scalar means "no filter".
+    if not isinstance(value, list):
         return ()
-    items = value if isinstance(value, list) else [value]
-    return tuple(perl_str(i) for i in items if i is not None and not isinstance(i, (dict, list)))
+    return tuple(perl_str(i) for i in value if i is not None and not isinstance(i, (dict, list)))
 
 
 def is_ticket_event(event: str) -> bool:
@@ -112,7 +112,7 @@ def parse_debugger(config: dict[str, Any]) -> DebuggerConfig:
     raw = section.get("DebugThreshold")
     threshold: DebugLevel = "error"
     if raw is not None:
-        level = perl_str(raw)
+        level = perl_str(raw).lower()  # Debugger.pm:90 matches case-insensitively
         if level in DEBUG_LEVELS:
             threshold = level  # type: ignore[assignment]
         else:
@@ -148,11 +148,14 @@ def _parse_events(
             unsupported.append((invoker, event))
             continue
         condition = entry.get("Condition")
+        # Handler.pm:119-120 checks only when Condition and Condition->{Condition} are non-empty
+        # hashes; otherwise the event fires unconditionally.
+        inner = condition.get("Condition") if isinstance(condition, dict) else None
         events.append(
             InvokerEvent(
                 event=event,
                 asynchronous=perl_truthy(entry.get("Asynchronous")),
-                condition=condition if isinstance(condition, dict) and condition else None,
+                condition=condition if isinstance(inner, dict) and inner else None,
             )
         )
     return tuple(events)

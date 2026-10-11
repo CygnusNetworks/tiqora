@@ -8,6 +8,7 @@ from typing import Any
 
 import structlog
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.compat.mapping.perl import perl_truthy
@@ -39,6 +40,7 @@ async def _build(
 ) -> GiWebservice | None:
     """Parse one row; None when it is broken or has no Requester section."""
     if parsed is None:
+        logger.warning("gi_webservice_invalid", ws_id=ws_id, name=name, error="invalid YAML")
         return None
     try:
         config = await replace_config_placeholders(parsed, sysconfig)
@@ -47,6 +49,11 @@ async def _build(
         requester = await asyncio.to_thread(parse_requester, config, huge_xml=huge_xml)
     except _PARSE_ERRORS as exc:
         logger.warning("gi_webservice_invalid", ws_id=ws_id, name=name, error=str(exc))
+        return None
+    except SQLAlchemyError:
+        raise
+    except Exception:
+        logger.exception("gi_webservice_unexpected_error", ws_id=ws_id, name=name)
         return None
     return GiWebservice(
         id=ws_id, name=name, requester=requester, debugger=requester.debugger, config=config

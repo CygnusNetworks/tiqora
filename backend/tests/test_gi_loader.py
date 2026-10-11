@@ -15,6 +15,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tests._gi_fixtures import cleanup_webservices, insert_webservice, requester_config
+from tiqora.gi.config import parse_requester
 from tiqora.gi.loader import GiWebservices, load_gi_webservice
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -132,9 +133,8 @@ async def test_refresh_follows_fingerprint(sync_url: str) -> None:
 async def test_broken_yaml_does_not_hide_others(sync_url: str) -> None:
     engine = create_engine(sync_url)
     with engine.begin() as conn:
-        stored: bytes | str = "Requester: {a: [1, 2}"
-        if conn.dialect.name != "postgresql":
-            stored = stored.encode()
+        raw = "Requester: {a: [1, 2}"
+        stored: bytes | str = raw if conn.dialect.name == "postgresql" else raw.encode()
         conn.execute(
             text(
                 "INSERT INTO gi_webservice_config (id, name, config, valid_id, create_time,"
@@ -147,9 +147,11 @@ async def test_broken_yaml_does_not_hide_others(sync_url: str) -> None:
     snapshot = GiWebservices()
 
     async def run(session: AsyncSession) -> None:
-        await snapshot.refresh(session, SysConfig(session))
+        with structlog.testing.capture_logs() as logs:
+            await snapshot.refresh(session, SysConfig(session))
         assert snapshot.by_id(BROKEN_ID) is None
         assert snapshot.by_id(REQ_ID) is not None
+        assert any(e["event"] == "gi_webservice_invalid" and e["ws_id"] == BROKEN_ID for e in logs)
 
     await _with_session(sync_url, run)
 
@@ -160,14 +162,14 @@ async def test_unparsable_requester_logged_and_skipped(
     from tiqora.api.compat.mapping import MappingError
     from tiqora.gi import loader
 
-    real = loader.parse_requester
+    real = parse_requester
 
     def flaky(config: dict[str, Any], *, huge_xml: bool) -> Any:
         if config["Requester"]["Transport"]["Config"]["Host"].endswith("bad.example.org"):
             raise MappingError("boom")
         return real(config, huge_xml=huge_xml)
 
-    monkeypatch.setattr(loader, "parse_requester", flaky)
+    monkeypatch.setattr(loader, "parse_requester", flaky)  # type: ignore[attr-defined]
     engine = create_engine(sync_url)
     with engine.begin() as conn:
         insert_webservice(
@@ -215,5 +217,38 @@ async def test_fqdn_placeholder_replaced_from_sysconfig(sync_url: str) -> None:
         assert await load_gi_webservice(session, sysconfig, DISABLED_ID) is None
         assert await load_gi_webservice(session, sysconfig, PROVIDER_ID) is None
         assert await load_gi_webservice(session, sysconfig, 51019) is None
+
+    await _with_session(sync_url, run)
+
+
+async def test_unexpected_error_in_one_row_does_not_block_others(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tiqora.gi import loader
+
+    real = parse_requester
+
+    def explode(config: dict[str, Any], *, huge_xml: bool) -> Any:
+        if config["Requester"]["Transport"]["Config"]["Host"].endswith("bad.example.org"):
+            raise RuntimeError("unexpected")
+        return real(config, huge_xml=huge_xml)
+
+    monkeypatch.setattr(loader, "parse_requester", explode)  # type: ignore[attr-defined]
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        insert_webservice(
+            conn,
+            ws_id=BROKEN_ID,
+            name="GiLoaderBoom",
+            config=requester_config(host="https://bad.example.org", invokers=INVOKERS),
+        )
+    engine.dispose()
+    snapshot = GiWebservices()
+
+    async def run(session: AsyncSession) -> None:
+        with structlog.testing.capture_logs() as logs:
+            await snapshot.refresh(session, SysConfig(session))
+        assert snapshot.by_id(BROKEN_ID) is None and snapshot.by_id(REQ_ID) is not None
+        assert any(e["event"] == "gi_webservice_unexpected_error" for e in logs)
 
     await _with_session(sync_url, run)
