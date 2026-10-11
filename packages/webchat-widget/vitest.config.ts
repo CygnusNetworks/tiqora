@@ -9,6 +9,7 @@ export default defineConfig({
   plugins: [widgetLocales({ localesDir: here("../../frontend/src/i18n/locales") })],
   test: {
     environment: "jsdom",
+    environmentOptions: { jsdom: { url: "http://localhost/" } },
     include: ["src/**/*.{test,spec}.{ts,tsx}", "scripts/**/*.test.ts"],
   },
 });

@@ -53,6 +53,12 @@ function interpolate(template: string, vars: Record<string, string> | undefined)
 export async function loadMessages(lang: string): Promise<Translate> {
   const chosen = pickLanguage(lang, LANGS);
   const loader = load[chosen] ?? load[FALLBACK_LANG];
-  const messages: Record<string, string> = loader ? (await loader()).default : {};
+  let messages: Record<string, string> = {};
+  try {
+    // English is already merged into every chunk at build time: no second runtime load.
+    if (loader) messages = (await loader()).default;
+  } catch {
+    // chunk fetch failed (offline, blocked): the keys themselves are the fallback text
+  }
   return (key, vars) => interpolate(has(messages, key) ? messages[key] : key, vars);
 }

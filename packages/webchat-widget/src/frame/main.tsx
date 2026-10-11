@@ -15,7 +15,7 @@ async function start(): Promise<void> {
   const lang = pickLanguage(params.get("lang") ?? navigator.language, LANGS);
   document.documentElement.lang = lang.replace("_", "-");
   document.documentElement.dir = isRtl(lang) ? "rtl" : "ltr";
-  await loadMessages(lang);
+  await loadMessages(lang).catch(() => undefined);
   const root = document.getElementById("app");
   if (root) render(<Placeholder />, root);
 }
