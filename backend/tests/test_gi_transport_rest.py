@@ -453,6 +453,48 @@ async def test_204_and_text_plain_and_bad_json() -> None:
     assert res.success and res.data == {}
 
 
+@pytest.mark.parametrize(
+    "extra, data",
+    [
+        ({"AdditionalHeaders": {"X-Name": "Müller"}}, {"TicketID": 7}),
+        ({}, {"TicketID": 7, "__RequestHeaders": {"X-Name": "Müller"}}),
+        ({}, {"TicketID": 7, "__RequestHeadersAppend": {"X-Name": "Müller"}}),
+    ],
+)
+async def test_non_ascii_header_values_are_sent_as_utf8(
+    extra: dict[str, Any], data: dict[str, Any]
+) -> None:
+    res, r = await call(config(**extra), data)
+    assert res.success
+    assert ("X-Name".lower().encode(), "Müller".encode()) in [
+        (k.lower(), v) for k, v in r.seen[0].headers.raw
+    ]
+
+
+@pytest.mark.parametrize("bad", ["a\r\nX-Evil: 1"])
+async def test_unsendable_header_value_is_a_failure_not_an_exception(bad: str) -> None:
+    res, r = await call(config(), {"TicketID": 7, "__RequestHeadersAppend": {"X-Bad": bad}})
+    assert not res.success and res.error_message
+    assert any(row.summary.startswith("Error while performing REST") for row in r.sink.rows)
+    assert not r.seen
+
+
+async def test_lone_surrogate_in_header_is_replaced_not_raised() -> None:
+    res, r = await call(config(), {"TicketID": 7, "__RequestHeadersAppend": {"X-S": "a\ud800b"}})
+    assert res.success and r.seen[0].headers["x-s"] == "a?b"
+
+
+async def test_nan_timeout_is_a_config_error() -> None:
+    res, _ = await call(config(Timeout="nan"), {"TicketID": 7})
+    assert not res.success and "Invalid Timeout" in (res.error_message or "")
+
+
+async def test_lowercase_content_type_append_still_picks_the_encoder() -> None:
+    form = {"content-type": "application/x-www-form-urlencoded"}
+    _, r = await call(config(), {"TicketID": 7, "a": "1", "__RequestHeadersAppend": form})
+    assert r.seen[0].content == b"a=1"
+
+
 async def test_response_size_cap_and_logging_threshold(monkeypatch: pytest.MonkeyPatch) -> None:
     small = EgressPolicy(
         allow_networks=EGRESS_TEST_POLICY.allow_networks,

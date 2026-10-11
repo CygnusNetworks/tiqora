@@ -22,6 +22,7 @@ from __future__ import annotations
 import base64
 import copy
 import json
+import math
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -246,6 +247,10 @@ def _json_body(data: Any) -> str:
     return text.replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
 
 
+def _utf8_safe(text: str) -> str:
+    return text.encode("utf-8", errors="replace").decode("utf-8")
+
+
 def _set_header(headers: dict[str, str], name: str, value: str) -> None:
     """Set a header, replacing one of the same name in any letter case (HTTP::Headers)."""
     for existing in [k for k in headers if k.lower() == name.lower()]:
@@ -297,7 +302,7 @@ async def build_rest_request(
         timeout = min(float(perl_str(config["Timeout"])), policy.max_timeout)
     except ValueError:
         return _fail("REST Transport: Invalid Timeout in config")
-    if timeout <= 0:
+    if not math.isfinite(timeout) or timeout <= 0:
         return _fail("REST Transport: Invalid Timeout in config")
 
     host = perl_str(config["Host"])
@@ -440,7 +445,7 @@ async def build_rest_request(
     if _is_hash_with_data(payload):
         if command in _BODY_COMMANDS:
             await debugger.debug("Remaining outgoing data to be sent", payload)
-            media = headers.get("Content-Type")
+            media = next((v for k, v in headers.items() if k.lower() == "content-type"), None)
             if media == "application/x-www-form-urlencoded":
                 text = build_query(payload).removeprefix("?")
             elif media == "application/xml":
@@ -470,12 +475,14 @@ async def build_rest_request(
 
     for name, value in extra_headers.items():
         _set_header(headers, name, value)
+    # lone surrogates cannot be sent (nor logged): make them '?' instead of raising later
+    headers = {_utf8_safe(k): _utf8_safe(v) for k, v in headers.items()}
 
     # ---- target --------------------------------------------------------------------------
     url = host + (controller if controller.startswith("/") else "/" + controller)
     error_base = (
         f"Error while performing REST '{command}' request to Controller "
-        f"'{redact_url(controller)}' on Host '{host}'."
+        f"'{redact_url(controller)}' on Host '{redact_url(host)}'."
     )
     scheme = urlparse(url).scheme.lower()
     pinned: PinnedOutboundURL | None = None
@@ -544,6 +551,13 @@ async def rest_perform_request(
         send_url = prepared.url
         wire_headers = dict(prepared.headers)
         extensions = {}
+    if any(c in n or c in v for n, v in wire_headers.items() for c in "\r\n\0"):
+        detail = "Header name or value contains a control character (CR, LF or NUL)."
+        await debugger.error(prepared.error_base, detail)
+        return failed(f"{prepared.error_base} {detail}")
+    # httpx encodes str header values as ASCII and would raise on "Müller". Znuny sends the
+    # octets as they are, so send UTF-8 bytes (lone surrogates were replaced when building).
+    wire_list = [(n.encode("utf-8"), v.encode("utf-8")) for n, v in wire_headers.items()]
     proxy: httpx.Proxy | None = None
     if prepared.proxy_url:
         proxy = httpx.Proxy(prepared.proxy_url, headers=prepared.proxy_headers or None)
@@ -559,7 +573,7 @@ async def rest_perform_request(
             request = http.build_request(
                 prepared.method,
                 send_url,
-                headers=wire_headers,
+                headers=wire_list,
                 content=prepared.body,
                 timeout=prepared.timeout,
                 extensions=extensions,
@@ -575,7 +589,8 @@ async def rest_perform_request(
     except EgressError as exc:
         await debugger.error(prepared.error_base, str(exc))
         return failed(f"{prepared.error_base} {exc}", status)
-    except httpx.HTTPError as exc:
+    except (httpx.HTTPError, ValueError, TypeError) as exc:
+        # ValueError/TypeError: build_request rejecting a malformed header, URL or timeout
         detail = f"{type(exc).__name__}: {redact_text(str(exc), secrets)}"
         await debugger.error(prepared.error_base, detail)
         return failed(prepared.error_base, status)
@@ -592,7 +607,7 @@ async def rest_perform_request(
         await debugger.debug(
             "JSON data received from remote system was too large for logging",
             "See SysConfig option GenericInterface::Operation::ResponseLoggingMaxSize to change"
-            " the maximum.",
+            " the maximum (Tiqora: TIQORA_GI_DEBUG_MAX_CONTENT_BYTES).",
         )
     else:
         await debugger.debug("JSON data received from remote system", text)
