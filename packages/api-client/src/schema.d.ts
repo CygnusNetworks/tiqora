@@ -8068,6 +8068,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/import/znuny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Znuny Stats
+         * @description Znuny statistics the agent may run, mapped to Tiqora reports; saves nothing.
+         */
+        get: operations["preview_znuny_stats_api_v1_reports_import_znuny_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/import/znuny/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Znuny Stats
+         * @description Save the chosen Znuny statistics as private reports / saved searches (re-import updates).
+         */
+        post: operations["apply_znuny_stats_api_v1_reports_import_znuny_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/import/znuny/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Znuny Stats File
+         * @description Map a Znuny statistics export file (XML); saves nothing.
+         */
+        post: operations["preview_znuny_stats_file_api_v1_reports_import_znuny_file_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/run": {
         parameters: {
             query?: never;
@@ -15810,6 +15870,41 @@ export interface components {
             /** Test Id */
             test_id: string;
         };
+        /** ImportIssueOut */
+        ImportIssueOut: {
+            /** Element */
+            element: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "dropped" | "approximated";
+            /** Value */
+            value: string;
+        };
+        /** ImportedStatOut */
+        ImportedStatOut: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "created" | "updated";
+            /** Id */
+            id: number;
+            /** Import Key */
+            import_key: string;
+            /** Issues */
+            issues: components["schemas"]["ImportIssueOut"][];
+            /**
+             * Target
+             * @enum {string}
+             */
+            target: "report" | "saved_search";
+            /** Title */
+            title: string;
+        };
         /** JitDefaults */
         JitDefaults: {
             /** Allowed Email Domains */
@@ -20200,6 +20295,43 @@ export interface components {
             /** Valid Id */
             valid_id?: number | null;
         };
+        /**
+         * StatLoadErrorOut
+         * @description ``stat_id`` is None in the aggregate entry non-admins get (no ids of unreadable stats).
+         */
+        StatLoadErrorOut: {
+            /** Message */
+            message: string;
+            /** Stat Id */
+            stat_id: number | null;
+        };
+        /** StatPreviewOut */
+        StatPreviewOut: {
+            /** Already Imported */
+            already_imported: ("report" | "saved_search") | null;
+            definition: components["schemas"]["ReportDefinition"] | null;
+            /** Description */
+            description: string;
+            /** Existing Id */
+            existing_id: number | null;
+            /** Import Key */
+            import_key: string;
+            /** Issues */
+            issues: components["schemas"]["ImportIssueOut"][];
+            /** Object Label */
+            object_label: string;
+            /** Stat Id */
+            stat_id: number | null;
+            /** Stat Number */
+            stat_number: string | null;
+            /**
+             * Target
+             * @enum {string}
+             */
+            target: "report" | "saved_search" | "none";
+            /** Title */
+            title: string;
+        };
         /** StateCreate */
         StateCreate: {
             /** Comments */
@@ -22099,6 +22231,34 @@ export interface components {
             partial: boolean;
             /** Unmapped */
             unmapped: components["schemas"]["UnmappedOut"][];
+        };
+        /** ZnunyStatsApplyIn */
+        ZnunyStatsApplyIn: {
+            /** File Content Base64 */
+            file_content_base64?: string | null;
+            /** Stat Ids */
+            stat_ids?: number[];
+        };
+        /** ZnunyStatsApplyOut */
+        ZnunyStatsApplyOut: {
+            /** Imported */
+            imported: components["schemas"]["ImportedStatOut"][];
+            /** Skipped */
+            skipped: components["schemas"]["StatPreviewOut"][];
+        };
+        /** ZnunyStatsFileIn */
+        ZnunyStatsFileIn: {
+            /** Content Base64 */
+            content_base64: string;
+        };
+        /** ZnunyStatsPreviewOut */
+        ZnunyStatsPreviewOut: {
+            /** Errors */
+            errors: components["schemas"]["StatLoadErrorOut"][];
+            /** Stats */
+            stats: components["schemas"]["StatPreviewOut"][];
+            /** Truncated */
+            truncated: boolean;
         };
     };
     responses: never;
@@ -42998,6 +43158,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReportFileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_znuny_stats_api_v1_reports_import_znuny_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZnunyStatsPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_znuny_stats_api_v1_reports_import_znuny_apply_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZnunyStatsApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZnunyStatsApplyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_znuny_stats_file_api_v1_reports_import_znuny_file_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZnunyStatsFileIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZnunyStatsPreviewOut"];
                 };
             };
             /** @description Validation Error */

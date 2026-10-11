@@ -42,8 +42,16 @@ def _numeric_key(key: object) -> int | None:
 async def list_stat_ids(
     session: AsyncSession, *, permission_group_ids: Collection[int] | None = None
 ) -> list[int]:
+    ids, _more = await list_stat_ids_page(session, permission_group_ids=permission_group_ids)
+    return ids
+
+
+async def list_stat_ids_page(
+    session: AsyncSession, *, permission_group_ids: Collection[int] | None = None
+) -> tuple[list[int], bool]:
     """Numeric ``xml_key`` values of stored statistics, sorted, capped at MAX_PREVIEW_STATS.
 
+    The second value says that more stats than MAX_PREVIEW_STATS qualify.
     ``permission_group_ids=None`` lists everything (admins). Otherwise only stats with a
     ``Permission`` leaf naming one of these group ids qualify; the filter runs BEFORE the cap
     and reads only the cheap Permission leaves, so a large site cannot hide visible stats.
@@ -56,7 +64,7 @@ async def list_stat_ids(
     else:
         wanted = {str(g) for g in permission_group_ids}
         if not wanted:
-            return []
+            return [], False
         result = await session.execute(
             text(
                 "SELECT xml_key, xml_content_value FROM xml_storage "
@@ -66,7 +74,7 @@ async def list_stat_ids(
         )
         keys = [k for (k, value) in result.all() if value is not None and str(value) in wanted]
     ids = sorted({n for n in map(_numeric_key, keys) if n is not None})
-    return ids[:MAX_PREVIEW_STATS]
+    return ids[:MAX_PREVIEW_STATS], len(ids) > MAX_PREVIEW_STATS
 
 
 async def load_stats(

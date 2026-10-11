@@ -16631,6 +16631,87 @@
         "title": "IdentityTestStartOut",
         "type": "object"
       },
+      "ImportIssueOut": {
+        "properties": {
+          "element": {
+            "title": "Element",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "dropped",
+              "approximated"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "element",
+          "value",
+          "reason",
+          "severity"
+        ],
+        "title": "ImportIssueOut",
+        "type": "object"
+      },
+      "ImportedStatOut": {
+        "properties": {
+          "action": {
+            "enum": [
+              "created",
+              "updated"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "import_key": {
+            "title": "Import Key",
+            "type": "string"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/ImportIssueOut"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "target": {
+            "enum": [
+              "report",
+              "saved_search"
+            ],
+            "title": "Target",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "import_key",
+          "title",
+          "target",
+          "id",
+          "action",
+          "issues"
+        ],
+        "title": "ImportedStatOut",
+        "type": "object"
+      },
       "JitDefaults": {
         "properties": {
           "allowed_email_domains": {
@@ -30121,6 +30202,141 @@
         "title": "StandardTemplateUpdate",
         "type": "object"
       },
+      "StatLoadErrorOut": {
+        "description": "``stat_id`` is None in the aggregate entry non-admins get (no ids of unreadable stats).",
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "stat_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stat Id"
+          }
+        },
+        "required": [
+          "stat_id",
+          "message"
+        ],
+        "title": "StatLoadErrorOut",
+        "type": "object"
+      },
+      "StatPreviewOut": {
+        "properties": {
+          "already_imported": {
+            "anyOf": [
+              {
+                "enum": [
+                  "report",
+                  "saved_search"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Already Imported"
+          },
+          "definition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportDefinition"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "existing_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Existing Id"
+          },
+          "import_key": {
+            "title": "Import Key",
+            "type": "string"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/ImportIssueOut"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "object_label": {
+            "title": "Object Label",
+            "type": "string"
+          },
+          "stat_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stat Id"
+          },
+          "stat_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stat Number"
+          },
+          "target": {
+            "enum": [
+              "report",
+              "saved_search",
+              "none"
+            ],
+            "title": "Target",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "import_key",
+          "stat_id",
+          "stat_number",
+          "title",
+          "description",
+          "object_label",
+          "target",
+          "issues",
+          "definition",
+          "already_imported",
+          "existing_id"
+        ],
+        "title": "StatPreviewOut",
+        "type": "object"
+      },
       "StateCreate": {
         "properties": {
           "comments": {
@@ -35390,6 +35606,101 @@
           "partial"
         ],
         "title": "ZnunyProfilePreviewOut",
+        "type": "object"
+      },
+      "ZnunyStatsApplyIn": {
+        "additionalProperties": false,
+        "properties": {
+          "file_content_base64": {
+            "anyOf": [
+              {
+                "maxLength": 1333336,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Content Base64"
+          },
+          "stat_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 200,
+            "title": "Stat Ids",
+            "type": "array"
+          }
+        },
+        "title": "ZnunyStatsApplyIn",
+        "type": "object"
+      },
+      "ZnunyStatsApplyOut": {
+        "properties": {
+          "imported": {
+            "items": {
+              "$ref": "#/components/schemas/ImportedStatOut"
+            },
+            "title": "Imported",
+            "type": "array"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/StatPreviewOut"
+            },
+            "title": "Skipped",
+            "type": "array"
+          }
+        },
+        "required": [
+          "imported",
+          "skipped"
+        ],
+        "title": "ZnunyStatsApplyOut",
+        "type": "object"
+      },
+      "ZnunyStatsFileIn": {
+        "properties": {
+          "content_base64": {
+            "maxLength": 1333336,
+            "minLength": 1,
+            "title": "Content Base64",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content_base64"
+        ],
+        "title": "ZnunyStatsFileIn",
+        "type": "object"
+      },
+      "ZnunyStatsPreviewOut": {
+        "properties": {
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/StatLoadErrorOut"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "stats": {
+            "items": {
+              "$ref": "#/components/schemas/StatPreviewOut"
+            },
+            "title": "Stats",
+            "type": "array"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stats",
+          "errors",
+          "truncated"
+        ],
+        "title": "ZnunyStatsPreviewOut",
         "type": "object"
       }
     }
@@ -79677,6 +79988,224 @@
           }
         },
         "summary": "Import Report File",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/import/znuny": {
+      "get": {
+        "description": "Znuny statistics the agent may run, mapped to Tiqora reports; saves nothing.",
+        "operationId": "preview_znuny_stats_api_v1_reports_import_znuny_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZnunyStatsPreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Znuny Stats",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/import/znuny/apply": {
+      "post": {
+        "description": "Save the chosen Znuny statistics as private reports / saved searches (re-import updates).",
+        "operationId": "apply_znuny_stats_api_v1_reports_import_znuny_apply_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ZnunyStatsApplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZnunyStatsApplyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Znuny Stats",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/import/znuny/file": {
+      "post": {
+        "description": "Map a Znuny statistics export file (XML); saves nothing.",
+        "operationId": "preview_znuny_stats_file_api_v1_reports_import_znuny_file_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ZnunyStatsFileIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZnunyStatsPreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Znuny Stats File",
         "tags": [
           "reports"
         ]
