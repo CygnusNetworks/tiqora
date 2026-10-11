@@ -114,7 +114,7 @@ def extract_soap_action_operation(soap_action: str | None) -> str | None:
     return stripped or None
 
 
-def _element_to_value(el: Element) -> Any:
+def element_to_value(el: Element) -> Any:
     """Decode an element to a scalar (leaf) or dict (has children)."""
     children = list(el)
     if not children:
@@ -122,12 +122,15 @@ def _element_to_value(el: Element) -> Any:
     return _children_to_dict(children)
 
 
+_element_to_value = element_to_value  # old private name
+
+
 def _children_to_dict(children: list[Element]) -> dict[str, Any]:
     """Group child elements by local tag name; repeats become lists."""
     grouped: dict[str, list[Any]] = {}
     for child in children:
         tag = _local_name(child.tag)
-        grouped.setdefault(tag, []).append(_element_to_value(child))
+        grouped.setdefault(tag, []).append(element_to_value(child))
     return {tag: (vals[0] if len(vals) == 1 else vals) for tag, vals in grouped.items()}
 
 
