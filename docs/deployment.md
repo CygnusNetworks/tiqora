@@ -427,12 +427,12 @@ streams for 3 minutes (one run of 20 streams for 30 s beforehand):
 
 | Streams held | Errors | API memory (RSS) | API CPU while holding |
 |---|---|---|---|
-| idle (after a 20-stream warm-up) | | 232 MiB | 0.2 % |
+| idle (after a 20-stream warm-up) | | 232 MiB | 0.16 % |
 | 200 | 0 | 255 MiB | about 7 % |
 | 500 | 0 | 306 MiB | about 7 % |
 
 That is roughly 0.15 MiB per open stream, with every heartbeat (every 25 s) re-reading the DB per stream. Memory
-is not returned after the streams close. These numbers are for orientation only; they come from one laptop and
+stayed at the peak (about 307 MiB) after the 500 streams closed. These numbers are for orientation only; they come from one laptop and
 idle streams (no messages). Plan for one `tiqora-api` process per roughly 500 open streams (the default
 `TIQORA_CHAT_MAX_STREAMS`), and raise the file-descriptor limit before raising the cap.
 

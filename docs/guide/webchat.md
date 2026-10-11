@@ -82,8 +82,8 @@ das Formular.
   **Nachrichten pro Chat (pro Minute)**. Die Standardwerte passen für die meisten Websites.
 - **Datei-Uploads**: **Datei-Uploads erlauben**, **Höchstgröße (MB)** und **Erlaubte Dateiarten** (PNG, JPEG,
   GIF, WebP, PDF, Textdatei). Andere Dateiarten, etwa Office-Dokumente oder Archive, lassen sich nicht freigeben.
-- **Aufbewahrung Chatverlauf (Tage)**: Danach werden Verlauf und Anhänge des Chats gelöscht; das Ticket bleibt
-  (siehe „Datenschutz“).
+- **Aufbewahrung Chatverlauf (Tage)**: Danach werden der Chatverlauf gelöscht und die Besucherdaten entfernt; Anhänge bleiben am Ticket; das Ticket
+  bleibt (siehe „Datenschutz“).
 
 **Einbetten**
 
@@ -200,9 +200,9 @@ Annehmen: Ein Mensch muss den Chat zuerst annehmen. Die REST-Endpunkte unter `/a
   Internetadresse (IP) wird nie im Klartext gespeichert, sondern nur als Hash mit einem geheimen Schlüssel, der
   sich nicht zurückrechnen lässt. Sie dient der Missbrauchsabwehr.
 - **Aufbewahrung**: Nach der unter **Aufbewahrung Chatverlauf (Tage)** eingestellten Frist (ab Ende des Chats,
-  ab Werk 30 Tage) löscht Tiqora automatisch Verlauf und Anhänge der Sitzung und entfernt Name, Adresse, Seite,
-  Browser-Kennung, IP-Hash und Besucher-ID. Nur eine leere Hülle bleibt als Verweis auf das Ticket. Die
-  Artikel im Ticket bleiben bestehen und werden wie alle Tickets über die DSGVO-Werkzeuge (Aufbewahrungsregeln,
+  ab Werk 30 Tage) löscht Tiqora automatisch den Chatverlauf (die Nachrichtenzeilen der Sitzung) und entfernt Name,
+  Adresse, Seite, Browser-Kennung, IP-Hash und Besucher-ID. Nur eine leere Hülle bleibt als Verweis auf das
+  Ticket. Die Artikel im Ticket, auch der Chattext und die Anhänge, bleiben bestehen und werden wie alle Tickets über die DSGVO-Werkzeuge (Aufbewahrungsregeln,
   Löschung, Anonymisierung) behandelt, siehe [gdpr.md](../gdpr.md#web-chat).
 - **Offline-Formular**: speichert eine beendete Sitzung mit demselben Aufbewahrungsverlauf; das Ticket folgt den
   üblichen Regeln.

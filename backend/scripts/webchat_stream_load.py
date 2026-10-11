@@ -10,12 +10,17 @@ NEVER point this at a production host: every session creates a real ticket.
 
 Prerequisites on the test instance (the defaults would throttle one load generator):
   * the web chat channel is on and a chat config with ``--key`` allows ``--website-origin``;
+    the chat has no required topic and no required pre-chat fields (the script sends neither);
   * the config's rate limits are raised (``sessions_per_config_minute`` 300,
     ``sessions_per_ip_10min`` 100) or ``--rate`` is kept below them;
   * ``TIQORA_CHAT_MAX_STREAMS`` >= N;
   * for the per-IP stream cap (6) the script sends a distinct ``X-Forwarded-For`` per
     session, which only counts when the peer is trusted: set
     ``TIQORA_TRUSTED_PROXIES=0.0.0.0/0`` (test instance only).
+
+The server ends a stream after 30 minutes and the script does not reconnect, so keep ``--minutes``
+below 30 (longer runs show up as ``closed early``). After the hold time streams end on their next
+SSE line (a heartbeat, at most 25 s later).
 
 Example::
 
@@ -168,7 +173,6 @@ async def run(args: argparse.Namespace) -> int:
                 + (f" rss={rss:.0f}MiB" if rss is not None else ""),
                 flush=True,
             )
-        deadline = 0.0  # release every stream
         await asyncio.gather(*tasks, return_exceptions=True)
 
     rss_after = rss_mib(args.pid) if args.pid else None

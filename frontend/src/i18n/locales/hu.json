@@ -5521,7 +5521,7 @@
           "text/plain": "Text file"
         },
         "retention": "Keep chat history (days)",
-        "retentionHint": "After that the chat history and attachments are deleted; the ticket stays."
+        "retentionHint": "After that the chat transcript is deleted and the visitor data cleared; attachments stay on the ticket; the ticket stays."
       },
       "embed": {
         "afterSave": "The embed code appears after the first save.",

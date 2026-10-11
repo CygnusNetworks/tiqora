@@ -301,11 +301,14 @@ The web chat ([guide](guide/webchat.md)) keeps visitor data in four places:
   for rate limiting and abuse protection and is cleared with the rest of the visitor data.
 - **Retention purge.** The `webchat_sweep` of `tiqora-worker` runs the chat's own retention, not the GDPR
   retention engine (that engine handles tickets; chat rows are a side table). After the chat's
-  **Aufbewahrung Chatverlauf (Tage)** (default 30, counted from the end of the chat) it deletes the messages and
-  attachment rows and clears name, e-mail, page URL, user agent, IP hash, `visitor_id` and the token hash. A
+  **Aufbewahrung Chatverlauf (Tage)** (default 30, counted from the end of the chat) it deletes the `tiqora_chat_message`
+  rows (transcript lines and the attachment listing) and clears name, e-mail, page URL, user agent, IP hash,
+  `visitor_id` and the token hash of the session row. Attachment files are article attachments of the ticket and
+  are **not** deleted by the purge. A
   tombstone row stays for the ticket link and keeps `customer_user_login` (identical to the ticket's customer;
-  erasure removes the whole row). The purge does not touch the ticket's articles, which still carry the visitor's
-  address and name in their headers: those follow the ticket's own retention and erasure.
+  erasure removes the whole row). The purge does not touch the ticket's articles or their attachments: the chat transcript articles still carry
+  the visitor's address, name and text, and the files stay. They follow the ticket's own retention and GDPR
+  erasure.
 - **How far a visitor's e-mail reaches.** The address the visitor typed lives in `tiqora_chat_session.visitor_email`,
   in the `From` header of the visitor's articles and, when it matched or created a customer, in the ticket's
   customer fields. Erasure of a customer reaches chat rows **through the ticket**: every chat session and message
@@ -313,7 +316,7 @@ The web chat ([guide](guide/webchat.md)) keeps visitor data in four places:
   e-mail value itself. A session whose `visitor_email` is the erased person but whose ticket belongs to another
   customer (an agent changed the customer, or the chat's **Standard-Kunde** received a ticket for an address that
   matched nobody) is not reached; this is the same scope rule as for mail (see "Scope is by ticket customer"
-  below). For such a person, delete or anonymize the chat tickets themselves, or wait for the retention purge,
+  above). For such a person, delete or anonymize the chat tickets themselves, or wait for the retention purge,
   which clears the e-mail from the session row regardless of the customer.
 - **Chat without an address.** A visitor who gave no address gets a placeholder sender
   (`visitor-...@chat.invalid`); nothing is ever mailed to it (recipients in the reserved `.invalid` TLD are

@@ -602,7 +602,9 @@ internet endpoint**, so abuse protection (rate limits, origin checks, upload lim
   `NotificationNewTicket`; follow-up lines use the normal agent notifications.
 - **Sweep.** `tiqora-worker` runs `webchat_sweep` (every `TIQORA_WEBCHAT_SWEEP_INTERVAL`, default 15 s; service
   switch `daemon.webchat_sweep.enabled`, default on): waiting timeout (`no_agent`), idle chats (`abandoned`) and
-  the retention purge.
+  the retention purge, which deletes the `tiqora_chat_message` rows and clears the session's visitor columns;
+  the transcript articles and their attachments stay on the ticket under the ticket's own retention and GDPR
+  erasure.
 - **AI.** Webchat articles are skipped by the auto-reply worker in phase 1; drafts work as on other tickets.
 - **Not a chat engine of Znuny.** Znuny's own chat module is not used.
 

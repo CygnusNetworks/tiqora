@@ -5529,7 +5529,7 @@
           "text/plain": "Textdatei"
         },
         "retention": "Aufbewahrung Chatverlauf (Tage)",
-        "retentionHint": "Danach werden Verlauf und Anhänge des Chats gelöscht; das Ticket bleibt."
+        "retentionHint": "Danach werden der Chatverlauf gelöscht und die Besucherdaten entfernt; Anhänge bleiben am Ticket; das Ticket bleibt."
       },
       "embed": {
         "afterSave": "Der Einbettungscode erscheint nach dem ersten Speichern.",
