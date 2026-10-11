@@ -134,6 +134,14 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build api-client
         run: pnpm --filter @tiqora/api-client build
+      - name: Lint webchat widget
+        run: pnpm --filter @tiqora/webchat-widget lint
+      - name: Test webchat widget
+        run: pnpm --filter @tiqora/webchat-widget test
+      # Includes scripts/check-size.mjs: fails when loader.js or the frame start
+      # exceeds its gzip budget.
+      - name: Build webchat widget
+        run: pnpm --filter @tiqora/webchat-widget build
       - name: Lint
         run: pnpm --filter tiqora-frontend lint
       - name: Typecheck + build

@@ -6,8 +6,8 @@ ARG PYTHON_VERSION=3.12
 ARG NODE_VERSION=22
 
 # ---------- Frontend build ----------
-# The frontend lives in a pnpm workspace (root package.json + packages/api-client),
-# so the workspace context is required for the install.
+# The frontend lives in a pnpm workspace (root package.json + packages/*:
+# api-client, webchat-widget), so the workspace context is required for the install.
 # Pinned to the build host's platform: dist/ is plain static files and
 # identical for every target arch, so a multi-arch build runs pnpm install +
 # vite once natively instead of once more under QEMU (slow, and prone to
@@ -28,6 +28,9 @@ RUN corepack enable \
     && pnpm install --frozen-lockfile
 COPY frontend/ ./frontend/
 RUN pnpm --filter tiqora-frontend build
+# Web-chat widget (loader.js, frame.html, assets/). Needs frontend/ for its texts
+# (webchatWidget.* in the locale files); its build ends with the gzip size budget.
+RUN pnpm --filter @tiqora/webchat-widget build
 
 # ---------- Python deps ----------
 # Base: python:*-slim-bookworm (Debian 12). gssapi (kerberos extra) needs
@@ -118,6 +121,8 @@ COPY backend/alembic /app/backend/alembic
 COPY backend/alembic.ini /app/backend/alembic.ini
 COPY backend/pyproject.toml /app/backend/pyproject.toml
 COPY --from=frontend-build /workspace/frontend/dist /app/frontend/dist
+# Served by webchat/static.py from TIQORA_WEBCHAT_DIST_DIR (default /app/webchat/dist).
+COPY --from=frontend-build /workspace/packages/webchat-widget/dist /app/webchat/dist
 COPY docker/entrypoint.sh /app/entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh

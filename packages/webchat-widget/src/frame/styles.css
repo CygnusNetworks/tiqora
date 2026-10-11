@@ -1,0 +1,27 @@
+/* Chat frame base styles. Theme colours are applied through the CSSOM at runtime
+   (never via inline style attributes or <style> elements: the frame CSP has no
+   'unsafe-inline'). */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+#app {
+  height: 100%;
+}

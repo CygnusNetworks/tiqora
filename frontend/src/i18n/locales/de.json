@@ -5338,5 +5338,80 @@
     "rangeInvalid": "Das Startdatum liegt nach dem Enddatum. Bitte den Zeitraum korrigieren.",
     "deniedTitle": "Kein Zugriff auf Berichte",
     "deniedBody": "Ihr Konto darf die Berichte nicht ansehen. Bitte wenden Sie sich an Ihre Administration."
+  },
+  "webchatWidget": {
+    "launcher": {
+      "open": "Chat öffnen",
+      "close": "Chat schließen",
+      "default": "Fragen? Schreiben Sie uns"
+    },
+    "header": {
+      "close": "Schließen",
+      "support": "Support"
+    },
+    "status": {
+      "waiting": "Einen Moment – gleich ist jemand für Sie da.",
+      "active": "{{name}} ist im Chat",
+      "activeAnon": "Ein Mitarbeiter ist im Chat",
+      "ended": "Der Chat ist beendet.",
+      "reconnecting": "Verbindung unterbrochen – wir verbinden neu …"
+    },
+    "prechat": {
+      "title": "Bevor es losgeht",
+      "topic": "Worum geht es?",
+      "message": "Ihre Nachricht",
+      "start": "Chat starten",
+      "privacy": "Datenschutzhinweise",
+      "required": "Bitte ausfüllen.",
+      "invalidEmail": "Bitte eine gültige E-Mail-Adresse eingeben.",
+      "invalidOption": "Bitte eine Auswahl treffen.",
+      "tooLong": "Der Text ist zu lang."
+    },
+    "composer": {
+      "placeholder": "Nachricht schreiben …",
+      "send": "Senden",
+      "attach": "Datei anhängen",
+      "tooLong": "Die Nachricht ist zu lang (höchstens {{max}} Zeichen).",
+      "failed": "Nicht gesendet – erneut versuchen",
+      "retry": "Erneut senden"
+    },
+    "upload": {
+      "tooLarge": "Die Datei ist zu groß (höchstens {{max}}).",
+      "type": "Diese Dateiart wird nicht angenommen.",
+      "failed": "Die Datei konnte nicht hochgeladen werden.",
+      "download": "Herunterladen"
+    },
+    "typing": "schreibt …",
+    "you": "Sie",
+    "offline": {
+      "title": "Gerade ist niemand im Chat",
+      "text": "Hinterlassen Sie uns eine Nachricht – wir antworten per E-Mail.",
+      "send": "Nachricht senden",
+      "thanks": "Danke! Wir melden uns per E-Mail."
+    },
+    "system": {
+      "agent_joined": "{{name}} ist dem Chat beigetreten.",
+      "agent_joinedAnon": "Ein Mitarbeiter ist dem Chat beigetreten.",
+      "chat_ended": "Der Chat wurde beendet.",
+      "visitor_left": "Sie haben den Chat beendet.",
+      "no_agent": "Gerade ist niemand frei. Wir antworten Ihnen per E-Mail.",
+      "no_agentNoEmail": "Gerade ist niemand frei. Wohin dürfen wir Ihnen antworten?",
+      "idle_closed": "Der Chat wurde wegen Inaktivität beendet."
+    },
+    "contact": {
+      "title": "Ihre E-Mail-Adresse",
+      "save": "Speichern",
+      "saved": "Danke, wir antworten per E-Mail."
+    },
+    "ended": {
+      "restart": "Neuen Chat starten",
+      "end": "Chat beenden"
+    },
+    "error": {
+      "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es noch einmal.",
+      "rateLimited": "Zu viele Nachrichten – bitte kurz warten.",
+      "unavailable": "Der Chat ist gerade nicht erreichbar.",
+      "notAllowed": "Dieser Chat ist für diese Website nicht freigegeben."
+    }
   }
 }

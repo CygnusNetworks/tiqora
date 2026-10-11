@@ -5338,5 +5338,80 @@
     "rangeInvalid": "The start date is after the end date. Please correct the period.",
     "deniedTitle": "No access to reports",
     "deniedBody": "Your account is not allowed to view reports. Please contact your administrator."
+  },
+  "webchatWidget": {
+    "launcher": {
+      "open": "Open chat",
+      "close": "Close chat",
+      "default": "Questions? Write to us"
+    },
+    "header": {
+      "close": "Close",
+      "support": "Support"
+    },
+    "status": {
+      "waiting": "One moment – someone will be with you shortly.",
+      "active": "{{name}} is in the chat",
+      "activeAnon": "A team member is in the chat",
+      "ended": "The chat has ended.",
+      "reconnecting": "Connection lost – reconnecting …"
+    },
+    "prechat": {
+      "title": "Before we start",
+      "topic": "What is it about?",
+      "message": "Your message",
+      "start": "Start chat",
+      "privacy": "Privacy notice",
+      "required": "Please fill in.",
+      "invalidEmail": "Please enter a valid email address.",
+      "invalidOption": "Please choose an option.",
+      "tooLong": "The text is too long."
+    },
+    "composer": {
+      "placeholder": "Write a message …",
+      "send": "Send",
+      "attach": "Attach file",
+      "tooLong": "The message is too long (at most {{max}} characters).",
+      "failed": "Not sent – try again",
+      "retry": "Send again"
+    },
+    "upload": {
+      "tooLarge": "The file is too large (at most {{max}}).",
+      "type": "This file type is not accepted.",
+      "failed": "The file could not be uploaded.",
+      "download": "Download"
+    },
+    "typing": "is typing …",
+    "you": "You",
+    "offline": {
+      "title": "Nobody is available right now",
+      "text": "Leave us a message – we will reply by email.",
+      "send": "Send message",
+      "thanks": "Thank you! We will get back to you by email."
+    },
+    "system": {
+      "agent_joined": "{{name}} has joined the chat.",
+      "agent_joinedAnon": "A team member has joined the chat.",
+      "chat_ended": "The chat has been ended.",
+      "visitor_left": "You have ended the chat.",
+      "no_agent": "Nobody is free right now. We will reply to you by email.",
+      "no_agentNoEmail": "Nobody is free right now. Where may we send our reply?",
+      "idle_closed": "The chat was closed due to inactivity."
+    },
+    "contact": {
+      "title": "Your email address",
+      "save": "Save",
+      "saved": "Thank you, we will reply by email."
+    },
+    "ended": {
+      "restart": "Start a new chat",
+      "end": "End chat"
+    },
+    "error": {
+      "generic": "Something went wrong. Please try again.",
+      "rateLimited": "Too many messages – please wait a moment.",
+      "unavailable": "The chat is not available right now.",
+      "notAllowed": "This chat is not enabled for this website."
+    }
   }
 }
