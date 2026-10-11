@@ -280,11 +280,14 @@ async def _article_count(env: Env, ticket_id: int) -> int:
 
 
 async def _history(env: Env, ticket_id: int) -> list[str]:
+    # ``TicketUnlockTimeoutUpdate`` writes a Misc "Reset of unlock time." row whenever the
+    # second-resolution unlock timestamp moved between two writes: wall-clock dependent, so
+    # it is not part of what these tests assert (the cause of the intermittent failures).
     rows = await _rows(
         env,
         "SELECT ht.name FROM ticket_history h"
         " JOIN ticket_history_type ht ON ht.id = h.history_type_id"
-        " WHERE h.ticket_id = :t ORDER BY h.id",
+        " WHERE h.ticket_id = :t AND h.name <> 'Reset of unlock time.' ORDER BY h.id",
         t=ticket_id,
     )
     return [str(r[0]) for r in rows]

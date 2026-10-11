@@ -16,6 +16,7 @@ from typing import Any
 from sqlalchemy import Connection, delete, insert, text
 
 from tiqora.db.tiqora.models import TiqoraChatConfig, TiqoraSettings
+from tiqora.webchat.config_cache import clear_config_cache
 from tiqora.webchat.models import ChatConfigValues, ChatTopic
 
 NOW = datetime(2026, 10, 10, 12, 0, 0)
@@ -137,7 +138,12 @@ def cleanup_band(
     group_ids: Iterable[int],
     user_ids: Iterable[int],
 ) -> None:
-    """Remove everything a module seeded in its band; safe to call before and after."""
+    """Remove everything a module seeded in its band; safe to call before and after.
+
+    Also drops the process-wide public config cache, so no cached config or channel switch
+    leaks from one module into the next.
+    """
+    clear_config_cache()
     lo, hi = config_ids.start, config_ids.stop
     users, groups, queues = list(user_ids), list(group_ids), list(queue_ids)
     band = {"lo": lo, "hi": hi}
@@ -162,7 +168,7 @@ def cleanup_band(
     ):
         for i in ids:
             conn.execute(text(sql), {"i": i})
-    conn.execute(delete(TiqoraSettings).where(TiqoraSettings.key.like("channel.webchat.%")))
+    conn.execute(delete(TiqoraSettings).where(TiqoraSettings.key == "channel.webchat.enabled"))
 
 
 def enable_webchat(conn: Connection) -> None:

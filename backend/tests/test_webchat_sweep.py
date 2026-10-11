@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, delete, insert, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tests._fake_redis import FakeRedis
@@ -26,6 +26,7 @@ from tests._webchat_fixtures import (
 )
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
+from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.events.pubsub import TIQORA_EVENTS_CHANNEL
 from tiqora.webchat import sweep as sweep_module
 from tiqora.webchat.availability import VISITOR_SEEN_PREFIX, mark_agent_online, set_agent_state
@@ -43,6 +44,7 @@ GROUP, QUEUE, CONFIG, CONFIG_OFF, AGENT = 48700, 48701, 48702, 48703, 48704
 CONFIG_IDS = range(48700, 48730)
 KEY, KEY_OFF = "wc_" + "7a" * 16, "wc_" + "7b" * 16
 ORIGIN = "https://www.example.org"
+SWITCH = "daemon.webchat_sweep.enabled"
 _URLS = ["mariadb_znuny_url", "postgres_znuny_url"]
 CTX = VisitorContext(
     ip_hash="0123456789abcdef0123456789abcdef", user_agent="UA", page_url=None, language="de"
@@ -322,6 +324,7 @@ async def test_retention_purges_messages_and_pii(env: Env) -> None:
     for col in ("visitor_name", "visitor_email", "page_url", "user_agent", "ip_hash"):
         assert row[col] is None, col
     assert row["token_hash"] == ""
+    assert row["visitor_id"] == ""
     assert row["purged_at"] == NOW
     assert await _messages(env, old) == []
     assert await _ticket_facts(env, old) == before
@@ -359,6 +362,181 @@ async def test_row_that_no_longer_qualifies_is_skipped(
     assert (await _tick(env))["timed_out"] == 0
     assert (await _row(env, fresh))["status"] == "waiting"
     assert [m[1] for m in await _messages(env, fresh) if m[0] == "system"] == []
+
+
+async def _ids_of(env: Env, *session_ids: str) -> dict[str, str]:
+    return {sid: (await _row(env, sid))["status"] for sid in session_ids}
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_batch_limit_spreads_over_ticks(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sweep_module, "SWEEP_BATCH", 2)
+    sids = [await _start(env, 60 + i) for i in range(3)]
+    sids.append(await _start(env, 63, config_id=CONFIG_OFF, key=KEY_OFF))
+    for sid in sids:
+        await _set(env, sid, waiting_since=NOW - timedelta(seconds=400))
+        await _seen(env, sid)
+    # Two configs, four expired rows, batch of 2: never more than 2 per tick.
+    assert (await _tick(env))["timed_out"] == 2
+    assert (await _tick(env))["timed_out"] == 2
+    assert (await _tick(env))["timed_out"] == 0
+    assert set((await _ids_of(env, *sids)).values()) == {"ended"}
+
+    # The same bound holds for the idle and the purge step.
+    idle = [await _start(env, 70 + i) for i in range(3)]
+    for sid in idle:
+        await _set(env, sid, visitor_last_seen=NOW - timedelta(seconds=500))
+    assert (await _tick(env))["abandoned"] == 2
+    assert (await _tick(env))["abandoned"] == 1
+    # 7 ended/abandoned rows, all old enough: purged 2 per tick.
+    for sid in sids + idle:
+        await _set(env, sid, ended_at=NOW - timedelta(days=60))
+    assert [(await _tick(env))["purged"] for _ in range(4)] == [2, 2, 2, 1]
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_config_loaded_once_per_config_and_tick(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sids = [await _start(env, 80 + i) for i in range(3)]
+    sids.append(await _start(env, 83, config_id=CONFIG_OFF, key=KEY_OFF))
+    for sid in sids:
+        await _set(env, sid, waiting_since=NOW - timedelta(seconds=400))
+        await _seen(env, sid)
+    calls: list[int] = []
+    real = sweep_module.load_config
+
+    async def counting(db: AsyncSession, config_id: int) -> Any:
+        calls.append(config_id)
+        return await real(db, config_id)
+
+    monkeypatch.setattr(sweep_module, "load_config", counting)
+    assert (await _tick(env))["timed_out"] == 4
+    # timeout step and purge step share the per-tick cache: one load per config id.
+    assert sorted(calls) == [CONFIG, CONFIG_OFF]
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_deleted_config_uses_defaults(env: Env) -> None:
+    gone = await _start(env, 90)
+    fresh = await _start(env, 91)
+    await _set(env, gone, waiting_since=NOW - timedelta(seconds=181))
+    await _set(env, fresh, waiting_since=NOW - timedelta(seconds=179))
+    old = await _start(env, 92)
+    young = await _start(env, 93)
+    await _set(env, old, status="ended", end_reason="visitor", ended_at=NOW - timedelta(days=31))
+    await _set(env, young, status="ended", end_reason="visitor", ended_at=NOW - timedelta(days=29))
+    for sid in (gone, fresh):
+        await _seen(env, sid)
+    # Delete the config row after the sessions exist (no FK).
+    async with env.factory() as db:
+        await db.execute(text("DELETE FROM tiqora_chat_config WHERE id = :c"), {"c": CONFIG})
+        await db.commit()
+    # Defaults: wait_timeout 180 s, retention 30 days.
+    assert await _tick(env) == {"timed_out": 1, "abandoned": 0, "purged": 1}
+    assert (await _row(env, gone))["status"] == "ended"
+    assert (await _row(env, fresh))["status"] == "waiting"
+    assert (await _row(env, old))["purged_at"] == NOW
+    assert (await _row(env, young))["purged_at"] is None
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_redis_failure_does_not_crash_tick(env: Env) -> None:
+    gone = await _start(env, 100)
+    timed = await _start(env, 101)
+    live = await _start(env, 102)
+    await _set(env, gone, visitor_last_seen=NOW - timedelta(seconds=500))
+    await _set(env, timed, waiting_since=NOW - timedelta(seconds=400))
+    await _set(env, live, status="active", assigned_user_id=AGENT, accepted_at=NOW)
+    await _set(env, live, visitor_last_seen=NOW - timedelta(seconds=60))
+    env.redis.fail = True
+    # Marker lookups and publishing fail; the database decides, the writes still commit.
+    res = await _tick(env)
+    assert res == {"timed_out": 1, "abandoned": 1, "purged": 0}
+    statuses = await _ids_of(env, gone, timed, live)
+    assert statuses == {gone: "abandoned", timed: "ended", live: "active"}
+    assert (await _messages(env, timed))[-1][1] == "no_agent"
+    assert (await _messages(env, gone))[-1][1] == "idle_closed"
+    env.redis.fail = False
+    assert (await _tick(env)) == {"timed_out": 0, "abandoned": 0, "purged": 0}
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_idle_and_purge_recheck_skip_changed_rows(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The batch select is stale: the visitor came back / the chat was never ended."""
+    back = await _start(env, 110)  # waiting, visitor seen just now
+    live = await _start(env, 111)  # still waiting: not final, no ended_at
+    await _set(env, live, status="active", assigned_user_id=AGENT, accepted_at=NOW)
+
+    async def stale_ids(db: AsyncSession, *conditions: Any, limit: int) -> list[str]:
+        return [live]
+
+    monkeypatch.setattr(sweep_module, "_ids", stale_ids)
+    # Purge re-check: an active chat must never be purged even if a stale batch names it.
+    # (_purge_expired only runs for configs with final rows; give it one.)
+    done = await _start(env, 112)
+    await _set(env, done, status="ended", end_reason="visitor", ended_at=NOW - timedelta(days=90))
+    assert (await _tick(env))["purged"] == 0
+    row = await _row(env, live)
+    assert row["status"] == "active" and row["purged_at"] is None
+    assert await _messages(env, live)
+
+    # Idle re-check: patch the candidate select via a visitor that returned after the select.
+    real = sweep_module._in_transaction
+    seen_ids: list[str] = []
+
+    async def late_touch(factory: Any, redis_client: Any, session_id: str, work: Any) -> bool:
+        seen_ids.append(session_id)
+        await _set(env, session_id, visitor_last_seen=NOW)  # visitor returns before the lock
+        return await real(factory, redis_client, session_id, work)
+
+    monkeypatch.setattr(sweep_module, "_in_transaction", late_touch)
+    await _set(env, back, visitor_last_seen=NOW - timedelta(seconds=500))
+    assert (await _tick(env))["abandoned"] == 0
+    assert back in seen_ids
+    assert (await _row(env, back))["status"] == "waiting"
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_worker_tick_reads_switch_and_runs(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    sid = await _start(env, 120)
+    await _set(env, sid, waiting_since=NOW - timedelta(seconds=400))
+    await _seen(env, sid)
+    monkeypatch.setattr(worker_module, "get_session_factory", lambda: env.factory)
+    monkeypatch.setattr(worker_module, "get_pubsub_redis", lambda settings=None: env.redis)
+    real = worker_module.run_webchat_sweep_tick
+
+    async def at_now(**kwargs: Any) -> dict[str, int]:
+        return await real(now=NOW, **kwargs)
+
+    monkeypatch.setattr(worker_module, "run_webchat_sweep_tick", at_now)
+    settings = Settings(environment="test")
+
+    async def set_switch(value: str | None) -> None:
+        async with env.factory() as db:
+            await db.execute(delete(TiqoraSettings).where(TiqoraSettings.key == SWITCH))
+            if value is not None:
+                await db.execute(insert(TiqoraSettings).values(key=SWITCH, value=value))
+            await db.commit()
+
+    try:
+        await set_switch("0")
+        assert await worker_module.run_webchat_worker_tick(settings) == {"skipped": 1}
+        assert (await _row(env, sid))["status"] == "waiting"
+        await set_switch("1")
+        res = await worker_module.run_webchat_worker_tick(settings)
+        assert res["timed_out"] == 1
+        assert (await _row(env, sid))["status"] == "ended"
+    finally:
+        await set_switch(None)
 
 
 @pytest.mark.asyncio

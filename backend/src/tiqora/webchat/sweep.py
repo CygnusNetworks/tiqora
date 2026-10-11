@@ -12,7 +12,8 @@ tickets and articles stay as they are — and loads keys first (no JOIN with Znu
   ``visitor_last_seen``; R-LASTSEEN: a brief marker gap with a fresh ``visitor_last_seen``
   keeps the chat) -> ``abandoned`` / ``idle`` + system line ``idle_closed``.
 * ``purged``: ``ended_at`` older than the config's ``retention_days`` -> messages deleted,
-  visitor data cleared, ``purged_at`` set (the row stays as a tombstone for the ticket link).
+  visitor data (name, email, page, user agent, IP hash, visitor id, token hash) cleared,
+  ``purged_at`` set (the row stays as a tombstone for the ticket link).
 
 Sessions of a disabled or deleted config are swept like any other (R-DISABLED-SESSIONS):
 a deleted config falls back to the default values.
@@ -33,7 +34,7 @@ from tiqora.jobs.service import utc_now
 from tiqora.webchat.availability import VISITOR_SEEN_PREFIX
 from tiqora.webchat.models import ChatConfigValues
 from tiqora.webchat.notify import flush_chat_notifications, queue_agent_event
-from tiqora.webchat.sessions import add_system_message, current_queue_id
+from tiqora.webchat.sessions import _agent_event, add_system_message, current_queue_id
 from tiqora.webchat.store import config_values, get_chat_session, load_config
 
 __all__ = [
@@ -125,13 +126,7 @@ async def _ids(db: AsyncSession, *conditions: Any, limit: int) -> list[str]:
 
 async def _end_event(db: AsyncSession, chat: TiqoraChatSession) -> None:
     queue_id = await current_queue_id(db, chat)
-    payload: dict[str, Any] = {
-        "type": "chat_ended",
-        "session_id": chat.id,
-        "ticket_id": int(chat.ticket_id),
-        "queue_id": queue_id,
-    }
-    queue_agent_event(db, payload)
+    queue_agent_event(db, _agent_event(chat, "chat_ended", queue_id))
 
 
 async def _time_out_waiting(
@@ -300,6 +295,7 @@ async def _purge_expired(
                     page_url=None,
                     user_agent=None,
                     ip_hash=None,
+                    visitor_id="",
                     token_hash="",
                     purged_at=now,
                 )
