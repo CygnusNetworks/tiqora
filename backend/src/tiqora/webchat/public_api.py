@@ -475,7 +475,8 @@ def _public_config(values: ChatConfigValues, availability: dict[str, bool]) -> C
         theme=values.theme,
         topics=topics,
         online=any(t.online for t in topics),
-        offline_mode=values.offline_mode,
+        # "ai" is exposed per topic by Task 5; until then the widget sees the form fallback
+        offline_mode="form" if values.offline_mode == "ai" else values.offline_mode,
         prechat_fields=[
             ChatPublicFieldOut(
                 key=f.key, kind=f.kind, label=f.label, required=f.required, options=f.options

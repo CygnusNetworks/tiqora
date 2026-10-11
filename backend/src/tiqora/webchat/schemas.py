@@ -109,7 +109,7 @@ class ChatAttachmentOut(BaseModel):
 
 class ChatMessageOut(BaseModel):
     seq: int
-    sender: Literal["visitor", "agent", "system"]
+    sender: Literal["visitor", "agent", "bot", "system"]
     body: str | None
     code: str | None
     params: dict[str, str | bool | None]
@@ -174,7 +174,7 @@ class ChatInboxItemOut(BaseModel):
     title: str
     topic_label: str | None
     visitor_name: str | None
-    status: Literal["waiting", "active"]
+    status: Literal["bot", "waiting", "active"]
     waiting_since: UtcDateTime | None
     accepted_at: UtcDateTime | None
 

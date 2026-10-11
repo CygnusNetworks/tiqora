@@ -62,22 +62,28 @@ def attachments_out(raw: str | None) -> list[ChatAttachmentOut]:
 def message_out(m: TiqoraChatMessage) -> ChatMessageOut:
     """The ONLY visitor serializer of a transcript line.
 
-    System lines carry their code (``body`` column) and params; agent lines the agent's
-    display name the agent side stored in ``meta`` (already ``None`` when the config hides
+    System lines carry their code (``body`` column) and params; agent and bot lines the
+    display name the sending side stored in ``meta`` (already ``None`` when the config hides
     names); never a user id, article id or ticket data.
     """
     meta = _json_obj(m.meta)
     meta = meta if isinstance(meta, dict) else {}
-    sender: Literal["visitor", "agent", "system"] = (
-        "visitor" if m.sender == "visitor" else "agent" if m.sender == "agent" else "system"
-    )
+    sender: Literal["visitor", "agent", "bot", "system"]
+    if m.sender == "visitor":
+        sender = "visitor"
+    elif m.sender == "agent":
+        sender = "agent"
+    elif m.sender == "bot":
+        sender = "bot"
+    else:
+        sender = "system"
     if sender == "system":
         body: str | None = None
         code: str | None = m.body if m.sender == "system" else None
         params = {str(k): v for k, v in meta.items() if v is None or isinstance(v, (str, bool))}
     else:
         body, code, params = m.body, None, {}
-    agent_name = meta.get("agent_name") if sender == "agent" else None
+    agent_name = meta.get("agent_name") if sender in ("agent", "bot") else None
     return ChatMessageOut(
         seq=int(m.seq),
         sender=sender,

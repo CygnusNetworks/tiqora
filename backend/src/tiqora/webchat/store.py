@@ -27,7 +27,7 @@ from tiqora.webchat.models import ChatConfigValues, default_prechat_fields
 logger = structlog.get_logger(__name__)
 
 #: Session statuses in which visitor and agent can still write.
-LIVE_STATUSES: Final = frozenset({"waiting", "active"})
+LIVE_STATUSES: Final = frozenset({"bot", "waiting", "active"})
 
 #: Columns holding JSON text; every other value column is a plain scalar.
 _JSON_COLUMNS: Final = (
@@ -47,6 +47,10 @@ _SCALAR_COLUMNS: Final = (
     "default_customer_user",
     "show_agent_names",
     "retention_days",
+    "bot_name",
+    "bot_tone_prompt",
+    "show_on_portal",
+    "identity_create_customers",
 )
 #: A topic that always validates, so one column can be checked on its own.
 _PROBE_TOPICS: Final = [{"key": "probe", "label": "probe", "queue_id": 1}]
@@ -83,6 +87,9 @@ def _default_for(column: str) -> Any:
 def _column_value(row: TiqoraChatConfig, column: str) -> Any:
     """Validate one column in isolation; invalid -> its default (and a warning)."""
     raw = getattr(row, column)
+    if raw is None and column == "bot_name":
+        # NULL means "use the default" (the column is nullable); not worth a warning.
+        return _default_for(column)
     try:
         value = json.loads(raw) if column in _JSON_COLUMNS else raw
         probe = ChatConfigValues.model_validate({"topics": _PROBE_TOPICS, column: value})

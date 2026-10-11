@@ -29,29 +29,11 @@ from tiqora.webchat.config_cache import clear_config_cache
 from tiqora.webchat.models import DF_KINDS_FOR_PRECHAT, ChatConfigValues
 from tiqora.webchat.origins import OriginError, own_origin
 from tiqora.webchat.schemas import ChatConfigCreateIn, ChatConfigOut, ChatConfigUpdateIn
-from tiqora.webchat.store import config_values
+from tiqora.webchat.store import _JSON_COLUMNS, _SCALAR_COLUMNS, config_values
 
 router = APIRouter(prefix="/chat-configs", tags=["admin:chat-configs"])
 
 ADMIN_PATH_SUFFIX: Final = "/admin/chat-configs"
-_JSON_COLUMNS: Final = (
-    "allowed_origins",
-    "topics",
-    "prechat_fields",
-    "upload_policy",
-    "theme",
-    "rate_limits",
-)
-_SCALAR_COLUMNS: Final = (
-    "greeting",
-    "privacy_url",
-    "offline_mode",
-    "business_calendar",
-    "wait_timeout_seconds",
-    "default_customer_user",
-    "show_agent_names",
-    "retention_days",
-)
 _VALUE_ERROR_PREFIX: Final = "Value error, "
 
 
