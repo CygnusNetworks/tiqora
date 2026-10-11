@@ -23,7 +23,7 @@ from tiqora.extensions.core import register_core
 from tiqora.extensions.registry import Registry
 from tiqora.jobs import JobContext, UnknownJobKind, enqueue_job, get_job
 from tiqora.jobs.registry import JOB_HANDLERS, JobHandler
-from tiqora.jobs.runner import FAILED_MESSAGE, UNKNOWN_KIND_MESSAGE, JobRunner
+from tiqora.jobs.runner import FAILED_MESSAGE, TIMEOUT_MESSAGE, UNKNOWN_KIND_MESSAGE, JobRunner
 from tiqora.jobs.schemas import job_out
 from tiqora.plugins.context import make_plugin_context
 from tiqora.plugins.discovery import discover_plugins
@@ -228,3 +228,48 @@ async def test_base_exception_in_plugin_job_is_a_job_error_not_a_crash(
     await asyncio.sleep(0)
     assert runner.active_count == 0
     assert (await runner.run_once())["started"] == 0
+
+
+async def test_system_exit_in_plugin_on_interrupted_does_not_end_the_worker(
+    f: async_sessionmaker[AsyncSession], fixture_plugins: Installer
+) -> None:
+    """on_interrupted is plugin code too: sys.exit() there must not end the worker (B-I2)."""
+    fixture_plugins()
+    (p,) = discover_plugins()
+    registrar = import_and_register(p, make_plugin_context(p))
+    hooked: list[str] = []
+
+    async def slow(jc: JobContext, payload: Any) -> None:
+        await asyncio.sleep(5)
+
+    async def leave(jc: JobContext, payload: Any) -> None:
+        hooked.append(jc.interrupted_by or "")
+        raise SystemExit(4)
+
+    registrar.job_handler(
+        JobHandler(
+            kind="org.example.hello.slow",
+            payload_model=_Payload,
+            run=slow,
+            title_key="plugin.org.example.hello:jobs.slow",
+            timeout_seconds=1,
+            on_interrupted=leave,
+        )
+    )
+    reg = Registry()
+    register_core(reg)
+    commit_registrar(reg, registrar)
+    async with f() as s:
+        job = await enqueue_job(
+            s, kind="org.example.hello.slow", payload={"text": "x"}, created_by=None, registry=reg
+        )
+        await s.commit()
+        job_id = job.id
+    runner = JobRunner(session_factory=f, settings=_SETTINGS, registry=reg, worker_id="t:1")
+    await runner.run_once()
+    await runner.wait_idle()
+    assert hooked == ["timeout"]  # the hook ran ...
+    done = await _fetch(f, job_id)
+    assert done.status == "failed" and done.error == TIMEOUT_MESSAGE
+    await asyncio.sleep(0)  # ... and the event loop survived its SystemExit
+    assert runner.active_count == 0

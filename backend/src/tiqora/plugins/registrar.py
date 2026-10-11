@@ -19,7 +19,7 @@ from fastapi.routing import APIRoute
 from pydantic import BaseModel
 
 from tiqora.extensions.registry import ExtensionPoint
-from tiqora.jobs.registry import JOB_HANDLERS, JobHandler, JobRun
+from tiqora.jobs.registry import JOB_HANDLERS, JobHandler
 from tiqora.plugins.context import PluginContext
 from tiqora.plugins.events import EVENT_SUBSCRIBERS, EventHandler, EventSubscriber
 from tiqora.plugins.manifest import PluginManifest
@@ -40,8 +40,11 @@ MAX_SETTINGS_KEY_LEN: Final = 200
 MAX_TIMEOUT_SECONDS: Final = 300
 
 
-def shield_job_run(run: JobRun) -> JobRun:
-    """Wrap a plugin job handler so ``SystemExit`` & co. become an ordinary job error (B-I2).
+def shield_job_run[T](
+    run: Callable[[Any, Any], Awaitable[T]],
+) -> Callable[[Any, Any], Awaitable[T]]:
+    """Wrap plugin job code (``run``, ``on_interrupted``) so ``SystemExit`` & co. become an
+    ordinary error (B-I2).
 
     The job runner maps every ``Exception`` (including ``JobRetry``/``JobFailed``/``JobCancelled``)
     and relies on ``CancelledError`` for its timeout; both pass unchanged. Any other
@@ -49,7 +52,7 @@ def shield_job_run(run: JobRun) -> JobRun:
     """
 
     @functools.wraps(run)
-    async def shielded(ctx: Any, payload: Any) -> dict[str, Any] | None:
+    async def shielded(ctx: Any, payload: Any) -> T:
         try:
             return await run(ctx, payload)
         except (Exception, asyncio.CancelledError):
@@ -271,9 +274,16 @@ class PluginRegistrar:
                     "(<name>: a-z, 0-9 und _)"
                 )
 
-        self._stage(
-            JOB_HANDLERS, dataclasses.replace(handler, run=shield_job_run(handler.run)), check=check
+        shielded = dataclasses.replace(
+            handler,
+            run=shield_job_run(handler.run),
+            on_interrupted=(
+                shield_job_run(handler.on_interrupted)
+                if handler.on_interrupted is not None
+                else None
+            ),
         )
+        self._stage(JOB_HANDLERS, shielded, check=check)
 
     def mcp_tool(
         self,
