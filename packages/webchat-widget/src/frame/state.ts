@@ -111,7 +111,8 @@ export function reducer(s: ChatState, a: Action): ChatState {
       if (!s.session) {
         view = c.online ? "prechat" : c.offline_mode === "form" ? "offline" : "hidden";
       }
-      return { ...s, config: c, view, error: null };
+      const topic = s.topic && c.topics.some((t) => t.key === s.topic) ? s.topic : null;
+      return { ...s, config: c, view, error: null, topic };
     }
     case "config-failed":
       return { ...s, view: a.status === 404 ? "hidden" : "blocked", error: String(a.status) };
@@ -147,6 +148,7 @@ export function reducer(s: ChatState, a: Action): ChatState {
         session: { ...s.session, status: a.status, agent_name: a.agentName, can_send: live },
         view: live ? s.view : "ended",
         agentTyping: live ? s.agentTyping : false,
+        pending: live ? s.pending : [],
       };
     }
     case "typing":
@@ -166,6 +168,7 @@ export function reducer(s: ChatState, a: Action): ChatState {
         view: s.session ? "ended" : s.view,
         session: s.session ? { ...s.session, can_send: false } : s.session,
         agentTyping: false,
+        pending: [],
       };
     case "opened":
       return { ...s, open: true, unread: 0 };
@@ -174,7 +177,8 @@ export function reducer(s: ChatState, a: Action): ChatState {
     case "offline-sent":
       return { ...s, view: "offline-sent" };
     case "set-topic":
-      return s.config?.topics.some((t) => t.key === a.topic) ? { ...s, topic: a.topic } : s;
+      // before /config only remembered; config-loaded drops a topic the config lacks
+      return !s.config || s.config.topics.some((t) => t.key === a.topic) ? { ...s, topic: a.topic } : s;
     case "stream-state":
       return s.stream === a.state ? s : { ...s, stream: a.state };
     case "error":

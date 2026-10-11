@@ -5409,6 +5409,9 @@
       "bodyTooLarge": "The message is too large.",
       "network": "No connection – please check your network.",
       "disabled": "The chat has been closed; you can no longer send messages."
+    },
+    "preview": {
+      "reply": "Hello! How can I help you?"
     }
   }
 }

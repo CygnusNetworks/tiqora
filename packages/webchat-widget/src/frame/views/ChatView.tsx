@@ -1,5 +1,4 @@
 import type { JSX } from "preact";
-import { useEffect, useRef } from "preact/hooks";
 import type { Translate } from "../i18n";
 import { isLive, type ChatState } from "../state";
 import { Composer } from "./Composer";
@@ -28,10 +27,6 @@ function statusLine(s: ChatState, t: Translate): string {
 export function ChatView(props: { state: ChatState; t: Translate; h: ChatHandlers; ended: boolean }): JSX.Element {
   const { state, t, h } = props;
   const config = state.config;
-  const restart = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (props.ended) restart.current?.focus();
-  }, [props.ended]);
   return (
     <div class="tq-chat">
       <p class="tq-status" role="status">
@@ -58,7 +53,6 @@ export function ChatView(props: { state: ChatState; t: Translate; h: ChatHandler
             class="tq-btn"
             type="button"
             onClick={h.onRestart}
-            ref={restart}
           >
             {t("ended.restart")}
           </button>

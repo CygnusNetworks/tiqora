@@ -21,7 +21,6 @@ type StreamLike = { start(): void; stop(): void };
 
 const TYPING_VISIBLE_MS = 5000;
 const PREVIEW_AGENT = "Max";
-const PREVIEW_REPLY = "Hallo! Wie kann ich Ihnen helfen?";
 
 const PREVIEW_DEFAULT: ChatPublicConfig = {
   greeting: null,
@@ -91,6 +90,7 @@ export function App(props: {
   const bridgeRef = useRef<FrameBridge | null>(null);
   const seq = useRef(0);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mainRef = useRef<HTMLElement>(null);
   const readyPosted = useRef(false);
   const lastUnread = useRef(0);
 
@@ -98,6 +98,8 @@ export function App(props: {
     () => (state.config ? (params.preview ? applyPreview(state.config, previewCfg) : state.config) : null),
     [state.config, previewCfg, params.preview],
   );
+
+  useEffect(() => () => void (typingTimer.current && clearTimeout(typingTimer.current)), []);
 
   // --- translations ---------------------------------------------------------------
   useEffect(() => {
@@ -169,7 +171,7 @@ export function App(props: {
           }
           if (dead) return;
           auth.current = { id: stored.sessionId, token: stored.token };
-          seq.current = Math.max(stored.lastSeq, maxSeq(all));
+          seq.current = maxSeq(all); // resume from what was loaded; replays are deduped
           dispatch({ type: "session-restored", session, messages: all });
         } catch (e) {
           if (e instanceof ChatApiError && e.status === 404) clearSession(params.k, props.store);
@@ -206,6 +208,15 @@ export function App(props: {
     }
   }, [state.unread]);
 
+  // --- focus follows the open panel and the view (never while closed) ----------------
+  const view = state.view;
+  useEffect(() => {
+    if (!state.open || !t) return;
+    const sel =
+      view === "chat" ? ".tq-input:not(:disabled)" : view === "ended" ? ".tq-foot .tq-btn" : view === "prechat" || view === "offline" ? "input,textarea,select" : ".tq-notice";
+    mainRef.current?.querySelector<HTMLElement>(sel)?.focus();
+  }, [state.open, view, t]);
+
   // --- persist a monotonic lastSeq (several tabs must never lower it) ---------------
   useEffect(() => {
     const top = maxSeq(state.messages);
@@ -225,8 +236,9 @@ export function App(props: {
       if (e.event === "message") {
         const m = asMessage(e.data);
         if (!m) return;
+        const known = stateRef.current.messages.some((x) => x.seq === m.seq);
         dispatch({ type: "message", message: m });
-        if (m.sender !== "visitor") bridgeRef.current?.post({ p: "tiqora-chat/1", type: "message", sender: m.sender });
+        if (!known && m.sender !== "visitor") bridgeRef.current?.post({ p: "tiqora-chat/1", type: "message", sender: m.sender });
       } else if (e.event === "session") {
         try {
           const o = JSON.parse(e.data) as { status?: unknown; agent_name?: unknown };
@@ -367,7 +379,7 @@ export function App(props: {
         created: { session_id: "preview", status: "active", token: "", message: { ...base, client_id: clientId, seq: 1, sender: "visitor", body: v.message } },
       });
       dispatch({ type: "session-event", status: "active", agentName: PREVIEW_AGENT });
-      dispatch({ type: "message", message: { ...base, client_id: null, seq: 2, sender: "agent", agent_name: PREVIEW_AGENT, body: PREVIEW_REPLY } });
+      dispatch({ type: "message", message: { ...base, client_id: null, seq: 2, sender: "agent", agent_name: PREVIEW_AGENT, body: t?.("preview.reply") ?? "" } });
       return;
     }
     setBusy(true);
@@ -439,7 +451,7 @@ export function App(props: {
   switch (state.view) {
     case "blocked":
       body = (
-        <p class="tq-notice" role="alert">
+        <p class="tq-notice" role="alert" tabIndex={-1}>
           {state.error === "403" ? t("error.notAllowed") : t("error.unavailable")}
         </p>
       );
@@ -449,7 +461,7 @@ export function App(props: {
       break;
     case "offline-sent":
       body = (
-        <p class="tq-notice" role="status" tabIndex={-1} ref={(el) => el?.focus()}>
+        <p class="tq-notice" role="status" tabIndex={-1}>
           {t("offline.thanks")}
         </p>
       );
@@ -487,7 +499,7 @@ export function App(props: {
           {"✕"}
         </button>
       </header>
-      <main class="tq-main">{body}</main>
+      <main class="tq-main" ref={mainRef}>{body}</main>
     </div>
   );
 }

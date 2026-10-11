@@ -55,9 +55,6 @@ export function PrechatForm(props: {
   const errors: Record<string, string> = { ...props.serverErrors, ...local };
   const privacy = safeHref(config.privacy_url);
 
-  useEffect(() => {
-    root.current?.querySelector<HTMLElement>("input,textarea,select")?.focus();
-  }, []);
   // Server errors arrive after a submit: move focus to the first invalid control.
   useEffect(() => {
     if (Object.keys(props.serverErrors).length) {

@@ -5417,6 +5417,9 @@
       "bodyTooLarge": "Die Nachricht ist zu groß.",
       "network": "Keine Verbindung – bitte prüfen Sie Ihr Netz.",
       "disabled": "Der Chat wurde beendet, Sie können nichts mehr senden."
+    },
+    "preview": {
+      "reply": "Hallo! Wie kann ich Ihnen helfen?"
     }
   }
 }

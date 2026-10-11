@@ -25,7 +25,9 @@ function start(): void {
   const origin = parseOrigin(q.get("origin"));
   const root = document.getElementById("app");
   if (!root || !k || !origin) return; // a frame without a valid host origin stays empty and never posts
-  const params: FrameParams = { k, origin, lang, preview: q.get("preview") === "1" };
+  const preview = q.get("preview") === "1";
+  if (preview && origin !== window.location.origin) return; // preview is Tiqora-own only
+  const params: FrameParams = { k, origin, lang, preview };
   render(<App params={params} api={createChatApi()} />, root);
 }
 

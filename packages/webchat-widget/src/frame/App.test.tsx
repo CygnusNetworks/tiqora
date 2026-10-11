@@ -117,7 +117,8 @@ describe("App", () => {
     expect(api.session).toHaveBeenCalledWith("sid1", "tok1");
     expect(api.messages).toHaveBeenCalledWith("sid1", "tok1", 0);
     expect(container.querySelectorAll(".tq-msg")).toHaveLength(2);
-    expect(stream.made[0].o.lastSeq()).toBe(5);
+    expect(stream.made[0].o.lastSeq()).toBe(2); // resumes from what was loaded, not the stored cursor
+    expect(loadSession("wc_key", store)?.lastSeq).toBe(5); // the persisted cursor never goes down
   });
 
   it("a stream event racing the restore is deduped and lastSeq never goes down (M12)", async () => {
@@ -242,6 +243,43 @@ describe("App", () => {
     expect(post).toHaveBeenCalledWith({ p: "tiqora-chat/1", type: "unread", count: 1 });
   });
 
+  it("focus follows the open panel and the view, never while closed", async () => {
+    const t = await loadMessages("de");
+    const hostMsg = (type: string) =>
+      act(() => {
+        window.dispatchEvent(new MessageEvent("message", { origin: "https://host.example", source: window, data: { p: "tiqora-chat/1", type } }));
+      });
+    (document.activeElement as HTMLElement | null)?.blur();
+    const { container } = renderPreact(<App params={params} api={fakeApi() as unknown as ChatApi} t={t} store={memStore()} createStream={fakeStream().create} />);
+    await flush();
+    expect(document.activeElement).toBe(document.body); // closed: no focus grab
+    hostMsg("open");
+    expect(document.activeElement).toBe(byLabel(container, "Name"));
+    input(byLabel(container, "Name"), "Erika");
+    input(byLabel(container, "E-Mail"), "e@example.org");
+    input(byLabel(container, "Ihre Nachricht"), "Hilfe");
+    click(byText(container, "button", "Chat starten"));
+    await flush();
+    expect(document.activeElement).toBe(container.querySelector(".tq-input"));
+    click(byText(container, "button", "Chat beenden"));
+    await flush();
+    expect(document.activeElement).toBe(byText(container, "button", "Neuen Chat starten"));
+  });
+
+  it("restoring a chat while closed does not take focus; opening focuses the composer", async () => {
+    const store = memStore();
+    saveSession("wc_key", { sessionId: "sid1", token: "tok1", lastSeq: 1 }, store);
+    (document.activeElement as HTMLElement | null)?.blur();
+    const t = await loadMessages("de");
+    const { container } = renderPreact(<App params={params} api={fakeApi() as unknown as ChatApi} t={t} store={store} createStream={fakeStream().create} />);
+    await flush();
+    expect(document.activeElement).toBe(document.body);
+    act(() => {
+      window.dispatchEvent(new MessageEvent("message", { origin: "https://host.example", source: window, data: { p: "tiqora-chat/1", type: "open" } }));
+    });
+    expect(document.activeElement).toBe(container.querySelector(".tq-input"));
+  });
+
   it("renders RTL", async () => {
     const { container } = await mount({ p: { lang: "ar" } });
     expect(container.querySelector(".tq-root")?.getAttribute("dir")).toBe("rtl");
@@ -261,7 +299,7 @@ describe("App", () => {
     input(byLabel(container, "Ihre Nachricht"), "Vorschau");
     click(byText(container, "button", "Chat starten"));
     await flush();
-    expect(container.textContent).toContain("Hallo! Wie kann ich Ihnen helfen?");
+    expect(container.textContent).toContain("Hallo! Wie kann ich Ihnen helfen?"); // webchatWidget.preview.reply
     input(container.querySelector("textarea") as Element, "noch eine");
     keydown(container.querySelector("textarea") as Element, "Enter");
     await flush();
