@@ -79,8 +79,13 @@ export function resolveWebchatData(p: string, method: string): unknown | undefin
     if (p.endsWith("/accept")) return { ticket_id: 117 };
     return {};
   }
+  if (p.endsWith("/api/v1/admin/channels/webchat")) return { channel: "webchat", enabled: true, config: {} };
   if (p.includes("/api/v1/admin/chat-configs")) {
     if (p.endsWith("/chat-configs")) return method === "GET" ? [config] : config;
+    if (p.endsWith("/rotate-key")) {
+      const key = "demo" + Math.random().toString(36).slice(2, 30).padEnd(28, "0");
+      return { ...config, public_key: key, embed_snippet: config.embed_snippet.replace(config.public_key, key) };
+    }
     return method === "DELETE" ? {} : config;
   }
   return undefined;
