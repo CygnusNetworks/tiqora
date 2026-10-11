@@ -205,7 +205,13 @@ function WebchatConfigEditor({ configId }: { configId: number | null }) {
         </p>
       )}
 
-      <div className="rounded-lg border border-hairline bg-surface p-4">
+      {shown.body && (
+        <p role="alert" className="text-sm text-danger" data-testid="webchat-body-error">
+          {shown.body}
+        </p>
+      )}
+
+      <div role="tabpanel" aria-label={t(`webchat.admin.tabs.${tab}`)} className="rounded-lg border border-hairline bg-surface p-4">
         {tab === "general" && <GeneralTab {...common} queues={queues} priorities={priorities} />}
         {tab === "hours" && <HoursTab {...common} />}
         {tab === "prechat" && <PrechatTab {...common} dynamicFields={dynamicFields} />}

@@ -92,6 +92,43 @@ describe("WidgetPreview", () => {
     for (const [msg] of post.mock.calls) expect(msg.config.theme.primary_color).toBe("#2563eb");
   });
 
+  it("sends the draft when the frame says ready, and only for its own window and origin", () => {
+    const view = render(mount(values()));
+    const frame = screen.getByTestId("webchat-widget-preview") as HTMLIFrameElement;
+    const post = vi.fn();
+    const win = { postMessage: post } as unknown as Window;
+    Object.defineProperty(frame, "contentWindow", { value: win, configurable: true });
+    const ready = { p: "tiqora-chat/1", type: "ready", online: true };
+    const send = (init: MessageEventInit) =>
+      act(() => {
+        window.dispatchEvent(new MessageEvent("message", init));
+      });
+
+    send({ data: ready, source: win, origin: "https://evil.example" });
+    send({ data: ready, source: window, origin: window.location.origin });
+    send({ data: { ...ready, p: "other" }, source: win, origin: window.location.origin });
+    send({ data: { ...ready, type: "unread" }, source: win, origin: window.location.origin });
+    expect(post).not.toHaveBeenCalled();
+
+    send({ data: ready, source: win, origin: window.location.origin });
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post.mock.calls[0][0].config.greeting).toBe("Hallo!");
+    expect(post.mock.calls[0][1]).toBe(window.location.origin);
+    // a reloaded frame (renewed key) announces itself again
+    send({ data: ready, source: win, origin: window.location.origin });
+    expect(post).toHaveBeenCalledTimes(2);
+
+    view.unmount();
+    send({ data: ready, source: win, origin: window.location.origin });
+    expect(post).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not post a config with duplicate field keys", () => {
+    const v = values();
+    v.prechat_fields = [...v.prechat_fields, { ...v.prechat_fields[0] }];
+    expect(toPreviewConfig(v)).toBeNull();
+  });
+
   it("sizes the frame per device", () => {
     const view = render(mount(values(), "mobile"));
     const frame = screen.getByTestId("webchat-widget-preview");

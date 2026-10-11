@@ -1,4 +1,4 @@
-import { HEX_COLOR, FIELD_KEY, TOPIC_KEY, withTopicKeys, type Values } from "./webchatForm";
+import { HEX_COLOR, FIELD_KEY, TOPIC_KEY, validatePrechat, withTopicKeys, type Values } from "./webchatForm";
 
 /**
  * Copy of the widget's host -> frame protocol (`packages/webchat-widget/src/shared/protocol.ts`);
@@ -34,6 +34,7 @@ export function toPreviewConfig(values: Values): PreviewConfig | null {
   if ((values.greeting ?? "").length > 500) return null;
   if (values.topics.length < 1 || values.topics.length > 20) return null;
   if (values.prechat_fields.length > 15) return null;
+  if (Object.keys(validatePrechat(values.prechat_fields)).length > 0) return null;
   const topics = withTopicKeys(values.topics.map((t) => ({ ...t, label: t.label.trim() })));
   if (topics.some((t) => !TOPIC_KEY.test(t.key) || t.label.length < 1 || t.label.length > 80)) return null;
   const fields = values.prechat_fields.map((f) => ({

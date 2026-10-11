@@ -39,6 +39,27 @@ export function WidgetPreview({
     );
   }, [src]);
 
+  // The frame attaches its listener after it has loaded, so the first draft goes out when it
+  // says `ready` (again after every reload, e.g. a renewed key); only its own window counts.
+  useEffect(() => {
+    const frameOrigin = new URL(src, window.location.href).origin;
+    const onMessage = (e: MessageEvent) => {
+      const d = e.data as { p?: unknown; type?: unknown } | null;
+      if (
+        e.source !== frameRef.current?.contentWindow ||
+        e.origin !== frameOrigin ||
+        !d ||
+        d.p !== PROTOCOL ||
+        d.type !== "ready"
+      ) {
+        return;
+      }
+      post();
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [src, post]);
+
   useEffect(() => {
     if (config) lastValid.current = config;
     const timer = window.setTimeout(post, DEBOUNCE_MS);
@@ -53,7 +74,6 @@ export function WidgetPreview({
         src={src}
         title={t("webchat.admin.look.previewTitle")}
         data-testid="webchat-widget-preview"
-        onLoad={post}
         style={{ width: size.width, height: size.height, maxWidth: "100%" }}
         className="mx-auto block rounded-lg border border-hairline bg-white shadow"
       />

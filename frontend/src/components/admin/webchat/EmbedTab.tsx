@@ -35,6 +35,13 @@ export function EmbedTab({
   }
 
   const snippet = config.embed_snippet;
+  const base = /\ssrc="([^"]*)"/.exec(snippet)?.[1];
+  let origin = window.location.origin;
+  try {
+    if (base) origin = new URL(base).origin;
+  } catch {
+    // relative src: keep this page's origin
+  }
   const copy = async () => {
     const ok = await copyText(snippet);
     if (!ok && codeRef.current) {
@@ -85,10 +92,10 @@ export function EmbedTab({
       <section className="space-y-1">
         <h3 className="text-sm font-semibold text-ink">{t("webchat.admin.embed.csp")}</h3>
         <p className="text-xs text-muted">
-          {t("webchat.admin.embed.cspHint")} <code className="font-mono text-ink">{window.location.origin}</code>
+          {t("webchat.admin.embed.cspHint")} <code className="font-mono text-ink">{origin}</code>
         </p>
         <pre className="overflow-x-auto rounded-md border border-hairline bg-surface-subtle p-3 text-xs text-ink">
-          <code data-testid="webchat-embed-csp" className="font-mono">{`script-src ${window.location.origin}; frame-src ${window.location.origin};`}</code>
+          <code data-testid="webchat-embed-csp" className="font-mono">{`script-src ${origin}; frame-src ${origin};`}</code>
         </pre>
       </section>
 

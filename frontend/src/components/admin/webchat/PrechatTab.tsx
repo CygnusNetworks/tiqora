@@ -191,6 +191,12 @@ export function PrechatTab({
                 </div>
               )}
 
+              {errors[p] && (
+                <p role="alert" data-testid={`webchat-field-${i}-error`} className="text-xs text-danger">
+                  {errors[p]}
+                </p>
+              )}
+
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <label className="flex items-center gap-2 text-sm text-ink">
                   <Switch
@@ -208,7 +214,7 @@ export function PrechatTab({
                   <Button size="sm" variant="ghost" disabled={i === fields.length - 1} aria-label={t("webchat.admin.general.moveDown")} data-testid={`webchat-field-${i}-down`} onClick={() => move(i, 1)}>
                     ↓
                   </Button>
-                  <Button size="sm" variant="ghost" data-testid={`webchat-field-${i}-remove`} onClick={() => setFields(fields.filter((_, j) => j !== i))}>
+                  <Button size="sm" variant="ghost" aria-label={`${t("webchat.admin.remove")}: ${f.label || f.key}`} data-testid={`webchat-field-${i}-remove`} onClick={() => setFields(fields.filter((_, j) => j !== i))}>
                     {t("webchat.admin.remove")}
                   </Button>
                 </div>
