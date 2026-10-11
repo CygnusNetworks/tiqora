@@ -85,11 +85,13 @@ from tiqora.domain.ticket_write_service import (
     change_title,
     change_type,
     create_ticket,
+    link_objects,
     link_tickets,
     lock_ticket,
     move_queue,
     set_customer,
     unlock_ticket,
+    unwatch_ticket,
     update_dynamic_field,
     watch_ticket,
 )
@@ -644,23 +646,98 @@ async def _action_article_send(
     if not body and not config.get("Subject"):
         raise RequiredFieldMissing("ArticleSend: Config must set Body or Subject")
     t = await _ticket_must_exist(session, ticket_id)
+    queue_id = int(t["queue_id"])
     article = ArticleIn(
         sender_type="agent",
         is_visible_for_customer=perl_truthy(config.get("IsVisibleForCustomer", 1)),
         subject=subject,
         body=body,
         channel="email",
-        to_address=str(config.get("To") or config.get("Customer") or "") or None,
+        # ``To`` is Znuny's key; ``Customer`` is the older Tiqora spelling.
+        from_address=await _article_send_from(session, config, queue_id),
+        to_address=_address_list(config.get("To") or config.get("Customer")),
+        cc=_address_list(config.get("Cc")),
+        bcc=_address_list(config.get("Bcc")),
     )
     await deliver_agent_email_reply(
         session,
         sysconfig,
         None,
         ticket_id=ticket_id,
-        queue_id=int(t["queue_id"]),
+        queue_id=queue_id,
         user_id=user_id,
         article=article,
     )
+
+
+def _address_list(value: Any) -> str | None:
+    """``To``/``Cc``/``Bcc`` as one comma separated string (a list value is joined)."""
+    if isinstance(value, (list, tuple)):
+        value = ", ".join(str(v).strip() for v in value if str(v).strip())
+    text_value = str(value or "").strip()
+    return text_value or None
+
+
+async def _system_address(
+    session: AsyncSession, *, address: str | None = None, queue_id: int | None = None
+) -> tuple[str, str] | None:
+    """``(address, realname)`` of a valid system address, by address or a queue's own."""
+    if address is not None:
+        row = (
+            await session.execute(
+                text(
+                    "SELECT value0, value1 FROM system_address"
+                    " WHERE LOWER(value0) = :a AND valid_id = 1 LIMIT 1"
+                ),
+                {"a": address.lower()},
+            )
+        ).first()
+    else:
+        row = (
+            await session.execute(
+                text(
+                    "SELECT sa.value0, sa.value1 FROM queue q"
+                    " JOIN system_address sa ON sa.id = q.system_address_id"
+                    " WHERE q.id = :q LIMIT 1"
+                ),
+                {"q": queue_id},
+            )
+        ).first()
+    if row is None or not str(row[0] or "").strip():
+        return None
+    return str(row[0]).strip(), str(row[1] or "").strip()
+
+
+async def _article_send_from(
+    session: AsyncSession, config: dict[str, Any], ticket_queue_id: int
+) -> str | None:
+    """Port of ``ArticleSend::FromGet`` (``TransitionAction/ArticleSend.pm:378-432``).
+
+    ``From`` only counts when it is a local system address (``Realname <address>``);
+    anything else is logged and replaced by the default. The default is the system address
+    of ``Queue``/``QueueID`` when set, else of the ticket's queue. ``None`` lets the shared
+    outbound path pick the ticket queue's address, which is the same default.
+    """
+    from email.utils import parseaddr
+
+    wanted = str(config.get("From") or "").strip()
+    if wanted:
+        found = await _system_address(session, address=parseaddr(wanted)[1] or wanted)
+        if found is not None:
+            addr, name = found
+            return f"{name} <{addr}>" if name else addr
+        logger.warning(
+            "ArticleSend: configured From address %r is not a system address, "
+            "using the default queue address",
+            wanted,
+        )
+    queue_id = await _resolve_queue_id(session, config.get("Queue"), config.get("QueueID"))
+    if queue_id is not None and int(queue_id) != ticket_queue_id:
+        found = await _system_address(session, queue_id=int(queue_id))
+        if found is not None:
+            addr, name = found
+            return f"{name} <{addr}>" if name else addr
+    return None
 
 
 _ARTICLE_CHANNEL_MAP: dict[str, str] = {
@@ -756,6 +833,63 @@ async def _action_ticket_sla_set(
     )
 
 
+def _comma_list(value: Any) -> list[str]:
+    """``split /\\s*,\\s*/`` of a Znuny list key (a list value is taken as is)."""
+    if value is None:
+        return []
+    items = value if isinstance(value, (list, tuple)) else str(value).split(",")
+    return [str(i).strip() for i in items if str(i).strip()]
+
+
+def _acting_user(config: dict[str, Any], user_id: int, module: str) -> int:
+    """``_OverrideUserID``: ``DynamicField_UserID`` or ``UserID`` replaces the acting user."""
+    raw = config.get("DynamicField_UserID") or config.get("UserID")
+    if raw in (None, ""):
+        return user_id
+    try:
+        return int(str(raw).strip())
+    except ValueError:
+        logger.warning("%s: UserID %r is not a number, using the acting user", module, raw)
+        return user_id
+
+
+async def _users_by_email(session: AsyncSession, pattern: str) -> list[int]:
+    """``UserSearch(PostMasterSearch)``: valid users whose ``UserEmail`` preference matches.
+
+    ``*`` is the wildcard, the match is case insensitive and the whole address has to match.
+    Matching happens here, not in SQL: the preference is a BLOB on MariaDB and a bytea on
+    PostgreSQL.
+    """
+    from fnmatch import fnmatchcase
+
+    wanted = pattern.lower().replace("[", "[[]")
+    rows = (
+        await session.execute(
+            text(
+                "SELECT p.user_id, p.preferences_value FROM user_preferences p"
+                " WHERE p.preferences_key = 'UserEmail'"
+            )
+        )
+    ).all()
+    ids = sorted(
+        {
+            int(uid)
+            for uid, value in rows
+            if value is not None
+            and fnmatchcase(
+                (bytes(value).decode("utf-8", "replace") if not isinstance(value, str) else value)
+                .strip()
+                .lower(),
+                wanted,
+            )
+        }
+    )
+    if not ids:
+        return []
+    valid = await session.execute(select(Users.id).where(Users.id.in_(ids), Users.valid_id == 1))
+    return sorted(int(r) for r in valid.scalars().all())
+
+
 async def _action_ticket_watch_set(
     session: AsyncSession,
     config: dict[str, Any],
@@ -763,13 +897,85 @@ async def _action_ticket_watch_set(
     user_id: int,
     sysconfig: SysConfig,
 ) -> None:
+    """Port of TicketWatchSet (``TicketWatchSet.pm:126-200``).
+
+    Znuny keys: ``Action`` (``Subscribe`` default; ``Unsubscribe``; ``UnsubscribeAll``), the
+    watchers as ``UserLogin`` / ``PostMasterSearch`` / ``UserIDs`` (comma lists, each present
+    list is applied) and ``UserID`` (``DynamicField_UserID``), which overrides the *acting*
+    user. Unknown logins / ids are skipped.
+
+    Fallback for configs written for Tiqora before: with none of the three lists, ``User``
+    (login) or ``UserID`` names the one watcher (default the acting user), and ``Action``
+    still picks subscribe or unsubscribe.
+    """
     del sysconfig
-    watcher_id = await _resolve_user_id(session, config.get("User"), config.get("UserID"))
-    if watcher_id is None:
-        watcher_id = user_id
-    await watch_ticket(
-        session, ticket_id=ticket_id, watcher_user_id=int(watcher_id), user_id=user_id
-    )
+    action = str(config.get("Action") or "Subscribe")
+
+    async def apply(watcher_id: int, actor: int) -> None:
+        if action == "Subscribe":
+            await watch_ticket(
+                session, ticket_id=ticket_id, watcher_user_id=watcher_id, user_id=actor
+            )
+        else:  # _TicketWatch: everything but Subscribe unsubscribes
+            await unwatch_ticket(
+                session, ticket_id=ticket_id, watcher_user_id=watcher_id, user_id=actor
+            )
+
+    if action == "UnsubscribeAll":
+        actor = _acting_user(config, user_id, "TicketWatchSet")
+        watchers = (
+            (
+                await session.execute(
+                    text("SELECT user_id FROM ticket_watcher WHERE ticket_id = :t"),
+                    {"t": ticket_id},
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for watcher_id in watchers:
+            await unwatch_ticket(
+                session, ticket_id=ticket_id, watcher_user_id=int(watcher_id), user_id=actor
+            )
+        return
+
+    logins = _comma_list(config.get("UserLogin"))
+    searches = _comma_list(config.get("PostMasterSearch"))
+    user_ids = _comma_list(config.get("UserIDs"))
+    if not (logins or searches or user_ids):
+        # Tiqora's own keys: one watcher, ``User`` (login) or ``UserID``.
+        watcher_id = await _resolve_user_id(
+            session,
+            config.get("User"),
+            int(config["UserID"]) if str(config.get("UserID") or "").isdigit() else None,
+        )
+        await apply(int(watcher_id) if watcher_id is not None else user_id, user_id)
+        return
+
+    actor = _acting_user(config, user_id, "TicketWatchSet")
+    for login in logins:
+        found = await _resolve_user_id(session, login, None)
+        if found is None:
+            logger.warning("TicketWatchSet: cannot find user login %r", login)
+            continue
+        await apply(int(found), actor)
+    for pattern in searches:
+        for found in await _users_by_email(session, pattern):
+            await apply(found, actor)
+    for raw in user_ids:
+        found_id = (
+            (
+                await session.execute(
+                    select(Users.id).where(Users.id == int(raw), Users.valid_id == 1)
+                )
+            ).scalar_one_or_none()
+            if raw.isdigit()
+            else None
+        )
+        if found_id is None:
+            logger.warning("TicketWatchSet: cannot find user with id %r", raw)
+            continue
+        await apply(int(found_id), actor)
 
 
 async def _action_link_add(
@@ -779,18 +985,45 @@ async def _action_link_add(
     user_id: int,
     sysconfig: SysConfig,
 ) -> None:
+    """Port of LinkAdd (``LinkAdd.pm``): ``LinkObject::LinkAdd`` with the config as is.
+
+    Znuny keys: ``SourceObject``, ``SourceKey``, ``TargetObject``, ``TargetKey``, ``Type``,
+    ``State`` (``Valid`` / ``Temporary``) and ``UserID`` (``DynamicField_UserID``), which
+    overrides the acting user. The link is stored from source to target as given.
+
+    Keys left out fall back to Tiqora's older form: source ``Ticket`` / the current ticket,
+    target ``Ticket`` with ``TargetTicketID`` (or ``TicketID``), ``Type`` or ``LinkType``
+    (default ``Normal``), ``State`` ``Valid``.
+    """
     del sysconfig
-    target = config.get("TargetTicketID") or config.get("TicketID")
-    if target is None:
-        raise RequiredFieldMissing("LinkAdd: Config must set 'TargetTicketID' or 'TicketID'")
-    link_type = str(config.get("Type") or config.get("LinkType") or "Normal")
-    await link_tickets(
+    actor = _acting_user(config, user_id, "LinkAdd")
+    source_object = str(config.get("SourceObject") or "Ticket").strip()
+    target_object = str(config.get("TargetObject") or "Ticket").strip()
+    source_key = str(config.get("SourceKey") or "").strip() or str(ticket_id)
+    target_key = str(
+        config.get("TargetKey") or config.get("TargetTicketID") or config.get("TicketID") or ""
+    ).strip()
+    if not target_key:
+        raise RequiredFieldMissing("LinkAdd: Config must set 'TargetKey' (or 'TargetTicketID')")
+    for object_name in (source_object, target_object):
+        if not _LINK_OBJECT_RE.match(object_name):
+            raise RequiredFieldMissing(f"LinkAdd: {object_name!r} is not a link object name")
+    for obj, key in ((source_object, source_key), (target_object, target_key)):
+        if obj == "Ticket" and not key.isdigit():
+            raise RequiredFieldMissing(f"LinkAdd: {key!r} is not a ticket id")
+    await link_objects(
         session,
-        source_ticket_id=ticket_id,
-        target_ticket_id=int(target),
-        link_type=link_type,
-        user_id=user_id,
+        source_object=source_object,
+        source_key=source_key,
+        target_object=target_object,
+        target_key=target_key,
+        link_type=str(config.get("Type") or config.get("LinkType") or "Normal"),
+        state=str(config.get("State") or "Valid"),
+        user_id=actor,
     )
+
+
+_LINK_OBJECT_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,99}$")
 
 
 def _offset_to_seconds(offset: Any) -> int:
