@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tiqora.channels.email.smtp import CapturingMailSender
@@ -1711,4 +1711,174 @@ async def test_ticket_times_are_rendered_in_each_recipients_time_zone(
             "tz-customer@example.com": "Created 2026-07-15 10:08:00\n",
         }
     finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_reserved_invalid_tld_recipients_are_dropped(mariadb_znuny_url: str) -> None:
+    """R-NOTIFY (a): a chat visitor without an address writes as ``…@chat.invalid``; neither
+    the Customer fallback (newest customer article's From) nor an agent address in that
+    reserved TLD may reach the mail server. A valid recipient of the same event still does."""
+    from structlog.testing import capture_logs
+
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+    owner_id, other_id = 48540, 48541  # webchat plan band (Task 6)
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            queue_id = await _insert_queue(session, "notify-q-wc48-invalid-tld")
+            await _insert_agent(session, user_id=owner_id, login="wc48.notify.owner")
+            await _set_user_prefs(session, owner_id, "owner@agents.invalid")
+            await _insert_agent(session, user_id=other_id, login="wc48.notify.other")
+            await _set_user_prefs(session, other_id, "other@example.com")
+            ticket_id = await _insert_ticket(
+                session, "NOTIFY_WC48_INVALID", owner_id=owner_id, queue_id=queue_id
+            )
+            article_id = await _insert_article(
+                session, ticket_id, sender_type="customer", is_visible=1
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO article_data_mime (article_id, a_from, a_subject, a_body,"
+                    " a_content_type, incoming_time, create_time, create_by, change_time,"
+                    " change_by)"
+                    " VALUES (:aid, '\"Besucher\" <visitor-abc123@chat.invalid>', 'Chat',"
+                    " 'Hallo', 'text/plain', 0, current_timestamp, 1, current_timestamp, 1)"
+                ),
+                {"aid": article_id},
+            )
+            await _insert_notification_event(
+                session,
+                "wc48-invalid-tld",
+                items={
+                    "Events": ["TicketCreate"],
+                    "QueueID": [str(queue_id)],
+                    "Recipients": ["AgentOwner", "Customer"],
+                    "RecipientAgents": [str(other_id)],
+                    "Transports": ["Email"],
+                },
+                subject="WC48-INVALID-TLD",
+                body="Hallo",
+            )
+            await _insert_outbox_event(session, "TicketCreate", ticket_id)
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+
+        with capture_logs() as logs:
+            result = await run_notifications_tick(session_factory=factory, mail_sender=sender)
+        assert result["sent"] == 1
+        assert [str(m["To"]) for m in sender.sent] == ["other@example.com"]
+        contexts = {e.get("context") for e in logs if e["event"] == "mail_recipient_invalid_tld"}
+        assert contexts == {"notification_agent", "notification_customer"}
+    finally:
+        async with factory() as session:
+            ids = {"a": owner_id, "b": other_id}
+            tid_sql = "SELECT id FROM ticket WHERE tn = 'NOTIFY_WC48_INVALID'"
+            nid_sql = "SELECT id FROM notification_event WHERE name = 'wc48-invalid-tld'"
+            for sql in (
+                "DELETE FROM article_data_mime WHERE article_id IN"
+                f" (SELECT id FROM article WHERE ticket_id IN ({tid_sql}))",
+                f"DELETE FROM article WHERE ticket_id IN ({tid_sql})",
+                f"DELETE FROM ticket_history WHERE ticket_id IN ({tid_sql})",
+                f"DELETE FROM tiqora_event_outbox WHERE ticket_id IN ({tid_sql})",
+                f"DELETE FROM tiqora_cache_invalidation WHERE ticket_id IN ({tid_sql})",
+                "DELETE FROM ticket WHERE tn = 'NOTIFY_WC48_INVALID'",
+                f"DELETE FROM notification_event_item WHERE notification_id IN ({nid_sql})",
+                f"DELETE FROM notification_event_message WHERE notification_id IN ({nid_sql})",
+                "DELETE FROM notification_event WHERE name = 'wc48-invalid-tld'",
+                "DELETE FROM queue WHERE name = 'notify-q-wc48-invalid-tld'",
+                "DELETE FROM user_preferences WHERE user_id IN (:a, :b)",
+                "DELETE FROM users WHERE id IN (:a, :b)",
+            ):
+                await session.execute(text(sql), ids)
+            await session.commit()
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_customer_recipient_falls_back_like_znuny(mariadb_znuny_url: str) -> None:
+    """NotificationEvent.pm 6.5 (~817-833): no customer_user row but the ticket's
+    CustomerUserID is an address -> that address, before the article From; a plain login
+    without a row -> the article From (unchanged); a real customer_user -> its address
+    (unchanged); CustomerNotifyJustToRealCustomer switches the address step off and drops
+    tickets without a customer."""
+    from tiqora.worker.notifications import _NotificationRow, _resolve_recipients, _ticket_row
+    from tiqora.znuny.sysconfig import SysConfig, yaml_encode_effective
+
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    notification = _NotificationRow(id=0, name="wc48", items={"Recipients": ["Customer"]})
+    ticket_ids: list[int] = []
+    queue_id = 0
+
+    async def just_real(name: str) -> object:
+        if name == "CustomerNotifyJustToRealCustomer":
+            return yaml_encode_effective("1")
+        return None
+
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            queue_id = await _insert_queue(session, "notify-q-wc48-customer-fallback")
+            await _insert_customer_user(session, "wc48.real", "real@example.com")
+            for tn, customer in (
+                ("WC48_ADDR", "Walkin@Example.COM"),
+                ("WC48_LOGIN", "wc48kunde"),
+                ("WC48_REAL", "wc48.real"),
+                ("WC48_NONE", None),
+            ):
+                tid = await _insert_ticket(
+                    session, tn, customer_user_id=customer, queue_id=queue_id
+                )
+                ticket_ids.append(tid)
+                article_id = await _insert_article(
+                    session, tid, sender_type="customer", is_visible=1
+                )
+                await session.execute(
+                    text(
+                        "INSERT INTO article_data_mime (article_id, a_from, a_subject, a_body,"
+                        " a_content_type, incoming_time, create_time, create_by, change_time,"
+                        " change_by) VALUES (:aid, 'Absender <from@example.net>', 'S', 'B',"
+                        " 'text/plain', 0, current_timestamp, 1, current_timestamp, 1)"
+                    ),
+                    {"aid": article_id},
+                )
+            await session.commit()
+
+            async def resolve(tid: int, sysconfig: SysConfig | None = None) -> list[str]:
+                ticket = await _ticket_row(session, tid)
+                assert ticket is not None
+                found = await _resolve_recipients(
+                    session, notification, ticket, sysconfig=sysconfig
+                )
+                return [r.email for r in found if r.kind == "Customer"]
+
+            addr, login, real, none = ticket_ids
+            assert await resolve(addr) == ["Walkin@example.com"]
+            assert await resolve(login) == ["from@example.net"]
+            assert await resolve(real) == ["real@example.com"]
+            assert await resolve(none) == ["from@example.net"]
+            strict = SysConfig(fetch=just_real)
+            assert await resolve(addr, strict) == ["from@example.net"]
+            assert await resolve(real, strict) == ["real@example.com"]
+            assert await resolve(none, strict) == []
+    finally:
+        async with factory() as session:
+            for sql in (
+                "DELETE FROM article_data_mime WHERE article_id IN"
+                " (SELECT id FROM article WHERE ticket_id IN :t)",
+                "DELETE FROM article WHERE ticket_id IN :t",
+                "DELETE FROM ticket_history WHERE ticket_id IN :t",
+                "DELETE FROM ticket WHERE id IN :t",
+            ):
+                if ticket_ids:
+                    await session.execute(
+                        text(sql).bindparams(bindparam("t", expanding=True)), {"t": ticket_ids}
+                    )
+            await session.execute(text("DELETE FROM queue WHERE id = :q"), {"q": queue_id})
+            await session.execute(text("DELETE FROM customer_user WHERE login = 'wc48.real'"))
+            await session.commit()
         await engine.dispose()

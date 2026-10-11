@@ -152,6 +152,11 @@ KEY_TELEGRAM_POLLER_INTERVAL_SECONDS = "daemon.telegram_poller.interval_seconds"
 KEY_REPORT_FACTS_ENABLED = "daemon.report_facts.enabled"
 KEY_REPORT_FACTS_INTERVAL_SECONDS = "daemon.report_facts.interval_seconds"
 
+# Web chat sweep (waiting timeouts, idle chats, retention). Default ON: it only writes
+# tiqora_chat_* rows.
+KEY_WEBCHAT_SWEEP_ENABLED = "daemon.webchat_sweep.enabled"
+KEY_WEBCHAT_SWEEP_INTERVAL_SECONDS = "daemon.webchat_sweep.interval_seconds"
+
 # Telegram inbound update_id cursor (Phase T3). Shared by both transports: the
 # poller advances it after each successfully processed getUpdates batch, the
 # webhook route advances it (dedup guard) after each delivered update. Not a

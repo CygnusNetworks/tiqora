@@ -1312,3 +1312,40 @@ async def test_agent_models_tool_rounds_reach_the_run(
         assert forced == {"propose_customer_message", "escalate_to_human", "no_reply_needed"}
     finally:
         await engine.dispose()
+
+
+async def test_webchat_customer_article_is_never_auto_replied(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from unittest.mock import AsyncMock
+
+    seed = _seed_ticket(mariadb_znuny_url, ns=48)
+    article_id = _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Hi, chat"
+    )
+    _insert_outbox_event(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        event_type="ArticleCreate",
+        article_id=article_id,
+        channel="webchat",
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+
+        process = AsyncMock(return_value=None)
+        monkeypatch.setattr("tiqora.ai.auto_worker._process_customer_article_event", process)
+        _patch_llm(monkeypatch, ScriptedLlm([_propose_response("reply", "Must not be sent.")]))
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        # The shared outbox may hold leftovers of earlier tests; only the chat
+        # event is under test.
+        assert [
+            c for c in process.await_args_list if c.args[2].ticket_id == seed["ticket_id"]
+        ] == []
+        assert totals["skipped_channel"] == 1
+        assert totals["auto_replies"] == 0
+    finally:
+        await engine.dispose()

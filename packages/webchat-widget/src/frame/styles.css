@@ -1,0 +1,274 @@
+/* Chat frame styles. Theme colours come from --tq-primary, set through the CSSOM (the
+   frame CSP has no 'unsafe-inline'). Everything else is fixed neutral colours. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+}
+#app {
+  height: 100%;
+}
+:root {
+  --tq-primary: #2563eb;
+  --tq-bg: #fff;
+  --tq-fg: #1f2937;
+  --tq-muted: #6b7280;
+  --tq-line: #e5e7eb;
+  --tq-bubble: #f3f4f6;
+  --tq-err: #b91c1c;
+}
+:root[data-theme="dark"] {
+  --tq-bg: #111827;
+  --tq-fg: #f3f4f6;
+  --tq-muted: #9ca3af;
+  --tq-line: #374151;
+  --tq-bubble: #1f2937;
+  --tq-err: #fca5a5;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] {
+    --tq-bg: #111827;
+    --tq-fg: #f3f4f6;
+    --tq-muted: #9ca3af;
+    --tq-line: #374151;
+    --tq-bubble: #1f2937;
+    --tq-err: #fca5a5;
+  }
+}
+.tq-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--tq-bg);
+  color: var(--tq-fg);
+}
+.tq-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 0 16px;
+  background: var(--tq-primary);
+  color: #fff;
+}
+.tq-head h1 {
+  margin: 0;
+  font-size: 1rem;
+}
+.tq-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+:focus-visible {
+  outline: 2px solid var(--tq-primary);
+  outline-offset: 2px;
+}
+.tq-head :focus-visible {
+  outline-color: #fff;
+}
+.tq-icon,
+.tq-btn,
+.tq-form input:not([type="checkbox"]),
+.tq-form select {
+  min-height: 44px;
+}
+.tq-icon {
+  min-width: 44px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  color: inherit;
+}
+.tq-btn {
+  padding: 0 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--tq-primary);
+  color: #fff;
+  cursor: pointer;
+}
+.tq-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.tq-link {
+  min-height: 44px;
+  padding: 0 4px;
+  background: none;
+  border: 0;
+  color: var(--tq-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.tq-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+.tq-form h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.tq-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tq-form input:not([type="checkbox"]),
+.tq-form select,
+.tq-form textarea,
+.tq-input {
+  padding: 8px 10px;
+  border: 1px solid var(--tq-line);
+  border-radius: 8px;
+  background: var(--tq-bg);
+}
+.tq-check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 44px;
+}
+[aria-invalid="true"] {
+  border-color: var(--tq-err) !important;
+}
+.tq-err,
+.tq-notice {
+  margin: 0;
+  color: var(--tq-err);
+  font-size: 0.9rem;
+}
+.tq-notice {
+  padding: 16px;
+}
+.tq-intro,
+.tq-privacy,
+.tq-status,
+.tq-count {
+  margin: 0;
+  color: var(--tq-muted);
+  font-size: 0.9rem;
+}
+.tq-chat {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.tq-status {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--tq-line);
+}
+.tq-log {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+}
+.tq-msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 85%;
+  gap: 2px;
+}
+.tq-own {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+.tq-other {
+  align-self: flex-start;
+}
+.tq-name {
+  font-size: 0.8rem;
+  color: var(--tq-muted);
+}
+.tq-bubble {
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--tq-bubble);
+  overflow-wrap: anywhere;
+}
+.tq-own .tq-bubble {
+  background: var(--tq-primary);
+  color: #fff;
+}
+.tq-own .tq-bubble a {
+  color: inherit;
+}
+.tq-pending {
+  opacity: 0.7;
+}
+.tq-text a {
+  color: var(--tq-primary);
+}
+.tq-sys,
+.tq-typing {
+  margin: 0;
+  text-align: center;
+  color: var(--tq-muted);
+  font-size: 0.85rem;
+}
+.tq-att {
+  display: block;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  text-align: start;
+}
+.tq-att img {
+  display: block;
+  max-width: 240px;
+  max-height: 240px;
+  border-radius: 8px;
+}
+.tq-foot {
+  padding: 8px 16px 12px;
+  border-top: 1px solid var(--tq-line);
+}
+.tq-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+.tq-input {
+  flex: 1;
+  min-height: 44px;
+  max-height: 120px;
+  resize: none;
+}
+.tq-send {
+  min-height: 44px;
+}
+.tq-endbtn {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.85rem;
+}
+.tq-banner {
+  padding: 4px 16px;
+}

@@ -35,6 +35,13 @@ of two shapes:
   :mod:`tiqora.ai.limits`). Admin-scoped: the SSE endpoint forwards it only
   to members of the ``admin`` group, who re-read the limit status.
 
+* ``{"type": "chat_waiting"|"chat_assigned"|"chat_message"|"chat_typing"|
+  "chat_ended", "session_id": <str>, "ticket_id": <int>, "queue_id": <int>,
+  ["user_id": <int>], ["topic_ref": "<config_id>:<topic_key>"]}`` — web-chat
+  activity (see :mod:`tiqora.webchat`). Queue-scoped like ``ticket_changed``
+  (``queue_id`` is the ticket's CURRENT queue). Carries no visitor name and no
+  message text: clients refetch the inbox / ticket chat.
+
 Publishing is always best-effort: this module never raises out of its
 publish functions, so callers (outbox drain, poller, presence writes) don't
 need their own try/except to stay safe. A failed publish only means
@@ -45,7 +52,7 @@ polling/refetch fallbacks, not that the underlying write failed.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Final
 
 import redis.asyncio as redis
 import structlog
@@ -55,6 +62,11 @@ from tiqora.config import Settings, get_settings
 logger = structlog.get_logger(__name__)
 
 TIQORA_EVENTS_CHANNEL = "tiqora:events"
+
+#: Agent-bus message types of the web chat (queue-scoped in the SSE endpoint).
+CHAT_EVENT_TYPES: Final = frozenset(
+    {"chat_waiting", "chat_assigned", "chat_message", "chat_typing", "chat_ended"}
+)
 
 _client: redis.Redis | None = None
 
@@ -180,6 +192,38 @@ async def publish_ai_limit_changed(redis_client: redis.Redis) -> None:
     ``GET /api/v1/admin/ai/limits`` (poll-via-invalidation, like presence).
     """
     await _publish(redis_client, {"type": "ai_limit_changed"})
+
+
+async def publish_chat_event(
+    redis_client: redis.Redis,
+    event_type: str,
+    *,
+    session_id: str,
+    ticket_id: int,
+    queue_id: int,
+    user_id: int | None = None,
+    topic_ref: str | None = None,
+) -> None:
+    """Publish a web-chat event on the agent bus. Best-effort — never raises.
+
+    The payload names ids only (no visitor data, no message text). *queue_id* must be the
+    ticket's current queue so the SSE endpoint scopes it to the right agents. An unknown
+    *event_type* is dropped with a warning.
+    """
+    if event_type not in CHAT_EVENT_TYPES:
+        logger.warning("chat_event_type_unknown", event_type=event_type)
+        return
+    payload: dict[str, Any] = {
+        "type": event_type,
+        "session_id": session_id,
+        "ticket_id": int(ticket_id),
+        "queue_id": int(queue_id),
+    }
+    if user_id is not None:
+        payload["user_id"] = int(user_id)
+    if topic_ref is not None:
+        payload["topic_ref"] = topic_ref
+    await _publish(redis_client, payload)
 
 
 async def _publish(redis_client: redis.Redis, payload: dict[str, Any]) -> None:

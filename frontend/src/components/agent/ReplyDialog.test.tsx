@@ -21,6 +21,7 @@ const {
   refineAvailability,
   getTicket,
   listReferenceStates,
+  request,
 } = vi.hoisted(() => ({
   getReplyDraft: vi.fn(),
   listTemplates: vi.fn(),
@@ -34,6 +35,7 @@ const {
   refineAvailability: vi.fn(),
   getTicket: vi.fn(),
   listReferenceStates: vi.fn(),
+  request: vi.fn(),
 }));
 
 vi.mock("@/lib/refineApi", async () => {
@@ -56,6 +58,7 @@ vi.mock("@/lib/api", async () => {
       acquireTicketLock,
       getTicket,
       listReferenceStates,
+      request,
     },
   };
 });
@@ -1138,5 +1141,48 @@ describe("ReplyDialog: state after sending (Danach)", () => {
     await screen.findByTestId("reply-dialog");
     await waitFor(() => expect(getTicket).toHaveBeenCalled());
     expect(screen.queryByTestId("reply-next-state")).toBeNull();
+  });
+});
+
+describe("ReplyDialog on a web chat ticket", () => {
+  const chat = (visitor_email: string | null) => ({
+    session_id: "s1",
+    status: "ended",
+    visitor_name: "Max",
+    visitor_email,
+    visitor_email_verified: false,
+  });
+  const open = (visitorEmail: string | null) => {
+    request.mockReset().mockImplementation((_m: string, path: string) =>
+      Promise.resolve(path.endsWith("/chat") ? chat(visitorEmail) : {}),
+    );
+    getReplyDraft.mockReset().mockResolvedValue({
+      ...baseDraft,
+      to_address: '"Besucher" <visitor-abc@chat.invalid>',
+    });
+    listTemplates.mockReset().mockResolvedValue([]);
+    getTicket.mockReset().mockResolvedValue({ id: 116, permissions: null });
+    listReferenceStates.mockReset().mockResolvedValue([]);
+    wrap(
+      <ReplyDialog ticketId={116} articleId={40} replyAll={false} open onClose={vi.fn()} channelName="WebChat" />,
+    );
+  };
+
+  it("never addresses @chat.invalid: To stays empty, send is disabled, the hint explains", async () => {
+    open(null);
+    expect(await screen.findByTestId("reply-webchat-no-email")).toHaveTextContent(
+      /did not leave an email address|keine E-Mail-Adresse/,
+    );
+    expect(screen.getByTestId("reply-to").textContent).not.toContain("chat.invalid");
+    await waitFor(() => expect(screen.getByTestId("reply-send")).toBeDisabled());
+  });
+
+  it("prefills To with the visitor's address and allows sending", async () => {
+    open("erika@example.org");
+    await waitFor(() => expect(screen.getByTestId("reply-to").textContent).toContain("erika@example.org"));
+    expect(screen.queryByTestId("reply-webchat-no-email")).toBeNull();
+    expect(screen.getByTestId("reply-to").textContent).not.toContain("chat.invalid");
+    fireEvent.change(screen.getByTestId("reply-body"), { target: { value: "Guten Tag" } });
+    await waitFor(() => expect(screen.getByTestId("reply-send")).not.toBeDisabled());
   });
 });

@@ -21,6 +21,7 @@ import { useReplyDraft } from "@/lib/replyDrafts";
 import { channelNameOf, dominantChannel } from "@/lib/articleChannel";
 import { requestComposer, requestConversationView } from "./telegram/composerBus";
 import { ReplyDialog } from "./ReplyDialog";
+import { isChatLive, useTicketChat } from "@/lib/webchatApi";
 import { TicketMetaCounters } from "./TicketMetaCounters";
 import { articleSortKey } from "@/lib/article";
 import { flattenQueues } from "./QueueTree";
@@ -180,6 +181,14 @@ export function TicketHeaderActions({
   // Telegram tickets reply through the messenger-style chat composer, not
   // the email-style dialog — see composerBus.ts.
   const isTelegramTicket = dominantChannel(articles) === "Telegram";
+  // A web chat with a live session does the same; an ended one is answered
+  // by e-mail through the dialog.
+  const isWebchatTicket = dominantChannel(articles) === "WebChat";
+  const webchatChatQ = useTicketChat(ticketId, isWebchatTicket);
+  const webchatLive = isChatLive(webchatChatQ.data);
+  // Chat state still loading: neither the composer nor the e-mail dialog is known to be
+  // right yet, so the reply button waits (a live chat must not get the e-mail dialog).
+  const webchatLoading = isWebchatTicket && webchatChatQ.isPending;
 
   const isLocked = Boolean(ticket.lock && ticket.lock.toLowerCase() !== "unlock");
 
@@ -280,12 +289,12 @@ export function TicketHeaderActions({
             <Button
               variant="primary"
               size="sm"
-              disabled={!canNote || !replyTarget}
+              disabled={!canNote || !replyTarget || webchatLoading}
               data-testid="ticket-actions-reply"
               data-has-draft={headerHasDraft ? "true" : undefined}
               className={cn(ai?.draftsButton && "rounded-r-none")}
               onClick={() => {
-                if (isTelegramTicket) {
+                if (isTelegramTicket || (isWebchatTicket && webchatLive)) {
                   // Bring a manually-split ticket back to the conversation
                   // view first — the composer only mounts there, and the
                   // focus request is buffered until it does.

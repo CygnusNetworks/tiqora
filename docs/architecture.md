@@ -971,6 +971,27 @@ The agent sidebar hides Znuny's plumbing queues `Postmaster`, `Raw` and
 system queues (n)* toggle; a queue search or the currently open queue still
 shows them. The queue tree is sorted case-insensitively.
 
+## Web chat (`webchat/`, `packages/webchat-widget`)
+
+- **Packages.** Backend `tiqora.webchat` (sessions, availability, hub, stream, sweep, uploads, origins, static
+  routes); public API `tiqora.webchat.public_api` mounted at `/api/chat/v1`; agent API `api/v1/chat.py`; admin API
+  `api/v1/admin/chat_configs.py`. Frontend: the chat inbox and conversation header in the agent shell, the admin
+  editor under Admin, **Web-Chat**. The widget is a separate pnpm package, `packages/webchat-widget`, with two
+  bundles: a small `loader.js` that website owners embed and the iframe document (`frame`) with the Preact chat.
+- **Static routes.** `tiqora-api` serves the build from `TIQORA_WEBCHAT_DIST_DIR`: `/chat/v1/loader.js`,
+  `/chat/v1/frame` (GET and HEAD) and hashed assets under `/chat/v1/`. Registered before the SPA catch-all. The
+  frame sets its own CSP from the chat's allowed websites (`frame-ancestors`) and must not get `X-Frame-Options`.
+- **Fan-out.** One `psubscribe tiqora:chat:*` per API process (`ChatHub`). Redis carries only wake and typing
+  markers (never visitor data); every open stream re-reads the DB, so live delivery and replay (`Last-Event-ID`)
+  share one code path. Only visitor streams subscribe to the hub. Caps on visitor streams: per visitor address, per
+  chat, per process (`TIQORA_CHAT_MAX_STREAMS`), 30 minutes per stream. Agent events (new chat, accepted, ended) go through the existing agent SSE bus with ids only.
+- **Post-commit notifications.** Session services only queue wake-ups and agent events on the `AsyncSession`;
+  the caller publishes them after `commit()`. **MCP flush latency:** MCP has no Redis client, so an MCP-posted
+  reply queues its wake-up but never publishes it; the visitor sees it on the next stream heartbeat, at most 25 s
+  later (REST replies are immediate).
+- **Shutdown.** uvicorn runs with `timeout_graceful_shutdown=8` so open streams are cut and the lifespan cleanup
+  (hub close, pools) runs before Docker's 10 s stop grace period ends.
+
 ## Observability
 
 | Endpoint / artifact | Purpose |

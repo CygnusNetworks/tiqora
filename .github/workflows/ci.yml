@@ -134,6 +134,14 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build api-client
         run: pnpm --filter @tiqora/api-client build
+      - name: Lint webchat widget
+        run: pnpm --filter @tiqora/webchat-widget lint
+      - name: Test webchat widget
+        run: pnpm --filter @tiqora/webchat-widget test
+      # Includes scripts/check-size.mjs: fails when loader.js or the frame start
+      # exceeds its gzip budget.
+      - name: Build webchat widget
+        run: pnpm --filter @tiqora/webchat-widget build
       - name: Lint
         run: pnpm --filter tiqora-frontend lint
       - name: Typecheck + build
@@ -168,6 +176,11 @@ jobs:
       - name: Playwright e2e (mocked API)
         if: startsWith(github.ref, 'refs/tags/v')
         run: pnpm --filter tiqora-frontend e2e
+      # Same Chromium as above (both packages resolve one @playwright/test); the widget
+      # e2e needs the dist/ of the "Build webchat widget" step.
+      - name: Playwright e2e (webchat widget, cross-origin)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: pnpm --filter @tiqora/webchat-widget e2e
 
   coverage-badges:
     name: Publish coverage badges

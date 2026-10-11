@@ -43,7 +43,7 @@ export function channelNameOf(
  * aren't seeded by this install yet, but the name is already reserved for
  * when they are; Telegram is seeded lazily by its gateway, see above).
  */
-export const CONVERSATIONAL_CHANNEL_NAMES = new Set<string>(["Chat", "WhatsApp", "SMS", "Telegram"]);
+export const CONVERSATIONAL_CHANNEL_NAMES = new Set<string>(["Chat", "WebChat", "WhatsApp", "SMS", "Telegram"]);
 
 export function isConversationalChannel(channelName: string): boolean {
   return CONVERSATIONAL_CHANNEL_NAMES.has(channelName);
@@ -54,7 +54,7 @@ export function channelIcon(channelName: string): string {
   if (channelName === "Phone") return "📞";
   if (channelName === "Internal") return "📝";
   if (channelName === "Telegram") return "✈";
-  if (channelName === "Chat" || channelName === "WhatsApp" || channelName === "SMS") return "💬";
+  if (channelName === "Chat" || channelName === "WebChat" || channelName === "WhatsApp" || channelName === "SMS") return "💬";
   return "✉";
 }
 

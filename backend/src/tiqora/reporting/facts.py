@@ -30,6 +30,7 @@ CHANNEL_KEYS: Final[dict[str, str]] = {
     "Internal": "internal",
     "Telegram": "telegram",
     "Chat": "webchat",
+    "WebChat": "webchat",
     "SMS": "sms",
     "WhatsApp": "whatsapp",
 }

@@ -581,6 +581,33 @@ channel's shared guest customer.
   never sees the ticket) — leave it disabled to avoid confusion, not because
   it would double-send.
 
+## Web chat (`webchat/`)
+
+The web chat is an embeddable widget for websites; setup and daily use are in the
+[guide](guide/webchat.md). Unlike the channels above it needs no external service, and it is a **visitor-facing
+internet endpoint**, so abuse protection (rate limits, origin checks, upload limits) is part of the design.
+
+- **Channel row.** Articles use a Tiqora-owned `communication_channel` row `WebChat` with the Znuny module
+  `Kernel::System::CommunicationChannel::Internal`. Storage is the MIME article tables (like Telegram), so
+  attachments and all readers (agent view, portal, search, MCP, compat `TicketGet`, GDPR) work unchanged; with the
+  `Internal` module Znuny renders the text and attachments and deletes them correctly. `TicketListItem.channel` is
+  `webchat`; the legacy `Chat` channel of archived OTRS chats maps to `webchat` too.
+- **Master switch.** `channel.webchat.enabled` (default off) in the admin channels API; the chats themselves
+  (topics, hours, look, limits) are configured under Admin, **Web-Chat**.
+- **Tables.** `tiqora_chat_config`, `tiqora_chat_session`, `tiqora_chat_message`, `tiqora_chat_agent_state`
+  (Alembic chain `versions_tiqora`). Sessions are `waiting`, `active`, `ended` or `abandoned`; the offline
+  message form stores an `ended` session with `end_reason="offline_form"`.
+- **History and notifications.** All writes go through `domain/ticket_write_service` (history, cache
+  invalidation, outbox events). The first visitor message is a `WebRequestCustomer` article and triggers
+  `NotificationNewTicket`; follow-up lines use the normal agent notifications.
+- **Sweep.** `tiqora-worker` runs `webchat_sweep` (every `TIQORA_WEBCHAT_SWEEP_INTERVAL`, default 15 s; service
+  switch `daemon.webchat_sweep.enabled`, default on): waiting timeout (`no_agent`), idle chats (`abandoned`) and
+  the retention purge, which deletes the `tiqora_chat_message` rows and clears the session's visitor columns;
+  the transcript articles and their attachments stay on the ticket under the ticket's own retention and GDPR
+  erasure.
+- **AI.** Webchat articles are skipped by the auto-reply worker in phase 1; drafts work as on other tickets.
+- **Not a chat engine of Znuny.** Znuny's own chat module is not used.
+
 ## Admin config
 
 `GET /api/v1/admin/channels` and `GET/PUT /api/v1/admin/channels/{sms,whatsapp,phone,telegram}`

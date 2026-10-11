@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Host page</title>
+    <!-- Test page of a customer site: the page language follows ?lang=. -->
+    <script src="/host-lang.js"></script>
+    <!-- A hostile / over-eager site stylesheet: the widget must look and sit right anyway. -->
+    <style>
+      * { letter-spacing: 9px !important; line-height: 0 !important; }
+      body > div, button, span, svg, path, iframe {
+        transform: scale(0.1) rotate(45deg) !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        filter: blur(9px) !important;
+        position: static !important;
+        pointer-events: none !important;
+        min-width: 0 !important;
+        max-width: 10px !important;
+        max-height: 10px !important;
+        padding: 40px !important;
+        margin: 90px !important;
+        background-image: linear-gradient(red, blue) !important;
+        outline: 5px solid red !important;
+        width: 3px !important;
+        height: 3px !important;
+        display: none !important;
+        left: 0 !important;
+        top: 0 !important;
+      }
+      /* SVG presentation properties: the launcher's icon must still be drawn. */
+      svg path {
+        d: path("M0 0") !important;
+        fill: transparent !important;
+        stroke: transparent !important;
+        stroke-width: 0 !important;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Our shop</h1>
+    <p>Some page content that is none of the chat's business.</p>
+    <script
+      src="http://127.0.0.1:5190/chat/v1/loader.js"
+      data-tiqora-chat="wc_e2ekey"
+      async
+    ></script>
+  </body>
+</html>

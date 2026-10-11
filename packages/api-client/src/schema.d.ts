@@ -21,6 +21,236 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chat/v1/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Public Config
+         * @description What the widget shows for config *k* on the website *origin*.
+         */
+        get: operations["get_public_config_api_chat_v1_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/offline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Offline Form
+         * @description Offline form: a ticket with the visitor's message (an e-mail address is required).
+         */
+        post: operations["post_offline_form_api_chat_v1_offline_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Chat Session
+         * @description Start a chat; 409 ``offline`` when nobody can take it (use the offline form).
+         */
+        post: operations["create_chat_session_api_chat_v1_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Chat Session State */
+        get: operations["get_chat_session_state_api_chat_v1_sessions__session_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions/{session_id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Chat Attachment
+         * @description One file (multipart ``file``, optional ``caption``/``client_id``) = one visitor line.
+         *
+         *     Takes the raw request so nothing is parsed before the length, token and limit checks
+         *     (R-UPLOAD).
+         */
+        post: operations["post_chat_attachment_api_chat_v1_sessions__session_id__attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions/{session_id}/contact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Chat Contact
+         * @description Leave an e-mail address after a chat ended without an answer.
+         */
+        post: operations["post_chat_contact_api_chat_v1_sessions__session_id__contact_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions/{session_id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Chat End
+         * @description The visitor closes the chat (idempotent).
+         */
+        post: operations["post_chat_end_api_chat_v1_sessions__session_id__end_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions/{session_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Chat Messages
+         * @description Transcript lines with ``seq > after`` in order.
+         */
+        get: operations["list_chat_messages_api_chat_v1_sessions__session_id__messages_get"];
+        put?: never;
+        /**
+         * Post Chat Message
+         * @description One visitor line; a retry with the same ``client_id`` returns the stored line.
+         */
+        post: operations["post_chat_message_api_chat_v1_sessions__session_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions/{session_id}/messages/{seq}/attachments/{index}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Chat Attachment
+         * @description A file of this session's transcript (raster images inline, everything else as a
+         *     download; ``nosniff`` + ``CSP: sandbox`` always).
+         */
+        get: operations["get_chat_attachment_api_chat_v1_sessions__session_id__messages__seq__attachments__index__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions/{session_id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream Chat Session
+         * @description Live transcript (C7): lines after ``Last-Event-ID`` (else ``after``), then live events.
+         *
+         *     A read (R-DISABLED-SESSIONS): keeps working when the chat was switched off. The hub
+         *     subscription is the last check, so a full hub (per IP, process total) answers 503 with
+         *     ``Retry-After: 30`` instead of an empty 200. The pre-check DB session is committed and
+         *     closed before the response starts; the stream opens short sessions per read.
+         */
+        get: operations["stream_chat_session_api_chat_v1_sessions__session_id__stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions/{session_id}/typing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Chat Typing
+         * @description The visitor is typing; at most one signal per 2 s, the rest is dropped silently.
+         */
+        post: operations["post_chat_typing_api_chat_v1_sessions__session_id__typing_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portal/auth/login": {
         parameters: {
             query?: never;
@@ -1840,6 +2070,60 @@ export interface paths {
         /** Update Channel */
         put: operations["update_channel_api_v1_admin_channels__channel__put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/chat-configs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Chat Configs */
+        get: operations["list_chat_configs_api_v1_admin_chat_configs_get"];
+        put?: never;
+        /** Create Chat Config */
+        post: operations["create_chat_config_api_v1_admin_chat_configs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/chat-configs/{config_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Chat Config */
+        get: operations["get_chat_config_api_v1_admin_chat_configs__config_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Chat Config */
+        delete: operations["delete_chat_config_api_v1_admin_chat_configs__config_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Chat Config */
+        patch: operations["update_chat_config_api_v1_admin_chat_configs__config_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/chat-configs/{config_id}/rotate-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rotate Chat Config Key */
+        post: operations["rotate_chat_config_key_api_v1_admin_chat_configs__config_id__rotate_key_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5872,6 +6156,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chat/agent-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Chat Agent State
+         * @description The agent's "Chats annehmen" state and how many chats they hold now.
+         */
+        get: operations["get_chat_agent_state_api_v1_chat_agent_state_get"];
+        /**
+         * Put Chat Agent State
+         * @description Set availability, topic filter (refs from ``GET /chat/topics``; empty = all) and the
+         *     concurrent-chat limit.
+         */
+        put: operations["put_chat_agent_state_api_v1_chat_agent_state_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Chat Inbox
+         * @description Waiting chats the agent may accept and the agent's own active chats.
+         */
+        get: operations["get_chat_inbox_api_v1_chat_inbox_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/sessions/{session_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Chat Accept
+         * @description Take a waiting chat (first accept wins; owner + lock like Znuny).
+         */
+        post: operations["post_chat_accept_api_v1_chat_sessions__session_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/sessions/{session_id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Chat End
+         * @description End a live chat; optionally close the ticket. Idempotent (204 again when ended).
+         */
+        post: operations["post_chat_end_api_v1_chat_sessions__session_id__end_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/chat/topics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Chat Topics
+         * @description Topics of valid chat configs whose queue the agent holds ``rw`` on.
+         */
+        get: operations["get_chat_topics_api_v1_chat_topics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customer-directory": {
         parameters: {
             query?: never;
@@ -8802,6 +9191,13 @@ export interface paths {
          *     same transaction (PATCH semantics). The state change is validated before
          *     the article is created, so an invalid one returns 403/404/422 without
          *     sending or storing anything.
+         *
+         *     Web chat (``channel=webchat``, agent, visible for the customer): the reply is also posted
+         *     into the ticket's live chat. A chat nobody accepted yet is accepted first, in its own
+         *     transaction (R-REPLY-ACCEPT-FIRST); a refused accept refuses the reply (409
+         *     ``at_capacity`` / ``already_taken``, 403 ``forbidden``). No live chat → 409
+         *     ``chat_not_live``; nothing is stored in either case. The text and ``state_id`` are
+         *     validated before the implicit accept. ``attachments`` are allowed.
          */
         post: operations["create_article_api_v1_tickets__ticket_id__articles_post"];
         delete?: never;
@@ -9175,6 +9571,48 @@ export interface paths {
          *     parts). Requires ``note``.
          */
         post: operations["retract_telegram_article_api_v1_tickets__ticket_id__articles__article_id__telegram_retract_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ticket Chat
+         * @description The ticket's newest chat for the conversation header (visitor, topic, status,
+         *     online/typing); 404 when the ticket has none.
+         */
+        get: operations["get_ticket_chat_api_v1_tickets__ticket_id__chat_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/chat/typing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Ticket Chat Typing
+         * @description The agent is typing in the ticket's live chat (the visitor sees it; at most one
+         *     signal per 2 s, the rest is dropped). Needs ``note`` on the ticket's queue.
+         */
+        post: operations["post_ticket_chat_typing_api_v1_tickets__ticket_id__chat_typing_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -12465,6 +12903,456 @@ export interface components {
             };
             /** Enabled */
             enabled?: boolean | null;
+        };
+        /** ChatAcceptOut */
+        ChatAcceptOut: {
+            /** Ticket Id */
+            ticket_id: number;
+        };
+        /**
+         * ChatAgentStateIn
+         * @description ``topics`` empty = every topic the agent may take; refs must come from ``/chat/topics``.
+         */
+        ChatAgentStateIn: {
+            /** Available */
+            available: boolean;
+            /**
+             * Max Concurrent
+             * @default 3
+             */
+            max_concurrent: number;
+            /** Topics */
+            topics?: string[];
+        };
+        /** ChatAgentStateOut */
+        ChatAgentStateOut: {
+            /** Active Count */
+            active_count: number;
+            /** Available */
+            available: boolean;
+            /** Max Concurrent */
+            max_concurrent: number;
+            /** Topics */
+            topics: string[];
+        };
+        /** ChatAttachmentOut */
+        ChatAttachmentOut: {
+            /** Content Type */
+            content_type: string;
+            /** Filename */
+            filename: string;
+            /** Index */
+            index: number;
+            /** Size */
+            size: number;
+        };
+        /** ChatConfigCreateIn */
+        ChatConfigCreateIn: {
+            /** Name */
+            name: string;
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
+            values: components["schemas"]["ChatConfigValues"];
+        };
+        /** ChatConfigOut */
+        ChatConfigOut: {
+            /**
+             * Changed
+             * Format: date-time
+             */
+            changed: string;
+            /**
+             * Created
+             * Format: date-time
+             */
+            created: string;
+            /** Embed Snippet */
+            embed_snippet: string;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Public Key */
+            public_key: string;
+            /** Session Count */
+            session_count: number;
+            /** Valid */
+            valid: boolean;
+            values: components["schemas"]["ChatConfigValues"];
+        };
+        /** ChatConfigUpdateIn */
+        ChatConfigUpdateIn: {
+            /** Name */
+            name?: string | null;
+            /** Valid */
+            valid?: boolean | null;
+            values?: components["schemas"]["ChatConfigValues"] | null;
+        };
+        /**
+         * ChatConfigValues
+         * @description Everything the admin edits except name / public_key / valid.
+         */
+        ChatConfigValues: {
+            /** Allowed Origins */
+            allowed_origins?: string[];
+            /** Business Calendar */
+            business_calendar?: string | null;
+            /** Default Customer User */
+            default_customer_user?: string | null;
+            /** Greeting */
+            greeting?: string | null;
+            /**
+             * Offline Mode
+             * @default form
+             * @enum {string}
+             */
+            offline_mode: "form" | "hide";
+            /** Prechat Fields */
+            prechat_fields?: components["schemas"]["PrechatField"][];
+            /** Privacy Url */
+            privacy_url?: string | null;
+            rate_limits?: components["schemas"]["ChatRateLimits"];
+            /**
+             * Retention Days
+             * @default 30
+             */
+            retention_days: number;
+            /**
+             * Show Agent Names
+             * @default true
+             */
+            show_agent_names: boolean;
+            theme?: components["schemas"]["ChatTheme"];
+            /** Topics */
+            topics: components["schemas"]["ChatTopic"][];
+            upload_policy?: components["schemas"]["UploadPolicy"];
+            /**
+             * Wait Timeout Seconds
+             * @default 180
+             */
+            wait_timeout_seconds: number;
+        };
+        /** ChatContactIn */
+        ChatContactIn: {
+            /**
+             * Email
+             * @default
+             */
+            email: string;
+            /** Name */
+            name?: string | null;
+        };
+        /** ChatEndIn */
+        ChatEndIn: {
+            /**
+             * Close Ticket
+             * @default false
+             */
+            close_ticket: boolean;
+        };
+        /** ChatInboxItemOut */
+        ChatInboxItemOut: {
+            /** Accepted At */
+            accepted_at: string | null;
+            /** Session Id */
+            session_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "waiting" | "active";
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+            /** Topic Label */
+            topic_label: string | null;
+            /** Visitor Name */
+            visitor_name: string | null;
+            /** Waiting Since */
+            waiting_since: string | null;
+        };
+        /** ChatInboxOut */
+        ChatInboxOut: {
+            /** Mine */
+            mine: components["schemas"]["ChatInboxItemOut"][];
+            /** Waiting */
+            waiting: components["schemas"]["ChatInboxItemOut"][];
+        };
+        /** ChatMessageIn */
+        ChatMessageIn: {
+            /** Body */
+            body: string;
+            /** Client Id */
+            client_id?: string | null;
+        };
+        /** ChatMessageOut */
+        ChatMessageOut: {
+            /** Agent Name */
+            agent_name: string | null;
+            /** Attachments */
+            attachments: components["schemas"]["ChatAttachmentOut"][];
+            /** Body */
+            body: string | null;
+            /** Client Id */
+            client_id: string | null;
+            /** Code */
+            code: string | null;
+            /**
+             * Created
+             * Format: date-time
+             */
+            created: string;
+            /** Params */
+            params: {
+                [key: string]: string | boolean | null;
+            };
+            /**
+             * Sender
+             * @enum {string}
+             */
+            sender: "visitor" | "agent" | "system";
+            /** Seq */
+            seq: number;
+        };
+        /**
+         * ChatOfflineIn
+         * @description Offline form; the same bounds as ``ChatSessionCreateIn`` (R-INPUT).
+         *
+         *     ``email`` defaults to ``""`` so a missing address is answered by the service with
+         *     ``invalid_prechat`` / ``{"email": "required"}`` instead of FastAPI's list shape
+         *     (R-OFFLINE-EMAIL).
+         */
+        ChatOfflineIn: {
+            /**
+             * Email
+             * @default
+             */
+            email: string;
+            /** Key */
+            key: string;
+            /** Language */
+            language?: string | null;
+            /** Message */
+            message: string;
+            /** Name */
+            name?: string | null;
+            /** Origin */
+            origin: string;
+            /** Page Url */
+            page_url?: string | null;
+            /** Prechat */
+            prechat?: {
+                [key: string]: string | boolean;
+            };
+            /** Topic */
+            topic?: string | null;
+            /** Visitor Id */
+            visitor_id: string;
+        };
+        /**
+         * ChatOfflineOut
+         * @description Empty acknowledgement of the offline form (``{}``).
+         */
+        ChatOfflineOut: Record<string, never>;
+        /**
+         * ChatPublicConfigOut
+         * @description What the widget needs to render; no admin name, ids or queue data.
+         */
+        ChatPublicConfigOut: {
+            /** Greeting */
+            greeting: string | null;
+            /** Max Message Length */
+            max_message_length: number;
+            /**
+             * Offline Mode
+             * @enum {string}
+             */
+            offline_mode: "form" | "hide";
+            /** Online */
+            online: boolean;
+            /** Prechat Fields */
+            prechat_fields: components["schemas"]["ChatPublicFieldOut"][];
+            /** Privacy Url */
+            privacy_url: string | null;
+            theme: components["schemas"]["ChatTheme"];
+            /** Topics */
+            topics: components["schemas"]["ChatPublicTopicOut"][];
+            upload: components["schemas"]["ChatPublicUploadOut"];
+        };
+        /** ChatPublicFieldOut */
+        ChatPublicFieldOut: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "text" | "textarea" | "email" | "select" | "checkbox";
+            /** Label */
+            label: string;
+            /** Options */
+            options: components["schemas"]["PrechatOption"][];
+            /** Required */
+            required: boolean;
+        };
+        /** ChatPublicTopicOut */
+        ChatPublicTopicOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Online */
+            online: boolean;
+        };
+        /** ChatPublicUploadOut */
+        ChatPublicUploadOut: {
+            /** Enabled */
+            enabled: boolean;
+            /** Max Bytes */
+            max_bytes: number;
+            /** Types */
+            types: string[];
+        };
+        /** ChatRateLimits */
+        ChatRateLimits: {
+            /**
+             * Messages Per Ip Minute
+             * @default 60
+             */
+            messages_per_ip_minute: number;
+            /**
+             * Messages Per Session Minute
+             * @default 30
+             */
+            messages_per_session_minute: number;
+            /**
+             * Offline Per Config Hour
+             * @default 60
+             */
+            offline_per_config_hour: number;
+            /**
+             * Offline Per Ip Hour
+             * @default 3
+             */
+            offline_per_ip_hour: number;
+            /**
+             * Sessions Per Config Minute
+             * @default 30
+             */
+            sessions_per_config_minute: number;
+            /**
+             * Sessions Per Ip 10Min
+             * @default 5
+             */
+            sessions_per_ip_10min: number;
+            /**
+             * Uploads Per Session 10Min
+             * @default 10
+             */
+            uploads_per_session_10min: number;
+        };
+        /** ChatSessionCreateIn */
+        ChatSessionCreateIn: {
+            /** Client Id */
+            client_id?: string | null;
+            /** Key */
+            key: string;
+            /** Language */
+            language?: string | null;
+            /** Message */
+            message: string;
+            /** Origin */
+            origin: string;
+            /** Page Url */
+            page_url?: string | null;
+            /** Prechat */
+            prechat?: {
+                [key: string]: string | boolean;
+            };
+            /** Topic */
+            topic?: string | null;
+            /** Visitor Id */
+            visitor_id: string;
+        };
+        /** ChatSessionCreatedOut */
+        ChatSessionCreatedOut: {
+            message: components["schemas"]["ChatMessageOut"];
+            /** Session Id */
+            session_id: string;
+            /** Status */
+            status: string;
+            /** Token */
+            token: string;
+        };
+        /** ChatSessionOut */
+        ChatSessionOut: {
+            /** Agent Name */
+            agent_name: string | null;
+            /** Can Send */
+            can_send: boolean;
+            /** Last Seq */
+            last_seq: number;
+            /** Needs Contact */
+            needs_contact: boolean;
+            /** Session Id */
+            session_id: string;
+            /** Status */
+            status: string;
+            /** Topic Label */
+            topic_label: string | null;
+        };
+        /** ChatTheme */
+        ChatTheme: {
+            /** Launcher Label */
+            launcher_label?: string | null;
+            /**
+             * Mode
+             * @default auto
+             * @enum {string}
+             */
+            mode: "auto" | "light" | "dark";
+            /**
+             * Position
+             * @default right
+             * @enum {string}
+             */
+            position: "right" | "left";
+            /**
+             * Primary Color
+             * @default #2563eb
+             */
+            primary_color: string;
+        };
+        /** ChatTopic */
+        ChatTopic: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Priority Id */
+            priority_id?: number | null;
+            /** Queue Id */
+            queue_id: number;
+        };
+        /**
+         * ChatTopicRefOut
+         * @description A chat topic the agent may take (``rw`` on its queue); ``ref`` = ``<config_id>:<key>``.
+         */
+        ChatTopicRefOut: {
+            /** Config Name */
+            config_name: string;
+            /** Label */
+            label: string;
+            /** Queue Id */
+            queue_id: number;
+            /** Ref */
+            ref: string;
         };
         /** CompanyCreateOut */
         CompanyCreateOut: {
@@ -17175,6 +18063,40 @@ export interface components {
             /** Value */
             value: string;
         };
+        /** PrechatField */
+        PrechatField: {
+            /** Dynamic Field */
+            dynamic_field?: string | null;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "text" | "textarea" | "email" | "select" | "checkbox";
+            /** Label */
+            label: string;
+            /**
+             * Maps To
+             * @default none
+             * @enum {string}
+             */
+            maps_to: "name" | "email" | "dynamic_field" | "none";
+            /** Options */
+            options?: components["schemas"]["PrechatOption"][];
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
+        };
+        /** PrechatOption */
+        PrechatOption: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+        };
         /** PresenceEntry */
         PresenceEntry: {
             /** Mode */
@@ -19699,6 +20621,50 @@ export interface components {
             /** Priority */
             priority?: number | null;
         };
+        /**
+         * TicketChatOut
+         * @description The newest chat of a ticket for the agent's conversation header (``ro`` on its queue).
+         *
+         *     ``visitor_email_verified`` is always False in phase 1 (R-NOTIFY b): the address is what
+         *     the visitor typed; nothing proved they own it.
+         */
+        TicketChatOut: {
+            /** Accepted At */
+            accepted_at: string | null;
+            /** Assigned Name */
+            assigned_name: string | null;
+            /** Assigned User Id */
+            assigned_user_id: number | null;
+            /** End Reason */
+            end_reason: string | null;
+            /** Ended At */
+            ended_at: string | null;
+            /** Language */
+            language: string | null;
+            /** Page Url */
+            page_url: string | null;
+            /** Session Id */
+            session_id: string;
+            /** Status */
+            status: string;
+            /** Topic Label */
+            topic_label: string | null;
+            /** Visitor Email */
+            visitor_email: string | null;
+            /**
+             * Visitor Email Verified
+             * @default false
+             */
+            visitor_email_verified: boolean;
+            /** Visitor Name */
+            visitor_name: string | null;
+            /** Visitor Online */
+            visitor_online: boolean;
+            /** Visitor Typing */
+            visitor_typing: boolean;
+            /** Waiting Since */
+            waiting_since: string | null;
+        };
         /** TicketCreateRequest */
         TicketCreateRequest: {
             /**
@@ -20584,6 +21550,21 @@ export interface components {
             /** Value */
             value: string;
         };
+        /** UploadPolicy */
+        UploadPolicy: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Max Bytes
+             * @default 10485760
+             */
+            max_bytes: number;
+            /** Types */
+            types?: ("image/png" | "image/jpeg" | "image/gif" | "image/webp" | "application/pdf" | "text/plain")[];
+        };
         /** UserCreate */
         UserCreate: {
             /** Email */
@@ -21147,6 +22128,744 @@ export interface operations {
                         [key: string]: string;
                     };
                 };
+            };
+        };
+    };
+    get_public_config_api_chat_v1_config_get: {
+        parameters: {
+            query: {
+                k: string;
+                origin: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatPublicConfigOut"];
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_offline_form_api_chat_v1_offline_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatOfflineIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatOfflineOut"];
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_chat_session_api_chat_v1_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatSessionCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSessionCreatedOut"];
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_chat_session_state_api_chat_v1_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSessionOut"];
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_chat_attachment_api_chat_v1_sessions__session_id__attachments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    caption?: string;
+                    client_id?: string;
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageOut"];
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description File too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_chat_contact_api_chat_v1_sessions__session_id__contact_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatContactIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_chat_end_api_chat_v1_sessions__session_id__end_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_chat_messages_api_chat_v1_sessions__session_id__messages_get: {
+        parameters: {
+            query?: {
+                after?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageOut"][];
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_chat_message_api_chat_v1_sessions__session_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatMessageIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageOut"];
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_chat_attachment_api_chat_v1_sessions__session_id__messages__seq__attachments__index__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                seq: number;
+                index: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": unknown;
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    stream_chat_session_api_chat_v1_sessions__session_id__stream_get: {
+        parameters: {
+            query?: {
+                after?: number;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server-sent events: message (with id = seq), session, typing, end */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": unknown;
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_chat_typing_api_chat_v1_sessions__session_id__typing_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -25663,6 +27382,218 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChannelConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_chat_configs_api_v1_admin_chat_configs_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatConfigOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_chat_config_api_v1_admin_chat_configs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatConfigCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_chat_config_api_v1_admin_chat_configs__config_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_chat_config_api_v1_admin_chat_configs__config_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_chat_config_api_v1_admin_chat_configs__config_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatConfigUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotate_chat_config_key_api_v1_admin_chat_configs__config_id__rotate_key_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatConfigOut"];
                 };
             };
             /** @description Validation Error */
@@ -36915,6 +38846,247 @@ export interface operations {
             };
         };
     };
+    get_chat_agent_state_api_v1_chat_agent_state_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatAgentStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_chat_agent_state_api_v1_chat_agent_state_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatAgentStateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatAgentStateOut"];
+                };
+            };
+            /** @description A topic ref the agent may not take (`unknown_topic`) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_chat_inbox_api_v1_chat_inbox_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatInboxOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_chat_accept_api_v1_chat_sessions__session_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatAcceptOut"];
+                };
+            };
+            /** @description No rw permission on the chat's queue (`forbidden`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown chat (`not_found`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `already_taken`, `at_capacity` or `not_waiting` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_chat_end_api_v1_chat_sessions__session_id__end_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ChatEndIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No rw permission on the chat's queue (`forbidden`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown chat (`not_found`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_chat_topics_api_v1_chat_topics_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatTopicRefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_directory_api_v1_customer_directory_get: {
         parameters: {
             query?: {
@@ -43861,6 +46033,109 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ticket_chat_api_v1_tickets__ticket_id__chat_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketChatOut"];
+                };
+            };
+            /** @description No ro permission on the ticket's queue (`forbidden`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown ticket or no chat on it (`not_found`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_ticket_chat_typing_api_v1_tickets__ticket_id__chat_typing_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No note permission on the ticket's queue (`forbidden`) */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown ticket (`not_found`) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The ticket has no live chat (`chat_not_live`) */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

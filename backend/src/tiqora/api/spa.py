@@ -37,6 +37,7 @@ _RESERVED_PREFIXES: tuple[str, ...] = (
     "/redoc",
     "/openapi.json",
     "/mcp",
+    "/chat/",
 )
 
 #: Vite gives assets content-hashed names, so they never change under a fixed

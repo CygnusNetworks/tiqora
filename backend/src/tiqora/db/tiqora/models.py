@@ -1601,3 +1601,139 @@ class TiqoraSavedSearchPref(TiqoraBase):
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
     __table_args__ = (Index("ix_tiqora_saved_search_pref_user", "user_id", "position"),)
+
+
+class TiqoraChatConfig(TiqoraBase):
+    """One embeddable web-chat widget configuration (public key, topics, look, limits).
+
+    All structured columns hold JSON as ``TEXT`` (house style); the typed shape is
+    ``tiqora.webchat.models.ChatConfigValues``.
+    """
+
+    __tablename__ = "tiqora_chat_config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    public_key: Mapped[str] = mapped_column(String(40), nullable=False)
+    valid: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
+    allowed_origins: Mapped[str] = mapped_column(Text, nullable=False)
+    topics: Mapped[str] = mapped_column(Text, nullable=False)
+    greeting: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    privacy_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    offline_mode: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="form", server_default="form"
+    )
+    business_calendar: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    wait_timeout_seconds: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=180, server_default="180"
+    )
+    prechat_fields: Mapped[str] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=False)
+    upload_policy: Mapped[str] = mapped_column(Text, nullable=False)
+    theme: Mapped[str] = mapped_column(Text, nullable=False)
+    rate_limits: Mapped[str] = mapped_column(Text, nullable=False)
+    default_customer_user: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    show_agent_names: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
+    retention_days: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=30, server_default="30"
+    )
+    created: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    changed: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    changed_by: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    __table_args__ = (
+        Index("ux_tiqora_chat_config_name", "name", unique=True),
+        Index("ux_tiqora_chat_config_key", "public_key", unique=True),
+    )
+
+
+class TiqoraChatSession(TiqoraBase):
+    """One chat conversation; ``id`` is ``uuid4().hex`` and doubles as the public handle.
+
+    No foreign keys: ``ticket_id`` points into Znuny's ``ticket`` table.
+    ``token_hash`` is the SHA-256 of the visitor secret (empty after the retention purge).
+    """
+
+    __tablename__ = "tiqora_chat_session"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, nullable=False)
+    config_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    topic_key: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    queue_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    ticket_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    status: Mapped[str] = mapped_column(String(12), nullable=False)
+    end_reason: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    visitor_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    visitor_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    visitor_email: Mapped[str | None] = mapped_column(String(250), nullable=True)
+    customer_user_login: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    assigned_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    last_seq: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    waiting_since: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    visitor_last_seen: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    page_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    ip_hash: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    language: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    created: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    purged_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_tiqora_chat_session_config", "config_id"),
+        Index("ix_tiqora_chat_session_status", "status", "config_id"),
+        Index("ix_tiqora_chat_session_ticket", "ticket_id"),
+        Index("ix_tiqora_chat_session_assigned", "assigned_user_id", "status"),
+        Index("ix_tiqora_chat_session_visitor", "visitor_id"),
+    )
+
+
+class TiqoraChatMessage(TiqoraBase):
+    """One transcript line of a chat session, ordered by the per-session ``seq``."""
+
+    __tablename__ = "tiqora_chat_message"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=True, nullable=False
+    )
+    session_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    ticket_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    seq: Mapped[int] = mapped_column(Integer, nullable=False)
+    sender: Mapped[str] = mapped_column(String(10), nullable=False)
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    meta: Mapped[str | None] = mapped_column(Text, nullable=True)
+    attachments: Mapped[str | None] = mapped_column(Text, nullable=True)
+    article_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    client_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        # NULL client_id values never collide on MariaDB or PostgreSQL
+        Index("ux_tiqora_chat_message_seq", "session_id", "seq", unique=True),
+        Index("ux_tiqora_chat_message_client", "session_id", "client_id", unique=True),
+        Index("ix_tiqora_chat_message_ticket", "ticket_id"),
+        Index("ix_tiqora_chat_message_article", "article_id"),
+    )
+
+
+class TiqoraChatAgentState(TiqoraBase):
+    """Per-agent chat availability; ``user_id`` mirrors ``users.id`` (never generated)."""
+
+    __tablename__ = "tiqora_chat_agent_state"
+
+    user_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    available: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    topics: Mapped[str] = mapped_column(Text, nullable=False)
+    max_concurrent: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=3, server_default="3"
+    )
+    changed: Mapped[datetime] = mapped_column(DateTime, nullable=False)

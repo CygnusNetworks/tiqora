@@ -128,7 +128,7 @@ UNLOCK_TYPE_NAME = "unlock"
 #: that channel (its origin: a Telegram ticket may later get an e-mail reply);
 #: everything else is "email". "Chat" is Znuny's seeded chat channel, the
 #: slot a web chat uses.
-LIST_CHANNELS: dict[str, str] = {"Telegram": "telegram", "Chat": "webchat"}
+LIST_CHANNELS: dict[str, str] = {"Telegram": "telegram", "Chat": "webchat", "WebChat": "webchat"}
 #: A ticket opened by a phone call (its FIRST article is on Znuny's ``Phone``
 #: channel) is listed as "phone" -- unless a chat channel above applies.
 #: Unlike chats, a later phone call does not change an e-mail ticket's channel.

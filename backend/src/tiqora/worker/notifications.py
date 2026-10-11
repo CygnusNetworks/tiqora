@@ -87,6 +87,7 @@ from tiqora.channels.email.smtp import (
     MailSender,
     SmtpMailSender,
     build_message,
+    drop_invalid_tld,
     message_id_domain,
 )
 from tiqora.config import Settings, get_settings
@@ -111,6 +112,7 @@ from tiqora.domain.subject_hook import SubjectHookConfig, load_subject_config
 from tiqora.domain.ticket_write_service import ArticleIn, add_article
 from tiqora.domain.timezones import USER_TIME_ZONE_KEY, default_time_zone, valid_time_zone
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.webchat.text import normalize_email
 from tiqora.worker.notification_templates import (
     configure_notification_context,
     has_untranslated_legacy_link,
@@ -350,6 +352,7 @@ async def _resolve_recipients(
     ticket: dict[str, object],
     skip_user_ids: frozenset[int] = frozenset(),
     extra_user_ids: Sequence[int] = (),
+    sysconfig: SysConfig | None = None,
 ) -> list[_Recipient]:
     recipients: list[_Recipient] = []
     seen: set[tuple[str, str]] = set()
@@ -381,7 +384,7 @@ async def _resolve_recipients(
         ).fetchall()
         prefs = {str(k): _decode_pref(v) for k, v in row}
         email = prefs.get("UserEmail", "")
-        if not email:
+        if not email or not drop_invalid_tld([email], context="notification_agent"):
             return
         key = ("Agent", email.lower())
         if key in seen:
@@ -466,6 +469,9 @@ async def _resolve_recipients(
     if "Customer" in recipient_kinds:
         email = None
         customer_login = ticket.get("customer_user_id")
+        just_real = await (sysconfig or SysConfig(session)).get_bool(
+            "CustomerNotifyJustToRealCustomer", False
+        )
         if customer_login:
             row = (
                 await session.execute(
@@ -475,7 +481,13 @@ async def _resolve_recipients(
             ).first()
             if row is not None:
                 email = str(row[0])
-        if not email:
+            elif not just_real:
+                # NotificationEvent.pm (6.5, ~817-833): a CustomerUserID that is no
+                # customer_user but an e-mail address (unknown sender, chat contact) is
+                # the recipient itself, before the article From fallback.
+                email = normalize_email(str(customer_login))
+        # CustomerNotifyJustToRealCustomer: no customer on the ticket -> no customer mail.
+        if not email and not (just_real and not customer_login):
             art_row = (
                 await session.execute(
                     text(
@@ -490,7 +502,8 @@ async def _resolve_recipients(
             ).first()
             if art_row is not None and art_row[0]:
                 email = get_email_address(str(art_row[0]))
-        if email:
+        # A chat visitor without an address writes as ``visitor-…@chat.invalid`` (R-NOTIFY a).
+        if email and drop_invalid_tld([email], context="notification_customer"):
             key = ("Customer", email.lower())
             if key not in seen:
                 seen.add(key)
@@ -926,7 +939,7 @@ async def process_event(
             continue
 
         recipients = await _resolve_recipients(
-            session, notification, ticket, skip_user_ids, extra_user_ids
+            session, notification, ticket, skip_user_ids, extra_user_ids, sysconfig
         )
         for recipient in recipients:
             try:

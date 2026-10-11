@@ -24,6 +24,7 @@ const {
   phoneConfig,
   dial,
   fieldOptionsFetch,
+  request,
 } = vi.hoisted(() => ({
   patchTicket: vi.fn(),
   listReferencePriorities: vi.fn(),
@@ -41,6 +42,7 @@ const {
   phoneConfig: vi.fn(),
   dial: vi.fn(),
   fieldOptionsFetch: vi.fn(),
+  request: vi.fn(),
 }));
 
 vi.mock("@/lib/fieldOptionsApi", () => ({ fieldOptionsApi: { fetch: fieldOptionsFetch } }));
@@ -64,6 +66,7 @@ vi.mock("@/lib/api", async () => {
     ...actual,
     api: {
       patchTicket,
+      request,
       listReferencePriorities,
       listReferenceStates,
       listReferenceTypes,
@@ -561,6 +564,79 @@ describe("TicketHeaderActions", () => {
     expect(viewHandler).toHaveBeenCalledOnce();
     expect(composerHandler).toHaveBeenCalledWith({ focus: true });
     expect(screen.queryByTestId("reply-dialog")).not.toBeInTheDocument();
+  });
+
+  it("routes 'Antworten' on a live web chat to the messenger composer, not the reply dialog", async () => {
+    request.mockReset().mockResolvedValue({ session_id: "s1", status: "active" });
+    listArticles.mockResolvedValue([
+      {
+        id: 501,
+        ticket_id: 7,
+        sender_type: "customer",
+        sender_type_id: 3,
+        communication_channel_id: 11,
+        communication_channel_name: "WebChat",
+        is_visible_for_customer: true,
+        create_time: "2024-06-01T13:00:00Z",
+        create_by: 10,
+        subject: "Chat",
+        from_address: null,
+        to_address: null,
+      },
+    ]);
+    const viewHandler = vi.fn();
+    const composerHandler = vi.fn();
+    function Listener() {
+      useConversationViewRequests(7, viewHandler);
+      useComposerRequests(7, composerHandler);
+      return null;
+    }
+    wrap(
+      <>
+        <Listener />
+        <TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />
+      </>,
+    );
+    await waitFor(() => expect(request).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByTestId("ticket-actions-reply")).not.toBeDisabled());
+    // Let the chat query settle before clicking.
+    await waitFor(() => expect(request.mock.results.length).toBeGreaterThan(0));
+    await new Promise((r) => setTimeout(r, 20));
+    fireEvent.click(screen.getByTestId("ticket-actions-reply"));
+    expect(viewHandler).toHaveBeenCalledOnce();
+    expect(composerHandler).toHaveBeenCalledWith({ focus: true });
+    expect(screen.queryByTestId("reply-dialog")).not.toBeInTheDocument();
+  });
+
+  it("'Antworten' on a web chat waits for the chat state instead of opening the e-mail dialog (T19 M7)", async () => {
+    let resolveChat: (v: unknown) => void = () => undefined;
+    const pending = new Promise((r) => (resolveChat = r));
+    request.mockReset().mockImplementation((_m: string, path: string) => (path.endsWith("/chat") ? pending : undefined));
+    listArticles.mockResolvedValue([
+      {
+        id: 502,
+        ticket_id: 7,
+        sender_type: "customer",
+        sender_type_id: 3,
+        communication_channel_id: 11,
+        communication_channel_name: "WebChat",
+        is_visible_for_customer: true,
+        create_time: "2024-06-01T13:00:00Z",
+        create_by: 10,
+        subject: "Chat",
+        from_address: null,
+        to_address: null,
+      },
+    ]);
+    wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
+    // the articles are loaded (it is a WebChat ticket) and the chat query is in flight
+    await waitFor(() => expect(request).toHaveBeenCalledWith("GET", "/api/v1/tickets/7/chat", expect.anything()));
+    const reply = screen.getByTestId("ticket-actions-reply");
+    expect(reply).toBeDisabled();
+    fireEvent.click(reply);
+    expect(screen.queryByTestId("reply-dialog")).not.toBeInTheDocument();
+    resolveChat({ session_id: "s1", status: "active" });
+    await waitFor(() => expect(screen.getByTestId("ticket-actions-reply")).not.toBeDisabled());
   });
 
   it("calls onOpenNote from the Notiz button", () => {

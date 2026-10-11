@@ -96,6 +96,10 @@ _TICKET_DELETE_ORDER: tuple[tuple[str, str, str], ...] = (
     # deleted here too so a hard ticket delete never leaves a dangling map row
     # holding original_body (agent-written text, see messages.py).
     ("tiqora_telegram_message", "article_id", "article"),
+    # WebChat transcript (tiqora-owned, no FK): visitor_email, message bodies
+    # and the visitor's page URL; ticket-keyed, deleted before the articles.
+    ("tiqora_chat_message", "ticket_id", "ticket"),
+    ("tiqora_chat_session", "ticket_id", "ticket"),
     ("article_search_index", "ticket_id", "ticket"),  # FK to article + ticket
     ("time_accounting", "ticket_id", "ticket"),  # FK to article + ticket
     ("ticket_history", "ticket_id", "ticket"),  # FK to article + ticket
@@ -1142,6 +1146,8 @@ async def run_erasure(
         "article_data_mime_attachment": 0,
         "article_search_index": 0,
         "tiqora_telegram_message": 0,
+        "tiqora_chat_message": 0,
+        "tiqora_chat_session": 0,
         "customer_preferences": 0,
         "customer_user_customer": 0,
         "group_customer_user": 0,
@@ -1855,6 +1861,20 @@ async def run_erasure(
             )
             counts["tiqora_telegram_message"] = counts.get("tiqora_telegram_message", 0) + n_tg
 
+            # ---- WebChat transcript: messages (free text) and sessions (visitor
+            # e-mail, name, page URL) of these tickets are removed whole, like
+            # the telegram map rows; rollback_job re-inserts them from backup.
+            for chat_table in ("tiqora_chat_message", "tiqora_chat_session"):
+                n_chat = await _backup_and_delete_by(
+                    session,
+                    job_id=job_id,
+                    table=chat_table,
+                    fk_col="ticket_id",
+                    ids=ticket_ids,
+                    now=now,
+                )
+                counts[chat_table] = counts.get(chat_table, 0) + n_chat
+
         # ---- customer_company: anonymize PII (keep PK) or delete if orphan ----
         company_ids = sorted({str(c.customer_id) for c in ordered if c.customer_id})
         for company_id in company_ids:
@@ -2214,6 +2234,8 @@ async def rollback_job(
                     "customer_user_customer",
                     "group_customer_user",
                     "tiqora_avatar",
+                    "tiqora_chat_message",
+                    "tiqora_chat_session",
                 ):
                     await _insert_row(session, table, {**pk, **original})
                 else:

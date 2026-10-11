@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
-from tiqora.db.legacy.article import Article, ArticleSenderType
+from tiqora.db.legacy.article import Article, ArticleSenderType, CommunicationChannel
 from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.ticket import Ticket, TicketHistory, TicketHistoryType
 from tiqora.domain.settings_store import (
@@ -26,6 +26,7 @@ from tiqora.events.pubsub import (
     publish_ticket_event,
     resolve_ticket_queue_ids,
 )
+from tiqora.webchat.sessions import COMM_CHANNEL_NAME
 from tiqora.worker.indexer import reindex_ticket_ids
 
 #: History type that marks a brand-new ticket, and the article sender type
@@ -118,23 +119,30 @@ async def poll_once(
             await set_setting(session, KEY_HISTORY_WATERMARK, str(max_hist))
 
         if max_art > art_wm:
-            rows = (
+            art_rows = (
                 await session.execute(
                     select(
                         Article.ticket_id,
                         Article.id,
                         ArticleSenderType.name,
+                        CommunicationChannel.name,
                     )
                     .join(
                         ArticleSenderType,
                         ArticleSenderType.id == Article.article_sender_type_id,
                     )
+                    .outerjoin(
+                        CommunicationChannel,
+                        CommunicationChannel.id == Article.communication_channel_id,
+                    )
                     .where(Article.id > art_wm)
                 )
             ).all()
-            for tid, _aid, sender in rows:
+            for tid, _aid, sender, channel in art_rows:
                 ticket_ids.add(int(tid))
-                if sender == _CUSTOMER_SENDER_TYPE:
+                # A chat line is no "new mail": the NewTicket history row of a
+                # chat's first message (above) still notifies once.
+                if sender == _CUSTOMER_SENDER_TYPE and channel != COMM_CHANNEL_NAME:
                     notify_ticket_ids.add(int(tid))
             await set_setting(session, KEY_ARTICLE_WATERMARK, str(max_art))
 

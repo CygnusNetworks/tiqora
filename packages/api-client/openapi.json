@@ -8024,6 +8024,1245 @@
         "title": "ChannelConfigUpdate",
         "type": "object"
       },
+      "ChatAcceptOut": {
+        "properties": {
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ticket_id"
+        ],
+        "title": "ChatAcceptOut",
+        "type": "object"
+      },
+      "ChatAgentStateIn": {
+        "description": "``topics`` empty = every topic the agent may take; refs must come from ``/chat/topics``.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "max_concurrent": {
+            "default": 3,
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Max Concurrent",
+            "type": "integer"
+          },
+          "topics": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Topics",
+            "type": "array"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "ChatAgentStateIn",
+        "type": "object"
+      },
+      "ChatAgentStateOut": {
+        "properties": {
+          "active_count": {
+            "title": "Active Count",
+            "type": "integer"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "max_concurrent": {
+            "title": "Max Concurrent",
+            "type": "integer"
+          },
+          "topics": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Topics",
+            "type": "array"
+          }
+        },
+        "required": [
+          "available",
+          "topics",
+          "max_concurrent",
+          "active_count"
+        ],
+        "title": "ChatAgentStateOut",
+        "type": "object"
+      },
+      "ChatAttachmentOut": {
+        "properties": {
+          "content_type": {
+            "title": "Content Type",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "index",
+          "filename",
+          "content_type",
+          "size"
+        ],
+        "title": "ChatAttachmentOut",
+        "type": "object"
+      },
+      "ChatConfigCreateIn": {
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "valid": {
+            "default": true,
+            "title": "Valid",
+            "type": "boolean"
+          },
+          "values": {
+            "$ref": "#/components/schemas/ChatConfigValues"
+          }
+        },
+        "required": [
+          "name",
+          "values"
+        ],
+        "title": "ChatConfigCreateIn",
+        "type": "object"
+      },
+      "ChatConfigOut": {
+        "properties": {
+          "changed": {
+            "format": "date-time",
+            "title": "Changed",
+            "type": "string"
+          },
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "embed_snippet": {
+            "title": "Embed Snippet",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "public_key": {
+            "title": "Public Key",
+            "type": "string"
+          },
+          "session_count": {
+            "title": "Session Count",
+            "type": "integer"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          },
+          "values": {
+            "$ref": "#/components/schemas/ChatConfigValues"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "public_key",
+          "valid",
+          "values",
+          "embed_snippet",
+          "session_count",
+          "created",
+          "changed"
+        ],
+        "title": "ChatConfigOut",
+        "type": "object"
+      },
+      "ChatConfigUpdateIn": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "valid": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid"
+          },
+          "values": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChatConfigValues"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "ChatConfigUpdateIn",
+        "type": "object"
+      },
+      "ChatConfigValues": {
+        "additionalProperties": false,
+        "description": "Everything the admin edits except name / public_key / valid.",
+        "properties": {
+          "allowed_origins": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Allowed Origins",
+            "type": "array"
+          },
+          "business_calendar": {
+            "anyOf": [
+              {
+                "pattern": "^(|[1-9][0-9]?)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Calendar"
+          },
+          "default_customer_user": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Customer User"
+          },
+          "greeting": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Greeting"
+          },
+          "offline_mode": {
+            "default": "form",
+            "enum": [
+              "form",
+              "hide"
+            ],
+            "title": "Offline Mode",
+            "type": "string"
+          },
+          "prechat_fields": {
+            "items": {
+              "$ref": "#/components/schemas/PrechatField"
+            },
+            "maxItems": 15,
+            "title": "Prechat Fields",
+            "type": "array"
+          },
+          "privacy_url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Privacy Url"
+          },
+          "rate_limits": {
+            "$ref": "#/components/schemas/ChatRateLimits"
+          },
+          "retention_days": {
+            "default": 30,
+            "maximum": 3650.0,
+            "minimum": 1.0,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "show_agent_names": {
+            "default": true,
+            "title": "Show Agent Names",
+            "type": "boolean"
+          },
+          "theme": {
+            "$ref": "#/components/schemas/ChatTheme"
+          },
+          "topics": {
+            "items": {
+              "$ref": "#/components/schemas/ChatTopic"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Topics",
+            "type": "array"
+          },
+          "upload_policy": {
+            "$ref": "#/components/schemas/UploadPolicy"
+          },
+          "wait_timeout_seconds": {
+            "default": 180,
+            "maximum": 3600.0,
+            "minimum": 30.0,
+            "title": "Wait Timeout Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "topics"
+        ],
+        "title": "ChatConfigValues",
+        "type": "object"
+      },
+      "ChatContactIn": {
+        "properties": {
+          "email": {
+            "default": "",
+            "maxLength": 250,
+            "title": "Email",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "ChatContactIn",
+        "type": "object"
+      },
+      "ChatEndIn": {
+        "properties": {
+          "close_ticket": {
+            "default": false,
+            "title": "Close Ticket",
+            "type": "boolean"
+          }
+        },
+        "title": "ChatEndIn",
+        "type": "object"
+      },
+      "ChatInboxItemOut": {
+        "properties": {
+          "accepted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted At"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "waiting",
+              "active"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tn": {
+            "title": "Tn",
+            "type": "string"
+          },
+          "topic_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic Label"
+          },
+          "visitor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visitor Name"
+          },
+          "waiting_since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waiting Since"
+          }
+        },
+        "required": [
+          "session_id",
+          "ticket_id",
+          "tn",
+          "title",
+          "topic_label",
+          "visitor_name",
+          "status",
+          "waiting_since",
+          "accepted_at"
+        ],
+        "title": "ChatInboxItemOut",
+        "type": "object"
+      },
+      "ChatInboxOut": {
+        "properties": {
+          "mine": {
+            "items": {
+              "$ref": "#/components/schemas/ChatInboxItemOut"
+            },
+            "title": "Mine",
+            "type": "array"
+          },
+          "waiting": {
+            "items": {
+              "$ref": "#/components/schemas/ChatInboxItemOut"
+            },
+            "title": "Waiting",
+            "type": "array"
+          }
+        },
+        "required": [
+          "waiting",
+          "mine"
+        ],
+        "title": "ChatInboxOut",
+        "type": "object"
+      },
+      "ChatMessageIn": {
+        "properties": {
+          "body": {
+            "maxLength": 4000,
+            "title": "Body",
+            "type": "string"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "title": "ChatMessageIn",
+        "type": "object"
+      },
+      "ChatMessageOut": {
+        "properties": {
+          "agent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Name"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/ChatAttachmentOut"
+            },
+            "title": "Attachments",
+            "type": "array"
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Params",
+            "type": "object"
+          },
+          "sender": {
+            "enum": [
+              "visitor",
+              "agent",
+              "system"
+            ],
+            "title": "Sender",
+            "type": "string"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seq",
+          "sender",
+          "body",
+          "code",
+          "params",
+          "agent_name",
+          "created",
+          "attachments",
+          "client_id"
+        ],
+        "title": "ChatMessageOut",
+        "type": "object"
+      },
+      "ChatOfflineIn": {
+        "description": "Offline form; the same bounds as ``ChatSessionCreateIn`` (R-INPUT).\n\n``email`` defaults to ``\"\"`` so a missing address is answered by the service with\n``invalid_prechat`` / ``{\"email\": \"required\"}`` instead of FastAPI's list shape\n(R-OFFLINE-EMAIL).",
+        "properties": {
+          "email": {
+            "default": "",
+            "maxLength": 250,
+            "title": "Email",
+            "type": "string"
+          },
+          "key": {
+            "maxLength": 40,
+            "title": "Key",
+            "type": "string"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "message": {
+            "maxLength": 4000,
+            "title": "Message",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "origin": {
+            "maxLength": 200,
+            "title": "Origin",
+            "type": "string"
+          },
+          "page_url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Url"
+          },
+          "prechat": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "maxProperties": 20,
+            "title": "Prechat",
+            "type": "object"
+          },
+          "topic": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic"
+          },
+          "visitor_id": {
+            "pattern": "^[A-Za-z0-9_-]{16,64}$",
+            "title": "Visitor Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "origin",
+          "visitor_id",
+          "message"
+        ],
+        "title": "ChatOfflineIn",
+        "type": "object"
+      },
+      "ChatOfflineOut": {
+        "description": "Empty acknowledgement of the offline form (``{}``).",
+        "properties": {},
+        "title": "ChatOfflineOut",
+        "type": "object"
+      },
+      "ChatPublicConfigOut": {
+        "description": "What the widget needs to render; no admin name, ids or queue data.",
+        "properties": {
+          "greeting": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Greeting"
+          },
+          "max_message_length": {
+            "title": "Max Message Length",
+            "type": "integer"
+          },
+          "offline_mode": {
+            "enum": [
+              "form",
+              "hide"
+            ],
+            "title": "Offline Mode",
+            "type": "string"
+          },
+          "online": {
+            "title": "Online",
+            "type": "boolean"
+          },
+          "prechat_fields": {
+            "items": {
+              "$ref": "#/components/schemas/ChatPublicFieldOut"
+            },
+            "title": "Prechat Fields",
+            "type": "array"
+          },
+          "privacy_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Privacy Url"
+          },
+          "theme": {
+            "$ref": "#/components/schemas/ChatTheme"
+          },
+          "topics": {
+            "items": {
+              "$ref": "#/components/schemas/ChatPublicTopicOut"
+            },
+            "title": "Topics",
+            "type": "array"
+          },
+          "upload": {
+            "$ref": "#/components/schemas/ChatPublicUploadOut"
+          }
+        },
+        "required": [
+          "greeting",
+          "privacy_url",
+          "theme",
+          "topics",
+          "online",
+          "offline_mode",
+          "prechat_fields",
+          "upload",
+          "max_message_length"
+        ],
+        "title": "ChatPublicConfigOut",
+        "type": "object"
+      },
+      "ChatPublicFieldOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "text",
+              "textarea",
+              "email",
+              "select",
+              "checkbox"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/PrechatOption"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "label",
+          "required",
+          "options"
+        ],
+        "title": "ChatPublicFieldOut",
+        "type": "object"
+      },
+      "ChatPublicTopicOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "online": {
+            "title": "Online",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "online"
+        ],
+        "title": "ChatPublicTopicOut",
+        "type": "object"
+      },
+      "ChatPublicUploadOut": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "max_bytes": {
+            "title": "Max Bytes",
+            "type": "integer"
+          },
+          "types": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Types",
+            "type": "array"
+          }
+        },
+        "required": [
+          "enabled",
+          "max_bytes",
+          "types"
+        ],
+        "title": "ChatPublicUploadOut",
+        "type": "object"
+      },
+      "ChatRateLimits": {
+        "additionalProperties": false,
+        "properties": {
+          "messages_per_ip_minute": {
+            "default": 60,
+            "maximum": 600.0,
+            "minimum": 5.0,
+            "title": "Messages Per Ip Minute",
+            "type": "integer"
+          },
+          "messages_per_session_minute": {
+            "default": 30,
+            "maximum": 300.0,
+            "minimum": 5.0,
+            "title": "Messages Per Session Minute",
+            "type": "integer"
+          },
+          "offline_per_config_hour": {
+            "default": 60,
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Offline Per Config Hour",
+            "type": "integer"
+          },
+          "offline_per_ip_hour": {
+            "default": 3,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Offline Per Ip Hour",
+            "type": "integer"
+          },
+          "sessions_per_config_minute": {
+            "default": 30,
+            "maximum": 300.0,
+            "minimum": 5.0,
+            "title": "Sessions Per Config Minute",
+            "type": "integer"
+          },
+          "sessions_per_ip_10min": {
+            "default": 5,
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Sessions Per Ip 10Min",
+            "type": "integer"
+          },
+          "uploads_per_session_10min": {
+            "default": 10,
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Uploads Per Session 10Min",
+            "type": "integer"
+          }
+        },
+        "title": "ChatRateLimits",
+        "type": "object"
+      },
+      "ChatSessionCreateIn": {
+        "properties": {
+          "client_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "key": {
+            "maxLength": 40,
+            "title": "Key",
+            "type": "string"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "message": {
+            "maxLength": 4000,
+            "title": "Message",
+            "type": "string"
+          },
+          "origin": {
+            "maxLength": 200,
+            "title": "Origin",
+            "type": "string"
+          },
+          "page_url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Url"
+          },
+          "prechat": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "maxProperties": 20,
+            "title": "Prechat",
+            "type": "object"
+          },
+          "topic": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic"
+          },
+          "visitor_id": {
+            "pattern": "^[A-Za-z0-9_-]{16,64}$",
+            "title": "Visitor Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "origin",
+          "visitor_id",
+          "message"
+        ],
+        "title": "ChatSessionCreateIn",
+        "type": "object"
+      },
+      "ChatSessionCreatedOut": {
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/ChatMessageOut"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session_id",
+          "token",
+          "status",
+          "message"
+        ],
+        "title": "ChatSessionCreatedOut",
+        "type": "object"
+      },
+      "ChatSessionOut": {
+        "properties": {
+          "agent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Name"
+          },
+          "can_send": {
+            "title": "Can Send",
+            "type": "boolean"
+          },
+          "last_seq": {
+            "title": "Last Seq",
+            "type": "integer"
+          },
+          "needs_contact": {
+            "title": "Needs Contact",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "topic_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic Label"
+          }
+        },
+        "required": [
+          "session_id",
+          "status",
+          "agent_name",
+          "topic_label",
+          "can_send",
+          "needs_contact",
+          "last_seq"
+        ],
+        "title": "ChatSessionOut",
+        "type": "object"
+      },
+      "ChatTheme": {
+        "additionalProperties": false,
+        "properties": {
+          "launcher_label": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Launcher Label"
+          },
+          "mode": {
+            "default": "auto",
+            "enum": [
+              "auto",
+              "light",
+              "dark"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "position": {
+            "default": "right",
+            "enum": [
+              "right",
+              "left"
+            ],
+            "title": "Position",
+            "type": "string"
+          },
+          "primary_color": {
+            "default": "#2563eb",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "title": "Primary Color",
+            "type": "string"
+          }
+        },
+        "title": "ChatTheme",
+        "type": "object"
+      },
+      "ChatTopic": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "pattern": "^[a-z][a-z0-9_-]{0,39}$",
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "priority_id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority Id"
+          },
+          "queue_id": {
+            "minimum": 1.0,
+            "title": "Queue Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "queue_id"
+        ],
+        "title": "ChatTopic",
+        "type": "object"
+      },
+      "ChatTopicRefOut": {
+        "description": "A chat topic the agent may take (``rw`` on its queue); ``ref`` = ``<config_id>:<key>``.",
+        "properties": {
+          "config_name": {
+            "title": "Config Name",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "queue_id": {
+            "title": "Queue Id",
+            "type": "integer"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "config_name",
+          "label",
+          "queue_id"
+        ],
+        "title": "ChatTopicRefOut",
+        "type": "object"
+      },
       "CompanyCreateOut": {
         "properties": {
           "customer_id": {
@@ -22015,6 +23254,99 @@
         "title": "PostmasterSetRuleIn",
         "type": "object"
       },
+      "PrechatField": {
+        "additionalProperties": false,
+        "properties": {
+          "dynamic_field": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dynamic Field"
+          },
+          "key": {
+            "pattern": "^[a-z][a-z0-9_]{0,39}$",
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "text",
+              "textarea",
+              "email",
+              "select",
+              "checkbox"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "maps_to": {
+            "default": "none",
+            "enum": [
+              "name",
+              "email",
+              "dynamic_field",
+              "none"
+            ],
+            "title": "Maps To",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/PrechatOption"
+            },
+            "maxItems": 50,
+            "title": "Options",
+            "type": "array"
+          },
+          "required": {
+            "default": false,
+            "title": "Required",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "label"
+        ],
+        "title": "PrechatField",
+        "type": "object"
+      },
+      "PrechatOption": {
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "PrechatOption",
+        "type": "object"
+      },
       "PresenceEntry": {
         "properties": {
           "mode": {
@@ -30043,6 +31375,175 @@
         "title": "TicketAttributeRelationUpdate",
         "type": "object"
       },
+      "TicketChatOut": {
+        "description": "The newest chat of a ticket for the agent's conversation header (``ro`` on its queue).\n\n``visitor_email_verified`` is always False in phase 1 (R-NOTIFY b): the address is what\nthe visitor typed; nothing proved they own it.",
+        "properties": {
+          "accepted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted At"
+          },
+          "assigned_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Name"
+          },
+          "assigned_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned User Id"
+          },
+          "end_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Reason"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "page_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Url"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "topic_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Topic Label"
+          },
+          "visitor_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visitor Email"
+          },
+          "visitor_email_verified": {
+            "default": false,
+            "title": "Visitor Email Verified",
+            "type": "boolean"
+          },
+          "visitor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visitor Name"
+          },
+          "visitor_online": {
+            "title": "Visitor Online",
+            "type": "boolean"
+          },
+          "visitor_typing": {
+            "title": "Visitor Typing",
+            "type": "boolean"
+          },
+          "waiting_since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waiting Since"
+          }
+        },
+        "required": [
+          "session_id",
+          "status",
+          "end_reason",
+          "visitor_name",
+          "visitor_email",
+          "topic_label",
+          "page_url",
+          "language",
+          "waiting_since",
+          "accepted_at",
+          "ended_at",
+          "assigned_user_id",
+          "assigned_name",
+          "visitor_online",
+          "visitor_typing"
+        ],
+        "title": "TicketChatOut",
+        "type": "object"
+      },
       "TicketCreateRequest": {
         "properties": {
           "archive_flag": {
@@ -32277,6 +33778,41 @@
         "title": "UnmappedOut",
         "type": "object"
       },
+      "UploadPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "max_bytes": {
+            "default": 10485760,
+            "maximum": 26214400.0,
+            "minimum": 1048576.0,
+            "title": "Max Bytes",
+            "type": "integer"
+          },
+          "types": {
+            "items": {
+              "enum": [
+                "image/png",
+                "image/jpeg",
+                "image/gif",
+                "image/webp",
+                "application/pdf",
+                "text/plain"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Types",
+            "type": "array"
+          }
+        },
+        "title": "UploadPolicy",
+        "type": "object"
+      },
       "UserCreate": {
         "properties": {
           "email": {
@@ -33887,6 +35423,751 @@
         "summary": "Root",
         "tags": [
           "ops"
+        ]
+      }
+    },
+    "/api/chat/v1/config": {
+      "get": {
+        "description": "What the widget shows for config *k* on the website *origin*.",
+        "operationId": "get_public_config_api_chat_v1_config_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "k",
+            "required": true,
+            "schema": {
+              "maxLength": 40,
+              "title": "K",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "origin",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "title": "Origin",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatPublicConfigOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Cross-origin request or website not allowed"
+          },
+          "404": {
+            "description": "Unknown, switched off or not yours"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited (Retry-After)"
+          },
+          "503": {
+            "description": "Chat temporarily unavailable (Retry-After)"
+          }
+        },
+        "summary": "Get Public Config",
+        "tags": [
+          "webchat-public"
+        ]
+      }
+    },
+    "/api/chat/v1/offline": {
+      "post": {
+        "description": "Offline form: a ticket with the visitor's message (an e-mail address is required).",
+        "operationId": "post_offline_form_api_chat_v1_offline_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatOfflineIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatOfflineOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Cross-origin request or website not allowed"
+          },
+          "404": {
+            "description": "Unknown, switched off or not yours"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited (Retry-After)"
+          },
+          "503": {
+            "description": "Chat temporarily unavailable (Retry-After)"
+          }
+        },
+        "summary": "Post Offline Form",
+        "tags": [
+          "webchat-public"
+        ]
+      }
+    },
+    "/api/chat/v1/sessions": {
+      "post": {
+        "description": "Start a chat; 409 ``offline`` when nobody can take it (use the offline form).",
+        "operationId": "create_chat_session_api_chat_v1_sessions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatSessionCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSessionCreatedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Cross-origin request or website not allowed"
+          },
+          "404": {
+            "description": "Unknown, switched off or not yours"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited (Retry-After)"
+          },
+          "503": {
+            "description": "Chat temporarily unavailable (Retry-After)"
+          }
+        },
+        "summary": "Create Chat Session",
+        "tags": [
+          "webchat-public"
+        ]
+      }
+    },
+    "/api/chat/v1/sessions/{session_id}": {
+      "get": {
+        "operationId": "get_chat_session_state_api_chat_v1_sessions__session_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Cross-origin request or website not allowed"
+          },
+          "404": {
+            "description": "Unknown, switched off or not yours"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited (Retry-After)"
+          },
+          "503": {
+            "description": "Chat temporarily unavailable (Retry-After)"
+          }
+        },
+        "summary": "Get Chat Session State",
+        "tags": [
+          "webchat-public"
+        ]
+      }
+    },
+    "/api/chat/v1/sessions/{session_id}/attachments": {
+      "post": {
+        "description": "One file (multipart ``file``, optional ``caption``/``client_id``) = one visitor line.\n\nTakes the raw request so nothing is parsed before the length, token and limit checks\n(R-UPLOAD).",
+        "operationId": "post_chat_attachment_api_chat_v1_sessions__session_id__attachments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "caption": {
+                    "type": "string"
+                  },
+                  "client_id": {
+                    "maxLength": 64,
+                    "type": "string"
+                  },
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Cross-origin request or website not allowed"
+          },
+          "404": {
+            "description": "Unknown, switched off or not yours"
+          },
+          "413": {
+            "description": "File too large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited (Retry-After)"
+          },
+          "503": {
+            "description": "Chat temporarily unavailable (Retry-After)"
+          }
+        },
+        "summary": "Post Chat Attachment",
+        "tags": [
+          "webchat-public"
+        ]
+      }
+    },
+    "/api/chat/v1/sessions/{session_id}/contact": {
+      "post": {
+        "description": "Leave an e-mail address after a chat ended without an answer.",
+        "operationId": "post_chat_contact_api_chat_v1_sessions__session_id__contact_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatContactIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Cross-origin request or website not allowed"
+          },
+          "404": {
+            "description": "Unknown, switched off or not yours"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited (Retry-After)"
+          },
+          "503": {
+            "description": "Chat temporarily unavailable (Retry-After)"
+          }
+        },
+        "summary": "Post Chat Contact",
+        "tags": [
+          "webchat-public"
+        ]
+      }
+    },
+    "/api/chat/v1/sessions/{session_id}/end": {
+      "post": {
+        "description": "The visitor closes the chat (idempotent).",
+        "operationId": "post_chat_end_api_chat_v1_sessions__session_id__end_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Cross-origin request or website not allowed"
+          },
+          "404": {
+            "description": "Unknown, switched off or not yours"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited (Retry-After)"
+          },
+          "503": {
+            "description": "Chat temporarily unavailable (Retry-After)"
+          }
+        },
+        "summary": "Post Chat End",
+        "tags": [
+          "webchat-public"
+        ]
+      }
+    },
+    "/api/chat/v1/sessions/{session_id}/messages": {
+      "get": {
+        "description": "Transcript lines with ``seq > after`` in order.",
+        "operationId": "list_chat_messages_api_chat_v1_sessions__session_id__messages_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "After",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ChatMessageOut"
+                  },
+                  "title": "Response List Chat Messages Api Chat V1 Sessions  Session Id  Messages Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Cross-origin request or website not allowed"
+          },
+          "404": {
+            "description": "Unknown, switched off or not yours"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited (Retry-After)"
+          },
+          "503": {
+            "description": "Chat temporarily unavailable (Retry-After)"
+          }
+        },
+        "summary": "List Chat Messages",
+        "tags": [
+          "webchat-public"
+        ]
+      },
+      "post": {
+        "description": "One visitor line; a retry with the same ``client_id`` returns the stored line.",
+        "operationId": "post_chat_message_api_chat_v1_sessions__session_id__messages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatMessageIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Cross-origin request or website not allowed"
+          },
+          "404": {
+            "description": "Unknown, switched off or not yours"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited (Retry-After)"
+          },
+          "503": {
+            "description": "Chat temporarily unavailable (Retry-After)"
+          }
+        },
+        "summary": "Post Chat Message",
+        "tags": [
+          "webchat-public"
+        ]
+      }
+    },
+    "/api/chat/v1/sessions/{session_id}/messages/{seq}/attachments/{index}": {
+      "get": {
+        "description": "A file of this session's transcript (raster images inline, everything else as a\ndownload; ``nosniff`` + ``CSP: sandbox`` always).",
+        "operationId": "get_chat_attachment_api_chat_v1_sessions__session_id__messages__seq__attachments__index__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "seq",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Seq",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "index",
+            "required": true,
+            "schema": {
+              "maximum": 100,
+              "minimum": 0,
+              "title": "Index",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {}
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Cross-origin request or website not allowed"
+          },
+          "404": {
+            "description": "Unknown, switched off or not yours"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited (Retry-After)"
+          },
+          "503": {
+            "description": "Chat temporarily unavailable (Retry-After)"
+          }
+        },
+        "summary": "Get Chat Attachment",
+        "tags": [
+          "webchat-public"
+        ]
+      }
+    },
+    "/api/chat/v1/sessions/{session_id}/stream": {
+      "get": {
+        "description": "Live transcript (C7): lines after ``Last-Event-ID`` (else ``after``), then live events.\n\nA read (R-DISABLED-SESSIONS): keeps working when the chat was switched off. The hub\nsubscription is the last check, so a full hub (per IP, process total) answers 503 with\n``Retry-After: 30`` instead of an empty 200. The pre-check DB session is committed and\nclosed before the response starts; the stream opens short sessions per read.",
+        "operationId": "stream_chat_session_api_chat_v1_sessions__session_id__stream_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "After",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {}
+            },
+            "description": "Server-sent events: message (with id = seq), session, typing, end"
+          },
+          "403": {
+            "description": "Cross-origin request or website not allowed"
+          },
+          "404": {
+            "description": "Unknown, switched off or not yours"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited (Retry-After)"
+          },
+          "503": {
+            "description": "Chat temporarily unavailable (Retry-After)"
+          }
+        },
+        "summary": "Stream Chat Session",
+        "tags": [
+          "webchat-public"
+        ]
+      }
+    },
+    "/api/chat/v1/sessions/{session_id}/typing": {
+      "post": {
+        "description": "The visitor is typing; at most one signal per 2 s, the rest is dropped silently.",
+        "operationId": "post_chat_typing_api_chat_v1_sessions__session_id__typing_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Cross-origin request or website not allowed"
+          },
+          "404": {
+            "description": "Unknown, switched off or not yours"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited (Retry-After)"
+          },
+          "503": {
+            "description": "Chat temporarily unavailable (Retry-After)"
+          }
+        },
+        "summary": "Post Chat Typing",
+        "tags": [
+          "webchat-public"
         ]
       }
     },
@@ -43298,6 +45579,443 @@
         "summary": "Update Channel",
         "tags": [
           "admin:channels"
+        ]
+      }
+    },
+    "/api/v1/admin/chat-configs": {
+      "get": {
+        "operationId": "list_chat_configs_api_v1_admin_chat_configs_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ChatConfigOut"
+                  },
+                  "title": "Response List Chat Configs Api V1 Admin Chat Configs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Chat Configs",
+        "tags": [
+          "admin:chat-configs"
+        ]
+      },
+      "post": {
+        "operationId": "create_chat_config_api_v1_admin_chat_configs_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatConfigCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatConfigOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Chat Config",
+        "tags": [
+          "admin:chat-configs"
+        ]
+      }
+    },
+    "/api/v1/admin/chat-configs/{config_id}": {
+      "delete": {
+        "operationId": "delete_chat_config_api_v1_admin_chat_configs__config_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Chat Config",
+        "tags": [
+          "admin:chat-configs"
+        ]
+      },
+      "get": {
+        "operationId": "get_chat_config_api_v1_admin_chat_configs__config_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatConfigOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Chat Config",
+        "tags": [
+          "admin:chat-configs"
+        ]
+      },
+      "patch": {
+        "operationId": "update_chat_config_api_v1_admin_chat_configs__config_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatConfigUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatConfigOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Chat Config",
+        "tags": [
+          "admin:chat-configs"
+        ]
+      }
+    },
+    "/api/v1/admin/chat-configs/{config_id}/rotate-key": {
+      "post": {
+        "operationId": "rotate_chat_config_key_api_v1_admin_chat_configs__config_id__rotate_key_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatConfigOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rotate Chat Config Key",
+        "tags": [
+          "admin:chat-configs"
         ]
       }
     },
@@ -67774,6 +70492,454 @@
         ]
       }
     },
+    "/api/v1/chat/agent-state": {
+      "get": {
+        "description": "The agent's \"Chats annehmen\" state and how many chats they hold now.",
+        "operationId": "get_chat_agent_state_api_v1_chat_agent_state_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatAgentStateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Chat Agent State",
+        "tags": [
+          "chat"
+        ]
+      },
+      "put": {
+        "description": "Set availability, topic filter (refs from ``GET /chat/topics``; empty = all) and the\nconcurrent-chat limit.",
+        "operationId": "put_chat_agent_state_api_v1_chat_agent_state_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatAgentStateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatAgentStateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "A topic ref the agent may not take (`unknown_topic`)"
+          }
+        },
+        "summary": "Put Chat Agent State",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/chat/inbox": {
+      "get": {
+        "description": "Waiting chats the agent may accept and the agent's own active chats.",
+        "operationId": "get_chat_inbox_api_v1_chat_inbox_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatInboxOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Chat Inbox",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/chat/sessions/{session_id}/accept": {
+      "post": {
+        "description": "Take a waiting chat (first accept wins; owner + lock like Znuny).",
+        "operationId": "post_chat_accept_api_v1_chat_sessions__session_id__accept_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatAcceptOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "No rw permission on the chat's queue (`forbidden`)"
+          },
+          "404": {
+            "description": "Unknown chat (`not_found`)"
+          },
+          "409": {
+            "description": "`already_taken`, `at_capacity` or `not_waiting`"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Chat Accept",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/chat/sessions/{session_id}/end": {
+      "post": {
+        "description": "End a live chat; optionally close the ticket. Idempotent (204 again when ended).",
+        "operationId": "post_chat_end_api_v1_chat_sessions__session_id__end_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ChatEndIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "No rw permission on the chat's queue (`forbidden`)"
+          },
+          "404": {
+            "description": "Unknown chat (`not_found`)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Chat End",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/chat/topics": {
+      "get": {
+        "description": "Topics of valid chat configs whose queue the agent holds ``rw`` on.",
+        "operationId": "get_chat_topics_api_v1_chat_topics_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ChatTopicRefOut"
+                  },
+                  "title": "Response Get Chat Topics Api V1 Chat Topics Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Chat Topics",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
     "/api/v1/customer-directory": {
       "get": {
         "description": "Customer users, name first. Sort keys: see ``customer_sort``; default name order.",
@@ -83592,7 +86758,7 @@
         ]
       },
       "post": {
-        "description": "Add an article to a ticket. Requires ``rw`` permission.\n\nAgent email replies (``channel=email``, ``sender_type=agent``) are SMTP-\ndelivered then stored (send-then-store). Delivery failure returns HTTP 502\nand does not leave a silent no-op 201.\n\nTelegram replies may carry ``attachments``, ``telegram_buttons`` and\n``telegram_reply_to_article_id`` (422 on any other channel); a failed\nTelegram send returns 409 with nothing stored. Outgoing agent email may\ncarry ``attachments`` as well (413 over the upload limit).\n\nWith ``state_id`` the ticket's state is changed after the article, in the\nsame transaction (PATCH semantics). The state change is validated before\nthe article is created, so an invalid one returns 403/404/422 without\nsending or storing anything.",
+        "description": "Add an article to a ticket. Requires ``rw`` permission.\n\nAgent email replies (``channel=email``, ``sender_type=agent``) are SMTP-\ndelivered then stored (send-then-store). Delivery failure returns HTTP 502\nand does not leave a silent no-op 201.\n\nTelegram replies may carry ``attachments``, ``telegram_buttons`` and\n``telegram_reply_to_article_id`` (422 on any other channel); a failed\nTelegram send returns 409 with nothing stored. Outgoing agent email may\ncarry ``attachments`` as well (413 over the upload limit).\n\nWith ``state_id`` the ticket's state is changed after the article, in the\nsame transaction (PATCH semantics). The state change is validated before\nthe article is created, so an invalid one returns 403/404/422 without\nsending or storing anything.\n\nWeb chat (``channel=webchat``, agent, visible for the customer): the reply is also posted\ninto the ticket's live chat. A chat nobody accepted yet is accepted first, in its own\ntransaction (R-REPLY-ACCEPT-FIRST); a refused accept refuses the reply (409\n``at_capacity`` / ``already_taken``, 403 ``forbidden``). No live chat \u2192 409\n``chat_not_live``; nothing is stored in either case. The text and ``state_id`` are\nvalidated before the implicit accept. ``attachments`` are allowed.",
         "operationId": "create_article_api_v1_tickets__ticket_id__articles_post",
         "parameters": [
           {
@@ -85266,6 +88432,164 @@
         "summary": "Retract Telegram Article",
         "tags": [
           "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/chat": {
+      "get": {
+        "description": "The ticket's newest chat for the conversation header (visitor, topic, status,\nonline/typing); 404 when the ticket has none.",
+        "operationId": "get_ticket_chat_api_v1_tickets__ticket_id__chat_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketChatOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "No ro permission on the ticket's queue (`forbidden`)"
+          },
+          "404": {
+            "description": "Unknown ticket or no chat on it (`not_found`)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ticket Chat",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/chat/typing": {
+      "post": {
+        "description": "The agent is typing in the ticket's live chat (the visitor sees it; at most one\nsignal per 2 s, the rest is dropped). Needs ``note`` on the ticket's queue.",
+        "operationId": "post_ticket_chat_typing_api_v1_tickets__ticket_id__chat_typing_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "No note permission on the ticket's queue (`forbidden`)"
+          },
+          "404": {
+            "description": "Unknown ticket (`not_found`)"
+          },
+          "409": {
+            "description": "The ticket has no live chat (`chat_not_live`)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Ticket Chat Typing",
+        "tags": [
+          "chat"
         ]
       }
     },

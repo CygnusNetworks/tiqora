@@ -89,6 +89,14 @@ class Settings(BaseSettings):
     # URI, …). Example: https://helpdesk.example.com — no trailing slash.
     # Empty → fall back to the first CORS origin (dev) in domain helpers.
     public_base_url: str = Field(default="", validation_alias="TIQORA_PUBLIC_BASE_URL")
+    # Web-chat: static widget build served by the api container, and the process-wide
+    # cap on open VISITOR chat streams (only those subscribe to ChatHub; the agent SSE in
+    # api/v1/events.py is not counted). Clamped to RLIMIT_NOFILE - 256 at startup, see
+    # webchat.hub.effective_max_streams.
+    webchat_dist_dir: str = Field(
+        default="/app/webchat/dist", validation_alias="TIQORA_WEBCHAT_DIST_DIR"
+    )
+    chat_max_streams: int = Field(default=500, ge=10, validation_alias="TIQORA_CHAT_MAX_STREAMS")
 
     # Frontend SPA served by the api container itself (single image ships
     # backend + UI). Disable (TIQORA_SERVE_FRONTEND=0) to front with a
@@ -490,6 +498,12 @@ class Settings(BaseSettings):
     )
     plugin_tasks_interval_seconds: int = Field(
         default=15, ge=5, le=300, validation_alias="TIQORA_PLUGIN_TASKS_INTERVAL_SECONDS"
+    )
+
+    # Web chat sweep (waiting timeout, idle chats, retention). ``daemon.webchat_sweep.enabled``
+    # (default ON) switches it off; this is only the poll interval.
+    webchat_sweep_interval_seconds: int = Field(
+        default=15, validation_alias="TIQORA_WEBCHAT_SWEEP_INTERVAL"
     )
 
     # AI worker (tiqora-ai-worker, separate process/compose service — see

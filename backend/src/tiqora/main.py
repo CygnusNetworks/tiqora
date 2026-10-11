@@ -22,6 +22,9 @@ from tiqora.cli.plugins import add_plugins_subparser
 from tiqora.cli.report import add_report_subparser
 from tiqora.config import get_settings
 
+# Below Docker's default 10 s stop grace period.
+GRACEFUL_SHUTDOWN_SECONDS = 8
+
 
 def main(argv: list[str] | None = None) -> None:
     """Parse CLI args and dispatch to the requested process role."""
@@ -79,6 +82,10 @@ def main(argv: list[str] | None = None) -> None:
             # request.client.host is the real client IP (rate limiting keys on it).
             proxy_headers=True,
             forwarded_allow_ips=settings.forwarded_allow_ips,
+            # Cut open SSE streams (chat visitors, agents) 8 s after SIGTERM so
+            # the lifespan shutdown (hub close, pools) runs before Docker's
+            # default 10 s stop grace period ends in SIGKILL.
+            timeout_graceful_shutdown=GRACEFUL_SHUTDOWN_SECONDS,
         )
     elif command == "worker":
         from tiqora.worker.__main__ import run_worker

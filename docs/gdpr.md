@@ -315,12 +315,49 @@ that company that were not erased.
 - **Scope is by ticket customer.** Only tickets whose `customer_user_id` is
   one of the selected logins are touched. The customer's address or name in
   other customers' tickets is not scrubbed, and Tiqora-owned tables other
-  than `tiqora_telegram_message`, the saved searches/reports (see above) and the
-  report facts (e.g. AI drafts/audit, mail log, Telegram contacts) are not
-  touched.
+  than `tiqora_telegram_message`, the saved searches/reports (see above), the
+  report facts and the web chat tables (e.g. AI drafts/audit, mail log, Telegram
+  contacts) are not touched; see [Web chat](#web-chat).
 - **Anonymize rollback of related tables** recomputes the replacement login
   from the job's `seed`, so it depends on `ValueMapper` producing the same
   output as at apply time.
+
+## Web chat
+
+The web chat ([guide](guide/webchat.md)) keeps visitor data in four places:
+
+| Where | What | Removed by |
+|---|---|---|
+| `tiqora_chat_session` | visitor name, e-mail, page URL, user agent, `ip_hash`, `visitor_id`, `customer_user_login` | erasure of the ticket's customer (hard delete **and** anonymize delete the rows whole, with backup/rollback in `tiqora_gdpr_backup`); the chat retention purge |
+| `tiqora_chat_message` | the transcript lines (free text) | same as above |
+| the chat tickets' articles | `a_from` / `a_to` carry the visitor's e-mail and name; the body carries the text | the normal ticket erasure and anonymization, retention policies |
+| the ticket | `customer_user_id` / `customer_id` when the e-mail matched or created a customer | customer anonymization |
+
+- **IP address.** Never stored in clear text: only `ip_hash`, a keyed hash (HMAC with the app secret). It is used
+  for rate limiting and abuse protection and is cleared with the rest of the visitor data.
+- **Retention purge.** The `webchat_sweep` of `tiqora-worker` runs the chat's own retention, not the GDPR
+  retention engine (that engine handles tickets; chat rows are a side table). After the chat's
+  **Aufbewahrung Chatverlauf (Tage)** (default 30, counted from the end of the chat) it deletes the `tiqora_chat_message`
+  rows (transcript lines and the attachment listing) and clears name, e-mail, page URL, user agent, IP hash,
+  `visitor_id` and the token hash of the session row. Attachment files are article attachments of the ticket and
+  are **not** deleted by the purge. A
+  tombstone row stays for the ticket link and keeps `customer_user_login` (identical to the ticket's customer;
+  erasure removes the whole row). The purge does not touch the ticket's articles or their attachments: the chat transcript articles still carry
+  the visitor's address, name and text, and the files stay. They follow the ticket's own retention and GDPR
+  erasure.
+- **How far a visitor's e-mail reaches.** The address the visitor typed lives in `tiqora_chat_session.visitor_email`,
+  in the `From` header of the visitor's articles and, when it matched or created a customer, in the ticket's
+  customer fields. Erasure of a customer reaches chat rows **through the ticket**: every chat session and message
+  of a ticket whose `customer_user_id` is one of the selected logins is deleted. Chat rows are *not* found by the
+  e-mail value itself. A session whose `visitor_email` is the erased person but whose ticket belongs to another
+  customer (an agent changed the customer, or the chat's **Standard-Kunde** received a ticket for an address that
+  matched nobody) is not reached; this is the same scope rule as for mail (see "Scope is by ticket customer"
+  above). For such a person, delete or anonymize the chat tickets themselves, or wait for the retention purge,
+  which clears the e-mail from the session row regardless of the customer.
+- **Chat without an address.** A visitor who gave no address gets a placeholder sender
+  (`visitor-...@chat.invalid`); nothing is ever mailed to it (recipients in the reserved `.invalid` TLD are
+  dropped). Customer notifications of chat tickets otherwise go to the address the visitor typed, which Tiqora
+  cannot verify.
 
 ## Tests
 

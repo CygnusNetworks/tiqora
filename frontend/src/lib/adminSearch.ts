@@ -374,6 +374,14 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     keywords: ["telegram", "bot", "messenger", "kanal", "channel", "chat"],
   },
   {
+    slug: "webchat",
+    route: "/admin/webchat",
+    group: "communication",
+    nameKey: "admin.nav.webchat",
+    descriptionKey: "admin.pageDescriptions.webchat",
+    keywords: ["webchat", "chat", "live-chat", "widget", "website", "einbetten", "embed"],
+  },
+  {
     slug: "oauth2-tokens",
     route: "/admin/oauth2-tokens",
     group: "communication",

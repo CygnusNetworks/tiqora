@@ -176,3 +176,20 @@ def test_saved_report_json_columns_fit_large_documents_on_mariadb() -> None:
     assert "MEDIUMTEXT" not in _column_ddl(
         TiqoraReport.__table__, "definition", postgresql.dialect()
     )
+
+
+def test_webchat_ddl() -> None:
+    from tiqora.db.tiqora.models import (
+        TiqoraChatAgentState,
+        TiqoraChatMessage,
+        TiqoraChatSession,
+    )
+
+    assert "AUTO_INCREMENT" not in _column_ddl(
+        TiqoraChatAgentState.__table__, "user_id", mysql.dialect()
+    )
+    assert "VARCHAR(32)" in _column_ddl(TiqoraChatSession.__table__, "id", mysql.dialect())
+    uniques = {
+        tuple(c.name for c in ix.columns) for ix in TiqoraChatMessage.__table__.indexes if ix.unique
+    }
+    assert ("session_id", "seq") in uniques and ("session_id", "client_id") in uniques

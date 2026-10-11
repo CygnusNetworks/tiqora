@@ -57,6 +57,10 @@ VALID_OPERATION_MODES = frozenset({OPERATION_MODE_PARALLEL, OPERATION_MODE_TIQOR
 # convention, always lowercase.
 TIQORA_ONLY_CHANNELS: frozenset[str] = frozenset({"telegram"})
 
+#: Source channels whose customer articles are never auto-replied (live chat:
+#: a visitor waits for a human; a delayed mail-style answer would be wrong).
+AUTO_REPLY_SKIP_CHANNELS: frozenset[str] = frozenset({"webchat"})
+
 
 class AiGateError(RuntimeError):
     """Raised when an AI feature is enabled/run while the gate is not open."""
@@ -176,6 +180,7 @@ async def require_feature_allowed(
 
 
 __all__ = [
+    "AUTO_REPLY_SKIP_CHANNELS",
     "OPERATION_MODE_PARALLEL",
     "OPERATION_MODE_TIQORA_PRIMARY",
     "TIQORA_ONLY_CHANNELS",

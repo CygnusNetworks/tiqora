@@ -13,6 +13,7 @@ from tiqora.api.v1 import (
     channels_sms,
     channels_telegram,
     channels_whatsapp,
+    chat,
     customer_directory,
     customer_keys,
     customers,
@@ -59,6 +60,8 @@ api_v1_router.include_router(ai.router)
 api_v1_router.include_router(ai.refine_router)
 api_v1_router.include_router(process.router)
 api_v1_router.include_router(events.router)
+api_v1_router.include_router(chat.router)
+api_v1_router.include_router(chat.ticket_router)
 api_v1_router.include_router(avatars.router)
 # Before customers.router, like /companies/.../vcards before /{login}/vcard.
 api_v1_router.include_router(avatars.customer_router)

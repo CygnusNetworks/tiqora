@@ -273,7 +273,7 @@ AI_REPLY_REQUEST_EVENT: Final = "TiqoraAiReplyRequest"
 # ---------------------------------------------------------------------------
 
 # Chat-like channels without a history type of their own in Znuny.
-_CHAT_CHANNELS: Final = frozenset({"telegram", "sms", "whatsapp"})
+_CHAT_CHANNELS: Final = frozenset({"telegram", "sms", "whatsapp", "webchat"})
 
 # ArticleCreate history types that make the *first* article of a ticket a
 # ``NotificationNewTicket`` (MIMEBase.pm: EmailAgent|EmailCustomer|
@@ -696,9 +696,17 @@ async def add_article(
         "sms": "SMS",
         "whatsapp": "WhatsApp",
         "telegram": "Telegram",
+        "webchat": "WebChat",
     }
     ch_name = channel_name_map.get(article.channel.lower(), "Internal")
-    comm_channel_id = await _channel_id(session, ch_name)
+    if ch_name == "WebChat":
+        # Never fall back to Internal for a chat line (``_channel_id`` would):
+        # register the row on first use (idempotent; cache cleanup inside).
+        from tiqora.channels.common import ensure_webchat_channel_row
+
+        comm_channel_id = await ensure_webchat_channel_row(session)
+    else:
+        comm_channel_id = await _channel_id(session, ch_name)
 
     # Generate fingerprint (Znuny: PID-RandomString-MessageID)
     fingerprint = f"{__import__('os').getpid()}-{secrets.token_hex(16)}-{article.message_id or ''}"
@@ -2145,7 +2153,8 @@ async def merge_tickets(
     2. Move article_search_index rows
     3. Move article-linked ticket_history rows (article_id IS NOT NULL)
     4. Move time_accounting rows
-    4b. Move tiqora_telegram_message map rows (Tiqora-only)
+    4b. Move tiqora_telegram_message map rows (Tiqora-only) and the
+        tiqora_chat_session / tiqora_chat_message rows
     5. Add merge-note article to merge ticket
     6. Write Merged history on both tickets
     7. Transfer watchers (skip duplicates)
@@ -2200,6 +2209,14 @@ async def merge_tickets(
             text("UPDATE tiqora_telegram_message SET ticket_id = :main WHERE ticket_id = :merge"),
             {"main": main_ticket_id, "merge": merge_ticket_id},
         )
+    # 4c. Same for the WebChat transcript (messages first: they reference the
+    # session by id only, no FK, so the order is irrelevant but kept stable).
+    for chat_table in ("tiqora_chat_message", "tiqora_chat_session"):
+        if await _table_exists(session, chat_table):
+            await session.execute(
+                text(f"UPDATE {chat_table} SET ticket_id = :main WHERE ticket_id = :merge"),
+                {"main": main_ticket_id, "merge": merge_ticket_id},
+            )
 
     # 5. Add merge-note article to merge ticket (internal channel, agent sender)
     merge_note = ArticleIn(
@@ -2458,6 +2475,11 @@ async def delete_article(
             text("DELETE FROM tiqora_telegram_message WHERE article_id = :aid"),
             {"aid": article_id},
         )
+    if await _table_exists(session, "tiqora_chat_message"):
+        await session.execute(
+            text("DELETE FROM tiqora_chat_message WHERE article_id = :aid"),
+            {"aid": article_id},
+        )
     await session.execute(
         text("UPDATE time_accounting SET article_id = NULL WHERE article_id = :aid"),
         {"aid": article_id},
@@ -2653,6 +2675,26 @@ class TicketWriteService:
                 user_id=user_id,
                 article=article,
             )
+        # An agent's customer-visible web-chat line also goes into the live chat
+        # (transcript + visitor stream); only exactly this combination -- notes,
+        # email and every other channel never reach the visitor.
+        if (
+            article.channel.lower() == "webchat"
+            and article.sender_type == "agent"
+            and article.is_visible_for_customer
+        ):
+            from tiqora.webchat.agent import ChatNotLive, deliver_agent_chat_reply
+
+            try:
+                return await deliver_agent_chat_reply(
+                    self._session,
+                    self._sysconfig,
+                    ticket_id=ticket_id,
+                    user_id=user_id,
+                    article=article,
+                )
+            except ChatNotLive as exc:
+                raise InvalidInput("chat_not_live") from exc
         return await add_article(
             self._session,
             ticket_id=ticket_id,

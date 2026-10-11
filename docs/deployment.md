@@ -419,6 +419,117 @@ https://znuny.example.com/             → existing Znuny (until cutover)
 WebSocket/SSE: ensure proxy timeouts allow long-lived MCP SSE and UI event
 streams (no aggressive idle kills).
 
+## Web chat
+
+The web chat (see the [admin and agent guide](guide/webchat.md)) is served by `tiqora-api` itself: the loader
+and the iframe document under `/chat/v1/`, the public visitor API under `/api/chat/v1/`. No nginx change is
+needed for routing, because `/chat/` and `/api/chat/` go to `tiqora-api` like the rest of the app. The
+`tiqora-worker` runs the chat sweep (waiting timeout, idle chats, retention).
+
+### Required behind a reverse proxy
+
+| Variable | Why it is REQUIRED |
+|---|---|
+| `TIQORA_PUBLIC_BASE_URL` (e.g. `https://helpdesk.example.org`) | Tiqora derives its own origin from it. Without it the origin comes from the `Host` header, which behind a TLS-terminating proxy is `http://helpdesk.example.org`: every chat start is then refused as cross-origin, the admin preview is refused, and the iframe's `connect-src` is built from whatever `Host` a request carries. Set it in production. |
+| `TIQORA_TRUSTED_PROXIES` and `TIQORA_FORWARDED_ALLOW_IPS` | The proxy addresses. Without them the real visitor address is not seen, so every visitor shares the proxy's rate-limit and stream-cap buckets (a handful of visitors then block everyone). |
+| `TIQORA_SESSION_COOKIE_SAMESITE` stays `lax` (default) or `strict`, never `none` | The chat frame is served from the same origin as the agent app. With `SameSite=None` an agent's or admin's session cookie would also travel with requests made from inside the frame on a customer's site, and the frame CSP's `connect-src <own>/api/chat/v1/` would be the only barrier left against a frame XSS calling `/api/v1` as that agent (for example during the admin preview). |
+
+Optional:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `TIQORA_CHAT_MAX_STREAMS` | `500` | Process-wide cap on open visitor chat streams. The agents' own event stream (`/api/v1/events`) is not counted, but it also holds a connection and a file descriptor. Clamped to the file-descriptor limit minus 256. Beyond it new visitor streams get `503` + `Retry-After`. |
+| `TIQORA_WEBCHAT_DIST_DIR` | `/app/webchat/dist` | Where the built widget lives (set by the image). |
+| `TIQORA_WEBCHAT_SWEEP_INTERVAL` | `15` | Sweep interval in seconds. |
+
+Other limits are fixed: 6 concurrent streams per visitor address, 3 per chat (the oldest is dropped), a stream
+lives at most 30 minutes (the widget reconnects and resumes with `Last-Event-ID`).
+
+### Reverse proxy notes
+
+- **Streams.** The SSE responses carry `X-Accel-Buffering: no`, which switches nginx buffering off for them;
+  a separate `proxy_buffering off` is not needed. The server sends a heartbeat every 25 s, so a
+  `proxy_read_timeout` of 90 s (the `/api/` default in our Puppet-managed nginx) is enough.
+- **`X-Frame-Options`.** The chat frame (`/chat/v1/frame`) must be embeddable on the customers' websites; it sets
+  its own `Content-Security-Policy: frame-ancestors ...` from the chat's allowed websites. If the proxy adds
+  `X-Frame-Options` (or a blanket `frame-ancestors`) to all responses, exempt `/chat/v1/frame`, otherwise the
+  browser refuses the iframe on every website.
+- **Uploads.** Visitors upload up to the chat's limit (default 10 MiB, at most the global attachment limit).
+  Raise nginx `client_max_body_size` for `/api/chat/` to at least that size plus overhead (for example `12m`);
+  the default of 1 MiB would answer `413` before Tiqora sees the request.
+
+### Post-deploy check (run once on production)
+
+Replace `<k>` by the public key of a chat (Admin, **Web-Chat**, tab **Einbetten**) and use one of its allowed
+websites as `origin`. `curl -sI` sends HEAD, which the frame supports; `curl -s -D - -o /dev/null` works too.
+
+```bash
+H=helpdesk.example.org
+# 1. frame: shows the frame CSP (frame-ancestors, connect-src) and NO X-Frame-Options
+curl -sI "https://$H/chat/v1/frame?k=<k>&origin=https://www.example.org" | grep -i -E '^(HTTP|content-security-policy|x-frame-options)'
+# 2. loader: 200, served by tiqora-api
+curl -sI "https://$H/chat/v1/loader.js" | head -1
+# 3. a 10 MiB attachment passes nginx client_max_body_size: a dummy body to the upload route of a
+#    nonexistent chat is enough; Tiqora answers with a JSON 4xx, nginx would answer an HTML 413
+head -c 10485760 /dev/zero | curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  -H "Origin: https://$H" -H 'Content-Type: application/octet-stream' --data-binary @- \
+  "https://$H/api/chat/v1/sessions/00000000000000000000000000000000/attachments"
+# 4. an SSE stream stays open for more than 90 s (heartbeats `: hb` every 25 s keep it alive);
+#    open one from the chat widget in a browser with the network tab, or:
+curl -sN --max-time 100 -H "X-Chat-Token: <token>" "https://$H/api/chat/v1/sessions/<session id>/stream"
+```
+
+Expected: step 1 has a `content-security-policy` with `frame-ancestors` and no `x-frame-options` header; step 2
+`HTTP/2 200`; step 3 a `4xx` other than `413` (a `413` here is nginx's `client_max_body_size`); step 4 keeps printing `: hb` lines and is cut only by `--max-time`.
+The Puppet-managed nginx cannot be inspected from this repository, which is why this is a checklist.
+
+### Graceful shutdown
+
+On `SIGTERM` uvicorn closes open SSE streams after at most 8 seconds (`timeout_graceful_shutdown`), below
+Docker's default stop grace period of 10 s, so the application's shutdown cleanup (stream hub, connection pools)
+runs instead of ending in `SIGKILL`. Widgets and agent tabs reconnect on their own.
+
+### Sizing
+
+The load script `backend/scripts/webchat_stream_load.py` creates N sessions against a **test instance** and
+holds N SSE streams for M minutes; it prints the streams held, errors and, with `--pid`, the RSS of the API
+process. It refuses non-local hosts (every session creates a ticket). Prepare the test instance: web chat on, a
+chat whose rate limits are raised (`sessions_per_config_minute` 300, `sessions_per_ip_10min` 100),
+`TIQORA_CHAT_MAX_STREAMS` at least N, and `TIQORA_TRUSTED_PROXIES=0.0.0.0/0` so the script's distinct
+`X-Forwarded-For` values count as separate visitors.
+
+Measured on 2026-10-11 against the local stack (`docker-compose.local.yml`, one `tiqora-api` container with a
+single uvicorn process, OrbStack on a laptop; MariaDB, Redis and the worker alongside; memory from
+`docker stats`, since the API runs in a container). Each run created N sessions at 4 to 5 per second and held the
+streams for 3 minutes (one run of 20 streams for 30 s beforehand):
+
+| Streams held | Errors | API memory (RSS) | API CPU while holding |
+|---|---|---|---|
+| idle (after a 20-stream warm-up) | | 232 MiB | 0.16 % |
+| 200 | 0 | 255 MiB | about 7 % |
+| 500 | 0 | 306 MiB | about 7 % |
+
+That is roughly 0.15 MiB per open stream, with every heartbeat (every 25 s) re-reading the DB per stream. Memory
+stayed at the peak (about 307 MiB) after the 500 streams closed. These numbers are for orientation only; they come from one laptop and
+idle streams (no messages). Plan for one `tiqora-api` process per roughly 500 open visitor streams (the default
+`TIQORA_CHAT_MAX_STREAMS`; agent event streams come on top), and raise the file-descriptor limit before raising the cap.
+
+Each open stream is one asyncio task and one socket; it does not hold a database connection while idle (every
+heartbeat opens a short session). Redis carries only wake and typing markers.
+
+### Notifications to visitors
+
+`.invalid` recipients are dropped on every mail path (logged as `mail_recipient_invalid_tld`), and a visitor who
+gave no address is never mailed: the placeholder address `visitor-...@chat.invalid` exists only so the article
+has a sender.
+
+### MCP and chats
+
+`ticket_reply` over MCP into a **waiting** chat answers `{"error": "chat_not_accepted"}`. The MCP transaction is
+already open, so accepting first (as the REST reply does) cannot run, and there is no MCP tool to accept a
+chat; a human accepts it, after which MCP replies work. MCP-posted replies have no Redis wake-up: they reach the
+visitor with the next stream heartbeat, at most 25 s later (REST replies reach them immediately).
+
 ## Observability
 
 - Scrape `GET /metrics` with Prometheus or Zabbix HTTP agent (requires
@@ -468,3 +579,4 @@ Known examples:
 - [ ] Network isolation: DB not public
 - [ ] MCP API keys rotated and scoped
 - [ ] AGPL obligations understood for network-facing deployments
+- [ ] Web chat: `TIQORA_PUBLIC_BASE_URL`, `TIQORA_TRUSTED_PROXIES` set; [post-deploy check](#post-deploy-check-run-once-on-production) done

@@ -48,7 +48,7 @@ from tiqora.ai.context import (
 )
 from tiqora.ai.customer_pause import SKIP_REASON as CUSTOMER_PAUSE_SKIP_REASON
 from tiqora.ai.customer_pause import active_pause_for_ticket
-from tiqora.ai.gate import is_tiqora_primary
+from tiqora.ai.gate import AUTO_REPLY_SKIP_CHANNELS, is_tiqora_primary
 from tiqora.ai.listfields import parse_str_list
 from tiqora.ai.llm_routing import (
     TASK_TRIAGE,
@@ -255,6 +255,10 @@ async def _process_event(session: AsyncSession, settings: Settings, event: Outbo
         return "no_article_id"
     if event.payload.get("auto_generated"):
         return "auto_generated"
+    # Live chat is routed by its topic (phase 1); a chat has no mail-style
+    # re-routing. Same list as the auto-reply skip.
+    if str(event.payload.get("channel") or "").lower() in AUTO_REPLY_SKIP_CHANNELS:
+        return "channel_skipped"
     if await article_sender_type(session, int(article_id)) != "customer":
         return "not_customer"
 

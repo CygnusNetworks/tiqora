@@ -47,8 +47,10 @@ async def test_list_channels_defaults_disabled_and_no_config(mariadb_znuny_url: 
         async with factory() as session:
             listed = await admin_channels.list_channels(_root_user(), session)
             names = {c.channel for c in listed}
-            assert names == {"sms", "whatsapp", "phone", "telegram"}
+            assert names == {"sms", "whatsapp", "phone", "telegram", "webchat"}
             assert all(c.enabled is False for c in listed)
+            webchat = next(c for c in listed if c.channel == "webchat")
+            assert webchat.config == {}
     finally:
         await engine.dispose()
 

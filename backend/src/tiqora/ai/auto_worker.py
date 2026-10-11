@@ -53,7 +53,12 @@ from tiqora.ai.context import (
 )
 from tiqora.ai.customer_pause import SKIP_REASON as CUSTOMER_PAUSE_SKIP_REASON
 from tiqora.ai.customer_pause import active_pause_for_ticket
-from tiqora.ai.gate import TIQORA_ONLY_CHANNELS, is_auto_reply_paused, is_tiqora_primary
+from tiqora.ai.gate import (
+    AUTO_REPLY_SKIP_CHANNELS,
+    TIQORA_ONLY_CHANNELS,
+    is_auto_reply_paused,
+    is_tiqora_primary,
+)
 from tiqora.ai.handoff import consume_ai_grant, mark_ai_escalated
 from tiqora.ai.kb_wiring import kb_bundle, kb_get_article_fn, kb_search_fn
 from tiqora.ai.limits import queue_tokens_used_today
@@ -578,6 +583,7 @@ async def run_auto_tick(
         "gate_open": int(gate_open),
         "tiqora_only_replies": 0,
         "no_reply": 0,
+        "skipped_channel": 0,
     }
     last_id = watermark
     touched_ticket_ids: set[int] = set()
@@ -589,6 +595,9 @@ async def run_auto_tick(
             continue
         touched_ticket_ids.add(event.ticket_id)
         source_channel = event.payload.get("channel")
+        if (source_channel or "").lower() in AUTO_REPLY_SKIP_CHANNELS:
+            totals["skipped_channel"] += 1
+            continue
         is_tiqora_only_channel = (source_channel or "").lower() in TIQORA_ONLY_CHANNELS
         # Per-event gate (plan §3.0 v1.1 relaxation, Phase E): outside
         # tiqora_primary, only events on a channel with no Znuny counterpart

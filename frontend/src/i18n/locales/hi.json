@@ -2181,6 +2181,7 @@
       "aiModels": "मॉडल",
       "identityProviders": "Identity providers",
       "reporting": "Report data",
+      "webchat": "Web chat",
       "plugins": "Extensions",
       "dashboardTemplates": "Dashboard templates"
     },
@@ -3110,6 +3111,10 @@
           "name": "Report data upkeep",
           "description": "Keeps the report data (ticket facts and daily open-ticket snapshots) up to date continuously."
         },
+        "webchat_sweep": {
+          "name": "Web chat housekeeping",
+          "description": "Ends chats nobody answered in time, closes chats whose visitor has left and deletes old chat transcripts after the retention period."
+        },
         "deploy_watch": {
           "name": "Deploy watcher",
           "description": "Detects processes and ACLs deployed in Znuny and makes Tiqora use them only after that."
@@ -3498,6 +3503,7 @@
       "identityProviders": "Set up sign-in through Microsoft, Google, SAML or LDAP.",
       "reporting": "Check the state of the report data and have everything recalculated.",
       "settingsReporting": "Reports: time zone, access, cache and limits for results and exports.",
+      "webchat": "Set up chats for websites, adjust the look and get the embed code.",
       "plugins": "Switch installed extensions on or off, check their state and configure them.",
       "dashboardTemplates": "Define home page dashboards per role, optionally binding."
     },
@@ -5612,6 +5618,329 @@
       "defaultHint": "Without a choice this applies: {{values}}",
       "alwaysOn": "Always on (set by the report)",
       "privateOther": "Private"
+    }
+  },
+  "webchat": {
+    "agent": {
+      "ringTitle": "New chat waiting",
+      "visitorFallback": "Visitor",
+      "badge": "Web chat",
+      "online": "Visitor online",
+      "offline": "Visitor offline",
+      "typing": "typing …",
+      "emailUnverified": "Email not verified",
+      "statusWaiting": "Waiting for {{age}}",
+      "statusWaitingNoAge": "Waiting",
+      "statusActive": "In chat with {{name}}",
+      "statusActiveNoName": "In chat",
+      "statusEnded": "Ended",
+      "ageSeconds": "{{count}} sec",
+      "ageMinutes": "{{count}} min",
+      "ageHours": "{{count}} h",
+      "accept": "Accept",
+      "end": "End chat",
+      "endKeepOpen": "Keep ticket open",
+      "endClose": "Close ticket",
+      "alreadyTaken": "Already taken",
+      "atCapacity": "You already have the maximum number of simultaneous chats.",
+      "actionFailed": "That did not work. Please try again.",
+      "chatEnded": "The chat has ended – please reply by email.",
+      "noVisitorEmail": "The visitor did not leave an email address.",
+      "composer": {
+        "inputLabel": "Chat message"
+      },
+      "notWaiting": "This chat is no longer waiting to be accepted.",
+      "forbidden": "You do not have permission to do that.",
+      "invalidRecipient": "Addresses ending in .invalid are placeholders and are never mailed.",
+      "inbox": {
+        "title": "Chats",
+        "buttonLabel": "Chats – {{count}} waiting",
+        "accepting": "Accept chats",
+        "topics": "Topics",
+        "topicsHint": "With no selection you take every topic.",
+        "maxConcurrent": "At most at the same time",
+        "waiting": "Waiting chats",
+        "noneWaiting": "No chats in the queue.",
+        "mine": "My chats",
+        "noneMine": "You have no running chats.",
+        "newWaiting": "New chat waiting. Waiting chats: {{count}}",
+        "atCapacity": "You already have {{count}} chats.",
+        "maxInvalid": "Please enter a whole number from {{min}} to {{max}}."
+      }
+    },
+    "admin": {
+      "remove": "Remove",
+      "back": "Back",
+      "saved": "Saved.",
+      "saveFailed": "That did not work. Please try again.",
+      "loadFailed": "The chat could not be loaded.",
+      "checkFields": "Please check the marked fields.",
+      "tabHasErrors": "Errors in this tab",
+      "newTitle": "New chat",
+      "editTitle": "Edit chat",
+      "tabs": {
+        "general": "General",
+        "hours": "Hours & offline",
+        "prechat": "Pre-chat form",
+        "look": "Appearance",
+        "protection": "Protection",
+        "embed": "Embed"
+      },
+      "list": {
+        "title": "Web chat",
+        "name": "Name",
+        "origins": "Websites",
+        "topics": "Topics",
+        "active": "Active",
+        "chats": "Chats",
+        "new": "New chat",
+        "empty": "No chat set up yet.",
+        "masterSwitch": "Web chat switched on",
+        "masterHint": "Turns the web chat on or off for all websites. Visitors can still end conversations in progress.",
+        "deleteConfirm": "Delete chat “{{name}}”?"
+      },
+      "general": {
+        "name": "Name",
+        "active": "Active",
+        "origins": "Allowed websites (one per line)",
+        "originsHint": "Only these websites may embed the chat, e.g. https://www.example.org. No path, no wildcards.",
+        "originLine": "Line {{line}}: {{message}}",
+        "topics": "Topics",
+        "topicsHint": "Visitors pick a topic; each topic sets the queue and priority of the ticket.",
+        "topicLabel": "Label",
+        "topicQueue": "Queue",
+        "topicPriority": "Priority",
+        "priorityNone": "Queue default",
+        "pickQueue": "Choose queue",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "addTopic": "Add topic",
+        "greeting": "Greeting",
+        "privacy": "Privacy link",
+        "privacyHint": "Linked in the chat; must start with https://.",
+        "showAgentNames": "Show agent name"
+      },
+      "hours": {
+        "hours": "Opening hours",
+        "hoursHint": "Outside these hours the chat counts as unstaffed.",
+        "always": "Always",
+        "defaultCalendar": "Default calendar",
+        "calendarN": "Calendar {{n}}",
+        "waitTimeout": "Wait before offering email (seconds)",
+        "waitTimeoutHint": "After this time without an answer the visitor is offered to write an email.",
+        "offline": "When nobody is available",
+        "offlineForm": "Message form",
+        "offlineHide": "Hide chat",
+        "defaultCustomer": "Default customer (optional)",
+        "defaultCustomerHint": "Customer user that chats without an email address are assigned to."
+      },
+      "prechat": {
+        "hint": "The chat asks for these fields before the conversation starts. “Map to” decides where the answer goes in the ticket.",
+        "key": "Key",
+        "label": "Label",
+        "kind": "Kind",
+        "kinds": {
+          "text": "Text",
+          "textarea": "Multi-line text",
+          "email": "Email",
+          "select": "Choice",
+          "checkbox": "Checkbox"
+        },
+        "mapsTo": "Map to",
+        "maps": {
+          "none": "display only",
+          "name": "Name",
+          "email": "Email",
+          "dynamic_field": "Dynamic field"
+        },
+        "dynamicField": "Dynamic field",
+        "pickDynamicField": "Choose field",
+        "options": "Choices",
+        "optionValue": "Value",
+        "optionLabel": "Label",
+        "addOption": "Add choice",
+        "required": "Required",
+        "addField": "Add field",
+        "preview": "Preview",
+        "previewEmpty": "No fields: visitors start the chat right away."
+      },
+      "look": {
+        "color": "Colour",
+        "position": "Position",
+        "right": "Right",
+        "left": "Left",
+        "mode": "Appearance",
+        "light": "Light",
+        "dark": "Dark",
+        "auto": "Automatic",
+        "launcher": "Button text",
+        "launcherHint": "Leave empty for the default text.",
+        "preview": "Preview",
+        "desktop": "Desktop",
+        "mobile": "Phone",
+        "previewAfterSave": "The preview appears after the first save.",
+        "previewTitle": "Chat preview",
+        "previewHint": "The preview shows colour, greeting, topics and pre-chat form of your draft, even while the chat is still switched off."
+      },
+      "protection": {
+        "limits": "Limits",
+        "limitsHint": "Protect the chat from abuse. The defaults suit most websites.",
+        "range": "{{min}} to {{max}}",
+        "rate": {
+          "sessions_per_ip_10min": "New chats per address (10 min)",
+          "sessions_per_config_minute": "New chats in total (per minute)",
+          "messages_per_session_minute": "Messages per chat (per minute)",
+          "messages_per_ip_minute": "Messages per address (per minute)",
+          "uploads_per_session_10min": "File uploads per chat (10 min)",
+          "offline_per_ip_hour": "Message forms per address (per hour)",
+          "offline_per_config_hour": "Message forms in total (per hour)"
+        },
+        "uploads": "File uploads",
+        "uploadsAllow": "Allow file uploads",
+        "maxMb": "Maximum size (MB)",
+        "types": "Allowed file types",
+        "type": {
+          "image/png": "PNG image",
+          "image/jpeg": "JPEG image",
+          "image/gif": "GIF image",
+          "image/webp": "WebP image",
+          "application/pdf": "PDF",
+          "text/plain": "Text file"
+        },
+        "retention": "Keep chat history (days)",
+        "retentionHint": "After that the chat transcript is deleted and the visitor data cleared; attachments stay on the ticket; the ticket stays."
+      },
+      "embed": {
+        "afterSave": "The embed code appears after the first save.",
+        "code": "Embed code",
+        "copy": "Copy",
+        "copied": "Copied.",
+        "copyFailed": "Copying is not possible. The text is selected, please copy it with Ctrl/Cmd+C.",
+        "where": "Paste this code on every page where the chat should appear, just before </body>.",
+        "csp": "Content Security Policy of the website",
+        "cspHint": "If your website uses a Content Security Policy, it must allow script-src and frame-src for the address of this Tiqora:",
+        "rotate": "Renew key",
+        "rotateHint": "Creates a new embed code. The previous code stops working.",
+        "rotateConfirm": "The old embed code will stop working."
+      },
+      "err": {
+        "nameRequired": "Please enter a name.",
+        "nameLong": "The name is too long.",
+        "originsMax": "At most {{max}} websites are allowed.",
+        "topicsMin": "Please add at least one topic.",
+        "topicsMax": "At most {{max}} topics are possible.",
+        "topicLabelRequired": "Please enter a label.",
+        "topicLabelLong": "The label is too long (80 characters at most).",
+        "queueRequired": "Please choose a queue.",
+        "keyInvalid": "Invalid key.",
+        "keyDuplicate": "This key is used twice.",
+        "greetingLong": "The greeting is too long (500 characters at most).",
+        "urlLong": "The address is too long.",
+        "urlHttps": "The address must start with https://.",
+        "bound": "Please enter a whole number from {{min}} to {{max}}.",
+        "valueLong": "The value is too long.",
+        "colorInvalid": "Please enter a colour such as #2563eb.",
+        "max40": "40 characters at most.",
+        "typesMin": "Please choose at least one file type.",
+        "fieldsMax": "At most {{max}} fields are possible.",
+        "fieldKeyPattern": "Use lowercase letters, digits and _; start with a letter (40 characters at most).",
+        "fieldKeyReserved": "The key “{{key}}” is reserved.",
+        "fieldLabelRequired": "Please enter a label.",
+        "fieldLabelLong": "The label is too long (100 characters at most).",
+        "optionsRequired": "Please add at least one choice.",
+        "optionsOnlySelect": "Choices exist only for the kind “Choice”.",
+        "optionsMax": "At most {{max}} choices are possible.",
+        "optionsIncomplete": "Every choice needs a value and a label.",
+        "optionsUnique": "The values of the choices must be unique.",
+        "mapsEmailTwice": "Only one field may be mapped to “Email”.",
+        "mapsNameTwice": "Only one field may be mapped to “Name”.",
+        "mapsEmailKind": "A field for the email address must be of kind “Email”.",
+        "mapsNameKind": "A field for the name must be of kind “Text”.",
+        "dynamicRequired": "Please choose a dynamic field."
+      }
+    }
+  },
+  "webchatWidget": {
+    "launcher": {
+      "open": "Open chat",
+      "close": "Close chat",
+      "default": "Questions? Write to us"
+    },
+    "header": {
+      "close": "Close",
+      "support": "Support"
+    },
+    "status": {
+      "waiting": "One moment – someone will be with you shortly.",
+      "active": "{{name}} is in the chat",
+      "activeAnon": "A team member is in the chat",
+      "ended": "The chat has ended.",
+      "reconnecting": "Connection lost – reconnecting …"
+    },
+    "prechat": {
+      "title": "Before we start",
+      "topic": "What is it about?",
+      "message": "Your message",
+      "start": "Start chat",
+      "privacy": "Privacy notice",
+      "required": "Please fill in.",
+      "invalidEmail": "Please enter a valid email address.",
+      "invalidOption": "Please choose an option.",
+      "tooLong": "The text is too long."
+    },
+    "composer": {
+      "placeholder": "Write a message …",
+      "send": "Send",
+      "attach": "Attach file",
+      "tooLong": "The message is too long (at most {{max}} characters).",
+      "failed": "Not sent – try again",
+      "retry": "Send again"
+    },
+    "upload": {
+      "tooLarge": "The file is too large (at most {{max}}).",
+      "type": "This file type is not accepted.",
+      "failed": "The file could not be uploaded.",
+      "download": "Download",
+      "empty": "The file is empty.",
+      "disabled": "Files cannot be sent here."
+    },
+    "typing": "is typing …",
+    "you": "You",
+    "offline": {
+      "title": "Nobody is available right now",
+      "text": "Leave us a message – we will reply by email.",
+      "send": "Send message",
+      "thanks": "Thank you! We will get back to you by email."
+    },
+    "system": {
+      "agent_joined": "{{name}} has joined the chat.",
+      "agent_joinedAnon": "A team member has joined the chat.",
+      "chat_ended": "The chat has been ended.",
+      "visitor_left": "You have ended the chat.",
+      "no_agent": "Nobody is free right now. We will reply to you by email.",
+      "no_agentNoEmail": "Nobody is free right now. Where may we send our reply?",
+      "idle_closed": "The chat was closed due to inactivity."
+    },
+    "contact": {
+      "title": "Your email address",
+      "save": "Save",
+      "saved": "Thank you, we will reply by email."
+    },
+    "ended": {
+      "restart": "Start a new chat",
+      "end": "End chat"
+    },
+    "error": {
+      "generic": "Something went wrong. Please try again.",
+      "rateLimited": "Too many messages – please wait a moment.",
+      "unavailable": "The chat is not available right now.",
+      "notAllowed": "This chat is not enabled for this website.",
+      "bodyTooLarge": "The message is too large.",
+      "network": "No connection – please check your network.",
+      "disabled": "The chat has been closed; you can no longer send messages."
+    },
+    "preview": {
+      "reply": "Hello! How can I help you?"
     }
   },
   "plugins": {

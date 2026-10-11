@@ -1,0 +1,49 @@
+# Build context of ./Dockerfile (app image) and tests/golden/Dockerfile.znuny
+# (which COPYs a root-level znuny-*/ tree and two tests/golden files).
+# Paths are scoped on purpose: no global **/dist or **/node_modules, so third-party
+# trees inside the Znuny source keep their dist/ directories.
+
+# VCS, tooling state, agent scratch
+.git
+.github
+.claude
+.superpowers
+.playwright-mcp
+.githooks
+
+# Local secrets never belong in an image context
+.env
+.env.*
+
+# JS: host installs and build outputs (rebuilt inside the frontend-build stage)
+node_modules
+frontend/node_modules
+frontend/dist
+frontend/coverage
+frontend/playwright-report
+frontend/test-results
+packages/*/node_modules
+packages/*/dist
+packages/*/playwright-report
+packages/*/test-results
+
+# Python: venvs and caches (the python-deps stage runs uv sync itself)
+.venv
+backend/.venv
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+backend/.pytest_cache
+.ruff_cache
+backend/.ruff_cache
+.mypy_cache
+backend/.mypy_cache
+backend/htmlcov
+backend/coverage.json
+backend/.coverage
+
+# Local runtime data of the compose stacks
+docker-data
+mailpit-data
+.meilisearch
+_site

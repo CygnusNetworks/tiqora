@@ -13,16 +13,19 @@ const kbdCls =
  */
 export function ComposerFooter({
   length,
+  max = MAX_MESSAGE_LENGTH,
   snippetCount,
   onSnippets,
 }: {
   length: number;
+  /** Message limit of the channel; Telegram's unless told otherwise. */
+  max?: number;
   /** `null` while the templates are still loading. */
   snippetCount: number | null;
   onSnippets: () => void;
 }) {
   const { t } = useTranslation();
-  const tooLong = length > MAX_MESSAGE_LENGTH;
+  const tooLong = length > max;
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 text-[11.5px] text-muted">
       <span className="inline-flex flex-wrap items-center gap-1">
@@ -46,7 +49,7 @@ export function ComposerFooter({
         data-testid="tg-composer-counter"
         className={cn("font-mono tabular-nums", tooLong && "font-semibold text-danger")}
       >
-        {length} / {MAX_MESSAGE_LENGTH}
+        {length} / {max}
       </span>
     </div>
   );

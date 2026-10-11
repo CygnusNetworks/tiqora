@@ -15,7 +15,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.config import get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.deployed.watcher import run_deploy_watch_tick
-from tiqora.domain.settings_store import KEY_REPORT_FACTS_INTERVAL_SECONDS, get_setting_int
+from tiqora.domain.settings_store import (
+    KEY_REPORT_FACTS_INTERVAL_SECONDS,
+    KEY_WEBCHAT_SWEEP_INTERVAL_SECONDS,
+    get_setting_int,
+)
 from tiqora.identity.metadata_refresh import run_identity_metadata_refresh_tick
 from tiqora.jobs.runner import JobRunner
 from tiqora.logging_setup import configure_logging
@@ -34,6 +38,7 @@ from tiqora.worker.smime_customer_renew import run_smime_customer_renew_tick
 from tiqora.worker.status import record_tick_status, seconds_until_daily
 from tiqora.worker.telegram_poller import run_telegram_poller_tick
 from tiqora.worker.unlock_timeout import run_unlock_timeout_tick
+from tiqora.worker.webchat import run_webchat_worker_tick
 from tiqora.worker.znuny_session_purge import run_znuny_session_purge_tick
 
 logger = structlog.get_logger(__name__)
@@ -174,6 +179,9 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
     async def report_facts_tick() -> dict[str, int]:
         return await run_report_facts_worker_tick(settings)
 
+    async def webchat_sweep_tick() -> dict[str, int]:
+        return await run_webchat_worker_tick(settings)
+
     from tiqora.extensions import get_registry
     from tiqora.plugins.event_dispatch import run_plugin_events_tick
 
@@ -270,6 +278,13 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             report_facts_tick,
             settings.report_facts_interval_seconds,
             KEY_REPORT_FACTS_INTERVAL_SECONDS,
+            stop,
+        ),
+        _interval_loop(
+            "webchat_sweep",
+            webchat_sweep_tick,
+            settings.webchat_sweep_interval_seconds,
+            KEY_WEBCHAT_SWEEP_INTERVAL_SECONDS,
             stop,
         ),
         _interval_loop(

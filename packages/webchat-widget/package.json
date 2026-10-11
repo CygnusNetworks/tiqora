@@ -1,0 +1,30 @@
+{
+  "name": "@tiqora/webchat-widget",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Embeddable Tiqora web-chat widget: host-page loader and iframe chat frame",
+  "scripts": {
+    "build": "tsc --noEmit && vite build -c vite.loader.config.ts && vite build -c vite.frame.config.ts && node scripts/check-size.mjs",
+    "dev": "vite -c vite.frame.config.ts",
+    "test": "vitest run",
+    "lint": "eslint src scripts e2e --max-warnings 0 && tsc --noEmit",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.62.1",
+    "@tiqora/api-client": "workspace:*",
+    "@types/node": "^22.20.1",
+    "eslint": "^9.39.5",
+    "globals": "^15.15.0",
+    "jsdom": "^26.1.0",
+    "typescript": "~5.7.3",
+    "typescript-eslint": "^8.66.0",
+    "vite": "^6.4.3",
+    "vitest": "^4.1.11"
+  }
+}

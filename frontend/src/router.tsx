@@ -110,6 +110,8 @@ import { PgpKeysPage } from "@/routes/admin/PgpKeysPage";
 import { SmimePage } from "@/routes/admin/SmimePage";
 import { MailAccountsPage } from "@/routes/admin/MailAccountsPage";
 import { TelegramChannelPage } from "@/routes/admin/TelegramChannelPage";
+import { WebchatConfigsPage } from "@/routes/admin/WebchatConfigsPage";
+import { WebchatConfigEditorPage } from "@/routes/admin/WebchatConfigEditorPage";
 import { OAuth2TokensPage } from "@/routes/admin/OAuth2TokensPage";
 import { MailLogPage } from "@/routes/admin/MailLogPage";
 import { SubjectConfigPage } from "@/routes/admin/SubjectConfigPage";
@@ -1158,6 +1160,18 @@ const adminAiMcpRoute = createRoute({
   component: AiMcpClientsPage,
 });
 
+const adminWebchatRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/webchat",
+  component: WebchatConfigsPage,
+});
+
+const adminWebchatEditRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/webchat/$configId",
+  component: WebchatConfigEditorPage,
+});
+
 const adminAiQueuesRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/ai/queues",
@@ -1307,6 +1321,8 @@ const routeTree = rootRoute.addChildren([
     adminAiProvidersRoute,
     adminAiModelsRoute,
     adminAiMcpRoute,
+    adminWebchatRoute,
+    adminWebchatEditRoute,
     adminAiQueuesRoute,
     adminAiQueueNewRoute,
     adminAiQueueEditRoute,

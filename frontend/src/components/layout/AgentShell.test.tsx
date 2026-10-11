@@ -73,6 +73,21 @@ const { listSearches, searchCounts } = vi.hoisted(() => ({ listSearches: vi.fn()
 vi.mock("@/lib/savedSearchesApi", () => ({
   savedSearchesApi: { list: listSearches, counts: searchCounts, setPrefs: vi.fn() },
 }));
+const { chatTopics } = vi.hoisted(() => ({ chatTopics: vi.fn() }));
+vi.mock("@/lib/webchatApi", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/webchatApi")>("@/lib/webchatApi");
+  return {
+    ...actual,
+    webchatApi: {
+      ...actual.webchatApi,
+      topics: chatTopics,
+      getAgentState: vi
+        .fn()
+        .mockResolvedValue({ available: false, max_concurrent: 3, active_count: 0, topics: [] }),
+      inbox: vi.fn().mockResolvedValue({ waiting: [], mine: [] }),
+    },
+  };
+});
 
 async function renderShell(initialEntry = "/agent") {
   const rootRoute = createRootRoute({
@@ -132,6 +147,7 @@ describe("AgentShell sidebar", () => {
     });
     listSearches.mockReset().mockResolvedValue([]);
     searchCounts.mockReset().mockResolvedValue({ counts: {} });
+    chatTopics.mockReset().mockResolvedValue([]);
     window.localStorage.clear();
     authFlags.canUseDirectory = false;
     void i18n.changeLanguage("de");
@@ -155,6 +171,20 @@ describe("AgentShell sidebar", () => {
     await screen.findByTestId("agent-sidebar-nav");
     await waitFor(() => expect(frontend).toHaveBeenCalled());
     expect(screen.queryByTestId("sidebar-group-plugins-toggle")).toBeNull();
+  });
+
+  it("hides the chat inbox button without chat topics", async () => {
+    await renderShell();
+    await screen.findByTestId("agent-sidebar-nav");
+    await waitFor(() => expect(chatTopics).toHaveBeenCalled());
+    expect(screen.queryByTestId("chat-inbox-trigger-desktop")).toBeNull();
+  });
+
+  it("shows the chat inbox button for an agent with chat topics", async () => {
+    chatTopics.mockResolvedValue([{ ref: "1:support", label: "Support", queue_id: 1, config_name: "W" }]);
+    await renderShell();
+    expect(await screen.findByTestId("chat-inbox-trigger-desktop")).toBeInTheDocument();
+    expect(screen.getByTestId("chat-inbox-trigger-mobile")).toBeInTheDocument();
   });
 
   it("shows the customer directory only with its permission", async () => {

@@ -17,6 +17,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from tests._row_cleanup import delete_above_marks, snapshot_marks
 from tiqora.config import get_settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraSettings
@@ -363,3 +364,118 @@ async def test_poll_once_reindex_failure_propagates_and_counts_error(
     assert after_error_count == before_error_count + 1
 
     await engine.dispose()
+
+
+def _channel_id_of(sync_url: str, name: str) -> int:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        value = conn.execute(
+            text("SELECT id FROM communication_channel WHERE name = :n"), {"n": name}
+        ).scalar_one()
+    engine.dispose()
+    return int(value)
+
+
+def _webchat_channel_id(sync_url: str) -> int:
+    """Id of the ``WebChat`` channel row (inserted like ``ensure_channel_row`` if absent)."""
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id FROM communication_channel WHERE name = 'WebChat'")
+        ).first()
+        if row is None:
+            blob = conn.execute(
+                text("SELECT channel_data FROM communication_channel WHERE name = 'Internal'")
+            ).scalar_one()
+            conn.execute(
+                text(
+                    "INSERT INTO communication_channel (name, module, package_name, channel_data,"
+                    " valid_id, create_time, create_by, change_time, change_by)"
+                    " VALUES ('WebChat', 'Kernel::System::CommunicationChannel::Internal',"
+                    " 'Tiqora', :b, 1, :t, 1, :t, 1)"
+                ),
+                {"b": blob, "t": NOW},
+            )
+            row = conn.execute(
+                text("SELECT id FROM communication_channel WHERE name = 'WebChat'")
+            ).first()
+    engine.dispose()
+    assert row is not None
+    return int(row[0])
+
+
+def _insert_customer_article_on(sync_url: str, *, ticket_id: int, channel_id: int, n: int) -> None:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        for i in range(n):
+            conn.execute(
+                text(
+                    "INSERT INTO article (ticket_id, article_sender_type_id,"
+                    " communication_channel_id, is_visible_for_customer,"
+                    " search_index_needs_rebuild, insert_fingerprint, create_time, create_by,"
+                    " change_time, change_by)"
+                    " VALUES (:tid, 3, :cc, 1, 0, :fp, :t, 1, :t, 1)"
+                ),
+                {"tid": ticket_id, "cc": channel_id, "fp": f"poller-wc-{ticket_id}-{i}", "t": NOW},
+            )
+    engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_webchat_follow_up_does_not_toast(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    sync_url: str = request.getfixturevalue(url_fixture)
+    _reset_watermarks(sync_url)
+    chat = _seed_queue_and_ticket(sync_url, ns=7)
+    mail = _seed_queue_and_ticket(sync_url, ns=8)
+    marks = snapshot_marks(
+        sync_url, ("article", "ticket_history", "communication_channel")
+    )  # children first
+    wc_channel = _webchat_channel_id(sync_url)
+    email_channel = _channel_id_of(sync_url, "Email")
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    with patch.object(poller, "reindex_ticket_ids", new=AsyncMock(return_value=0)):
+        await poller.poll_once(settings=get_settings(), session_factory=factory)
+
+    # Window 1: the chat ticket opens (NewTicket) with three customer lines;
+    # another ticket gets three customer e-mails (real Email channel row).
+    _insert_history(sync_url, ticket_id=int(chat["ticket"]), history_type_id=1)
+    _insert_customer_article_on(sync_url, ticket_id=int(chat["ticket"]), channel_id=wc_channel, n=3)
+    _insert_customer_article_on(
+        sync_url, ticket_id=int(mail["ticket"]), channel_id=email_channel, n=3
+    )
+    with (
+        patch.object(poller, "reindex_ticket_ids", new=AsyncMock(return_value=2)),
+        patch.object(poller, "publish_ticket_event", new=AsyncMock()),
+        patch.object(poller, "publish_new_ticket_in_queue", new=AsyncMock()) as pub_new,
+    ):
+        await poller.poll_once(settings=get_settings(), session_factory=factory)
+    notified = sorted(c.kwargs["ticket_id"] for c in pub_new.await_args_list)
+    assert notified == sorted([int(chat["ticket"]), int(mail["ticket"])])  # once each
+
+    # Window 2: only more WebChat customer lines -> reindex ping, but no toast.
+    _insert_customer_article_on(sync_url, ticket_id=int(chat["ticket"]), channel_id=wc_channel, n=2)
+    with (
+        patch.object(poller, "reindex_ticket_ids", new=AsyncMock(return_value=1)),
+        patch.object(poller, "publish_ticket_event", new=AsyncMock()) as pub_event,
+        patch.object(poller, "publish_new_ticket_in_queue", new=AsyncMock()) as pub_new2,
+    ):
+        await poller.poll_once(settings=get_settings(), session_factory=factory)
+    pub_event.assert_awaited_once()
+    pub_new2.assert_not_called()
+
+    await engine.dispose()
+    delete_above_marks(sync_url, marks)
+    cleanup = create_engine(sync_url)
+    with cleanup.begin() as conn:  # the seed rows of this test (ns 7 and 8)
+        for seed in (chat, mail):
+            conn.execute(text("DELETE FROM ticket WHERE id = :i"), {"i": seed["ticket"]})
+            conn.execute(text("DELETE FROM queue WHERE id = :i"), {"i": seed["queue"]})
+            conn.execute(
+                text("DELETE FROM permission_groups WHERE id = :i"), {"i": int(seed["queue"]) + 30}
+            )
+    cleanup.dispose()

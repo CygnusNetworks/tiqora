@@ -2367,3 +2367,157 @@ async def test_erasure_removes_report_facts_and_marks_dirty(
             ):
                 await session.execute(text(stmt), {"t": tid, "cu": cuid, "c": company})
     await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+@pytest.mark.parametrize("mode", ["anonymize", "delete"])
+async def test_hard_delete_and_anonymize_remove_chat_rows(
+    url_fixture: str, mode: str, request: pytest.FixtureRequest
+) -> None:
+    """WebChat transcript rows of an erased customer's ticket are removed
+    (both modes, both dialects) and come back unchanged on rollback."""
+    from sqlalchemy import create_engine
+
+    from tests._row_cleanup import delete_above_marks, snapshot_marks
+
+    url = request.getfixturevalue(url_fixture)
+    mysql = _is_mysql(url)
+    # Children first (delete order of delete_above_marks).
+    mark_tables = (
+        "tiqora_chat_message",
+        "tiqora_gdpr_backup",
+        "tiqora_gdpr_job",
+        "tiqora_gdpr_audit",
+        "tiqora_cache_invalidation",
+        "tiqora_event_outbox",
+        "ticket_history",
+        "article_search_index",
+        "article_data_mime_attachment",
+        "article_data_mime_plain",
+        "article_data_mime",
+        "article",
+        "ticket",
+        "customer_user",
+    )
+    marks = snapshot_marks(url, mark_tables)
+    engine, factory = await _factory(url)
+    tag = f"{url_fixture[:2]}{mode}"
+    login = f"erase.chat.{tag}@example.com"
+    company = f"ERASE-CHAT-{tag.upper()}"
+    sid = ("wc48gdpr" + tag).ljust(32, "0")
+
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session, mysql=mysql)
+            await _insert_company(session, customer_id=company, name=f"Acme Chat {tag}")
+            cuid = await _insert_customer(session, login=login, customer_id=company)
+            tid = await _insert_ticket(
+                session, customer_user_id=login, customer_id=company, tn=f"2026CH{tag}{cuid}"
+            )
+            article_id = await _insert_article_bundle(
+                session, ticket_id=tid, from_addr=login, body="Chat line"
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_chat_session (id, config_id, queue_id, ticket_id,"
+                    " status, token_hash, visitor_id, visitor_email, last_seq,"
+                    " visitor_last_seen, created)"
+                    " VALUES (:sid, 48426, 1, :tid, 'ended', :th, 'v1', :em, 2, :t, :t)"
+                ),
+                {"sid": sid, "tid": tid, "th": "0" * 64, "em": login, "t": NOW},
+            )
+            for seq, body in ((1, "Hallo, ich brauche Hilfe"), (2, "Danke")):
+                await session.execute(
+                    text(
+                        "INSERT INTO tiqora_chat_message (session_id, ticket_id, seq, sender,"
+                        " body, article_id, created)"
+                        " VALUES (:sid, :tid, :seq, 'visitor', :b, :aid, :t)"
+                    ),
+                    {"sid": sid, "tid": tid, "seq": seq, "b": body, "aid": article_id, "t": NOW},
+                )
+            await session.commit()
+
+        async def _chat_state() -> tuple[int, list[str], list[str | None]]:
+            async with factory() as session:
+                n_sessions = (
+                    await session.execute(
+                        text("SELECT COUNT(*) FROM tiqora_chat_session WHERE ticket_id = :t"),
+                        {"t": tid},
+                    )
+                ).scalar_one()
+                bodies = (
+                    (
+                        await session.execute(
+                            text(
+                                "SELECT body FROM tiqora_chat_message"
+                                " WHERE ticket_id = :t ORDER BY seq"
+                            ),
+                            {"t": tid},
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+                emails = (
+                    (
+                        await session.execute(
+                            text(
+                                "SELECT visitor_email FROM tiqora_chat_session WHERE ticket_id = :t"
+                            ),
+                            {"t": tid},
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+            return int(n_sessions), list(bodies), list(emails)
+
+        before = await _chat_state()
+        assert before == (1, ["Hallo, ich brauche Hilfe", "Danke"], [login])
+        result = await run_erasure(
+            factory,
+            Settings(),
+            customer_user_ids=[cuid],
+            mode="delete" if mode == "delete" else "anonymize",
+            seed=21,
+            force_parallel=True,
+            actor="test",
+            delete_tickets=mode == "delete",
+        )
+        assert result.counts["tiqora_chat_message"] == 2
+        assert result.counts["tiqora_chat_session"] == 1
+        assert await _chat_state() == (0, [], [])
+
+        await rollback_job(factory, Settings(), result.job_id, force_parallel=True, actor="test")
+        assert await _chat_state() == before
+    finally:
+        async with factory() as session:
+            await session.execute(
+                text("DELETE FROM tiqora_chat_message WHERE session_id = :s"), {"s": sid}
+            )
+            await session.execute(text("DELETE FROM tiqora_chat_session WHERE id = :s"), {"s": sid})
+            await session.commit()
+        await engine.dispose()
+        delete_above_marks(
+            url,
+            marks,
+            first=[
+                (
+                    "DELETE FROM tiqora_report_dirty_ticket WHERE ticket_id > :m",
+                    {"m": marks["ticket"]},
+                )
+            ],
+        )
+        sync_engine = create_engine(url)
+        with sync_engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM customer_user_customer WHERE user_id LIKE :p"),
+                {"p": "erase.chat.%"},
+            )
+            conn.execute(
+                text("DELETE FROM customer_company WHERE customer_id LIKE :p"),
+                {"p": "ERASE-CHAT-%"},
+            )
+        sync_engine.dispose()

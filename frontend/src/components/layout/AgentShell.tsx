@@ -17,6 +17,8 @@ import { AccountMenu } from "@/components/agent/AccountMenu";
 import { OnlineAgentsPopover } from "@/components/agent/OnlineAgentsPopover";
 import { TimeZoneHint } from "@/components/agent/TimeZoneHint";
 import { SavedSearchNav } from "@/components/searches/SavedSearchNav";
+import { ChatInboxButton } from "@/components/agent/webchat/ChatInboxButton";
+import { ChatRingProvider } from "@/components/agent/webchat/ChatRingContext";
 import { effectiveTimeZone } from "@/lib/timeZone";
 import {
   AddressBookIcon,
@@ -576,6 +578,7 @@ function HeaderControls({
       <div className="mx-0.5 flex items-center gap-0.5">
         <ConnectionStatus />
         <OnlineAgentsPopover />
+        <ChatInboxButton variant={searchFill ? "desktop" : "mobile"} />
         <NotificationBell />
         <HeaderIconButton onClick={onHelp} label={t("shortcuts.title")} testId="header-help">
           <HelpIcon className="text-[18px]" />
@@ -618,6 +621,7 @@ export function AgentShell({ children }: { children: ReactNode }) {
   return (
     <PluginProvider>
     <SSEProvider>
+      <ChatRingProvider>
       <div className="flex min-h-screen flex-col bg-bg md:grid md:grid-cols-[216px_1fr]">
         <aside
           className="hidden shrink-0 flex-col border-r border-hairline bg-surface px-3 py-4 md:flex"
@@ -682,6 +686,7 @@ export function AgentShell({ children }: { children: ReactNode }) {
         <NotificationToaster />
         <CallPopup />
       </div>
+      </ChatRingProvider>
     </SSEProvider>
     </PluginProvider>
   );

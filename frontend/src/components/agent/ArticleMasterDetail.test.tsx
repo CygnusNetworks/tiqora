@@ -13,6 +13,7 @@ const {
   getReplyDraft,
   listTemplates,
   deleteArticle,
+  request,
 } = vi.hoisted(() => ({
   listArticles: vi.fn(),
   getArticleBody: vi.fn(),
@@ -20,6 +21,7 @@ const {
   getReplyDraft: vi.fn(),
   listTemplates: vi.fn(),
   deleteArticle: vi.fn(),
+  request: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -33,6 +35,7 @@ vi.mock("@/lib/api", async () => {
       getReplyDraft,
       listTemplates,
       deleteArticle,
+      request,
       listQueues: vi.fn().mockResolvedValue([]),
       createArticle: vi.fn().mockResolvedValue({ id: 999 }),
       forwardArticle: vi.fn(),
@@ -663,5 +666,73 @@ describe("ArticleMasterDetail — Telegram chat composer", () => {
 
     const input = (await screen.findByTestId("tg-composer-input")) as HTMLTextAreaElement;
     await waitFor(() => expect(input.value).toBe("Vom Panel übernommener Entwurf"));
+  });
+});
+
+describe("ArticleMasterDetail — web chat", () => {
+  const WC_ARTICLES = [
+    {
+      id: 40,
+      ticket_id: 116,
+      sender_type: "customer",
+      sender_type_id: 3,
+      communication_channel_id: 11,
+      communication_channel_name: "WebChat",
+      is_visible_for_customer: true,
+      create_time: "2026-10-10T09:00:00Z",
+      create_by: 40,
+      subject: "Chat",
+      from_address: '"Besucher" <visitor-abc@chat.invalid>',
+      to_address: null,
+    },
+  ];
+  const chatWith = (status: string) => ({
+    session_id: "s1",
+    status,
+    visitor_name: "Max",
+    visitor_email: null,
+    visitor_email_verified: false,
+    topic_label: null,
+    language: "de",
+    page_url: null,
+    assigned_user_id: null,
+    assigned_name: null,
+    waiting_since: null,
+    accepted_at: null,
+    ended_at: null,
+    end_reason: null,
+    visitor_online: false,
+    visitor_typing: false,
+  });
+
+  const mockChat = (status: string) =>
+    request.mockReset().mockImplementation((_m: string, path: string) =>
+      Promise.resolve(path.endsWith("/chat") ? chatWith(status) : { drafts: [] }),
+    );
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    listArticles.mockReset().mockResolvedValue(WC_ARTICLES);
+    getArticleBody.mockReset().mockResolvedValue({ article_id: 40, content_type: "text/plain", is_html: false, body: "Hallo" });
+    listAttachments.mockReset().mockResolvedValue([]);
+    listTemplates.mockReset().mockResolvedValue([]);
+  });
+
+  it("shows the messenger composer and the session header while the chat is live", async () => {
+    mockChat("active");
+    wrap(<ArticleMasterDetail ticketId={116} />);
+    expect(await screen.findByTestId("tg-composer")).toBeInTheDocument();
+    expect(await screen.findByTestId("webchat-session-header")).toBeInTheDocument();
+    expect(screen.getByTestId("article-sort-toggle")).toBeEnabled();
+  });
+
+  it("shows the reply dialog button instead of the messenger composer once the chat ended", async () => {
+    mockChat("ended");
+    wrap(<ArticleMasterDetail ticketId={116} />);
+    await screen.findByTestId("webchat-session-header");
+    expect(screen.queryByTestId("tg-composer")).toBeNull();
+    expect(screen.queryByTestId("tg-composer-input")).toBeNull();
+    // The per-bubble reply is the e-mail dialog again.
+    expect(screen.getAllByTitle(/Reply|Antworten/).length).toBeGreaterThan(0);
   });
 });

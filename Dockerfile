@@ -6,8 +6,9 @@ ARG PYTHON_VERSION=3.12
 ARG NODE_VERSION=22
 
 # ---------- Frontend build ----------
-# The frontend lives in a pnpm workspace (root package.json + packages/api-client),
-# so the workspace context is required for the install.
+# The frontend lives in a pnpm workspace (root package.json + packages/*:
+# api-client, plugin-sdk, webchat-widget), so the workspace context is required for
+# the install.
 # Pinned to the build host's platform: dist/ is plain static files and
 # identical for every target arch, so a multi-arch build runs pnpm install +
 # vite once natively instead of once more under QEMU (slow, and prone to
@@ -20,14 +21,30 @@ ARG VITE_APP_VERSION=""
 ARG VITE_GIT_SHA=""
 ENV VITE_APP_VERSION=$VITE_APP_VERSION \
     VITE_GIT_SHA=$VITE_GIT_SHA
+# Only what `pnpm install` needs before the install, so source edits keep the
+# install layer cached: the manifest of every workspace package (each `workspace:*`
+# dependency must be present, or the frozen install fails), plus api-client in full
+# (the root postinstall builds it from its openapi.json). plugin-sdk has no install
+# or build step of its own; its sources follow after the install.
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY packages/ ./packages/
+COPY packages/api-client/ ./packages/api-client/
+COPY packages/plugin-sdk/package.json ./packages/plugin-sdk/
+COPY packages/webchat-widget/package.json ./packages/webchat-widget/
 COPY frontend/package.json ./frontend/
 RUN corepack enable \
     && corepack prepare --activate \
     && pnpm install --frozen-lockfile
+# The frontend imports plugin-sdk from source (vite.config.ts reads its shared-module
+# list to build the plugin runtime shims; the app imports its types and runtime).
+COPY packages/plugin-sdk/ ./packages/plugin-sdk/
 COPY frontend/ ./frontend/
 RUN pnpm --filter tiqora-frontend build
+# Web-chat widget (loader.js, frame.html, assets/). Needs frontend/ for its texts
+# (webchatWidget.* in the locale files); its build ends with the gzip size budget,
+# which reads dist/.vite/manifest.json -- dropped afterwards, nothing serves it.
+COPY packages/webchat-widget/ ./packages/webchat-widget/
+RUN pnpm --filter @tiqora/webchat-widget build \
+    && rm -rf packages/webchat-widget/dist/.vite
 
 # ---------- Python deps ----------
 # Base: python:*-slim-bookworm (Debian 12). gssapi (kerberos extra) needs
@@ -118,6 +135,8 @@ COPY backend/alembic /app/backend/alembic
 COPY backend/alembic.ini /app/backend/alembic.ini
 COPY backend/pyproject.toml /app/backend/pyproject.toml
 COPY --from=frontend-build /workspace/frontend/dist /app/frontend/dist
+# Served by webchat/static.py from TIQORA_WEBCHAT_DIST_DIR (default /app/webchat/dist).
+COPY --from=frontend-build /workspace/packages/webchat-widget/dist /app/webchat/dist
 COPY docker/entrypoint.sh /app/entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh

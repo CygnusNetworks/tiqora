@@ -28,7 +28,10 @@ def test_httpx_request_log_hides_the_telegram_bot_token(monkeypatch: pytest.Monk
     # Other tests (uvicorn's dictConfig) may have disabled the logger or raised
     # its level; this one only cares about what the filter does to a record.
     monkeypatch.setattr(httpx_logger, "disabled", False)
-    monkeypatch.setattr(httpx_logger, "level", logging.INFO)
+    # setLevel() (unlike assigning .level) also clears Logger._cache, where an
+    # earlier httpx log call at a higher effective level left INFO -> disabled.
+    previous_level = httpx_logger.level
+    httpx_logger.setLevel(logging.INFO)
     collect = _Collect()
     httpx_logger.addHandler(collect)
     try:
@@ -44,6 +47,7 @@ def test_httpx_request_log_hides_the_telegram_bot_token(monkeypatch: pytest.Monk
         httpx_logger.info("HTTP Request: POST https://llm.example/v1/chat/completions")
     finally:
         httpx_logger.removeHandler(collect)
+        httpx_logger.setLevel(previous_level)
 
     first, second = collect.messages
     assert "TEST-token_value" not in first

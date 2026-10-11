@@ -11,6 +11,8 @@ import { api } from "@/lib/api";
 import { addNotification } from "@/lib/notificationStore";
 import { receiveCallEvent, type CallEventMessage } from "@/lib/callPopup";
 import { AI_LIMITS_QUERY_KEY } from "@/lib/aiLimits";
+import { receiveChatWaiting } from "@/lib/chatRing";
+import { chatInboxKey, ticketChatKey } from "@/lib/webchatApi";
 
 type TicketChangedMessage = {
   type: "ticket_changed";
@@ -38,12 +40,24 @@ type AiLimitChangedMessage = {
   type: "ai_limit_changed";
 };
 
+/** Web chat lifecycle, addressed by the backend to agents who may take the
+ * chat's queue. Carries ids only; the UI re-reads inbox / ticket / chat. */
+export type ChatEventMessage = {
+  type: "chat_waiting" | "chat_assigned" | "chat_message" | "chat_typing" | "chat_ended";
+  session_id: string;
+  ticket_id: number;
+  queue_id: number;
+  user_id?: number;
+  topic_ref?: string;
+};
+
 export type SSEMessage =
   | TicketChangedMessage
   | PresenceChangedMessage
   | TicketNewInQueueMessage
   | CallEventMessage
-  | AiLimitChangedMessage;
+  | AiLimitChangedMessage
+  | ChatEventMessage;
 
 const listeners = new Set<(message: SSEMessage) => void>();
 
@@ -106,6 +120,28 @@ export function handleSSEMessage(queryClient: QueryClient, raw: string): void {
 
   if (message.type === "ai_limit_changed") {
     void queryClient.invalidateQueries({ queryKey: AI_LIMITS_QUERY_KEY });
+    return;
+  }
+
+  if (
+    message.type === "chat_waiting" ||
+    message.type === "chat_assigned" ||
+    message.type === "chat_message" ||
+    message.type === "chat_typing" ||
+    message.type === "chat_ended"
+  ) {
+    if (message.type === "chat_typing") {
+      // Typing never changes the inbox: refetching it here would make every chat agent of
+      // the queue GET /chat/inbox every 2 s per typing visitor. Only the header refreshes.
+      void queryClient.invalidateQueries({ queryKey: ticketChatKey(message.ticket_id) });
+      return;
+    }
+    void queryClient.invalidateQueries({ queryKey: chatInboxKey });
+    if (message.type === "chat_waiting") {
+      receiveChatWaiting(message);
+    } else {
+      void queryClient.invalidateQueries({ queryKey: ["tickets", message.ticket_id] });
+    }
     return;
   }
 

@@ -338,10 +338,13 @@ def _insert_event(
     article_id: int | None,
     event_type: str = "ArticleCreate",
     auto_generated: bool | None = None,
+    channel: str | None = None,
 ) -> int:
     engine = create_engine(sync_url)
     with engine.begin() as conn:
         payload: dict[str, Any] = {}
+        if channel is not None:
+            payload["channel"] = channel
         if article_id is not None:
             payload["article_id"] = article_id
         if auto_generated is not None:
@@ -804,6 +807,7 @@ async def test_destination_delay_reply_parks_the_reply(
         "locked",
         "too_old",
         "agent_created",
+        "webchat",
     ],
 )
 async def test_guards_prevent_triage(
@@ -817,6 +821,7 @@ async def test_guards_prevent_triage(
         "locked": 14,
         "too_old": 15,
         "agent_created": 17,
+        "webchat": 18,
     }[scenario]
     created = NOW - timedelta(days=5) if scenario == "too_old" else datetime.now()
     ids = _seed(mariadb_znuny_url, ns=ns, created=created)
@@ -877,6 +882,7 @@ async def test_guards_prevent_triage(
             ticket_id=ids["ticket_id"],
             article_id=article_id,
             auto_generated=True if scenario == "auto_generated" else None,
+            channel="webchat" if scenario == "webchat" else None,
         )
 
         await run_triage_tick(session_factory=factory)

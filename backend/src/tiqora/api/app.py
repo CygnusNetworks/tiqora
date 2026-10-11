@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 import redis.asyncio as redis
 import structlog
 from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from starlette.requests import Request
@@ -18,10 +19,15 @@ from tiqora.api.portal import portal_router
 from tiqora.api.portal.deps import require_portal_enabled
 from tiqora.api.spa import mount_spa, spa_is_available
 from tiqora.api.v1 import api_v1_router
+from tiqora.api.v1.admin.chat_configs import chat_config_validation_handler
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import check_database, get_session_factory
 from tiqora.identity.env_providers import ensure_env_providers, env_ldap_tls_warnings
 from tiqora.logging_setup import configure_logging
+from tiqora.webchat.public_api import CHAT_PUBLIC_PREFIX, chat_body_limit_middleware
+from tiqora.webchat.public_api import router as webchat_public_router
+from tiqora.webchat.static import NONE_CSP, mount_webchat_assets
+from tiqora.webchat.static import router as webchat_static_router
 
 logger = structlog.get_logger(__name__)
 
@@ -94,6 +100,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging(settings)
     app.state.session_factory = get_session_factory()
     app.state.redis = redis.from_url(settings.redis_url, decode_responses=True)
+    app.state.chat_hub = None
     logger.info(
         "tiqora_starting",
         version=__version__,
@@ -204,10 +211,37 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await asyncio.wait_for(reload_task, 5)
         except Exception:  # noqa: BLE001 - timeout (task already cancelled) or task failure
             logger.warning("compat_webservice_reloader_stop_failed", exc_info=True)
+    chat_hub = getattr(app.state, "chat_hub", None)
+    if chat_hub is not None:
+        await chat_hub.aclose()
     redis_client = getattr(app.state, "redis", None)
     if redis_client is not None:
         await redis_client.aclose()
     logger.info("tiqora_stopped")
+
+
+_CHAT_LABEL_WORDS = frozenset(
+    {"api", "chat", "v1", "config", "sessions", "messages", "stream", "typing"}
+    | {"attachments", "contact", "end", "offline"}
+)
+
+
+def _chat_label_path(path: str) -> str:
+    """Metrics label of a public chat path: session ids → ``{id}``, numbers → ``{n}``.
+
+    The API is anonymous, so any other segment collapses to ``{x}`` (no label per URL).
+    """
+    out: list[str] = []
+    for part in path.split("/"):
+        if len(part) == 32 and all(c in "0123456789abcdef" for c in part):
+            out.append("{id}")
+        elif part.isdigit():
+            out.append("{n}")
+        elif part == "" or part in _CHAT_LABEL_WORDS:
+            out.append(part)
+        else:
+            out.append("{x}")
+    return "/".join(out)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -258,6 +292,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return await body_size_limit_middleware(request, call_next)
 
     @app.middleware("http")
+    async def chat_body_limit(request: Request, call_next: CallNext) -> StarletteResponse:
+        """R-UPLOAD: bound public chat bodies before FastAPI reads them."""
+        return await chat_body_limit_middleware(request, call_next)
+
+    @app.middleware("http")
     async def csrf_origin_check_middleware(
         request: Request, call_next: CallNext
     ) -> StarletteResponse:
@@ -293,13 +332,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         csp_header = (
             "Content-Security-Policy" if cfg.csp_enforce else "Content-Security-Policy-Report-Only"
         )
-        response.headers.setdefault(csp_header, _SPA_CSP)
+        # /chat/v1/ (widget frame) sets its own enforced CSP; a Report-Only
+        # frame-ancestors on top would only confuse (C9). Every other answer there
+        # (errors, assets) must not be frameable.
+        if request.url.path.startswith("/chat/v1/"):
+            response.headers.setdefault("Content-Security-Policy", NONE_CSP)
+        else:
+            response.headers.setdefault(csp_header, _SPA_CSP)
         return response
 
     @app.middleware("http")
     async def metrics_middleware(request: Request, call_next: CallNext) -> StarletteResponse:
         path = request.url.path
-        if path.startswith(cfg.api_prefix):
+        if path.startswith(CHAT_PUBLIC_PREFIX + "/"):
+            label_path = _chat_label_path(path)
+        elif path.startswith(cfg.api_prefix):
             # Collapse dynamic segments for low-cardinality labels
             parts = path.split("/")
             label_parts: list[str] = []
@@ -321,8 +368,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ).inc()
         return response
 
+    app.add_exception_handler(RequestValidationError, chat_config_validation_handler)
     app.include_router(api_v1_router, prefix=cfg.api_prefix)
     app.include_router(compat_router)
+    app.include_router(webchat_public_router, prefix=CHAT_PUBLIC_PREFIX)
     app.include_router(
         portal_router,
         prefix="/api/portal",
@@ -415,6 +464,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.state.plugin_router = create_plugin_router()
     app.mount("/api/plugins", app.state.plugin_router)
+
+    app.include_router(webchat_static_router)
+    mount_webchat_assets(app, cfg)
 
     # Must be last: the SPA fallback matches any remaining GET path.
     mount_spa(app, cfg)
