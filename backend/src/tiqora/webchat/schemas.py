@@ -195,8 +195,9 @@ class ChatEndIn(BaseModel):
 class TicketChatOut(BaseModel):
     """The newest chat of a ticket for the agent's conversation header (``ro`` on its queue).
 
-    ``visitor_email_verified`` is always False in phase 1 (R-NOTIFY b): the address is what
-    the visitor typed; nothing proved they own it.
+    ``visitor_email_verified`` is True only for a chat with a verified identity
+    (``identity_source`` set, signed token or portal login) that carries an address
+    (R-NOTIFY b); otherwise the address is what the visitor typed.
     """
 
     session_id: str
@@ -205,6 +206,7 @@ class TicketChatOut(BaseModel):
     visitor_name: str | None
     visitor_email: str | None
     visitor_email_verified: bool = False
+    identity_source: str | None = None
     topic_label: str | None
     page_url: str | None
     language: str | None

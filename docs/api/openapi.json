@@ -8255,6 +8255,25 @@
             "title": "Allowed Origins",
             "type": "array"
           },
+          "bot_name": {
+            "default": "KI-Assistent",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Bot Name",
+            "type": "string"
+          },
+          "bot_tone_prompt": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bot Tone Prompt"
+          },
           "business_calendar": {
             "anyOf": [
               {
@@ -8291,10 +8310,16 @@
             ],
             "title": "Greeting"
           },
+          "identity_create_customers": {
+            "default": false,
+            "title": "Identity Create Customers",
+            "type": "boolean"
+          },
           "offline_mode": {
             "default": "form",
             "enum": [
               "form",
+              "ai",
               "hide"
             ],
             "title": "Offline Mode",
@@ -8333,6 +8358,11 @@
           "show_agent_names": {
             "default": true,
             "title": "Show Agent Names",
+            "type": "boolean"
+          },
+          "show_on_portal": {
+            "default": false,
+            "title": "Show On Portal",
             "type": "boolean"
           },
           "theme": {
@@ -8419,6 +8449,7 @@
           },
           "status": {
             "enum": [
+              "bot",
               "waiting",
               "active"
             ],
@@ -8615,6 +8646,7 @@
             "enum": [
               "visitor",
               "agent",
+              "bot",
               "system"
             ],
             "title": "Sender",
@@ -9197,6 +9229,15 @@
       "ChatTopic": {
         "additionalProperties": false,
         "properties": {
+          "ai_mode": {
+            "default": "off",
+            "enum": [
+              "off",
+              "first_line"
+            ],
+            "title": "Ai Mode",
+            "type": "string"
+          },
           "key": {
             "pattern": "^[a-z][a-z0-9_-]{0,39}$",
             "title": "Key",
@@ -31376,7 +31417,7 @@
         "type": "object"
       },
       "TicketChatOut": {
-        "description": "The newest chat of a ticket for the agent's conversation header (``ro`` on its queue).\n\n``visitor_email_verified`` is always False in phase 1 (R-NOTIFY b): the address is what\nthe visitor typed; nothing proved they own it.",
+        "description": "The newest chat of a ticket for the agent's conversation header (``ro`` on its queue).\n\n``visitor_email_verified`` is True only for a chat with a verified identity\n(``identity_source`` set, signed token or portal login) that carries an address\n(R-NOTIFY b); otherwise the address is what the visitor typed.",
         "properties": {
           "accepted_at": {
             "anyOf": [
@@ -31434,6 +31475,17 @@
               }
             ],
             "title": "Ended At"
+          },
+          "identity_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Source"
           },
           "language": {
             "anyOf": [

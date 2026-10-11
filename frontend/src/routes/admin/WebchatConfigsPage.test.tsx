@@ -58,7 +58,7 @@ const config: ChatConfig = {
   values: {
     ...completeValues(defaultValues()),
     allowed_origins: ["https://www.example.org"],
-    topics: [{ key: "support", label: "Support", queue_id: 1, priority_id: null }],
+    topics: [{ key: "support", label: "Support", queue_id: 1, priority_id: null, ai_mode: "off" }],
   },
 };
 

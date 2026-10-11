@@ -181,6 +181,7 @@ def validate_prechat(
     values: Mapping[str, str | bool],
     *,
     require_email: bool = False,
+    identity_fields: bool = False,
 ) -> PrechatResult:
     """Validate the visitor's pre-chat answers; every error is collected, then raised.
 
@@ -190,14 +191,18 @@ def validate_prechat(
     lose control/bidi characters first; an empty optional field is simply absent.
     ``require_email`` (offline form): an address is required even when no field maps to
     ``email`` — then it is read from ``values["email"]``.
+    ``identity_fields`` (a verified identity supplies name and address): fields mapped to
+    ``name`` / ``email`` are neither required nor read, and ``require_email`` is satisfied.
     """
     out = _Collector()
     email_field = next((f for f in fields if f.maps_to == "email"), None)
     for f in fields:
+        if identity_fields and f.maps_to in ("name", "email"):
+            continue
         required = f.required or (require_email and f is email_field)
         _field_value(f, values.get(f.key), out, required=required)
 
-    if require_email and email_field is None:
+    if require_email and email_field is None and not identity_fields:
         raw = values.get(EMAIL_KEY)
         if raw is not None and not isinstance(raw, str):
             out.errors[EMAIL_KEY] = "type"

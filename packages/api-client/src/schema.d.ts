@@ -12998,6 +12998,13 @@ export interface components {
         ChatConfigValues: {
             /** Allowed Origins */
             allowed_origins?: string[];
+            /**
+             * Bot Name
+             * @default KI-Assistent
+             */
+            bot_name: string;
+            /** Bot Tone Prompt */
+            bot_tone_prompt?: string | null;
             /** Business Calendar */
             business_calendar?: string | null;
             /** Default Customer User */
@@ -13005,11 +13012,16 @@ export interface components {
             /** Greeting */
             greeting?: string | null;
             /**
+             * Identity Create Customers
+             * @default false
+             */
+            identity_create_customers: boolean;
+            /**
              * Offline Mode
              * @default form
              * @enum {string}
              */
-            offline_mode: "form" | "hide";
+            offline_mode: "form" | "ai" | "hide";
             /** Prechat Fields */
             prechat_fields?: components["schemas"]["PrechatField"][];
             /** Privacy Url */
@@ -13025,6 +13037,11 @@ export interface components {
              * @default true
              */
             show_agent_names: boolean;
+            /**
+             * Show On Portal
+             * @default false
+             */
+            show_on_portal: boolean;
             theme?: components["schemas"]["ChatTheme"];
             /** Topics */
             topics: components["schemas"]["ChatTopic"][];
@@ -13063,7 +13080,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "waiting" | "active";
+            status: "bot" | "waiting" | "active";
             /** Ticket Id */
             ticket_id: number;
             /** Title */
@@ -13116,7 +13133,7 @@ export interface components {
              * Sender
              * @enum {string}
              */
-            sender: "visitor" | "agent" | "system";
+            sender: "visitor" | "agent" | "bot" | "system";
             /** Seq */
             seq: number;
         };
@@ -13331,6 +13348,12 @@ export interface components {
         };
         /** ChatTopic */
         ChatTopic: {
+            /**
+             * Ai Mode
+             * @default off
+             * @enum {string}
+             */
+            ai_mode: "off" | "first_line";
             /** Key */
             key: string;
             /** Label */
@@ -20625,8 +20648,9 @@ export interface components {
          * TicketChatOut
          * @description The newest chat of a ticket for the agent's conversation header (``ro`` on its queue).
          *
-         *     ``visitor_email_verified`` is always False in phase 1 (R-NOTIFY b): the address is what
-         *     the visitor typed; nothing proved they own it.
+         *     ``visitor_email_verified`` is True only for a chat with a verified identity
+         *     (``identity_source`` set, signed token or portal login) that carries an address
+         *     (R-NOTIFY b); otherwise the address is what the visitor typed.
          */
         TicketChatOut: {
             /** Accepted At */
@@ -20639,6 +20663,8 @@ export interface components {
             end_reason: string | null;
             /** Ended At */
             ended_at: string | null;
+            /** Identity Source */
+            identity_source?: string | null;
             /** Language */
             language: string | null;
             /** Page Url */

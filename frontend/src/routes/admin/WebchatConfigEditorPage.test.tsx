@@ -62,7 +62,7 @@ const saved: ChatConfig = {
   values: {
     ...completeValues(defaultValues()),
     allowed_origins: ["https://www.example.org"],
-    topics: [{ key: "support", label: "Support", queue_id: 1, priority_id: null }],
+    topics: [{ key: "support", label: "Support", queue_id: 1, priority_id: null, ai_mode: "off" }],
   },
 };
 
@@ -122,7 +122,7 @@ describe("WebchatConfigEditorPage", () => {
       valid: true,
       values: {
         allowed_origins: ["https://www.example.org"],
-        topics: [{ key: "support-hilfe", label: "Support & Hilfe", queue_id: 1, priority_id: null }],
+        topics: [{ key: "support-hilfe", label: "Support & Hilfe", queue_id: 1, priority_id: null, ai_mode: "off" }],
         greeting: null,
         privacy_url: null,
         business_calendar: null,

@@ -36,7 +36,7 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import structlog
 from sqlalchemy import text, update
@@ -93,6 +93,9 @@ from tiqora.webchat.text import (
 from tiqora.webchat.tokens import VISITOR_ID_RE, issue_visitor_token, new_session_id
 from tiqora.webchat.uploads import UploadRejected, check_upload
 from tiqora.znuny.sysconfig import SysConfig
+
+if TYPE_CHECKING:
+    from tiqora.webchat.visitor_identity import ResolvedIdentity
 
 __all__ = [
     "ARTICLE_CHANNEL",
@@ -256,10 +259,16 @@ def _check_visitor_id(visitor_id: str) -> None:
 
 
 def _validate(
-    fields: Sequence[PrechatField], values: dict[str, str | bool], *, require_email: bool
+    fields: Sequence[PrechatField],
+    values: dict[str, str | bool],
+    *,
+    require_email: bool,
+    identity_fields: bool = False,
 ) -> PrechatResult:
     try:
-        return validate_prechat(fields, values, require_email=require_email)
+        return validate_prechat(
+            fields, values, require_email=require_email, identity_fields=identity_fields
+        )
     except PrechatInvalid as exc:
         raise ChatError("invalid_prechat", 422, errors=exc.errors) from exc
 
@@ -472,12 +481,23 @@ async def _open_ticket_and_session(
     language: str | None,
     offline: bool,
     now: datetime,
+    identity: ResolvedIdentity | None = None,
 ) -> tuple[TiqoraChatSession, str, int]:
-    """Ticket (+ dynamic fields), first customer article, session row; ``(row, token, article)``."""
+    """Ticket (+ dynamic fields), first customer article, session row; ``(row, token, article)``.
+
+    A verified *identity* replaces the typed name/address and the customer lookup.
+    """
     df_values, extra_lines = await _checked_df_values(db, values.prechat_fields, prechat)
-    customer_id, customer_user = await resolve_chat_customer(
-        db, email=prechat.email, default_customer_user=values.default_customer_user
-    )
+    customer_id: str | None
+    customer_user: str | None
+    if identity is not None:
+        customer_id, customer_user = identity.customer_id, identity.customer_user_login
+        name, email = identity.name, identity.email
+    else:
+        customer_id, customer_user = await resolve_chat_customer(
+            db, email=prechat.email, default_customer_user=values.default_customer_user
+        )
+        email = prechat.email
     state_id, priority_id = await _ticket_defaults(db, sysconfig, topic)
     title = _title(message)
     ticket_id = await create_ticket(
@@ -505,7 +525,7 @@ async def _open_ticket_and_session(
             subject=title,
             body=_article_body(message, extra_lines),
             channel=CHANNEL,
-            from_address=visitor_from_address(name, prechat.email, visitor_id),
+            from_address=visitor_from_address(name, email, visitor_id),
         ),
         user_id=SYSTEM_USER_ID,
         sysconfig=sysconfig,
@@ -524,7 +544,8 @@ async def _open_ticket_and_session(
         token_hash=token_hash,
         visitor_id=visitor_id,
         visitor_name=name,
-        visitor_email=prechat.email,
+        visitor_email=email,
+        identity_source=identity.source if identity is not None else None,
         customer_user_login=customer_user,
         last_seq=0,
         waiting_since=None if offline else now,
@@ -552,6 +573,7 @@ async def create_session(
     payload: ChatSessionCreateIn,
     ctx: VisitorContext,
     now: datetime,
+    identity: ResolvedIdentity | None = None,
 ) -> tuple[TiqoraChatSession, str, TiqoraChatMessage]:
     """Start a chat: ticket + first visitor article + session row + message ``seq`` 1.
 
@@ -565,7 +587,12 @@ async def create_session(
     _check_visitor_id(payload.visitor_id)
     topic = _pick_topic(values, payload.topic)
     body = _clean_message(payload.message)
-    prechat = _validate(values.prechat_fields, dict(payload.prechat), require_email=False)
+    prechat = _validate(
+        values.prechat_fields,
+        dict(payload.prechat),
+        require_email=False,
+        identity_fields=identity is not None,
+    )
     client_id = _clean_client_id(payload.client_id)
     if not await within_business_hours(sysconfig, values.business_calendar, now):
         raise ChatError("offline", 409)
@@ -581,13 +608,14 @@ async def create_session(
         topic=topic,
         visitor_id=payload.visitor_id,
         prechat=prechat,
-        name=prechat.name,
+        name=identity.name if identity is not None else prechat.name,
         message=body,
         ctx=ctx,
         page_url=payload.page_url,
         language=payload.language,
         offline=False,
         now=now,
+        identity=identity,
     )
     first = await insert_message(
         db,

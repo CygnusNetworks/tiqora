@@ -17,6 +17,8 @@ MODULES = [
     "tiqora.webchat.hub",
     "tiqora.webchat.notify",
     "tiqora.webchat.sessions",
+    "tiqora.webchat.identity",
+    "tiqora.webchat.visitor_identity",
     "tiqora.webchat.agent",
     "tiqora.webchat.stream",
     "tiqora.webchat.public_api",

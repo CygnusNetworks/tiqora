@@ -68,7 +68,7 @@ export function setValues(draft: Draft, patch: Partial<Values>): Draft {
 export function defaultValues(): Values {
   return {
     allowed_origins: [],
-    topics: [{ key: "", label: "", queue_id: 0, priority_id: null }],
+    topics: [{ key: "", label: "", queue_id: 0, priority_id: null, ai_mode: "off" }],
     greeting: null,
     privacy_url: null,
     offline_mode: "form",
@@ -92,6 +92,10 @@ export function defaultValues(): Values {
     default_customer_user: null,
     show_agent_names: true,
     retention_days: 30,
+    bot_name: "KI-Assistent",
+    bot_tone_prompt: null,
+    show_on_portal: false,
+    identity_create_customers: false,
   };
 }
 

@@ -11,7 +11,7 @@ function values(patch: Partial<Values> = {}): Values {
   return {
     ...v,
     greeting: "Hallo!",
-    topics: [{ key: "support", label: "Support", queue_id: 1, priority_id: null }],
+    topics: [{ key: "support", label: "Support", queue_id: 1, priority_id: null, ai_mode: "off" }],
     ...patch,
   };
 }
