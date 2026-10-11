@@ -5625,6 +5625,139 @@
       "empty": "Nothing found",
       "clearSearch": "Clear search",
       "added": "“{{title}}” added"
+    },
+    "settings": {
+      "title": "Settings",
+      "cancel": "Cancel",
+      "apply": "Apply",
+      "titleField": "Title",
+      "titleHint": "Leave empty to use the default title.",
+      "preview": "Preview",
+      "range": "The value must be between {{min}} and {{max}}.",
+      "number": "Please enter a number.",
+      "ticketList": {
+        "which": "Which tickets?",
+        "savedSearch": "Saved search",
+        "savedSearchHint": "If the search changes, the widget changes with it.",
+        "standard": "Standard",
+        "columns": "Columns",
+        "columnsMin": "At least one column must be selected.",
+        "sort": "Sort order",
+        "sortOther": "Other sort order",
+        "sorts": {
+          "deadlineAsc": "Due date, earliest first",
+          "changedDesc": "Recently changed",
+          "priorityDesc": "Priority",
+          "ageAsc": "Oldest first",
+          "ageDesc": "Newest first"
+        },
+        "rows": "Number of rows",
+        "density": "Appearance",
+        "compact": "Compact",
+        "comfortable": "Comfortable",
+        "columnTitle": "Ticket title"
+      },
+      "notes": {
+        "label": "Note",
+        "hint": "Markdown is supported. Everyone who sees this dashboard sees the note.",
+        "tooLong": "The note may be at most {{max}} characters long."
+      },
+      "links": {
+        "legend": "Links",
+        "label": "Label {{n}}",
+        "url": "Address {{n}}",
+        "up": "Move link {{n}} up",
+        "down": "Move link {{n}} down",
+        "remove": "Remove link {{n}}",
+        "removeShort": "Remove",
+        "add": "Add link",
+        "count": "{{used}} of {{max}}",
+        "hint": "Addresses must start with /, http://, https:// or mailto:.",
+        "labelMissing": "Please enter a label.",
+        "urlMissing": "Please enter an address.",
+        "urlNotAllowed": "This address is not allowed."
+      },
+      "forms": {
+        "counter": {
+          "fields": {
+            "preset": {
+              "label": "Which tickets?",
+              "options": {
+                "mine_open": "My open",
+                "mine_new": "My new",
+                "unowned_new": "To pick up",
+                "escalated": "Escalated",
+                "ai_escalated": "Handed over by AI"
+              }
+            },
+            "tone": {
+              "label": "Colour of the number",
+              "options": {
+                "neutral": "Neutral",
+                "danger": "Red (warning)",
+                "ok": "Green (fine)"
+              }
+            }
+          }
+        },
+        "queueOverview": {
+          "fields": {
+            "limit": {
+              "label": "Number of queues"
+            },
+            "only_with_work": {
+              "label": "Only queues with tickets",
+              "help": "Queues without open or new tickets are hidden."
+            }
+          }
+        },
+        "escalations": {
+          "fields": {
+            "limit": {
+              "label": "Number of entries"
+            },
+            "within_hours": {
+              "label": "Deadlines within the next hours",
+              "help": "0 shows only deadlines that have already passed."
+            }
+          }
+        },
+        "reminders": {
+          "fields": {
+            "window_hours": {
+              "label": "Period in hours",
+              "help": "Reminders that fall due within this period."
+            },
+            "limit": {
+              "label": "Number of entries"
+            }
+          }
+        },
+        "recentViews": {
+          "fields": {
+            "limit": {
+              "label": "Number of tickets"
+            }
+          }
+        },
+        "calendarAgenda": {
+          "fields": {
+            "days": {
+              "label": "Number of days"
+            },
+            "limit": {
+              "label": "Number of appointments"
+            }
+          }
+        },
+        "teamPresence": {
+          "fields": {
+            "limit": {
+              "label": "Number of people"
+            }
+          }
+        }
+      }
     }
   }
 }

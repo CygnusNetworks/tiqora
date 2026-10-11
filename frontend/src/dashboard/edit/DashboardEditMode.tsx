@@ -16,7 +16,7 @@ import { formatTimeOfDay } from "@/lib/format";
 import { ConflictDialog } from "./ConflictDialog";
 import { EditToolbar } from "./EditToolbar";
 import { useEditSession } from "./useEditSession";
-import { WidgetSettingsDialog } from "./WidgetSettingsDialog";
+import { SettingsDrawer } from "../settings/SettingsDrawer";
 
 /** A new widget id matching the server's `^[A-Za-z0-9_-]{8,36}$`. */
 function newWidgetId(): string {
@@ -85,7 +85,7 @@ export function DashboardEditMode({
     return editDataPlan(savedWidgets, savedData, state.widgets, (key) => hasData.has(key));
   }, [defs, savedWidgets, savedData, state.widgets]);
 
-  const [settingsFor, setSettingsFor] = useState<{ id: string; title: string } | null>(null);
+  const [settingsFor, setSettingsFor] = useState<{ id: string } | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   const isTemplate = dashboard.kind === "template";
@@ -120,12 +120,17 @@ export function DashboardEditMode({
     toolbarRef.current?.focus();
   }, []);
 
+  const settingsWidget = settingsFor ? state.widgets.find((w) => w.id === settingsFor.id) : undefined;
+  const settingsDef = settingsWidget ? defs.find((d) => d.key === settingsWidget.type_key) : undefined;
+  // The server's 422 for this widget: `settings.<field>` maps onto a field, anything else is general.
+  const settingsErrors = useMemo(() => {
+    if (!settingsFor || settingsFor.id !== session.invalidWidgetId || !session.invalidMessage) return undefined;
+    return { [session.invalidPath ?? ""]: session.invalidMessage };
+  }, [settingsFor, session.invalidWidgetId, session.invalidMessage, session.invalidPath]);
+
   const openSettings = useCallback(
     (id: string) => {
-      const cell = Array.from(gridBoxRef.current?.querySelectorAll<HTMLElement>("[data-widget-id]") ?? []).find(
-        (el) => el.dataset.widgetId === id,
-      );
-      setSettingsFor({ id, title: cell?.getAttribute("aria-label") ?? "" });
+      setSettingsFor({ id });
     },
     [],
   );
@@ -265,11 +270,17 @@ export function DashboardEditMode({
           />,
           galleryHost,
         )}
-      {settingsFor && (
-        <WidgetSettingsDialog
-          title={settingsFor.title}
-          message={settingsFor.id === session.invalidWidgetId ? session.invalidMessage : null}
-          onClose={() => setSettingsFor(null)}
+      {settingsWidget && settingsDef && (
+        <SettingsDrawer
+          key={settingsWidget.id}
+          widget={settingsWidget}
+          def={settingsDef}
+          errors={settingsErrors}
+          onApply={(settings, titleOverride) => {
+            dispatch({ type: "settings", id: settingsWidget.id, settings, titleOverride });
+            setSettingsFor(null);
+          }}
+          onCancel={() => setSettingsFor(null)}
         />
       )}
       <ConfirmDialog

@@ -41,6 +41,8 @@ export interface EditSession {
   /** Widget named by the last 422 (`widgets[i]…`) and the server's message. */
   invalidWidgetId: string | null;
   invalidMessage: string | null;
+  /** Field path inside the widget (`settings.limit`) when the server named one. */
+  invalidPath: string | null;
   /** Message for the toolbar after a failed save that names no widget. */
   saveError: string | null;
   /** Server version after a 409 (the conflict dialog is open while set). */
@@ -90,7 +92,7 @@ export function useEditSession(dashboard: Dashboard, userId: number): EditSessio
 
   const [offered, setOffered] = useState<Draft | null>(() => readDraft(userId, dashboardId, dashboard.version));
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
-  const [invalid, setInvalid] = useState<{ id: string; message: string | null } | null>(null);
+  const [invalid, setInvalid] = useState<{ id: string; message: string | null; path: string | null } | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [conflictVersion, setConflictVersion] = useState<number | null>(null);
   const [overwrite, setOverwrite] = useState<Draft["overwrites"] | null>(null);
@@ -202,7 +204,7 @@ export function useEditSession(dashboard: Dashboard, userId: number): EditSessio
       if (bad) {
         const m = bad.path ? WIDGET_PATH.exec(bad.path) : null;
         const widget = m ? s.widgets[Number(m[1])] : undefined;
-        if (widget) setInvalid({ id: widget.id, message: bad.message });
+        if (widget) setInvalid({ id: widget.id, message: bad.message, path: m ? bad.path!.slice(m[0].length).replace(/^\./, "") || null : null });
         else setSaveError(bad.message ?? t("dashboards.edit.saveFailed"));
         return "invalid";
       }
@@ -232,6 +234,7 @@ export function useEditSession(dashboard: Dashboard, userId: number): EditSessio
     save,
     invalidWidgetId: invalid?.id ?? null,
     invalidMessage: invalid?.message ?? null,
+    invalidPath: invalid?.path ?? null,
     saveError,
     conflictVersion,
     dismissConflict,

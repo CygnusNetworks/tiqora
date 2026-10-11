@@ -34,6 +34,7 @@ export function Dialog({
   placement = "center",
   className,
   role = "dialog",
+  closeLabel,
 }: {
   open: boolean;
   onClose: () => void;
@@ -52,6 +53,8 @@ export function Dialog({
   className?: string;
   /** `alertdialog` for confirmations that interrupt (e.g. losing unsaved changes). */
   role?: "dialog" | "alertdialog";
+  /** Accessible name of the ✕ button (default: "Zurück"). */
+  closeLabel?: string;
 }) {
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -160,7 +163,7 @@ export function Dialog({
             variant="ghost"
             size="sm"
             onClick={onClose}
-            aria-label={t("common.back")}
+            aria-label={closeLabel ?? t("common.back")}
             data-dialog-close
             className="-mr-1 shrink-0"
           >

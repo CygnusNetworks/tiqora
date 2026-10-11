@@ -116,3 +116,21 @@ def test_escalations_defaults_to_upcoming_deadlines() -> None:
 
 def test_unknown_widget_type_settings_pass_through_unchanged() -> None:
     assert validate_widget_settings("org.example.weather", {"city": "Bonn"}) == {"city": "Bonn"}
+
+
+def _link_url_cases() -> list[dict[str, Any]]:
+    import json
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[2] / "frontend/src/dashboard/settings/linkUrlCases.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("case", _link_url_cases(), ids=lambda c: repr(c["url"]))
+def test_link_url_shared_cases_match_the_client_mirror(case: dict[str, Any]) -> None:
+    """The same cases run in `frontend/src/dashboard/settings/linkUrl.test.ts`."""
+    if case["ok"]:
+        assert safe_link_url(case["url"]) == case["url"]
+    else:
+        with pytest.raises(SettingsError):
+            safe_link_url(case["url"])

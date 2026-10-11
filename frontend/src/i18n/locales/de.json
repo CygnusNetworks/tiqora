@@ -5633,6 +5633,139 @@
       "empty": "Nichts gefunden",
       "clearSearch": "Suche löschen",
       "added": "„{{title}}“ hinzugefügt"
+    },
+    "settings": {
+      "title": "Einstellungen",
+      "cancel": "Abbrechen",
+      "apply": "Übernehmen",
+      "titleField": "Titel",
+      "titleHint": "Leer lassen, um den Standardtitel zu verwenden.",
+      "preview": "Vorschau",
+      "range": "Der Wert muss zwischen {{min}} und {{max}} liegen.",
+      "number": "Bitte geben Sie eine Zahl an.",
+      "ticketList": {
+        "which": "Welche Tickets?",
+        "savedSearch": "Gespeicherte Suche",
+        "savedSearchHint": "Ändert sich die Suche, ändert sich das Widget mit.",
+        "standard": "Standard",
+        "columns": "Spalten",
+        "columnsMin": "Mindestens eine Spalte muss ausgewählt sein.",
+        "sort": "Sortierung",
+        "sortOther": "Andere Sortierung",
+        "sorts": {
+          "deadlineAsc": "Fälligkeit, früheste zuerst",
+          "changedDesc": "Zuletzt geändert",
+          "priorityDesc": "Priorität",
+          "ageAsc": "Älteste zuerst",
+          "ageDesc": "Neueste zuerst"
+        },
+        "rows": "Anzahl Zeilen",
+        "density": "Darstellung",
+        "compact": "Kompakt",
+        "comfortable": "Bequem",
+        "columnTitle": "Ticket-Titel"
+      },
+      "notes": {
+        "label": "Notiz",
+        "hint": "Markdown ist möglich. Alle, die dieses Dashboard sehen, sehen die Notiz.",
+        "tooLong": "Die Notiz darf höchstens {{max}} Zeichen lang sein."
+      },
+      "links": {
+        "legend": "Links",
+        "label": "Bezeichnung {{n}}",
+        "url": "Adresse {{n}}",
+        "up": "Link {{n}} nach oben",
+        "down": "Link {{n}} nach unten",
+        "remove": "Link {{n}} entfernen",
+        "removeShort": "Entfernen",
+        "add": "Link hinzufügen",
+        "count": "{{used}} von {{max}}",
+        "hint": "Erlaubt sind Adressen, die mit /, http://, https:// oder mailto: beginnen.",
+        "labelMissing": "Bitte tragen Sie eine Bezeichnung ein.",
+        "urlMissing": "Bitte tragen Sie eine Adresse ein.",
+        "urlNotAllowed": "Diese Adresse ist nicht erlaubt."
+      },
+      "forms": {
+        "counter": {
+          "fields": {
+            "preset": {
+              "label": "Welche Tickets?",
+              "options": {
+                "mine_open": "Meine offenen",
+                "mine_new": "Meine neuen",
+                "unowned_new": "Zum Übernehmen",
+                "escalated": "Eskaliert",
+                "ai_escalated": "Von der KI übergeben"
+              }
+            },
+            "tone": {
+              "label": "Farbe der Zahl",
+              "options": {
+                "neutral": "Neutral",
+                "danger": "Rot (Warnung)",
+                "ok": "Grün (in Ordnung)"
+              }
+            }
+          }
+        },
+        "queueOverview": {
+          "fields": {
+            "limit": {
+              "label": "Anzahl Queues"
+            },
+            "only_with_work": {
+              "label": "Nur Queues mit Tickets",
+              "help": "Queues ohne offene oder neue Tickets werden ausgeblendet."
+            }
+          }
+        },
+        "escalations": {
+          "fields": {
+            "limit": {
+              "label": "Anzahl Einträge"
+            },
+            "within_hours": {
+              "label": "Fristen in den nächsten Stunden",
+              "help": "0 zeigt nur bereits überschrittene Fristen."
+            }
+          }
+        },
+        "reminders": {
+          "fields": {
+            "window_hours": {
+              "label": "Zeitraum in Stunden",
+              "help": "Erinnerungen, die in diesem Zeitraum fällig werden."
+            },
+            "limit": {
+              "label": "Anzahl Einträge"
+            }
+          }
+        },
+        "recentViews": {
+          "fields": {
+            "limit": {
+              "label": "Anzahl Tickets"
+            }
+          }
+        },
+        "calendarAgenda": {
+          "fields": {
+            "days": {
+              "label": "Anzahl Tage"
+            },
+            "limit": {
+              "label": "Anzahl Termine"
+            }
+          }
+        },
+        "teamPresence": {
+          "fields": {
+            "limit": {
+              "label": "Anzahl Personen"
+            }
+          }
+        }
+      }
     }
   }
 }

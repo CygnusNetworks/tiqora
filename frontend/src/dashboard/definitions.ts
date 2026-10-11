@@ -191,3 +191,35 @@ export function settingsWithDefaults(
   }
   return out;
 }
+
+// ---------------------------------------------------------------- settings form adapters
+
+/**
+ * The counter stores `source: { kind: "preset", preset }`; its settings form shows the flat enum
+ * field `preset` instead (SchemaForm renders flat scalars). `counterFromSettings` /
+ * `counterToSettings` map between the two; the stored shape is what the server validates.
+ */
+export const COUNTER_FORM_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  properties: {
+    preset: { type: "string", enum: [...TICKET_PRESETS], default: "mine_open" },
+    tone: { type: "string", enum: ["neutral", "danger", "ok"], default: "neutral" },
+  },
+};
+
+export function counterFromSettings(settings: Record<string, unknown>): Record<string, unknown> {
+  const source = isPlainObject(settings.source) ? settings.source : {};
+  const preset = (TICKET_PRESETS as readonly unknown[]).includes(source.preset) ? source.preset : "mine_open";
+  return { preset, tone: typeof settings.tone === "string" ? settings.tone : "neutral" };
+}
+
+export function counterToSettings(
+  form: Record<string, unknown>,
+  prev: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...prev,
+    source: { kind: "preset", preset: form.preset ?? "mine_open" },
+    tone: form.tone ?? "neutral",
+  };
+}

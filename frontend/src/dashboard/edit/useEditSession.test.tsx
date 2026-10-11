@@ -240,6 +240,7 @@ test("a 422 with a widget path marks that widget and keeps the message", async (
   expect(outcome).toBe("invalid");
   expect(result.current.invalidWidgetId).toBe("demo-w-list-open");
   expect(result.current.invalidMessage).toBe("Der Wert muss zwischen 1 und 50 liegen.");
+  expect(result.current.invalidPath).toBe("settings.limit");
   expect(result.current.saveError).toBeNull();
 });
 
