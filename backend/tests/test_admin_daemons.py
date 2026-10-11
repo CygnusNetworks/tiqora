@@ -23,6 +23,7 @@ from tiqora.api.v1.admin.schemas import DaemonUpdate
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.domain.auth import AuthenticatedUser
+from tiqora.worker.services import DAEMON_SERVICES
 from tiqora.znuny.password import hash_password
 
 pytestmark = pytest.mark.db
@@ -83,7 +84,7 @@ async def test_get_daemons_defaults(mariadb_znuny_url: str) -> None:
     try:
         async with factory() as session:
             out = await admin_daemons.list_daemons(_root_user(), session)
-            assert len(out.services) == 22
+            assert len(out.services) == len(DAEMON_SERVICES)
             by_slug = {s.slug: s for s in out.services}
             # Znuny RenewCustomerSMIMECertificates: active by default, 02:02,
             # itself a no-op unless SMIME + SMIME::FetchFromCustomer are on.
