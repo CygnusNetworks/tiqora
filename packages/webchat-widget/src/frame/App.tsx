@@ -28,6 +28,7 @@ const PREVIEW_DEFAULT: ChatPublicConfig = {
   offline_mode: "form",
   online: true,
   prechat_fields: [],
+  portal_identity: false,
   privacy_url: null,
   theme: { mode: "auto", position: "right", primary_color: "#2563eb" },
   topics: [],
@@ -50,7 +51,7 @@ function asMessage(data: string): ChatMessage | null {
   try {
     const o = JSON.parse(data) as Partial<ChatMessage> | null;
     if (!o || typeof o.seq !== "number" || !Number.isInteger(o.seq)) return null;
-    if (o.sender !== "visitor" && o.sender !== "agent" && o.sender !== "system") return null;
+    if (o.sender !== "visitor" && o.sender !== "agent" && o.sender !== "bot" && o.sender !== "system") return null;
     return {
       agent_name: null,
       body: null,
@@ -243,7 +244,7 @@ export function App(props: {
         if (!m) return;
         const known = stateRef.current.messages.some((x) => x.seq === m.seq);
         dispatch({ type: "message", message: m });
-        if (!known && m.sender !== "visitor") bridgeRef.current?.post({ p: "tiqora-chat/1", type: "message", sender: m.sender });
+        if (!known && m.sender !== "visitor") bridgeRef.current?.post({ p: "tiqora-chat/1", type: "message", sender: m.sender === "system" ? "system" : "agent" });
       } else if (e.event === "session") {
         try {
           const o = JSON.parse(e.data) as { status?: unknown; agent_name?: unknown };

@@ -10,6 +10,7 @@ export function cfg(over: Partial<ChatPublicConfig> = {}): ChatPublicConfig {
       { key: "name", kind: "text", label: "Name", required: true, options: [] },
       { key: "email", kind: "email", label: "E-Mail", required: true, options: [] },
     ],
+    portal_identity: false,
     privacy_url: "https://example.org/privacy",
     theme: { mode: "auto", position: "right", primary_color: "#2563eb" },
     topics: [],

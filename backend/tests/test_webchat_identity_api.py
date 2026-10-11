@@ -15,7 +15,7 @@ from typing import Any
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tests._fake_redis import FakeRedis
@@ -34,11 +34,12 @@ from tiqora.api.deps import get_redis
 from tiqora.config import Settings
 from tiqora.crypto.secret import encrypt_secret
 from tiqora.db.tiqora.base import TiqoraBase
+from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.domain.customer_auth import CustomerSessionStore
 from tiqora.jobs.service import utc_now
 from tiqora.webchat.availability import mark_agent_online, set_agent_state
 from tiqora.webchat.config_cache import clear_config_cache
-from tiqora.webchat.identity import portal_identity_key, sign_identity_token
+from tiqora.webchat.identity import sign_identity_token
 from tiqora.webchat.store import config_values, load_config
 from tiqora.webchat.visitor_identity import verify_and_resolve
 
@@ -117,6 +118,19 @@ class Env:
         self.sql(
             "UPDATE tiqora_chat_config SET show_on_portal = :v WHERE id = :i", v=value, i=CONFIG
         )
+        clear_config_cache()
+
+    def set_channel(self, value: str) -> None:
+        engine = create_engine(self.url)
+        try:
+            with engine.begin() as conn:
+                conn.execute(
+                    update(TiqoraSettings)
+                    .where(TiqoraSettings.key == "channel.webchat.enabled")
+                    .values(value=value)
+                )
+        finally:
+            engine.dispose()
         clear_config_cache()
 
     def set_rate_limits(self, **limits: int) -> None:
@@ -244,11 +258,10 @@ async def test_create_with_valid_identity_201_and_identified_as(env: Env) -> Non
         i=created["session_id"],
     )[0]
     assert tuple(row) == ("website", "wc546-erika", "Erika Muster")
-    ticket = env.sql(
-        "SELECT t.customer_user_id FROM ticket t JOIN tiqora_chat_session s ON s.ticket_id = t.id"
-        " WHERE s.id = :i",
-        i=created["session_id"],
-    )
+    ticket_id = env.sql(
+        "SELECT ticket_id FROM tiqora_chat_session WHERE id = :i", i=created["session_id"]
+    )[0][0]
+    ticket = env.sql("SELECT customer_user_id FROM ticket WHERE id = :t", t=ticket_id)
     assert ticket[0][0] == "wc546-erika"
 
 
@@ -368,12 +381,12 @@ async def test_identify_full_post_real_session(env: Env) -> None:
             headers=_h(created),
         )
     assert res.status_code == 204, res.text
-    rows = env.sql(
-        "SELECT t.customer_user_id, t.customer_id, s.visitor_email FROM ticket t"
-        " JOIN tiqora_chat_session s ON s.ticket_id = t.id WHERE s.id = :i",
+    sess = env.sql(
+        "SELECT ticket_id, visitor_email FROM tiqora_chat_session WHERE id = :i",
         i=created["session_id"],
-    )
-    assert tuple(rows[0]) == ("wc546-erika", "wc546-co", "wc546-erika@example.org")
+    )[0]
+    tick = env.sql("SELECT customer_user_id, customer_id FROM ticket WHERE id = :t", t=sess[0])[0]
+    assert (tick[0], tick[1], sess[1]) == ("wc546-erika", "wc546-co", "wc546-erika@example.org")
 
 
 # -- POST /identity/portal -------------------------------------------------------------------
@@ -470,7 +483,6 @@ async def test_portal_assertion_creates_identified_chat(env: Env) -> None:
         i=created["session_id"],
     )[0]
     assert tuple(row) == ("portal", "wc546-erika")
-    assert portal_identity_key(SECRET_KEY)  # the assertion is signed with the derived key
 
 
 @pytest.mark.asyncio
@@ -530,3 +542,7 @@ async def test_portal_webchat_endpoint(env: Env) -> None:
         env.sql("UPDATE tiqora_chat_config SET valid = :v WHERE id = :i", v=False, i=CONFIG)
         invalid = await client.get("/api/portal/webchat", headers=cookie)
         assert invalid.status_code == 404
+        env.sql("UPDATE tiqora_chat_config SET valid = :v WHERE id = :i", v=True, i=CONFIG)
+        env.set_channel("false")
+        off = await client.get("/api/portal/webchat", headers=cookie)
+        assert off.status_code == 404

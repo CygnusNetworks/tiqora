@@ -97,6 +97,12 @@ describe("App", () => {
     expect(post).toHaveBeenCalledWith({ p: "tiqora-chat/1", type: "message", sender: "agent" });
     expect(JSON.stringify(post.mock.calls)).not.toContain("Hallo!");
 
+    // a bot (AI) message is shown like an agent message, and the host is told "agent"
+    expect(post.mock.calls.filter((c) => c[0].type === "message")).toHaveLength(1);
+    stream.emit("message", msg({ seq: 3, sender: "bot", body: "Ich bin die KI", agent_name: null }), "3");
+    expect(container.textContent).toContain("Ich bin die KI");
+    expect(post.mock.calls.filter((c) => c[0].type === "message")).toHaveLength(2);
+
     click(byText(container, "button", "Chat beenden"));
     await flush();
     expect(api.end).toHaveBeenCalledWith("sid1", "tok1");
