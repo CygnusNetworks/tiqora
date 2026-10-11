@@ -96,3 +96,14 @@ export function useTicketChat(ticketId: number, enabled: boolean): UseQueryResul
     },
   });
 }
+
+/** A chat the agent can still type into (a reply to a waiting one accepts it first). */
+export function isChatLive(chat: TicketChat | null | undefined): boolean {
+  return chat?.status === "waiting" || chat?.status === "active";
+}
+
+/** Addresses in the reserved `.invalid` TLD (the placeholder a visitor
+ * without an e-mail address gets) must never be mailed. */
+export function isInvalidTldAddress(email: string): boolean {
+  return /\.invalid$/i.test(email.trim().replace(/^.*<|>$/g, "").trim());
+}

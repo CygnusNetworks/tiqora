@@ -7,6 +7,7 @@ import { Menu, MenuItem } from "@/components/ui/Menu";
 import { useReplyDraft } from "@/lib/replyDrafts";
 import { requestComposer, requestConversationView } from "./telegram/composerBus";
 import { ReplyDialog } from "./ReplyDialog";
+import { isChatLive, useTicketChat } from "@/lib/webchatApi";
 import { BounceDialog, ForwardDialog, SplitDialog } from "./ArticleActionDialogs";
 import { useDeleteArticleNote } from "./useDeleteArticleNote";
 
@@ -41,6 +42,11 @@ export function ArticleQuickActions({
     null,
   );
   const isTelegram = channelNameOf(article) === "Telegram";
+  // A live web chat answers in the messenger composer like Telegram; an
+  // ended one falls back to the e-mail dialog (no reply-all there either).
+  const isWebchat = channelNameOf(article) === "WebChat";
+  const webchatLive = isChatLive(useTicketChat(ticketId, isWebchat).data);
+  const messengerReply = isTelegram || (isWebchat && webchatLive);
   // The backend knows our system addresses: false = reply-all would reach
   // nobody beyond the plain reply, so it is offered greyed out.
   const replyAllUseful = article.reply_all_available !== false;
@@ -63,7 +69,7 @@ export function ArticleQuickActions({
           data-has-draft={hasDraft ? "true" : undefined}
           title={compact ? (hasDraft ? t("ticket.draftResume") : t("ticket.reply")) : undefined}
           onClick={() => {
-            if (isTelegram) {
+            if (messengerReply) {
               // May be reached from the split view (a Telegram ticket the
               // agent manually switched away from conversation) — bring the
               // composer's view back first, like TicketHeaderActions; the
@@ -85,7 +91,7 @@ export function ArticleQuickActions({
           )}
         </Button>
       </span>
-      {!isTelegram && !compact && (
+      {!isTelegram && !isWebchat && !compact && (
         <span
           title={!canNote ? noPerm : !replyAllUseful ? t("ticket.replyAllNoOthers") : undefined}
           className="inline-flex"

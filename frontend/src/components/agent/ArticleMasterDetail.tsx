@@ -9,7 +9,9 @@ import { ArticleSplitView } from "./ArticleSplitView";
 import { ArticleConversationView } from "./ArticleConversationView";
 import { ArticleComposer } from "./ArticleTimeline";
 import { useConversationViewRequests } from "./telegram/composerBus";
-import { TelegramChatComposer } from "./telegram/TelegramChatComposer";
+import { MessengerComposer } from "./messenger/MessengerComposer";
+import { telegramAdapter, webchatAdapter } from "./messenger/adapters";
+import { isChatLive, useTicketChat } from "@/lib/webchatApi";
 import { useArticleListState, type ArticleFilter } from "./useArticleListState";
 import { useArticleView, type ArticleViewMode } from "./useArticleView";
 import type { ReactNode } from "react";
@@ -52,7 +54,7 @@ export function ArticleMasterDetail({
   const locale = toBcp47(i18n.language);
   const state = useArticleListState({ ticketId, descending, onToggleDescending });
   const { view, isAuto, setView } = useArticleView(ticketId, state.articles);
-  // The header's "Antworten" on a Telegram ticket switches a manually-split
+  // The header's "Antworten" on a Telegram or live web chat ticket switches a manually-split
   // view back to conversation before it asks the (only-then-mounted)
   // composer to focus — see composerBus.ts.
   useConversationViewRequests(ticketId, () => setView("conversation"));
@@ -64,11 +66,18 @@ export function ArticleMasterDetail({
   useEffect(() => {
     onComposingChange?.(composing);
   }, [composing, onComposingChange]);
-  const isTelegram = dominantChannel(state.articles) === "Telegram";
-  const showChatComposer = view === "conversation" && canNote && isTelegram;
-  // A Telegram chat follows the shared sort toggle (newest-first = newest
+  const channel = dominantChannel(state.articles);
+  const isTelegram = channel === "Telegram";
+  const isWebchat = channel === "WebChat";
+  const isMessenger = isTelegram || isWebchat;
+  // A web chat answers in the messenger composer only while the session is
+  // live; once it ended the reply dialog (e-mail) takes over.
+  const ticketChat = useTicketChat(ticketId, isWebchat).data ?? null;
+  const showChatComposer =
+    view === "conversation" && canNote && (isTelegram || (isWebchat && isChatLive(ticketChat)));
+  // A messenger chat follows the shared sort toggle (newest-first = newest
   // message and the composer on top); other conversations stay chronological.
-  const sortLocked = view === "conversation" && !isTelegram;
+  const sortLocked = view === "conversation" && !isMessenger;
 
   if (state.isLoading) {
     return (
@@ -130,10 +139,14 @@ export function ArticleMasterDetail({
           canNote={canNote}
           canDelete={canDelete}
           locale={locale}
-          newestFirst={isTelegram && state.descending}
+          newestFirst={isMessenger && state.descending}
           composer={
             showChatComposer ? (
-              <TelegramChatComposer ticketId={ticketId} onComposingChange={setChatComposing} />
+              <MessengerComposer
+                ticketId={ticketId}
+                adapter={isWebchat ? webchatAdapter : telegramAdapter}
+                onComposingChange={setChatComposing}
+              />
             ) : undefined
           }
         />

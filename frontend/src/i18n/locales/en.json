@@ -5341,7 +5341,30 @@
   },
   "webchat": {
     "agent": {
-      "ringTitle": "New chat waiting"
+      "ringTitle": "New chat waiting",
+      "visitorFallback": "Visitor",
+      "badge": "Web chat",
+      "online": "Visitor online",
+      "offline": "Visitor offline",
+      "typing": "typing …",
+      "emailUnverified": "Email not verified",
+      "statusWaiting": "Waiting for {{age}}",
+      "statusWaitingNoAge": "Waiting",
+      "statusActive": "In chat with {{name}}",
+      "statusActiveNoName": "In chat",
+      "statusEnded": "Ended",
+      "ageSeconds": "{{count}} sec",
+      "ageMinutes": "{{count}} min",
+      "ageHours": "{{count}} h",
+      "accept": "Accept",
+      "end": "End chat",
+      "endKeepOpen": "Keep ticket open",
+      "endClose": "Close ticket",
+      "alreadyTaken": "Already taken",
+      "atCapacity": "You already have the maximum number of simultaneous chats.",
+      "actionFailed": "That did not work. Please try again.",
+      "chatEnded": "The chat has ended – please reply by email.",
+      "noVisitorEmail": "The visitor did not leave an email address."
     }
   },
   "webchatWidget": {

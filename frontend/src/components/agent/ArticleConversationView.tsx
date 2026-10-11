@@ -32,6 +32,7 @@ import { useDeleteArticleNote } from "./useDeleteArticleNote";
 import { AttachmentList } from "./ArticleTimeline";
 import { useTelegramChat } from "@/lib/telegramChatApi";
 import { TelegramContactHeader } from "./telegram/TelegramContactHeader";
+import { WebchatSessionHeader } from "./webchat/WebchatSessionHeader";
 import {
   TelegramBubbleActions,
   TelegramButtonPills,
@@ -114,7 +115,8 @@ export function ArticleConversationView({
   const chat = isTelegram ? (chatQ.data ?? null) : null;
   const metaById = new Map((chat?.messages ?? []).map((m) => [m.article_id, m]));
   // A messenger thread follows new messages; a mail thread only jumps on open.
-  const followId = isTelegram ? (articles[articles.length - 1]?.id ?? null) : null;
+  const isWebchat = dominantChannel(lookupArticles) === "WebChat";
+  const followId = isTelegram || isWebchat ? (articles[articles.length - 1]?.id ?? null) : null;
 
   // Keep the newest message in view whenever this view mounts (tab switch),
   // the ticket changes, a new message arrives or the order flips: bottom of
@@ -219,6 +221,7 @@ export function ArticleConversationView({
   return (
     <div className="space-y-2">
       {chat && <TelegramContactHeader key="header" chat={chat} locale={locale} />}
+      {isWebchat && <WebchatSessionHeader key="webchat-header" ticketId={ticketId} />}
       {newestFirst ? [composerSlot, thread] : [thread, composerSlot]}
     </div>
   );

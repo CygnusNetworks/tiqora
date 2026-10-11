@@ -5341,7 +5341,30 @@
   },
   "webchat": {
     "agent": {
-      "ringTitle": "Neuer Chat wartet"
+      "ringTitle": "Neuer Chat wartet",
+      "visitorFallback": "Besucher",
+      "badge": "Web-Chat",
+      "online": "Besucher online",
+      "offline": "Besucher offline",
+      "typing": "schreibt …",
+      "emailUnverified": "E-Mail nicht bestätigt",
+      "statusWaiting": "Wartet seit {{age}}",
+      "statusWaitingNoAge": "Wartet",
+      "statusActive": "Im Chat mit {{name}}",
+      "statusActiveNoName": "Im Chat",
+      "statusEnded": "Beendet",
+      "ageSeconds": "{{count}} Sek.",
+      "ageMinutes": "{{count}} Min.",
+      "ageHours": "{{count}} Std.",
+      "accept": "Annehmen",
+      "end": "Chat beenden",
+      "endKeepOpen": "Ticket offen lassen",
+      "endClose": "Ticket schließen",
+      "alreadyTaken": "Schon angenommen",
+      "atCapacity": "Sie haben bereits die maximale Zahl gleichzeitiger Chats.",
+      "actionFailed": "Das hat nicht geklappt. Bitte versuchen Sie es erneut.",
+      "chatEnded": "Der Chat ist beendet – bitte per E-Mail antworten.",
+      "noVisitorEmail": "Der Besucher hat keine E-Mail-Adresse hinterlassen."
     }
   },
   "webchatWidget": {

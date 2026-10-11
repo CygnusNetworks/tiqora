@@ -21,6 +21,7 @@ import { useComposerLock } from "@/lib/composerLock";
 import { ComposerLockBanner } from "./ComposerLock";
 import { ComposerEditorFrame } from "./ComposerEditorFrame";
 import { useChatAttachments } from "./telegram/useChatAttachments";
+import { isInvalidTldAddress, useTicketChat } from "@/lib/webchatApi";
 import { EmailSecurityControl } from "./EmailSecurityControl";
 import { useEmailSecurity } from "./useEmailSecurity";
 import { MentionTextarea } from "./MentionTextarea";
@@ -90,6 +91,9 @@ export function ReplyDialog({
   channelName?: string;
 }) {
   const isTelegram = channelName === "Telegram";
+  // An ended web chat is answered by e-mail to the address the visitor left
+  // (the chat's own article address is a `.invalid` placeholder).
+  const isWebchat = channelName === "WebChat";
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { confirm, dialog: confirmDialog } = useConfirm();
@@ -175,6 +179,10 @@ export function ReplyDialog({
   const saveDraft = useSaveReplyDraft();
   const clearDraft = useClearReplyDraft();
 
+  const chatQ = useTicketChat(ticketId, open && isWebchat);
+  const chatLoading = isWebchat && chatQ.isPending;
+  const visitorEmail = chatQ.data?.visitor_email?.trim() ?? "";
+
   const draftQ = useQuery({
     queryKey: [
       "tickets",
@@ -205,14 +213,23 @@ export function ReplyDialog({
     // server reply first and patching the stored draft in afterwards would
     // overwrite anything typed in between.
     if (!draftsLoaded) return;
+    // The visitor's address decides the recipient — wait for it.
+    if (chatLoading) return;
     // `initialDraft` is an object literal at the call site (AiPanel), so it
     // changes identity on every parent render — seed once per actual target
     // instead, or an unrelated re-render would wipe whatever is being typed.
     const seedKey = `${ticketId}:${articleId}:${replyAll}:${initialDraft?.id ?? ""}`;
     if (seededKeyRef.current === seedKey) return;
     seededKeyRef.current = seedKey;
-    const serverTo = parseRecipientList(d.to_address);
-    const serverCc = parseRecipientList(d.cc);
+    // Never `.invalid`: that is the placeholder of a visitor without an
+    // address; the typed one (when there is one) replaces it.
+    const mailable = (list: Recipient[]) =>
+      isWebchat ? list.filter((r) => !isInvalidTldAddress(r.email)) : list;
+    const serverTo =
+      isWebchat && visitorEmail.includes("@") && !isInvalidTldAddress(visitorEmail)
+        ? [{ name: "", email: visitorEmail }]
+        : mailable(parseRecipientList(d.to_address));
+    const serverCc = mailable(parseRecipientList(d.cc));
     const serverSubject = initialDraft?.subject ?? d.subject;
     // Answer on top (blank, or the AI draft's text), blank line, then the
     // quoted original.
@@ -227,8 +244,8 @@ export function ReplyDialog({
     };
 
     const stored = getDraft(queryClient, ticketId, articleId);
-    const nextTo = stored ? parseRecipientList(stored.to) : serverTo;
-    const nextCc = stored ? parseRecipientList(stored.cc) : serverCc;
+    const nextTo = stored ? mailable(parseRecipientList(stored.to)) : serverTo;
+    const nextCc = stored ? mailable(parseRecipientList(stored.cc)) : serverCc;
     const nextBcc = stored ? parseRecipientList(stored.bcc) : [];
     const nextReplyTo = stored?.replyTo ?? "";
     setTo(nextTo);
@@ -245,6 +262,9 @@ export function ReplyDialog({
   }, [
     draftQ.data,
     draftsLoaded,
+    chatLoading,
+    isWebchat,
+    visitorEmail,
     initialDraft,
     queryClient,
     ticketId,
@@ -498,9 +518,13 @@ export function ReplyDialog({
     [replyAll, t],
   );
 
+  // Nothing ever goes to the reserved `.invalid` TLD.
+  const hasInvalidTld = [...to, ...cc, ...bcc].some((r) => isInvalidTldAddress(r.email));
+  const noVisitorEmail = isWebchat && !chatLoading && to.length === 0;
   const canSend =
     body.trim().length > 0 &&
     (isTelegram || to.length > 0) &&
+    !hasInvalidTld &&
     !sendMutation.isPending &&
     !attachments.encoding &&
     ticketLock.lockedBy === null &&
@@ -649,6 +673,14 @@ export function ReplyDialog({
             </p>
           ) : (
             <>
+              {noVisitorEmail && (
+                <p
+                  className="rounded border border-hairline bg-surface-subtle/60 px-2 py-1 text-xs text-muted"
+                  data-testid="reply-webchat-no-email"
+                >
+                  {t("webchat.agent.noVisitorEmail")}
+                </p>
+              )}
               <RecipientsField
                 label={t("ticket.replyTo")}
                 fieldKey="to"

@@ -1,0 +1,551 @@
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import { api, ApiError, type ArticleCreateRequest, type TelegramButtonIn, type TemplateOut } from "@/lib/api";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { cn } from "@/lib/cn";
+import { useComposerLock } from "@/lib/composerLock";
+import { ticketAiApi } from "@/lib/ticketAiApi";
+import { ComposerLockBanner } from "../ComposerLock";
+import {
+  defaultPendingDate,
+  needsDate,
+  useNextStateOptions,
+  type NextState,
+} from "../replyNextState";
+import { ButtonEditor } from "../telegram/ButtonEditor";
+import { ChatSnippetPicker } from "../telegram/ChatSnippetPicker";
+import {
+  cleanButtons,
+  filterSnippets,
+  findSlashQuery,
+  resolvedPreset,
+  snippetText,
+} from "../telegram/chatComposerHelpers";
+import { AttachmentChips, QuoteChip } from "../telegram/ComposerChips";
+import { ComposerFooter } from "../telegram/ComposerFooter";
+import { SendMenuButton } from "../telegram/SendMenuButton";
+import { useComposerRequests } from "../telegram/composerBus";
+import {
+  MAX_ATTACHMENTS,
+  MAX_ATTACHMENT_BYTES,
+  formatBytes,
+  useChatAttachments,
+} from "../telegram/useChatAttachments";
+import { useChatDraftSync } from "../telegram/useChatDraftSync";
+import { isUncertainFailure as isUncertain, readableApiReason } from "../telegram/telegramErrors";
+import type { MessengerChannelAdapter } from "./adapters";
+import { useTypingPing } from "./useTypingPing";
+
+/**
+ * Messenger-style input bar under a Telegram or web chat conversation —
+ * replaces the reply dialog there. The channel specifics (limits, quote and
+ * buttons, typing endpoint, who is on the other end) come from `adapter`. Enter sends; the reply goes out with an empty subject
+ * (the backend fills in the ticket title) and no signature. Quote, buttons,
+ * attachments and the state afterwards ride along in the same
+ * create-article call, so a failed send leaves everything in place for
+ * "Erneut senden".
+ */
+export function MessengerComposer({
+  ticketId,
+  adapter,
+  onComposingChange,
+}: {
+  ticketId: number;
+  adapter: MessengerChannelAdapter;
+  /** Presence heartbeat: true while there is something unsent. */
+  onComposingChange?: (composing: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const { confirm, dialog: confirmDialog } = useConfirm();
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const [body, setBody] = useState("");
+  const [caret, setCaret] = useState(0);
+  const [quoteId, setQuoteId] = useState<number | null>(null);
+  const [aiDraftId, setAiDraftId] = useState<number | null>(null);
+  const [buttonsOn, setButtonsOn] = useState(false);
+  const [buttons, setButtons] = useState<TelegramButtonIn[]>([]);
+  const [pendingDate, setPendingDate] = useState(defaultPendingDate);
+  /** Slash position the agent dismissed with Esc — typing on keeps it shut. */
+  const [snippetDismissed, setSnippetDismissed] = useState<number | null>(null);
+  const [snippetIndex, setSnippetIndex] = useState(0);
+  /** Slash position the "Textbausteine" button opened — the picker then also
+   * shows when the queue has no snippets, to say so. */
+  const [snippetRequested, setSnippetRequested] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  /** Caret to restore after a programmatic edit (snippet insert). */
+  const caretAfterRef = useRef<number | null>(null);
+
+  const attachments = useChatAttachments();
+  const sendTyping = useCallback(() => adapter.sendTyping(ticketId), [adapter, ticketId]);
+  const ping = useTypingPing(sendTyping);
+  const hasText = body.trim().length > 0;
+  const hasContent = hasText || attachments.items.length > 0;
+
+  const ticketLock = useComposerLock(ticketId, "compose", hasContent);
+  const next = useNextStateOptions(ticketId, true);
+  const nextOptions: NextState[] = next.canSetState ? next.options.map((o) => o.key) : ["keep"];
+  // With "Problem gelöst? Ja/Nein" attached, no answer means solved: the
+  // default becomes auto-close on the date ("Ja" closes, "Nein" reopens).
+  const hasResolveButtons = buttons.some((b) => b.action === "resolve_yes");
+  const primaryNext: NextState =
+    hasResolveButtons && nextOptions.includes("autoclose") ? "autoclose" : next.defaultNext;
+  const recipientName = adapter.useRecipientName(ticketId);
+  const customerLanguage = adapter.useCustomerLanguage?.(ticketId) ?? null;
+  const aiQ = useQuery({
+    queryKey: ["tickets", ticketId, "ai"],
+    queryFn: ({ signal }) => ticketAiApi.getState(ticketId, signal),
+  });
+  const suggestion = aiQ.data?.drafts.find((d) => d.status === "open" && d.id !== aiDraftId) ?? null;
+  const templatesQ = useQuery({
+    queryKey: ["tickets", ticketId, "templates", "Chat"],
+    queryFn: () => api.listTemplates(ticketId, "Chat"),
+  });
+
+  // Presence: report changes, and "done" when the composer goes away (view
+  // switch) so a stale "composing" doesn't outlive it.
+  const composingCb = useRef(onComposingChange);
+  composingCb.current = onComposingChange;
+  useEffect(() => {
+    composingCb.current?.(hasContent);
+  }, [hasContent]);
+  useEffect(() => () => composingCb.current?.(false), []);
+
+  // Loads an AI draft into the body — the inline suggestion below and a
+  // draft handed over from elsewhere (AiPanel's "Entwurf übernehmen") both
+  // go through this: an overwrite confirm when there is already different,
+  // non-empty typed text, then body + ai_draft_id + focus.
+  const applyDraft = async (draft: { id: number; body: string }) => {
+    if (body.trim() && body !== draft.body) {
+      const ok = await confirm({
+        title: t("ticket.telegram.composer.aiReplaceTitle"),
+        message: t("ticket.telegram.composer.aiReplaceMessage"),
+        confirmLabel: t("ticket.telegram.composer.aiReplaceConfirm"),
+        variant: "danger",
+      });
+      if (!ok) return;
+    }
+    setBody(draft.body);
+    setCaret(draft.body.length);
+    setAiDraftId(draft.id);
+    inputRef.current?.focus();
+  };
+
+  useComposerRequests(ticketId, (req) => {
+    if (adapter.supportsQuote && req.quoteArticleId != null) setQuoteId(req.quoteArticleId);
+    if (req.draft) void applyDraft(req.draft);
+    if (req.focus) inputRef.current?.focus();
+  });
+
+  // Whatever was typed before the stored draft arrived wins over it.
+  const draftSync = useChatDraftSync(ticketId, { body, quoteArticleId: quoteId, aiDraftId }, (d) => {
+    setBody((prev) => prev || d.body);
+    setQuoteId((prev) => prev ?? d.quoteArticleId);
+    setAiDraftId((prev) => prev ?? d.aiDraftId);
+  });
+
+  // ── Textarea: grow with the text (CSS caps it at ~6 lines) ──
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+    if (caretAfterRef.current !== null) {
+      el.setSelectionRange(caretAfterRef.current, caretAfterRef.current);
+      caretAfterRef.current = null;
+    }
+  }, [body]);
+
+  // ── Snippets ──
+  const slash = findSlashQuery(body, caret);
+  const templates = templatesQ.data ?? [];
+  const matches = slash && slash.start !== snippetDismissed ? filterSnippets(templates, slash.query) : [];
+  const noSnippets =
+    slash !== null && slash.start === snippetRequested && templatesQ.isSuccess && templates.length === 0;
+  const pickerOpen = matches.length > 0 || (noSnippets && slash.start !== snippetDismissed);
+  const activeSnippet = Math.min(snippetIndex, matches.length - 1);
+
+  const pickSnippet = (tpl: TemplateOut) => {
+    if (!slash) return;
+    const text = snippetText(tpl);
+    const pos = slash.start + text.length;
+    setBody(body.slice(0, slash.start) + text + body.slice(slash.end));
+    setCaret(pos);
+    caretAfterRef.current = pos;
+    setSnippetIndex(0);
+    setSnippetRequested(null);
+    inputRef.current?.focus();
+  };
+
+  // The footer button: start a `/` query at the caret (or reuse the one the
+  // agent is already typing) so the picker opens and a pick replaces it.
+  const openSnippets = () => {
+    const el = inputRef.current;
+    if (slash) {
+      setSnippetDismissed(null);
+      setSnippetRequested(slash.start);
+      el?.focus();
+      return;
+    }
+    const pos = el?.selectionStart ?? body.length;
+    const before = body.slice(0, pos);
+    const insert = before === "" || /\s$/.test(before) ? "/" : " /";
+    const start = pos + insert.length - 1;
+    setBody(before + insert + body.slice(pos));
+    setCaret(start + 1);
+    caretAfterRef.current = start + 1;
+    setSnippetDismissed(null);
+    setSnippetRequested(start);
+    setSnippetIndex(0);
+    el?.focus();
+  };
+
+  // ── Send ──
+  const tooLong = body.length > adapter.maxMessageLength;
+  const canSend =
+    hasContent &&
+    !tooLong &&
+    !attachments.encoding &&
+    ticketLock.lockedBy === null;
+
+  // What the in-flight send took, so success clears exactly that and keeps
+  // anything the agent typed, attached or changed while it was on its way.
+  type Sent = {
+    payload: ArticleCreateRequest;
+    attachmentIds: number[];
+    quoteId: number | null;
+    aiDraftId: number | null;
+    buttons: TelegramButtonIn[];
+    nextState: NextState;
+  };
+  const latest = useRef({ buttons });
+  latest.current = { buttons };
+
+  const send = useMutation({
+    mutationFn: (sent: Sent) => api.createArticle(ticketId, sent.payload),
+    onError: (err) => {
+      // The reply may have gone out after all — show it if it did.
+      if (isUncertain(err)) {
+        void qc.invalidateQueries({ queryKey: ["tickets", ticketId, "articles"] });
+        void qc.invalidateQueries({ queryKey: adapter.metaQueryKey(ticketId) });
+      }
+      // The visitor left or the chat was ended elsewhere: the meta data now
+      // says so and the page swaps this composer for the reply dialog.
+      if (adapter.isConversationEnded?.(err)) {
+        void qc.invalidateQueries({ queryKey: adapter.metaQueryKey(ticketId) });
+      }
+    },
+    onSuccess: (_res, sent) => {
+      const { payload } = sent;
+      draftSync.markSent();
+      void qc.invalidateQueries({ queryKey: ["tickets", ticketId, "articles"] });
+      void qc.invalidateQueries({ queryKey: ["tickets", ticketId] });
+      void qc.invalidateQueries({ queryKey: adapter.metaQueryKey(ticketId) });
+      if (payload.state_id != null) {
+        // A state change moves the ticket between list segments and counts.
+        void qc.invalidateQueries({ queryKey: ["tickets"] });
+        void qc.invalidateQueries({ queryKey: ["queues"] });
+      }
+      if (payload.ai_draft_id != null) {
+        // Sending with ai_draft_id accepts the draft server-side.
+        void qc.invalidateQueries({ queryKey: ["tickets", ticketId, "ai"] });
+      }
+      setBody((b) => (b === payload.body ? "" : b));
+      attachments.removeMany(sent.attachmentIds);
+      setQuoteId((q) => (q === sent.quoteId ? null : q));
+      setAiDraftId((a) => (a === sent.aiDraftId ? null : a));
+      if (latest.current.buttons === sent.buttons) {
+        setButtons([]);
+        setButtonsOn(false);
+      }
+      if (needsDate(sent.nextState)) setPendingDate(defaultPendingDate());
+      inputRef.current?.focus();
+    },
+  });
+
+  // "keep" for a plain send; waiting/closing come from the send menu (or its
+  // shortcuts) and apply to this one message only.
+  const submit = (nextState: NextState = primaryNext) => {
+    if (!canSend || send.isPending) return;
+    if (needsDate(nextState) && !pendingDate) return;
+    const sentButtons = adapter.supportsButtons && buttonsOn ? cleanButtons(buttons) : [];
+    send.mutate({
+      payload: {
+        sender_type: "agent",
+        // Empty on purpose: the backend uses the ticket title.
+        subject: "",
+        body,
+        content_type: "text/plain; charset=utf-8",
+        channel: adapter.channel,
+        is_visible_for_customer: true,
+        ...(attachments.payload.length > 0 ? { attachments: attachments.payload } : {}),
+        ...adapter.extraPayload({ quoteId: adapter.supportsQuote ? quoteId : null, buttons: sentButtons }),
+        ai_draft_id: aiDraftId,
+        ...next.payloadFor(nextState, pendingDate),
+      },
+      attachmentIds: attachments.payloadIds,
+      quoteId,
+      aiDraftId,
+      buttons,
+      nextState,
+    });
+  };
+
+  // 413 first: nginx refuses the body before the API sees it, so that one is
+  // certain — and its HTML page is no message for the agent.
+  const sendErrorKind = !send.error
+    ? null
+    : adapter.isConversationEnded?.(send.error)
+      ? "ended"
+      : send.error instanceof ApiError && send.error.status === 413
+        ? "tooLarge"
+        : isUncertain(send.error)
+        ? "uncertain"
+        : "failed";
+  const sendError =
+    sendErrorKind === "ended"
+      ? t("webchat.agent.chatEnded")
+      : sendErrorKind === "tooLarge"
+      ? t("ticket.telegram.composer.attachTooLargeServer")
+      : sendErrorKind === "uncertain"
+        ? t("ticket.telegram.composer.sendUncertain")
+        : sendErrorKind === "failed"
+          ? (readableApiReason(send.error) ?? t("ticket.telegram.composer.sendError"))
+          : null;
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // IME composition (e.g. Japanese input) uses Enter to confirm a word.
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    if (pickerOpen && slash) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const step = e.key === "ArrowDown" ? 1 : -1;
+        setSnippetIndex((activeSnippet + step + matches.length) % matches.length);
+        return;
+      }
+      if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
+        e.preventDefault();
+        pickSnippet(matches[activeSnippet]);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setSnippetDismissed(slash.start);
+        return;
+      }
+    }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      const wanted: NextState =
+        e.metaKey || e.ctrlKey ? "closed" : e.altKey ? "pending" : primaryNext;
+      // A shortcut for a state the agent may not set sends nothing rather
+      // than silently sending with a different outcome.
+      if (!nextOptions.includes(wanted)) return;
+      submit(wanted);
+    }
+  };
+
+  const onChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    const pos = e.target.selectionStart ?? value.length;
+    setBody(value);
+    setCaret(pos);
+    setSnippetIndex(0);
+    if (!findSlashQuery(value, pos)) setSnippetDismissed(null);
+    if (value.trim()) ping();
+  };
+
+  const takeSuggestion = () => (suggestion ? applyDraft(suggestion) : undefined);
+
+  const closeButtons = () => {
+    // Off = discard: hidden buttons must not come back (or be sent) the next
+    // time the editor opens.
+    setButtons([]);
+    setButtonsOn(false);
+  };
+
+  const applyPreset = () => {
+    const preset = resolvedPreset(customerLanguage);
+    setButtons(preset.buttons);
+    if (!body.trim()) setBody(preset.body);
+  };
+
+  const name = recipientName || t("ticket.telegram.composer.customer");
+
+  return (
+    <div
+      data-testid="tg-composer"
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        setDragOver(true);
+      }}
+      onDragLeave={(e) => {
+        // Moving over a child fires dragleave on the parent too.
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        setDragOver(false);
+      }}
+      onDrop={(e) => {
+        setDragOver(false);
+        if (e.dataTransfer.files.length === 0) return;
+        e.preventDefault();
+        attachments.add(e.dataTransfer.files);
+      }}
+      className={cn(
+        "grid gap-2 rounded-lg border bg-surface p-2.5",
+        dragOver ? "border-accent ring-1 ring-accent" : "border-hairline",
+      )}
+    >
+      {confirmDialog}
+      <ComposerLockBanner
+        lockedBy={ticketLock.lockedBy}
+        onTakeOver={ticketLock.takeOver}
+        busy={ticketLock.takingOver}
+      />
+
+      {suggestion && (
+        <div
+          data-testid="tg-composer-ai"
+          className="flex min-w-0 items-center gap-2 rounded-lg border border-purple/30 bg-purple/10 px-2.5 py-1.5 text-xs"
+        >
+          <span className="shrink-0 font-semibold text-purple">✦ {t("ticket.telegram.composer.aiSuggestion")}</span>
+          <span className="min-w-0 flex-1 truncate text-ink">{suggestion.body}</span>
+          <button
+            type="button"
+            data-testid="tg-composer-ai-take"
+            onClick={() => void takeSuggestion()}
+            className="shrink-0 font-semibold text-purple hover:underline"
+          >
+            {t("ticket.telegram.composer.aiTake")}
+          </button>
+        </div>
+      )}
+
+      {(quoteId !== null || attachments.items.length > 0) && (
+        <div className="flex min-w-0 flex-wrap gap-1.5">
+          {quoteId !== null && (
+            <QuoteChip ticketId={ticketId} articleId={quoteId} onRemove={() => setQuoteId(null)} />
+          )}
+          <AttachmentChips items={attachments.items} onRemove={attachments.remove} />
+        </div>
+      )}
+
+      {adapter.supportsButtons && buttonsOn && (
+        <ButtonEditor buttons={buttons} onChange={setButtons} onPreset={applyPreset} onClose={closeButtons} />
+      )}
+
+      <div className="relative flex items-end gap-2">
+        {pickerOpen && (
+          <ChatSnippetPicker matches={matches} activeIndex={activeSnippet} onPick={pickSnippet} />
+        )}
+        <button
+          type="button"
+          title={t("ticket.telegram.composer.attach")}
+          aria-label={t("ticket.telegram.composer.attach")}
+          onClick={() => fileRef.current?.click()}
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted hover:text-ink"
+        >
+          ⊕
+        </button>
+        {adapter.supportsButtons && (
+          <button
+            type="button"
+            data-testid="tg-composer-buttons-toggle"
+            aria-pressed={buttonsOn}
+            title={t("ticket.telegram.composer.buttonsTitle")}
+            aria-label={t("ticket.telegram.composer.buttonsTitle")}
+            onClick={() => (buttonsOn ? closeButtons() : setButtonsOn(true))}
+            className={cn(
+              "grid h-8 w-8 shrink-0 place-items-center rounded-lg border",
+              buttonsOn ? "border-accent/50 bg-accent-dim text-accent" : "border-hairline text-muted hover:text-ink",
+            )}
+          >
+            <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current stroke-[1.8]">
+              <rect x="3" y="14" width="8" height="6" rx="1.5" />
+              <rect x="13" y="14" width="8" height="6" rx="1.5" />
+              <rect x="3" y="4" width="18" height="6" rx="1.5" />
+            </svg>
+          </button>
+        )}
+        <input
+          ref={fileRef}
+          type="file"
+          multiple
+          hidden
+          data-testid="tg-composer-file"
+          onChange={(e) => {
+            if (e.target.files) attachments.add(e.target.files);
+            // Same file again must still fire a change.
+            e.target.value = "";
+          }}
+        />
+        <textarea
+          ref={inputRef}
+          rows={1}
+          value={body}
+          data-testid="tg-composer-input"
+          aria-label={t("ticket.telegram.composer.inputLabel")}
+          placeholder={t("ticket.telegram.composer.placeholder", { name })}
+          onChange={onChange}
+          onKeyDown={onKeyDown}
+          onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
+          onPaste={(e) => {
+            const files = e.clipboardData?.files;
+            if (!files || files.length === 0) return;
+            e.preventDefault();
+            attachments.add(files);
+          }}
+          className="max-h-[8.25rem] min-h-[2rem] flex-1 resize-none overflow-y-auto rounded-lg border border-hairline bg-bg px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
+        />
+        <SendMenuButton
+          options={nextOptions}
+          primary={primaryNext}
+          disabled={!canSend}
+          sending={send.isPending}
+          pendingDate={pendingDate}
+          onPendingDate={setPendingDate}
+          onSend={submit}
+        />
+      </div>
+
+      {attachments.error && (
+        <p className="text-xs text-danger" data-testid="tg-composer-attach-error">
+          {attachments.error === "tooLarge"
+            ? t("ticket.telegram.composer.attachTooLarge", { max: formatBytes(MAX_ATTACHMENT_BYTES) })
+            : attachments.error === "tooMany"
+              ? t("ticket.telegram.composer.attachTooMany", { max: MAX_ATTACHMENTS })
+              : t("ticket.telegram.composer.attachReadFailed")}
+        </p>
+      )}
+      {sendError && (
+        <p className="flex flex-wrap items-center gap-2 text-xs text-danger" data-testid="tg-composer-error">
+          <span>{sendError}</span>
+          {/* No instant resend when it's unclear whether the first one
+              arrived; the text stays, so the agent can send it after
+              checking the history. */}
+          {sendErrorKind !== "uncertain" && sendErrorKind !== "ended" && (
+            <button
+              type="button"
+              data-testid="tg-composer-retry"
+              disabled={!canSend || send.isPending}
+              onClick={() => submit(send.variables?.nextState ?? primaryNext)}
+              className="font-semibold underline disabled:opacity-50"
+            >
+              {t("ticket.telegram.composer.retry")}
+            </button>
+          )}
+        </p>
+      )}
+
+      <ComposerFooter
+        length={body.length}
+        max={adapter.maxMessageLength}
+        snippetCount={templatesQ.isSuccess ? templates.length : null}
+        onSnippets={openSnippets}
+      />
+    </div>
+  );
+}
