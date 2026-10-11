@@ -45,6 +45,17 @@ export type SSEMessage =
   | CallEventMessage
   | AiLimitChangedMessage;
 
+const listeners = new Set<(message: SSEMessage) => void>();
+
+/** Subscribes to every parsed SSE message (for consumers that debounce their own refetch, such as
+ * the dashboard grid). Returns the unsubscribe function. */
+export function subscribeSSE(listener: (message: SSEMessage) => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
 /** Cache key used by TicketZoomPage's presence poll — kept here so useSSE's
  * invalidation and the query that reads it never drift apart. */
 export function presenceQueryKey(ticketId: number) {
@@ -61,6 +72,15 @@ export function handleSSEMessage(queryClient: QueryClient, raw: string): void {
     message = JSON.parse(raw) as SSEMessage;
   } catch {
     return;
+  }
+
+  // Bus first: every branch below returns early, listeners must see all message types.
+  for (const listener of [...listeners]) {
+    try {
+      listener(message);
+    } catch {
+      // a broken subscriber must not stop the cache invalidation below
+    }
   }
 
   if (message.type === "ticket_changed") {

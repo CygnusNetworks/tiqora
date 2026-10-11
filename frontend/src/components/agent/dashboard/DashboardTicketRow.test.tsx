@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { beforeAll, describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import {
@@ -60,6 +60,11 @@ async function renderInRouter(ui: React.ReactElement) {
   );
 }
 
+beforeAll(() => {
+  // The memory router restores scroll on navigation; jsdom has no window.scrollTo.
+  vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+});
+
 describe("DashboardTicketRow", () => {
   it("renders number, title, queue, state chip and priority chip", async () => {
     await renderInRouter(<DashboardTicketRow ticket={ticket} />);
@@ -92,5 +97,50 @@ describe("DashboardTicketRow", () => {
     await renderInRouter(<DashboardTicketRow ticket={ticket} />);
     const link = await screen.findByTestId("dashboard-ticket-42");
     expect(link.getAttribute("href")).toContain("/agent/tickets/42");
+  });
+
+  it("keeps today's look by default: comfortable padding and every meta piece", async () => {
+    await renderInRouter(<DashboardTicketRow ticket={ticket} />);
+    const link = await screen.findByTestId("dashboard-ticket-42");
+    expect(link).toHaveClass("py-2.5");
+    expect(link).toHaveAttribute("data-density", "comfortable");
+  });
+
+  it("compact density tightens the row; columns choose which pieces show", async () => {
+    await renderInRouter(
+      <DashboardTicketRow ticket={ticket} density="compact" columns={["title", "state"]} />,
+    );
+    const link = await screen.findByTestId("dashboard-ticket-42");
+    expect(link).toHaveClass("py-1.5");
+    expect(link).not.toHaveClass("py-2.5");
+    expect(link).toHaveTextContent("Printer on fire");
+    expect(link).not.toHaveTextContent("20240601000042");
+    expect(link).not.toHaveTextContent("Level 2");
+    expect(screen.getByTestId("dashboard-ticket-42-state-chip")).toBeInTheDocument();
+    expect(screen.queryByTestId("dashboard-ticket-42-priority")).toBeNull();
+  });
+
+  it("shows the customer under the title only when the customer column is chosen", async () => {
+    const withCustomer = { ...ticket, customer_email: "kunde@example.org" };
+    await renderInRouter(<DashboardTicketRow ticket={withCustomer} columns={["title", "customer"]} />);
+    expect(await screen.findByTestId("dashboard-ticket-42-customer")).toHaveTextContent("kunde@example.org");
+  });
+
+  it("keeps the customer out of the default row (avatar only)", async () => {
+    await renderInRouter(<DashboardTicketRow ticket={{ ...ticket, customer_email: "kunde@example.org" }} />);
+    await screen.findByTestId("dashboard-ticket-42");
+    expect(screen.queryByTestId("dashboard-ticket-42-customer")).toBeNull();
+  });
+
+  it("can be inert (edit mode) or plain text without a link (preview)", async () => {
+    await renderInRouter(<DashboardTicketRow ticket={ticket} linkMode="inert" />);
+    expect(await screen.findByTestId("dashboard-ticket-42")).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("renders no link at all with linkMode none", async () => {
+    await renderInRouter(<DashboardTicketRow ticket={ticket} linkMode="none" />);
+    const row = await screen.findByTestId("dashboard-ticket-42");
+    expect(row.tagName).not.toBe("A");
+    expect(row).toHaveTextContent("Printer on fire");
   });
 });

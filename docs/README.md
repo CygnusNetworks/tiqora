@@ -51,6 +51,7 @@
 | [channels.md](channels.md) | SMS, WhatsApp Business, Telegram (chat composer), and Phone/CTI (phone tickets, call logging, incoming-call popup) channel plugins |
 | [crypto.md](crypto.md) | PGP and S/MIME: key stores shared with Znuny, settings with Znuny precedence, key admin, verify/decrypt inbound, sign/encrypt outbound with per-queue defaults, customer keys, signed/encrypted notifications (off by default) |
 | [gdpr.md](gdpr.md) | Customer anonymization and retention-policy tooling, ownership write-gate |
+| [dashboards.md](dashboards.md) | Configurable agent dashboards: widgets, layout, sharing, admin role templates (incl. mandatory), permissions, keyboard/phone use, adding widgets and providers (German) |
 | [process-management.md](process-management.md) | BPM ticket processes: reused `pm_*` tables, engine flow, agent + portal CustomerInterface, REST API, supported/deferred scope |
 
 ## Design and specs

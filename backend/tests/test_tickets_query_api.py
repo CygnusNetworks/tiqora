@@ -197,8 +197,13 @@ def _cond(field: str, op: str, value: Any = None) -> dict[str, Any]:
     return {"field": field, "op": op, "value": value}
 
 
+# Service-only sort keys that the public API does not expose: "until" (pending reminder
+# time) is used by the dashboard's reminders widget only.
+_INTERNAL_SORT_KEYS = {"until"}
+
+
 def test_sort_keys_match_service() -> None:
-    assert set(get_args(TicketSortKey)) == set(TicketService._SORT_COLUMNS)
+    assert set(get_args(TicketSortKey)) == set(TicketService._SORT_COLUMNS) - _INTERNAL_SORT_KEYS
 
 
 async def test_query_filters_sorts_and_pages(env: Env) -> None:

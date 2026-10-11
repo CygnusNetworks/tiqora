@@ -7,7 +7,7 @@ from typing import Annotated
 
 import redis.asyncio as redis
 from fastapi import Cookie, Depends, Header, HTTPException, Request, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
@@ -30,6 +30,18 @@ async def get_db(
         factory = get_session_factory()
     async with factory() as session:
         yield session
+
+
+def get_session_factory_dep(request: Request) -> async_sessionmaker[AsyncSession]:
+    """The session factory ``get_db`` uses, for code that opens its own sessions.
+
+    Dashboard providers run concurrently, each in its own session (an ``AsyncSession`` is not
+    concurrency-safe); tests override this next to ``get_db``.
+    """
+    factory = getattr(request.app.state, "session_factory", None)
+    if factory is None:
+        factory = get_session_factory()
+    return factory
 
 
 async def get_redis(request: Request) -> redis.Redis:

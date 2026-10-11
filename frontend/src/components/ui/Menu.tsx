@@ -165,12 +165,13 @@ export function Menu({
     };
   }, [open]);
 
+  // The panel only exists once `pos` is set (layout effect after opening), so wait for it.
   useEffect(() => {
-    if (open && autoFocus) {
+    if (open && autoFocus && pos) {
       itemAt(panelRef.current, 0)?.focus();
       setAutoFocus(false);
     }
-  }, [open, autoFocus]);
+  }, [open, autoFocus, pos]);
 
   const onTriggerKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
@@ -259,6 +260,10 @@ export function MenuItem({
   danger,
   highlight,
   testId,
+  disabled,
+  softDisabled,
+  title,
+  description,
 }: {
   onSelect?: () => void;
   children: ReactNode;
@@ -268,45 +273,69 @@ export function MenuItem({
   danger?: boolean;
   highlight?: boolean;
   testId?: string;
+  /** Really disabled: skipped by arrow-key navigation. */
+  disabled?: boolean;
+  /** Looks and answers disabled (`aria-disabled`) but stays focusable, so its `title` can explain why. */
+  softDisabled?: boolean;
+  title?: string;
+  /** Announced with the item (`aria-describedby`), e.g. why a soft-disabled item does nothing:
+   * a `title` alone is not read out on keyboard focus. */
+  description?: string;
 }) {
   const ctx = useContext(MenuContext);
+  const descId = useId();
+  const inactive = disabled === true || softDisabled === true;
   return (
-    <button
-      type="button"
-      role="menuitem"
-      tabIndex={-1}
-      data-testid={testId}
-      onClick={() => {
-        onSelect?.();
-        if (!keepOpen) ctx?.close();
-      }}
-      className={cn(
-        "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors duration-100 focus:outline-none",
-        highlight
-          ? "bg-accent/15 font-semibold text-accent hover:bg-accent/25 focus-visible:bg-accent/25"
-          : danger
-            ? "text-danger hover:bg-danger/10 focus-visible:bg-danger/10"
-            : "text-ink/90 hover:bg-surface-subtle focus-visible:bg-surface-subtle",
-      )}
-    >
-      {icon != null && (
-        <span
-          className={cn(
-            "flex w-4 shrink-0 justify-center text-[15px]",
-            highlight ? "text-accent" : "text-muted",
-          )}
-          aria-hidden
-        >
-          {icon}
+    <>
+      <button
+        type="button"
+        role="menuitem"
+        tabIndex={-1}
+        data-testid={testId}
+        disabled={disabled}
+        aria-disabled={softDisabled ? true : undefined}
+        aria-describedby={description ? descId : undefined}
+        title={title}
+        onClick={() => {
+          if (softDisabled) return;
+          onSelect?.();
+          if (!keepOpen) ctx?.close();
+        }}
+        className={cn(
+          "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors duration-100 focus:outline-none",
+          inactive
+            ? "cursor-not-allowed text-ink/90 opacity-50"
+            : highlight
+            ? "bg-accent/15 font-semibold text-accent hover:bg-accent/25 focus-visible:bg-accent/25"
+            : danger
+              ? "text-danger hover:bg-danger/10 focus-visible:bg-danger/10"
+              : "text-ink/90 hover:bg-surface-subtle focus-visible:bg-surface-subtle",
+        )}
+      >
+        {icon != null && (
+          <span
+            className={cn(
+              "flex w-4 shrink-0 justify-center text-[15px]",
+              highlight ? "text-accent" : "text-muted",
+            )}
+            aria-hidden
+          >
+            {icon}
+          </span>
+        )}
+        <span className="min-w-0 flex-1 truncate">{children}</span>
+        {selected != null && (
+          <span className="flex w-4 shrink-0 justify-center text-accent" aria-hidden>
+            {selected ? <CheckMark /> : null}
+          </span>
+        )}
+      </button>
+      {description && (
+        <span id={descId} hidden>
+          {description}
         </span>
       )}
-      <span className="min-w-0 flex-1 truncate">{children}</span>
-      {selected != null && (
-        <span className="flex w-4 shrink-0 justify-center text-accent" aria-hidden>
-          {selected ? <CheckMark /> : null}
-        </span>
-      )}
-    </button>
+    </>
   );
 }
 

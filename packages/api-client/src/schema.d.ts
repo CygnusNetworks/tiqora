@@ -2499,6 +2499,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/dashboard-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Templates */
+        get: operations["list_templates_api_v1_admin_dashboard_templates_get"];
+        put?: never;
+        /** Create Template */
+        post: operations["create_template_api_v1_admin_dashboard_templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/dashboard-templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Template */
+        put: operations["update_template_api_v1_admin_dashboard_templates__template_id__put"];
+        post?: never;
+        /** Delete Template */
+        delete: operations["delete_template_api_v1_admin_dashboard_templates__template_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/deploy": {
         parameters: {
             query?: never;
@@ -6322,6 +6358,200 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard-widget-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Widget Types
+         * @description The ten core widget types (plugin widgets have no server side in phase 1).
+         */
+        get: operations["list_widget_types_api_v1_dashboard_widget_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard-widget-types/{key}/data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Widget Data
+         * @description Data for unsaved settings (settings drawer); runs as the viewer, writes no history.
+         */
+        post: operations["preview_widget_data_api_v1_dashboard_widget_types__key__data_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Dashboards */
+        get: operations["list_dashboards_api_v1_dashboards_get"];
+        put?: never;
+        /** Create Dashboard */
+        post: operations["create_dashboard_api_v1_dashboards_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/ensure-start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ensure Start
+         * @description The caller's first dashboard; 201 when this call created "Mein Start", else 200.
+         */
+        post: operations["ensure_start_api_v1_dashboards_ensure_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Order */
+        put: operations["put_order_api_v1_dashboards_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/{dashboard_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Dashboard */
+        get: operations["get_dashboard_api_v1_dashboards__dashboard_id__get"];
+        /** Save Dashboard */
+        put: operations["save_dashboard_api_v1_dashboards__dashboard_id__put"];
+        post?: never;
+        /** Delete Dashboard */
+        delete: operations["delete_dashboard_api_v1_dashboards__dashboard_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/{dashboard_id}/data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dashboard Data
+         * @description Data of the dashboard's widgets (``widgets`` = comma list of ids; default all).
+         *
+         *     Providers run as the viewer, at most four at once, five seconds each; a widget that runs
+         *     out of time is ``pending``. Ids that are not on this dashboard are ignored.
+         */
+        get: operations["dashboard_data_api_v1_dashboards__dashboard_id__data_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/{dashboard_id}/share": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Share Dashboard
+         * @description Share with groups (owner only); ``[]`` unshares. Templates are distributed by role.
+         */
+        put: operations["share_dashboard_api_v1_dashboards__dashboard_id__share_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/{dashboard_id}/widgets/{widget_id}/data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Widget Data
+         * @description One widget's data with the longer single-widget budget (25 s).
+         */
+        get: operations["widget_data_api_v1_dashboards__dashboard_id__widgets__widget_id__data_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/{dashboard_id}/widgets/{widget_id}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Widget Settings */
+        patch: operations["patch_widget_settings_api_v1_dashboards__dashboard_id__widgets__widget_id__settings_patch"];
         trace?: never;
     };
     "/api/v1/events/stream": {
@@ -13201,6 +13431,82 @@ export interface components {
             /** Interval Seconds */
             interval_seconds?: number | null;
         };
+        /** DashboardCreateIn */
+        DashboardCreateIn: {
+            /** Copy From */
+            copy_from?: number | null;
+            /** Icon */
+            icon?: string | null;
+            /** Name */
+            name: string;
+        };
+        /** DashboardDataOut */
+        DashboardDataOut: {
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Widgets */
+            widgets: {
+                [key: string]: components["schemas"]["WidgetDataOut"];
+            };
+        };
+        /** DashboardOrderIn */
+        DashboardOrderIn: {
+            /** Ids */
+            ids: number[];
+        };
+        /** DashboardOut */
+        DashboardOut: {
+            /** Can Edit */
+            can_edit: boolean;
+            /** Can Share */
+            can_share: boolean;
+            /** Group Ids */
+            group_ids: number[];
+            /** Icon */
+            icon: string | null;
+            /** Id */
+            id: number;
+            /** Is Owner */
+            is_owner: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "personal" | "template" | "shared";
+            /** Locked */
+            locked: boolean;
+            /** Name */
+            name: string;
+            /** Owner Name */
+            owner_name: string | null;
+            /** Sort */
+            sort: number;
+            /** Source Template Id */
+            source_template_id: number | null;
+            /** Version */
+            version: number;
+            /** Widgets */
+            widgets: components["schemas"]["WidgetOut"][];
+        };
+        /** DashboardSaveIn */
+        DashboardSaveIn: {
+            /** Icon */
+            icon?: string | null;
+            /** Name */
+            name: string;
+            /** Version */
+            version: number;
+            /** Widgets */
+            widgets: components["schemas"]["WidgetIn"][];
+        };
+        /** DashboardShareIn */
+        DashboardShareIn: {
+            /** Group Ids */
+            group_ids: number[];
+        };
         /**
          * DashboardSummary
          * @description KPI-tile counts for the agent dashboard.
@@ -13216,6 +13522,93 @@ export interface components {
             my_open: number;
             /** Unowned New */
             unowned_new: number;
+        };
+        /** DashboardTabOut */
+        DashboardTabOut: {
+            /** Can Edit */
+            can_edit: boolean;
+            /** Can Share */
+            can_share: boolean;
+            /** Group Ids */
+            group_ids: number[];
+            /** Icon */
+            icon: string | null;
+            /** Id */
+            id: number;
+            /** Is Owner */
+            is_owner: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "personal" | "template" | "shared";
+            /** Locked */
+            locked: boolean;
+            /** Name */
+            name: string;
+            /** Owner Name */
+            owner_name: string | null;
+            /** Sort */
+            sort: number;
+            /** Source Template Id */
+            source_template_id: number | null;
+            /** Version */
+            version: number;
+        };
+        /** DashboardTemplateIn */
+        DashboardTemplateIn: {
+            /** Icon */
+            icon?: string | null;
+            /**
+             * Locked
+             * @default false
+             */
+            locked: boolean;
+            /** Name */
+            name: string;
+            /** Role Ids */
+            role_ids: number[];
+            /**
+             * Sort
+             * @default 0
+             */
+            sort: number;
+        };
+        /** DashboardTemplateOut */
+        DashboardTemplateOut: {
+            /** Can Edit */
+            can_edit: boolean;
+            /** Can Share */
+            can_share: boolean;
+            /** Group Ids */
+            group_ids: number[];
+            /** Icon */
+            icon: string | null;
+            /** Id */
+            id: number;
+            /** Is Owner */
+            is_owner: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "personal" | "template" | "shared";
+            /** Locked */
+            locked: boolean;
+            /** Name */
+            name: string;
+            /** Owner Name */
+            owner_name: string | null;
+            /** Role Ids */
+            role_ids: number[];
+            /** Sort */
+            sort: number;
+            /** Source Template Id */
+            source_template_id: number | null;
+            /** Version */
+            version: number;
+            /** Widget Count */
+            widget_count: number;
         };
         /** DashboardWidgetContribution */
         DashboardWidgetContribution: {
@@ -17343,6 +17736,20 @@ export interface components {
             value?: string | null;
         };
         /**
+         * Rect
+         * @description A widget rectangle in grid cells (12 columns on ``lg``).
+         */
+        Rect: {
+            /** H */
+            h: number;
+            /** W */
+            w: number;
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+        };
+        /**
          * RecurrenceIn
          * @description Common RRULE subset: FREQ + INTERVAL + (COUNT xor UNTIL).
          */
@@ -19513,7 +19920,7 @@ export interface components {
             params?: components["schemas"]["TicketListParams"];
             /**
              * Sort
-             * @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending).
+             * @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending) | until (pending reminder time; tickets without one last when ascending).
              * @default age
              */
             sort: string;
@@ -20549,6 +20956,82 @@ export interface components {
             /** Processed */
             processed: number;
         };
+        /** WidgetDataOut */
+        WidgetDataOut: {
+            /** Data */
+            data?: {
+                [key: string]: unknown;
+            } | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "pending" | "error" | "forbidden";
+        };
+        /** WidgetIn */
+        WidgetIn: {
+            /** Id */
+            id: string;
+            layout: components["schemas"]["WidgetLayouts"];
+            /** Settings */
+            settings?: {
+                [key: string]: unknown;
+            };
+            /** Title Override */
+            title_override?: string | null;
+            /** Type Key */
+            type_key: string;
+            /**
+             * Type Version
+             * @default 1
+             */
+            type_version: number;
+        };
+        /** WidgetLayouts */
+        WidgetLayouts: {
+            lg: components["schemas"]["Rect"];
+            md?: components["schemas"]["Rect"] | null;
+        };
+        /**
+         * WidgetOut
+         * @description Same fields as ``WidgetIn``, settings as stored.
+         */
+        WidgetOut: {
+            /** Id */
+            id: string;
+            layout: components["schemas"]["WidgetLayouts"];
+            /** Settings */
+            settings?: {
+                [key: string]: unknown;
+            };
+            /** Title Override */
+            title_override?: string | null;
+            /** Type Key */
+            type_key: string;
+            /**
+             * Type Version
+             * @default 1
+             */
+            type_version: number;
+        };
+        /** WidgetPreviewIn */
+        WidgetPreviewIn: {
+            /** Settings */
+            settings?: {
+                [key: string]: unknown;
+            };
+        };
+        /** WidgetSettingsPatchIn */
+        WidgetSettingsPatchIn: {
+            /** Settings */
+            settings: {
+                [key: string]: unknown;
+            };
+            /** Version */
+            version: number;
+        };
         /** WidgetSize */
         WidgetSize: {
             /**
@@ -20584,6 +21067,15 @@ export interface components {
                 number,
                 number
             ];
+        };
+        /** WidgetTypeOut */
+        WidgetTypeOut: {
+            /** Has Data */
+            has_data: boolean;
+            /** Key */
+            key: string;
+            /** Version */
+            version: number;
         };
         /** ZnunyImportIn */
         ZnunyImportIn: {
@@ -26901,6 +27393,151 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DaemonServiceOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_templates_api_v1_admin_dashboard_templates_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardTemplateOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_template_api_v1_admin_dashboard_templates_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardTemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_template_api_v1_admin_dashboard_templates__template_id__put: {
+        parameters: {
+            query: {
+                /** @description Optimistic lock: the version last read */
+                version: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardTemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_template_api_v1_admin_dashboard_templates__template_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -37475,6 +38112,475 @@ export interface operations {
             };
         };
     };
+    list_widget_types_api_v1_dashboard_widget_types_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetTypeOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_widget_data_api_v1_dashboard_widget_types__key__data_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WidgetPreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetDataOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_dashboards_api_v1_dashboards_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardTabOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_dashboard_api_v1_dashboards_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ensure_start_api_v1_dashboards_ensure_start_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_order_api_v1_dashboards_order_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardOrderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_dashboard_api_v1_dashboards__dashboard_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                dashboard_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_dashboard_api_v1_dashboards__dashboard_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                dashboard_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardSaveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_dashboard_api_v1_dashboards__dashboard_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                dashboard_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dashboard_data_api_v1_dashboards__dashboard_id__data_get: {
+        parameters: {
+            query?: {
+                widgets?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                dashboard_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardDataOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    share_dashboard_api_v1_dashboards__dashboard_id__share_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                dashboard_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardShareIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    widget_data_api_v1_dashboards__dashboard_id__widgets__widget_id__data_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                dashboard_id: number;
+                widget_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetDataOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_widget_settings_api_v1_dashboards__dashboard_id__widgets__widget_id__settings_patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                dashboard_id: number;
+                widget_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WidgetSettingsPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     stream_events_api_v1_events_stream_get: {
         parameters: {
             query?: never;
@@ -40930,7 +42036,7 @@ export interface operations {
                 channel?: ("email" | "telegram" | "webchat" | "phone")[] | null;
                 offset?: number;
                 limit?: number;
-                /** @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending). */
+                /** @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending) | until (pending reminder time; tickets without one last when ascending). */
                 sort?: string;
                 order?: string;
                 /** @description Also list archived tickets (admins only; ignored otherwise). */
@@ -41131,7 +42237,7 @@ export interface operations {
                 escalating_within?: number | null;
                 /** @description Repeatable; any of: email (no message on a chat channel, not opened by a phone call), telegram, webchat, phone (first article on the Phone channel and no chat message). Several values match tickets of any of them. */
                 channel?: ("email" | "telegram" | "webchat" | "phone")[] | null;
-                /** @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending). */
+                /** @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending) | until (pending reminder time; tickets without one last when ascending). */
                 sort?: string;
                 order?: string;
                 /** @description Also export archived tickets (admins only; ignored otherwise). */

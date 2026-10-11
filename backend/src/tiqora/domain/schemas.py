@@ -688,7 +688,8 @@ class PortalAttachmentUploadResponse(BaseModel):
     attachment_ids: list[int]
 
 
-#: Sort keys of ``POST /tickets/query``; must equal ``TicketService._SORT_COLUMNS``.
+#: Sort keys of ``POST /tickets/query``; must equal ``TicketService._SORT_COLUMNS`` minus the
+#: service-only ``until`` (dashboard reminders widget).
 TicketSortKey = Literal[
     "age", "created", "changed", "tn", "title", "priority", "activity", "deadline"
 ]

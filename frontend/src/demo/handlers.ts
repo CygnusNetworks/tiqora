@@ -7,6 +7,7 @@ import {
   demoPortalProcess,
   demoRefine,
 } from "./mockData";
+import { resolve as resolveDashboards } from "./dashboardsMock";
 import { setDemoFactsBuilding } from "./reportsMock";
 import { demoReportFile, resolveSavedRequest } from "./savedMock";
 import type { ReportRunIn } from "@/lib/reportsApi";
@@ -81,7 +82,20 @@ function respond(pathname: string, method: string): unknown {
 const DEMO_QR_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21" width="200" height="200"><rect width="21" height="21" fill="#fff"/><path d="M0 0h7v7H0zM14 0h7v7h-7zM0 14h7v7H0z" fill="none" stroke="#000" stroke-width="2"/><path d="M2 2h3v3H2zM16 2h3v3h-3zM2 16h3v3H2zM9 1h2v2H9zM9 5h3v2H9zM8 9h2v2H8zM12 9h3v2h-3zM10 13h2v3h-2zM14 14h3v2h-3zM18 17h2v3h-2zM12 18h3v2h-3z" fill="#000"/></svg>';
 
+/** Dashboards need the request body / query, which resolveData never sees (R-DASH-DEMO-BODY). */
+async function dashboardsResponse(request: Request): Promise<Response | undefined> {
+  const url = new URL(request.url);
+  const hasBody = request.method !== "GET" && request.method !== "DELETE";
+  const body = hasBody ? await request.json().catch(() => ({})) : undefined;
+  const out = resolveDashboards(request.method, url.pathname, body, url.searchParams);
+  if (!out) return undefined;
+  return out.status === 204 ? new HttpResponse(null, { status: 204 }) : HttpResponse.json(out.body as never, { status: out.status });
+}
+
 export const handlers = [
+  http.all("*/api/v1/dashboards*", async ({ request }) => (await dashboardsResponse(request)) ?? HttpResponse.json([])),
+  http.post("*/api/v1/dashboard-widget-types/*/data", async ({ request }) => (await dashboardsResponse(request)) ?? HttpResponse.json({})),
+  http.all("*/api/v1/admin/dashboard-templates*", async ({ request }) => (await dashboardsResponse(request)) ?? HttpResponse.json({})),
   // Demo QR code for the customer TOTP enrolment (a placeholder, not a real secret).
   http.get(
     "*/api/portal/auth/totp/enroll/qr",

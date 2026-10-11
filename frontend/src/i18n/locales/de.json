@@ -2181,7 +2181,8 @@
       "aiModels": "Modelle",
       "identityProviders": "Identitätsanbieter",
       "reporting": "Berichtsdaten",
-      "plugins": "Erweiterungen"
+      "plugins": "Erweiterungen",
+      "dashboardTemplates": "Dashboard-Vorlagen"
     },
     "table": {
       "id": "ID",
@@ -3505,7 +3506,8 @@
       "identityProviders": "Anmeldung über Microsoft, Google, SAML oder LDAP einrichten.",
       "reporting": "Zustand der Berichtsdaten ansehen und alles neu berechnen lassen.",
       "settingsReporting": "Berichte: Zeitzone, Zugriff, Zwischenspeicher sowie Grenzen für Ergebnisse und Exporte.",
-      "plugins": "Installierte Erweiterungen ein- und ausschalten, Zustand prüfen und einstellen."
+      "plugins": "Installierte Erweiterungen ein- und ausschalten, Zustand prüfen und einstellen.",
+      "dashboardTemplates": "Startseiten je Rolle als Vorlage festlegen, optional verbindlich."
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -4472,6 +4474,45 @@
           "other": "Erweitert die Oberfläche ({{value}})"
         }
       }
+    },
+    "dashboardTemplates": {
+      "title": "Dashboard-Vorlagen",
+      "subtitle": "Womit ein neues Dashboard für eine Rolle startet.",
+      "new": "Neue Vorlage",
+      "loadFailed": "Die Vorlagen konnten nicht geladen werden.",
+      "empty": "Vorlagen legen fest, womit ein neues Dashboard für eine Rolle startet. Legen Sie die erste Vorlage an.",
+      "columns": {
+        "name": "Name",
+        "roles": "Rollen",
+        "locked": "Gesperrt",
+        "widgets": "Widgets",
+        "priority": "Priorität",
+        "actions": "Aktionen"
+      },
+      "yes": "Ja",
+      "no": "Nein",
+      "noRoles": "Keine Rolle",
+      "newTitle": "Neue Vorlage",
+      "editTitle": "Vorlage bearbeiten",
+      "name": "Name",
+      "nameRequired": "Bitte einen Namen eingeben.",
+      "roles": "Rollen",
+      "rolesRequired": "Bitte mindestens eine Rolle wählen.",
+      "rolesLoadFailed": "Die Rollen konnten nicht geladen werden.",
+      "locked": "Für die Rollen verbindlich (Benutzer können sie nicht ändern)",
+      "priority": "Priorität",
+      "priorityHelp": "Bei mehreren passenden Vorlagen kommt die mit dem kleineren Wert zuerst.",
+      "create": "Anlegen",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "edit": "Bearbeiten",
+      "editLayout": "Layout bearbeiten",
+      "delete": "Löschen",
+      "saveFailed": "Die Vorlage konnte nicht gespeichert werden.",
+      "conflict": "Diese Vorlage wurde inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es noch einmal.",
+      "deleteTitle": "Vorlage „{{name}}“ löschen?",
+      "deleteMessage": "Dashboards, die Benutzer bereits aus dieser Vorlage erhalten haben, bleiben bestehen.",
+      "deleteFailed": "Die Vorlage konnte nicht gelöscht werden."
     }
   },
   "kb": {
@@ -5585,8 +5626,390 @@
     "slotError": "Erweiterung „{{name}}“ konnte nicht geladen werden.",
     "slotErrorDetails": "Details",
     "safeModeBrowser": "Erweiterungen sind in diesem Browserfenster ausgeschaltet.",
-    "pageNotFound": "Diese Seite der Erweiterung gibt es nicht.",
-    "widgetsTitle": "Erweiterungen"
+    "pageNotFound": "Diese Seite der Erweiterung gibt es nicht."
+  },
+  "dashboards": {
+    "state": {
+      "loading": "Wird geladen",
+      "retry": "Erneut versuchen",
+      "loadFailed": "Diese Daten konnten nicht geladen werden.",
+      "forbidden": "Dafür fehlt Ihnen die Berechtigung.",
+      "unavailable": "Widget nicht verfügbar",
+      "unavailableHint": "Diese Art von Widget gibt es hier nicht (mehr). Es bleibt gespeichert, bis Sie es entfernen.",
+      "remove": "Entfernen",
+      "showAll": "Alle {{count}} anzeigen",
+      "total": "{{count}} insgesamt"
+    },
+    "due": {
+      "since": "seit {{duration}}",
+      "in": "in {{duration}}"
+    },
+    "columns": {
+      "ticket": "Ticket",
+      "tn": "Ticketnummer",
+      "title": "Titel",
+      "customer": "Kunde",
+      "state": "Status",
+      "due": "Fällig",
+      "queue": "Queue",
+      "owner": "Besitzer",
+      "priority": "Priorität",
+      "changed": "Geändert",
+      "created": "Erstellt"
+    },
+    "presets": {
+      "mine_open": {
+        "counter": "Meine offenen",
+        "list": "Meine offenen Tickets"
+      },
+      "mine_new": {
+        "counter": "Meine neuen",
+        "list": "Meine neuen Tickets"
+      },
+      "unowned_new": {
+        "counter": "Zum Übernehmen",
+        "list": "Zum Übernehmen"
+      },
+      "escalated": {
+        "counter": "Eskaliert",
+        "list": "Eskalierte Tickets"
+      },
+      "ai_escalated": {
+        "counter": "Von der KI übergeben",
+        "list": "Von der KI übergeben"
+      }
+    },
+    "widgets": {
+      "ticketList": {
+        "title": "Ticketliste",
+        "description": "Tickets einer Auswahl als Tabelle",
+        "empty": "Noch keine Tickets in dieser Suche.",
+        "changeFilter": "Filter ändern"
+      },
+      "counter": {
+        "title": "Kennzahl",
+        "description": "Eine Zahl mit Verlauf, z. B. Ihre offenen Tickets",
+        "delta": "{{delta}} seit dem letzten Stand"
+      },
+      "queueOverview": {
+        "title": "Queues",
+        "description": "Offene und neue Tickets je Queue",
+        "empty": "Keine Queues mit offenen oder neuen Tickets.",
+        "emptyNone": "Keine Queues sichtbar.",
+        "all": "Alle Queues anzeigen",
+        "counts": "{{open}} offen · {{new}} neu"
+      },
+      "escalations": {
+        "title": "Eskalationen",
+        "description": "Überschrittene und nächste Fristen zuerst",
+        "empty": "Keine eskalierten Tickets.",
+        "emptyWithin_one": "Keine Fristen in der nächsten Stunde.",
+        "emptyWithin_other": "Keine Fristen in den nächsten {{count}} Stunden.",
+        "order": "nächste Frist zuerst",
+        "remaining": "noch {{duration}}",
+        "kind": {
+          "first_response": "Erste Antwort",
+          "update": "Aktualisierung",
+          "solution": "Lösungszeit",
+          "escalation": "Eskalation"
+        }
+      },
+      "reminders": {
+        "title": "Erinnerungen fällig",
+        "description": "Wartende Tickets, deren Erinnerung fällig ist",
+        "empty": "Keine fälligen Erinnerungen.",
+        "overdue": "Überfällig"
+      },
+      "recentViews": {
+        "title": "Zuletzt angesehen",
+        "description": "Tickets, die Sie zuletzt geöffnet haben",
+        "empty": "Noch nichts angesehen.",
+        "untitled": "(kein Betreff)"
+      },
+      "calendarAgenda": {
+        "title": "Kalender",
+        "description": "Ihre Termine von heute",
+        "empty": "Heute keine Termine.",
+        "emptyDays_one": "Heute keine Termine.",
+        "emptyDays_other": "Keine Termine in den nächsten {{count}} Tagen.",
+        "today": "Heute im Kalender",
+        "days_one": "Heute im Kalender",
+        "days_other": "Die nächsten {{count}} Tage",
+        "open": "Kalender öffnen"
+      },
+      "teamPresence": {
+        "title": "Team",
+        "description": "Wer gerade online ist",
+        "empty": "Gerade ist niemand online.",
+        "online_one": "{{count}} online",
+        "online_other": "{{count}} online",
+        "more_one": "und {{count}} weitere Person",
+        "more_other": "und {{count}} weitere"
+      },
+      "notes": {
+        "title": "Notizen",
+        "description": "Freier Text für Sie oder Ihr Team",
+        "empty": "Noch keine Notiz. In den Einstellungen können Sie Text eintragen."
+      },
+      "links": {
+        "title": "Links",
+        "description": "Wichtige Adressen auf einen Blick",
+        "empty": "Noch keine Links. In den Einstellungen können Sie welche eintragen."
+      },
+      "chooseSearch": "Suche wählen"
+    },
+    "tabs": {
+      "label": "Dashboards",
+      "new": "Neues Dashboard",
+      "locked": "Verbindlich",
+      "owner": "von {{name}}"
+    },
+    "view": {
+      "customize": "Anpassen",
+      "share": "Teilen",
+      "loading": "Dashboard wird geladen",
+      "loadFailed": "Das Dashboard konnte nicht geladen werden.",
+      "listFailed": "Die Dashboards konnten nicht geladen werden.",
+      "tooSlow": "Das dauert zu lange.",
+      "widgetCrashed": "Dieses Widget konnte nicht angezeigt werden.",
+      "templateBanner": "Sie sehen die Vorlage „{{name}}“. Änderungen gelten für alle, die sie über ihre Rolle bekommen.",
+      "lockedHint": "Dieses Dashboard ist für Ihre Rolle verbindlich und lässt sich nicht anpassen.",
+      "empty": "Auf diesem Dashboard ist noch nichts.",
+      "emptyEdit": "Auf diesem Dashboard ist noch nichts. Mit „Anpassen“ fügen Sie Widgets hinzu."
+    },
+    "edit": {
+      "toolbar": "Bearbeiten",
+      "title": "{{name}} bearbeiten",
+      "draftSaved": "Entwurf gesichert · {{time}}",
+      "restoreDraft": "Entwurf von {{time}} wiederherstellen",
+      "dropDraft": "Entwurf verwerfen",
+      "undo": "Rückgängig",
+      "redo": "Wiederholen",
+      "discard": "Verwerfen",
+      "save": "Speichern",
+      "saving": "Wird gespeichert …",
+      "discardTitle": "Änderungen verwerfen?",
+      "discardMessage": "Ihre Änderungen an diesem Dashboard gehen verloren, auch der gesicherte Entwurf.",
+      "discardConfirm": "Änderungen verwerfen",
+      "continue": "Weiter bearbeiten",
+      "conflictTitle": "Dieses Dashboard wurde inzwischen geändert",
+      "conflictMessage": "Es wurde gespeichert, während Sie es bearbeitet haben – in einem anderen Fenster oder von jemand anderem. „Neu laden“ zeigt die neue Fassung. Ihre Änderungen bleiben als Entwurf erhalten und lassen sich beim nächsten „Anpassen“ wiederherstellen. Gespeichert ersetzen sie die neue Fassung dann vollständig; sie werden nicht zusammengeführt.",
+      "conflictReload": "Neu laden",
+      "keyboardHint": "Tastatur: Widget fokussieren, Pfeiltasten verschieben, Umschalt + Pfeiltasten ändern die Größe, Eingabe öffnet die Einstellungen.",
+      "phoneHint": "Auf schmalen Bildschirmen stehen Widgets untereinander; die Reihenfolge lässt sich hier ändern.",
+      "settings": "Einstellungen",
+      "duplicate": "Duplizieren",
+      "remove": "Entfernen",
+      "up": "Nach oben",
+      "down": "Nach unten",
+      "widgetRole": "verschiebbares Widget",
+      "moved": "„{{title}}“ ist jetzt in Spalte {{col}}, Zeile {{row}}, {{w}} mal {{h}}",
+      "movedOrder": "„{{title}}“ ist jetzt an Stelle {{pos}} von {{count}}",
+      "removed": "„{{title}}“ entfernt",
+      "duplicated": "„{{title}}“ dupliziert",
+      "limitReached": "Es sind höchstens {{count}} Widgets möglich.",
+      "tooTall": "Das Layout ist zu hoch.",
+      "saveFailed": "Das Dashboard konnte nicht gespeichert werden.",
+      "close": "Schließen",
+      "restoreOverwrite": "Ihre Änderungen von {{time}} wiederherstellen – ersetzt beim Speichern die neuere Fassung (Stand {{newer}})",
+      "conflictMessageTemplate": "Diese Vorlage wurde gespeichert, während Sie sie bearbeitet haben – in einem anderen Fenster oder von einer anderen Person. „Neu laden“ zeigt die neue Fassung. Ihre Änderungen bleiben als Entwurf erhalten und lassen sich beim nächsten „Anpassen“ wiederherstellen. Gespeichert ersetzen sie die neue Fassung dann vollständig – auch die Änderungen anderer, für alle, die die Vorlage über ihre Rolle bekommen.",
+      "overwriteTitle": "Neuere Fassung ersetzen?",
+      "overwriteMessage": "Sie haben Ihre Änderungen begonnen, bevor eine neuere Fassung dieses Dashboards gespeichert wurde (Stand {{newer}}). „Ersetzen und speichern“ ersetzt diese Fassung vollständig durch Ihre; was dort geändert wurde, geht verloren.",
+      "overwriteMessageTemplate": "Sie haben Ihre Änderungen begonnen, bevor eine neuere Fassung dieser Vorlage gespeichert wurde (Stand {{newer}}). „Ersetzen und speichern“ ersetzt sie vollständig durch Ihre: Änderungen anderer gehen verloren, und das gilt für alle, die die Vorlage über ihre Rolle bekommen.",
+      "overwriteConfirm": "Ersetzen und speichern"
+    },
+    "gallery": {
+      "title": "Widget hinzufügen",
+      "open": "Widget hinzufügen",
+      "close": "Galerie schließen",
+      "search": "Suchen",
+      "searchPlaceholder": "z. B. Eskalation, Notiz, Queue",
+      "groups": {
+        "tickets": "Tickets",
+        "me": "Für mich",
+        "team": "Team"
+      },
+      "hint": "Ins Raster ziehen oder anklicken – das Widget landet in der ersten freien Lücke.",
+      "limit": "Es sind höchstens {{max}} Widgets möglich.",
+      "empty": "Nichts gefunden",
+      "clearSearch": "Suche löschen",
+      "addedAt": "„{{title}}“ hinzugefügt – {{n}} von {{max}} Widgets"
+    },
+    "settings": {
+      "title": "Einstellungen",
+      "cancel": "Abbrechen",
+      "apply": "Übernehmen",
+      "titleField": "Titel",
+      "titleHint": "Leer lassen, um den Standardtitel zu verwenden.",
+      "preview": "Vorschau",
+      "range": "Der Wert muss zwischen {{min}} und {{max}} liegen.",
+      "number": "Bitte geben Sie eine Zahl an.",
+      "ticketList": {
+        "which": "Welche Tickets?",
+        "savedSearch": "Gespeicherte Suche",
+        "savedSearchHint": "Ändert sich die Suche, ändert sich das Widget mit.",
+        "standard": "Standard",
+        "columns": "Spalten",
+        "columnsMin": "Mindestens eine Spalte muss ausgewählt sein.",
+        "columnsMax": "Höchstens {{max}} Spalten sind möglich.",
+        "sort": "Sortierung",
+        "sortOther": "Andere Sortierung",
+        "sorts": {
+          "deadlineAsc": "Fälligkeit, früheste zuerst",
+          "changedDesc": "Zuletzt geändert",
+          "priorityDesc": "Priorität",
+          "ageAsc": "Älteste zuerst",
+          "ageDesc": "Neueste zuerst"
+        },
+        "rows": "Anzahl Zeilen",
+        "density": "Darstellung",
+        "compact": "Kompakt",
+        "comfortable": "Bequem",
+        "columnTitle": "Ticket-Titel"
+      },
+      "notes": {
+        "label": "Notiz",
+        "hint": "Markdown ist möglich. Alle, die dieses Dashboard sehen, sehen die Notiz.",
+        "tooLong": "Die Notiz darf höchstens {{max}} Zeichen lang sein."
+      },
+      "links": {
+        "legend": "Links",
+        "label": "Bezeichnung {{n}}",
+        "url": "Adresse {{n}}",
+        "up": "Link {{n}} nach oben",
+        "down": "Link {{n}} nach unten",
+        "remove": "Link {{n}} entfernen",
+        "removeShort": "Entfernen",
+        "add": "Link hinzufügen",
+        "count": "{{used}} von {{max}}",
+        "hint": "Erlaubt sind Adressen, die mit /, http://, https:// oder mailto: beginnen.",
+        "labelMissing": "Bitte tragen Sie eine Bezeichnung ein.",
+        "urlMissing": "Bitte tragen Sie eine Adresse ein.",
+        "urlNotAllowed": "Diese Adresse ist nicht erlaubt."
+      },
+      "forms": {
+        "counter": {
+          "fields": {
+            "tone": {
+              "options": {
+                "neutral": "Neutral",
+                "danger": "Rot (Warnung)",
+                "ok": "Grün (in Ordnung)"
+              }
+            }
+          }
+        },
+        "queueOverview": {
+          "fields": {
+            "limit": {
+              "label": "Anzahl Queues"
+            },
+            "only_with_work": {
+              "label": "Nur Queues mit Tickets",
+              "help": "Queues ohne offene oder neue Tickets werden ausgeblendet."
+            }
+          }
+        },
+        "escalations": {
+          "fields": {
+            "limit": {
+              "label": "Anzahl Einträge"
+            },
+            "within_hours": {
+              "label": "Fristen in den nächsten Stunden",
+              "help": "0 zeigt nur bereits überschrittene Fristen."
+            }
+          }
+        },
+        "reminders": {
+          "fields": {
+            "window_hours": {
+              "label": "Zeitraum in Stunden",
+              "help": "Erinnerungen, die in diesem Zeitraum fällig werden."
+            },
+            "limit": {
+              "label": "Anzahl Einträge"
+            }
+          }
+        },
+        "recentViews": {
+          "fields": {
+            "limit": {
+              "label": "Anzahl Tickets"
+            }
+          }
+        },
+        "calendarAgenda": {
+          "fields": {
+            "days": {
+              "label": "Anzahl Tage"
+            },
+            "limit": {
+              "label": "Anzahl Termine"
+            }
+          }
+        },
+        "teamPresence": {
+          "fields": {
+            "limit": {
+              "label": "Anzahl Personen"
+            }
+          }
+        }
+      },
+      "source": {
+        "pick": "Suche oder Ansicht",
+        "mine": "Meine Suchen",
+        "shared": "Mit mir geteilt",
+        "gone": "Suche nicht mehr verfügbar",
+        "ownFilter": "Eigener Filter",
+        "ownFilterHint": "Bedingungen auf Ticketfeldern kombinieren, nur für dieses Widget."
+      },
+      "counter": {
+        "tone": "Farbe"
+      }
+    },
+    "manage": {
+      "newTitle": "Neues Dashboard",
+      "name": "Name",
+      "nameRequired": "Bitte einen Namen eingeben.",
+      "copyFrom": "Kopie von",
+      "copyNone": "Leer beginnen",
+      "create": "Anlegen",
+      "cancel": "Abbrechen",
+      "createFailed": "Das Dashboard konnte nicht angelegt werden.",
+      "renameTitle": "Dashboard umbenennen",
+      "save": "Speichern",
+      "renameFailed": "Das Dashboard konnte nicht umbenannt werden.",
+      "conflict": "Dieses Dashboard wurde inzwischen geändert. Bitte versuchen Sie es noch einmal.",
+      "menu": "Menü für {{name}}",
+      "rename": "Umbenennen",
+      "moveLeft": "Nach links",
+      "moveRight": "Nach rechts",
+      "copy": "Als eigenes Dashboard kopieren",
+      "delete": "Löschen",
+      "lastKept": "Das letzte Dashboard bleibt bestehen.",
+      "copyName": "{{name}} (Kopie)",
+      "deleteTitle": "Dashboard „{{name}}“ löschen?",
+      "deleteMessage": "Das Dashboard und alle seine Widgets werden gelöscht. Das lässt sich nicht rückgängig machen.",
+      "actionFailed": "Das hat nicht geklappt. Bitte versuchen Sie es noch einmal."
+    },
+    "share": {
+      "title": "Dashboard teilen",
+      "intro": "Legen Sie fest, wer „{{name}}“ sehen darf.",
+      "onlyMe": "Nur ich",
+      "groups": "Mit Gruppen",
+      "search": "Gruppen suchen",
+      "groupsLabel": "Gruppen",
+      "noGroups": "Sie gehören keiner Gruppe an, mit der Sie teilen dürfen.",
+      "noMatch": "Keine Gruppe passt.",
+      "loadFailed": "Die Gruppen konnten nicht geladen werden.",
+      "note": "Die Mitglieder sehen nur Tickets aus Queues, die sie selbst lesen dürfen. Titel, Notizen und Filtereinstellungen der Widgets sehen alle Mitglieder.",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "failed": "Das Teilen hat nicht geklappt. Bitte versuchen Sie es noch einmal.",
+      "pickOne": "Wählen Sie mindestens eine Gruppe aus."
+    }
   },
   "filters": {
     "all": "Alle Bedingungen müssen zutreffen",

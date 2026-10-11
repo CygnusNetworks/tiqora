@@ -2181,7 +2181,8 @@
       "aiModels": "Model",
       "identityProviders": "Identity providers",
       "reporting": "Report data",
-      "plugins": "Extensions"
+      "plugins": "Extensions",
+      "dashboardTemplates": "Dashboard templates"
     },
     "table": {
       "id": "ID",
@@ -3497,7 +3498,8 @@
       "identityProviders": "Set up sign-in through Microsoft, Google, SAML or LDAP.",
       "reporting": "Check the state of the report data and have everything recalculated.",
       "settingsReporting": "Reports: time zone, access, cache and limits for results and exports.",
-      "plugins": "Switch installed extensions on or off, check their state and configure them."
+      "plugins": "Switch installed extensions on or off, check their state and configure them.",
+      "dashboardTemplates": "Define home page dashboards per role, optionally binding."
     },
     "types": {
       "title_plural": "Jenis tiket",
@@ -4464,6 +4466,45 @@
           "other": "Extends the interface ({{value}})"
         }
       }
+    },
+    "dashboardTemplates": {
+      "title": "Dashboard templates",
+      "subtitle": "What a new dashboard starts with for a role.",
+      "new": "New template",
+      "loadFailed": "The templates could not be loaded.",
+      "empty": "Templates define what a new dashboard starts with for a role. Create the first template.",
+      "columns": {
+        "name": "Name",
+        "roles": "Roles",
+        "locked": "Locked",
+        "widgets": "Widgets",
+        "priority": "Priority",
+        "actions": "Actions"
+      },
+      "yes": "Yes",
+      "no": "No",
+      "noRoles": "No role",
+      "newTitle": "New template",
+      "editTitle": "Edit template",
+      "name": "Name",
+      "nameRequired": "Please enter a name.",
+      "roles": "Roles",
+      "rolesRequired": "Please choose at least one role.",
+      "rolesLoadFailed": "The roles could not be loaded.",
+      "locked": "Binding for the roles (users cannot change it)",
+      "priority": "Priority",
+      "priorityHelp": "If several templates match, the one with the lower value comes first.",
+      "create": "Create",
+      "save": "Save",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "editLayout": "Edit layout",
+      "delete": "Delete",
+      "saveFailed": "The template could not be saved.",
+      "conflict": "This template has been changed in the meantime. Please reload the page and try again.",
+      "deleteTitle": "Delete template \"{{name}}\"?",
+      "deleteMessage": "Dashboards that users already received from this template are kept.",
+      "deleteFailed": "The template could not be deleted."
     }
   },
   "kb": {
@@ -5577,8 +5618,390 @@
     "slotError": "Extension “{{name}}” could not be loaded.",
     "slotErrorDetails": "Details",
     "safeModeBrowser": "Extensions are switched off in this browser window.",
-    "pageNotFound": "This page of the extension does not exist.",
-    "widgetsTitle": "Extensions"
+    "pageNotFound": "This page of the extension does not exist."
+  },
+  "dashboards": {
+    "state": {
+      "loading": "Loading",
+      "retry": "Try again",
+      "loadFailed": "This data could not be loaded.",
+      "forbidden": "You don't have permission for this.",
+      "unavailable": "Widget not available",
+      "unavailableHint": "This kind of widget is not available here (any more). It stays saved until you remove it.",
+      "remove": "Remove",
+      "showAll": "Show all {{count}}",
+      "total": "{{count}} in total"
+    },
+    "due": {
+      "since": "for {{duration}}",
+      "in": "in {{duration}}"
+    },
+    "columns": {
+      "ticket": "Ticket",
+      "tn": "Ticket number",
+      "title": "Title",
+      "customer": "Customer",
+      "state": "State",
+      "due": "Due",
+      "queue": "Queue",
+      "owner": "Owner",
+      "priority": "Priority",
+      "changed": "Changed",
+      "created": "Created"
+    },
+    "presets": {
+      "mine_open": {
+        "counter": "My open",
+        "list": "My open tickets"
+      },
+      "mine_new": {
+        "counter": "My new",
+        "list": "My new tickets"
+      },
+      "unowned_new": {
+        "counter": "To pick up",
+        "list": "To pick up"
+      },
+      "escalated": {
+        "counter": "Escalated",
+        "list": "Escalated tickets"
+      },
+      "ai_escalated": {
+        "counter": "Handed over by AI",
+        "list": "Handed over by AI"
+      }
+    },
+    "widgets": {
+      "ticketList": {
+        "title": "Ticket list",
+        "description": "Tickets of a selection as a table",
+        "empty": "No tickets in this search yet.",
+        "changeFilter": "Change filter"
+      },
+      "counter": {
+        "title": "Key figure",
+        "description": "A number with its trend, e.g. your open tickets",
+        "delta": "{{delta}} since the last count"
+      },
+      "queueOverview": {
+        "title": "Queues",
+        "description": "Open and new tickets per queue",
+        "empty": "No queues with open or new tickets.",
+        "emptyNone": "No queues visible.",
+        "all": "Show all queues",
+        "counts": "{{open}} open · {{new}} new"
+      },
+      "escalations": {
+        "title": "Escalations",
+        "description": "Breached and upcoming deadlines first",
+        "empty": "No escalated tickets.",
+        "emptyWithin_one": "No deadlines within the next hour.",
+        "emptyWithin_other": "No deadlines within the next {{count}} hours.",
+        "order": "next deadline first",
+        "remaining": "{{duration}} left",
+        "kind": {
+          "first_response": "First response",
+          "update": "Update",
+          "solution": "Solution time",
+          "escalation": "Escalation"
+        }
+      },
+      "reminders": {
+        "title": "Reminders due",
+        "description": "Pending tickets whose reminder is due",
+        "empty": "No reminders due.",
+        "overdue": "Overdue"
+      },
+      "recentViews": {
+        "title": "Recently viewed",
+        "description": "Tickets you opened last",
+        "empty": "Nothing viewed yet.",
+        "untitled": "(no subject)"
+      },
+      "calendarAgenda": {
+        "title": "Calendar",
+        "description": "Your appointments today",
+        "empty": "No appointments today.",
+        "emptyDays_one": "No appointments today.",
+        "emptyDays_other": "No appointments in the next {{count}} days.",
+        "today": "Today in the calendar",
+        "days_one": "Today in the calendar",
+        "days_other": "The next {{count}} days",
+        "open": "Open calendar"
+      },
+      "teamPresence": {
+        "title": "Team",
+        "description": "Who is online right now",
+        "empty": "Nobody is online right now.",
+        "online_one": "{{count}} online",
+        "online_other": "{{count}} online",
+        "more_one": "and {{count}} more person",
+        "more_other": "and {{count}} more"
+      },
+      "notes": {
+        "title": "Notes",
+        "description": "Free text for you or your team",
+        "empty": "No note yet. You can add text in the settings."
+      },
+      "links": {
+        "title": "Links",
+        "description": "Important addresses at a glance",
+        "empty": "No links yet. You can add some in the settings."
+      },
+      "chooseSearch": "Choose search"
+    },
+    "tabs": {
+      "label": "Dashboards",
+      "new": "New dashboard",
+      "locked": "Mandatory",
+      "owner": "by {{name}}"
+    },
+    "view": {
+      "customize": "Customize",
+      "share": "Share",
+      "loading": "Loading dashboard",
+      "loadFailed": "The dashboard could not be loaded.",
+      "listFailed": "The dashboards could not be loaded.",
+      "tooSlow": "This is taking too long.",
+      "widgetCrashed": "This widget could not be shown.",
+      "templateBanner": "You are viewing the template “{{name}}”. Changes apply to everyone who gets it through their role.",
+      "lockedHint": "This dashboard is mandatory for your role and cannot be customized.",
+      "empty": "There is nothing on this dashboard yet.",
+      "emptyEdit": "There is nothing on this dashboard yet. Use “Customize” to add widgets."
+    },
+    "edit": {
+      "toolbar": "Edit",
+      "title": "Editing {{name}}",
+      "draftSaved": "Draft saved · {{time}}",
+      "restoreDraft": "Restore draft from {{time}}",
+      "dropDraft": "Discard draft",
+      "undo": "Undo",
+      "redo": "Redo",
+      "discard": "Discard",
+      "save": "Save",
+      "saving": "Saving …",
+      "discardTitle": "Discard changes?",
+      "discardMessage": "Your changes to this dashboard will be lost, including the saved draft.",
+      "discardConfirm": "Discard changes",
+      "continue": "Keep editing",
+      "conflictTitle": "This dashboard has been changed in the meantime",
+      "conflictMessage": "It was saved while you were editing it – in another window or by someone else. “Reload” shows the new version. Your changes stay as a draft and can be restored the next time you choose “Customize”. If you save them, they replace the new version completely; they are not merged.",
+      "conflictReload": "Reload",
+      "keyboardHint": "Keyboard: focus a widget, arrow keys move it, Shift + arrow keys resize it, Enter opens its settings.",
+      "phoneHint": "On narrow screens widgets are stacked; you can change their order here.",
+      "settings": "Settings",
+      "duplicate": "Duplicate",
+      "remove": "Remove",
+      "up": "Move up",
+      "down": "Move down",
+      "widgetRole": "movable widget",
+      "moved": "“{{title}}” is now in column {{col}}, row {{row}}, {{w}} by {{h}}",
+      "movedOrder": "“{{title}}” is now at position {{pos}} of {{count}}",
+      "removed": "“{{title}}” removed",
+      "duplicated": "“{{title}}” duplicated",
+      "limitReached": "At most {{count}} widgets are possible.",
+      "tooTall": "The layout is too tall.",
+      "saveFailed": "The dashboard could not be saved.",
+      "close": "Close",
+      "restoreOverwrite": "Restore your changes from {{time}} – saving replaces the newer version (as of {{newer}})",
+      "conflictMessageTemplate": "This template was saved while you were editing it – in another window or by another person. “Reload” shows the new version. Your changes stay as a draft and can be restored the next time you choose “Customize”. If you save them, they replace the new version completely – including other people's changes, for everyone who gets the template through their role.",
+      "overwriteTitle": "Replace the newer version?",
+      "overwriteMessage": "You started your changes before a newer version of this dashboard was saved (as of {{newer}}). “Replace and save” replaces that version completely with yours; what was changed there is lost.",
+      "overwriteMessageTemplate": "You started your changes before a newer version of this template was saved (as of {{newer}}). “Replace and save” replaces it completely with yours: other people's changes are lost, for everyone who gets the template through their role.",
+      "overwriteConfirm": "Replace and save"
+    },
+    "gallery": {
+      "title": "Add widget",
+      "open": "Add widget",
+      "close": "Close gallery",
+      "search": "Search",
+      "searchPlaceholder": "e.g. escalation, note, queue",
+      "groups": {
+        "tickets": "Tickets",
+        "me": "For me",
+        "team": "Team"
+      },
+      "hint": "Drag onto the grid or click – the widget lands in the first free gap.",
+      "limit": "No more than {{max}} widgets are possible.",
+      "empty": "Nothing found",
+      "clearSearch": "Clear search",
+      "addedAt": "“{{title}}” added – {{n}} of {{max}} widgets"
+    },
+    "settings": {
+      "title": "Settings",
+      "cancel": "Cancel",
+      "apply": "Apply",
+      "titleField": "Title",
+      "titleHint": "Leave empty to use the default title.",
+      "preview": "Preview",
+      "range": "The value must be between {{min}} and {{max}}.",
+      "number": "Please enter a number.",
+      "ticketList": {
+        "which": "Which tickets?",
+        "savedSearch": "Saved search",
+        "savedSearchHint": "If the search changes, the widget changes with it.",
+        "standard": "Standard",
+        "columns": "Columns",
+        "columnsMin": "At least one column must be selected.",
+        "columnsMax": "No more than {{max}} columns are possible.",
+        "sort": "Sort order",
+        "sortOther": "Other sort order",
+        "sorts": {
+          "deadlineAsc": "Due date, earliest first",
+          "changedDesc": "Recently changed",
+          "priorityDesc": "Priority",
+          "ageAsc": "Oldest first",
+          "ageDesc": "Newest first"
+        },
+        "rows": "Number of rows",
+        "density": "Appearance",
+        "compact": "Compact",
+        "comfortable": "Comfortable",
+        "columnTitle": "Ticket title"
+      },
+      "notes": {
+        "label": "Note",
+        "hint": "Markdown is supported. Everyone who sees this dashboard sees the note.",
+        "tooLong": "The note may be at most {{max}} characters long."
+      },
+      "links": {
+        "legend": "Links",
+        "label": "Label {{n}}",
+        "url": "Address {{n}}",
+        "up": "Move link {{n}} up",
+        "down": "Move link {{n}} down",
+        "remove": "Remove link {{n}}",
+        "removeShort": "Remove",
+        "add": "Add link",
+        "count": "{{used}} of {{max}}",
+        "hint": "Addresses must start with /, http://, https:// or mailto:.",
+        "labelMissing": "Please enter a label.",
+        "urlMissing": "Please enter an address.",
+        "urlNotAllowed": "This address is not allowed."
+      },
+      "forms": {
+        "counter": {
+          "fields": {
+            "tone": {
+              "options": {
+                "neutral": "Neutral",
+                "danger": "Red (warning)",
+                "ok": "Green (fine)"
+              }
+            }
+          }
+        },
+        "queueOverview": {
+          "fields": {
+            "limit": {
+              "label": "Number of queues"
+            },
+            "only_with_work": {
+              "label": "Only queues with tickets",
+              "help": "Queues without open or new tickets are hidden."
+            }
+          }
+        },
+        "escalations": {
+          "fields": {
+            "limit": {
+              "label": "Number of entries"
+            },
+            "within_hours": {
+              "label": "Deadlines within the next hours",
+              "help": "0 shows only deadlines that have already passed."
+            }
+          }
+        },
+        "reminders": {
+          "fields": {
+            "window_hours": {
+              "label": "Period in hours",
+              "help": "Reminders that fall due within this period."
+            },
+            "limit": {
+              "label": "Number of entries"
+            }
+          }
+        },
+        "recentViews": {
+          "fields": {
+            "limit": {
+              "label": "Number of tickets"
+            }
+          }
+        },
+        "calendarAgenda": {
+          "fields": {
+            "days": {
+              "label": "Number of days"
+            },
+            "limit": {
+              "label": "Number of appointments"
+            }
+          }
+        },
+        "teamPresence": {
+          "fields": {
+            "limit": {
+              "label": "Number of people"
+            }
+          }
+        }
+      },
+      "source": {
+        "pick": "Search or view",
+        "mine": "My searches",
+        "shared": "Shared with me",
+        "gone": "Search no longer available",
+        "ownFilter": "Own filter",
+        "ownFilterHint": "Combine conditions on ticket fields, only for this widget."
+      },
+      "counter": {
+        "tone": "Colour"
+      }
+    },
+    "manage": {
+      "newTitle": "New dashboard",
+      "name": "Name",
+      "nameRequired": "Please enter a name.",
+      "copyFrom": "Copy of",
+      "copyNone": "Start empty",
+      "create": "Create",
+      "cancel": "Cancel",
+      "createFailed": "The dashboard could not be created.",
+      "renameTitle": "Rename dashboard",
+      "save": "Save",
+      "renameFailed": "The dashboard could not be renamed.",
+      "conflict": "This dashboard has been changed in the meantime. Please try again.",
+      "menu": "Menu for {{name}}",
+      "rename": "Rename",
+      "moveLeft": "Move left",
+      "moveRight": "Move right",
+      "copy": "Copy as my own dashboard",
+      "delete": "Delete",
+      "lastKept": "The last dashboard stays.",
+      "copyName": "{{name}} (copy)",
+      "deleteTitle": "Delete dashboard \"{{name}}\"?",
+      "deleteMessage": "The dashboard and all its widgets will be deleted. This cannot be undone.",
+      "actionFailed": "That did not work. Please try again."
+    },
+    "share": {
+      "title": "Share dashboard",
+      "intro": "Choose who can see \"{{name}}\".",
+      "onlyMe": "Only me",
+      "groups": "With groups",
+      "search": "Search groups",
+      "groupsLabel": "Groups",
+      "noGroups": "You are not in any group you may share with.",
+      "noMatch": "No group matches.",
+      "loadFailed": "The groups could not be loaded.",
+      "note": "Members only see tickets from queues they are allowed to read themselves. All members see the widgets' titles, notes and filter settings.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "failed": "Sharing failed. Please try again.",
+      "pickOne": "Select at least one group."
+    }
   },
   "filters": {
     "all": "All conditions must match",

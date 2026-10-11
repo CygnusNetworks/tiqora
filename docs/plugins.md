@@ -784,7 +784,10 @@ plugin has a UI or settings; `de.json` and others optional) is loaded into the
 i18next namespace `plugin.<id>`. Fallback order: the language, the language
 without region, English. Keys used by the host: the labels in the web manifest
 (`nav.overview`, `page.title`, …), `settings.title`,
-`settings.fields.<field>.label` for the generated settings form. A job's
+`settings.fields.<field>.label` for the generated settings form,
+`widget.<key>.fields.<field>.label` for a dashboard widget's settings form
+(R-PLUGIN-WIDGET-FIELD-LABELS; without it the field's `title` from
+`settings_schema` is shown). A job's
 title comes from `JobHandler.title_key` (for example
 `plugin.<id>:jobs.echo`). Use `t("plugin.<id>:some.key")` anywhere, or
 `usePluginTranslation()` inside your components.

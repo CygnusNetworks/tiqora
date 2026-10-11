@@ -5,10 +5,40 @@ import {
   handleSSEMessage,
   presenceQueryKey,
   SSEProvider,
+  subscribeSSE,
   useConnectionStatus,
 } from "./useSSE";
 import { clearNotifications, useNotifications } from "./notificationStore";
 import { getCalls, resetCalls } from "./callPopup";
+
+describe("subscribeSSE", () => {
+  it("listeners get parsed messages and can unsubscribe", () => {
+    const queryClient = new QueryClient();
+    const seen: string[] = [];
+    const off = subscribeSSE((m) => seen.push(m.type));
+    handleSSEMessage(queryClient, JSON.stringify({ type: "ticket_changed", ticket_id: 1, event: "x" }));
+    off();
+    handleSSEMessage(queryClient, JSON.stringify({ type: "ticket_changed", ticket_id: 2, event: "x" }));
+    expect(seen).toEqual(["ticket_changed"]);
+  });
+
+  it("sees every message type, ignores unparsable input and survives a throwing listener", () => {
+    const queryClient = new QueryClient();
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    const seen: string[] = [];
+    const offBad = subscribeSSE(() => {
+      throw new Error("boom");
+    });
+    const off = subscribeSSE((m) => seen.push(m.type));
+    handleSSEMessage(queryClient, "not json");
+    handleSSEMessage(queryClient, JSON.stringify({ type: "presence_changed", ticket_id: 7 }));
+    handleSSEMessage(queryClient, JSON.stringify({ type: "ai_limit_changed" }));
+    off();
+    offBad();
+    expect(seen).toEqual(["presence_changed", "ai_limit_changed"]);
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+});
 
 describe("handleSSEMessage", () => {
   it("invalidates the tickets cache prefix for ticket_changed", () => {

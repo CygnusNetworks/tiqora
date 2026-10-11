@@ -18,6 +18,8 @@ export type ConfirmDialogProps = {
   /** Extra content rendered between the message and the action row, e.g. the
    * text input used by `usePrompt`. */
   children?: ReactNode;
+  /** `alertdialog` when the choice can lose data. */
+  role?: "dialog" | "alertdialog";
 };
 
 /**
@@ -38,10 +40,11 @@ export function ConfirmDialog({
   confirmDisabled,
   pending,
   children,
+  role,
 }: ConfirmDialogProps) {
   const { t } = useTranslation();
   return (
-    <Dialog open={open} onClose={onCancel} title={title}>
+    <Dialog open={open} onClose={onCancel} title={title} role={role}>
       <div className="space-y-4" data-testid="confirm-dialog">
         <p className="text-sm text-ink">{message}</p>
         {children}

@@ -574,6 +574,56 @@ are replaced by a catalogue of 25 built-in reports over typed sources.
   report viewer `ReportViewPage.tsx` has the runtime parameter controls), `/agent/searches/...` for saved searches and
   the editor.
 
+### Dashboards
+
+User guide: [dashboards.md](dashboards.md).
+
+- **Tables** (`tiqora_*`, additive; Alembic chain `versions_tiqora`): `tiqora_dashboard` (one
+  row per dashboard: owner, name, `kind` = personal/shared/template, `locked`, `version` for
+  optimistic locking, `sort`), `tiqora_dashboard_widget` (widget id, `type_key`, `type_version`,
+  `title_override`, JSON `settings` and per-breakpoint `layout`), `tiqora_dashboard_role`
+  (template to role, mandatory flag lives on the dashboard row), `tiqora_dashboard_group` (shares)
+  and `tiqora_dashboard_counter_sample` (one counter value per user, counter and UTC day for the
+  sparkline). Nothing touches Znuny tables.
+- **API** (`api/v1/dashboards.py`, admin templates in `api/v1/admin/dashboard_templates.py`): list
+  tabs, `ensure-start` (first visit: copy of the first unlocked role template or the built-in
+  default of `dashboard/defaults.py`), read, whole-dashboard `PUT` with the read `version` (409 with
+  the current version on conflict), `PATCH` of one widget's settings, share, order, delete. Locked
+  templates reach role members as read-only tabs, not as copies.
+- **Providers** (`dashboard/providers/`): the extension point `core.dashboard.providers`
+  (`DASHBOARD_PROVIDERS`, filled by `register_core`) maps a widget `type_key` to a
+  `DashboardProvider` (settings model, `run`, timeout). Core providers: counter, ticket list,
+  escalations, reminders, calendar agenda, team presence; sources (preset, saved search, own filter)
+  are resolved in `providers/sources.py` and always evaluated for the viewer's queue scope. Widgets
+  without a provider (notes, links, queue overview, recent views, plugin widgets) are absent from
+  data responses and render from their settings or their own routes.
+- **Batched data endpoint**: `GET /dashboards/{id}/data` runs all providers of a dashboard (or the
+  `widgets` list asked for) in one request and answers `{widgets: {id: {status, data|error}}}` with
+  per-widget status `ok`, `pending`, `error` or `forbidden`, so one slow or failing widget never
+  fails the page; `GET /dashboards/{id}/widgets/{id}/data` refreshes one widget and
+  `POST /dashboard-widget-types/{key}/data` previews unsaved settings (never writes history).
+- **Layout engine** (`frontend/src/dashboard/layout/`): pure functions over rectangles on a 12
+  column grid (`lg`, container at least 900 px) or 8 columns (`md`, at least 520 px); below that
+  one column in stored order (`sm`). Moves and resizes push overlapping widgets down and compact
+  upwards; the backend normalises the same way (`dashboard/layout.py`, shared test vectors in
+  `normalizeCases.json`). Editing is a reducer session with undo/redo and a draft in
+  `localStorage`; the drag hook (`edit/useDragResize.ts`) and the keyboard rules
+  (`layout/keyboard.ts`) only dispatch actions.
+- **Extension points**: `core.dashboard.providers` (backend, data sources) and
+  `core.dashboard.widgets` (frontend, `plugins/dashboardWidgets.ts`; core widgets and plugin widgets
+  register into the same point and show up in the gallery). Plugin widget settings labels use the
+  plugin namespace `plugin.<id>` with key `widget.<key>.fields.<field>.label`.
+- **Widget data** (`dashboard/runner.py`): each widget's provider runs as the viewer in its own
+  session, but at most four per request at once and, process-wide, at most half the engine's
+  pool size (overflow not counted) across all batches, single-widget fetches and previews,
+  because many agents opening the home page at once would otherwise take the whole connection
+  pool (default 5 + 10) and stall unrelated endpoints. Waiting for a slot or a connection counts
+  against the widget's budget (5 s); with one second or less left it is `pending` without
+  running. The database statement timeout is what is left of the budget, with one extra second
+  on the client side; a cancelled connection is invalidated instead of pooled, and a batch ends
+  after 20 s with the unfinished widgets `pending`. Counter samples older than 35 days are
+  purged by the first sample write of each UTC day.
+
 ### Calendar / appointments
 
 `tiqora/calendar/` (`CalendarService`, `recurrence.py`, `ics.py`) plus

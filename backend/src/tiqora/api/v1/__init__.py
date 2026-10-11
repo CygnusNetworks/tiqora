@@ -16,6 +16,7 @@ from tiqora.api.v1 import (
     customer_directory,
     customer_keys,
     customers,
+    dashboards,
     events,
     integrations,
     jobs,
@@ -77,6 +78,8 @@ api_v1_router.include_router(stats.router)
 api_v1_router.include_router(reports.router)
 api_v1_router.include_router(saved_searches.router)
 api_v1_router.include_router(reports.sources_router)
+api_v1_router.include_router(dashboards.router)
+api_v1_router.include_router(dashboards.widget_types_router)
 api_v1_router.include_router(integrations.router)
 api_v1_router.include_router(jobs.router)
 api_v1_router.include_router(plugins.router)

@@ -1,7 +1,8 @@
 /**
- * Plugin slots of the agent app (P12): sidebar entries, panels in the ticket
- * view and widgets on the home page. Each plugin component sits in its own
- * PluginBoundary, so one broken plugin never hides the others.
+ * Plugin slots of the agent app (P12): sidebar entries and panels in the
+ * ticket view. Each plugin component sits in its own PluginBoundary, so one
+ * broken plugin never hides the others. Dashboard widgets of plugins are
+ * placed by the home page's grid (`DASHBOARD_WIDGETS`), not here.
  */
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,7 +20,6 @@ import {
   ShieldIcon,
   UserIcon,
 } from "@/components/ui/icons";
-import { useDashboardWidgetDefinitions, type WidgetDefinition } from "./dashboardWidgets";
 import { pluginNamespace } from "./i18n";
 import { PluginBoundary } from "./PluginBoundary";
 import { PluginComponent } from "./PluginComponent";
@@ -99,70 +99,5 @@ export function PluginTicketPanels({ ticketId }: { ticketId: number }) {
         </div>
       ))}
     </>
-  );
-}
-
-// Literal class names: Tailwind cannot see names built from a template.
-const COL_SPAN: Record<number, string> = {
-  1: "md:col-span-1",
-  2: "md:col-span-2",
-  3: "md:col-span-3",
-  4: "md:col-span-4",
-  5: "md:col-span-5",
-  6: "md:col-span-6",
-  7: "md:col-span-7",
-  8: "md:col-span-8",
-  9: "md:col-span-9",
-  10: "md:col-span-10",
-  11: "md:col-span-11",
-  12: "md:col-span-12",
-};
-
-/** Defaults of a JSON-schema `properties` object (`{ key: { default } }`). */
-function settingsDefaults(schema: Record<string, unknown> | null): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  const props = schema?.properties;
-  if (typeof props !== "object" || props === null) return out;
-  for (const [name, spec] of Object.entries(props)) {
-    if (typeof spec === "object" && spec !== null && "default" in spec) {
-      out[name] = (spec as { default: unknown }).default;
-    }
-  }
-  return out;
-}
-
-/**
- * "Erweiterungen" section on the home page: every widget a plugin registered.
- * Self-contained so the dashboards plan can drop it in favour of its grid.
- */
-export function PluginWidgetsSection() {
-  const { t } = useTranslation();
-  const widgets = useDashboardWidgetDefinitions().filter((w: WidgetDefinition) => w.owner !== "core");
-  if (widgets.length === 0) return null;
-  return (
-    <section data-testid="plugin-widgets">
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">{t("plugins.widgetsTitle")}</h2>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
-        {widgets.map((w) => {
-          const [cols, rows] = w.size.default;
-          const Widget = w.component;
-          return (
-            <div
-              key={w.key}
-              className={COL_SPAN[Math.min(12, Math.max(1, cols))]}
-              data-testid={`plugin-widget-${w.key}`}
-            >
-              <Widget
-                instanceId={`home-${w.key}`}
-                settings={settingsDefaults(w.settingsSchema)}
-                size={{ w: cols, h: rows }}
-                filters={{}}
-                mode="view"
-              />
-            </div>
-          );
-        })}
-      </div>
-    </section>
   );
 }

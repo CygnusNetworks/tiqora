@@ -33,6 +33,8 @@ export function Dialog({
   size = "md",
   placement = "center",
   className,
+  role = "dialog",
+  closeLabel,
 }: {
   open: boolean;
   onClose: () => void;
@@ -49,6 +51,10 @@ export function Dialog({
   /** `right`: a full-height side panel (edit forms beside the content). */
   placement?: "center" | "right";
   className?: string;
+  /** `alertdialog` for confirmations that interrupt (e.g. losing unsaved changes). */
+  role?: "dialog" | "alertdialog";
+  /** Accessible name of the ✕ button (default: "Zurück"). */
+  closeLabel?: string;
 }) {
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -124,7 +130,7 @@ export function Dialog({
         "fixed inset-0 z-50 flex",
         placement === "right" ? "items-stretch justify-end" : "items-center justify-center p-4",
       )}
-      role="dialog"
+      role={role}
       aria-modal="true"
       aria-labelledby="dialog-title"
     >
@@ -157,7 +163,7 @@ export function Dialog({
             variant="ghost"
             size="sm"
             onClick={onClose}
-            aria-label={t("common.back")}
+            aria-label={closeLabel ?? t("common.back")}
             data-dialog-close
             className="-mr-1 shrink-0"
           >

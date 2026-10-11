@@ -1,4 +1,5 @@
-import type { Page, Route } from "@playwright/test";
+import { test, type Page, type Route } from "@playwright/test";
+import { GONE_SAVED_SEARCH_ID, createDemoDashboards, resolveDashboards, type DemoDashboards } from "../../src/demo/dashboardsMock";
 import type { ReportRunIn } from "../../src/lib/reportsApi";
 // Reports reuse the demo's pure report data (catalogue definitions + deterministic results).
 import { DEMO_FACTS, DEMO_REPORT_CATALOGUE, demoReport, demoSources, resolveReportRun } from "../../src/demo/reportsMock";
@@ -464,6 +465,46 @@ let ticketProcessState: TicketProcessState = ticketProcessStateNotInProcess;
 
 let authenticated = false;
 
+/**
+ * Stateful dashboards store per test (R-DASH-E2E-STORE): the pages of one test share it, tests do
+ * not - serial tests in one worker would otherwise inherit each other's saves. Seeded with the
+ * default dashboard "Mein Start" plus a second dashboard "Alt" holding one widget of an unknown type.
+ */
+const dashboardStores = new Map<string, DemoDashboards>();
+function dashboardStore(): DemoDashboards {
+  const id = test.info().testId;
+  let store = dashboardStores.get(id);
+  if (!store) {
+    store = createDemoDashboards({
+      extraDashboards: [
+        {
+          name: "Alt",
+          widgets: [
+            {
+              id: "e2e-gone",
+              type_key: "org.example.gone",
+              type_version: 1,
+              title_override: null,
+              settings: { keep: "me" },
+              layout: { lg: { x: 0, y: 0, w: 6, h: 3 } },
+            },
+            {
+              id: "e2e-gone-search",
+              type_key: "core.ticket-list",
+              type_version: 1,
+              title_override: null,
+              settings: { source: { kind: "saved_search", id: GONE_SAVED_SEARCH_ID }, limit: 8 },
+              layout: { lg: { x: 6, y: 0, w: 6, h: 5 } },
+            },
+          ],
+        },
+      ],
+    });
+    dashboardStores.set(id, store);
+  }
+  return store;
+}
+
 // --- saved reports / saved searches: in-memory per test (reset in mockApi) ------------------
 // The seed rows are the demo's pure data; the store and its mutations live here so no test sees
 // another test's writes.
@@ -564,6 +605,17 @@ export async function mockApi(page: Page) {
     const url = new URL(req.url());
     const path = url.pathname;
     const method = req.method();
+
+    // Dashboards (/agent home page): stateful per test, answered from the request body/query.
+    if (/\/api\/v1\/(dashboards|dashboard-widget-types|admin\/dashboard-templates)(\/|$)/.test(path)) {
+      const hasBody = method !== "GET" && method !== "DELETE";
+      const out = resolveDashboards(dashboardStore(), method, path, hasBody ? req.postDataJSON() : undefined, url.searchParams);
+      if (out) {
+        if (out.status === 204) await route.fulfill({ status: 204 });
+        else await json(route, out.status, out.body);
+        return;
+      }
+    }
 
     // Plugin list of the agent/admin shells: no plugins installed.
     if (path.endsWith("/api/v1/plugins/frontend") && method === "GET") {

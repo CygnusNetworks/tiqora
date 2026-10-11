@@ -28,6 +28,7 @@ import structlog
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.deps import CurrentUser, DbSession, get_redis
 from tiqora.db.legacy.user import Users
@@ -117,14 +118,14 @@ async def ping_presence(
     await touch_online_presence(redis_client, user)
 
 
-@router.get("/online", response_model=list[OnlineAgentOut])
-async def list_online_agents(
-    user: CurrentUser,
-    redis_client: RedisDep,
-    session: DbSession,
+async def list_online_agents_for(
+    redis_client: redis.Redis, session: AsyncSession
 ) -> list[OnlineAgentOut]:
-    """Currently-online agents (Redis TTL presence, resolved via users table)."""
-    del user  # auth gate only; include the caller in the list
+    """Currently-online agents (Redis TTL presence, resolved via users table).
+
+    Shared by ``GET /agents/online`` and the dashboard team-presence widget. A Redis
+    outage yields an empty list, never an error.
+    """
     try:
         online = await _scan_online_user_ids(redis_client)
     except Exception:  # noqa: BLE001 — Redis down → empty list, never 500
@@ -164,3 +165,14 @@ async def list_online_agents(
     # Stable order: login ascending for the popover.
     out.sort(key=lambda a: a.login.lower())
     return out
+
+
+@router.get("/online", response_model=list[OnlineAgentOut])
+async def list_online_agents(
+    user: CurrentUser,
+    redis_client: RedisDep,
+    session: DbSession,
+) -> list[OnlineAgentOut]:
+    """Currently-online agents (Redis TTL presence, resolved via users table)."""
+    del user  # auth gate only; include the caller in the list
+    return await list_online_agents_for(redis_client, session)

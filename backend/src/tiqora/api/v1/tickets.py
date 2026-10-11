@@ -387,7 +387,8 @@ ChannelQuery = Annotated[list[ListChannel] | None, Query(description=_CHANNEL_DE
 _SORT_DESC = (
     "age | created | changed | tn | title | priority | activity (newest article's"
     " create_time, falling back to the ticket's create_time) | deadline (nearest"
-    " SLA deadline that is set; tickets without one last when ascending)."
+    " SLA deadline that is set; tickets without one last when ascending) | until (pending"
+    " reminder time; tickets without one last when ascending)."
 )
 
 

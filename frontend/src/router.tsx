@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-router";
 import { SetPasswordPage } from "@/routes/SetPasswordPage";
 import { LoginPage } from "@/routes/LoginPage";
-import { DashboardPage } from "@/routes/agent/DashboardPage";
+import { DashboardPage, type DashboardSearch } from "@/routes/agent/DashboardPage";
 import { ReportsPage, type ReportsSearch } from "@/routes/agent/ReportsPage";
 import { ReportBuilderPage } from "@/routes/agent/ReportBuilderPage";
 import { validateReportBuilderSearch } from "@/routes/agent/reportBuilderSearch";
@@ -116,6 +116,7 @@ import { SubjectConfigPage } from "@/routes/admin/SubjectConfigPage";
 import { SettingsSectionPage } from "@/routes/admin/SettingsSectionPage";
 import { DaemonsPage } from "@/routes/admin/DaemonsPage";
 import { PluginsPage } from "@/routes/admin/PluginsPage";
+import { DashboardTemplatesPage } from "@/routes/admin/DashboardTemplatesPage";
 import { ReportingAdminPage } from "@/routes/admin/ReportingAdminPage";
 import { SystemInfoPage } from "@/routes/admin/SystemInfoPage";
 import { PostmasterFiltersPage } from "@/routes/admin/PostmasterFiltersPage";
@@ -206,6 +207,11 @@ const agentLayoutRoute = createRoute({
 const agentIndexRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/",
+  // `?d=<dashboard id>`; the router JSON-parses search values, so "7" arrives as a number.
+  validateSearch: (s: Record<string, unknown>): DashboardSearch => {
+    const raw = typeof s.d === "string" && /^\d+$/.test(s.d) ? Number(s.d) : s.d;
+    return typeof raw === "number" && Number.isSafeInteger(raw) && raw > 0 ? { d: raw } : {};
+  },
   component: DashboardPage,
 });
 
@@ -1104,6 +1110,12 @@ const adminReportingRoute = createRoute({
   component: ReportingAdminPage,
 });
 
+const adminDashboardTemplatesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/dashboard-templates",
+  component: DashboardTemplatesPage,
+});
+
 const adminSettingsSectionRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/settings/$section",
@@ -1288,6 +1300,7 @@ const routeTree = rootRoute.addChildren([
     adminDaemonsRoute,
     adminPluginsRoute,
     adminReportingRoute,
+    adminDashboardTemplatesRoute,
     adminSettingsSectionRoute,
     adminSystemRoute,
     adminAiRoute,

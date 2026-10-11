@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
-import { useConfirm, usePrompt } from "./ConfirmDialog";
+import { ConfirmDialog, useConfirm, usePrompt } from "./ConfirmDialog";
 
 function ConfirmHarness({ onResult }: { onResult: (v: boolean) => void }) {
   const { confirm, dialog } = useConfirm();
@@ -100,5 +100,24 @@ describe("usePrompt", () => {
     fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
 
     await waitFor(() => expect(onResult).toHaveBeenCalledWith(null));
+  });
+});
+
+describe("ConfirmDialog role", () => {
+  it("is a dialog by default and an alertdialog when asked (data-loss confirmations)", () => {
+    const noop = vi.fn();
+    const { rerender } = render(
+      <I18nextProvider i18n={i18n}>
+        <ConfirmDialog open title="Verwerfen?" message="Weg ist weg." onConfirm={noop} onCancel={noop} />
+      </I18nextProvider>,
+    );
+    expect(screen.getByRole("dialog", { name: "Verwerfen?" })).toBeVisible();
+    rerender(
+      <I18nextProvider i18n={i18n}>
+        <ConfirmDialog open role="alertdialog" title="Verwerfen?" message="Weg ist weg." onConfirm={noop} onCancel={noop} />
+      </I18nextProvider>,
+    );
+    expect(screen.getByRole("alertdialog", { name: "Verwerfen?" })).toBeVisible();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
