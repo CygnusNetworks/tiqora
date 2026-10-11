@@ -27,6 +27,7 @@ from tiqora.dashboard.schemas import (
     DashboardOrderIn,
     DashboardOut,
     DashboardSaveIn,
+    DashboardShareIn,
     DashboardTabOut,
     WidgetDataOut,
     WidgetOut,
@@ -42,6 +43,7 @@ from tiqora.dashboard.settings_models import (
 from tiqora.extensions import Registry, get_registry
 from tiqora.jobs.service import utc_now
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.permissions.sharing import ShareGroupError
 
 router = APIRouter(prefix="/dashboards", tags=["dashboards"])
 widget_types_router = APIRouter(prefix="/dashboard-widget-types", tags=["dashboards"])
@@ -107,6 +109,8 @@ def _raise_http(exc: Exception) -> NoReturn:
             status.HTTP_409_CONFLICT,
             {"message": exc.message, "current_version": exc.current_version},
         ) from exc
+    if isinstance(exc, ShareGroupError):
+        raise HTTPException(422, {"message": exc.message, "path": exc.path}) from exc
     if isinstance(exc, store.DashboardInvalid):
         raise HTTPException(
             422,
@@ -124,6 +128,7 @@ _STORE_ERRORS: Final = (
     store.DashboardForbidden,
     store.DashboardConflict,
     store.DashboardInvalid,
+    ShareGroupError,
 )
 
 
@@ -183,6 +188,26 @@ async def save_dashboard(
     try:
         out = await store.save_dashboard(
             session, dashboard_id, user.id, body, admin=await _is_admin(session, user)
+        )
+        await session.commit()
+    except _STORE_ERRORS as exc:
+        await session.rollback()
+        _raise_http(exc)
+    return out
+
+
+@router.put("/{dashboard_id}/share", response_model=DashboardOut)
+async def share_dashboard(
+    dashboard_id: int, body: DashboardShareIn, session: DbSession, user: CurrentUser
+) -> DashboardOut:
+    """Share with groups (owner only); ``[]`` unshares. Templates are distributed by role."""
+    try:
+        out = await store.set_share(
+            session,
+            dashboard_id,
+            user.id,
+            body.group_ids,
+            admin=await _is_admin(session, user),
         )
         await session.commit()
     except _STORE_ERRORS as exc:

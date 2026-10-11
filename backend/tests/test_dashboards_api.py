@@ -12,7 +12,16 @@ from typing import Any
 
 import pytest
 
-from tests._dashboard_helpers import ROLE_1, USER_A, USER_B, USER_C, Env, open_env
+from tests._dashboard_helpers import (
+    GROUP_1,
+    GROUP_2,
+    ROLE_1,
+    USER_A,
+    USER_B,
+    USER_C,
+    Env,
+    open_env,
+)
 
 pytestmark = pytest.mark.db
 
@@ -394,3 +403,80 @@ async def test_widget_types_report_which_types_have_data(env: Env) -> None:
     }
     assert types["core.counter"] is True
     assert types["core.notes"] is False and types["core.recent-views"] is False
+
+
+# ------------------------------------------------------------------ sharing (Task 16)
+
+
+def _grant_ro(env: Env, user_id: int, group_id: int) -> None:
+    """Give ``user_id`` ``ro`` on ``group_id`` (removed again by the band cleanup)."""
+    env._sql_write(
+        "INSERT INTO group_user (user_id, group_id, permission_key,"
+        " create_time, create_by, change_time, change_by)"
+        " VALUES (:u, :g, 'ro', :t, 1, :t, 1)",
+        u=user_id,
+        g=group_id,
+        t=env.now,
+    )
+
+
+async def test_share_makes_the_dashboard_visible_to_group_members_and_unshare_hides_it(
+    env: Env,
+) -> None:
+    _grant_ro(env, USER_A, GROUP_2)
+    d = await env.make_personal(USER_A, name="dash497 sh1")
+    url = f"/api/v1/dashboards/{d.id}"
+    r = await env.as_user(USER_A).put(f"{url}/share", json={"group_ids": [GROUP_2]})
+    assert r.status_code == 200 and r.json()["kind"] == "shared"
+    assert r.json()["group_ids"] == [GROUP_2] and r.json()["version"] == d.version + 1
+    assert d.id in [t["id"] for t in (await env.as_user(USER_B).get("/api/v1/dashboards")).json()]
+    assert (await env.client.get(url)).status_code == 200
+    off = await env.as_user(USER_A).put(f"{url}/share", json={"group_ids": []})
+    assert off.status_code == 200 and off.json()["kind"] == "personal"
+    assert off.json()["group_ids"] == []
+    assert await env.count_rows("tiqora_dashboard_group", dashboard_id=d.id) == 0
+    assert (await env.as_user(USER_B).get(url)).status_code == 404
+
+
+async def test_share_rejects_groups_the_owner_cannot_share_with(env: Env) -> None:
+    d = await env.make_personal(USER_B, name="dash497 sh2")
+    url = f"/api/v1/dashboards/{d.id}/share"
+    r = await env.as_user(USER_B).put(url, json={"group_ids": [GROUP_1]})  # B has no ro on GROUP_1
+    assert r.status_code == 422 and r.json()["detail"]["path"] == "group_ids"
+    assert r.json()["detail"]["message"]
+    assert await env.count_rows("tiqora_dashboard_group", dashboard_id=d.id) == 0
+    assert (await env.client.get(f"/api/v1/dashboards/{d.id}")).json()["kind"] == "personal"
+    # an unknown group is refused the same way
+    r = await env.client.put(url, json={"group_ids": [2_000_000_000]})
+    assert r.status_code == 422 and r.json()["detail"]["path"] == "group_ids"
+
+
+async def test_only_the_owner_shares_and_templates_cannot_be_shared(env: Env) -> None:
+    d = await env.make_personal(USER_A, name="dash497 sh3", share_group_ids=[GROUP_2])
+    url = f"/api/v1/dashboards/{d.id}/share"
+    # visible via the group, but not the owner
+    assert (await env.as_user(USER_B).put(url, json={"group_ids": []})).status_code == 403
+    assert (await env.as_user(USER_C).put(url, json={"group_ids": []})).status_code == 404  # unseen
+    assert await env.count_rows("tiqora_dashboard_group", dashboard_id=d.id) == 1  # untouched
+    tpl = await env.make_template(name="dash497 tpl", role_ids=[ROLE_1], locked=False)
+    r = await env.admin.put(f"/api/v1/dashboards/{tpl.id}/share", json={"group_ids": [GROUP_1]})
+    assert r.status_code == 403 and "Rollen" in str(r.json())
+    assert await env.count_rows("tiqora_dashboard_group", dashboard_id=tpl.id) == 0
+
+
+async def test_a_shared_dashboard_edit_by_a_viewer_is_403_and_copy_works(env: Env) -> None:
+    _grant_ro(env, USER_A, GROUP_2)
+    d = (await env.as_user(USER_A).post("/api/v1/dashboards/ensure-start")).json()
+    shared = await env.client.put(
+        f"/api/v1/dashboards/{d['id']}/share", json={"group_ids": [GROUP_2]}
+    )
+    assert shared.status_code == 200
+    b = env.as_user(USER_B)
+    put = await b.put(
+        f"/api/v1/dashboards/{d['id']}",
+        json=_save_body(shared.json(), name="x", widgets=[]),
+    )
+    assert put.status_code == 403
+    cp = await b.post("/api/v1/dashboards", json={"name": "dash497 Kopie", "copy_from": d["id"]})
+    assert cp.status_code == 201 and cp.json()["is_owner"] is True and cp.json()["id"] != d["id"]
+    assert len(cp.json()["widgets"]) == len(d["widgets"])

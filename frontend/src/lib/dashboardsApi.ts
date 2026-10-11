@@ -17,6 +17,8 @@ export type DashboardTemplate = Schemas["DashboardTemplateOut"];
 export type DashboardTemplateIn = Schemas["DashboardTemplateIn"];
 export type DashboardSaveIn = Schemas["DashboardSaveIn"];
 export type WidgetType = Schemas["WidgetTypeOut"];
+export type DashboardShareIn = Schemas["DashboardShareIn"];
+export type ShareGroup = Schemas["ShareGroupOut"];
 export type DashboardData = { widgets: Record<string, WidgetResult> };
 
 const BASE = "/api/v1/dashboards";
@@ -90,9 +92,14 @@ export const dashboardsApi = {
   order(ids: number[]) {
     return api.request<void>("PUT", `${BASE}/order`, { body: { ids } });
   },
-  /** Task 16 adds the typed schema; the body is `{group_ids}`. */
+  /** Owner only; `[]` makes the dashboard personal again. 422 `path: group_ids` = group not allowed. */
   share(id: number, groupIds: number[]) {
-    return api.request<Dashboard>("PUT", `${BASE}/${id}/share`, { body: { group_ids: groupIds } });
+    const body: DashboardShareIn = { group_ids: groupIds };
+    return api.request<Dashboard>("PUT", `${BASE}/${id}/share`, { body });
+  },
+  /** Groups the agent may share with (the same list the report builder offers). */
+  shareGroups(signal?: AbortSignal) {
+    return api.request<ShareGroup[]>("GET", "/api/v1/reference/share-groups", { signal });
   },
   /** All widgets of a dashboard, or only `widgetIds` (one comma-joined `widgets` parameter). */
   data(id: number, widgetIds?: string[], signal?: AbortSignal) {

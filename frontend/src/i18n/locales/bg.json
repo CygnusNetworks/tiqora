@@ -5985,6 +5985,22 @@
       "deleteTitle": "Delete dashboard \"{{name}}\"?",
       "deleteMessage": "The dashboard and all its widgets will be deleted. This cannot be undone.",
       "actionFailed": "That did not work. Please try again."
+    },
+    "share": {
+      "title": "Share dashboard",
+      "intro": "Choose who can see \"{{name}}\".",
+      "onlyMe": "Only me",
+      "groups": "With groups",
+      "search": "Search groups",
+      "groupsLabel": "Groups",
+      "noGroups": "You are not in any group you may share with.",
+      "noMatch": "No group matches.",
+      "loadFailed": "The groups could not be loaded.",
+      "note": "Members only see tickets from queues they are allowed to read themselves.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "failed": "Sharing failed. Please try again.",
+      "pickOne": "Select at least one group."
     }
   },
   "filters": {

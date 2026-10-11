@@ -13,6 +13,7 @@ import { useDashboardData } from "@/dashboard/data";
 import { DashboardEditMode } from "@/dashboard/edit/DashboardEditMode";
 import { greetingKey } from "@/dashboard/legacy";
 import { toEditWidget } from "@/dashboard/model";
+import { ShareDialog } from "@/dashboard/tabs/ShareDialog";
 import { ManagedDashboardTabs } from "@/dashboard/tabs/ManagedDashboardTabs";
 import { useGridBreakpoint } from "@/dashboard/useGridBreakpoint";
 import { useSelectedDashboard } from "@/dashboard/useSelectedDashboard";
@@ -56,7 +57,7 @@ function ErrorBox({ message, onRetry }: { message: string; onRetry: () => void }
  * The agent home page: greeting, the tab row of the agent's dashboards and the widget grid of the
  * selected one. First visit (no own dashboard yet, R-DASH-FIRST-VISIT) creates "Mein Start".
  * "Anpassen" switches to edit mode: the edit toolbar replaces greeting, tabs and header buttons
- * until "Speichern" or "Verwerfen". "Teilen" is a placeholder until Task 16; the tabs manage
+ * until "Speichern" or "Verwerfen". "Teilen" opens `ShareDialog`; the tabs manage
  * dashboards themselves (`ManagedDashboardTabs`).
  */
 export function DashboardPage() {
@@ -119,6 +120,7 @@ export function DashboardPage() {
   const dashboard = dashQ.data && dashQ.data.id === selectedId ? dashQ.data : undefined;
   const widgets = useMemo(() => (dashboard ? dashboard.widgets.map(toEditWidget) : []), [dashboard]);
   const [editing, setEditing] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const isEditing = editing && dashboard !== undefined && dashboard.can_edit && user != null;
   // While editing nothing is fetched for the view; its last data is reused by the edit grid.
   const { byWidget, refetch } = useDashboardData(dashboard?.id ?? 0, widgets, {
@@ -242,8 +244,8 @@ export function DashboardPage() {
             {dashboard.can_share && (
               <button
                 type="button"
-                disabled
-                className={cn(BUTTON, "border border-hairline bg-surface text-ink hover:bg-surface-subtle disabled:hover:bg-surface")}
+                onClick={() => setSharing(true)}
+                className={cn(BUTTON, "border border-hairline bg-surface text-ink hover:bg-surface-subtle")}
               >
                 {t("dashboards.view.share")}
               </button>
@@ -286,6 +288,7 @@ export function DashboardPage() {
         </div>
         {isEditing && <div ref={setGalleryHost} className="sticky top-24 w-[340px] flex-none self-start empty:hidden max-lg:hidden" />}
       </div>
+      {sharing && dashboard && <ShareDialog dashboard={dashboard} onClose={() => setSharing(false)} />}
     </div>
   );
 }

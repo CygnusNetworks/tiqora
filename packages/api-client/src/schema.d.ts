@@ -6497,6 +6497,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboards/{dashboard_id}/share": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Share Dashboard
+         * @description Share with groups (owner only); ``[]`` unshares. Templates are distributed by role.
+         */
+        put: operations["share_dashboard_api_v1_dashboards__dashboard_id__share_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dashboards/{dashboard_id}/widgets/{widget_id}/data": {
         parameters: {
             query?: never;
@@ -13481,6 +13501,11 @@ export interface components {
             version: number;
             /** Widgets */
             widgets: components["schemas"]["WidgetIn"][];
+        };
+        /** DashboardShareIn */
+        DashboardShareIn: {
+            /** Group Ids */
+            group_ids: number[];
         };
         /**
          * DashboardSummary
@@ -38428,6 +38453,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DashboardDataOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    share_dashboard_api_v1_dashboards__dashboard_id__share_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                dashboard_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardShareIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardOut"];
                 };
             };
             /** @description Validation Error */

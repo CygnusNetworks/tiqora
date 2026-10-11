@@ -48,6 +48,7 @@ from tiqora.db.tiqora.models import (
 )
 from tiqora.jobs.service import utc_now
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.permissions.sharing import check_share_groups
 
 __all__ = [
     "DashboardConflict",
@@ -64,6 +65,7 @@ __all__ = [
     "patch_widget_settings",
     "save_dashboard",
     "set_order",
+    "set_share",
     "update_template",
     "user_role_ids",
 ]
@@ -72,6 +74,7 @@ _OWNED_KINDS: Final = ("personal", "shared")
 MSG_NOT_EDITABLE: Final = "Dieses Dashboard kannst du nicht bearbeiten."
 MSG_LIMIT: Final = f"Es sind höchstens {MAX_DASHBOARDS_PER_USER} Dashboards möglich."
 MSG_WIDGET_ID_TAKEN: Final = "Diese Widget-ID ist schon vergeben."
+MSG_TEMPLATE_SHARE: Final = "Vorlagen werden über die Rollen verteilt."
 MSG_LAST: Final = "Das letzte Dashboard bleibt bestehen."
 
 
@@ -655,6 +658,45 @@ async def delete_dashboard(
         await session.execute(delete(model).where(model.dashboard_id == dashboard_id))
     await session.execute(delete(TiqoraDashboard).where(TiqoraDashboard.id == dashboard_id))
     session.expire_all()
+
+
+async def set_share(
+    session: AsyncSession,
+    dashboard_id: int,
+    user_id: int,
+    group_ids: Sequence[int],
+    *,
+    admin: bool,
+) -> DashboardOut:
+    """Share with groups (owner only); an empty list makes the dashboard personal again.
+
+    Raises ``ShareGroupError`` for a group the owner may not share with.
+    """
+    row = await _visible_row(session, dashboard_id, user_id, admin=admin)
+    if row.kind == "template":
+        raise DashboardForbidden(MSG_TEMPLATE_SHARE)
+    _require_edit(row, user_id, admin=admin)
+    wanted = await check_share_groups(session, user_id, group_ids)
+    async with session.begin_nested():
+        await session.execute(
+            delete(TiqoraDashboardGroup).where(TiqoraDashboardGroup.dashboard_id == dashboard_id)
+        )
+        for gid in wanted:
+            await session.execute(
+                insert(TiqoraDashboardGroup).values(dashboard_id=dashboard_id, group_id=gid)
+            )
+        await session.execute(
+            update(TiqoraDashboard)
+            .where(TiqoraDashboard.id == dashboard_id)
+            .values(
+                kind="shared" if wanted else "personal",
+                version=TiqoraDashboard.version + 1,
+                changed_at=utc_now(),
+            )
+        )
+    fresh = await _load_row(session, dashboard_id)
+    assert fresh is not None
+    return await dashboard_out(session, fresh, user_id, admin=admin)
 
 
 async def set_order(session: AsyncSession, user_id: int, ids: Sequence[int]) -> None:

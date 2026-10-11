@@ -14,6 +14,7 @@ import pytest
 from sqlalchemy.exc import DBAPIError, IntegrityError, OperationalError
 
 from tests._dashboard_helpers import (
+    GROUP_1,
     GROUP_2,
     ROLE_1,
     ROLE_2,
@@ -469,3 +470,45 @@ async def test_ensure_start_does_not_retry_other_errors(
     calls, result = await _fail_once(env, monkeypatch, _db_error(Exception(2013, "gone")))
     assert calls == 1 and isinstance(result, DBAPIError)
     assert await env.count_dashboards(USER_B) == []
+
+
+# ------------------------------------------------------------------ sharing (Task 16)
+
+
+async def test_set_share_replaces_groups_bumps_version_and_unshare_deletes_rows(env: Env) -> None:
+    from tiqora.dashboard.store import set_share
+
+    env._sql_write(
+        "INSERT INTO group_user (user_id, group_id, permission_key,"
+        " create_time, create_by, change_time, change_by)"
+        " VALUES (:u, :g, 'ro', :t, 1, :t, 1)",
+        u=USER_A,
+        g=GROUP_2,
+        t=env.now,
+    )
+    d = await env.make_personal(USER_A, name="dash497 sh store")
+    shared = await env.run(set_share, d.id, USER_A, [GROUP_2, GROUP_2], admin=False)
+    assert shared.kind == "shared" and shared.group_ids == [GROUP_2]
+    assert shared.version == d.version + 1
+    assert await env.count_rows("tiqora_dashboard_group", dashboard_id=d.id) == 1
+    off = await env.run(set_share, d.id, USER_A, [], admin=False)
+    assert off.kind == "personal" and off.group_ids == [] and off.version == d.version + 2
+    assert await env.count_rows("tiqora_dashboard_group", dashboard_id=d.id) == 0
+
+
+async def test_set_share_refuses_foreign_groups_viewers_and_templates(env: Env) -> None:
+    from tiqora.dashboard.store import set_share
+    from tiqora.permissions.sharing import ShareGroupError
+
+    d = await env.make_personal(USER_A, name="dash497 sh store2")
+    with pytest.raises(ShareGroupError):
+        await env.run(set_share, d.id, USER_A, [GROUP_2], admin=False)  # A has no ro on GROUP_2
+    assert await env.count_rows("tiqora_dashboard_group", dashboard_id=d.id) == 0
+    viewer = await env.make_personal(USER_A, name="dash497 sh store3", share_group_ids=[GROUP_2])
+    with pytest.raises(DashboardForbidden):
+        await env.run(set_share, viewer.id, USER_B, [], admin=False)
+    with pytest.raises(DashboardNotFound):
+        await env.run(set_share, viewer.id, USER_C, [], admin=False)
+    tpl = await env.make_template(name="dash497 tpl st", role_ids=[ROLE_1], locked=False)
+    with pytest.raises(DashboardForbidden, match="Rollen"):
+        await env.run(set_share, tpl.id, 1, [GROUP_1], admin=True)

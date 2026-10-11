@@ -23,8 +23,11 @@ import { handleSSEMessage } from "@/lib/useSSE";
 import { setDisplayTimeZone } from "@/lib/timeZone";
 import { DASHBOARD_WIDGETS, defineWidget, type WidgetProps } from "@/plugins/dashboardWidgets";
 import { demoDashboard, demoDefaultWidgets, demoTab, demoWidgetData } from "@/demo/dashboardsMock";
+import { makeUser } from "@/test/fireUser";
 import { registerCoreWidgets } from "@/dashboard/widgets";
 import { DashboardPage } from "./DashboardPage";
+
+const user = makeUser();
 
 // ---------------------------------------------------------------- mocks
 
@@ -339,14 +342,24 @@ describe("DashboardPage", () => {
     expect(screen.getByRole("tab", { name: "Mein Start" })).toHaveAttribute("aria-controls", panel.id);
   });
 
-  it("'Teilen' is still a disabled placeholder (Task 16); '+' and 'Anpassen' are live", async () => {
+  it("'Teilen', '+' and 'Anpassen' are live; 'Teilen' opens the share dialog and saving shares the dashboard", async () => {
+    vi.spyOn(dashboardsApi, "shareGroups").mockResolvedValue([{ id: 2, name: "Support" }]);
+    const share = vi.spyOn(dashboardsApi, "share").mockImplementation(async (id, groupIds) =>
+      demoDashboard({ ...DEFAULT_DASHBOARD, id, kind: "shared", group_ids: groupIds, version: DEFAULT_DASHBOARD.version + 1 }),
+    );
     await renderPage();
     await screen.findByTestId("dashboard-grid");
-    const share = screen.getByRole("button", { name: "Teilen" });
-    expect(share).toBeDisabled();
-    expect(share).toHaveClass("disabled:opacity-50", "disabled:cursor-not-allowed", "disabled:hover:bg-surface");
+    const button = screen.getByRole("button", { name: "Teilen" });
+    expect(button).toBeEnabled();
     expect(screen.getByRole("button", { name: "Anpassen" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Neues Dashboard" })).toBeEnabled();
+    await user.click(button);
+    const dialog = await screen.findByRole("dialog", { name: "Dashboard teilen" });
+    await user.click(within(dialog).getByRole("radio", { name: "Mit Gruppen" }));
+    await user.click(await within(dialog).findByRole("checkbox", { name: "Support" }));
+    await user.click(within(dialog).getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(share).toHaveBeenCalledWith(DEFAULT_DASHBOARD.id, [2]));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Dashboard teilen" })).toBeNull());
   });
 
   it("the remembered dashboard opens on the next visit", async () => {

@@ -5993,6 +5993,22 @@
       "deleteTitle": "Dashboard „{{name}}“ löschen?",
       "deleteMessage": "Das Dashboard und alle seine Widgets werden gelöscht. Das lässt sich nicht rückgängig machen.",
       "actionFailed": "Das hat nicht geklappt. Bitte versuchen Sie es noch einmal."
+    },
+    "share": {
+      "title": "Dashboard teilen",
+      "intro": "Legen Sie fest, wer „{{name}}“ sehen darf.",
+      "onlyMe": "Nur ich",
+      "groups": "Mit Gruppen",
+      "search": "Gruppen suchen",
+      "groupsLabel": "Gruppen",
+      "noGroups": "Sie gehören keiner Gruppe an, mit der Sie teilen dürfen.",
+      "noMatch": "Keine Gruppe passt.",
+      "loadFailed": "Die Gruppen konnten nicht geladen werden.",
+      "note": "Die Mitglieder sehen nur Tickets aus Queues, die sie selbst lesen dürfen.",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "failed": "Das Teilen hat nicht geklappt. Bitte versuchen Sie es noch einmal.",
+      "pickOne": "Wählen Sie mindestens eine Gruppe aus."
     }
   },
   "filters": {
