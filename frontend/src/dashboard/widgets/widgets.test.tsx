@@ -231,7 +231,7 @@ describe.each(DATA_WIDGET_KEYS)("%s data states", (key) => {
     expect(screen.getByText("Nein.")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Erneut versuchen" })).toBeNull();
     await show({ status: "forbidden" });
-    expect(screen.getByText("Dafür fehlt dir die Berechtigung.")).toBeVisible();
+    expect(screen.getByText("Dafür fehlt Ihnen die Berechtigung.")).toBeVisible();
   });
 });
 

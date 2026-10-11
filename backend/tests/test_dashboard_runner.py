@@ -228,7 +228,7 @@ async def test_forbidden_and_invalid_settings_statuses() -> None:
     assert (out["a"].status, out["a"].error) == ("forbidden", "Nein.")
     assert (out["b"].status, out["b"].error) == ("error", INVALID_SETTINGS_MESSAGE)
     assert INVALID_SETTINGS_MESSAGE == "Die Einstellungen dieses Widgets sind ungültig."
-    assert ProviderForbidden().message == "Dafür fehlt dir die Berechtigung."
+    assert ProviderForbidden().message == "Dafür fehlt Ihnen die Berechtigung."
 
 
 async def test_invalid_settings_do_not_open_a_session() -> None:

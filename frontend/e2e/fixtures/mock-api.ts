@@ -1,5 +1,5 @@
 import { test, type Page, type Route } from "@playwright/test";
-import { createDemoDashboards, resolveDashboards, type DemoDashboards } from "../../src/demo/dashboardsMock";
+import { GONE_SAVED_SEARCH_ID, createDemoDashboards, resolveDashboards, type DemoDashboards } from "../../src/demo/dashboardsMock";
 import type { ReportRunIn } from "../../src/lib/reportsApi";
 // Reports reuse the demo's pure report data (catalogue definitions + deterministic results).
 import { DEMO_FACTS, DEMO_REPORT_CATALOGUE, demoReport, demoSources, resolveReportRun } from "../../src/demo/reportsMock";
@@ -468,14 +468,38 @@ let authenticated = false;
 /**
  * Stateful dashboards store per test (R-DASH-E2E-STORE): the pages of one test share it, tests do
  * not - serial tests in one worker would otherwise inherit each other's saves. Seeded with the
- * default dashboard "Mein Start" plus an empty "Alt" tab.
+ * default dashboard "Mein Start" plus a second dashboard "Alt" holding one widget of an unknown type.
  */
 const dashboardStores = new Map<string, DemoDashboards>();
 function dashboardStore(): DemoDashboards {
   const id = test.info().testId;
   let store = dashboardStores.get(id);
   if (!store) {
-    store = createDemoDashboards({ extraTabs: ["Alt"] });
+    store = createDemoDashboards({
+      extraDashboards: [
+        {
+          name: "Alt",
+          widgets: [
+            {
+              id: "e2e-gone",
+              type_key: "org.example.gone",
+              type_version: 1,
+              title_override: null,
+              settings: { keep: "me" },
+              layout: { lg: { x: 0, y: 0, w: 6, h: 3 } },
+            },
+            {
+              id: "e2e-gone-search",
+              type_key: "core.ticket-list",
+              type_version: 1,
+              title_override: null,
+              settings: { source: { kind: "saved_search", id: GONE_SAVED_SEARCH_ID }, limit: 8 },
+              layout: { lg: { x: 6, y: 0, w: 6, h: 5 } },
+            },
+          ],
+        },
+      ],
+    });
     dashboardStores.set(id, store);
   }
   return store;

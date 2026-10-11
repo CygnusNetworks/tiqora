@@ -14,7 +14,7 @@ test("an alert dialog with 'Neu laden' and 'Weiter bearbeiten'; Escape keeps edi
   expect(screen.queryByRole("alertdialog")).toBeNull();
   rerender(<ConflictDialog open onReload={onReload} onContinue={onContinue} />);
   const dialog = screen.getByRole("alertdialog", { name: "Dieses Dashboard wurde inzwischen geändert" });
-  expect(dialog).toHaveTextContent("Deine Änderungen bleiben als Entwurf erhalten");
+  expect(dialog).toHaveTextContent("Ihre Änderungen bleiben als Entwurf erhalten");
   expect(dialog).toHaveTextContent("ersetzen sie die neue Fassung dann vollständig; sie werden nicht zusammengeführt");
   fireEvent.click(within(dialog).getByRole("button", { name: "Neu laden" }));
   fireEvent.click(within(dialog).getByRole("button", { name: "Weiter bearbeiten" }));

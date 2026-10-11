@@ -620,7 +620,7 @@ describe("DashboardPage", () => {
     mockDashboard({ widgets: [wire("s1", "org.example.stats", { lg: { x: 0, y: 0, w: 4, h: 2 } })] });
     await renderPage();
     const tile = await screen.findByTestId("widget-s1");
-    expect(within(tile).getByText("Dafür fehlt dir die Berechtigung.")).toBeVisible();
+    expect(within(tile).getByText("Dafür fehlt Ihnen die Berechtigung.")).toBeVisible();
     expect(screen.queryByText("Geheime Zahlen")).toBeNull();
   });
 
@@ -976,7 +976,7 @@ describe("DashboardPage", () => {
       dashboards.set(1, demoDashboard({ ...dashboards.get(1)!, version: 4, widgets: DEFAULT_WIDGETS.slice(0, 10) }));
       fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
       const dialog = await screen.findByRole("alertdialog", { name: /inzwischen geändert/ });
-      expect(dialog).toHaveTextContent("Deine Änderungen bleiben als Entwurf erhalten");
+      expect(dialog).toHaveTextContent("Ihre Änderungen bleiben als Entwurf erhalten");
       expect(dialog).toHaveTextContent("ersetzen sie die neue Fassung dann vollständig");
       fireEvent.click(within(dialog).getByRole("button", { name: "Neu laden" }));
       await waitFor(() => expect(order()).toHaveLength(10)); // the newer version is shown
@@ -986,12 +986,12 @@ describe("DashboardPage", () => {
       await conflictThenReload();
       fireEvent.click(screen.getByRole("button", { name: "Anpassen" }));
       const offer = await screen.findByRole("button", { name: /wiederherstellen – ersetzt beim Speichern die neuere Fassung \(Stand \d\d:\d\d\)/ });
-      expect(offer).toHaveTextContent(/^Deine Änderungen von \d\d:\d\d wiederherstellen/);
+      expect(offer).toHaveTextContent(/^Ihre Änderungen von \d\d:\d\d wiederherstellen/);
       fireEvent.click(offer);
       expect(order()).toHaveLength(11);
       fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
       const confirm = screen.getByRole("alertdialog", { name: "Neuere Fassung ersetzen?" });
-      expect(confirm).toHaveTextContent("ersetzt diese Fassung vollständig durch deine");
+      expect(confirm).toHaveTextContent("ersetzt diese Fassung vollständig durch Ihre");
       fireEvent.click(within(confirm).getByRole("button", { name: "Weiter bearbeiten" }));
       expect(save).toHaveBeenCalledTimes(1); // only the conflicting attempt
       fireEvent.click(screen.getByRole("button", { name: "Speichern" }));

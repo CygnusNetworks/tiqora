@@ -5633,9 +5633,9 @@
       "loading": "Wird geladen",
       "retry": "Erneut versuchen",
       "loadFailed": "Diese Daten konnten nicht geladen werden.",
-      "forbidden": "Dafür fehlt dir die Berechtigung.",
+      "forbidden": "Dafür fehlt Ihnen die Berechtigung.",
       "unavailable": "Widget nicht verfügbar",
-      "unavailableHint": "Diese Art von Widget gibt es hier nicht (mehr). Es bleibt gespeichert, bis du es entfernst.",
+      "unavailableHint": "Diese Art von Widget gibt es hier nicht (mehr). Es bleibt gespeichert, bis Sie es entfernen.",
       "remove": "Entfernen",
       "showAll": "Alle {{count}} anzeigen",
       "total": "{{count}} insgesamt"
@@ -5688,7 +5688,7 @@
       },
       "counter": {
         "title": "Kennzahl",
-        "description": "Eine Zahl mit Verlauf, z. B. deine offenen Tickets",
+        "description": "Eine Zahl mit Verlauf, z. B. Ihre offenen Tickets",
         "empty": "Keine Zahl vorhanden.",
         "delta": "{{delta}} seit dem letzten Stand"
       },
@@ -5723,13 +5723,13 @@
       },
       "recentViews": {
         "title": "Zuletzt angesehen",
-        "description": "Tickets, die du zuletzt geöffnet hast",
+        "description": "Tickets, die Sie zuletzt geöffnet haben",
         "empty": "Noch nichts angesehen.",
         "untitled": "(kein Betreff)"
       },
       "calendarAgenda": {
         "title": "Kalender",
-        "description": "Deine Termine von heute",
+        "description": "Ihre Termine von heute",
         "empty": "Heute keine Termine.",
         "emptyDays_one": "Heute keine Termine.",
         "emptyDays_other": "Keine Termine in den nächsten {{count}} Tagen.",
@@ -5749,13 +5749,13 @@
       },
       "notes": {
         "title": "Notizen",
-        "description": "Freier Text für dich oder dein Team",
-        "empty": "Noch keine Notiz. In den Einstellungen kannst du Text eintragen."
+        "description": "Freier Text für Sie oder Ihr Team",
+        "empty": "Noch keine Notiz. In den Einstellungen können Sie Text eintragen."
       },
       "links": {
         "title": "Links",
         "description": "Wichtige Adressen auf einen Blick",
-        "empty": "Noch keine Links. In den Einstellungen kannst du welche eintragen."
+        "empty": "Noch keine Links. In den Einstellungen können Sie welche eintragen."
       },
       "chooseSearch": "Suche wählen"
     },
@@ -5773,10 +5773,10 @@
       "listFailed": "Die Dashboards konnten nicht geladen werden.",
       "tooSlow": "Das dauert zu lange.",
       "widgetCrashed": "Dieses Widget konnte nicht angezeigt werden.",
-      "templateBanner": "Du siehst die Vorlage „{{name}}“. Änderungen gelten für alle, die sie über ihre Rolle bekommen.",
-      "lockedHint": "Dieses Dashboard ist für deine Rolle verbindlich und lässt sich nicht anpassen.",
+      "templateBanner": "Sie sehen die Vorlage „{{name}}“. Änderungen gelten für alle, die sie über ihre Rolle bekommen.",
+      "lockedHint": "Dieses Dashboard ist für Ihre Rolle verbindlich und lässt sich nicht anpassen.",
       "empty": "Auf diesem Dashboard ist noch nichts.",
-      "emptyEdit": "Auf diesem Dashboard ist noch nichts. Mit „Anpassen“ fügst du Widgets hinzu."
+      "emptyEdit": "Auf diesem Dashboard ist noch nichts. Mit „Anpassen“ fügen Sie Widgets hinzu."
     },
     "edit": {
       "toolbar": "Bearbeiten",
@@ -5790,11 +5790,11 @@
       "save": "Speichern",
       "saving": "Wird gespeichert …",
       "discardTitle": "Änderungen verwerfen?",
-      "discardMessage": "Deine Änderungen an diesem Dashboard gehen verloren, auch der gesicherte Entwurf.",
+      "discardMessage": "Ihre Änderungen an diesem Dashboard gehen verloren, auch der gesicherte Entwurf.",
       "discardConfirm": "Änderungen verwerfen",
       "continue": "Weiter bearbeiten",
       "conflictTitle": "Dieses Dashboard wurde inzwischen geändert",
-      "conflictMessage": "Es wurde gespeichert, während du es bearbeitet hast – in einem anderen Fenster oder von jemand anderem. „Neu laden“ zeigt die neue Fassung. Deine Änderungen bleiben als Entwurf erhalten und lassen sich beim nächsten „Anpassen“ wiederherstellen. Gespeichert ersetzen sie die neue Fassung dann vollständig; sie werden nicht zusammengeführt.",
+      "conflictMessage": "Es wurde gespeichert, während Sie es bearbeitet haben – in einem anderen Fenster oder von jemand anderem. „Neu laden“ zeigt die neue Fassung. Ihre Änderungen bleiben als Entwurf erhalten und lassen sich beim nächsten „Anpassen“ wiederherstellen. Gespeichert ersetzen sie die neue Fassung dann vollständig; sie werden nicht zusammengeführt.",
       "conflictReload": "Neu laden",
       "keyboardHint": "Tastatur: Widget fokussieren, Pfeiltasten verschieben, Umschalt + Pfeiltasten ändern die Größe, Eingabe öffnet die Einstellungen.",
       "phoneHint": "Auf schmalen Bildschirmen stehen Widgets untereinander; die Reihenfolge lässt sich hier ändern.",
@@ -5812,11 +5812,11 @@
       "tooTall": "Das Layout ist zu hoch.",
       "saveFailed": "Das Dashboard konnte nicht gespeichert werden.",
       "close": "Schließen",
-      "restoreOverwrite": "Deine Änderungen von {{time}} wiederherstellen – ersetzt beim Speichern die neuere Fassung (Stand {{newer}})",
-      "conflictMessageTemplate": "Diese Vorlage wurde gespeichert, während du sie bearbeitet hast – in einem anderen Fenster oder von einer anderen Person. „Neu laden“ zeigt die neue Fassung. Deine Änderungen bleiben als Entwurf erhalten und lassen sich beim nächsten „Anpassen“ wiederherstellen. Gespeichert ersetzen sie die neue Fassung dann vollständig – auch die Änderungen anderer, für alle, die die Vorlage über ihre Rolle bekommen.",
+      "restoreOverwrite": "Ihre Änderungen von {{time}} wiederherstellen – ersetzt beim Speichern die neuere Fassung (Stand {{newer}})",
+      "conflictMessageTemplate": "Diese Vorlage wurde gespeichert, während Sie sie bearbeitet haben – in einem anderen Fenster oder von einer anderen Person. „Neu laden“ zeigt die neue Fassung. Ihre Änderungen bleiben als Entwurf erhalten und lassen sich beim nächsten „Anpassen“ wiederherstellen. Gespeichert ersetzen sie die neue Fassung dann vollständig – auch die Änderungen anderer, für alle, die die Vorlage über ihre Rolle bekommen.",
       "overwriteTitle": "Neuere Fassung ersetzen?",
-      "overwriteMessage": "Du hast deine Änderungen begonnen, bevor eine neuere Fassung dieses Dashboards gespeichert wurde (Stand {{newer}}). „Ersetzen und speichern“ ersetzt diese Fassung vollständig durch deine; was dort geändert wurde, geht verloren.",
-      "overwriteMessageTemplate": "Du hast deine Änderungen begonnen, bevor eine neuere Fassung dieser Vorlage gespeichert wurde (Stand {{newer}}). „Ersetzen und speichern“ ersetzt sie vollständig durch deine: Änderungen anderer gehen verloren, und das gilt für alle, die die Vorlage über ihre Rolle bekommen.",
+      "overwriteMessage": "Sie haben Ihre Änderungen begonnen, bevor eine neuere Fassung dieses Dashboards gespeichert wurde (Stand {{newer}}). „Ersetzen und speichern“ ersetzt diese Fassung vollständig durch Ihre; was dort geändert wurde, geht verloren.",
+      "overwriteMessageTemplate": "Sie haben Ihre Änderungen begonnen, bevor eine neuere Fassung dieser Vorlage gespeichert wurde (Stand {{newer}}). „Ersetzen und speichern“ ersetzt sie vollständig durch Ihre: Änderungen anderer gehen verloren, und das gilt für alle, die die Vorlage über ihre Rolle bekommen.",
       "overwriteConfirm": "Ersetzen und speichern"
     },
     "gallery": {

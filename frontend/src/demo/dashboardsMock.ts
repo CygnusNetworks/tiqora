@@ -197,6 +197,9 @@ const presetOf = (settings: Settings): string => {
   return source?.kind === "preset" && source.preset && source.preset in PRESET_ITEMS ? source.preset : "mine_open";
 };
 /** Saved searches and own filters answer with the open tickets (the demo has no query engine). */
+/** Saved-search id the demo and e2e fixtures treat as deleted. */
+export const GONE_SAVED_SEARCH_ID = 99999;
+
 const customSource = (settings: Settings): boolean => {
   const kind = (settings.source as { kind?: string } | undefined)?.kind;
   return kind === "saved_search" || kind === "filter";
@@ -232,6 +235,11 @@ export function demoWidgetData(key: string, settings: Settings = {}): WidgetResu
       return { status: "ok", data: { value: c.value, delta: c.delta, spark: [...c.spark] } };
     }
     case "core.ticket-list": {
+      // A saved search nobody can use any more (deleted or no longer shared): the tile offers "Suche wählen".
+      const src = settings.source as { kind?: string; id?: number } | undefined;
+      if (src?.kind === "saved_search" && src.id === GONE_SAVED_SEARCH_ID) {
+        return { status: "forbidden", error: "Diese Suche ist für Sie nicht freigegeben." };
+      }
       const all = PRESET_ITEMS[customSource(settings) ? "mine_open" : presetOf(settings)];
       return { status: "ok", data: { items: all.slice(0, limitOf(settings, 8)), total: all.length } };
     }

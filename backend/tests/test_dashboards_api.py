@@ -154,7 +154,7 @@ async def test_locked_template_is_403_on_put_and_delete_for_a_role_member(env: E
     put = await env.client.put(f"/api/v1/dashboards/{tpl.id}", json=_save_body(got, name="x"))
     assert (
         put.status_code == 403
-        and put.json()["detail"] == "Dieses Dashboard kannst du nicht bearbeiten."
+        and put.json()["detail"] == "Dieses Dashboard können Sie nicht bearbeiten."
     )
     assert (await env.client.delete(f"/api/v1/dashboards/{tpl.id}")).status_code == 403
     assert (await env.client.get(f"/api/v1/dashboards/{tpl.id}")).json()[

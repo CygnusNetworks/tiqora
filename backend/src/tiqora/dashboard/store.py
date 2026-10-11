@@ -76,7 +76,7 @@ __all__ = [
 ]
 
 _OWNED_KINDS: Final = ("personal", "shared")
-MSG_NOT_EDITABLE: Final = "Dieses Dashboard kannst du nicht bearbeiten."
+MSG_NOT_EDITABLE: Final = "Dieses Dashboard können Sie nicht bearbeiten."
 MSG_LIMIT: Final = f"Es sind höchstens {MAX_DASHBOARDS_PER_USER} Dashboards möglich."
 MSG_WIDGET_ID_TAKEN: Final = "Diese Widget-ID ist schon vergeben."
 MSG_TEMPLATE_SHARE: Final = "Vorlagen werden über die Rollen verteilt."

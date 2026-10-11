@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.extensions.registry import ExtensionPoint
 
-FORBIDDEN_MESSAGE: Final = "Dafür fehlt dir die Berechtigung."
+FORBIDDEN_MESSAGE: Final = "Dafür fehlt Ihnen die Berechtigung."
 
 
 @dataclass(frozen=True, slots=True)
