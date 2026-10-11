@@ -28,12 +28,14 @@ from tiqora.domain.dynamic_field_values import (
     get_df_values_bulk,
 )
 from tiqora.domain.ticket_write_service import TicketNotFound
+from tiqora.process.condition_modules import resolve_condition_module
 from tiqora.process.config import TransitionConditionField, TransitionConfig
 from tiqora.util.perl_regex import REGEX_TIMEOUT_SECONDS, PerlRegexError, compile_perl_regex
 
 logger = logging.getLogger(__name__)
 
 ConditionValue = str | list[str] | None
+_WARNED_MODULES: set[str] = set()
 ConditionData = dict[str, ConditionValue]
 
 # Condition types derived from TransitionValidation::Base: only these substitute smart tags
@@ -432,8 +434,11 @@ def _evaluate_field(
         return _MATCH if equal == len(cond.match) else _NO_MATCH
 
     if type_ == "Module":
-        logger.warning("transition condition Type Module is not supported")
-        return _NO_MATCH
+        module = resolve_condition_module(cond.match)
+        if module is None:
+            _warn_module_unavailable(cond.match)
+            return _NO_MATCH
+        return _MATCH if module.validate(data, field_name) else _NO_MATCH
 
     if type_ in BASE_CONDITION_TYPES:
         check = _check_value_get(field_name, data, tags)
@@ -444,6 +449,14 @@ def _evaluate_field(
 
     logger.warning("unsupported transition condition Type: %s", cond.type_)
     return _ERROR
+
+
+def _warn_module_unavailable(match: Any) -> None:
+    """Log an unavailable condition module once per process run."""
+    key = str(match)
+    if key not in _WARNED_MODULES:
+        _WARNED_MODULES.add(key)
+        logger.warning("transition condition module not available: %s", key)
 
 
 _ORDERED_OPS = {

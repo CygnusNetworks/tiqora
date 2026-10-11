@@ -60,6 +60,11 @@ def register_core(registry: Registry) -> None:
     for action in core_transition_actions():
         registry.add(TRANSITION_ACTIONS, action)
 
+    from tiqora.process.condition_modules import CONDITION_MODULES, core_condition_modules
+
+    for module in core_condition_modules():
+        registry.add(CONDITION_MODULES, module)
+
 
 def get_registry() -> Registry:
     global _REGISTRY
