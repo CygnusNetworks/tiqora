@@ -4,6 +4,7 @@
   first; pass it to ``tests._row_cleanup.snapshot_marks`` / ``delete_above_marks``.
 * :func:`insert_webservice` / :func:`cleanup_webservices` - seed and remove
   ``gi_webservice_config`` rows (plus their Tiqora-side ``gi.webservice.<id>.*`` settings).
+* :data:`EGRESS_TEST_POLICY` - egress policy that allows the documentation address ranges.
 * :func:`requester_config` - a minimal valid Znuny webservice config with a requester.
 
 Only made-up hosts (``example.org``) appear here.
@@ -12,6 +13,7 @@ Only made-up hosts (``example.org``) appear here.
 from __future__ import annotations
 
 import copy
+import ipaddress
 from collections.abc import Iterable
 from datetime import datetime
 from typing import Any
@@ -22,6 +24,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.exc import DatabaseError
 
 from tiqora.db.tiqora.models import TiqoraSettings
+from tiqora.gi.egress import EgressPolicy
 
 # Children first: the order is the delete order.
 GI_MARK_TABLES: tuple[str, ...] = (
@@ -41,6 +44,18 @@ GI_MARK_TABLES: tuple[str, ...] = (
 )
 
 _SEED_TIME = datetime(2026, 1, 1, 10, 0, 0)
+
+# Documentation ranges (RFC 5737 / RFC 3849) are private and not reserved, so the SSRF guard
+# accepts them only through an allowlist: every transport/requester/job test uses this policy
+# together with a resolver that returns a documentation address.
+EGRESS_TEST_POLICY = EgressPolicy(
+    allow_networks=(ipaddress.ip_network("198.51.100.0/24"), ipaddress.ip_network("2001:db8::/32")),
+    allow_hosts=frozenset(),
+    allow_insecure_tls=False,
+    cert_dirs=(),
+    max_timeout=30.0,
+    max_response_bytes=1024 * 1024,
+)
 
 
 def insert_webservice(

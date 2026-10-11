@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import ipaddress
 import socket
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from urllib.parse import urlparse, urlunparse
 
@@ -69,14 +69,45 @@ def is_blocked_ip(
     return bool(ip.is_private) and not allow_private
 
 
+IPNetwork = ipaddress.IPv4Network | ipaddress.IPv6Network
+
+# Carrier-grade NAT: neither ``is_private`` nor ``is_global``, so ``is_blocked_ip`` lets it
+# through. Callers that want it closed (GenericInterface egress) check it themselves.
+CGNAT_NETWORK = ipaddress.ip_network("100.64.0.0/10")
+
+
+def _allowed_by_networks(
+    ip: ipaddress.IPv4Address | ipaddress.IPv6Address, allow_networks: Sequence[IPNetwork]
+) -> bool:
+    """True if *ip* is private/ULA/CGNAT and lies inside one of *allow_networks*.
+
+    Loopback, link-local (metadata), multicast, unspecified and reserved addresses are
+    never allowed, whatever the list says.
+    """
+    if not allow_networks:
+        return False
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    if ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_unspecified or ip.is_reserved:
+        return False
+    if not (ip.is_private or (isinstance(ip, ipaddress.IPv4Address) and ip in CGNAT_NETWORK)):
+        return False
+    return any(net.version == ip.version and ip in net for net in allow_networks)
+
+
 def _check_ip_string(
-    raw: str, *, allow_private: bool = False
+    raw: str,
+    *,
+    allow_private: bool = False,
+    allow_networks: Sequence[IPNetwork] = (),
 ) -> ipaddress.IPv4Address | ipaddress.IPv6Address:
     try:
         ip = ipaddress.ip_address(raw)
     except ValueError as exc:
         raise OutboundURLError(f"invalid IP address {raw!r}") from exc
-    if is_blocked_ip(ip, allow_private=allow_private):
+    if is_blocked_ip(ip, allow_private=allow_private) and not _allowed_by_networks(
+        ip, allow_networks
+    ):
         raise OutboundURLError(f"blocked address {ip}")
     return ip
 
@@ -133,11 +164,14 @@ def pin_outbound_url(
     require_https: bool = False,
     resolver: HostResolver | None = None,
     allow_private_networks: bool = False,
+    allow_networks: Sequence[IPNetwork] = (),
 ) -> PinnedOutboundURL:
     """Validate *url* and return a :class:`PinnedOutboundURL` for safe egress.
 
     Raises :class:`OutboundURLError` when the scheme is wrong, the host cannot
-    be resolved, or **any** resolved address is blocked.
+    be resolved, or **any** resolved address is blocked. An address that would be
+    blocked is still accepted when it is private/ULA/CGNAT and inside one of
+    *allow_networks* (never loopback, link-local, multicast, unspecified or reserved).
     """
     if not url or not str(url).strip():
         raise OutboundURLError("URL must not be empty")
@@ -174,14 +208,18 @@ def pin_outbound_url(
         literal = None
 
     if literal is not None:
-        if is_blocked_ip(literal, allow_private=allow_private_networks):
+        if is_blocked_ip(
+            literal, allow_private=allow_private_networks
+        ) and not _allowed_by_networks(literal, allow_networks):
             raise OutboundURLError(f"blocked address {literal}")
         pinned_ip = str(literal)
     else:
         resolved = resolve(hostname, port)
         checked: list[str] = []
         for raw in resolved:
-            ip = _check_ip_string(raw, allow_private=allow_private_networks)
+            ip = _check_ip_string(
+                raw, allow_private=allow_private_networks, allow_networks=allow_networks
+            )
             checked.append(str(ip))
         # Prefer IPv4 for broader reachability; fall back to first address.
         pinned_ip = next((a for a in checked if ":" not in a), checked[0])
