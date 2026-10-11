@@ -67,9 +67,12 @@ DASHBOARD_PROVIDERS: Final = ExtensionPoint[DashboardProvider](
 
 def core_providers() -> list[DashboardProvider]:
     """The core providers, registered by ``register_core``."""
+    from tiqora.dashboard.providers.ai_status import ai_status_provider
     from tiqora.dashboard.providers.calendar_agenda import calendar_agenda_provider
+    from tiqora.dashboard.providers.chat_queue import chat_queue_provider
     from tiqora.dashboard.providers.counter import counter_provider
     from tiqora.dashboard.providers.escalations import escalations_provider
+    from tiqora.dashboard.providers.queue_overview import queue_overview_provider
     from tiqora.dashboard.providers.reminders import reminders_provider
     from tiqora.dashboard.providers.team_presence import team_presence_provider
     from tiqora.dashboard.providers.ticket_list import ticket_list_provider
@@ -81,4 +84,7 @@ def core_providers() -> list[DashboardProvider]:
         reminders_provider(),
         calendar_agenda_provider(),
         team_presence_provider(),
+        queue_overview_provider(),
+        chat_queue_provider(),
+        ai_status_provider(),
     ]

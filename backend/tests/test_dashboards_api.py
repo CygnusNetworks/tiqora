@@ -308,8 +308,10 @@ async def test_data_batch_returns_only_widgets_with_providers(env: Env) -> None:
     body = r.json()
     counters = _ids_of(d, "core.counter")
     assert len(counters) == 4 and set(body["widgets"]) >= set(counters)
-    for frontend_only in ("core.recent-views", "core.queue-overview"):
-        assert not set(_ids_of(d, frontend_only)) & set(body["widgets"])
+    assert not set(_ids_of(d, "core.recent-views")) & set(body["widgets"])  # frontend only
+    assert set(_ids_of(d, "core.queue-overview")) <= set(
+        body["widgets"]
+    )  # server data since wave 3
     first = body["widgets"][counters[0]]
     assert first["status"] == "ok" and set(first["data"]) == {"value", "delta", "spark"}
     assert first["error"] is None and body["generated_at"].endswith("+00:00")
