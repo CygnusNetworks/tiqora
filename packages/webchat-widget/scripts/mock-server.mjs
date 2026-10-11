@@ -5,7 +5,8 @@
  *
  *   5190  "Tiqora": serves dist/ under /chat/v1/ with the frame headers of the backend
  *         (webchat/static.py) and an in-memory /api/chat/v1 plus /__test/* hooks
- *   5191  an ALLOWED host page (e2e/host.html embedding the loader)
+ *   5191  an ALLOWED host page (e2e/host.html embedding the loader), served as
+ *         http://localhost:5191 so it is cross-SITE to 127.0.0.1:5190
  *   5192  a host page that is NOT allowed (same HTML; the frame refuses it)
  *
  * Run `pnpm build` first. State is in memory; POST /__test/reset clears it.
@@ -23,7 +24,8 @@ const TIQORA_PORT = 5190;
 const ALLOWED_PORT = 5191;
 const DENIED_PORT = 5192;
 const TIQORA = `http://127.0.0.1:${TIQORA_PORT}`;
-const ALLOWED_ORIGIN = `http://127.0.0.1:${ALLOWED_PORT}`;
+// localhost vs 127.0.0.1 are different SITES, so the widget runs as a real third-party frame.
+const ALLOWED_ORIGIN = `http://localhost:${ALLOWED_PORT}`;
 const KEY = "wc_e2ekey";
 const UPLOAD_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
@@ -44,6 +46,7 @@ const TYPES = {
 let sessions = new Map();
 let offline = false;
 let lastSession = null;
+const stats = { frame200: 0, assets: 0 };
 const offlineMessages = [];
 
 function resetState() {
@@ -51,6 +54,8 @@ function resetState() {
   sessions = new Map();
   offline = false;
   lastSession = null;
+  stats.frame200 = 0;
+  stats.assets = 0;
   offlineMessages.length = 0;
 }
 
@@ -107,15 +112,22 @@ function serveFrame(req, res, url) {
   const origin = url.searchParams.get("origin") ?? "";
   const referer = req.headers.referer;
   const refuse = (status, text) => {
-    res.writeHead(status, { "Content-Type": "text/plain; charset=utf-8", "Content-Security-Policy": "frame-ancestors 'none'", "Cache-Control": "no-store" });
+    res.writeHead(status, {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex",
+    });
     res.end(text);
   };
   if (url.searchParams.get("k") !== KEY) return refuse(404, "Nicht gefunden.");
   if (origin !== ALLOWED_ORIGIN) return refuse(403, "Diese Website ist für den Chat nicht freigegeben.");
   if (referer && originOf(referer) !== origin) return refuse(403, "Diese Website ist für den Chat nicht freigegeben.");
+  stats.frame200++;
   res.writeHead(200, {
     "Content-Type": "text/html; charset=utf-8",
     "Cache-Control": "no-store",
+    "Cross-Origin-Resource-Policy": "cross-origin",
     "X-Robots-Tag": "noindex",
     "Referrer-Policy": "same-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
@@ -319,6 +331,7 @@ async function api(req, res, url) {
 async function testHook(req, res, url) {
   const p = url.pathname;
   if (p === "/__test/health") return json(res, 200, { ok: true });
+  if (req.method === "GET" && p === "/__test/stats") return json(res, 200, stats);
   if (req.method === "GET" && p === "/__test/last-session") return json(res, 200, { session_id: lastSession });
   if (req.method === "GET" && p === "/__test/offline-messages") return json(res, 200, offlineMessages);
   if (req.method !== "POST") return notFound(res);
@@ -372,6 +385,7 @@ const tiqora = createServer((req, res) => {
     }
     if (url.pathname === "/chat/v1/frame") return serveFrame(req, res, url);
     if (url.pathname.startsWith("/chat/v1/assets/")) {
+      stats.assets++;
       return sendFile(res, join(dist, url.pathname.slice("/chat/v1/".length)), {
         "Cache-Control": "public, max-age=31536000, immutable",
       });
@@ -395,6 +409,7 @@ const serveHost = (req, res) => {
 };
 
 tiqora.listen(TIQORA_PORT, "127.0.0.1");
-for (const port of [ALLOWED_PORT, DENIED_PORT]) createServer(serveHost).listen(port, "127.0.0.1");
+// No bind address: "localhost" may resolve to ::1 or 127.0.0.1.
+for (const port of [ALLOWED_PORT, DENIED_PORT]) createServer(serveHost).listen(port);
 console.log(`mock-server: Tiqora ${TIQORA}, allowed host :${ALLOWED_PORT}, denied host :${DENIED_PORT}`);
 for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => process.exit(0));

@@ -1,8 +1,8 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
 const TIQORA = "http://127.0.0.1:5190";
-const HOST = "http://127.0.0.1:5191/host.html";
-const DENIED_HOST = "http://127.0.0.1:5192/host.html";
+const HOST = "http://localhost:5191/host.html";
+const DENIED_HOST = "http://localhost:5192/host.html";
 const LAUNCHER = "Fragen? Schreiben Sie uns";
 // 1x1 transparent PNG
 const PNG = Buffer.from(
@@ -83,6 +83,40 @@ test("uploads a PNG and refuses an SVG", async ({ page }) => {
   await expect(frame.locator('img[alt="evil.svg"]')).toHaveCount(0);
 });
 
+test("launcher and panel survive hostile host CSS", async ({ page }) => {
+  await page.goto(HOST);
+  const launcher = page.getByRole("button", { name: LAUNCHER });
+  await expect(launcher).toBeVisible();
+  const view = page.viewportSize()!;
+  const style = (sel: string) =>
+    page.locator(sel).evaluate((el) => {
+      const c = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      return {
+        opacity: c.opacity,
+        visibility: c.visibility,
+        transform: c.transform,
+        filter: c.filter,
+        position: c.position,
+        pointer: c.pointerEvents,
+        box: [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)],
+      };
+    });
+  const l = await style("button[aria-controls]");
+  expect(l).toMatchObject({ opacity: "1", visibility: "visible", transform: "none", filter: "none", position: "fixed", pointer: "auto" });
+  expect(l.box).toEqual([view.width - 20 - 56, view.height - 20 - 56, 56, 56]);
+  await launcher.click(); // really clickable
+  const frame = frameOf(page);
+  await expect(frame.getByText("Bevor es losgeht")).toBeVisible();
+  const p = await style("#tiqora-chat-panel");
+  expect(p).toMatchObject({ opacity: "1", visibility: "visible", transform: "none", filter: "none", position: "fixed" });
+  expect(p.box).toEqual([view.width - 20 - 380, view.height - 88 - 600, 380, 600]);
+  const f = await style('iframe[title="Chat"]');
+  expect(f).toMatchObject({ opacity: "1", visibility: "visible", transform: "none", position: "static" });
+  expect(f.box).toEqual([p.box[0], p.box[1], 380, 600]);
+  expect(await page.evaluate(() => document.body.scrollHeight <= innerHeight + 200)).toBe(true);
+});
+
 test("RTL for Arabic pages", async ({ page }) => {
   await page.goto(`${HOST}?lang=ar`);
   await expect(page.locator("button[aria-controls]")).toBeVisible();
@@ -96,6 +130,22 @@ test("is not shown on a site that is not allowed", async ({ page }) => {
   await page.waitForTimeout(3000);
   await expect(page.locator("button[aria-controls]")).toHaveCount(0);
   await expect(page.locator("#tiqora-chat-panel")).toBeHidden();
+});
+
+test("an iframe from a site that lies about its origin is blocked by frame-ancestors", async ({ page, request }) => {
+  await page.goto(DENIED_HOST);
+  await page.evaluate(() => {
+    const f = document.createElement("iframe");
+    f.referrerPolicy = "no-referrer"; // no Referer to give the lie away
+    f.src = "http://127.0.0.1:5190/chat/v1/frame?k=wc_e2ekey&origin=" + encodeURIComponent("http://localhost:5191") + "&lang=de";
+    document.body.appendChild(f);
+  });
+  await page.waitForTimeout(2500);
+  const stats = await (await request.get(`${TIQORA}/__test/stats`)).json();
+  // the server did answer (200 with frame-ancestors for 5191) but the browser refused to
+  // render it on 5192: the frame never fetched a single asset
+  expect(stats.frame200).toBeGreaterThan(0);
+  expect(stats.assets).toBe(0);
 });
 
 test("a second loader embed does nothing", async ({ page }) => {

@@ -9,6 +9,7 @@ import { createHostBridge } from "./bridge";
 import { createEvents, installHostApi } from "./hostApi";
 import { LAUNCHER_Z, createLauncher, css, type Launcher } from "./launcher";
 
+const LOADER_PATH = "/chat/v1/loader.js";
 const KEY = /^[A-Za-z0-9_-]{1,40}$/;
 const PANEL_ID = "tiqora-chat-panel";
 const IDLE_MS = 1500;
@@ -18,10 +19,23 @@ type Win = Window & { __tiqoraChatLoaded?: boolean };
 
 export function boot(win: Win, script: HTMLScriptElement | null): void {
   const doc = win.document;
-  const s = script ?? doc.querySelector<HTMLScriptElement>("script[data-tiqora-chat]");
+  const isLoaderSrc = (el: HTMLScriptElement) => {
+    try {
+      return new URL(el.src).pathname === LOADER_PATH;
+    } catch {
+      return false;
+    }
+  };
+  // Without document.currentScript (module/eval-style embeds) the script is looked up
+  // by its src; anything but exactly one match could be somebody else's tag: abort.
+  let s = script;
+  if (!s) {
+    const found = [...doc.querySelectorAll<HTMLScriptElement>("script[data-tiqora-chat]")].filter(isLoaderSrc);
+    s = found.length === 1 ? found[0] : null;
+  }
   const key = s?.dataset.tiqoraChat ?? "";
-  if (!s || !KEY.test(key)) {
-    console.warn("[tiqora-chat] data-tiqora-chat attribute missing or invalid on the loader script");
+  if (!s || !KEY.test(key) || !isLoaderSrc(s)) {
+    console.warn("[tiqora-chat] no single valid loader script tag (data-tiqora-chat, src .../chat/v1/loader.js)");
     return;
   }
   let tiqoraOrigin: string;
@@ -32,7 +46,10 @@ export function boot(win: Win, script: HTMLScriptElement | null): void {
   } catch {
     return;
   }
-  if (win.__tiqoraChatLoaded) return; // double embed: the first one wins
+  if (win.__tiqoraChatLoaded === true) {
+    console.warn("[tiqora-chat] loader already running on this page, this embed is ignored");
+    return; // double embed: the first one wins
+  }
   win.__tiqoraChatLoaded = true;
 
   const events = createEvents();
@@ -147,7 +164,7 @@ export function boot(win: Win, script: HTMLScriptElement | null): void {
     iframe.title = "Chat";
     iframe.setAttribute("allow", "clipboard-write");
     iframe.referrerPolicy = "strict-origin";
-    css(iframe, { width: "100%", height: "100%", border: "0", display: "block", background: "transparent" });
+    css(iframe, { width: "100%", height: "100%", border: "0", display: "block", background: "transparent" }, true);
     iframe.src =
       `${tiqoraOrigin}/chat/v1/frame?k=${encodeURIComponent(key)}` +
       `&origin=${encodeURIComponent(win.location.origin)}&lang=${encodeURIComponent(lang)}`;
@@ -160,14 +177,15 @@ export function boot(win: Win, script: HTMLScriptElement | null): void {
       "z-index": String(Number(LAUNCHER_Z) + 1),
       background: "transparent",
       "box-shadow": "0 8px 30px rgba(0,0,0,.28)",
-    });
+      "box-sizing": "border-box",
+    }, true);
     layout();
     panel.appendChild(iframe);
-    const container = doc.createElement("div");
-    container.appendChild(panel);
-    doc.body.appendChild(container);
+    doc.body.appendChild(panel); // no wrapper: nothing for host rules like `body > div` to hit
     bridge = createHostBridge({ iframe, tiqoraOrigin, onFrameMessage: onFrame });
-    win.matchMedia?.(MOBILE).addEventListener?.("change", layout);
+    const mq = win.matchMedia?.(MOBILE);
+    if (mq?.addEventListener) mq.addEventListener("change", layout);
+    else mq?.addListener?.(layout); // Safari < 14
   };
 
   const later = () => {

@@ -17,7 +17,12 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const ICON_CHAT = "M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H10l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z";
 const ICON_CLOSE = "M6 6l12 12M18 6L6 18";
 
-export function css(el: HTMLElement | SVGElement, props: Record<string, string>): void {
+/**
+ * Host CSS isolation: `all: initial` first (an inline !important declaration beats the
+ * host's author rules, !important or not, for every property), then the explicit values.
+ */
+export function css(el: HTMLElement | SVGElement, props: Record<string, string>, reset = false): void {
+  if (reset) el.style.setProperty("all", "initial", "important");
   for (const [k, v] of Object.entries(props)) el.style.setProperty(k, v, "important");
 }
 
@@ -49,24 +54,24 @@ export function createLauncher(
     "background-color": HEX_COLOR.test(opts.color) ? opts.color : "#2563eb",
     "box-shadow": "0 4px 14px rgba(0,0,0,.3)",
     "z-index": LAUNCHER_Z,
+    "box-sizing": "border-box",
     "font-family": "system-ui,sans-serif",
-  });
+  }, true);
 
   const svg = doc.createElementNS(SVG_NS, "svg");
   svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("width", "26");
-  svg.setAttribute("height", "26");
   svg.setAttribute("aria-hidden", "true");
+  css(svg, { display: "block", width: "26px", height: "26px", overflow: "visible", color: "#fff" }, true);
   const chat = doc.createElementNS(SVG_NS, "path");
   chat.setAttribute("d", ICON_CHAT);
-  chat.setAttribute("fill", "currentColor");
+  css(chat, { display: "inline", fill: "currentColor", stroke: "none" }, true);
   const close = doc.createElementNS(SVG_NS, "path");
   close.setAttribute("d", ICON_CLOSE);
-  close.setAttribute("fill", "none");
-  close.setAttribute("stroke", "currentColor");
-  close.setAttribute("stroke-width", "2.5");
-  close.setAttribute("stroke-linecap", "round");
-  css(close, { display: "none" });
+  css(
+    close,
+    { display: "none", fill: "none", stroke: "currentColor", "stroke-width": "2.5px", "stroke-linecap": "round" },
+    true,
+  );
   svg.append(chat, close);
 
   const badge = doc.createElement("span");
@@ -85,7 +90,7 @@ export function createLauncher(
     color: "#fff",
     font: "700 12px/20px system-ui,sans-serif",
     "text-align": "center",
-  });
+  }, true);
   el.append(svg, badge);
   el.addEventListener("click", () => opts.onClick());
 

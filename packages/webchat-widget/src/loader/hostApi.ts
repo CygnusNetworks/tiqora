@@ -66,15 +66,19 @@ export function installHostApi(win: Window, impl: HostApiImpl): void {
   });
   const w = win as unknown as { Tiqora?: Record<string, unknown> };
   const existing = w.Tiqora;
-  if (existing && typeof existing === "object") {
+  // An object or a function (command stubs): only `chat` is touched, so other widgets
+  // holding the same reference keep working.
+  if (existing && (typeof existing === "object" || typeof existing === "function")) {
     try {
       existing.chat = chat;
       return;
     } catch {
       // frozen or exotic object: fall through and replace it by a copy
     }
-    w.Tiqora = { ...existing, chat };
-    return;
   }
-  w.Tiqora = { chat };
+  try {
+    w.Tiqora = { ...(typeof existing === "object" ? existing : null), chat };
+  } catch {
+    console.warn("[tiqora-chat] window.Tiqora is not writable, host API unavailable");
+  }
 }

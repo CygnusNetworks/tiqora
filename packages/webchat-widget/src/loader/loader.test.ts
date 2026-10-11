@@ -240,6 +240,44 @@ describe("boot", () => {
     expect(document.activeElement).toBe(launcher());
   });
 
+  const tag = (src: string, key: string) => {
+    const el = document.createElement("script");
+    el.src = src;
+    el.dataset.tiqoraChat = key;
+    document.head.appendChild(el);
+    return el;
+  };
+
+  it("without currentScript, uses the fallback for exactly one loader tag", () => {
+    tag("https://evil.example/other.js", "wc_planted"); // not a loader URL: ignored
+    tag(`${ORIGIN}/chat/v1/loader.js?v=2`, "wc_fallback");
+    boot(window, null);
+    vi.advanceTimersByTime(2000);
+    const url = new URL((document.querySelector("iframe") as HTMLIFrameElement).src);
+    expect(url.origin).toBe(ORIGIN);
+    expect(url.searchParams.get("k")).toBe("wc_fallback");
+    document.head.replaceChildren();
+  });
+
+  it("without currentScript, two loader tags abort with a warning", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    tag(`${ORIGIN}/chat/v1/loader.js`, "wc_a");
+    tag("https://evil.example/chat/v1/loader.js", "wc_b");
+    boot(window, null);
+    vi.advanceTimersByTime(2000);
+    expect(document.querySelector("iframe")).toBeNull();
+    expect(warn).toHaveBeenCalled();
+    document.head.replaceChildren();
+  });
+
+  it("a non-loader src is refused even when handed in directly", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    script.src = "https://evil.example/x.js";
+    boot(window, script);
+    vi.advanceTimersByTime(2000);
+    expect(document.querySelector("iframe")).toBeNull();
+  });
+
   it("refuses a loader script without a valid key", () => {
     script.dataset.tiqoraChat = "bad key";
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
