@@ -79,6 +79,20 @@ describe("useDashboardData", () => {
     expect(client.getQueryData(dashboardKeys.data(1))).toBeDefined();
   });
 
+  it("a widget missing from the cached batch shows a skeleton while the batch refetches (added in edit mode)", async () => {
+    client.setQueryData<DashboardData>(dashboardKeys.data(1), { widgets: { "w-counter": ok(5) } });
+    await client.invalidateQueries({ queryKey: dashboardKeys.data(1) }); // the save invalidates
+    let resolve: (d: DashboardData) => void = () => {};
+    data.mockImplementationOnce(() => new Promise<DashboardData>((r) => (resolve = r)));
+    const widgets = [...WIDGETS, wire("w-new", "core.counter")];
+    const { result } = renderHook(() => useDashboardData(1, widgets, { enabled: true }), { wrapper });
+    await waitFor(() => expect(data).toHaveBeenCalledTimes(1));
+    expect(result.current.byWidget["w-new"].status).toBe("loading");
+    expect(result.current.byWidget["w-counter"]).toMatchObject({ status: "ok", data: { value: 5 } });
+    act(() => resolve({ widgets: { "w-counter": ok(6), "w-new": ok(2) } }));
+    await waitFor(() => expect(result.current.byWidget["w-new"]).toMatchObject({ status: "ok", data: { value: 2 } }));
+  });
+
   it("makes no request while disabled and keeps the cached data", async () => {
     client.setQueryData<DashboardData>(dashboardKeys.data(1), { widgets: { "w-counter": ok(5) } });
     const { result } = renderHook(() => useDashboardData(1, WIDGETS, { enabled: false }), { wrapper });

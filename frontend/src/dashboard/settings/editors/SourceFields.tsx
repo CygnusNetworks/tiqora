@@ -27,7 +27,7 @@ function filterOf(source: unknown): TicketFilter | null {
 /**
  * "Which tickets?" of ticket lists and counters: a saved search (the built-in views and the
  * searches the user can see) or an own filter built right here. Shared by both editors.
- * Server messages for `source.*` show under the card they belong to.
+ * Server messages for `source.*` show under the card they belong to (the active one unless it is `source.id`).
  */
 export function SourceFields({
   value,
@@ -79,10 +79,12 @@ export function SourceFields({
   const known = searchId !== null && searches.some((s) => s.id === searchId);
   const selected = searchId !== null ? `search:${searchId}` : `preset:${preset ?? "mine_open"}`;
 
+  // `source.id` belongs to the search card; every other source message (`source`, `source.preset`,
+  // `source.filter…`) to the card that is active, so none lands under a card that is not shown.
   const sourceErrors = Object.entries(errors).filter(([k]) => k === "source" || k.startsWith("source."));
   const errorsFor = (kind: "search" | "filter") =>
     sourceErrors
-      .filter(([k]) => (kind === "search" ? k === "source.id" : k !== "source.id"))
+      .filter(([k]) => (k === "source.id" || !ownFilter ? kind === "search" : kind === "filter"))
       .map(([, m]) => m);
 
   const pick = (v: string) => {

@@ -10,8 +10,9 @@ const FOCUS = "focus-visible:outline focus-visible:outline-2 focus-visible:outli
 /**
  * The tab row of the home page (WAI-ARIA tabs, manual activation): arrow keys / Home / End move the
  * focus, Enter or Space opens the dashboard. A locked role template carries a lock and the
- * description "Verbindlich"; a dashboard shared with the agent names its owner. The "+" button sits
- * after the tab list. Each tab has a "..." menu button next to it (rename, move, copy, delete).
+ * description "Verbindlich"; a dashboard shared with the agent names its owner. After the tab list
+ * (outside `role="tablist"`, so the list owns only tabs and stays one tab stop) sit the "..." menu of
+ * the SELECTED tab (rename, move, copy, delete) and the "+" button.
  */
 export interface TabActions {
   onRename: (tab: DashboardTab) => void;
@@ -32,7 +33,7 @@ export function DashboardTabs({
   selectedId: number | null;
   onSelect: (id: number) => void;
   onCreate: () => void;
-  /** The tab menus; without them the tabs carry no menu button. */
+  /** The menu of the selected tab; without it there is no menu button. */
   actions?: TabActions;
   /** Id of the tab panel (the page's content area); tab ids are `<panelId>-tab-<id>`. */
   panelId?: string;
@@ -41,7 +42,8 @@ export function DashboardTabs({
   const baseId = useId();
   const refs = useRef(new Map<number, HTMLButtonElement>());
   const ownIds = tabs.filter((tab) => tab.is_owner).map((tab) => tab.id);
-  const focusable = tabs.some((tab) => tab.id === selectedId) ? selectedId : (tabs[0]?.id ?? null);
+  const selectedTab = tabs.find((tab) => tab.id === selectedId) ?? null;
+  const focusable = selectedTab ? selectedTab.id : (tabs[0]?.id ?? null);
 
   const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const last = tabs.length - 1;
@@ -68,8 +70,8 @@ export function DashboardTabs({
           const descId = `${baseId}-d${tab.id}`;
           const description = locked ? t("dashboards.tabs.locked") : owner ? t("dashboards.tabs.owner", { name: owner }) : null;
           return (
-            <div key={tab.id} role="presentation" className="inline-flex max-w-full items-center gap-0.5">
             <button
+              key={tab.id}
               ref={(el) => {
                 if (el) refs.current.set(tab.id, el);
                 else refs.current.delete(tab.id);
@@ -105,21 +107,20 @@ export function DashboardTabs({
                 </span>
               )}
             </button>
-            {actions && (
-              <TabMenu
-                tab={tab}
-                index={ownIds.indexOf(tab.id)}
-                count={ownIds.length}
-                onRename={() => actions.onRename(tab)}
-                onMove={(dir) => actions.onMove(tab, dir)}
-                onDelete={() => actions.onDelete(tab)}
-                onCopy={() => actions.onCopy(tab)}
-              />
-            )}
-            </div>
           );
         })}
       </div>
+      {actions && selectedTab && (
+        <TabMenu
+          tab={selectedTab}
+          index={ownIds.indexOf(selectedTab.id)}
+          count={ownIds.length}
+          onRename={() => actions.onRename(selectedTab)}
+          onMove={(dir) => actions.onMove(selectedTab, dir)}
+          onDelete={() => actions.onDelete(selectedTab)}
+          onCopy={() => actions.onCopy(selectedTab)}
+        />
+      )}
       <button
         type="button"
         aria-label={t("dashboards.tabs.new")}

@@ -26,6 +26,26 @@ export const CORE_SETTINGS_EDITORS: Record<string, ComponentType<SettingsEditorP
   "core.notes": NotesSettingsEditor,
 };
 
+const isSourcePath = (p: string) => p === "source" || p.startsWith("source.");
+
+/** The server error paths (inside `settings`) each bespoke editor shows next to a field. */
+const CORE_EDITOR_ERROR_PATHS: Record<string, (path: string) => boolean> = {
+  "core.ticket-list": (p) => isSourcePath(p) || ["columns", "sort", "order", "limit"].includes(p),
+  "core.counter": isSourcePath,
+  "core.links": (p) => /^items\.\d+\.(label|url)$/.test(p),
+  "core.notes": (p) => p === "markdown",
+};
+
+/**
+ * Whether the settings UI of `def` shows a server error at `path` (`limit`, `items.0.url`) next to
+ * a field. Anything else is shown as a general message in the drawer, so no 422 text gets lost.
+ */
+export function showsErrorPath(def: Pick<WidgetDefinition, "key">, adapter: FormAdapter | null, path: string): boolean {
+  const bespoke = CORE_EDITOR_ERROR_PATHS[def.key];
+  if (bespoke) return bespoke(path);
+  return adapter !== null && Object.prototype.hasOwnProperty.call(adapter.schema.properties ?? {}, path);
+}
+
 /** A generated form over (a view of) the stored settings. */
 export interface FormAdapter {
   schema: JsonSchema;

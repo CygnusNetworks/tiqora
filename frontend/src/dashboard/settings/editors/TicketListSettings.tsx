@@ -38,6 +38,7 @@ export function TicketListSettingsEditor({ value, onChange, errors, focusSource 
   const known = SORTS.some((s) => s.id === combo);
   const limit = typeof value.limit === "number" ? value.limit : "";
   const limitErr = errors.limit;
+  const sortErr = errors.sort ?? errors.order;
   const density = value.density === "compact" ? "compact" : "comfortable";
 
   return (
@@ -80,7 +81,8 @@ export function TicketListSettingsEditor({ value, onChange, errors, focusSource 
           <select
             id={`${uid}-sort`}
             value={known ? combo : "other"}
-            aria-invalid={errors.sort ? true : undefined}
+            aria-invalid={sortErr ? true : undefined}
+            aria-describedby={sortErr ? `${uid}-sort-err` : undefined}
             onChange={(e) => {
               const s = SORTS.find((x) => x.id === e.target.value);
               if (s) set({ sort: s.sort, order: s.order });
@@ -98,6 +100,11 @@ export function TicketListSettingsEditor({ value, onChange, errors, focusSource 
               </option>
             ))}
           </select>
+          {sortErr && (
+            <p id={`${uid}-sort-err`} role="alert" className="mt-1 text-xs text-danger">
+              {sortErr}
+            </p>
+          )}
         </div>
         <div>
           <label htmlFor={`${uid}-limit`} className="mb-1 block text-xs font-medium text-muted">

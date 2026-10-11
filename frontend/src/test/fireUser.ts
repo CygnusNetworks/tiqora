@@ -1,6 +1,10 @@
 import { fireEvent } from "@testing-library/react";
 
 // @testing-library/user-event is not a dependency: a small stand-in over fireEvent.
+// Its limits: no layout or pointer model (a click never moves the focus, hidden or covered elements
+// are clicked anyway), `keyboard` sends ONE key per call to the focused element (no "{Shift>}" or
+// key sequences), and `type` appends per character without honouring `maxLength`, selection or
+// caret position. Real focus and typing behaviour is covered by the Playwright specs.
 const FOCUSABLE = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 export function makeUser() {
   return {

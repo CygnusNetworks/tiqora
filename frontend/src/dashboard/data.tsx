@@ -327,7 +327,8 @@ export function useDashboardData(
       if (!hasData(defByKey.get(w.type_key))) out[w.id] = { status: "none" };
       else if (refetching.has(w.id)) out[w.id] = { status: "loading" };
       else if (entry) out[w.id] = toState(entry);
-      else if (batchData) out[w.id] = { status: "none" };
+      // not in the batch yet (e.g. added in edit mode): a skeleton until the refetch answers
+      else if (batchData) out[w.id] = batch.isFetching ? { status: "loading" } : { status: "none" };
       else if (batch.isError && !batch.isFetching) out[w.id] = { status: "error" };
       else out[w.id] = { status: "loading" };
     }

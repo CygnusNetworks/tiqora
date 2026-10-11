@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -13,9 +13,10 @@ function tabOf(d: Dashboard): DashboardTab {
 }
 
 /**
- * The tab row of the home page with its management: "+" (new, optionally a copy), and per tab
- * rename / move / copy / delete. Every change goes through `dashboardsApi` and the shared
- * `dashboardKeys.list()` cache; the tab it creates or the neighbour of a deleted one is selected.
+ * The tab row of the home page with its management: "+" (new, optionally a copy), and the "..." menu
+ * of the selected tab (rename / move / copy / delete). Every change goes through `dashboardsApi` and
+ * the shared `dashboardKeys.list()` cache; the tab it creates or the neighbour of a deleted one is
+ * selected. Dialogs return the focus to the "..." button; after a delete it moves to the neighbour.
  */
 export function ManagedDashboardTabs({
   tabs,
@@ -35,6 +36,15 @@ export function ManagedDashboardTabs({
   const [deleting, setDeleting] = useState<DashboardTab | null>(null);
   const [deletePending, setDeletePending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  const [focusTab, setFocusTab] = useState<number | null>(null);
+
+  // Runs after the confirm dialog's cleanup has refocused its opener, so the neighbour tab wins.
+  useEffect(() => {
+    if (focusTab === null) return;
+    rowRef.current?.querySelector<HTMLElement>(`[data-testid="dashboard-tab-${focusTab}"]`)?.focus();
+    setFocusTab(null);
+  }, [focusTab, tabs]);
 
   const created = (d: Dashboard) => {
     qc.setQueryData(dashboardKeys.one(d.id), d);
@@ -116,7 +126,10 @@ export function ManagedDashboardTabs({
       qc.removeQueries({ queryKey: dashboardKeys.one(tab.id) });
       qc.setQueryData<DashboardTab[]>(dashboardKeys.list(), (prev) => prev?.filter((x) => x.id !== tab.id));
       void qc.invalidateQueries({ queryKey: dashboardKeys.list(), exact: true });
-      if (tab.id === selectedId && neighbour) onSelect(neighbour.id);
+      if (tab.id === selectedId && neighbour) {
+        onSelect(neighbour.id);
+        setFocusTab(neighbour.id);
+      }
     } catch (err) {
       setProblem(apiErrorMessage(err, t("dashboards.manage.actionFailed")));
     } finally {
@@ -127,19 +140,21 @@ export function ManagedDashboardTabs({
 
   return (
     <>
-      <DashboardTabs
-        tabs={tabs}
-        selectedId={selectedId}
-        onSelect={onSelect}
-        onCreate={() => setCreating(true)}
-        panelId={panelId}
-        actions={{
-          onRename: setRenaming,
-          onMove: (tab, dir) => void move(tab, dir),
-          onDelete: setDeleting,
-          onCopy: (tab) => void copy(tab),
-        }}
-      />
+      <div ref={rowRef} className="contents">
+        <DashboardTabs
+          tabs={tabs}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          onCreate={() => setCreating(true)}
+          panelId={panelId}
+          actions={{
+            onRename: setRenaming,
+            onMove: (tab, dir) => void move(tab, dir),
+            onDelete: setDeleting,
+            onCopy: (tab) => void copy(tab),
+          }}
+        />
+      </div>
       {problem && (
         <p role="alert" className="text-sm text-danger">
           {problem}

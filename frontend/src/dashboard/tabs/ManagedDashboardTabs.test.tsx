@@ -47,7 +47,11 @@ async function renderTabs() {
 }
 
 const menuButtonOf = (name: string) => screen.getByRole("button", { name: `Menü für ${name}` });
-const menuOf = (name: string) => menuButtonOf(name);
+/** The single "..." belongs to the selected tab: select the tab, then open its menu. */
+async function openMenuOf(name: string) {
+  await user.click(screen.getByRole("tab", { name }));
+  await user.click(menuButtonOf(name));
+}
 const openNew = async () => user.click(screen.getByRole("button", { name: "Neues Dashboard" }));
 
 beforeAll(async () => {
@@ -119,7 +123,7 @@ describe("dashboard management in the tab row", () => {
 
   it("rename saves with the current widgets and the new name; a 409 keeps the old name and says why", async () => {
     await renderTabs();
-    await user.click(menuOf("Mein Start"));
+    await openMenuOf("Mein Start");
     await user.click(screen.getByRole("menuitem", { name: "Umbenennen" }));
     await user.clear(screen.getByLabelText("Name"));
     await user.type(screen.getByLabelText("Name"), "Mein Tag");
@@ -130,7 +134,7 @@ describe("dashboard management in the tab row", () => {
     expect(await screen.findByRole("tab", { name: "Mein Tag" })).toBeVisible();
 
     spies.save.mockRejectedValue(new DashboardConflictError("Dieses Dashboard wurde inzwischen geändert.", 4));
-    await user.click(menuOf("Mein Tag"));
+    await openMenuOf("Mein Tag");
     await user.click(screen.getByRole("menuitem", { name: "Umbenennen" }));
     await user.click(screen.getByRole("button", { name: "Speichern" }));
     expect(await screen.findByText(/inzwischen geändert/)).toBeVisible();
@@ -139,7 +143,7 @@ describe("dashboard management in the tab row", () => {
 
   it("move left/right calls order with the permuted own ids; disabled at the ends and absent for foreign tabs", async () => {
     await renderTabs();
-    await user.click(menuOf("Eigen B"));
+    await openMenuOf("Eigen B");
     await user.click(screen.getByRole("menuitem", { name: "Nach links" }));
     expect(spies.order).toHaveBeenCalledWith([4, 1]);
     await waitFor(() =>
@@ -151,18 +155,17 @@ describe("dashboard management in the tab row", () => {
       ]),
     );
 
-    await user.click(menuOf("Eigen B")); // now the first tab
+    await openMenuOf("Eigen B"); // now the first tab
     expect(screen.getByRole("menuitem", { name: "Nach links" })).toBeDisabled();
     expect(screen.getByRole("menuitem", { name: "Nach rechts" })).toBeEnabled();
     await user.keyboard("{Escape}");
-    await user.click(menuOf("Team Support")); // shared by someone else
+    await openMenuOf("Team Support"); // shared by someone else
     expect(screen.queryByRole("menuitem", { name: "Nach links" })).toBeNull();
   });
 
   it("delete asks for confirmation, then removes and selects the neighbour; the last own dashboard cannot be deleted", async () => {
     await renderTabs();
-    await user.click(screen.getByRole("tab", { name: "Eigen B" }));
-    await user.click(menuOf("Eigen B"));
+    await openMenuOf("Eigen B");
     await user.click(screen.getByRole("menuitem", { name: "Löschen" }));
     const dialog = screen.getByRole("alertdialog");
     expect(within(dialog).getByText("Dashboard „Eigen B“ löschen?")).toBeVisible();
@@ -171,11 +174,13 @@ describe("dashboard management in the tab row", () => {
     expect(spies.remove).toHaveBeenCalledWith(4);
     expect(await screen.findByRole("tab", { name: "Mein Start", selected: true })).toBeVisible();
     expect(screen.queryByRole("tab", { name: "Eigen B" })).toBeNull();
+    await waitFor(() => expect(screen.getByRole("tab", { name: "Mein Start" })).toHaveFocus());
 
-    await user.click(menuOf("Mein Start"));
+    await openMenuOf("Mein Start");
     const del = screen.getByRole("menuitem", { name: "Löschen" });
     expect(del).toHaveAttribute("aria-disabled", "true");
     expect(del).toHaveAttribute("title", "Das letzte Dashboard bleibt bestehen.");
+    expect(del).toHaveAccessibleDescription("Das letzte Dashboard bleibt bestehen.");
     await user.click(del);
     expect(screen.queryByRole("alertdialog")).toBeNull();
   });
@@ -185,7 +190,7 @@ describe("dashboard management in the tab row", () => {
       new ApiError(422, { detail: { message: "Das letzte Dashboard bleibt bestehen.", path: "id" } }, "/api/v1/dashboards/4"),
     );
     await renderTabs();
-    await user.click(menuOf("Eigen B"));
+    await openMenuOf("Eigen B");
     await user.click(screen.getByRole("menuitem", { name: "Löschen" }));
     await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Löschen" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Das letzte Dashboard bleibt bestehen.");
@@ -194,15 +199,43 @@ describe("dashboard management in the tab row", () => {
 
   it("a shared or locked tab offers copy and no rename/delete", async () => {
     await renderTabs();
-    await user.click(menuOf("Team Support"));
+    await openMenuOf("Team Support");
     expect(screen.queryByRole("menuitem", { name: "Umbenennen" })).toBeNull();
     expect(screen.queryByRole("menuitem", { name: "Löschen" })).toBeNull();
     await user.click(screen.getByRole("menuitem", { name: "Als eigenes Dashboard kopieren" }));
     expect(spies.create).toHaveBeenCalledWith({ name: "Team Support (Kopie)", icon: null, copy_from: 2 });
     expect(await screen.findByRole("tab", { name: "Team Support (Kopie)", selected: true })).toBeVisible();
 
-    await user.click(menuOf("Leitstand"));
+    await openMenuOf("Leitstand");
     expect(screen.getAllByRole("menuitem").map((i) => i.textContent)).toEqual(["Als eigenes Dashboard kopieren"]);
+  });
+
+  it("there is one '...' button, for the selected tab, after the tab list; the list owns only tabs", async () => {
+    await renderTabs();
+    const list = screen.getByRole("tablist");
+    expect(within(list).queryAllByRole("button")).toHaveLength(0);
+    expect(list.querySelectorAll("button:not([role=tab])")).toHaveLength(0);
+    expect(screen.getAllByRole("button", { name: /^Menü für / })).toHaveLength(1);
+    expect(list).not.toContainElement(menuButtonOf("Mein Start"));
+    await user.click(screen.getByRole("tab", { name: "Leitstand" }));
+    expect(screen.getAllByRole("button", { name: /^Menü für / })).toHaveLength(1);
+    expect(menuButtonOf("Leitstand")).toBeVisible();
+  });
+
+  it("closing the rename dialog or cancelling a delete returns the focus to the '...' button", async () => {
+    await renderTabs();
+    await openMenuOf("Eigen B");
+    await user.click(screen.getByRole("menuitem", { name: "Umbenennen" }));
+    expect(screen.getByRole("dialog")).toBeVisible();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(menuButtonOf("Eigen B")).toHaveFocus();
+
+    await user.click(menuButtonOf("Eigen B"));
+    await user.click(screen.getByRole("menuitem", { name: "Löschen" }));
+    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Abbrechen" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(menuButtonOf("Eigen B")).toHaveFocus();
   });
 
   it("the tab menu is keyboard operable", async () => {

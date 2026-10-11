@@ -6,6 +6,8 @@ import { isSafeLinkUrl } from "./linkUrl";
 export const MAX_NOTE_CHARS = 5000;
 export const MAX_LINKS = 12;
 export const MAX_TITLE_CHARS = 200;
+/** The server's cap on ticket-list columns (`TicketListSettings.columns`, max_length=8). */
+export const MAX_TICKET_COLUMNS = 8;
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
@@ -42,6 +44,8 @@ export function validateTicketList(value: Record<string, unknown>, t: TFunction)
   }
   if (!Array.isArray(value.columns) || value.columns.length === 0) {
     errors.columns = t("dashboards.settings.ticketList.columnsMin");
+  } else if (value.columns.length > MAX_TICKET_COLUMNS) {
+    errors.columns = t("dashboards.settings.ticketList.columnsMax", { max: MAX_TICKET_COLUMNS });
   }
   return errors;
 }

@@ -63,6 +63,9 @@ describe("ShareDialog", () => {
     renderDialog();
     await user.click(screen.getByRole("radio", { name: "Mit Gruppen" }));
     expect(screen.getByRole("button", { name: "Speichern" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Speichern" })).toHaveAccessibleDescription(
+      "Wählen Sie mindestens eine Gruppe aus.",
+    );
   });
 
   it("the search narrows the list of groups", async () => {
@@ -97,8 +100,9 @@ describe("ShareDialog", () => {
     await waitFor(() => expect(api.share).toHaveBeenCalledWith(1, [2]));
   });
 
-  it("the viewer-scope note is shown", async () => {
+  it("the note names the viewer scope and what every member sees (R-DASH-SHARE-NOTE)", async () => {
     renderDialog(demoDashboard({ ...d, kind: "shared", group_ids: [2] }));
     expect(await screen.findByText(/nur Tickets aus Queues, die sie selbst lesen dürfen/)).toBeVisible();
+    expect(screen.getByText(/Titel, Notizen und Filtereinstellungen der Widgets sehen alle Mitglieder\./)).toBeVisible();
   });
 });

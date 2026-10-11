@@ -5689,7 +5689,6 @@
       "counter": {
         "title": "Kennzahl",
         "description": "Eine Zahl mit Verlauf, z. B. Ihre offenen Tickets",
-        "empty": "Keine Zahl vorhanden.",
         "delta": "{{delta}} seit dem letzten Stand"
       },
       "queueOverview": {
@@ -5834,7 +5833,6 @@
       "limit": "Es sind höchstens {{max}} Widgets möglich.",
       "empty": "Nichts gefunden",
       "clearSearch": "Suche löschen",
-      "added": "„{{title}}“ hinzugefügt",
       "addedAt": "„{{title}}“ hinzugefügt – {{n}} von {{max}} Widgets"
     },
     "settings": {
@@ -5853,6 +5851,7 @@
         "standard": "Standard",
         "columns": "Spalten",
         "columnsMin": "Mindestens eine Spalte muss ausgewählt sein.",
+        "columnsMax": "Höchstens {{max}} Spalten sind möglich.",
         "sort": "Sortierung",
         "sortOther": "Andere Sortierung",
         "sorts": {
@@ -5982,7 +5981,7 @@
       "renameTitle": "Dashboard umbenennen",
       "save": "Speichern",
       "renameFailed": "Das Dashboard konnte nicht umbenannt werden.",
-      "conflict": "Dieses Dashboard wurde inzwischen geändert. Bitte laden Sie die Seite neu und versuchen Sie es noch einmal.",
+      "conflict": "Dieses Dashboard wurde inzwischen geändert. Bitte versuchen Sie es noch einmal.",
       "menu": "Menü für {{name}}",
       "rename": "Umbenennen",
       "moveLeft": "Nach links",
@@ -6005,7 +6004,7 @@
       "noGroups": "Sie gehören keiner Gruppe an, mit der Sie teilen dürfen.",
       "noMatch": "Keine Gruppe passt.",
       "loadFailed": "Die Gruppen konnten nicht geladen werden.",
-      "note": "Die Mitglieder sehen nur Tickets aus Queues, die sie selbst lesen dürfen.",
+      "note": "Die Mitglieder sehen nur Tickets aus Queues, die sie selbst lesen dürfen. Titel, Notizen und Filtereinstellungen der Widgets sehen alle Mitglieder.",
       "save": "Speichern",
       "cancel": "Abbrechen",
       "failed": "Das Teilen hat nicht geklappt. Bitte versuchen Sie es noch einmal.",

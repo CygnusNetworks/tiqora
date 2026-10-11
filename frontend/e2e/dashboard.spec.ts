@@ -152,7 +152,18 @@ test("a widget of an unknown type shows the unavailable tile and survives a save
   await page.getByRole("tab", { name: "Alt" }).click();
   await expect(page.getByText("Widget nicht verfügbar")).toBeVisible();
   await page.getByRole("button", { name: "Anpassen" }).click();
+  const put = page.waitForRequest((r) => r.method() === "PUT" && /\/api\/v1\/dashboards\/\d+$/.test(new URL(r.url()).pathname));
   await page.getByRole("button", { name: "Speichern" }).click();
+  // the unknown widget goes back exactly as stored: type, version, settings and layout
+  const sent = ((await put).postDataJSON() as { widgets: { id: string }[] }).widgets.find((w) => w.id === "e2e-gone");
+  expect(sent).toEqual({
+    id: "e2e-gone",
+    type_key: "org.example.gone",
+    type_version: 1,
+    title_override: null,
+    settings: { keep: "me" },
+    layout: { lg: { x: 0, y: 0, w: 6, h: 3 } },
+  });
   await expect(page.getByRole("toolbar", { name: "Bearbeiten" })).toHaveCount(0);
   await page.reload();
   await page.getByRole("tab", { name: "Alt" }).click();

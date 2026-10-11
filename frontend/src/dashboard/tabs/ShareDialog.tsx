@@ -15,7 +15,8 @@ type Mode = "me" | "groups";
 /**
  * "Teilen": a dashboard is either private ("Nur ich", saves an empty list) or shared with groups the
  * owner may share with (`GET /reference/share-groups`). Members see only tickets from queues they
- * may read themselves; the dialog says so. A server refusal (422, `group_ids`) is shown under the list.
+ * may read themselves, while the widgets' titles, notes and filter settings are visible to every member
+ * (R-DASH-SHARE-NOTE); the dialog says both. A server refusal (422, `group_ids`) is shown under the list.
  */
 export function ShareDialog({ dashboard, onClose }: { dashboard: DashboardTab; onClose: () => void }) {
   const { t } = useTranslation();
@@ -37,6 +38,7 @@ export function ShareDialog({ dashboard, onClose }: { dashboard: DashboardTab; o
   // Groups the owner may no longer share with have no checkbox: they drop out of the selection.
   const chosen = [...picked].filter((id) => !groupsQ.data || groupsQ.data.some((g) => g.id === id));
   const canSave = !pending && (mode === "me" || chosen.length > 0);
+  const needsGroup = mode === "groups" && chosen.length === 0;
 
   const toggle = (id: number) => {
     setError(null);
@@ -78,7 +80,12 @@ export function ShareDialog({ dashboard, onClose }: { dashboard: DashboardTab; o
           <Button variant="secondary" onClick={onClose} disabled={pending}>
             {t("dashboards.share.cancel")}
           </Button>
-          <Button variant="primary" onClick={() => void save()} disabled={!canSave}>
+          <Button
+            variant="primary"
+            onClick={() => void save()}
+            disabled={!canSave}
+            aria-describedby={needsGroup ? `${ids}-pick` : undefined}
+          >
             {pending ? <Spinner /> : t("dashboards.share.save")}
           </Button>
         </>
@@ -122,7 +129,11 @@ export function ShareDialog({ dashboard, onClose }: { dashboard: DashboardTab; o
                 </label>
               ))}
             </div>
-            {chosen.length === 0 && <p className="text-xs text-muted">{t("dashboards.share.pickOne")}</p>}
+            {needsGroup && (
+              <p id={`${ids}-pick`} className="text-xs text-muted">
+                {t("dashboards.share.pickOne")}
+              </p>
+            )}
             {error && (
               <p role="alert" className="text-sm text-danger">
                 {error}

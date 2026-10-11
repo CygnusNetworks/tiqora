@@ -1051,6 +1051,23 @@ describe("DashboardPage", () => {
       expect(screen.getByRole("toolbar", { name: "Bearbeiten" })).toBeVisible();
     });
 
+    it("applying the widget's settings ends its 422: no outline, no old message when the drawer opens again", async () => {
+      save.mockRejectedValueOnce(
+        new ApiError(422, { detail: { message: "Der Wert muss zwischen 1 und 50 liegen.", path: "widgets[6].settings.limit" } }, "/api/v1/dashboards/1"),
+      );
+      await enterEdit();
+      fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+      const dialog = await screen.findByRole("dialog", { name: /Einstellungen/ });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Übernehmen" }));
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: /Einstellungen/ })).toBeNull());
+      // the applied settings are previewed (skeleton id); the cell is found by its widget id
+      const cell = screen.getByTestId("dashboard-grid").querySelector<HTMLElement>('[data-widget-id="w-list"]')!;
+      expect(cell).not.toHaveClass("ring-danger");
+      fireEvent.click(within(cell).getByRole("button", { name: "Einstellungen" }));
+      const again = await screen.findByRole("dialog", { name: /Einstellungen/ });
+      expect(within(again).queryByText("Der Wert muss zwischen 1 und 50 liegen.")).toBeNull();
+    });
+
     it("entering edit mode reuses the view's data: no preview request, no second batch; a duplicate with the same settings reuses it too", async () => {
       await enterEdit();
       expect(within(cellOf("w-counter-1")).getByText("12")).toBeVisible();
@@ -1153,11 +1170,17 @@ describe("DashboardPage", () => {
         mockDashboard({ widgets: [WIDE] });
         await enterEdit();
         fireEvent.click(within(gallery()).getByRole("button", { name: /Notizen/ }));
-        expect(screen.getByText("„Notizen“ hinzugefügt – 2 von 40 Widgets")).toBeInTheDocument();
+        const live = screen.getByText("„Notizen“ hinzugefügt – 2 von 40 Widgets");
+        expect(live).toHaveAttribute("aria-live", "polite");
+        const first = ids().filter((id) => id !== "w-wide");
+        expect(first).toHaveLength(1);
+        expect(gcell(first[0])).toHaveFocus();
         fireEvent.click(within(gallery()).getByRole("button", { name: /Notizen/ }));
-        // the same widget twice is announced twice (different text), and the new widget has the focus
-        expect(screen.getByText("„Notizen“ hinzugefügt – 3 von 40 Widgets")).toBeInTheDocument();
+        // the same widget twice is announced twice (the same live region, different text), and each
+        // new widget gets the focus
+        expect(live).toHaveTextContent(/^„Notizen“ hinzugefügt – 3 von 40 Widgets$/);
         const added = ids().filter((id) => id !== "w-wide");
+        expect(added[0]).toBe(first[0]);
         expect(gcell(added[1])).toHaveFocus();
         expect(added).toHaveLength(2);
         expect(added[0]).toMatch(/^[0-9a-f-]{36}$/);
@@ -1261,6 +1284,18 @@ describe("DashboardPage: 'Suche wählen' on a tile whose saved search is gone", 
     const dialog = await screen.findByRole("dialog", { name: /Einstellungen/ });
     expect(screen.getByRole("toolbar", { name: "Bearbeiten" })).toBeVisible();
     await waitFor(() => expect(within(dialog).getByRole("radio", { name: "Gespeicherte Suche" })).toHaveFocus());
+  });
+
+  it("closing that drawer puts the focus on the widget (the view-mode button that opened it is gone)", async () => {
+    mockDashboard({ widgets: [listWidget], can_edit: true });
+    forbidden();
+    await renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Suche wählen" }));
+    const dialog = await screen.findByRole("dialog", { name: /Einstellungen/ });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Abbrechen" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: /Einstellungen/ })).toBeNull());
+    const cell = screen.getByTestId("dashboard-grid").querySelector<HTMLElement>('[data-widget-id="w-gone"]');
+    await waitFor(() => expect(cell).toHaveFocus());
   });
 
   it("someone who cannot edit the dashboard sees the message and no action", async () => {

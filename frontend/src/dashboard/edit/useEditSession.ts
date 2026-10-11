@@ -43,6 +43,8 @@ export interface EditSession {
   invalidMessage: string | null;
   /** Field path inside the widget (`settings.limit`) when the server named one. */
   invalidPath: string | null;
+  /** The user applied new settings to this widget: its 422 (outline, drawer message) is over. */
+  clearInvalid: (widgetId: string) => void;
   /** Message for the toolbar after a failed save that names no widget. */
   saveError: string | null;
   /** Server version after a 409 (the conflict dialog is open while set). */
@@ -213,6 +215,10 @@ export function useEditSession(dashboard: Dashboard, userId: number): EditSessio
     }
   }, [dashboardId, icon, userId, qc, t]);
 
+  const clearInvalid = useCallback(
+    (widgetId: string) => setInvalid((cur) => (cur?.id === widgetId ? null : cur)),
+    [],
+  );
   const dismissConflict = useCallback(() => setConflictVersion(null), []);
   const rebaseDraft = useCallback(
     (version: number) => {
@@ -235,6 +241,7 @@ export function useEditSession(dashboard: Dashboard, userId: number): EditSessio
     invalidWidgetId: invalid?.id ?? null,
     invalidMessage: invalid?.message ?? null,
     invalidPath: invalid?.path ?? null,
+    clearInvalid,
     saveError,
     conflictVersion,
     dismissConflict,

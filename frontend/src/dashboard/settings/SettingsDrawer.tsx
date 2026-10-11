@@ -10,7 +10,7 @@ import { settingsWithDefaults } from "../definitions";
 import { widgetTexts } from "../gallery/galleryModel";
 import { presetOf } from "../widgets/presets";
 import type { EditWidget } from "../model";
-import { CORE_SETTINGS_EDITORS, formAdapterFor } from "./registry";
+import { CORE_SETTINGS_EDITORS, formAdapterFor, showsErrorPath } from "./registry";
 import { SettingsPreview } from "./SettingsPreview";
 import { MAX_TITLE_CHARS, finalizeSettings, validateCore, validateSchemaValues } from "./validate";
 
@@ -112,6 +112,13 @@ export function SettingsDrawer({
   }, [Editor, adapter, def.key, draft, t]);
   const invalid = Object.keys(clientErrors).length > 0;
   const fieldErrors = { ...server.fields, ...clientErrors };
+  // A server message for a field the form does not show (e.g. `items` itself) goes on top instead.
+  const generalErrors = [
+    ...server.general,
+    ...Object.entries(server.fields)
+      .filter(([path]) => !showsErrorPath(def, adapter, path))
+      .map(([, message]) => message),
+  ];
 
   const apply = () => {
     if (invalid) return;
@@ -147,7 +154,7 @@ export function SettingsDrawer({
           apply();
         }}
       >
-        {server.general.map((m) => (
+        {generalErrors.map((m) => (
           <p key={m} role="alert" className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
             {m}
           </p>

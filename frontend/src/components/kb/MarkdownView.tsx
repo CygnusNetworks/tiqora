@@ -7,12 +7,15 @@ export type MarkdownViewProps = {
   markdown: string;
   className?: string;
   "data-testid"?: string;
-  /** `restricted`: for text one person writes for many (shared dashboard notes) — no forms,
-   * images, frames, embeds or inline styles; every link opens in a new tab without referrer. */
+  /** `restricted`: for text one person writes for many (shared dashboard notes) — HTML only
+   * (no SVG or MathML), no forms, images, frames, embeds or inline styles; every link opens in a
+   * new tab without referrer. */
   profile?: "default" | "restricted";
 };
 
 const RESTRICTED: Config = {
+  // HTML only: SVG (<image href>, <feImage>) and MathML (xlink:href) could load remote URLs.
+  USE_PROFILES: { html: true },
   FORBID_TAGS: [
     "form",
     "input",

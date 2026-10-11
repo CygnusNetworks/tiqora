@@ -222,6 +222,21 @@ describe("SettingsDrawer", () => {
     );
   });
 
+  it("ticket list: more than 8 columns block 'Übernehmen' with the server's cap", async () => {
+    // 8 stored (two of them beyond the chips), then one more chip: 9
+    const eight = ["tn", "title", "customer", "state", "due", "queue", "changed", "created"];
+    const user = mount({ widget: widgetOf("core.ticket-list", { columns: eight }) });
+    const { dialog } = await open(user);
+    expect(applyBtn()).toBeEnabled();
+    const unchecked = within(dialog).getAllByRole("checkbox", { checked: false });
+    await user.click(unchecked[0]);
+    expect(within(dialog).getByText("Höchstens 8 Spalten sind möglich.")).toBeVisible();
+    expect(applyBtn()).toBeDisabled();
+    await user.click(within(dialog).getByRole("checkbox", { name: "Queue" }));
+    expect(within(dialog).queryByText("Höchstens 8 Spalten sind möglich.")).toBeNull();
+    expect(applyBtn()).toBeEnabled();
+  });
+
   it("ticket list: the last remaining column cannot be unchecked", async () => {
     const user = mount({ widget: widgetOf("core.ticket-list", { columns: ["tn", "title"] }) });
     const { dialog } = await open(user);
@@ -412,6 +427,32 @@ describe("SettingsDrawer", () => {
     await user.clear(screen.getByLabelText("Anzahl Zeilen"));
     await user.type(screen.getByLabelText("Anzahl Zeilen"), "7");
     expect(screen.getByLabelText("Anzahl Zeilen")).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("a server message on the preset or the source shows under the active search card", async () => {
+    const user = mount({
+      widget: widgetOf("core.ticket-list", { source: { kind: "preset", preset: "mine_open" } }),
+      errors: { "settings.source.preset": "Diese Ansicht gibt es nicht." },
+    });
+    const { dialog } = await open(user);
+    expect(within(dialog).getByText("Diese Ansicht gibt es nicht.")).toBeVisible();
+    expect(within(dialog).getByLabelText("Suche oder Ansicht")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("a server message on the sort shows under the sort select", async () => {
+    const user = mount({ errors: { "settings.sort": "Diese Sortierung gibt es nicht." } });
+    const { dialog } = await open(user);
+    expect(within(dialog).getByText("Diese Sortierung gibt es nicht.")).toBeVisible();
+    expect(within(dialog).getByLabelText("Sortierung")).toHaveAccessibleDescription("Diese Sortierung gibt es nicht.");
+  });
+
+  it("a server message for a field the form does not show is a general message, not lost", async () => {
+    const user = mount({
+      widget: widgetOf("core.links", { items: [] }),
+      errors: { "settings.items": "Höchstens 12 Links sind möglich." },
+    });
+    const { dialog } = await open(user);
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Höchstens 12 Links sind möglich.");
   });
 
   it("migrates older stored settings on open", async () => {

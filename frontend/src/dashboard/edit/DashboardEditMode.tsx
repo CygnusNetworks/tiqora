@@ -145,6 +145,22 @@ export function DashboardEditMode({
     },
     [],
   );
+  // Closing the drawer: the dialog returns the focus to its opener. When that opener is gone (the
+  // view-mode "Suche wählen" button unmounted when edit mode started), the widget's cell takes it.
+  const refocusAfterSettings = useRef<string | null>(null);
+  const closeSettings = useCallback((id: string) => {
+    refocusAfterSettings.current = id;
+    setSettingsFor(null);
+  }, []);
+  useEffect(() => {
+    const id = refocusAfterSettings.current;
+    if (settingsFor !== null || id === null) return;
+    refocusAfterSettings.current = null;
+    const active = document.activeElement;
+    if (active && active !== document.body && active.isConnected) return;
+    const cell = Array.from(gridBoxRef.current?.querySelectorAll<HTMLElement>("[data-widget-id]") ?? []).find((el) => el.dataset.widgetId === id);
+    (cell ?? toolbarRef.current)?.focus();
+  }, [settingsFor]);
   // A 422 naming a widget opens its settings.
   const invalidId = session.invalidWidgetId;
   useEffect(() => {
@@ -310,9 +326,10 @@ export function DashboardEditMode({
           focusSource={focusSource}
           onApply={(settings, titleOverride) => {
             dispatch({ type: "settings", id: settingsWidget.id, settings, titleOverride });
-            setSettingsFor(null);
+            session.clearInvalid(settingsWidget.id);
+            closeSettings(settingsWidget.id);
           }}
-          onCancel={() => setSettingsFor(null)}
+          onCancel={() => closeSettings(settingsWidget.id)}
         />
       )}
       <ConfirmDialog

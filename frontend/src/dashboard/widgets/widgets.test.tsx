@@ -632,6 +632,50 @@ describe("core.notes", () => {
     expect(wiki).toHaveAttribute("rel", "noopener noreferrer");
   });
 
+  it("drops SVG and MathML from shared notes, so no foreign element can load a URL", async () => {
+    const probes = [
+      '<svg><image href="https://evil.example.org/a.png" /></svg>',
+      '<svg><image xlink:href="https://evil.example.org/b.png" /></svg>',
+      '<svg><filter id="f"><feImage href="https://evil.example.org/c.png" /></filter></svg>',
+      '<math><mi xlink:href="https://evil.example.org/d">x</mi></math>',
+    ];
+    await renderWidget("core.notes", { markdown: `Vorher\n\n${probes.join("\n\n")}\n\nNachher` }, { status: "none" });
+    const body = screen.getByTestId("notes-markdown");
+    for (const tag of ["svg", "image", "feImage", "filter", "math", "mi"]) {
+      expect(body.getElementsByTagName(tag)).toHaveLength(0);
+    }
+    expect(body.innerHTML).not.toContain("evil.example.org");
+    expect(screen.getByText("Vorher")).toBeVisible();
+    expect(screen.getByText("Nachher")).toBeVisible();
+  });
+
+  it("keeps links, tables and ordinary markup in shared notes", async () => {
+    await renderWidget(
+      "core.notes",
+      {
+        markdown: [
+          "## Übersicht",
+          "[Wiki](https://example.org/wiki) [Queues](/agent/queues) [Team](mailto:team@example.org)",
+          "| Kopf | Wert |\n| --- | --- |\n| a | 1 |",
+          "- eins\n- zwei",
+          "> Zitat ~~alt~~",
+          "```\ncode\n```",
+          "<details><summary>Mehr</summary>Details</details>",
+          "---",
+        ].join("\n\n"),
+      },
+      { status: "none" },
+    );
+    const body = screen.getByTestId("notes-markdown");
+    expect(screen.getByRole("heading", { name: "Übersicht" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Wiki" })).toHaveAttribute("href", "https://example.org/wiki");
+    expect(screen.getByRole("link", { name: "Queues" })).toHaveAttribute("href", "/agent/queues");
+    expect(screen.getByRole("link", { name: "Team" })).toHaveAttribute("href", "mailto:team@example.org");
+    for (const tag of ["table", "thead", "th", "td", "ul", "li", "blockquote", "del", "pre", "code", "details", "summary", "hr"]) {
+      expect(body.querySelector(tag), tag).not.toBeNull();
+    }
+  });
+
   it("has an empty state", async () => {
     await renderWidget("core.notes", {}, { status: "none" });
     expect(screen.getByText(/Noch keine Notiz/)).toBeVisible();
