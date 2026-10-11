@@ -52,4 +52,43 @@ describe("ProcessDialogForm", () => {
     wrap(<ProcessDialogForm form={form} values={{}} onChange={() => {}} errors={{ Title: "Pflichtfeld" }} />);
     expect(screen.getByTestId("process-form-Title-error")).toHaveTextContent("Pflichtfeld");
   });
+  const mixed: ProcessDialogFormData = {
+    ...form,
+    fields: [
+      { ...base, name: "CustomerUserID", kind: "customer", label: "Customer", required: false },
+      { ...base, name: "Article", kind: "article", label: "Article", required: false, time_units: "1", uploads: true },
+      {
+        ...base,
+        name: "Attachments",
+        kind: "ticket_attachments",
+        label: "Attachments",
+        required: false,
+        options: [{ value: "Article::1::1", label: "#1: wf3.pdf" }],
+      },
+    ],
+  };
+
+  it("portal form never renders customer or ticket_attachments kinds", () => {
+    wrap(<ProcessDialogForm form={mixed} values={{}} onChange={() => {}} scope="portal" />);
+    expect(screen.queryByTestId("process-form-CustomerUserID")).toBeNull();
+    expect(screen.queryByTestId("process-form-Attachments")).toBeNull();
+    expect(screen.getByTestId("process-form-Article.Subject")).toBeInTheDocument();
+  });
+
+  it("agent form shows the ticket attachments, the time field and the upload area under the article text", () => {
+    const onChange = vi.fn();
+    wrap(
+      <ProcessDialogForm
+        form={{ ...mixed, fields: mixed.fields.slice(1) }}
+        values={{ Attachments: [] }}
+        onChange={onChange}
+        uploads={<div data-testid="slot-uploads" />}
+      />,
+    );
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(onChange).toHaveBeenCalledWith("Attachments", ["Article::1::1"]);
+    const body = screen.getByTestId("process-form-Article.Body-label").parentElement!;
+    expect(body).toContainElement(screen.getByTestId("slot-uploads"));
+    expect(screen.getByTestId("process-form-TimeUnits")).toBeInTheDocument();
+  });
 });

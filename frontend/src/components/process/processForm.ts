@@ -1,13 +1,16 @@
 import type { TFunction } from "i18next";
 import { dfToFieldValue, fieldValueToDf } from "@/components/fields/dynamicFields";
-import type { FieldDef, FieldKind, FieldValue, FieldValues } from "@/components/fields/types";
+import type { FieldDef, FieldKind, FieldOption, FieldValue, FieldValues } from "@/components/fields/types";
 import { isEmptyFieldValue } from "@/components/fields/validate";
 import { fromZonedInputValue, toZonedInputValue } from "@/lib/timeZone";
+import type { ArticleAttachmentIn } from "@/lib/api";
 import type { ProcessDialogFieldData, ProcessDialogFormData } from "@/lib/processApi";
 
 export const ARTICLE_SUBJECT_KEY = "Article.Subject";
 export const ARTICLE_BODY_KEY = "Article.Body";
 export const CUSTOMER_ID_KEY = "CustomerID";
+export const TIME_UNITS_KEY = "TimeUnits";
+export const ARTICLE_ATTACHMENTS_KEY = "ArticleAttachments";
 const CUSTOMER_USER_KEY = "CustomerUserID";
 const DF_PREFIX = "DynamicField_";
 
@@ -15,6 +18,13 @@ const DF_PREFIX = "DynamicField_";
 export function processLabel(field: ProcessDialogFieldData, t: TFunction): string {
   if (field.name.startsWith(DF_PREFIX)) return field.label;
   return t(`process.field.${field.name}`, { defaultValue: field.label });
+}
+
+export type ProcessScope = "agent" | "portal";
+
+/** The customer portal never gets a customer search or the ticket's attachments (the server leaves them out; the form agrees). */
+function hiddenInScope(field: ProcessDialogFieldData, scope: ProcessScope): boolean {
+  return scope === "portal" && (field.kind === "customer" || field.kind === "ticket_attachments");
 }
 
 function optionLabel(field: ProcessDialogFieldData, value: string, label: string, t: TFunction): string {
@@ -33,9 +43,19 @@ const ENGINE_KIND: Partial<Record<ProcessDialogFieldData["kind"], FieldKind>> = 
   pending_time: "datetime",
 };
 
-export function processFieldDefs(form: ProcessDialogFormData, t: TFunction): FieldDef[] {
+/** Server options -> field options (the label of the Lock values is translated). */
+export function toFieldOptions(
+  field: ProcessDialogFieldData,
+  options: { value: string; label: string }[],
+  t: TFunction,
+): FieldOption[] {
+  return options.map((o) => ({ value: o.value, label: optionLabel(field, o.value, o.label, t) }));
+}
+
+export function processFieldDefs(form: ProcessDialogFormData, t: TFunction, scope: ProcessScope = "agent"): FieldDef[] {
   const defs: FieldDef[] = [];
   for (const field of form.fields) {
+    if (hiddenInScope(field, scope)) continue;
     const required = field.required;
     const help = field.description_long || field.description_short || undefined;
     if (field.kind === "article") {
@@ -43,9 +63,29 @@ export function processFieldDefs(form: ProcessDialogFormData, t: TFunction): Fie
         { key: ARTICLE_SUBJECT_KEY, kind: "text", label: t("process.field.ArticleSubject"), required },
         { key: ARTICLE_BODY_KEY, kind: "textarea", label: t("process.field.ArticleBody"), required, help },
       );
+      // Znuny: Display 1 offers the time field, 2 makes it mandatory (AccountTime off sends "0").
+      if (field.time_units !== "0") {
+        defs.push({
+          key: TIME_UNITS_KEY,
+          kind: "number",
+          label: t("process.field.TimeUnits"),
+          required: field.time_units === "2",
+          min: 0,
+          step: 0.01,
+        });
+      }
+    } else if (field.kind === "ticket_attachments") {
+      defs.push({
+        key: field.name,
+        kind: "ticket_attachments",
+        label: t("process.field.TicketAttachments"),
+        required,
+        help,
+        options: toFieldOptions(field, field.options ?? [], t),
+      });
     } else if (field.kind === "customer") {
       defs.push(
-        { key: CUSTOMER_USER_KEY, kind: "text", label: t("process.field.CustomerUserID"), required, help },
+        { key: CUSTOMER_USER_KEY, kind: "customer", label: t("process.field.CustomerUserID"), required, help },
         { key: CUSTOMER_ID_KEY, kind: "text", label: t("process.field.CustomerID") },
       );
     } else if (field.kind === "unsupported") {
@@ -68,10 +108,9 @@ export function processFieldDefs(form: ProcessDialogFormData, t: TFunction): Fie
         help,
       };
       if (kind === "select" || kind === "multiselect") {
-        def.options = (field.options ?? []).map((o) => ({
-          value: o.value,
-          label: optionLabel(field, o.value, o.label, t),
-        }));
+        def.options = toFieldOptions(field, field.options ?? [], t);
+        // refreshed options (useProcessFormOptions) arrive under the canonical field name
+        def.optionsKey = field.name;
         def.allowEmpty = kind === "select" && !required;
       }
       defs.push(def);
@@ -108,8 +147,12 @@ export function initialProcessValues(form: ProcessDialogFormData): FieldValues {
         const a = d && typeof d === "object" ? (d as Record<string, unknown>) : {};
         out[ARTICLE_SUBJECT_KEY] = asText(a.Subject);
         out[ARTICLE_BODY_KEY] = asText(a.Body);
+        if (field.time_units !== "0") out[TIME_UNITS_KEY] = null;
         break;
       }
+      case "ticket_attachments":
+        out[field.name] = [];
+        break;
       case "customer":
         out[CUSTOMER_USER_KEY] = asText(d);
         out[CUSTOMER_ID_KEY] = "";
@@ -139,17 +182,29 @@ export function initialProcessValues(form: ProcessDialogFormData): FieldValues {
 }
 
 /** Engine values -> `field_values` of the API (article split, UTC ISO instants, DF lists). Empty ticket attributes are left out (Znuny skips them); an empty dynamic field is sent as `[]` and clears it. */
-export function toSubmitValues(form: ProcessDialogFormData, values: FieldValues, zone?: string): Record<string, unknown> {
+export function toSubmitValues(
+  form: ProcessDialogFormData,
+  values: FieldValues,
+  zone?: string,
+  extras: { uploads?: ArticleAttachmentIn[]; scope?: ProcessScope } = {},
+): Record<string, unknown> {
   const out: Record<string, unknown> = {};
+  const scope = extras.scope ?? "agent";
   const put = (key: string, value: FieldValue | undefined) => {
     if (!isEmptyFieldValue(value)) out[key] = value;
   };
   for (const field of form.fields) {
+    if (hiddenInScope(field, scope)) continue;
     const v = values[field.name];
     switch (field.kind) {
       case "article":
         put("Subject", values[ARTICLE_SUBJECT_KEY]);
         put("Body", values[ARTICLE_BODY_KEY]);
+        if (field.time_units !== "0") put(TIME_UNITS_KEY, values[TIME_UNITS_KEY]);
+        if (field.uploads && extras.uploads && extras.uploads.length > 0) out[ARTICLE_ATTACHMENTS_KEY] = extras.uploads;
+        break;
+      case "ticket_attachments":
+        put(field.name, v);
         break;
       case "customer":
         put(CUSTOMER_USER_KEY, values[CUSTOMER_USER_KEY]);

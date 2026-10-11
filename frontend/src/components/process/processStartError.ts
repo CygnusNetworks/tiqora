@@ -15,6 +15,7 @@ export function processStartErrorMessage(
   forbiddenKey = "process.start.forbidden",
 ): string {
   if (err instanceof ApiError && err.status === 400) return t("process.form.invalid");
+  if (err instanceof ApiError && err.status === 413) return t("process.form.uploadTooLarge");
   if (err instanceof ApiError && err.status === 403) return t(forbiddenKey);
   if (err instanceof ApiError && err.status === 404) return t("process.start.notFound");
   if (err instanceof ApiError && err.status === 409) return t(conflictKey);

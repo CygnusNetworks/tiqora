@@ -194,4 +194,77 @@ describe("processForm", () => {
     expect(def.required).toBe(false);
     expect(validateFieldValues([def], { PendingTime: "" }, t)).toEqual({});
   });
+  const articleForm = (time_units: "0" | "1" | "2", uploads = true): ProcessDialogFormData => ({
+    ...form,
+    fields: [{ ...base, name: "Article", kind: "article", label: "Article", required: false, time_units, uploads }],
+  });
+
+  it("article with time_units '2' marks Zeitaufwand required; '0' renders no field", () => {
+    const keys = (f: ProcessDialogFormData) => processFieldDefs(f, t).map((d) => d.key);
+    expect(keys(articleForm("0"))).toEqual([ARTICLE_SUBJECT_KEY, ARTICLE_BODY_KEY]);
+    const optional = processFieldDefs(articleForm("1"), t).find((d) => d.key === "TimeUnits");
+    expect(optional).toMatchObject({ kind: "number", label: "Zeitaufwand", required: false });
+    const mandatory = processFieldDefs(articleForm("2"), t).find((d) => d.key === "TimeUnits");
+    expect(mandatory?.required).toBe(true);
+    const defs = processFieldDefs(articleForm("2"), t);
+    expect(validateFieldValues(defs, { ...initialProcessValues(articleForm("2")) }, t).TimeUnits).toBe(t("fields.required"));
+    expect(validateFieldValues(defs, { ...initialProcessValues(articleForm("2")), TimeUnits: 1.5 }, t).TimeUnits).toBeUndefined();
+  });
+
+  it("toSubmitValues maps TimeUnits, ArticleAttachments, Attachments; CustomerID may stay empty", () => {
+    const f: ProcessDialogFormData = {
+      ...form,
+      fields: [
+        { ...base, name: "CustomerUserID", kind: "customer", label: "Customer", required: false },
+        { ...base, name: "Article", kind: "article", label: "Article", required: false, time_units: "1", uploads: true },
+        {
+          ...base,
+          name: "Attachments",
+          kind: "ticket_attachments",
+          label: "Attachments",
+          required: false,
+          options: [{ value: "Article::1::1", label: "a.pdf" }],
+        },
+      ],
+    };
+    const upload = { filename: "wf3.txt", content_type: "text/plain", content_base64: "aGk=" };
+    const values = {
+      ...initialProcessValues(f),
+      CustomerUserID: "anna.wf3@example.org",
+      [ARTICLE_SUBJECT_KEY]: "Hallo",
+      [ARTICLE_BODY_KEY]: "Text",
+      TimeUnits: 15,
+      Attachments: ["Article::1::1"],
+    };
+    expect(toSubmitValues(f, values, undefined, { uploads: [upload] })).toEqual({
+      CustomerUserID: "anna.wf3@example.org",
+      Subject: "Hallo",
+      Body: "Text",
+      TimeUnits: 15,
+      ArticleAttachments: [upload],
+      Attachments: ["Article::1::1"],
+    });
+    // nothing chosen: neither key is sent; an empty CustomerID is left out for the server to fill
+    const empty = toSubmitValues(f, initialProcessValues(f));
+    expect(empty).toEqual({});
+    expect("CustomerID" in toSubmitValues(f, values)).toBe(false);
+    // uploads only travel with an article that allows them
+    const noUploads = { ...f, fields: f.fields.map((x) => (x.kind === "article" ? { ...x, uploads: false } : x)) };
+    expect(toSubmitValues(noUploads, values, undefined, { uploads: [upload] }).ArticleAttachments).toBeUndefined();
+  });
+
+  it("portal form never renders customer or ticket_attachments kinds", () => {
+    const f: ProcessDialogFormData = {
+      ...form,
+      fields: [
+        { ...base, name: "CustomerUserID", kind: "customer", label: "Customer", required: false },
+        { ...base, name: "Attachments", kind: "ticket_attachments", label: "Attachments", required: false },
+        { ...base, name: "Title", kind: "text", label: "Title", required: false },
+      ],
+    };
+    expect(processFieldDefs(f, t, "portal").map((d) => d.key)).toEqual(["Title"]);
+    expect(processFieldDefs(f, t, "agent").map((d) => d.kind)).toEqual(["customer", "text", "ticket_attachments", "text"]);
+    const values = { ...initialProcessValues(f), CustomerUserID: "x", Attachments: ["Article::1::1"], Title: "T" };
+    expect(toSubmitValues(f, values, undefined, { scope: "portal" })).toEqual({ Title: "T" });
+  });
 });

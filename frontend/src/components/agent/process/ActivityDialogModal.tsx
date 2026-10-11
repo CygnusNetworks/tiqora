@@ -75,6 +75,7 @@ export function ActivityDialogModal({
             onCancel={onClose}
             testIdPrefix="process-dialog"
             fieldTestId="process-field"
+            optionsTarget={{ scope: "agent", kind: "dialog", ticketId, dialogEntityId: activityDialogEntityId }}
           />
         </div>
       )}
