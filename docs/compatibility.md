@@ -767,6 +767,23 @@ MariaDB and validated:
   (`group_customer_user` is implemented), SysConfig deploy UI, GI webservice
   admin, package manager.
 
+## Web chat in Znuny
+
+Chats created by Tiqora's web chat show in Znuny's ticket view like internal-note articles: the `WebChat`
+`communication_channel` row uses Znuny's `Internal` backend module (Tiqora needs MIME storage for attachments and
+Znuny's own `Chat` backend stores lines in `article_data_otrs_chat` without attachments). This is expected, not a
+bug. Znuny's own chat engine is not used.
+
+- `Admin::CommunicationChannel::Sync` drops channel rows that have no `CommunicationChannel###...` registration,
+  exactly as it does for the Telegram, SMS and WhatsApp rows today; Tiqora re-creates the row on the next chat
+  write. Registering `WebChat` in TiqoraSync is a follow-up.
+- Web chat tickets are created with the Postmaster default state and priority and owner/creator user 1, not with
+  the `CustomerTicketMessage` defaults or `CustomerPanelUserID`, and they never trigger Znuny's web-ticket
+  auto-response (`AutoResponseForWebTickets`, a Perl boolean that would have to be read with `get_bool` if it
+  were ever honoured).
+- The chat retention purge (see [gdpr.md](gdpr.md#web-chat)) clears the visitor's data in Tiqora's session table
+  only. Name and e-mail also live on the chat articles and the ticket; those are the GDPR engine's scope.
+
 ## Znuny features not implemented
 
 *Last reviewed: 2026-10-01. This is the single maintained parity list — update

@@ -691,6 +691,15 @@ SSE (`lib/useSSE.ts`): new `ChatEventMessage = { type: "chat_waiting" | "chat_as
 17. **Rate limiter fails closed** (503) when Redis is down — the chat cannot deliver anything without Redis anyway.
 18. **Transcript option** ("Transkript als ein Artikel beim Beenden") moves to phase 2; with decision 1 Znuny already shows every message.
 19. **Load test** is a manual script with documented results (`backend/scripts/webchat_stream_load.py`, Task 22), not a CI gate.
+20. **Retention** runs in the webchat sweep (`tiqora-worker`, `webchat_sweep`), not in the GDPR retention engine: the engine handles tickets, chat rows are a side table (R-DEVIATIONS a).
+21. **Ticket defaults**: chat tickets use the Postmaster default state and priority and user 1 (not the `CustomerTicketMessage` defaults or `CustomerPanelUserID`) and never trigger Znuny's web-ticket auto-response (`AutoResponseForWebTickets`, a Perl boolean that must be read with `get_bool` if it is ever honoured) (R-DEVIATIONS b).
+22. **Widget locales**: English is merged into every widget locale chunk at build time, so a missing key falls back to English (Task 14).
+23. **Retention purge also clears `visitor_id`** (and the token hash) of the session row, not only name, e-mail, page, user agent and IP hash (Task 11).
+24. **Admin preview** works for disabled, invalid or draft configs and while the channel switch is off; it is frameable only by 'self' (R-PREVIEW-DRAFT).
+25. **Pre-chat reserved keys and mapping**: the field keys `message` and `topic` are reserved, and at most one field maps to E-Mail and one to Name (R-PRECHAT-KEYS), so the widget's offline "first email field" convention holds.
+26. **No `availability` frame message in phase 1**: the loader fires the host `on("availability")` event once, derived from `ready.online`; the message type stays in the protocol for later phases (R-AVAILABILITY).
+27. **MCP**: `ticket_reply` into a waiting chat returns `chat_not_accepted`; there is no MCP accept tool in phase 1 (R-MCP-CHAT-WAITING). MCP-posted replies reach the visitor with the next stream heartbeat (at most 25 s).
+28. **Notifications**: recipients in the reserved `.invalid` TLD are dropped on every outbound mail path, and a visitor without an e-mail address is never mailed (R-NOTIFY).
 
 ---
 ## Tasks

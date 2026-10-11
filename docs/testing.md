@@ -163,6 +163,22 @@ The suite is skipped by default; set `GOLDEN=1` to un-skip
 by `backend/tests/conftest.py` for testcontainers-based tests.
 `just golden-test` sets `GOLDEN=1` for you.
 
+## Web chat widget
+
+The widget (`packages/webchat-widget`) has its own unit tests and a Playwright suite that serves the widget from a
+second origin (a "website" on one port, Tiqora's frame on another) to cover the cross-origin behaviour:
+
+```sh
+pnpm --filter @tiqora/webchat-widget lint
+pnpm --filter @tiqora/webchat-widget test      # Vitest
+pnpm --filter @tiqora/webchat-widget build     # required before e2e: the e2e serves dist/
+pnpm --filter @tiqora/webchat-widget e2e       # Playwright, cross-origin
+```
+
+The backend web chat tests live in `backend/tests/test_webchat_*.py` and are DB tests like the rest (MariaDB
+and PostgreSQL). Chat stream sizing is a manual script, `backend/scripts/webchat_stream_load.py`, not a CI gate
+(see [deployment.md](deployment.md#sizing)).
+
 ## CI
 
 `.github/workflows/golden.yml` is **workflow_dispatch only** (no push, no

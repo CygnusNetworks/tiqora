@@ -93,7 +93,7 @@ only those tools may run. Rate limit: `TIQORA_API_KEY_RATE_LIMIT_*` (default
 | Tool | Purpose |
 |---|---|
 | `ticket_create` | Create a new ticket. Returns `TicketID` and `TicketNumber`. |
-| `ticket_reply` | Post a customer-visible reply article (**agent email channel sends SMTP**, REST parity). |
+| `ticket_reply` | Post a customer-visible reply article (**agent email channel sends SMTP**, REST parity). Into a **waiting** web chat it returns `{"error": "chat_not_accepted"}` (there is no MCP tool to accept a chat; a human accepts first). Replies into an active chat reach the visitor with the next stream heartbeat, at most 25 s later. |
 | `ticket_note` | Post an internal (agent-only, not customer-visible) note article. |
 | `ticket_update_state` | Change ticket state by state ID. |
 | `ticket_update_queue` | Move ticket to a different queue by queue ID. |

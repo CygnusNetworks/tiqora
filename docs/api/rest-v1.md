@@ -504,6 +504,45 @@ Configured via `/api/v1/admin/webhooks`; delivery payload shape, HMAC
 signing, and retry semantics are documented in
 [`../ai-integration.md`](../ai-integration.md#1-webhook-payload-schema-versioned-envelope).
 
+## Web chat
+
+Two surfaces; the guide is [guide/webchat.md](../guide/webchat.md).
+
+**Public visitor API** (`/api/chat/v1`, no login). It is called only by the chat frame on Tiqora's own origin:
+unsafe methods need a same-origin `Origin` header (a foreign one is `403 cross_origin`), there is no CORS and no
+cookie. A visitor proves a session with the `X-Chat-Token` header returned when the session is created (only its
+SHA-256 is stored). Errors are `{"detail": "<code>"}`; `429`/`503` carry `Retry-After`.
+
+| Method and path | Purpose |
+|---|---|
+| `GET /config?k=<key>&origin=<website>` | What the widget shows: topics, pre-chat fields, theme, online state. The `origin` must be allowed by the chat. |
+| `POST /sessions` | Start a chat with the first message; creates the ticket (`409 offline` when nobody can take it). |
+| `GET /sessions/{id}` | Status, agent name, `can_send`. |
+| `GET /sessions/{id}/messages?after=` | Transcript lines after a sequence number. |
+| `GET /sessions/{id}/stream` | Server-sent events (`message` with `id` = sequence, `session`, `typing`, `end`); resume with `Last-Event-ID`. A heartbeat comment every 25 s; at most 30 min per stream. |
+| `POST /sessions/{id}/messages`, `/typing`, `/attachments`, `/contact`, `/end` | Visitor actions. Uploads: png, jpeg, gif, webp, pdf, txt; the chat's own size limit. |
+| `GET /sessions/{id}/messages/{seq}/attachments/{index}` | Download a transcript attachment. |
+| `POST /offline` | The message form when nobody is available (creates a ticket). |
+
+**Agent endpoints** (`/api/v1/chat`, session cookie or API key). They map to the API-key area `tickets`
+(`GET` = `ro`, `POST`/`PUT` = `rw`).
+
+| Method and path | Purpose |
+|---|---|
+| `GET /chat/agent-state`, `PUT /chat/agent-state` | The agent's availability, topic filter and `max_concurrent`. |
+| `GET /chat/topics` | Topics whose queue the agent holds `rw` on. |
+| `GET /chat/inbox` | Waiting chats and the agent's own active chats. |
+| `POST /chat/sessions/{id}/accept` | Take a waiting chat (first accept wins; `already_taken`, `at_capacity`, `not_waiting`). |
+| `POST /chat/sessions/{id}/end` | End a live chat, optionally closing the ticket (idempotent). |
+| `GET /tickets/{id}/chat` | The ticket's newest chat for the conversation header. |
+| `POST /tickets/{id}/chat/typing` | The agent is typing. |
+
+Replying into a chat uses the ordinary `POST /tickets/{id}/articles`. A reply to a **waiting** chat accepts it
+first; if the accept is refused, the reply is refused with that error (`409`) and nothing is written. Over MCP
+`ticket_reply` into a waiting chat returns `chat_not_accepted`, there is no MCP accept tool.
+
+Admin CRUD for chats is under `/api/v1/admin/chat-configs` (including `POST /{id}/rotate-key`).
+
 ## Realtime events (SSE)
 
 ```sh
