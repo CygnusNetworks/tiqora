@@ -8167,6 +8167,245 @@
         "title": "ChatAttachmentOut",
         "type": "object"
       },
+      "ChatConfigCreateIn": {
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "valid": {
+            "default": true,
+            "title": "Valid",
+            "type": "boolean"
+          },
+          "values": {
+            "$ref": "#/components/schemas/ChatConfigValues"
+          }
+        },
+        "required": [
+          "name",
+          "values"
+        ],
+        "title": "ChatConfigCreateIn",
+        "type": "object"
+      },
+      "ChatConfigOut": {
+        "properties": {
+          "changed": {
+            "format": "date-time",
+            "title": "Changed",
+            "type": "string"
+          },
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "embed_snippet": {
+            "title": "Embed Snippet",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "public_key": {
+            "title": "Public Key",
+            "type": "string"
+          },
+          "session_count": {
+            "title": "Session Count",
+            "type": "integer"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          },
+          "values": {
+            "$ref": "#/components/schemas/ChatConfigValues"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "public_key",
+          "valid",
+          "values",
+          "embed_snippet",
+          "session_count",
+          "created",
+          "changed"
+        ],
+        "title": "ChatConfigOut",
+        "type": "object"
+      },
+      "ChatConfigUpdateIn": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "valid": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid"
+          },
+          "values": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChatConfigValues"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "ChatConfigUpdateIn",
+        "type": "object"
+      },
+      "ChatConfigValues": {
+        "additionalProperties": false,
+        "description": "Everything the admin edits except name / public_key / valid.",
+        "properties": {
+          "allowed_origins": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Allowed Origins",
+            "type": "array"
+          },
+          "business_calendar": {
+            "anyOf": [
+              {
+                "pattern": "^(|[1-9][0-9]?)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Calendar"
+          },
+          "default_customer_user": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Customer User"
+          },
+          "greeting": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Greeting"
+          },
+          "offline_mode": {
+            "default": "form",
+            "enum": [
+              "form",
+              "hide"
+            ],
+            "title": "Offline Mode",
+            "type": "string"
+          },
+          "prechat_fields": {
+            "items": {
+              "$ref": "#/components/schemas/PrechatField"
+            },
+            "maxItems": 15,
+            "title": "Prechat Fields",
+            "type": "array"
+          },
+          "privacy_url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Privacy Url"
+          },
+          "rate_limits": {
+            "$ref": "#/components/schemas/ChatRateLimits"
+          },
+          "retention_days": {
+            "default": 30,
+            "maximum": 3650.0,
+            "minimum": 1.0,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "show_agent_names": {
+            "default": true,
+            "title": "Show Agent Names",
+            "type": "boolean"
+          },
+          "theme": {
+            "$ref": "#/components/schemas/ChatTheme"
+          },
+          "topics": {
+            "items": {
+              "$ref": "#/components/schemas/ChatTopic"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Topics",
+            "type": "array"
+          },
+          "upload_policy": {
+            "$ref": "#/components/schemas/UploadPolicy"
+          },
+          "wait_timeout_seconds": {
+            "default": 180,
+            "maximum": 3600.0,
+            "minimum": 30.0,
+            "title": "Wait Timeout Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "topics"
+        ],
+        "title": "ChatConfigValues",
+        "type": "object"
+      },
       "ChatContactIn": {
         "properties": {
           "email": {
@@ -8718,6 +8957,62 @@
         "title": "ChatPublicUploadOut",
         "type": "object"
       },
+      "ChatRateLimits": {
+        "additionalProperties": false,
+        "properties": {
+          "messages_per_ip_minute": {
+            "default": 60,
+            "maximum": 600.0,
+            "minimum": 5.0,
+            "title": "Messages Per Ip Minute",
+            "type": "integer"
+          },
+          "messages_per_session_minute": {
+            "default": 30,
+            "maximum": 300.0,
+            "minimum": 5.0,
+            "title": "Messages Per Session Minute",
+            "type": "integer"
+          },
+          "offline_per_config_hour": {
+            "default": 60,
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Offline Per Config Hour",
+            "type": "integer"
+          },
+          "offline_per_ip_hour": {
+            "default": 3,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Offline Per Ip Hour",
+            "type": "integer"
+          },
+          "sessions_per_config_minute": {
+            "default": 30,
+            "maximum": 300.0,
+            "minimum": 5.0,
+            "title": "Sessions Per Config Minute",
+            "type": "integer"
+          },
+          "sessions_per_ip_10min": {
+            "default": 5,
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Sessions Per Ip 10Min",
+            "type": "integer"
+          },
+          "uploads_per_session_10min": {
+            "default": 10,
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Uploads Per Session 10Min",
+            "type": "integer"
+          }
+        },
+        "title": "ChatRateLimits",
+        "type": "object"
+      },
       "ChatSessionCreateIn": {
         "properties": {
           "client_id": {
@@ -8939,6 +9234,46 @@
           }
         },
         "title": "ChatTheme",
+        "type": "object"
+      },
+      "ChatTopic": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "pattern": "^[a-z][a-z0-9_-]{0,39}$",
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "priority_id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority Id"
+          },
+          "queue_id": {
+            "minimum": 1.0,
+            "title": "Queue Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "queue_id"
+        ],
+        "title": "ChatTopic",
         "type": "object"
       },
       "ChatTopicRefOut": {
@@ -21776,6 +22111,76 @@
         "title": "PostmasterSetRuleIn",
         "type": "object"
       },
+      "PrechatField": {
+        "additionalProperties": false,
+        "properties": {
+          "dynamic_field": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dynamic Field"
+          },
+          "key": {
+            "pattern": "^[a-z][a-z0-9_]{0,39}$",
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "text",
+              "textarea",
+              "email",
+              "select",
+              "checkbox"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "maps_to": {
+            "default": "none",
+            "enum": [
+              "name",
+              "email",
+              "dynamic_field",
+              "none"
+            ],
+            "title": "Maps To",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/PrechatOption"
+            },
+            "maxItems": 50,
+            "title": "Options",
+            "type": "array"
+          },
+          "required": {
+            "default": false,
+            "title": "Required",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "label"
+        ],
+        "title": "PrechatField",
+        "type": "object"
+      },
       "PrechatOption": {
         "additionalProperties": false,
         "properties": {
@@ -31253,6 +31658,41 @@
           "name"
         ],
         "title": "TypeRefOut",
+        "type": "object"
+      },
+      "UploadPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "max_bytes": {
+            "default": 10485760,
+            "maximum": 26214400.0,
+            "minimum": 1048576.0,
+            "title": "Max Bytes",
+            "type": "integer"
+          },
+          "types": {
+            "items": {
+              "enum": [
+                "image/png",
+                "image/jpeg",
+                "image/gif",
+                "image/webp",
+                "application/pdf",
+                "text/plain"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Types",
+            "type": "array"
+          }
+        },
+        "title": "UploadPolicy",
         "type": "object"
       },
       "UserCreate": {
@@ -42589,6 +43029,443 @@
         "summary": "Update Channel",
         "tags": [
           "admin:channels"
+        ]
+      }
+    },
+    "/api/v1/admin/chat-configs": {
+      "get": {
+        "operationId": "list_chat_configs_api_v1_admin_chat_configs_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ChatConfigOut"
+                  },
+                  "title": "Response List Chat Configs Api V1 Admin Chat Configs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Chat Configs",
+        "tags": [
+          "admin:chat-configs"
+        ]
+      },
+      "post": {
+        "operationId": "create_chat_config_api_v1_admin_chat_configs_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatConfigCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatConfigOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Chat Config",
+        "tags": [
+          "admin:chat-configs"
+        ]
+      }
+    },
+    "/api/v1/admin/chat-configs/{config_id}": {
+      "delete": {
+        "operationId": "delete_chat_config_api_v1_admin_chat_configs__config_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Chat Config",
+        "tags": [
+          "admin:chat-configs"
+        ]
+      },
+      "get": {
+        "operationId": "get_chat_config_api_v1_admin_chat_configs__config_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatConfigOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Chat Config",
+        "tags": [
+          "admin:chat-configs"
+        ]
+      },
+      "patch": {
+        "operationId": "update_chat_config_api_v1_admin_chat_configs__config_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatConfigUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatConfigOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Chat Config",
+        "tags": [
+          "admin:chat-configs"
+        ]
+      }
+    },
+    "/api/v1/admin/chat-configs/{config_id}/rotate-key": {
+      "post": {
+        "operationId": "rotate_chat_config_key_api_v1_admin_chat_configs__config_id__rotate_key_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatConfigOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rotate Chat Config Key",
+        "tags": [
+          "admin:chat-configs"
         ]
       }
     },

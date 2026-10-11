@@ -20,6 +20,7 @@ from tiqora.api.v1.admin import (
     auto_responses,
     avatars,
     channels,
+    chat_configs,
     crypto_keys,
     crypto_settings,
     customer_links,
@@ -90,6 +91,7 @@ admin_router.include_router(api_keys.router)
 admin_router.include_router(crypto_keys.router)
 admin_router.include_router(crypto_settings.router)
 admin_router.include_router(channels.router)
+admin_router.include_router(chat_configs.router)
 admin_router.include_router(mail_outbound.router)
 admin_router.include_router(mail_accounts.router)
 admin_router.include_router(oauth2_tokens.router)

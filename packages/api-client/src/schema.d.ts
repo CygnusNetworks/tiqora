@@ -2076,6 +2076,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/chat-configs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Chat Configs */
+        get: operations["list_chat_configs_api_v1_admin_chat_configs_get"];
+        put?: never;
+        /** Create Chat Config */
+        post: operations["create_chat_config_api_v1_admin_chat_configs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/chat-configs/{config_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Chat Config */
+        get: operations["get_chat_config_api_v1_admin_chat_configs__config_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Chat Config */
+        delete: operations["delete_chat_config_api_v1_admin_chat_configs__config_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Chat Config */
+        patch: operations["update_chat_config_api_v1_admin_chat_configs__config_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/chat-configs/{config_id}/rotate-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rotate Chat Config Key */
+        post: operations["rotate_chat_config_key_api_v1_admin_chat_configs__config_id__rotate_key_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/crypto-keys": {
         parameters: {
             query?: never;
@@ -12346,6 +12400,95 @@ export interface components {
             /** Size */
             size: number;
         };
+        /** ChatConfigCreateIn */
+        ChatConfigCreateIn: {
+            /** Name */
+            name: string;
+            /**
+             * Valid
+             * @default true
+             */
+            valid: boolean;
+            values: components["schemas"]["ChatConfigValues"];
+        };
+        /** ChatConfigOut */
+        ChatConfigOut: {
+            /**
+             * Changed
+             * Format: date-time
+             */
+            changed: string;
+            /**
+             * Created
+             * Format: date-time
+             */
+            created: string;
+            /** Embed Snippet */
+            embed_snippet: string;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Public Key */
+            public_key: string;
+            /** Session Count */
+            session_count: number;
+            /** Valid */
+            valid: boolean;
+            values: components["schemas"]["ChatConfigValues"];
+        };
+        /** ChatConfigUpdateIn */
+        ChatConfigUpdateIn: {
+            /** Name */
+            name?: string | null;
+            /** Valid */
+            valid?: boolean | null;
+            values?: components["schemas"]["ChatConfigValues"] | null;
+        };
+        /**
+         * ChatConfigValues
+         * @description Everything the admin edits except name / public_key / valid.
+         */
+        ChatConfigValues: {
+            /** Allowed Origins */
+            allowed_origins?: string[];
+            /** Business Calendar */
+            business_calendar?: string | null;
+            /** Default Customer User */
+            default_customer_user?: string | null;
+            /** Greeting */
+            greeting?: string | null;
+            /**
+             * Offline Mode
+             * @default form
+             * @enum {string}
+             */
+            offline_mode: "form" | "hide";
+            /** Prechat Fields */
+            prechat_fields?: components["schemas"]["PrechatField"][];
+            /** Privacy Url */
+            privacy_url?: string | null;
+            rate_limits?: components["schemas"]["ChatRateLimits"];
+            /**
+             * Retention Days
+             * @default 30
+             */
+            retention_days: number;
+            /**
+             * Show Agent Names
+             * @default true
+             */
+            show_agent_names: boolean;
+            theme?: components["schemas"]["ChatTheme"];
+            /** Topics */
+            topics: components["schemas"]["ChatTopic"][];
+            upload_policy?: components["schemas"]["UploadPolicy"];
+            /**
+             * Wait Timeout Seconds
+             * @default 180
+             */
+            wait_timeout_seconds: number;
+        };
         /** ChatContactIn */
         ChatContactIn: {
             /**
@@ -12530,6 +12673,44 @@ export interface components {
             /** Types */
             types: string[];
         };
+        /** ChatRateLimits */
+        ChatRateLimits: {
+            /**
+             * Messages Per Ip Minute
+             * @default 60
+             */
+            messages_per_ip_minute: number;
+            /**
+             * Messages Per Session Minute
+             * @default 30
+             */
+            messages_per_session_minute: number;
+            /**
+             * Offline Per Config Hour
+             * @default 60
+             */
+            offline_per_config_hour: number;
+            /**
+             * Offline Per Ip Hour
+             * @default 3
+             */
+            offline_per_ip_hour: number;
+            /**
+             * Sessions Per Config Minute
+             * @default 30
+             */
+            sessions_per_config_minute: number;
+            /**
+             * Sessions Per Ip 10Min
+             * @default 5
+             */
+            sessions_per_ip_10min: number;
+            /**
+             * Uploads Per Session 10Min
+             * @default 10
+             */
+            uploads_per_session_10min: number;
+        };
         /** ChatSessionCreateIn */
         ChatSessionCreateIn: {
             /** Client Id */
@@ -12601,6 +12782,17 @@ export interface components {
              * @default #2563eb
              */
             primary_color: string;
+        };
+        /** ChatTopic */
+        ChatTopic: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Priority Id */
+            priority_id?: number | null;
+            /** Queue Id */
+            queue_id: number;
         };
         /**
          * ChatTopicRefOut
@@ -16926,6 +17118,33 @@ export interface components {
             /** Value */
             value: string;
         };
+        /** PrechatField */
+        PrechatField: {
+            /** Dynamic Field */
+            dynamic_field?: string | null;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "text" | "textarea" | "email" | "select" | "checkbox";
+            /** Label */
+            label: string;
+            /**
+             * Maps To
+             * @default none
+             * @enum {string}
+             */
+            maps_to: "name" | "email" | "dynamic_field" | "none";
+            /** Options */
+            options?: components["schemas"]["PrechatOption"][];
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
+        };
         /** PrechatOption */
         PrechatOption: {
             /** Label */
@@ -19993,6 +20212,21 @@ export interface components {
             id: number;
             /** Name */
             name: string;
+        };
+        /** UploadPolicy */
+        UploadPolicy: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Max Bytes
+             * @default 10485760
+             */
+            max_bytes: number;
+            /** Types */
+            types?: ("image/png" | "image/jpeg" | "image/gif" | "image/webp" | "application/pdf" | "text/plain")[];
         };
         /** UserCreate */
         UserCreate: {
@@ -25638,6 +25872,218 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChannelConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_chat_configs_api_v1_admin_chat_configs_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatConfigOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_chat_config_api_v1_admin_chat_configs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatConfigCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_chat_config_api_v1_admin_chat_configs__config_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_chat_config_api_v1_admin_chat_configs__config_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_chat_config_api_v1_admin_chat_configs__config_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatConfigUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotate_chat_config_key_api_v1_admin_chat_configs__config_id__rotate_key_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatConfigOut"];
                 };
             };
             /** @description Validation Error */

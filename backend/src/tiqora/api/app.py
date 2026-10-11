@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 import redis.asyncio as redis
 import structlog
 from fastapi import Depends, FastAPI, HTTPException, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from starlette.requests import Request
@@ -18,6 +19,7 @@ from tiqora.api.portal import portal_router
 from tiqora.api.portal.deps import require_portal_enabled
 from tiqora.api.spa import mount_spa, spa_is_available
 from tiqora.api.v1 import api_v1_router
+from tiqora.api.v1.admin.chat_configs import chat_config_validation_handler
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import check_database, get_session_factory
 from tiqora.identity.env_providers import ensure_env_providers, env_ldap_tls_warnings
@@ -352,6 +354,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ).inc()
         return response
 
+    app.add_exception_handler(RequestValidationError, chat_config_validation_handler)
     app.include_router(api_v1_router, prefix=cfg.api_prefix)
     app.include_router(compat_router)
     app.include_router(webchat_public_router, prefix=CHAT_PUBLIC_PREFIX)

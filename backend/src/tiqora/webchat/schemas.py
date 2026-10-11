@@ -14,7 +14,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from tiqora.domain.schemas import UtcDateTime
-from tiqora.webchat.models import ChatTheme, PrechatOption
+from tiqora.webchat.models import ChatConfigValues, ChatTheme, PrechatOption
 from tiqora.webchat.text import MAX_EMAIL_LENGTH, MAX_PAGE_URL_LENGTH
 from tiqora.webchat.tokens import VISITOR_ID_RE
 
@@ -215,3 +215,30 @@ class TicketChatOut(BaseModel):
     assigned_name: str | None
     visitor_online: bool
     visitor_typing: bool
+
+
+# -- admin side (``/api/v1/admin/chat-configs``, admins only) ------------------------------------
+
+
+class ChatConfigOut(BaseModel):
+    id: int
+    name: str
+    public_key: str
+    valid: bool
+    values: ChatConfigValues
+    embed_snippet: str
+    session_count: int
+    created: UtcDateTime
+    changed: UtcDateTime
+
+
+class ChatConfigCreateIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    valid: bool = True
+    values: ChatConfigValues
+
+
+class ChatConfigUpdateIn(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    valid: bool | None = None
+    values: ChatConfigValues | None = None
