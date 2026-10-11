@@ -290,6 +290,14 @@ mode a saved `customer` filter that selected the erased company now selects the
 token (the company's tickets carry it), also for tickets of other customers of
 that company that were not erased.
 
+Scheduled reports follow the same erasure: runtime parameter values of a schedule
+item that name the erased login (or, in delete mode, company) are rewritten when the
+report parameter targets `customer_user` / `customer`, and e-mail recipients equal to
+the erased customer's address (case-insensitive) are deleted. Both bump the
+schedule's `version`. A rollback restores the item parameters but does not bring back
+deleted recipient rows. Removing an agent deletes their schedules, run history and run
+files, and drops them as a recipient of other schedules.
+
 ### Caveats
 
 - **Parallel operation with Znuny.** The admin API bypasses the ownership

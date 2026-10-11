@@ -150,6 +150,7 @@ async def delete_user_rows(session: AsyncSession, user_id: int) -> None:
     """Delete the agent's own rows and the account. Caller must have checked
     :func:`blocking_references` first and owns the transaction."""
     dialect = session.bind.dialect.name if session.bind is not None else ""
+    await _delete_report_schedules(session, user_id)
     for table, column in OWNED:
         if not await _table_exists(session, table):
             continue
@@ -161,3 +162,23 @@ async def delete_user_rows(session: AsyncSession, user_id: int) -> None:
     # The agent's Znuny/GI sessions carry their name and e-mail: they go with the account.
     await delete_agent_sessions(session, user_id)
     await session.execute(text("DELETE FROM users WHERE id = :uid"), {"uid": user_id})
+
+
+async def _delete_report_schedules(session: AsyncSession, user_id: int) -> None:
+    """Scheduled reports of the agent: their schedules (items/recipients), run history and
+    files go away; the agent as a recipient of other people's schedules is dropped."""
+    if not await _table_exists(session, "tiqora_report_schedule"):
+        return
+    own = "SELECT id FROM tiqora_report_schedule WHERE owner_user_id = :uid"
+    runs = f"SELECT id FROM tiqora_report_run WHERE owner_user_id = :uid OR schedule_id IN ({own})"
+    params = {"uid": user_id}
+    for stmt in (
+        f"DELETE FROM tiqora_report_run_file WHERE run_id IN ({runs})",  # noqa: S608
+        "DELETE FROM tiqora_report_run WHERE owner_user_id = :uid"  # noqa: S608
+        f" OR schedule_id IN ({own})",
+        f"DELETE FROM tiqora_report_schedule_recipient WHERE schedule_id IN ({own})",  # noqa: S608
+        f"DELETE FROM tiqora_report_schedule_item WHERE schedule_id IN ({own})",  # noqa: S608
+        "DELETE FROM tiqora_report_schedule WHERE owner_user_id = :uid",
+        "DELETE FROM tiqora_report_schedule_recipient WHERE kind = 'user' AND ref_id = :uid",
+    ):
+        await session.execute(text(stmt), params)
