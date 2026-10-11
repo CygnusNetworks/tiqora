@@ -492,7 +492,8 @@ async def _open_ticket_and_session(
     customer_user: str | None
     if identity is not None:
         customer_id, customer_user = identity.customer_id, identity.customer_user_login
-        name, email = identity.name, identity.email
+        name = identity.name[:200] if identity.name else identity.name
+        email = identity.email
     else:
         customer_id, customer_user = await resolve_chat_customer(
             db, email=prechat.email, default_customer_user=values.default_customer_user

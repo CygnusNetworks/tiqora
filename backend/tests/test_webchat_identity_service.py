@@ -496,6 +496,21 @@ async def test_identify_anonymous_session_sets_customer(env: Env) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("env", _URLS, indirect=True)
+async def test_identify_without_email_drops_typed_address(env: Env) -> None:
+    chat = await _start(env, prechat={"email": "anon@example.org"})
+    sub_only = await _resolve(env, _claims(sub="wc54-unknown-sub"))
+    assert sub_only.email is None
+    assert await _identify(env, chat, sub_only) is True
+    async with env.factory() as db:
+        row = await get_chat_session(db, chat.id)
+        info = await ticket_chat_info(db, env.redis, ticket_id=int(chat.ticket_id), user_id=AGENT)
+    assert row is not None
+    assert row.identity_source == "website" and row.visitor_email is None
+    assert info.visitor_email_verified is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("env", _URLS, indirect=True)
 async def test_identify_keeps_customer_an_agent_changed(env: Env) -> None:
     chat = await _start(env, prechat={"email": "anon@example.org"})
     async with env.factory() as db:

@@ -255,8 +255,9 @@ async def identify_session(
 
     locked.identity_source = identity.source
     locked.customer_user_login = identity.customer_user_login
-    if identity.email:
-        locked.visitor_email = identity.email
+    # Unconditional: a typed prechat address must never stay behind a set identity_source,
+    # or ticket_chat_info would report it as verified (R-NOTIFY b).
+    locked.visitor_email = identity.email
     if identity.name:
         locked.visitor_name = identity.name[:200]
     await db.flush([locked])
