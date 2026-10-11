@@ -3936,6 +3936,26 @@
           "query_timeout_seconds": {
             "label": "Time limit per database query in seconds",
             "help": "If a single query takes longer it is stopped and a message is shown."
+          },
+          "schedule_external_recipients": {
+            "label": "Allow external recipients for scheduled reports",
+            "help": "Off: scheduled reports go to Tiqora agents, groups and roles only. On: users with write permission in the “stats” group may also enter external e-mail addresses."
+          },
+          "schedule_max_recipients": {
+            "label": "Maximum recipients per delivery",
+            "help": "Upper limit of resolved e-mail addresses per delivery of a scheduled report."
+          },
+          "run_retention_days": {
+            "label": "Keep delivery history for days",
+            "help": "Delivery history and the sent attachments are deleted after this many days (7 to 365)."
+          },
+          "pdf_row_limit": {
+            "label": "Maximum rows per report in a PDF",
+            "help": "Longer tables are cut off in the PDF and marked as truncated."
+          },
+          "delivery_max_attachment_mb": {
+            "label": "Maximum attachment size per e-mail in MB",
+            "help": "If all attachments of one delivery are larger, the delivery fails with a message."
           }
         }
       },
