@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import base64
 import json
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from types import SimpleNamespace
@@ -621,3 +622,18 @@ def test_flatten_and_interpolate_quirks() -> None:
     )
     assert build_query({}) == ""
     assert build_query({"k": "a/b:c@d!*'()~"}) == "?k=a%2Fb%3Ac%40d!*'()~"
+
+
+async def test_dns_resolution_runs_off_the_event_loop(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Final review m1: getaddrinfo blocks, so pinning must not run on the worker's loop."""
+    loop_thread = threading.get_ident()
+    threads: list[int] = []
+
+    def recording(host: str, port: int) -> list[str]:
+        threads.append(threading.get_ident())
+        return HOSTS[host]
+
+    monkeypatch.setitem(globals(), "resolver", recording)
+    res, _ = await call(config(), {"TicketID": 7})
+    assert res.success and threads
+    assert loop_thread not in threads

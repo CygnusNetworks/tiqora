@@ -98,3 +98,28 @@ def test_redact_url_and_text() -> None:
     assert redact_text("abc", ["ab"]) == "abc"  # values shorter than 4 chars are not masked
     # The longer secret is replaced first, so a shorter one cannot leave a fragment behind.
     assert redact_text("x secret-long y", ["secret", "secret-long"]) == "x *** y"
+
+
+def test_redact_config_masks_numbers_and_lists_under_secret_keys() -> None:
+    """Final review m4: not only strings are secrets."""
+    c = redact_config(
+        {
+            "Token": 123456,
+            "Tokens": ["t-one", 42, ""],
+            "Password": 3.5,
+            "Authentication": {"BasicAuthPassword": 99, "Mode": "x"},
+            "TokenEnabled": True,
+            "TokenNone": None,
+            "Count": 7,
+        }
+    )
+    assert c["Token"] == c["Password"] == MASK
+    assert c["Tokens"] == [MASK, MASK, ""]
+    assert c["Authentication"] == {"BasicAuthPassword": MASK, "Mode": "x"}
+    assert c["TokenEnabled"] is True and c["TokenNone"] is None and c["Count"] == 7
+
+
+def test_redact_text_masks_json_escaped_secrets() -> None:
+    secret = 'a"b\\c-ö-long'
+    for dumped in (json.dumps(secret), json.dumps(secret, ensure_ascii=False)):
+        assert redact_text(dumped, [secret]) == '"***"'

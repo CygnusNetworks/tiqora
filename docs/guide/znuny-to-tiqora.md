@@ -189,8 +189,8 @@ you're only changing which UI agents use.
 ## Stage 3 — Take over daemon functions, one at a time
 
 **Goal**: move background responsibilities (mail fetch, escalation sweep,
-notifications, GenericAgent, automatic unlock, pending checks) from Znuny's
-daemon to Tiqora's worker, in a
+notifications, GenericAgent, automatic unlock, pending checks, outgoing
+webservice calls) from Znuny's daemon to Tiqora's worker, in a
 controlled order, each individually verified and reversible.
 
 Each function is gated by its own `daemon.<name>.enabled` key in
@@ -220,7 +220,15 @@ in [`../parallel-operation.md`](../parallel-operation.md)):
    GenericAgent executor is usually a *required* setting that cannot be
    switched off on its own; see [`../cutover.md`](../cutover.md) §0.
    → [`../parallel-operation.md`](../parallel-operation.md#taking-over-genericagent)
-5. **Postmaster (inbound mail) — last.** This is the highest-risk takeover:
+5. **Outgoing webservice calls (GenericInterface invokers)**
+   (`daemon.gi_requester.enabled`, Admin → Dienste → "Ausgehende
+   Webservice-Aufrufe") — only if a valid webservice has event invokers.
+   Set Znuny's `Ticket::EventModulePost###9900-GenericInterface` to invalid
+   first and wait until Znuny's scheduler has no `GenericInterface` tasks
+   left; with both sides active every call is sent twice. Verify with
+   "Probelauf" and one real ticket change in the webservice's Protokoll tab.
+   → [`../parallel-operation.md`](../parallel-operation.md#taking-over-genericinterface-invokers)
+6. **Postmaster (inbound mail) — last.** This is the highest-risk takeover:
    getting it wrong risks duplicate-processed or (for POP3/IMAP
    delete-after-fetch) lost mail.
    → [`../parallel-operation.md`](../parallel-operation.md#taking-over-mail-processing)

@@ -322,6 +322,7 @@ async def test_reschedule_enqueues_new_job_with_past_execution_data(env: Env, mo
     assert len(jobs) == 2
     first, second = jobs
     assert first["status"] == "succeeded" and first["result"]["status"] == "rescheduled"
+    assert first["checkpoint"] == "sending"  # sent before it failed: the send mark stays
     assert first["dedupe_key"] is not None
     assert second["id"] != first_id and second["status"] == "queued"
     assert second["dedupe_key"] is None
@@ -438,6 +439,9 @@ async def test_future_task_time_diff_fallback(
     await env.run(job_id)
     first, second = env.jobs()
     assert first["result"]["status"] == "rescheduled"
+    # final review m2: the original is marked before its follow-up is committed, so a crash
+    # in between cannot requeue it into a second retry chain
+    assert first["checkpoint"] == "rescheduled"
     assert 295 <= (second["due_at"] - before).total_seconds() <= 305
     assert second["payload"]["past_execution"]["RetryCount"] == 1
     assert second["due_at"] - before < timedelta(seconds=310)

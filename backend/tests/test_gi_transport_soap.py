@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -310,3 +311,18 @@ async def test_secrets_echoed_by_the_remote_are_masked() -> None:
     assert "gi51-secret" not in (res.error_message or "")
     assert "gi51-secret" not in sink.dump()
     assert res.secret_values and "gi51-secret" in res.secret_values
+
+
+async def test_dns_resolution_runs_off_the_event_loop(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Final review m1: getaddrinfo blocks, so pinning must not run on the worker's loop."""
+    loop_thread = threading.get_ident()
+    threads: list[int] = []
+
+    def recording(host: str, port: int) -> list[str]:
+        threads.append(threading.get_ident())
+        return HOSTS[host]
+
+    monkeypatch.setitem(globals(), "resolver", recording)
+    res, _, _ = await call(config())
+    assert res.success and threads
+    assert loop_thread not in threads

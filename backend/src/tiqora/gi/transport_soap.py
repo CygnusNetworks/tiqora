@@ -11,6 +11,7 @@ with a proxy only the proxy URL is pinned (the proxy resolves the endpoint); one
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import contextlib
 import math
@@ -165,7 +166,8 @@ async def soap_perform_request(
                 ca_file=perl_str(ca_file) if ca_file else None,
                 ca_dir=perl_str(ca_dir) if ca_dir else None,
             )
-        proxy_url, proxy_headers = proxy_for(config, policy)
+        # getaddrinfo blocks: keep DNS off the shared worker loop
+        proxy_url, proxy_headers = await asyncio.to_thread(proxy_for, config, policy)
     except EgressError as exc:
         return await error(str(exc))
     for value in proxy_headers.values():
@@ -182,7 +184,7 @@ async def soap_perform_request(
     pinned: PinnedOutboundURL | None = None
     try:
         if proxy_url is None:
-            pinned = pin(endpoint, policy, resolver=resolver)
+            pinned = await asyncio.to_thread(pin, endpoint, policy, resolver=resolver)
         elif not endpoint.lower().startswith(("http://", "https://")):
             raise EgressError(f"Ziel {redact_url(endpoint)} ist nicht erlaubt: nur http und https.")
     except EgressError as exc:

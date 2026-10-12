@@ -128,3 +128,16 @@ async def test_add_secrets_masks_later_lines_only() -> None:
     await d.error("after gi51-token-late", {"k": "x gi51-token-late"})
     assert sink.rows[0].summary == "before gi51-token-late"
     assert "gi51-token-late" not in sink.rows[1].summary + sink.rows[1].content
+
+
+async def test_secret_with_quote_or_backslash_is_masked_in_dumps() -> None:
+    """Final review m4: json.dumps escapes ``"`` and ``\\``; the masking must still hit."""
+    secret = 'pa"ss\\word-ö'
+    sink = MemorySink()
+    debugger = _debugger(sink, secret_values=[secret])
+    await debugger.debug("dict", {"Note": f"value {secret} end", "List": [secret]})
+    await debugger.debug("raw json echo", json.dumps({"echo": secret}))
+    await debugger.debug("raw ascii json echo", json.dumps({"echo": secret}, ensure_ascii=True))
+    for row in sink.rows:
+        assert "pa" not in row.content and "word" not in row.content, row.content
+        assert "***" in row.content

@@ -19,6 +19,7 @@ Deliberate differences from Znuny (all safe-side):
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import copy
 import json
@@ -350,7 +351,8 @@ async def build_rest_request(
         proxy_cfg = config.get("Proxy")
         if isinstance(proxy_cfg, dict) and _string_with_data(proxy_cfg.get("ProxyPassword")):
             secrets.append(perl_str(proxy_cfg["ProxyPassword"]))
-        proxy_url, proxy_headers = proxy_for(config, policy)
+        # getaddrinfo blocks: keep DNS off the shared worker loop
+        proxy_url, proxy_headers = await asyncio.to_thread(proxy_for, config, policy)
     except EgressError as exc:
         return await error(str(exc))
     for value in proxy_headers.values():
@@ -488,7 +490,7 @@ async def build_rest_request(
     pinned: PinnedOutboundURL | None = None
     try:
         if proxy_url is None:
-            pinned = pin(url, policy, resolver=resolver)
+            pinned = await asyncio.to_thread(pin, url, policy, resolver=resolver)
         elif scheme not in ("http", "https"):
             raise EgressError(f"Ziel {host} ist nicht erlaubt: nur http und https.")
     except EgressError as exc:

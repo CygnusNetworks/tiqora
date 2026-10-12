@@ -82,14 +82,29 @@ class GiDebugger:
             return self._max_content_bytes
         return get_settings().gi_debug_max_content_bytes
 
+    def _mask_leaves(self, data: Any) -> Any:
+        if isinstance(data, Mapping):
+            return {key: self._mask_leaves(item) for key, item in data.items()}
+        if isinstance(data, list | tuple):
+            return [self._mask_leaves(item) for item in data]
+        if isinstance(data, str):
+            return redact_text(data, self._secrets)
+        return data
+
     def _render(self, data: Any) -> str:
         if data is None or data == "" or data == {} or data == []:
             return NO_DATA
         if isinstance(data, str):
             text = redact_text(data, self._secrets)
         elif isinstance(data, Mapping | list | tuple):
+            # Mask the string leaves first: after json.dumps a secret with a quote or
+            # backslash only exists in its escaped form (redact_text covers that as well).
             dumped = json.dumps(
-                redact_config(data), sort_keys=True, indent=2, ensure_ascii=False, default=str
+                self._mask_leaves(redact_config(data)),
+                sort_keys=True,
+                indent=2,
+                ensure_ascii=False,
+                default=str,
             )
             text = redact_text(dumped, self._secrets)
         else:

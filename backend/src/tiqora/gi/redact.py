@@ -7,6 +7,7 @@ value), configuration dumps (by key name) and URLs (user info and secret query v
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Iterable, Mapping
 from typing import Any, Final
@@ -39,10 +40,23 @@ def _usable(secret_values: Iterable[str]) -> list[str]:
     return sorted(found, key=len, reverse=True)
 
 
+def _variants(secret: str) -> list[str]:
+    """*secret* plus its JSON-escaped forms: a secret with ``"``, ``\\`` or non-ASCII
+    characters appears escaped in a JSON dump or a raw JSON response that echoes it."""
+    found = [secret]
+    for ascii_only in (False, True):
+        escaped = json.dumps(secret, ensure_ascii=ascii_only)[1:-1]
+        if escaped not in found:
+            found.append(escaped)
+    return found
+
+
 def redact_text(text: str, secret_values: Iterable[str]) -> str:
-    """Replace every occurrence of every secret value (4+ characters) with ``***``."""
-    for secret in _usable(secret_values):
-        text = text.replace(secret, MASK)
+    """Replace every occurrence of every secret value (4+ characters), also in its
+    JSON-escaped form, with ``***``."""
+    variants = {v for secret in _usable(secret_values) for v in _variants(secret)}
+    for value in sorted(variants, key=len, reverse=True):
+        text = text.replace(value, MASK)
     return text
 
 
@@ -77,13 +91,28 @@ def redact_headers(
     return out
 
 
+def _mask_secret_value(item: Any) -> Any:
+    """The value behind a secret-looking key: every non-empty string and number is masked,
+    lists element by element. Mappings are walked by key name as usual (``Authentication``
+    holds the auth type next to the password)."""
+    if isinstance(item, Mapping):
+        return redact_config(item)
+    if isinstance(item, list | tuple):
+        return [_mask_secret_value(element) for element in item]
+    if isinstance(item, str):
+        return MASK if item else item
+    if isinstance(item, bool) or item is None:
+        return item
+    return MASK  # int, float, anything else that renders as text
+
+
 def redact_config(value: Any) -> Any:
-    """Deep copy of *value* with the non-empty string behind every secret-looking key masked."""
+    """Deep copy of *value* with the non-empty value behind every secret-looking key masked."""
     if isinstance(value, Mapping):
         result: dict[Any, Any] = {}
         for key, item in value.items():
-            if isinstance(key, str) and SECRET_KEY_RE.search(key) and isinstance(item, str):
-                result[key] = MASK if item else item
+            if isinstance(key, str) and SECRET_KEY_RE.search(key):
+                result[key] = _mask_secret_value(item)
             else:
                 result[key] = redact_config(item)
         return result

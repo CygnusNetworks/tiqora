@@ -387,6 +387,13 @@ async def test_debugger_search_pagination_and_filters(
         with pytest.raises(HTTPException) as exc:
             await _list(env, WS, before="not-a-cursor")
         assert exc.value.status_code == 422
+        # final review m3: a forged cursor with an offset is normalised to naive UTC, no 500
+        forged = base64.urlsafe_b64encode(
+            json.dumps(["2026-01-01T12:30:00+02:00", "znuny", 10**9]).encode()
+        ).decode()
+        assert api._decode_cursor(forged)[0] == datetime(2026, 1, 1, 10, 30)
+        aware = await _list(env, WS, before=forged)
+        assert [e.communication_id[:7] for e in aware.entries] == ["gi51-z1"]
 
 
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])

@@ -47,6 +47,7 @@ GI_INVOKE_SYNC_KIND: Final = "core.gi_invoke_sync"
 GI_LANE: Final = "gi"  # async invokers, 2 slots
 GI_SYNC_LANE: Final = "gi_sync"  # Asynchronous: 0 invokers, 1 slot, strict id order
 CHECKPOINT_SENDING: Final = "sending"
+CHECKPOINT_RESCHEDULED: Final = "rescheduled"  # failed before sending, follow-up job queued
 
 WEBSERVICE_GONE_MESSAGE: Final = "Der Webservice ist nicht mehr gültig."
 INTERRUPTED_AFTER_SEND_MESSAGE: Final = (
@@ -150,8 +151,12 @@ async def run_gi_invoke(ctx: JobContext, payload: GiInvokePayload) -> dict[str, 
             )
             await session.commit()
 
+    sent = False
+
     async def before_send() -> None:
+        nonlocal sent
         await ctx.checkpoint(CHECKPOINT_SENDING)
+        sent = True
 
     outcome = await run_requester(
         session_factory=ctx.session_factory,
@@ -185,6 +190,10 @@ async def run_gi_invoke(ctx: JobContext, payload: GiInvokePayload) -> dict[str, 
         and decision.reschedule
         and decision.past is not None
     ):
+        if not sent:
+            # Without a checkpoint an interrupted job is requeued: if that happened after the
+            # follow-up below is committed, two retry chains would run (and send twice).
+            await ctx.checkpoint(CHECKPOINT_RESCHEDULED)
         async with ctx.session_factory() as session:
             next_at = decision.execution_time
             if next_at is None:

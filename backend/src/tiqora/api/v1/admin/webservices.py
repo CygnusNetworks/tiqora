@@ -459,7 +459,11 @@ def _decode_cursor(raw: str) -> tuple[datetime, str, int]:
         when, source, entry_id = json.loads(base64.urlsafe_b64decode(padded.encode()))
         if source not in ("tiqora", "znuny"):
             raise ValueError(source)
-        return datetime.fromisoformat(when), str(source), int(entry_id)
+        moment = datetime.fromisoformat(when)
+        if moment.tzinfo is not None:
+            # create_time columns are naive UTC; an aware value fails to bind on PostgreSQL
+            moment = moment.astimezone(UTC).replace(tzinfo=None)
+        return moment, str(source), int(entry_id)
     except (ValueError, TypeError, binascii.Error, json.JSONDecodeError) as exc:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_CONTENT, "Ungültige Seitenangabe"
