@@ -41,6 +41,7 @@ from tiqora.domain.settings_store import (
     KEY_REPORT_RUNS_PURGE_ENABLED,
     KEY_REPORT_SCHEDULER_ENABLED,
     KEY_REPORT_SCHEDULER_INTERVAL_SECONDS,
+    KEY_SCIM_EVENTS_PURGE_ENABLED,
     KEY_SMIME_CUSTOMER_RENEW_ENABLED,
     KEY_TELEGRAM_POLLER_ENABLED,
     KEY_TELEGRAM_POLLER_INTERVAL_SECONDS,
@@ -265,6 +266,14 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         toggleable=True,
         schedule_kind="daily",
         daily_at="04:30",
+    ),
+    DaemonService(
+        slug="scim_events_purge",
+        enabled_key=KEY_SCIM_EVENTS_PURGE_ENABLED,
+        default_enabled=True,
+        toggleable=True,
+        schedule_kind="daily",
+        daily_at="04:40",
     ),
     # Keeps the report data (facts, events, daily snapshots) current after the backfill.
     DaemonService(

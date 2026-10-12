@@ -18,7 +18,8 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.config import Settings
-from tiqora.db.tiqora.models import TiqoraScimEvent, TiqoraScimToken
+from tiqora.db.tiqora.models import TiqoraScimToken
+from tiqora.identity.scim.audit import record_event_in
 from tiqora.identity.scim.constants import (
     LAST_USED_WRITE_INTERVAL,
     MAX_ACTIVE_TOKENS,
@@ -105,23 +106,6 @@ def _record(row: TiqoraScimToken) -> ScimTokenRecord:
     )
 
 
-def _admin_event(
-    *, provider_id: int, token_id: int, operation: str, actor_id: int, user_kind: str
-) -> TiqoraScimEvent:
-    # Task 5 replaces this direct row with ``audit.record_event_in``.
-    return TiqoraScimEvent(
-        provider_id=provider_id,
-        token_id=token_id,
-        created=utc_now(),
-        method="ADMIN",
-        resource="Token",
-        operation=operation,
-        user_kind=user_kind,
-        status=200,
-        actor_user_id=actor_id,
-    )
-
-
 async def _active_count(session: AsyncSession, provider_id: int) -> int:
     stmt = select(func.count(TiqoraScimToken.id)).where(
         TiqoraScimToken.provider_id == provider_id,
@@ -179,16 +163,17 @@ async def create_token(
     )
     session.add(row)
     await session.flush()
-    session.add(
-        _admin_event(
-            provider_id=provider.id,
-            token_id=int(row.id),
-            operation="token_create",
-            actor_id=actor_id,
-            user_kind=user_kind,
-        )
+    await record_event_in(
+        session,
+        provider_id=provider.id,
+        token_id=int(row.id),
+        method="ADMIN",
+        resource="Token",
+        operation="token_create",
+        status=200,
+        user_kind=user_kind,
+        actor_user_id=actor_id,
     )
-    await session.flush()
     return _record(row), raw
 
 
@@ -212,16 +197,17 @@ async def revoke_token(
         raise ScimTokenError({"token": "Zugangsschlüssel nicht gefunden."})
     if row.revoked_at is None:
         row.revoked_at = utc_now()
-        session.add(
-            _admin_event(
-                provider_id=provider_id,
-                token_id=int(row.id),
-                operation="token_revoke",
-                actor_id=actor_id,
-                user_kind=row.user_kind,
-            )
+        await record_event_in(
+            session,
+            provider_id=provider_id,
+            token_id=int(row.id),
+            method="ADMIN",
+            resource="Token",
+            operation="token_revoke",
+            status=200,
+            user_kind=row.user_kind,
+            actor_user_id=actor_id,
         )
-        await session.flush()
     return _record(row)
 
 
