@@ -111,10 +111,9 @@ async def test_record_event_own_transaction(maker: async_sessionmaker[AsyncSessi
             resource="Token",
             operation="token_create",
             status=200,
-        )
+        )  # flushed, caller transaction still open
+        await _record(maker, 409, "conflict", scim_id="a" * 36, user_kind="agent", user_id=7)
         await caller.rollback()  # the caller's own work is gone ...
-    assert await _rows(maker) == []
-    await _record(maker, 409, "conflict", scim_id="a" * 36, user_kind="agent", user_id=7)
     rows = await _rows(maker)  # ... the separately recorded event persists
     assert len(rows) == 1
     row = rows[0]
@@ -125,6 +124,36 @@ async def test_record_event_own_transaction(maker: async_sessionmaker[AsyncSessi
         "User",
     )
     assert (row.scim_id, row.user_kind, row.user_id) == ("a" * 36, "agent", 7)
+
+
+async def test_wrong_call_raises_and_is_not_swallowed(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    with capture_logs() as logs:
+        with pytest.raises(TypeError):
+            await record_event(  # type: ignore[call-arg]
+                maker,
+                provider_id=PID,
+                token_id=None,
+                method="ADMIN",
+                resource="Token",
+                operation="token_create",
+                status=200,
+                actor_id=5,
+            )
+        async with maker() as caller:
+            with pytest.raises(TypeError):
+                await record_event_in(  # type: ignore[call-arg]
+                    caller, provider_id=PID, token_id=None, method="POST", resource="User"
+                )
+    assert not [e for e in logs if e["event"] == "scim_event_not_recorded"]
+    assert await _rows(maker) == []
+
+
+async def test_overlong_scim_id_is_clamped(maker: async_sessionmaker[AsyncSession]) -> None:
+    await _record(maker, 404, "rejected", scim_id="b" * 80)
+    [row] = await _rows(maker)
+    assert row.scim_id == "b" * 36
 
 
 async def test_record_event_in_joins_callers_transaction(
@@ -211,7 +240,7 @@ async def test_list_events_newest_first_and_failures_only(
 async def test_purge_respects_retention(maker: async_sessionmaker[AsyncSession]) -> None:
     now = utc_now()
     async with maker() as s:
-        for age, status in ((181, 200), (10, 201)):
+        for age, status in ((8, 200), (3, 201)):
             s.add(
                 TiqoraScimEvent(
                     provider_id=PID,
@@ -223,9 +252,9 @@ async def test_purge_respects_retention(maker: async_sessionmaker[AsyncSession])
                 )
             )
         await s.commit()
-    settings = Settings(environment="test", scim_event_retention_days=180)
+    settings = Settings(environment="test", scim_event_retention_days=5)
     result = await run_scim_events_purge_tick(settings)
-    assert result == {"deleted": 1}
+    assert result == {"deleted": 1}  # 5 is not the default: the setting is really read
     assert [r.status for r in await _rows(maker)] == [201]
 
 

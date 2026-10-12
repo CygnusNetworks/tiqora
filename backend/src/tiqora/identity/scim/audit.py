@@ -8,7 +8,7 @@ row to the caller's transaction (admin token operations).
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any, Final, Literal
+from typing import Final, Literal
 
 import structlog
 from sqlalchemy import delete, select
@@ -44,6 +44,7 @@ ScimOperation = Literal[
 ]
 
 DETAIL_MAX: Final = 500
+SCIM_ID_MAX: Final = 36  # CHAR(36); a client-supplied path id may be longer
 LIST_LIMIT_MAX: Final = 200
 
 
@@ -68,7 +69,7 @@ def _build(
         method=method,
         resource=resource,
         operation=operation,
-        scim_id=scim_id,
+        scim_id=scim_id[:SCIM_ID_MAX] if scim_id is not None else None,
         user_kind=user_kind,
         user_id=user_id,
         status=status,
@@ -77,25 +78,82 @@ def _build(
     )
 
 
-async def record_event(session_factory: async_sessionmaker[AsyncSession], **fields: Any) -> None:
-    """Write one event in its own transaction; a logging failure never reaches the caller."""
+async def record_event(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    provider_id: int | None,
+    token_id: int | None,
+    method: str,
+    resource: str,
+    operation: ScimOperation,
+    status: int,
+    scim_id: str | None = None,
+    user_kind: str | None = None,
+    user_id: int | None = None,
+    detail: str | None = None,
+    actor_user_id: int | None = None,
+) -> None:
+    """Write one event in its own transaction; a DB failure never reaches the caller.
+
+    The row is built outside the ``try``: a wrong call (programming error) raises loudly.
+    """
+    row = _build(
+        provider_id=provider_id,
+        token_id=token_id,
+        method=method,
+        resource=resource,
+        operation=operation,
+        status=status,
+        scim_id=scim_id,
+        user_kind=user_kind,
+        user_id=user_id,
+        detail=detail,
+        actor_user_id=actor_user_id,
+    )
     try:
-        row = _build(**fields)
         async with session_factory() as session:
             session.add(row)
             await session.commit()
     except Exception:  # noqa: BLE001 — auditing must not break provisioning
         logger.warning(
             "scim_event_not_recorded",
-            provider_id=fields.get("provider_id"),
-            operation=fields.get("operation"),
+            provider_id=provider_id,
+            operation=operation,
             exc_info=True,
         )
 
 
-async def record_event_in(session: AsyncSession, **fields: Any) -> None:
+async def record_event_in(
+    session: AsyncSession,
+    *,
+    provider_id: int | None,
+    token_id: int | None,
+    method: str,
+    resource: str,
+    operation: ScimOperation,
+    status: int,
+    scim_id: str | None = None,
+    user_kind: str | None = None,
+    user_id: int | None = None,
+    detail: str | None = None,
+    actor_user_id: int | None = None,
+) -> None:
     """Add the event to the caller's transaction (flush, no commit)."""
-    session.add(_build(**fields))
+    session.add(
+        _build(
+            provider_id=provider_id,
+            token_id=token_id,
+            method=method,
+            resource=resource,
+            operation=operation,
+            status=status,
+            scim_id=scim_id,
+            user_kind=user_kind,
+            user_id=user_id,
+            detail=detail,
+            actor_user_id=actor_user_id,
+        )
+    )
     await session.flush()
 
 
