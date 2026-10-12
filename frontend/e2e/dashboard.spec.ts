@@ -105,10 +105,11 @@ test("two tabs: saving in the second after the first saved shows the conflict di
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const a = await ctx.newPage();
   const b = await ctx.newPage();
+  // Both tabs use the mock session that beforeEach signed in (one per test, like two tabs of one
+  // browser sharing the cookie), so neither logs in again.
   for (const p of [a, b]) {
     await germanUi(p);
     await mockApi(p);
-    await loginAsAgent(p);
     await p.goto("/agent");
     await p.getByRole("button", { name: "Anpassen" }).click();
   }

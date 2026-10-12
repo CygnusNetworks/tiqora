@@ -1,4 +1,4 @@
-import { test, type Page, type Route } from "@playwright/test";
+import { test, type Page, type Route, type TestInfo } from "@playwright/test";
 import { GONE_SAVED_SEARCH_ID, createDemoDashboards, demoDefaultWidgets, demoTemplateUpdateHint, resolveDashboards, type DemoDashboards } from "../../src/demo/dashboardsMock";
 import { resolveKiosk } from "../../src/demo/kioskMock";
 import type { ReportRunIn } from "../../src/lib/reportsApi";
@@ -644,15 +644,24 @@ async function json(route: Route, status: number, body: unknown) {
   });
 }
 
+// The test whose run last reset the module-level mock state (session flag, KB article, process
+// state, saved searches).
+let stateResetFor: TestInfo | undefined;
+
 /**
  * Intercept all /api/v1/* calls with deterministic fixtures.
- * Call once per test (or in beforeEach).
+ * Call it for every page of a test (beforeEach plus any extra page). The shared mock state is reset
+ * only on the first call of a test: a reset from a second page's call would sign out the pages that
+ * are already open (their next request gets 401 and the app sends them to /login).
  */
 export async function mockApi(page: Page) {
-  authenticated = false;
-  kbArticleFull = initialKbArticle();
-  ticketProcessState = ticketProcessStateNotInProcess;
-  resetSavedStore();
+  if (stateResetFor !== test.info()) {
+    stateResetFor = test.info();
+    authenticated = false;
+    kbArticleFull = initialKbArticle();
+    ticketProcessState = ticketProcessStateNotInProcess;
+    resetSavedStore();
+  }
 
   await page.route("**/api/v1/**", async (route) => {
     const req = route.request();
