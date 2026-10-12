@@ -12,6 +12,7 @@ from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.cmdb.access import CmdbAccess, require_class_access
+from tiqora.cmdb.attachments import attachment_ids_in, bind_staged, check_staged
 from tiqora.cmdb.classes import ClassService
 from tiqora.cmdb.definition import AttributeDef, iter_attribute_paths, parse_definition_json
 from tiqora.cmdb.errors import CmdbError, CmdbNotFound
@@ -406,7 +407,7 @@ class CiService:
         incident_state_id: int,
         attributes: Mapping[str, Any],
         change_note: str | None = None,
-        attachment_ids: Sequence[int] = (),  # bound by the attachment task
+        attachment_ids: Sequence[int] = (),  # staged uploads of ``access.user_id``
         recompute: bool = True,
         enforce_permissions: bool = True,
     ) -> CiRecord:
@@ -430,6 +431,11 @@ class CiService:
         if issues:
             raise InvalidValues(issues)
         await self._validate_refs(definition.attributes, values, ci_id=None, user_id=access.user_id)
+        staged = list(dict.fromkeys(attachment_ids))
+        if staged:
+            issues = await check_staged(self._s, access.user_id, staged)
+            if issues:
+                raise InvalidValues(issues)
         number = await next_ci_number(self._s, class_id)
         now = utc_now()
         uid = access.user_id
@@ -472,6 +478,12 @@ class CiService:
         await write_index(self._s, int(row.id), definition.attributes, values)
         self._history(int(row.id), "ConfigItemCreate", number, None, uid, now)
         self._history(int(row.id), "VersionCreate", "1", int(version.id), uid, now)
+        await bind_staged(
+            self._s,
+            uid,
+            int(row.id),
+            [*staged, *sorted(attachment_ids_in(definition.attributes, values))],
+        )
         await self._s.flush()
         if recompute and cat[incident_state_id][2] == _INCIDENT:
             await self._recompute([int(row.id)])
@@ -620,6 +632,7 @@ class CiService:
             )
         for detail in _value_events(old_values, new_values):
             self._history(ci_id, "ValueUpdate", detail, vid, uid, now)
+        await bind_staged(self._s, uid, ci_id, sorted(attachment_ids_in(attrs, new_values)))
         await self._s.flush()
         if recompute and new_func != old_func:
             await self._recompute([ci_id])

@@ -60,6 +60,7 @@ __all__ = [
     "QUEUE_HIDDEN",
     "QUEUE_RW",
     "SERVER_ATTRS",
+    "SERVER_ATTRS_WITH_MANUAL",
     "TICKET_CLOSED",
     "TICKET_HIDDEN",
     "TICKET_OPEN",
@@ -148,6 +149,13 @@ SERVER_ATTRS: list[dict[str, Any]] = [
         "group",
         sub=[_attr("Disk", "Disk", "text", count_max=4)],
     ),
+]
+
+
+#: ``SERVER_ATTRS`` plus an ``attachment`` attribute ``Manual`` (CI attachment tests)
+SERVER_ATTRS_WITH_MANUAL: list[dict[str, Any]] = [
+    *SERVER_ATTRS,
+    _attr("Manual", "Manual", "attachment"),
 ]
 
 

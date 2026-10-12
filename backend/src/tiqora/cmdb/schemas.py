@@ -302,6 +302,16 @@ class CiStatesOut(BaseModel):
     incident_current: CatalogItemOut
 
 
+class CmdbAttachmentOut(BaseModel):
+    id: int
+    #: ``None`` = staged upload that is not attached to a CI yet
+    ci_id: int | None
+    filename: str
+    content_type: str
+    size_bytes: int
+    created_at: UtcDateTime
+
+
 class CiCreateIn(BaseModel):
     class_id: int = Field(ge=1)
     name: str = Field(min_length=1, max_length=250)

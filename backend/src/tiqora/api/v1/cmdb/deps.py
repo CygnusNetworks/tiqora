@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.deps import CurrentUser, DbSession
 from tiqora.cmdb.access import CmdbAccess, load_access
+from tiqora.cmdb.attachments import AttachmentInUse
 from tiqora.cmdb.catalog import CatalogItemExists, CatalogMisconfigured
 from tiqora.cmdb.classes import (
     ClassConflict,
@@ -40,6 +41,14 @@ def cmdb_http_error(exc: Exception) -> HTTPException:
         if exc.mode == "znuny_readthrough":
             return HTTPException(status.HTTP_409_CONFLICT, IN_ZNUNY)
         return HTTPException(status.HTTP_404_NOT_FOUND, NOT_FOUND)
+    if isinstance(exc, AttachmentInUse):
+        return HTTPException(
+            status.HTTP_409_CONFLICT,
+            {
+                "code": "attachment_in_use",
+                "message": "Der Anhang wird noch in einem Attribut verwendet.",
+            },
+        )
     if isinstance(exc, CmdbNotFound):
         return HTTPException(status.HTTP_404_NOT_FOUND, NOT_FOUND)
     if isinstance(exc, CmdbForbidden):
