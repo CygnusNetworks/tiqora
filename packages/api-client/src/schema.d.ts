@@ -11158,6 +11158,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/linked-articles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Linked Articles
+         * @description Queue a note (or e-mail reply) on tickets linked to this one. Needs ``rw`` on the ticket.
+         *
+         *     The targets must be linked to the ticket now; the job re-checks links and ``rw`` per target.
+         */
+        post: operations["post_linked_articles_api_v1_tickets__ticket_id__linked_articles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/links": {
         parameters: {
             query?: never;
@@ -18471,6 +18493,26 @@ export interface components {
         LinkTypeSyncOut: {
             /** Changed */
             changed: number;
+        };
+        /** LinkedArticlesIn */
+        LinkedArticlesIn: {
+            /** Body Html */
+            body_html: string;
+            /**
+             * Mode
+             * @default note
+             * @enum {string}
+             */
+            mode: "note" | "reply";
+            /** Subject */
+            subject: string;
+            /** Target Ticket Ids */
+            target_ticket_ids: number[];
+            /**
+             * Visible For Customer
+             * @default false
+             */
+            visible_for_customer: boolean;
         };
         /**
          * LlmModelIn
@@ -53136,6 +53178,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HistoryEntry"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_linked_articles_api_v1_tickets__ticket_id__linked_articles_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkedArticlesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
                 };
             };
             /** @description Validation Error */

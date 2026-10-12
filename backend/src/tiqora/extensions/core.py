@@ -40,6 +40,7 @@ def register_core(registry: Registry) -> None:
     registry.add(CI_PROVIDERS, CiProviderFactory(mode="znuny_readthrough", create=ZnunyCiProvider))
 
     from tiqora.gi.jobs import GI_INVOKE_JOB, GI_INVOKE_SYNC_JOB
+    from tiqora.itsm.linked_articles import LINKED_ARTICLES_JOB
     from tiqora.jobs.handlers.gi_mail import GI_MAIL_JOB
     from tiqora.jobs.handlers.ticket_export import TICKET_EXPORT_JOB
     from tiqora.jobs.registry import JOB_HANDLERS
@@ -49,6 +50,7 @@ def register_core(registry: Registry) -> None:
 
     registry.add(JOB_HANDLERS, TICKET_EXPORT_JOB)
     registry.add(JOB_HANDLERS, GI_MAIL_JOB)
+    registry.add(JOB_HANDLERS, LINKED_ARTICLES_JOB)
     registry.add(JOB_HANDLERS, GI_INVOKE_JOB)
     registry.add(JOB_HANDLERS, GI_INVOKE_SYNC_JOB)
     registry.add(JOB_HANDLERS, REPORT_BACKFILL_JOB)

@@ -20133,6 +20133,51 @@
         "title": "LinkTypeSyncOut",
         "type": "object"
       },
+      "LinkedArticlesIn": {
+        "properties": {
+          "body_html": {
+            "maxLength": 200000,
+            "minLength": 1,
+            "title": "Body Html",
+            "type": "string"
+          },
+          "mode": {
+            "default": "note",
+            "enum": [
+              "note",
+              "reply"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "subject": {
+            "maxLength": 250,
+            "minLength": 1,
+            "title": "Subject",
+            "type": "string"
+          },
+          "target_ticket_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 1,
+            "title": "Target Ticket Ids",
+            "type": "array"
+          },
+          "visible_for_customer": {
+            "default": false,
+            "title": "Visible For Customer",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "target_ticket_ids",
+          "subject",
+          "body_html"
+        ],
+        "title": "LinkedArticlesIn",
+        "type": "object"
+      },
       "LlmModelIn": {
         "description": "POST and PUT (full replace).",
         "properties": {
@@ -102344,6 +102389,91 @@
         "summary": "Ticket History",
         "tags": [
           "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/linked-articles": {
+      "post": {
+        "description": "Queue a note (or e-mail reply) on tickets linked to this one. Needs ``rw`` on the ticket.\n\nThe targets must be linked to the ticket now; the job re-checks links and ``rw`` per target.",
+        "operationId": "post_linked_articles_api_v1_tickets__ticket_id__linked_articles_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkedArticlesIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Linked Articles",
+        "tags": [
+          "itsm"
         ]
       }
     },

@@ -5635,7 +5635,8 @@
         "report_backfill": "Build report data",
         "gi_invoke": "Web service call",
         "gi_invoke_sync": "Web service call",
-        "report_delivery": "Report delivery"
+        "report_delivery": "Report delivery",
+        "itsm_linked_articles": "Note to linked tickets"
       },
       "gi_mail": "Send email from a web service request"
     },

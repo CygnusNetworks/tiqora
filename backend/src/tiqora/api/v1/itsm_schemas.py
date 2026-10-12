@@ -260,3 +260,14 @@ def service_out(info: ServiceItsmInfo, *, default_minutes: int) -> ServiceItsmOu
         if info.incident_state is None
         else incident_state_out(info.incident_state),
     )
+
+
+# --- note / reply to linked tickets (Task 18) ----------------------------------------------
+
+
+class LinkedArticlesIn(BaseModel):
+    target_ticket_ids: list[int] = Field(min_length=1)
+    mode: Literal["note", "reply"] = "note"
+    subject: str = Field(min_length=1, max_length=250)
+    body_html: str = Field(min_length=1, max_length=200_000)
+    visible_for_customer: bool = False

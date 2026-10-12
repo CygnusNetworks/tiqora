@@ -5635,7 +5635,8 @@
         "report_backfill": "Berichtsdaten aufbauen",
         "gi_invoke": "Webservice-Aufruf",
         "gi_invoke_sync": "Webservice-Aufruf",
-        "report_delivery": "Berichtsversand"
+        "report_delivery": "Berichtsversand",
+        "itsm_linked_articles": "Notiz an verknüpfte Tickets"
       },
       "gi_mail": "E-Mail aus einer Webservice-Anfrage versenden"
     },

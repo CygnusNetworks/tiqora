@@ -25,6 +25,7 @@ from tiqora.api.v1.itsm_schemas import (
     CiVersionPageOut,
     ItsmStatusOut,
     ItsmZnunyInfoOut,
+    LinkedArticlesIn,
     LinkTypeOptionOut,
     MatrixOut,
     PrioritySuggestionOut,
@@ -52,6 +53,11 @@ from tiqora.itsm.ci_provider import (
     CiVersionInfo,
 )
 from tiqora.itsm.link_types import LinkPair, offered_link_types
+from tiqora.itsm.linked_articles import (
+    LinkedArticlesPayload,
+    enqueue_linked_articles,
+    linked_ticket_ids,
+)
 from tiqora.itsm.mode import ItsmModeState, get_itsm_mode, require_itsm_enabled
 from tiqora.itsm.priority import load_matrix, suggest_priority
 from tiqora.itsm.providers import get_ci_provider
@@ -62,6 +68,7 @@ from tiqora.itsm.services import (
     service_info,
 )
 from tiqora.itsm.settings import ItsmSettings, load_itsm_settings
+from tiqora.jobs.schemas import JobAccepted
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -555,6 +562,49 @@ async def unlink_ticket_ci(
         )
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@ticket_router.post(
+    "/{ticket_id}/linked-articles",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=JobAccepted,
+)
+async def post_linked_articles(
+    ticket_id: int,
+    body: LinkedArticlesIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> JobAccepted:
+    """Queue a note (or e-mail reply) on tickets linked to this one. Needs ``rw`` on the ticket.
+
+    The targets must be linked to the ticket now; the job re-checks links and ``rw`` per target.
+    """
+    await require_itsm_enabled(session)
+    await _require_ticket(session, user.id, ticket_id, write=True)
+    cfg = await load_itsm_settings(session, settings)
+    targets = list(dict.fromkeys(t for t in body.target_ticket_ids if t != ticket_id))
+    if not targets:
+        _refuse("no_targets", status.HTTP_422_UNPROCESSABLE_ENTITY)
+    if len(targets) > cfg.linked_articles_max_tickets:
+        _refuse("too_many_targets", status.HTTP_422_UNPROCESSABLE_ENTITY)
+    if not set(targets) <= await linked_ticket_ids(session, ticket_id):
+        _refuse("targets_not_linked", status.HTTP_422_UNPROCESSABLE_ENTITY)
+    job = await enqueue_linked_articles(
+        session,
+        LinkedArticlesPayload(
+            source_ticket_id=ticket_id,
+            target_ticket_ids=targets,
+            mode=body.mode,
+            subject=body.subject,
+            body_html=body.body_html,
+            visible_for_customer=body.visible_for_customer,
+            origin="linked_note",
+            acting_user_id=user.id,
+        ),
+    )
+    await session.commit()
+    return JobAccepted(job_id=job.id, status="queued")
 
 
 # --- services (Task 17) ----------------------------------------------------------------------
