@@ -30,7 +30,15 @@ from tiqora.process.engine import execute_transition_action
 from tiqora.process.exceptions import PluginActionTimedOut
 from tiqora.znuny.sysconfig import SysConfig
 
-QUEUE, GROUP, DF_ID = 55081, 55082, 55083
+QUEUE, GROUP, DF_ID, AGENT = 55081, 55082, 55083, 55084
+PROC, ACT_A, ACT_B, DIALOG, TRANS = (
+    "Process-pp55",
+    "Activity-pp55-a",
+    "Activity-pp55-b",
+    "ActivityDialog-pp55",
+    "Transition-pp55",
+)
+ACTIONS = ("TransitionAction-pp55-1", "TransitionAction-pp55-2")
 ACTION_MODULE = ZNUNY_MODULE_PREFIX + "Plugin_points_SetContract"
 NOW = datetime(2026, 10, 12, 12, 0, 0)
 
@@ -45,6 +53,36 @@ MARK_TABLES: tuple[str, ...] = (
     "article",
     "ticket",
     "ticket_number_counter",
+)
+
+_PROCESS_YAML = f"""
+Description: pp55
+StartActivity: {ACT_A}
+StartActivityDialog: {DIALOG}
+Path:
+  {ACT_A}:
+    {TRANS}:
+      ActivityEntityID: {ACT_B}
+      TransitionAction:
+      - {ACTIONS[0]}
+      - {ACTIONS[1]}
+  {ACT_B}: {{}}
+"""
+_DIALOG_YAML = """
+DescriptionShort: pp55
+FieldOrder:
+- Title
+Fields:
+  Title:
+    Display: '1'
+SubmitButtonText: Submit
+Interface:
+- AgentInterface
+Permission: ''
+"""
+_TRANS_YAML = (
+    "Condition:\n  '1':\n    Fields:\n      Title:\n        Match: ^Updated\n"
+    "        Type: Regexp\n    Type: and\n  Type: and\nConditionLinking: and\n"
 )
 
 
@@ -62,6 +100,16 @@ def _clean_seed(conn: Any) -> None:
     conn.execute(text(f"DELETE FROM dynamic_field_value WHERE field_id = {DF_ID}"))
     conn.execute(text(f"DELETE FROM dynamic_field WHERE id = {DF_ID}"))
     conn.execute(text(f"DELETE FROM queue WHERE id = {QUEUE}"))
+    conn.execute(text(f"DELETE FROM group_user WHERE group_id = {GROUP}"))
+    conn.execute(text(f"DELETE FROM users WHERE id = {AGENT}"))
+    for table in (
+        "pm_process",
+        "pm_activity",
+        "pm_activity_dialog",
+        "pm_transition",
+        "pm_transition_action",
+    ):
+        conn.execute(text(f"DELETE FROM {table} WHERE entity_id LIKE '%-pp55%'"))
     conn.execute(text(f"DELETE FROM permission_groups WHERE id = {GROUP}"))
 
 
@@ -91,6 +139,22 @@ def _seed(sync_url: str) -> None:
         )
         conn.execute(
             text(
+                "INSERT INTO users (id, login, pw, first_name, last_name, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:u, 'pp55.agent', 'x', 'Proc', 'Agent', 1, :t, 1, :t, 1)"
+            ),
+            {"u": AGENT, "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO group_user (user_id, group_id, permission_key, create_time,"
+                " create_by, change_time, change_by) VALUES (:u, :g, 'rw', :t, 1, :t, 1)"
+            ),
+            {"u": AGENT, "g": GROUP, "t": NOW},
+        )
+        _seed_process(conn)
+        conn.execute(
+            text(
                 "INSERT INTO dynamic_field (id, internal_field, name, label, field_order,"
                 " field_type, object_type, config, valid_id,"
                 " create_time, create_by, change_time, change_by)"
@@ -100,6 +164,40 @@ def _seed(sync_url: str) -> None:
             {"id": DF_ID, "t": NOW},
         )
     engine.dispose()
+
+
+def _seed_process(conn: Any) -> None:
+    """One process: A --(Title ^Updated)--> B with two plugin actions on the transition."""
+    now = "current_timestamp"
+
+    def put(table: str, eid: str, cfg: str, extra: str = "", extra_val: str = "") -> None:
+        conn.execute(
+            text(
+                f"INSERT INTO {table} (entity_id, name, {extra}config,"
+                " create_time, create_by, change_time, change_by)"
+                f" VALUES (:eid, :eid, {extra_val}:cfg, {now}, 1, {now}, 1)"
+            ),
+            {"eid": eid, "cfg": cfg},
+        )
+
+    conn.execute(
+        text(
+            "INSERT INTO pm_process (entity_id, name, state_entity_id, layout, config,"
+            f" create_time, create_by, change_time, change_by)"
+            f" VALUES (:eid, :eid, 'S1', '{{}}', :cfg, {now}, 1, {now}, 1)"
+        ),
+        {"eid": PROC, "cfg": _PROCESS_YAML},
+    )
+    put("pm_activity", ACT_A, f"ActivityDialog:\n  '1': {DIALOG}\n")
+    put("pm_activity", ACT_B, "ActivityDialog: {}\n")
+    put("pm_activity_dialog", DIALOG, _DIALOG_YAML)
+    put("pm_transition", TRANS, _TRANS_YAML)
+    for eid, contract in zip(ACTIONS, ("a", "b"), strict=True):
+        put(
+            "pm_transition_action",
+            eid,
+            f"Config:\n  Contract: {contract}\nModule: {ACTION_MODULE}\n",
+        )
 
 
 class Env:
@@ -307,6 +405,98 @@ async def test_action_timeout_inside_a_db_call_leaves_a_usable_session(
     assert time.monotonic() - started < 4.0
     assert env.contract(tid) == []
     assert env.history_count(tid) >= 1  # the ticket itself (created earlier) is untouched
+
+
+def _http_client(env: Env) -> Any:
+    from httpx import ASGITransport, AsyncClient
+
+    from tiqora.api.app import create_app
+    from tiqora.api.deps import get_current_user, get_db
+    from tiqora.config import Settings
+    from tiqora.domain.auth import AuthenticatedUser
+
+    async def override_db() -> AsyncIterator[AsyncSession]:
+        async with env.factory() as session:
+            yield session
+
+    app = create_app(Settings(environment="test"))
+    app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
+        id=AGENT, login="pp55.agent", first_name="Proc", last_name="Agent", auth_method="session"
+    )
+    app.dependency_overrides[get_db] = override_db
+    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+
+
+async def test_two_slow_actions_share_one_budget_through_the_route(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F2/F3 end to end: engine budget scope + the route's 422, nothing stored.
+
+    Fails without ``action_budget_scope`` in ``run_transitions`` (the second action would get a
+    fresh budget, succeed, and the submit would answer 200) and without the route's
+    ``except PluginActionTimedOut`` (500 instead of 422).
+    """
+    tid = await _ticket()
+    async with _http_client(env) as client:
+        started = await client.post(
+            f"/api/v1/process/ticket/{tid}/start", json={"process_entity_id": PROC}
+        )
+        assert started.status_code == 200, started.text
+        points_behaviour().MODE["action"] = "slow"  # each action succeeds after 0.15 s
+        monkeypatch.setattr(process_points, "ACTION_BUDGET_SECONDS", 0.3)
+        with capture_logs() as logs:
+            t0 = time.monotonic()
+            resp = await client.post(
+                f"/api/v1/process/ticket/{tid}/submit",
+                json={
+                    "activity_dialog_entity_id": DIALOG,
+                    "field_values": {"Title": "Updated via REST"},
+                },
+            )
+            elapsed = time.monotonic() - t0
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["detail"] == (
+        "Aktion der Erweiterung „Erweiterungspunkte-Test“ hat zu lange gebraucht; "
+        "nichts wurde gespeichert"
+    )
+    assert elapsed < 1.0
+    # both actions started; the first fit into the budget, the second ran out of it
+    assert [c[1]["Contract"] for c in points_behaviour().CALLS if c[0] == "action.SetContract"] == [
+        "a",
+        "b",
+    ]
+    failed = [e for e in logs if e["event"] == "plugin_transition_action_failed"]
+    assert [e["timed_out"] for e in failed] == [True]
+    # nothing stored: no contract value, title and activity unchanged
+    assert env.contract(tid) == []
+    assert env.rows("SELECT title FROM ticket WHERE id = :t", t=tid)[0][0] == "Vertrag"
+    async with _http_client(env) as client:
+        state = await client.get(f"/api/v1/process/ticket/{tid}/state")
+    assert state.status_code == 200
+    assert state.json()["activity_entity_id"] == ACT_A
+
+
+def test_registrar_returns_names_and_rejects_non_iterable_params(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tiqora.plugins.context import make_plugin_context
+    from tiqora.plugins.discovery import discover_plugins
+    from tiqora.plugins.loader import import_and_register
+    from tiqora.plugins.registrar import RegistrationRejected
+
+    boot_points_plugin(tmp_path, monkeypatch)
+    (discovered,) = [d for d in discover_plugins() if d.plugin_id == "org.example.points"]
+    registrar = import_and_register(discovered, make_plugin_context(discovered))
+
+    async def run(ac: Any) -> None:
+        return None
+
+    assert registrar.transition_action("Other", run) == "Plugin_points_Other"
+    assert registrar.condition_module("IsOther", lambda d, f: True) == (
+        ZNUNY_VALIDATION_PREFIX + "Plugin_points_IsOther"
+    )
+    with pytest.raises(RegistrationRejected, match="ActionParam"):
+        registrar.transition_action("BadParams", run, params=5)  # type: ignore[arg-type]
 
 
 def test_condition_module(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

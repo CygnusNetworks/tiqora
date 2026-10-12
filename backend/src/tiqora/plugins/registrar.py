@@ -389,10 +389,18 @@ class PluginRegistrar:
         *,
         params: Iterable[ActionParam] = (),
         timeout_seconds: int = 5,
-    ) -> None:
-        """Stage ``Plugin_<short_id>_<name>`` as a process transition action (D5)."""
+    ) -> str:
+        """Stage ``Plugin_<short_id>_<name>`` as a process transition action (D5).
+
+        Returns the qualified name.
+        """
         qname = qualified(self._manifest.short_id, name)
-        params_t = tuple(params)
+        params_t: tuple[Any, ...]
+        try:
+            params_t = tuple(params)
+            params_error = False
+        except TypeError:
+            params_t, params_error = (), True
 
         def check() -> None:
             if not isinstance(name, str) or not CAMEL_NAME_RE.fullmatch(name):
@@ -408,6 +416,10 @@ class PluginRegistrar:
                 raise RegistrationRejected(
                     f"Zeitlimit einer Prozessaktion muss zwischen {MIN_ACTION_TIMEOUT} "
                     f"und {MAX_ACTION_TIMEOUT} Sekunden liegen"
+                )
+            if params_error:
+                raise RegistrationRejected(
+                    f"Parameter der Prozessaktion „{name}“ müssen eine Liste von ActionParam sein"
                 )
             for param in params_t:
                 if not isinstance(param, ActionParam):
@@ -428,9 +440,14 @@ class PluginRegistrar:
             stage_action(qualified_name=qname, adapter=adapter, params=params_t),
             check=check,
         )
+        return qname
 
-    def condition_module(self, name: str, run: ConditionRun) -> None:
-        """Stage ``Plugin_<short_id>_<name>`` as a ``Type: Module`` transition condition (D5)."""
+    def condition_module(self, name: str, run: ConditionRun) -> str:
+        """Stage ``Plugin_<short_id>_<name>`` as a ``Type: Module`` transition condition (D5).
+
+        Returns the full match path. A condition runs synchronously on the event loop while the
+        transitions are evaluated: it must be a plain, fast ``def`` (no I/O, no blocking calls).
+        """
         match = ZNUNY_VALIDATION_PREFIX + qualified(self._manifest.short_id, name)
 
         def check() -> None:
@@ -455,3 +472,4 @@ class PluginRegistrar:
             ),
             check=check,
         )
+        return match

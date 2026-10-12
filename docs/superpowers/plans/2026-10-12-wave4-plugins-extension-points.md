@@ -174,7 +174,7 @@ def call_plugin_sync[T](plugin_id: str, what: str, fn: Callable[[], T]) -> CallO
     # is possible — documented: these callbacks must be pure and fast
 
 class PluginCallBudget:
-    """Shared deadline for a chain of calls (sync hooks: 5 s, auth chain: 20 s, customer sources: 5 s)."""
+    """Shared deadline for a chain of calls (sync hooks: 5 s, auth chain: 20 s, customer sources: 5 s, transition actions: per action 1..10 s and 20 s per dialog submit, a timeout answers 422 and invalidates the session)."""
     def __init__(self, seconds: float, *, clock: Callable[[], float] = time.monotonic) -> None
     def remaining(self) -> float          # >= 0
     def timeout_for(self, own: float) -> float   # min(own, remaining())
@@ -265,8 +265,8 @@ The spec's "each extension point: contract test with a fixture plugin" is satisf
 ```python
 def before(self, operation: SyncOperation, name: str, handler: SyncHandler, *,
            timeout_ms: int = 1000, on_error: Literal["allow", "deny"] = "allow", order: int = 100) -> None   # [core.events.sync_hooks]
-def transition_action(self, name: str, run: TransitionActionRun, *, params: Sequence[ActionParam] = (),
-                      timeout_seconds: int = 30) -> str            # returns the qualified name   [core.process.transition_actions]
+def transition_action(self, name: str, run: TransitionActionRun, *, params: Iterable[ActionParam] = (),
+                      timeout_seconds: int = 5) -> str            # returns the qualified name   [core.process.transition_actions]
 def condition_module(self, name: str, run: ConditionRun) -> str     # returns the full match path  [core.process.condition_modules]
 def placeholder(self, name: str, resolve: PlaceholderResolve, *, timeout_ms: int = 500) -> str   # returns the tag  [core.templates.placeholders]
 def number_generator(self, name: str, build: NumberBuild, *, label: str, pattern: str,

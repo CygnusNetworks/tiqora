@@ -74,6 +74,8 @@ async def _set_contract(ac: ActionContext) -> None:
         raise RuntimeError("kaputt")
     if mode == "hang":
         await asyncio.sleep(30)
+    if mode == "slow":  # succeeds, but takes a fixed time (shared-budget chain test)
+        await asyncio.sleep(0.15)
     if mode == "db_hang":  # a long statement on the engine session (cancelled by the timeout)
         dialect = ac.session.get_bind().dialect.name
         sql = "SELECT SLEEP(5)" if dialect == "mysql" else "SELECT pg_sleep(5)"
