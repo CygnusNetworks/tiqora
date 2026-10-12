@@ -2786,6 +2786,14 @@
         "FadeAway": "Phasing out"
       }
     },
+    "processDesigner": {
+      "title": "Process designer",
+      "phoneReadOnly": "The designer can only be edited on a larger screen. Here you see the steps of the process.",
+      "loadError": "Could not load the process.",
+      "draft": "Draft",
+      "palette": "Building blocks",
+      "panel": "Properties"
+    },
     "mailOutbound": {
       "title": "出站电子邮件 (SMTP)",
       "description": "坐席回复的 SMTP 设置。密码以加密方式存储，并且 API 绝不会返回。",

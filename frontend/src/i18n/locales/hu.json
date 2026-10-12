@@ -2786,6 +2786,14 @@
         "FadeAway": "Phasing out"
       }
     },
+    "processDesigner": {
+      "title": "Process designer",
+      "phoneReadOnly": "The designer can only be edited on a larger screen. Here you see the steps of the process.",
+      "loadError": "Could not load the process.",
+      "draft": "Draft",
+      "palette": "Building blocks",
+      "panel": "Properties"
+    },
     "mailOutbound": {
       "title": "Kimenő e-mail (SMTP)",
       "description": "SMTP-beállítások az ügyintézői válaszokhoz. A jelszót titkosítva tárolja, és az API soha nem adja vissza.",

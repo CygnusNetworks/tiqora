@@ -1641,6 +1641,81 @@ function demoProcessDetail(entityId: string) {
     ],
   };
 }
+// Process designer (admin): draft of the sample "Bestellung" process with three steps, the catalogue,
+// validation findings and deployed versions. Mirrors ProcessDraftOut / DesignerCatalogOut.
+const designerEntity = (entity_type: string, entity_id: string, id: number, name: string, config: Record<string, unknown>, sync_state = "synced") => ({
+  entity_type, entity_id, id, name, config, version: `v-${entity_id}`, sync_state,
+  changed_at: "2026-10-09T09:00:00Z", changed_by: 1,
+});
+const designerDraft = {
+  process: designerEntity("Process", "Process-demo", 1, "Bestellung", {
+    Description: "Bestellung von Arbeitsmitteln",
+    StartActivity: "Activity-1",
+    StartActivityDialog: "AD-1",
+    Path: {
+      "Activity-1": { "Transition-1": { ActivityEntityID: "Activity-2", TransitionAction: ["TA-1"] } },
+      "Activity-2": { "Transition-2": { ActivityEntityID: "Activity-3" } },
+      "Activity-3": {},
+    },
+  }, "not_sync"),
+  state_entity_id: "S1",
+  state_name: "Active",
+  layout: { "Activity-1": { left: "40", top: "60" }, "Activity-2": { left: "300", top: "60" }, "Activity-3": { left: "560", top: "60" } },
+  activities: [
+    designerEntity("Activity", "Activity-1", 1, "Antrag erfassen", { ActivityDialog: { "1": "AD-1" } }),
+    designerEntity("Activity", "Activity-2", 2, "Genehmigung", { ActivityDialog: { "1": "AD-2", "2": "AD-3" } }),
+    designerEntity("Activity", "Activity-3", 3, "Abgeschlossen", { ActivityDialog: {} }),
+  ],
+  activity_dialogs: [
+    designerEntity("ActivityDialog", "AD-1", 1, "Antrag", { DescriptionShort: "Antrag", Interface: ["AgentInterface"], Fields: {}, FieldOrder: [] }),
+    designerEntity("ActivityDialog", "AD-2", 2, "Genehmigen", { DescriptionShort: "Genehmigen", Interface: ["AgentInterface"], Fields: {}, FieldOrder: [] }),
+    designerEntity("ActivityDialog", "AD-3", 3, "Rückfrage", { DescriptionShort: "Rückfrage", Interface: ["AgentInterface"], Fields: {}, FieldOrder: [] }),
+  ],
+  transitions: [
+    designerEntity("Transition", "Transition-1", 1, "Antrag vollständig", { ConditionLinking: "and", Condition: {} }),
+    designerEntity("Transition", "Transition-2", 2, "Genehmigt", { ConditionLinking: "and", Condition: {} }),
+  ],
+  transition_actions: [
+    designerEntity("TransitionAction", "TA-1", 1, "Status auf offen", { Module: "Kernel::System::ProcessManagement::TransitionAction::TicketStateSet", Config: { State: "open" } }),
+  ],
+  missing_references: [] as string[],
+  pending_changes: 2,
+};
+const designerCatalog = {
+  actions: [
+    { name: "TicketStateSet", module: "Kernel::System::ProcessManagement::TransitionAction::TicketStateSet", supported: true, tiqora_only: false, params: [{ name: "State", kind: "state", required: false, one_of: ["State", "StateID"], list_value: false }] },
+  ],
+  condition_types: ["Module", "Regexp", "String", "Equal", "NotEqual", "Contains", "NotContains", "GreaterThan", "GreaterThanOrEqual", "LessThan", "LessThanOrEqual"],
+  condition_modules: ["Kernel::System::ProcessManagement::TransitionValidation::ValidateDemo"],
+  fields: [
+    { name: "Queue", label: "Queue", kind: "queue", dialog: true, condition: true, options: [] },
+    { name: "Title", label: "Titel", kind: "text", dialog: true, condition: true, options: [] },
+  ],
+  interfaces: ["AgentInterface", "CustomerInterface"],
+  permissions: ["", "ro", "rw"],
+  account_time: false,
+};
+const designerValidation = [
+  { code: "transition_without_condition", severity: "warning", entity_type: "Transition", entity_id: "Transition-1", field: "Condition", params: { name: "Antrag vollständig" } },
+];
+const designerRevisions = [
+  { id: 4, source: "tiqora", entity_count: 11, deployed_at: "2026-10-07T14:30:00Z", deployed_by: 1 },
+  { id: 3, source: "znuny", entity_count: 10, deployed_at: "2026-10-01T08:00:00Z", deployed_by: null },
+];
+function demoProcessDesigner(p: string, method: string): unknown {
+  if (p.endsWith("/process-designer/catalog")) return designerCatalog;
+  if (p.endsWith("/process-designer/processes") && method === "GET")
+    return demoAdminProcesses.map((r) => ({ entity_type: "Process", entity_id: r.entity_id, name: r.name, used_by: [], sync_state: r.entity_id === "Process-demo" ? "not_sync" : "synced", state_entity_id: r.state_entity_id, state_name: r.state_name }));
+  if (p.endsWith("/validation")) return designerValidation;
+  if (p.endsWith("/process-designer/revisions")) return designerRevisions;
+  if (p.match(/\/process-designer\/entities\/[^/]+$/) && method === "GET") return [];
+  if (p.match(/\/process-designer\/processes\/[^/]+$/) && method === "GET") {
+    const id = decodeURIComponent(p.split("/").pop() ?? "");
+    const row = demoAdminProcesses.find((r) => r.entity_id === id);
+    return row ? { ...designerDraft, process: { ...designerDraft.process, entity_id: row.entity_id, name: row.name } } : designerDraft;
+  }
+  return method === "GET" ? [] : {};
+}
 // Daemons page: the deploy watcher runs in live mode (the banner under its name).
 const demoDaemons = {
   services: [
@@ -2064,6 +2139,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/admin/deploy") && method === "POST")
     return { action: "recorded", checksum: "demo", kind: "process", revision_id: 4 };
   if (p.endsWith("/api/v1/admin/processes")) return demoAdminProcesses;
+  if (p.includes("/api/v1/admin/process-designer/")) return demoProcessDesigner(p, method);
   if (p.endsWith("/api/v1/admin/daemons") && method === "GET") return demoDaemons;
   if (p.endsWith("/api/v1/phone/calls/active")) return [];
   if (p.endsWith("/api/v1/reference/caller")) return demoCallerLookup;

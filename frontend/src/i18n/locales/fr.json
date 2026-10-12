@@ -2786,6 +2786,14 @@
         "FadeAway": "Phasing out"
       }
     },
+    "processDesigner": {
+      "title": "Process designer",
+      "phoneReadOnly": "The designer can only be edited on a larger screen. Here you see the steps of the process.",
+      "loadError": "Could not load the process.",
+      "draft": "Draft",
+      "palette": "Building blocks",
+      "panel": "Properties"
+    },
     "mailOutbound": {
       "title": "E-mail sortant (SMTP)",
       "description": "Paramètres SMTP pour les réponses des agents. Le mot de passe est stocké crypté et n'est jamais renvoyé par l'API.",

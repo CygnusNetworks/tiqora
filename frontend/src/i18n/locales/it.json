@@ -2786,6 +2786,14 @@
         "FadeAway": "Phasing out"
       }
     },
+    "processDesigner": {
+      "title": "Process designer",
+      "phoneReadOnly": "The designer can only be edited on a larger screen. Here you see the steps of the process.",
+      "loadError": "Could not load the process.",
+      "draft": "Draft",
+      "palette": "Building blocks",
+      "panel": "Properties"
+    },
     "mailOutbound": {
       "title": "E-mail in uscita (SMTP)",
       "description": "Impostazioni SMTP per le risposte dell'agente. La password è memorizzata crittografata e non viene mai restituita.",

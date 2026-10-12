@@ -2786,6 +2786,14 @@
         "FadeAway": "Phasing out"
       }
     },
+    "processDesigner": {
+      "title": "Process designer",
+      "phoneReadOnly": "The designer can only be edited on a larger screen. Here you see the steps of the process.",
+      "loadError": "Could not load the process.",
+      "draft": "Draft",
+      "palette": "Building blocks",
+      "panel": "Properties"
+    },
     "mailOutbound": {
       "title": "आउटबाउंड ईमेल (एसएमटीपी)",
       "description": "एजेंट उत्तरों के लिए एसएमटीपी सेटिंग्स। पासवर्ड एन्क्रिप्टेड संग्रहीत है और एपीआई द्वारा कभी वापस नहीं किया जाता है।",

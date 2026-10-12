@@ -36,6 +36,13 @@ reimplementing it in Python/TypeScript. See
 - The **schema fixture files** are unmodified upstream artefacts and simply
   keep their upstream GPL-3.0 licence.
 
+## Third-party frontend components
+
+- **`@xyflow/react`** (React Flow, <https://reactflow.dev>), MIT licence,
+  © webkid GmbH. Used by the process designer canvas
+  (`frontend/src/components/process-designer/`) and loaded only with that
+  admin route.
+
 ## Trademarks
 
 "Znuny" is a trademark of Znuny GmbH. "OTRS" is a registered trademark of

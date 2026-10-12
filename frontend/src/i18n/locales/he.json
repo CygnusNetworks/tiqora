@@ -2786,6 +2786,14 @@
         "FadeAway": "Phasing out"
       }
     },
+    "processDesigner": {
+      "title": "Process designer",
+      "phoneReadOnly": "The designer can only be edited on a larger screen. Here you see the steps of the process.",
+      "loadError": "Could not load the process.",
+      "draft": "Draft",
+      "palette": "Building blocks",
+      "panel": "Properties"
+    },
     "mailOutbound": {
       "title": "דוא\"ל יוצא (SMTP)",
       "description": "הגדרות SMTP עבור תשובות סוכן. הסיסמה מאוחסנת מוצפנת ולעולם לא מוחזרת על ידי ה-API.",

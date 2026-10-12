@@ -2794,6 +2794,14 @@
         "FadeAway": "Läuft aus"
       }
     },
+    "processDesigner": {
+      "title": "Prozess-Designer",
+      "phoneReadOnly": "Der Designer lässt sich nur auf einem größeren Bildschirm bearbeiten. Hier sehen Sie die Schritte des Prozesses.",
+      "loadError": "Der Prozess konnte nicht geladen werden.",
+      "draft": "Entwurf",
+      "palette": "Bausteine",
+      "panel": "Eigenschaften"
+    },
     "mailOutbound": {
       "title": "Ausgehende E-Mail (SMTP)",
       "description": "SMTP-Einstellungen für Agentenantworten. Passwort wird verschlüsselt gespeichert und nie zurückgegeben.",

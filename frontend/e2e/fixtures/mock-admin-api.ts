@@ -132,6 +132,40 @@ export async function mockAdminApi(page: Page) {
       return;
     }
 
+    // Process designer: one draft process with two steps (ProcessDraftOut) and the catalogue.
+    if (path.includes("/api/v1/admin/process-designer/") && method === "GET") {
+      const ent = (entity_type: string, entity_id: string, id: number, name: string, config: Record<string, unknown>) => ({
+        entity_type, entity_id, id, name, config, version: `v-${entity_id}`, sync_state: "synced",
+        changed_at: "2026-10-09T09:00:00Z", changed_by: 1,
+      });
+      if (path.endsWith("/catalog")) {
+        await json(route, 200, { actions: [], condition_types: [], condition_modules: [], fields: [], interfaces: ["AgentInterface"], permissions: [""], account_time: false });
+        return;
+      }
+      if (path.endsWith("/process-designer/processes/Process-1")) {
+        await json(route, 200, {
+          process: ent("Process", "Process-1", 1, "Onboarding", {
+            Description: "",
+            StartActivity: "Activity-a",
+            StartActivityDialog: "ActivityDialog-1",
+            Path: { "Activity-a": { "Transition-1": { ActivityEntityID: "Activity-b" } }, "Activity-b": {} },
+          }),
+          state_entity_id: "S1",
+          state_name: "Active",
+          layout: { "Activity-a": { left: "40", top: "40" }, "Activity-b": { left: "300", top: "40" } },
+          activities: [ent("Activity", "Activity-a", 1, "Collect info", {}), ent("Activity", "Activity-b", 2, "Done", {})],
+          activity_dialogs: [],
+          transitions: [ent("Transition", "Transition-1", 1, "Go on", {})],
+          transition_actions: [],
+          missing_references: [],
+          pending_changes: 0,
+        });
+        return;
+      }
+      await json(route, 200, []);
+      return;
+    }
+
     // ProcessManagement overview (read-only)
     if (path.endsWith("/api/v1/admin/processes") && method === "GET") {
       const processes: AdminProcess[] = [

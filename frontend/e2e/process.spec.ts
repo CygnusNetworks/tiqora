@@ -36,19 +36,20 @@ test.describe("ticket process widget", () => {
   });
 });
 
-test.describe("admin processes (read-only)", () => {
+test.describe("admin processes", () => {
   test.beforeEach(async ({ page }) => {
     await mockAdminApi(page);
     await loginAsAgent(page);
   });
 
-  test("lists processes and drills into a process's activities", async ({ page }) => {
+  test("lists processes and opens the designer", async ({ page }) => {
     await page.goto("/admin/processes");
     await expect(page.getByTestId("admin-processes-page")).toBeVisible();
     await expect(page.getByTestId("process-link-Process-1")).toContainText("Onboarding");
 
     await page.getByTestId("process-link-Process-1").click();
-    await expect(page.getByTestId("admin-process-detail-page")).toBeVisible();
-    await expect(page.getByTestId("process-activity-Activity-a")).toContainText("Collect info");
+    await expect(page.getByTestId("process-designer-page")).toBeVisible();
+    await expect(page.getByTestId("process-designer-canvas")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Onboarding" })).toBeVisible();
   });
 });
