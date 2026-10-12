@@ -455,8 +455,10 @@ async def _customers_only(ctx: AuthContext, check: PasswordCheck) -> str | None:
 
 
 def _register_auth(registry: PluginRegistry) -> None:
-    registry.password_provider("directory", _directory, order=100, timeout_seconds=1)
-    registry.password_provider("backup", _backup, order=110, timeout_seconds=1)
+    registry.password_provider(
+        "directory", _directory, audience="both", order=100, timeout_seconds=1
+    )
+    registry.password_provider("backup", _backup, audience="both", order=110, timeout_seconds=1)
     registry.password_provider(
         "customers_only", _customers_only, audience="customer", order=120, timeout_seconds=1
     )

@@ -836,7 +836,7 @@ class PluginRegistrar:
         name: str,
         authenticate: PasswordAuthenticate,
         *,
-        audience: Literal["agent", "customer", "both"] = "both",
+        audience: Literal["agent", "customer", "both"],
         order: int = 100,
         timeout_seconds: int = 5,
     ) -> None:

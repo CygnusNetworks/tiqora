@@ -195,7 +195,7 @@ class PluginRegistry(_t.Protocol):
         name: str,
         authenticate: PasswordAuthenticate,
         *,
-        audience: _t.Literal["agent", "customer", "both"] = "both",
+        audience: _t.Literal["agent", "customer", "both"],
         order: int = 100,
         timeout_seconds: int = 5,
     ) -> None: ...

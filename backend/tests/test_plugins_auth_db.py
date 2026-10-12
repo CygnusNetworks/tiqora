@@ -154,7 +154,8 @@ async def test_agent_login_via_plugin(env: Env) -> None:
     assert r.status_code == 200, r.text
     assert r.json()["user"]["login"] == "pp55-agent"
     assert r.json()["pending_2fa"] is False
-    assert _calls("auth.directory") == [("pp55-agent", "agent", _calls("auth.directory")[0][2])]
+    assert [c[:2] for c in _calls("auth.directory")] == [("pp55-agent", "agent")]
+    assert _calls("auth.directory")[0][2] is not None  # the client ip reaches the provider
 
 
 async def test_agent_wrong_password_is_401(env: Env) -> None:
@@ -221,6 +222,8 @@ async def test_password_never_logged(env: Env) -> None:
 async def test_2fa_still_required(env: Env) -> None:
     async with env.client() as client:
         r = await _agent(client, "pp55-2fa")
+        # the pending cookie is no session: a protected endpoint refuses it
+        assert (await client.get("/api/v1/auth/me")).status_code == 401
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["pending_2fa"] is True and body["user"] is None
@@ -258,10 +261,10 @@ async def test_chain_budget(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(auth_providers, "CHAIN_BUDGET_SECONDS", 0.5)
     points_behaviour().MODE["auth"] = "hang"
     points_behaviour().MODE["auth.backup"] = "hang"
-    started = time.monotonic()
     async with env.client() as client:
+        started = time.monotonic()
         r = await _agent(client)
-    elapsed = time.monotonic() - started
+        elapsed = time.monotonic() - started
     assert r.status_code == 401
     assert elapsed < 1.0, elapsed  # not 1 s + 1 s: the second provider is skipped
     assert _calls("auth.backup") == []

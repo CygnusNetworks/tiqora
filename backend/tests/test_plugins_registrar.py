@@ -55,6 +55,7 @@ ALL_POINTS = [
     "core.job_handlers",
     "core.mcp.tools",
     "core.http.public_routes",
+    "core.auth.password_providers",
 ]
 
 
@@ -410,3 +411,44 @@ def test_mail_filter_rejects_bad_arguments(kwargs: dict[str, Any], message: str)
     with pytest.raises(RegistrationRejected, match=message):
         reg.mail_filter(args.pop("name"), args.pop("stage"), args.pop("run"), **args)
     assert reg.staged == ()
+
+
+async def _auth(ctx: Any, check: Any) -> str | None:
+    return None
+
+
+def _auth_sync(ctx: Any, check: Any) -> str | None:
+    return None
+
+
+def test_password_provider_audience_is_required(registrar: PluginRegistrar) -> None:
+    with pytest.raises(TypeError):
+        registrar.password_provider("pp", _auth)  # type: ignore[call-arg]
+
+
+@pytest.mark.parametrize(
+    ("name", "fn", "kwargs", "match"),
+    [
+        ("Bad Name", _auth, {}, "Name"),
+        ("pp", _auth_sync, {}, "async"),
+        ("pp", _auth, {"audience": "admin"}, "Zielgruppe"),
+        ("pp", _auth, {"timeout_seconds": 0}, "Zeitlimit"),
+        ("pp", _auth, {"timeout_seconds": 16}, "Zeitlimit"),
+        ("pp", _auth, {"timeout_seconds": True}, "Zeitlimit"),
+        ("pp", _auth, {"order": -1}, "Reihenfolge"),
+        ("pp", _auth, {"order": 1001}, "Reihenfolge"),
+    ],
+)
+def test_password_provider_rejects(
+    registrar: PluginRegistrar, name: str, fn: Any, kwargs: dict[str, Any], match: str
+) -> None:
+    args: dict[str, Any] = {"audience": "both", **kwargs}
+    with pytest.raises(RegistrationRejected, match=match):
+        registrar.password_provider(name, fn, **args)
+    assert registrar.staged == ()
+
+
+def test_password_provider_staged(registrar: PluginRegistrar) -> None:
+    registrar.password_provider("pp", _auth, audience="agent")
+    ((_, item),) = registrar.staged
+    assert item.key == "org.example.hello:pp" and item.audience == "agent"
