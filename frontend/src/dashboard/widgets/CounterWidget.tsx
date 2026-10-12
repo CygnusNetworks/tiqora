@@ -8,7 +8,8 @@ import { useDrill } from "../drill/useDrill";
 import { WidgetDataBody } from "../chrome/WidgetDataBody";
 import { Sparkline } from "../chrome/Sparkline";
 import { ChooseSourceAction } from "./SourceAction";
-import { FEWER_IS_BETTER, isCustomSource, presetOf, type TicketSource } from "./presets";
+import { FEWER_IS_BETTER, isCustomSource, presetOf, widgetPreset, type TicketSource } from "./presets";
+import { useIsKiosk } from "../wallboard/kioskContext";
 
 export interface CounterSettings {
   source: TicketSource;
@@ -38,7 +39,12 @@ export function CounterWidget({ instanceId, settings, size, mode }: WidgetProps<
   const chrome = useWidgetChrome();
   const { status, data } = useWidgetData<CounterData>();
   // Saved searches and own filters have no preset: the tile is named by its title override or the type.
-  const preset = isCustomSource(settings.source) ? null : (presetOf(settings.source) ?? "mine_open");
+  const kiosk = useIsKiosk();
+  const preset = kiosk
+    ? widgetPreset(settings, true)
+    : isCustomSource(settings.source)
+      ? null
+      : (presetOf(settings.source) ?? "mine_open");
   const tone = settings.tone in VALUE_TONE ? settings.tone : "neutral";
   const delta = status === "ok" && typeof data?.delta === "number" ? data.delta : null;
   const title = preset ? t(`dashboards.presets.${preset}.counter`) : t("dashboards.widgets.counter.title");

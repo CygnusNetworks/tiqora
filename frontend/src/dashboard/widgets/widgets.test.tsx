@@ -314,6 +314,31 @@ describe("core.counter", () => {
   });
 });
 
+describe("wallboard titles without details (no source on the wire)", () => {
+  const ok: WidgetDataState = { status: "ok", data: { value: 3, delta: 0, spark: [3, 3] } };
+  it("titles a counter by the preset name the server sent", async () => {
+    await renderWidget("core.counter", { preset: "unowned_new" }, ok, "wallboard", {}, () => {}, { kiosk: true });
+    expect(screen.getByText("Zum Übernehmen")).toBeInTheDocument();
+    expect(screen.queryByText("Meine offenen")).toBeNull();
+  });
+  it("does not fall back to Meine offenen for a custom source (no preset sent)", async () => {
+    await renderWidget("core.counter", {}, ok, "wallboard", {}, () => {}, { kiosk: true });
+    expect(screen.queryByText("Meine offenen")).toBeNull();
+  });
+  it("titles a ticket list by the preset name the server sent", async () => {
+    await renderWidget(
+      "core.ticket-list",
+      { preset: "escalated" },
+      { status: "ok", data: { items: [], total: 0 } },
+      "wallboard",
+      {},
+      () => {},
+      { kiosk: true },
+    );
+    expect(screen.queryByText("Meine offenen Tickets")).toBeNull();
+  });
+});
+
 // ---------------------------------------------------------------- ticket list
 
 describe("core.ticket-list", () => {

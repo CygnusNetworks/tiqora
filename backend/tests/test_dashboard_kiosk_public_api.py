@@ -129,14 +129,14 @@ async def test_board_widgets_carry_only_whitelisted_configuration(env: Env3) -> 
     plain = (await _get(env, BOARD, (await _link(env, [d]))["token"])).json()
     by_id = {w["id"]: w for w in plain["dashboards"][0]["widgets"]}
     counter = by_id[_wid(d, 1)]
-    assert counter["settings"] == {"tone": "danger"}, "no source, no preset"
+    assert counter["settings"] == {"tone": "danger", "preset": "mine_open"}, "preset name only"
     assert counter["title_override"] is None
     assert by_id[_wid(d, 2)]["settings"] == {}, "notes only with details"
     assert "example.org" not in json.dumps(plain) and "Beispiel GmbH" not in json.dumps(plain)
     detailed = (await _get(env, BOARD, (await _link(env, [d], show_details=True))["token"])).json()
     by_id = {w["id"]: w for w in detailed["dashboards"][0]["widgets"]}
     assert by_id[_wid(d, 1)]["title_override"] == "Kunde Beispiel GmbH"
-    assert by_id[_wid(d, 1)]["settings"] == {"tone": "danger"}
+    assert by_id[_wid(d, 1)]["settings"] == {"tone": "danger", "preset": "mine_open"}
     assert by_id[_wid(d, 2)]["settings"] == {"markdown": "Notiz fuer anna@example.org"}
 
 

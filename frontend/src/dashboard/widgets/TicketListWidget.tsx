@@ -18,7 +18,7 @@ import { WidgetDataBody, WidgetEmpty } from "../chrome/WidgetDataBody";
 import { TicketLink } from "../chrome/TicketLink";
 import { DueText } from "./DueText";
 import { ChooseSourceAction } from "./SourceAction";
-import { presetOf, type TicketSource } from "./presets";
+import { widgetPreset, type TicketSource } from "./presets";
 
 export interface TicketListSettings {
   source: TicketSource;
@@ -129,7 +129,7 @@ export function TicketListWidget({ instanceId, settings, size, mode }: WidgetPro
   const kiosk = useIsKiosk();
   const drill = useDrill(instanceId, mode);
   const { status, data } = useWidgetData<TicketListData>();
-  const preset = presetOf(settings.source);
+  const preset = widgetPreset(settings, kiosk);
   const items = Array.isArray(data?.items) ? data.items : [];
   const total = typeof data?.total === "number" ? data.total : items.length;
   const more = status === "ok" && total > items.length;

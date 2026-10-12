@@ -51,3 +51,11 @@ export function presetOf(source: unknown): TicketPreset | null {
 
 /** Counters where fewer is better: a drop is good news (green). */
 export const FEWER_IS_BETTER: ReadonlySet<TicketPreset> = new Set(["escalated", "ai_escalated", "unowned_new"]);
+
+/** The preset a ticket widget is titled by. On a wallboard the server sends no `source` (it may name
+ * a customer), only the preset name of a preset source in `settings.preset`; any other source has no
+ * preset there. Elsewhere the `source` decides. */
+export function widgetPreset(settings: { source?: unknown; preset?: unknown }, kiosk: boolean): TicketPreset | null {
+  if (!kiosk) return presetOf(settings.source);
+  return presetOf({ kind: "preset", preset: settings.preset });
+}

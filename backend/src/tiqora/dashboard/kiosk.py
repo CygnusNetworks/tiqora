@@ -53,6 +53,7 @@ from tiqora.reporting.person_dimensions import NON_PERSON_DIMENSIONS, PERSON_DIM
 
 __all__ = [
     "KIOSK_REFRESH_SECONDS",
+    "KIOSK_DERIVED_SETTINGS",
     "KIOSK_RULES",
     "KIOSK_SAFE_TICKET_FIELDS",
     "KIOSK_SETTINGS_WHITELIST",
@@ -129,6 +130,10 @@ KIOSK_SAFE_TICKET_FIELDS: Final[frozenset[str]] = frozenset(
 
 #: settings keys per widget type the wallboard needs to render it; nothing else leaves (never
 #: ``source``, ``report_key``, ``parameters``, notes or links)
+_PRESET_NAMES: Final = frozenset(
+    {"mine_open", "mine_new", "unowned_new", "escalated", "ai_escalated"}
+)
+
 KIOSK_SETTINGS_WHITELIST: Final[dict[str, frozenset[str]]] = {
     "core.counter": frozenset({"tone"}),
     "core.ticket-list": frozenset({"columns", "limit", "density", "sort"}),
@@ -143,6 +148,13 @@ KIOSK_SETTINGS_WHITELIST: Final[dict[str, frozenset[str]]] = {
     "core.heatmap": frozenset(),
     "core.chat-queue": frozenset({"limit"}),
     "core.ai-status": frozenset(),
+}
+
+#: keys ``redact_settings`` derives instead of copying: the preset NAME of a preset source (so a
+#: tile keeps its "Neu bei mir" title), never a saved-search id or a filter
+KIOSK_DERIVED_SETTINGS: Final[dict[str, frozenset[str]]] = {
+    "core.counter": frozenset({"preset"}),
+    "core.ticket-list": frozenset({"preset"}),
 }
 
 Rule = Callable[[dict[str, Any], bool], dict[str, Any] | None]
@@ -330,7 +342,14 @@ def redact_settings(
     """
     _ = show_details
     allowed = KIOSK_SETTINGS_WHITELIST.get(type_key, frozenset())
-    return {k: v for k, v in settings.items() if k in allowed}
+    out = {k: v for k, v in settings.items() if k in allowed}
+    if "preset" in KIOSK_DERIVED_SETTINGS.get(type_key, frozenset()):
+        src = settings.get("source")
+        if isinstance(src, Mapping) and src.get("kind", "preset") == "preset":
+            name = src.get("preset", "mine_open")
+            if isinstance(name, str) and name in _PRESET_NAMES:
+                out["preset"] = name
+    return out
 
 
 def kiosk_title(title_override: str | None, show_details: bool) -> str | None:

@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 
 from tiqora.dashboard.kiosk import (
+    KIOSK_DERIVED_SETTINGS,
     KIOSK_RULES,
     KIOSK_SAFE_TICKET_FIELDS,
     KIOSK_SETTINGS_WHITELIST,
@@ -307,7 +308,10 @@ def test_settings_leaving_the_server_stay_inside_the_whitelist() -> None:
     for key, settings in full.items():
         for details in (False, True):
             out = redact_settings(key, settings, details)
-            assert set(out) <= KIOSK_SETTINGS_WHITELIST.get(key, frozenset()), key
+            allowed = KIOSK_SETTINGS_WHITELIST.get(key, frozenset()) | KIOSK_DERIVED_SETTINGS.get(
+                key, frozenset()
+            )
+            assert set(out) <= allowed, key
             text = json.dumps(out)
             assert not any(
                 bad in text
@@ -331,3 +335,23 @@ def test_title_override_only_with_details() -> None:
     assert kiosk_title("Kunde Beispiel GmbH", False) is None
     assert kiosk_title("Kunde Beispiel GmbH", True) == "Kunde Beispiel GmbH"
     assert kiosk_title(None, True) is None
+
+
+def test_preset_name_survives_for_preset_sources_only() -> None:
+    for name in ("mine_open", "mine_new", "unowned_new", "escalated", "ai_escalated"):
+        src = {"kind": "preset", "preset": name}
+        for key in ("core.counter", "core.ticket-list"):
+            assert redact_settings(key, {"source": src, "tone": "ok"}, False).get("preset") == name
+    for src in (
+        {"kind": "saved_search", "id": 7},
+        {
+            "kind": "filter",
+            "filter": {"where": {"field": "customer_user_id", "op": "eq", "value": "a"}},
+        },
+        {"kind": "preset", "preset": "<script>"},
+    ):
+        out = redact_settings("core.counter", {"source": src}, True)
+        assert "preset" not in out and "source" not in out
+    assert "preset" not in redact_settings(
+        "core.queue-overview", {"source": {"kind": "preset"}}, True
+    )
