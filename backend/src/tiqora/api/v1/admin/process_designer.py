@@ -14,9 +14,10 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Response, status
 from sqlalchemy import select
 
-from tiqora.api.deps import DbSession
+from tiqora.api.deps import AppSettings, DbSession
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.db.legacy.process_management import PmActivity, PmProcess
+from tiqora.domain.ownership import get_ownership_state
 from tiqora.process.designer.catalog import build_designer_catalog
 from tiqora.process.designer.draft import (
     list_entities,
@@ -34,6 +35,11 @@ from tiqora.process.designer.schemas import (
     ProcessDraftOut,
     ProcessDraftSummaryOut,
     ProcessUpdateIn,
+)
+from tiqora.process.designer.validation import (
+    ValidationIssueOut,
+    load_reference_data,
+    validate_process,
 )
 from tiqora.process.designer.writer import (
     EntityInUse,
@@ -104,6 +110,19 @@ async def list_entity_summaries(
 ) -> list[EntitySummaryOut]:
     _ = admin
     return await list_entities(session, entity_type)
+
+
+@router.get("/processes/{process_entity_id}/validation", response_model=list[ValidationIssueOut])
+async def get_validation(
+    process_entity_id: str, admin: AdminUser, session: DbSession, settings: AppSettings
+) -> list[ValidationIssueOut]:
+    _ = admin
+    with _mapped_errors():
+        draft = await load_process_draft(session, process_entity_id)
+    refs = await load_reference_data(session)
+    parallel = not (await get_ownership_state(session, settings)).active
+    issues = validate_process(draft, refs, parallel_operation=parallel)
+    return [ValidationIssueOut.of(i) for i in issues]
 
 
 @router.post("/processes", response_model=ProcessDraftOut, status_code=status.HTTP_201_CREATED)

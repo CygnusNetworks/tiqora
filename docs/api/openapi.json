@@ -35373,6 +35373,58 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "ValidationIssueOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "entity_type": {
+            "enum": [
+              "Process",
+              "Activity",
+              "ActivityDialog",
+              "Transition",
+              "TransitionAction"
+            ],
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Params",
+            "type": "object"
+          },
+          "severity": {
+            "enum": [
+              "error",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "entity_type",
+          "entity_id",
+          "field",
+          "params"
+        ],
+        "title": "ValidationIssueOut",
+        "type": "object"
+      },
       "Visualization": {
         "additionalProperties": false,
         "properties": {
@@ -58698,6 +58750,84 @@
           }
         },
         "summary": "Copy Process",
+        "tags": [
+          "admin:process-designer"
+        ]
+      }
+    },
+    "/api/v1/admin/process-designer/processes/{process_entity_id}/validation": {
+      "get": {
+        "operationId": "get_validation_api_v1_admin_process_designer_processes__process_entity_id__validation_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "process_entity_id",
+            "required": true,
+            "schema": {
+              "title": "Process Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ValidationIssueOut"
+                  },
+                  "title": "Response Get Validation Api V1 Admin Process Designer Processes  Process Entity Id  Validation Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Validation",
         "tags": [
           "admin:process-designer"
         ]

@@ -3984,6 +3984,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/process-designer/processes/{process_entity_id}/validation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Validation */
+        get: operations["get_validation_api_v1_admin_process_designer_processes__process_entity_id__validation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/processes": {
         parameters: {
             query?: never;
@@ -22327,6 +22344,29 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** ValidationIssueOut */
+        ValidationIssueOut: {
+            /** Code */
+            code: string;
+            /** Entity Id */
+            entity_id: string;
+            /**
+             * Entity Type
+             * @enum {string}
+             */
+            entity_type: "Process" | "Activity" | "ActivityDialog" | "Transition" | "TransitionAction";
+            /** Field */
+            field: string;
+            /** Params */
+            params: {
+                [key: string]: string;
+            };
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "error" | "warning";
+        };
         /** Visualization */
         Visualization: {
             /** Chart Measures */
@@ -33488,6 +33528,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProcessDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_validation_api_v1_admin_process_designer_processes__process_entity_id__validation_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                process_entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationIssueOut"][];
                 };
             };
             /** @description Validation Error */
