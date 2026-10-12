@@ -349,6 +349,31 @@ class Settings(BaseSettings):
         default=60, validation_alias="TIQORA_API_KEY_RATE_LIMIT_WINDOW"
     )
 
+    # SCIM provisioning (/scim/v2): per-token request throttle, per-IP failed-auth
+    # lockout (only bad tokens are counted; a valid token is never IP-locked) and limits.
+    scim_rate_limit_enabled: bool = Field(
+        default=True, validation_alias="TIQORA_SCIM_RATE_LIMIT_ENABLED"
+    )
+    scim_rate_limit_max: int = Field(default=600, validation_alias="TIQORA_SCIM_RATE_LIMIT_MAX")
+    scim_rate_limit_window_seconds: int = Field(
+        default=60, validation_alias="TIQORA_SCIM_RATE_LIMIT_WINDOW"
+    )
+    scim_auth_fail_max: int = Field(default=10, validation_alias="TIQORA_SCIM_AUTH_FAIL_MAX")
+    scim_auth_fail_window_seconds: int = Field(
+        default=600, validation_alias="TIQORA_SCIM_AUTH_FAIL_WINDOW"
+    )
+    scim_auth_lockout_seconds: int = Field(default=900, validation_alias="TIQORA_SCIM_AUTH_LOCKOUT")
+    scim_max_body_bytes: int = Field(default=2097152, validation_alias="TIQORA_SCIM_MAX_BODY_BYTES")
+    scim_max_members_per_request: int = Field(
+        default=5000, validation_alias="TIQORA_SCIM_MAX_MEMBERS"
+    )
+    scim_role_sync_interval_seconds: int = Field(
+        default=15, validation_alias="TIQORA_SCIM_ROLE_SYNC_INTERVAL"
+    )
+    scim_event_retention_days: int = Field(
+        default=180, validation_alias="TIQORA_SCIM_EVENT_RETENTION_DAYS"
+    )
+
     # Trusted reverse-proxy IPs whose X-Forwarded-For/X-Real-IP uvicorn honours so
     # request.client.host reflects the real client (not the proxy). REQUIRED behind
     # nginx, else the per-IP rate limit keys every request on the proxy IP and locks

@@ -68,6 +68,98 @@ class ApiKeyRateLimiter:
             return RateLimitDecision(allowed=True)
 
 
+_SCIM_TOKEN_PREFIX = "tiqora:scim:rl:token:"
+_SCIM_FAIL_IP_PREFIX = "tiqora:scim:fail:ip:"
+_SCIM_LOCK_IP_PREFIX = "tiqora:scim:lock:ip:"
+
+
+class ScimRateLimiter:
+    """Throttles for ``/scim/v2``: a per-IP lock for bad tokens, a per-token request window.
+
+    Own key namespace (``tiqora:scim:*``) so token ids never collide with API-key ids. Only
+    failed authentications count towards the IP lock; callers must authenticate first, so a
+    valid token is never locked out by an attacker sharing its IP. All methods fail open when
+    Redis raises (an outage must not stop provisioning or deprovisioning).
+    """
+
+    def __init__(self, client: Any, settings: Settings) -> None:
+        self._client = client
+        self._enabled = settings.scim_rate_limit_enabled
+        self._token_max = max(1, settings.scim_rate_limit_max)
+        self._token_window = max(1, settings.scim_rate_limit_window_seconds)
+        self._fail_max = max(1, settings.scim_auth_fail_max)
+        self._fail_window = max(1, settings.scim_auth_fail_window_seconds)
+        self._lockout = max(1, settings.scim_auth_lockout_seconds)
+
+    @staticmethod
+    def _norm_ip(ip: str) -> str:
+        return (ip or "").strip() or "unknown"
+
+    def _active(self) -> bool:
+        return self._enabled and self._client is not None
+
+    async def check_ip(self, ip: str) -> RateLimitDecision:
+        """Locked IP -> not allowed, ``retry_after`` = remaining lock time."""
+        if not self._active():
+            return RateLimitDecision(allowed=True)
+        try:
+            raw = await self._client.ttl(f"{_SCIM_LOCK_IP_PREFIX}{self._norm_ip(ip)}")
+            ttl = int(raw) if raw is not None else 0
+        except Exception:  # noqa: BLE001 — fail open
+            logger.warning("scim_ratelimit_unavailable", op="check_ip")
+            return RateLimitDecision(allowed=True)
+        if ttl == -1:
+            ttl = self._lockout  # present without expiry: treat as a full lock window
+        if ttl > 0:
+            return RateLimitDecision(allowed=False, retry_after=ttl, reason="scim_ip_lockout")
+        return RateLimitDecision(allowed=True)
+
+    async def record_auth_failure(self, ip: str) -> RateLimitDecision | None:
+        """Count one failed authentication; lock the IP once the maximum is reached."""
+        if not self._active():
+            return None
+        ip_n = self._norm_ip(ip)
+        key = f"{_SCIM_FAIL_IP_PREFIX}{ip_n}"
+        try:
+            count = int(await self._client.incr(key))
+            if count == 1:
+                await self._client.expire(key, self._fail_window)
+            if count < self._fail_max:
+                return None
+            await self._client.set(f"{_SCIM_LOCK_IP_PREFIX}{ip_n}", "1", ex=self._lockout)
+        except Exception:  # noqa: BLE001 — fail open
+            logger.warning("scim_ratelimit_unavailable", op="record_auth_failure")
+            return None
+        logger.warning(
+            "scim_auth_lockout",
+            ip=ip_n,
+            failures=count,
+            window_seconds=self._fail_window,
+            lockout_seconds=self._lockout,
+        )
+        return RateLimitDecision(allowed=False, retry_after=self._lockout, reason="scim_ip_lockout")
+
+    async def check_token(self, token_id: int) -> RateLimitDecision:
+        """Fixed-window counter per token (counts the request being checked)."""
+        if not self._active():
+            return RateLimitDecision(allowed=True)
+        key = f"{_SCIM_TOKEN_PREFIX}{token_id}"
+        try:
+            count = int(await self._client.incr(key))
+            if count == 1:
+                await self._client.expire(key, self._token_window)
+            if count > self._token_max:
+                ttl = int(await self._client.ttl(key) or self._token_window)
+                return RateLimitDecision(
+                    allowed=False,
+                    retry_after=max(1, ttl),
+                    reason="scim_token_rate_limit",
+                )
+        except Exception:  # noqa: BLE001 — fail open
+            logger.warning("scim_ratelimit_unavailable", op="check_token")
+        return RateLimitDecision(allowed=True)
+
+
 class AuthRateLimiter:
     """Per-login and per-IP failed-attempt throttle with temporary lockout."""
 
