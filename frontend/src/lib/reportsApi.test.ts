@@ -53,3 +53,31 @@ describe("reportsApi saved-report routes", () => {
     expect(reportDescription({ kind: "builtin", description_key: "d.key" } as never, t)).toBe("T:d.key");
   });
 });
+
+describe("reportsApi Znuny import", () => {
+  it("calls the preview and apply routes", async () => {
+    const spy = vi.spyOn(api, "request").mockResolvedValue({} as never);
+    await reportsApi.znunyStatsPreview();
+    await reportsApi.znunyStatsApply({ stat_ids: [3, 4] });
+    expect(spy.mock.calls.map((c) => [c[0], c[1]])).toEqual([
+      ["GET", "/api/v1/reports/import/znuny"],
+      ["POST", "/api/v1/reports/import/znuny/apply"],
+    ]);
+    expect(spy.mock.calls[1][2]).toMatchObject({ body: { stat_ids: [3, 4] } });
+  });
+
+  it("sends the file as base64", async () => {
+    const spy = vi.spyOn(api, "request").mockResolvedValue({ stats: [], errors: [], truncated: false } as never);
+    await reportsApi.znunyStatsFilePreview(new File(["<otrs_stats/>"], "s.xml", { type: "text/xml" }));
+    expect(spy.mock.calls[0].slice(0, 2)).toEqual(["POST", "/api/v1/reports/import/znuny/file"]);
+    expect(spy.mock.calls[0][2]).toMatchObject({ body: { content_base64: btoa("<otrs_stats/>") } });
+  });
+
+  it("rejects files over 1 MB before upload", async () => {
+    const spy = vi.spyOn(api, "request").mockResolvedValue({} as never);
+    await expect(
+      reportsApi.znunyStatsFilePreview(new File([new Uint8Array(1_000_001)], "big.xml")),
+    ).rejects.toThrow();
+    expect(spy).not.toHaveBeenCalled();
+  });
+});

@@ -8,6 +8,7 @@ import {
   demoRefine,
 } from "./mockData";
 import { resolve as resolveDashboards } from "./dashboardsMock";
+import { resolve as resolveSchedules } from "./schedulesMock";
 import { setDemoFactsBuilding } from "./reportsMock";
 import { demoReportFile, resolveSavedRequest } from "./savedMock";
 import type { ReportRunIn } from "@/lib/reportsApi";
@@ -92,7 +93,24 @@ async function dashboardsResponse(request: Request): Promise<Response | undefine
   return out.status === 204 ? new HttpResponse(null, { status: 204 }) : HttpResponse.json(out.body as never, { status: out.status });
 }
 
+/** Report schedules and the Znuny stats import: bodies and queries matter, so they get their own handler. */
+async function schedulesResponse(request: Request): Promise<Response | undefined> {
+  const url = new URL(request.url);
+  const hasBody = request.method !== "GET" && request.method !== "DELETE";
+  const body = hasBody ? await request.json().catch(() => ({})) : undefined;
+  const out = resolveSchedules(request.method, url.pathname, body, url.searchParams);
+  if (!out) return undefined;
+  if (url.pathname.includes("/report-runs/"))
+    return new HttpResponse(out.body as string, {
+      headers: { "content-type": "application/pdf", "content-disposition": 'attachment; filename="bericht.pdf"' },
+    });
+  return out.status === 204 ? new HttpResponse(null, { status: 204 }) : HttpResponse.json(out.body as never, { status: out.status });
+}
+
 export const handlers = [
+  http.all("*/api/v1/report-schedules*", async ({ request }) => (await schedulesResponse(request)) ?? HttpResponse.json([])),
+  http.get("*/api/v1/report-runs/*", async ({ request }) => (await schedulesResponse(request)) ?? new HttpResponse(null, { status: 404 })),
+  http.all("*/api/v1/reports/import/znuny*", async ({ request }) => (await schedulesResponse(request)) ?? HttpResponse.json({})),
   http.all("*/api/v1/dashboards*", async ({ request }) => (await dashboardsResponse(request)) ?? HttpResponse.json([])),
   http.post("*/api/v1/dashboard-widget-types/*/data", async ({ request }) => (await dashboardsResponse(request)) ?? HttpResponse.json({})),
   http.all("*/api/v1/admin/dashboard-templates*", async ({ request }) => (await dashboardsResponse(request)) ?? HttpResponse.json({})),

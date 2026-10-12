@@ -44,6 +44,13 @@ export type ReportingStatus = Schemas["ReportingStatusOut"];
 export type ReportBackfillIn = Schemas["ReportBackfillIn"];
 export type ReportSource = Schemas["ReportSourceOut"];
 export type ReportCell = string | number | null;
+export type ZnunyStatsPreview = Schemas["ZnunyStatsPreviewOut"];
+export type StatPreview = Schemas["StatPreviewOut"];
+export type ImportIssue = Schemas["ImportIssueOut"];
+export type ZnunyStatsApplyIn = Schemas["ZnunyStatsApplyIn"];
+export type ZnunyStatsApplyOut = Schemas["ZnunyStatsApplyOut"];
+/** Largest Znuny stats export file the server accepts (`MAX_FILE_BYTES`, 1 MB). */
+export const MAX_ZNUNY_FILE_BYTES = 1_000_000;
 /** Time buckets of a date dimension (`Grain` in backend/src/tiqora/reporting/definition.py). */
 export type Grain = "day" | "week" | "month" | "quarter" | "year";
 export const GRAINS: readonly Grain[] = ["day", "week", "month", "quarter", "year"];
@@ -99,6 +106,20 @@ export const reportsApi = {
   adminStatus(signal?: AbortSignal) {
     return api.request<ReportingStatus>("GET", "/api/v1/admin/reporting/status", { signal });
   },
+  /** Stats found in the Znuny database (admins, plus visibility rules on the server); imports nothing. */
+  znunyStatsPreview(signal?: AbortSignal) {
+    return api.request<ZnunyStatsPreview>("GET", "/api/v1/reports/import/znuny", { signal });
+  },
+  /** Previews an exported stats XML file; the file travels as base64 and nothing is saved. */
+  async znunyStatsFilePreview(file: File) {
+    if (file.size > MAX_ZNUNY_FILE_BYTES) throw new Error("file too large");
+    const content_base64 = await fileToBase64(file);
+    return api.request<ZnunyStatsPreview>("POST", "/api/v1/reports/import/znuny/file", { body: { content_base64 } });
+  },
+  /** Imports the chosen stats (`stat_ids` from the database, or `file_content_base64` for a file). */
+  znunyStatsApply(body: ZnunyStatsApplyIn) {
+    return api.request<ZnunyStatsApplyOut>("POST", "/api/v1/reports/import/znuny/apply", { body });
+  },
   adminBackfill(body: ReportBackfillIn) {
     return api.request<JobAccepted>("POST", "/api/v1/admin/reporting/backfill", { body });
   },
@@ -125,4 +146,18 @@ export function reportTitle(report: ReportItem, t: TFunction): string {
 export function reportDescription(report: ReportItem, t: TFunction): string {
   if (report.kind === "saved") return report.description ?? "";
   return report.description_key ? t(report.description_key) : "";
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("file read failed"));
+    reader.onload = () => {
+      const bytes = new Uint8Array(reader.result as ArrayBuffer);
+      let bin = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      resolve(btoa(bin));
+    };
+    reader.readAsArrayBuffer(file);
+  });
 }
