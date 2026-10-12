@@ -10,8 +10,9 @@ Deliberate differences from Znuny:
 
 * A transport failure does not call the invoker's ``HandleResponse`` with the error: for
   ``Ticket::Generic`` it carries no data, so it runs no action and returns nothing the caller
-  could merge into the result (the merge of foreign keys for asynchronous calls therefore
-  never has anything to merge either).
+  could merge into the result. Znuny's asynchronous merge would in fact overwrite the
+  reschedule data (``Data=undef``), so Znuny never retries asynchronous Ticket::Generic
+  transport failures; Tiqora deliberately does.
 * ``dry_run`` builds the request and returns it (masked); nothing is sent, nothing is written
   to the debugger, no response action runs.
 * The egress policy can be injected (tests); otherwise it is loaded per webservice.
@@ -366,7 +367,8 @@ async def _dry_run(
     resolver: HostResolver | None,
     communication_id: str,
 ) -> RequesterOutcome:
-    """Build the request exactly as the transport would and return it, masked. No network."""
+    """Build the request exactly as the transport would and return it, masked. Nothing is sent
+    to the target; an OAuth2 token refresh may still contact the token endpoint."""
     result: TransportResult | PreparedRestRequest
     if transport_type == "HTTP::REST":
         async with session_factory() as session:

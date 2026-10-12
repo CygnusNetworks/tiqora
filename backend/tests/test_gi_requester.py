@@ -7,6 +7,7 @@ debugger create are removed with ``snapshot_marks`` / ``delete_above_marks``.
 
 from __future__ import annotations
 
+import base64
 import json
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
@@ -337,11 +338,15 @@ async def test_mapping_error_stage_and_no_send(url_fixture: str) -> None:
             "Config": {"Template": "this is no xsl"},
         },
     }
-    out, mock, sink = await _run(url_fixture, _cfg(invoker, error_handling=RETRY))
+    staged = {"Retry": {**RETRY["Retry"], "ErrorStageFilter": ["RequesterRequestMap"]}}
+    out, mock, sink = await _run(url_fixture, _cfg(invoker, error_handling=staged))
     assert not out.success and mock.seen == []
     assert out.error_message
-    # the retry module has no stage filter, so a mapping failure is rescheduled as well
+    # rescheduled only because the stage filter matches RequesterRequestMap
     assert out.reschedule is not None
+    other = {"Retry": {**RETRY["Retry"], "ErrorStageFilter": ["RequesterRequestPerform"]}}
+    out2, mock2, _ = await _run(url_fixture, _cfg(invoker, error_handling=other))
+    assert not out2.success and mock2.seen == [] and out2.reschedule is None
     assert "Error data before mapping" in sink.subjects()
 
 
@@ -410,6 +415,54 @@ async def test_dry_run_sends_nothing_and_masks(url_fixture: str) -> None:
     assert json.loads(request["body"])["Event"]["Event"] == "TicketCreate"
 
 
+async def test_soap_dry_run_sends_nothing_and_masks(url_fixture: str) -> None:
+    proxy_password = "example-proxy-secret-three"
+    template = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">\n'
+        '<xsl:output method="xml" encoding="utf-8" indent="yes"/>\n'
+        '<xsl:template match="/RootElement"><Out>'
+        '<Event><xsl:value-of select="Event/Event"/></Event>'
+        "</Out></xsl:template>\n</xsl:stylesheet>"
+    )
+    invoker = {**GENERIC, "MappingOutbound": {"Type": "XSLT", "Config": {"Template": template}}}
+    cfg = requester_config(
+        invokers={"SendTicket": invoker},
+        transport="HTTP::SOAP",
+        transport_extra={
+            "Endpoint": "https://crm.example.org/soap",
+            "NameSpace": "https://example.org/ns",
+            "Authentication": {
+                "AuthType": "BasicAuth",
+                "BasicAuthUser": "apiuser",
+                "BasicAuthPassword": PASSWORD,
+            },
+            "Proxy": {
+                "UseProxy": "Yes",
+                "ProxyHost": "http://198.51.100.20:3128",
+                "ProxyUser": "proxyuser",
+                "ProxyPassword": proxy_password,
+            },
+        },
+    )
+    out, mock, sink = await _run(url_fixture, cfg, dry_run=True)
+    assert out.success, out.error_message
+    assert mock.seen == []  # nothing sent
+    assert sink.rows == []  # a dry run leaves no debugger trail
+    request = out.data["request"]
+    assert request["method"] == "POST" and "crm.example.org" in request["url"]
+    shown = json.dumps(out.data)
+    for secret in (
+        PASSWORD,
+        proxy_password,
+        base64.b64encode(f"apiuser:{PASSWORD}".encode()).decode(),
+    ):
+        assert secret not in shown
+    assert request["headers"]["Authorization"].startswith("Basic ")
+    assert "***" in request["headers"]["Authorization"]
+    assert "Envelope" in request["body"] and "TicketCreate" in request["body"]
+
+
 async def test_before_send_called_exactly_once_before_network(url_fixture: str) -> None:
     calls: list[int] = []
     mock = Mock()
@@ -421,7 +474,7 @@ async def test_before_send_called_exactly_once_before_network(url_fixture: str) 
     assert out.success and calls == [0] and len(mock.seen) == 1
 
 
-async def test_before_send_not_called_when_nothing_is_sent(url_fixture: str) -> None:
+async def test_before_send_not_called_when_invoker_fails_before_transport(url_fixture: str) -> None:
     calls: list[int] = []
 
     async def before() -> None:
