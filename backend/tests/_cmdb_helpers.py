@@ -4,8 +4,8 @@ Users: ``cmdb4a`` (A, ``rw`` on GROUP_RW, ``ro`` on GROUP_RO), ``cmdb4b`` (B, ``
 GROUP_RO only), ``cmdb4admin`` (ADMIN, ``rw`` on ``admin``). Queues: QUEUE_RW (GROUP_RW),
 QUEUE_HIDDEN (GROUP_HIDDEN). Customers ``cmdb4-cust-a@example.org`` (company ``cmdb4-co-a``,
 extra mapping to ``cmdb4-co-c``) and ``cmdb4-cust-b@example.org`` (company ``cmdb4-co-b``).
-Service 740400 (``cmdb4-service``). Tickets 740300 (QUEUE_RW, customer a, open), 740301
-(QUEUE_HIDDEN, open), 740302 (QUEUE_RW, closed).
+Services 740400 and 740401 (``cmdb4-service``, ``cmdb4-service-2``). Tickets 740300 (QUEUE_RW,
+customer a, open), 740301 (QUEUE_HIDDEN, open), 740302 (QUEUE_RW, closed).
 
 Test modules re-export ``cmdb_db`` and ``_cmdb_rows_reset`` (the latter autouse) as module
 attributes, which is what pytest collects (a plain import would trip ruff's F811):
@@ -48,7 +48,9 @@ from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraCmdbCatalog
 from tiqora.domain.auth import AuthenticatedUser
+from tiqora.extensions import get_registry
 from tiqora.itsm.link_type_defaults import DEFAULT_LINK_TYPES
+from tiqora.jobs.runner import JobRunner
 
 __all__ = [
     "ATTRS",
@@ -61,6 +63,7 @@ __all__ = [
     "QUEUE_RW",
     "SERVER_ATTRS",
     "SERVICE_ID",
+    "SERVICE_ID_2",
     "SERVER_ATTRS_WITH_MANUAL",
     "TICKET_CLOSED",
     "TICKET_HIDDEN",
@@ -78,6 +81,7 @@ __all__ = [
     "make_ci",
     "make_class",
     "parse_attrs",
+    "run_jobs_until_idle",
     "set_mode",
     "to_async_url",
 ]
@@ -86,7 +90,7 @@ GROUP_RW, GROUP_RO, GROUP_HIDDEN = 740010, 740011, 740012
 USER_A, USER_B, USER_ADMIN = 740100, 740101, 740102
 QUEUE_RW, QUEUE_HIDDEN = 740200, 740201
 TICKET_OPEN, TICKET_HIDDEN, TICKET_CLOSED = 740300, 740301, 740302
-SERVICE_ID = 740400
+SERVICE_ID, SERVICE_ID_2 = 740400, 740401
 CUSTOMER_A, CUSTOMER_B = "cmdb4-cust-a@example.org", "cmdb4-cust-b@example.org"
 
 _USERS = {
@@ -204,7 +208,13 @@ _ZNUNY_CLEANUP = (
     "DELETE FROM users WHERE id BETWEEN 740100 AND 740199",
 )
 #: ``tiqora_*`` rows the tests of this band create besides the CMDB tables
+_CMDB_JOBS = (
+    "DELETE FROM tiqora_job_file WHERE job_id IN"
+    " (SELECT id FROM tiqora_job WHERE kind LIKE 'core.cmdb_%')",
+    "DELETE FROM tiqora_job WHERE kind LIKE 'core.cmdb_%'",
+)
 _TIQORA_CLEANUP = (
+    *_CMDB_JOBS,
     "DELETE FROM tiqora_job_file WHERE job_id IN"
     " (SELECT id FROM tiqora_job WHERE created_by BETWEEN :lo AND :hi)",
     "DELETE FROM tiqora_job WHERE created_by BETWEEN :lo AND :hi",
@@ -308,13 +318,14 @@ def _seed_znuny_world(sync_url: str) -> None:
                     ),
                     {"id": qid, "n": f"cmdb4-queue-{qid}", "g": gid, "t": _T},
                 )
-            conn.execute(
-                text(
-                    "INSERT INTO service (id, name, valid_id, create_time, create_by,"
-                    " change_time, change_by) VALUES (:id, 'cmdb4-service', 1, :t, 1, :t, 1)"
-                ),
-                {"id": SERVICE_ID, "t": _T},
-            )
+            for sid, sname in ((SERVICE_ID, "cmdb4-service"), (SERVICE_ID_2, "cmdb4-service-2")):
+                conn.execute(
+                    text(
+                        "INSERT INTO service (id, name, valid_id, create_time, create_by,"
+                        " change_time, change_by) VALUES (:id, :n, 1, :t, 1, :t, 1)"
+                    ),
+                    {"id": sid, "n": sname, "t": _T},
+                )
             admin_group = int(
                 conn.execute(
                     text("SELECT id FROM permission_groups WHERE name = 'admin'")
@@ -442,6 +453,8 @@ def _cmdb_rows_reset(cmdb_db: CmdbWorld) -> Iterator[None]:
             for table in _CMDB_TABLES:
                 conn.execute(text(f"DELETE FROM {table}"))
             _delete_non_seed(conn)
+            for stmt in _CMDB_JOBS:
+                conn.execute(text(stmt))
             conn.execute(
                 text(_q("DELETE FROM tiqora_settings WHERE `key` = 'itsm.mode'", is_mysql))
             )
@@ -521,6 +534,20 @@ async def _catalog_id(session: AsyncSession, catalog_class: str, key: str) -> in
         )
     )
     return int(row.scalar_one())
+
+
+async def run_jobs_until_idle(world: CmdbWorld, *, max_rounds: int = 20) -> None:
+    """Drive ``JobRunner`` (as ``tests/test_reports_api.py`` does) until no job is queued."""
+    runner = JobRunner(
+        session_factory=world.factory,
+        settings=Settings(environment="test"),
+        registry=get_registry(),
+    )
+    for _ in range(max_rounds):
+        started = (await runner.run_once())["started"]
+        await runner.wait_idle()
+        if not started:
+            return
 
 
 def _agent(uid: int) -> AuthenticatedUser:

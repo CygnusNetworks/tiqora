@@ -34,6 +34,7 @@ def register_core(registry: Registry) -> None:
         validate_section_schema(section)
         registry.add(SETTINGS_SECTIONS, section)
 
+    from tiqora.cmdb.propagation import CMDB_PROPAGATION_JOB
     from tiqora.gi.jobs import GI_INVOKE_JOB, GI_INVOKE_SYNC_JOB
     from tiqora.jobs.handlers.gi_mail import GI_MAIL_JOB
     from tiqora.jobs.handlers.ticket_export import TICKET_EXPORT_JOB
@@ -50,6 +51,7 @@ def register_core(registry: Registry) -> None:
     registry.add(JOB_HANDLERS, REPORT_RUN_JOB)
     registry.add(JOB_HANDLERS, REPORT_EXPORT_JOB)
     registry.add(JOB_HANDLERS, REPORT_DELIVERY_JOB)
+    registry.add(JOB_HANDLERS, CMDB_PROPAGATION_JOB)
 
     from tiqora.reporting.semantic import REPORT_SOURCES
     from tiqora.reporting.sources import core_report_sources

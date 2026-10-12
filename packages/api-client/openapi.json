@@ -54558,6 +54558,72 @@
         ]
       }
     },
+    "/api/v1/admin/cmdb/propagation/recompute": {
+      "post": {
+        "description": "Queue the full recompute of derived incident states (one job at a time, dedupe ``all``).",
+        "operationId": "recompute_propagation_api_v1_admin_cmdb_propagation_recompute_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recompute Propagation",
+        "tags": [
+          "admin:cmdb"
+        ]
+      }
+    },
     "/api/v1/admin/cmdb/seed-defaults": {
       "post": {
         "description": "Idempotent: missing catalog rows and link types, then (re)create the two add-on views.\n\nA missing ``CREATE VIEW`` privilege is not an error: the answer says ``views_present: false``.",

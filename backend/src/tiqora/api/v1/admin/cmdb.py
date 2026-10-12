@@ -37,6 +37,7 @@ from tiqora.cmdb.definition import (
 )
 from tiqora.cmdb.errors import CmdbError
 from tiqora.cmdb.gate import current_itsm_mode
+from tiqora.cmdb.propagation import enqueue_full_recompute
 from tiqora.cmdb.schemas import (
     CatalogItemIn,
     CatalogItemOut,
@@ -65,6 +66,7 @@ from tiqora.db.tiqora.models import (
     TiqoraCmdbCiVersionArchive,
     TiqoraCmdbClass,
 )
+from tiqora.jobs.schemas import JobAccepted
 
 logger = structlog.get_logger(__name__)
 
@@ -140,6 +142,16 @@ async def seed(admin: AdminUser, session: DbSession) -> CmdbAdminStatusOut:
     if not created:
         logger.warning("cmdb_seed_views_missing", message="CREATE VIEW-Recht fehlt")
     return await _admin_status(session, views=created)
+
+
+@router.post(
+    "/propagation/recompute", response_model=JobAccepted, status_code=status.HTTP_202_ACCEPTED
+)
+async def recompute_propagation(admin: AdminUser, session: DbSession) -> JobAccepted:
+    """Queue the full recompute of derived incident states (one job at a time, dedupe ``all``)."""
+    job_id = await enqueue_full_recompute(session, user_id=admin.id)
+    await session.commit()
+    return JobAccepted(job_id=job_id, status="queued")
 
 
 # --- catalog ----------------------------------------------------------------------------
