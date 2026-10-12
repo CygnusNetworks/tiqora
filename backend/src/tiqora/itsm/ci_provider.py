@@ -132,7 +132,9 @@ class CiQuery:
 @dataclass(frozen=True, slots=True)
 class CiPage:
     items: tuple[CiSummary, ...]
+    # exact unless ``truncated`` (Mode A: an attribute search hit its candidate cap)
     total: int
+    truncated: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,6 +176,10 @@ class CiPermissionDenied(CiError):
 
 class CiReadOnly(CiError):
     """Write attempted on read-only data (never raised for links)."""
+
+
+class CiSearchTooBroad(CiError):
+    """The query would scan too much (statement time limit hit); the caller narrows it."""
 
 
 class CiUnavailable(CiError):
@@ -270,6 +276,7 @@ __all__ = [
     "CiQuery",
     "CiReadOnly",
     "CiRef",
+    "CiSearchTooBroad",
     "CiSource",
     "CiSummary",
     "CiTicketLink",

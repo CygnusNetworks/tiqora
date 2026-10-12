@@ -35,6 +35,14 @@ class SchemaProfile:
     #: role -> ``general_catalog.general_catalog_class``
     catalog_classes: Mapping[str, str]
 
+    def current_xml_type(self, class_id: int) -> str:
+        """``xml_storage.xml_type`` of the attributes of a CI's current version."""
+        return f"{self.xml_type_prefix}{class_id}"
+
+    def archive_xml_type(self, class_id: int) -> str:
+        """``xml_type`` of the attributes of the older versions of a class."""
+        return f"{self.xml_archive_prefix}{class_id}"
+
 
 _CATALOG_CLASSES: Final[Mapping[str, str]] = {
     "ci_class": "ITSM::ConfigItem::Class",
@@ -61,6 +69,10 @@ def _profile(name: str, spec: str) -> SchemaProfile:
         catalog_classes=_CATALOG_CLASSES,
     )
 
+
+#: ``general_catalog_preferences.pref_key`` values the adapter reads
+PREF_FUNCTIONALITY: Final = "Functionality"  # incident / deployment states
+PREF_PERMISSION: Final = "Permission"  # CI class -> group id
 
 PROFILES: Final[Mapping[str, SchemaProfile]] = {
     "itsm-6": _profile("itsm-6", ">=6.5,<6.6"),
