@@ -25,6 +25,8 @@ import { DASHBOARD_WIDGETS, defineWidget, type WidgetProps } from "@/plugins/das
 import { demoDashboard, demoDefaultWidgets, demoTab, demoWidgetData } from "@/demo/dashboardsMock";
 import { makeUser } from "@/test/fireUser";
 import { savedSearchesApi } from "@/lib/savedSearchesApi";
+import { reportsApi } from "@/lib/reportsApi";
+import { demoCatalogue } from "@/demo/reportsMock";
 import { registerCoreWidgets } from "@/dashboard/widgets";
 import { DashboardPage } from "./DashboardPage";
 
@@ -1166,6 +1168,33 @@ describe("DashboardPage", () => {
         expect(within(gallery()).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Tickets", "Für mich", "Team"]);
         expect(within(gallery()).getByRole("button", { name: /Hallo-Widget/ })).toBeVisible();
         expect(screen.getByRole("button", { name: "Widget hinzufügen", expanded: true })).toBeVisible();
+      });
+
+      it("offers the 'Berichte' group only to people who may view reports; a new report opens its settings and cancelling removes it again", async () => {
+        const catalogue = vi.spyOn(reportsApi, "catalogue").mockResolvedValue(demoCatalogue() as never);
+        mockDashboard({ widgets: [WIDE] });
+        await enterEdit();
+        expect(within(gallery()).queryByRole("heading", { name: "Berichte" })).toBeNull();
+        expect(within(gallery()).queryByRole("button", { name: /Bericht/ })).toBeNull();
+        cleanup();
+        auth.user.can_view_reports = true;
+        try {
+          await enterEdit();
+          expect(within(gallery()).getByRole("heading", { level: 3, name: "Berichte" })).toBeVisible();
+          fireEvent.click(within(gallery()).getByRole("button", { name: /^Bericht/ }));
+          const drawer = await screen.findByRole("dialog");
+          expect(within(drawer).getByRole("button", { name: "Übernehmen" })).toBeDisabled();
+          expect(ids()).toHaveLength(2);
+          fireEvent.click(within(drawer).getByRole("button", { name: "Abbrechen" }));
+          await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+          expect(ids()).toEqual(["w-wide"]);
+          // the removal is an undo step
+          fireEvent.click(undoButton());
+          expect(ids()).toHaveLength(2);
+          expect(catalogue).toHaveBeenCalled();
+        } finally {
+          auth.user.can_view_reports = false;
+        }
       });
 
       it("a click adds the widget with a fresh uuid in the first free spot, as one undo step", async () => {

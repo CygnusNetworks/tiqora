@@ -91,11 +91,11 @@ describe("defineCoreWidget", () => {
 });
 
 describe("galleryGroupOf", () => {
-  it("maps tickets and team to themselves and everything else to 'Für mich'", () => {
+  it("maps tickets, team and reports to themselves and everything else to 'Für mich'", () => {
     expect(galleryGroupOf(anyDef({ category: "tickets" }))).toBe("tickets");
     expect(galleryGroupOf(anyDef({ category: "team" }))).toBe("team");
     expect(galleryGroupOf(anyDef({ category: "other" }))).toBe("me");
-    expect(galleryGroupOf(anyDef({ category: "reports" }))).toBe("me");
+    expect(galleryGroupOf(anyDef({ category: "reports" }))).toBe("reports");
     expect(galleryGroupOf(anyDef({ category: "ai" }))).toBe("me");
   });
 });

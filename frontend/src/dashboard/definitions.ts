@@ -107,10 +107,11 @@ export function defineCoreWidget<S>(d: CoreWidgetSpec<S>): WidgetDefinition<any>
   });
 }
 
-/** Gallery groups of the mockup: Tickets / Für mich / Team. */
-export function galleryGroupOf(def: Pick<WidgetDefinition, "category">): "tickets" | "me" | "team" {
+/** Gallery groups: Tickets / Für mich / Team / Berichte. */
+export function galleryGroupOf(def: Pick<WidgetDefinition, "category">): "tickets" | "me" | "team" | "reports" {
   if (def.category === "tickets") return "tickets";
   if (def.category === "team") return "team";
+  if (def.category === "reports") return "reports";
   return "me";
 }
 

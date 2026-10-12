@@ -123,7 +123,9 @@ function GridCell({
   onConfigure,
   cellEdit,
   style,
+  dashboardId,
 }: {
+  dashboardId?: number;
   widget: EditWidget;
   def: WidgetDefinition | undefined;
   state: WidgetDataState;
@@ -155,8 +157,8 @@ function GridCell({
   const handle = cellEdit?.chrome.handle;
   const actions = cellEdit?.chrome.actions;
   const chrome = useMemo(
-    () => ({ titleOverride: widget.title_override, canEdit, handle, actions, pinned: widget.pinned === true, onConfigure: edit?.onOpenSettings ? () => edit.onOpenSettings?.(id) : onConfigure && (() => onConfigure(id)) }),
-    [widget.title_override, widget.pinned, canEdit, handle, actions, edit, onConfigure, id],
+    () => ({ titleOverride: widget.title_override, canEdit, handle, actions, pinned: widget.pinned === true, dashboardId, onConfigure: edit?.onOpenSettings ? () => edit.onOpenSettings?.(id) : onConfigure && (() => onConfigure(id)) }),
+    [widget.title_override, widget.pinned, canEdit, handle, actions, edit, onConfigure, id, dashboardId],
   );
   const waiting = state.status === "loading" || state.status === "pending";
   const size = { w: rect.w, h: rect.h };
@@ -604,6 +606,7 @@ export function DashboardGrid({
       onConfigure: canEdit ? onConfigureWidget : undefined,
       cellEdit,
       style,
+      dashboardId,
     };
     return editing && edit?.previewIds?.has(w.id) ? (
       <PreviewGridCell key={w.id} {...props} />

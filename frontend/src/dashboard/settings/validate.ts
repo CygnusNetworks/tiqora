@@ -81,6 +81,19 @@ export function validateLinks(value: Record<string, unknown>, t: TFunction): Rec
   return errors;
 }
 
+/** A report widget needs a report (the server insists on it) and a row count in range. */
+export function validateReport(value: Record<string, unknown>, t: TFunction): Record<string, string> {
+  const errors: Record<string, string> = {};
+  if (typeof value.report_key !== "string" || value.report_key === "") {
+    errors.report_key = t("dashboards.settings.report.required");
+  }
+  const rows = value.max_rows;
+  if (typeof rows !== "number" || !Number.isInteger(rows) || rows < 1 || rows > 50) {
+    errors.max_rows = t("dashboards.settings.range", { min: 1, max: 50 });
+  }
+  return errors;
+}
+
 /** Client errors of a core widget's bespoke editor. */
 export function validateCore(typeKey: string, value: Record<string, unknown>, t: TFunction): Record<string, string> {
   switch (typeKey) {
@@ -90,6 +103,8 @@ export function validateCore(typeKey: string, value: Record<string, unknown>, t:
       return validateNotes(value, t);
     case "core.links":
       return validateLinks(value, t);
+    case "core.report":
+      return validateReport(value, t);
     default:
       return {};
   }

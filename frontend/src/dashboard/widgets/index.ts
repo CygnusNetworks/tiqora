@@ -13,8 +13,10 @@ import { NotesWidget, type NotesSettings } from "./NotesWidget";
 import { QueueOverviewWidget, type QueueOverviewSettings } from "./QueueOverviewWidget";
 import { RecentViewsWidget, type RecentViewsSettings } from "./RecentViewsWidget";
 import { RemindersWidget, type RemindersSettings } from "./RemindersWidget";
+import { ReportWidget, type ReportWidgetSettings } from "./ReportWidget";
 import { TeamPresenceWidget, type TeamPresenceSettings } from "./TeamPresenceWidget";
 import { TicketListWidget, type TicketListSettings } from "./TicketListWidget";
+import { TIME_RANGE_PRESETS } from "../filters/timeRanges";
 import { DEFAULT_SOURCE } from "./presets";
 
 const int = (minimum: number, maximum: number, dflt: number) => ({
@@ -188,9 +190,30 @@ export const CORE_WIDGETS: WidgetDefinition<any>[] = [
     refreshOn: [],
     component: LinksWidget,
   }),
+  defineCoreWidget<ReportWidgetSettings>({
+    key: "core.report",
+    version: 1,
+    ...texts("report"),
+    category: "reports",
+    icon: "chart",
+    size: { default: [6, 5], min: [4, 3], max: [12, 10] },
+    settings: object({
+      // no default: a report has to be chosen (the settings drawer opens on add)
+      report_key: { type: "string", maxLength: 80 },
+      time_range: { type: "string", enum: [...TIME_RANGE_PRESETS] },
+      parameters: { type: "object", default: {} },
+      dimension_choices: { type: "object", default: {} },
+      display: { type: "string", enum: ["auto", "table"], default: "auto" },
+      max_rows: int(1, 50, 10),
+    }),
+    data: { endpoint: "core.report" },
+    refreshOn: ["interval:300"],
+    permission: "stats",
+    component: ReportWidget,
+  }),
 ];
 
-/** Registers the ten core widgets once (owner "core"); keys already registered are left alone. */
+/** Registers the core widgets once (owner "core"); keys already registered are left alone. */
 export function registerCoreWidgets(): void {
   for (const def of CORE_WIDGETS) {
     if (DASHBOARD_WIDGETS.get(def.key)) continue;

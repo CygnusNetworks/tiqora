@@ -6085,7 +6085,18 @@
         "description": "Wichtige Adressen auf einen Blick",
         "empty": "Noch keine Links. In den Einstellungen können Sie welche eintragen."
       },
-      "chooseSearch": "Suche wählen"
+      "chooseSearch": "Suche wählen",
+      "report": {
+        "title": "Bericht",
+        "description": "Ein Bericht aus der Auswertung als Diagramm oder Tabelle",
+        "empty": "Wählen Sie einen Bericht in den Einstellungen.",
+        "running": "Wird im Hintergrund berechnet …",
+        "tooManyJobs": "Es laufen bereits mehrere Berichte im Hintergrund.",
+        "jobFailed": "Der Bericht konnte nicht berechnet werden.",
+        "tooLargePreview": "Zu umfangreich für die Vorschau – wird nach dem Speichern im Hintergrund berechnet.",
+        "tooLargeWallboard": "Dieser Bericht ist für das Wallboard zu umfangreich.",
+        "queueIgnored": "Der Queue-Filter gilt für diesen Bericht nicht."
+      }
     },
     "tabs": {
       "label": "Dashboards",
@@ -6156,7 +6167,8 @@
       "groups": {
         "tickets": "Tickets",
         "me": "Für mich",
-        "team": "Team"
+        "team": "Team",
+        "reports": "Berichte"
       },
       "hint": "Ins Raster ziehen oder anklicken – das Widget landet in der ersten freien Lücke.",
       "limit": "Es sind höchstens {{max}} Widgets möglich.",
@@ -6298,7 +6310,19 @@
         "tone": "Farbe"
       },
       "useFilters": "Dashboard-Filter auf dieses Widget anwenden",
-      "useFiltersHint": "Aus: Das Widget ignoriert die Queue- und Zeitfilter des Dashboards."
+      "useFiltersHint": "Aus: Das Widget ignoriert die Queue- und Zeitfilter des Dashboards.",
+      "report": {
+        "report": "Bericht",
+        "choose": "Bericht wählen",
+        "builtin": "Standardberichte",
+        "saved": "Gespeicherte Berichte",
+        "catalogueFailed": "Die Berichte konnten nicht geladen werden.",
+        "required": "Bitte wählen Sie einen Bericht.",
+        "splitBy": "Aufteilen nach",
+        "display": "Darstellung",
+        "table": "Tabelle",
+        "rows": "Anzahl Zeilen"
+      }
     },
     "manage": {
       "newTitle": "Neues Dashboard",

@@ -6085,7 +6085,18 @@
         "description": "Important addresses at a glance",
         "empty": "No links yet. You can add some in the settings."
       },
-      "chooseSearch": "Choose search"
+      "chooseSearch": "Choose search",
+      "report": {
+        "title": "Report",
+        "description": "A report as a chart or table",
+        "empty": "Choose a report in the settings.",
+        "running": "Calculating in the background …",
+        "tooManyJobs": "Several reports are already running in the background.",
+        "jobFailed": "The report could not be calculated.",
+        "tooLargePreview": "Too large for the preview – it is calculated in the background after saving.",
+        "tooLargeWallboard": "This report is too large for the wallboard.",
+        "queueIgnored": "The queue filter does not apply to this report."
+      }
     },
     "tabs": {
       "label": "Dashboards",
@@ -6156,7 +6167,8 @@
       "groups": {
         "tickets": "Tickets",
         "me": "For me",
-        "team": "Team"
+        "team": "Team",
+        "reports": "Reports"
       },
       "hint": "Drag onto the grid or click – the widget lands in the first free gap.",
       "limit": "No more than {{max}} widgets are possible.",
@@ -6298,7 +6310,19 @@
         "tone": "Colour"
       },
       "useFilters": "Apply dashboard filters to this widget",
-      "useFiltersHint": "Off: the widget ignores the queue and time filters of the dashboard."
+      "useFiltersHint": "Off: the widget ignores the queue and time filters of the dashboard.",
+      "report": {
+        "report": "Bericht",
+        "choose": "Choose a report",
+        "builtin": "Built-in reports",
+        "saved": "Saved reports",
+        "catalogueFailed": "The reports could not be loaded.",
+        "required": "Please choose a report.",
+        "splitBy": "Split by",
+        "display": "Display",
+        "table": "Table",
+        "rows": "Rows"
+      }
     },
     "manage": {
       "newTitle": "New dashboard",

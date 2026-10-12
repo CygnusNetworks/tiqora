@@ -168,6 +168,8 @@ export function DashboardEditMode({
   }, [invalidId, openSettings]);
 
   const focusAfterAdd = useRef<string | null>(null);
+  /** A just-added report widget whose drawer has not been confirmed yet. */
+  const freshReport = useRef<string | null>(null);
   // The newly added widget takes the focus once it is in the grid.
   useEffect(() => {
     const id = focusAfterAdd.current;
@@ -187,6 +189,12 @@ export function DashboardEditMode({
       const id = newWidgetId();
       dispatch({ type: "add", def: widgetLikeOf(def), id, ...(at ? { at } : {}), bp });
       focusAfterAdd.current = id;
+      // A report widget is nothing without a report: its settings open at once, and cancelling takes it back out.
+      if (def.key === "core.report") {
+        freshReport.current = id;
+        setFocusSource(false);
+        setSettingsFor({ id });
+      }
       // The count makes every announcement differ, so adding the same widget twice is read twice.
       setAdded(
         t("dashboards.gallery.addedAt", {
@@ -326,10 +334,18 @@ export function DashboardEditMode({
           focusSource={focusSource}
           onApply={(settings, titleOverride, pinned) => {
             dispatch({ type: "settings", id: settingsWidget.id, settings, titleOverride, pinned });
+            if (freshReport.current === settingsWidget.id) freshReport.current = null;
             session.clearInvalid(settingsWidget.id);
             closeSettings(settingsWidget.id);
           }}
-          onCancel={() => closeSettings(settingsWidget.id)}
+          onCancel={() => {
+            // Cancelling the drawer a freshly added report widget opened removes it again (one undo step).
+            if (freshReport.current === settingsWidget.id) {
+              freshReport.current = null;
+              dispatch({ type: "remove", id: settingsWidget.id });
+            }
+            closeSettings(settingsWidget.id);
+          }}
         />
       )}
       <ConfirmDialog

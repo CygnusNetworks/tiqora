@@ -25,6 +25,8 @@ export interface WidgetChrome {
   onConfigure?: () => void;
   /** The widget ignores the dashboard-wide filters (shows the pin glyph while filters are active). */
   pinned?: boolean;
+  /** The dashboard this widget is placed on (widgets that start work for themselves, e.g. report jobs). */
+  dashboardId?: number;
 }
 
 const ChromeContext = createContext<WidgetChrome>({});
