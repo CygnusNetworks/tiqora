@@ -27,7 +27,18 @@ Folgt.
 
 ## 6 CMDB (Modus B)
 
-Folgt.
+In Modus B führt Tiqora die Konfigurationsdatenbank selbst. Klassen mit versionierter
+Attributdefinition (Designer, Vorlagen, Import von Znuny-Definitionen), CIs mit Versionsverlauf,
+Einsatz- und Vorfallstatus, Verknüpfungen zu CIs, Tickets, Services, Kunden und KB-Artikeln,
+zyklensichere Weitergabe von Störungen entlang der Linktypen, Abhängigkeitsgraph mit
+„Auswirkungen“, CSV/XLSX-Import und -Export als Hintergrundjobs, Massenbearbeitung, Anhänge,
+gespeicherte Suchen und die Kundenportal-Seite „Meine Geräte und Systeme“ gehören dazu. Der
+Zugriff folgt der Znuny-Gruppe der Klasse. In Modus A (Znuny führt das ITSM) antworten die
+CMDB-Endpunkte mit `409 cmdb_in_znuny`, bei ausgeschaltetem ITSM mit `404`; die Linktypen und
+die Verknüpfungstabelle `tiqora_itsm_link` teilt sich die CMDB mit dem ITSM-Kern (Kapitel 4).
+Zwei Ansichten (`tiqora_v1_itsm_ci`, `tiqora_v1_itsm_ci_links`) bedienen die Znuny-Erweiterung.
+
+Alle Einzelheiten, Einstellungen und Grenzen stehen in [cmdb.md](cmdb.md).
 
 ## 7 Parallelbetrieb und Umstieg
 

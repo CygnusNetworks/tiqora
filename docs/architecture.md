@@ -811,6 +811,40 @@ TicketCreate, Watch, LinkAdd, …) — see
 [docs/process-management.md](process-management.md) for the full
 supported-vs-deferred breakdown and REST endpoint list.
 
+### CMDB (`tiqora.cmdb`, ITSM Mode B)
+
+Tiqora's own configuration database; see [cmdb.md](cmdb.md) for the user-facing description.
+
+- **Tables** (all `tiqora_*`, never JOINed with Znuny tables): `tiqora_cmdb_catalog`,
+  `tiqora_cmdb_class`, `tiqora_cmdb_class_definition` (one row per definition version),
+  `tiqora_cmdb_ci` (header with own and derived incident state, `lock_version`),
+  `tiqora_cmdb_ci_version` (+ `..._archive`; attributes as JSON `{"v", "s"}` entries, nested via
+  `s`), `tiqora_cmdb_ci_attr` (search index of the current version, searchable attributes only,
+  casefolded `value_key`, index `ix_tiqora_cmdb_ci_attr_value`), `tiqora_cmdb_ci_history`,
+  `tiqora_cmdb_attachment`, `tiqora_cmdb_import_template`, `tiqora_cmdb_saved_search`, and the
+  shared `tiqora_itsm_link` (FK to `tiqora_itsm_link_type`, owned by the ITSM core).
+- **Gate:** `cmdb/gate.py` resolves the ITSM mode (stored `itsm.mode`, else detection of Znuny's
+  ITSM tables); the routes answer 404 (off) or 409 `cmdb_in_znuny` (Mode A).
+- **Access:** `cmdb/access.py`; the class's Znuny group, `ro` reads / `rw` writes, optional
+  `cmdb.access_group` as an extra gate.
+- **Services:** `ClassService`, `CiService` (write path with versions, locking, history, number
+  allocation, search index), `search.py` (filter compiler over the index table), `links.py`,
+  `propagation.py` (bounded forward/reverse BFS, service incident states), `impact.py`,
+  `attachments.py`, `portal.py`, `erasure.py` (GDPR), and `provider.py` (the Mode-B
+  implementation of the ITSM `CiProvider` protocol, registered by `register_core`).
+- **Jobs** (`tiqora.jobs`, polled through `/api/v1/jobs`, nothing synchronous over about 60 s):
+  `core.cmdb_import`, `core.cmdb_export`, `core.cmdb_bulk`, `core.cmdb_propagation`
+  (full recompute, also the overflow path of a save), `core.cmdb_reindex` (index rebuild in
+  batches of 1000 after a class definition changes its searchable set), `core.cmdb_archive`;
+  the daily worker tick `cmdb_version_archive` (03:20) archives old versions.
+- **Views:** `tiqora_v1_itsm_ci` and `tiqora_v1_itsm_ci_links` for the Znuny add-on, created in a
+  SAVEPOINT by the migration and by `seed-defaults` (a missing `CREATE VIEW` privilege is logged,
+  not fatal).
+- **Importer API:** `cmdb/importer_api.py` is the only write entry the ITSM import uses
+  (headers, versions, attachments, links keep their original numbers and timestamps).
+- **Frontend:** `routes/agent/cmdb`, `routes/admin/cmdb`, `routes/portal/PortalCi*`,
+  `components/cmdb`; the demo and e2e mock in `demo/cmdbMock.ts`.
+
 ### Shared foundations
 
 Cross-cutting building blocks that features compose instead of re-implementing.

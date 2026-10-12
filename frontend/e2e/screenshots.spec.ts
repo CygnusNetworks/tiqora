@@ -369,3 +369,14 @@ test("dashboard filter bar, report widget and wallboard screenshots", async ({ p
   await page.waitForTimeout(900);
   await page.screenshot({ path: `${OUT}/wallboard-dark.png`, fullPage: false });
 });
+
+// CMDB (Mode B) on the demo store of the mock API: list, CI detail, impact graph, class editor.
+test("cmdb screenshots", async ({ page }) => {
+  await prep(page);
+  await mockApi(page);
+  await loginAsAgent(page);
+  await shot(page, "/agent/cmdb", "agent-cmdb-list");
+  await shot(page, "/agent/cmdb/1", "agent-cmdb-ci");
+  await shot(page, "/agent/cmdb/1?tab=dependencies", "agent-cmdb-graph");
+  await shot(page, "/admin/cmdb/classes/1", "admin-cmdb-class-editor");
+});
