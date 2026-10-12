@@ -192,8 +192,9 @@ describe("phase 2 demo data", () => {
     expect(aging.result.rows.length).toBeLessThanOrEqual(3);
     const heat = demoWidgetData("core.heatmap", { time_range: "90d" })?.data as { result: { rows: unknown[] } };
     expect(heat.result.rows.length).toBeGreaterThan(0);
-    const chat = demoWidgetData("core.chat-queue", {})?.data as { waiting: number; oldest_waiting_since: string; items: unknown[] };
+    const chat = demoWidgetData("core.chat-queue", {})?.data as { waiting: number; bot: number; oldest_waiting_since: string; items: unknown[] };
     expect(chat.waiting).toBe(3);
+    expect(chat.bot).toBe(2);
     const ageMin = (Date.now() - Date.parse(chat.oldest_waiting_since)) / 60000;
     expect(ageMin).toBeGreaterThan(3.9);
     expect(ageMin).toBeLessThan(4.5);

@@ -301,12 +301,31 @@ async def test_chat_queue_scoped_to_rw_queues_and_never_returns_visitor_name(env
     assert capped["waiting"] == 2 and len(capped["items"]) == 1
 
 
+async def test_chat_queue_counts_bot_chats_apart_from_waiting(env: Env3) -> None:
+    """M5: a chat the AI answers is not waiting for a human. It is a count of its own (``bot``,
+    same ``rw`` filter as ``waiting``) and never an item."""
+    _chat_config(env)
+    _chat_session(env, "d3-wait-q1", ticket="chat_q1", status="waiting", assigned=None)
+    _chat_session(env, "d3-bot-q1", ticket="q1_open", status="bot", assigned=None)
+    _chat_session(env, "d3-bot-q1-second", ticket="chat_q1", status="bot", assigned=None)
+    _chat_session(env, "d3-bot-q2", ticket="chat_q2", status="bot", assigned=None)
+    out = await data_of(env, A, W("c", "core.chat-queue"))
+    assert out["waiting"] == 1 and out["bot"] == 2
+    assert [i["session_id"] for i in out["items"]] == ["d3-wait-q1"]
+    assert "d3-bot" not in json.dumps(out)
+    assert out["oldest_waiting_since"] == out["items"][0]["waiting_since"]
+    # B holds no rw anywhere: no bot chat is visible to B either
+    other = await data_of(env, B, W("c", "core.chat-queue"))
+    assert other["bot"] == 0 and other["waiting"] == 0
+
+
 async def test_chat_queue_disabled_when_no_chat_config(env: Env3) -> None:
     assert await data_of(env, A, W("c", "core.chat-queue")) == {
         "enabled": False,
         "waiting": 0,
         "oldest_waiting_since": None,
         "mine": 0,
+        "bot": 0,
         "items": [],
     }
     _chat_config(env, valid=False)  # an invalid configuration counts as none

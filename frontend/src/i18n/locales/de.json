@@ -6918,7 +6918,8 @@
         "mine": "Meine Chats",
         "oldest": "Der älteste wartet seit {{d}}",
         "since": "wartet seit {{d}}",
-        "none": "Kein Chat wartet."
+        "none": "Kein Chat wartet.",
+        "bot": "Mit KI im Gespräch: {{n}}"
       },
       "aiStatus": {
         "title": "KI-Status",

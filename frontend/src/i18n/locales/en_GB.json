@@ -6918,7 +6918,8 @@
         "mine": "My chats",
         "oldest": "The oldest has been waiting for {{d}}",
         "since": "waiting for {{d}}",
-        "none": "No chat is waiting."
+        "none": "No chat is waiting.",
+        "bot": "With the AI: {{n}}"
       },
       "aiStatus": {
         "title": "AI status",

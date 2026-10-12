@@ -71,7 +71,7 @@ Fassungen nicht zusammen.
 | Bericht | Ein Bericht aus der Auswertung als Diagramm oder Tabelle |
 | SLA-Quote, Rückstand nach Alter, Heatmap | Fertige Auswertungen als Kachel |
 | KI-Status | Autopilot, Übergaben und Budget der KI |
-| Chat-Warteschlange | Wartende Web-Chats (bis 200; „200+“ bei Erreichen der Grenze) |
+| Chat-Warteschlange | Wartende Web-Chats (bis 200; „200+“ bei Erreichen der Grenze) und die Zahl der Chats, die gerade der KI-Assistent beantwortet („Mit KI im Gespräch“; nur die Zahl, sie zählen nicht als wartend) |
 
 Plugins können weitere Widgets mitbringen; sie erscheinen in derselben Galerie.
 
@@ -175,8 +175,8 @@ und erreicht dadurch weder Server-Logs noch Referrer. Verwaltung: Widerrufen und
 - Ohne Details entfallen Tickettitel, Kunden und Namen in Listen; Fehlermeldungen von Kacheln
   lauten dann allgemein „Diese Daten konnten nicht geladen werden.“ Widget-Arten ohne
   Wallboard-Regel (Plugins) erscheinen als „Auf dem Wallboard ausgeblendet“ und laufen nicht.
-- Die Web-Chat-Kachel zeigt auf dem Wallboard nur die wartenden Chats, nicht „Meine Chats“ des
-  Erstellers. Die KI-Kachel zeigt die Token-Budgets der Queues, nie die Kosten der KI-Anbieter.
+- Die Web-Chat-Kachel zeigt auf dem Wallboard nur die wartenden Chats und die Zahl der Chats beim
+  KI-Assistenten, nicht „Meine Chats“ des Erstellers. Die KI-Kachel zeigt die Token-Budgets der Queues, nie die Kosten der KI-Anbieter.
 - Abgelaufene, widerrufene oder unbekannte Links zeigen dieselbe Meldung („Dieser Wallboard-Link
   ist ungültig oder abgelaufen“); wiederholtes Raten wird begrenzt.
 

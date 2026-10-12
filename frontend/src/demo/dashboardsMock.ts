@@ -340,6 +340,7 @@ export function demoWidgetData(key: string, settings: Settings = {}, queueIds: n
           waiting: 3,
           oldest_waiting_since: items[0].waiting_since,
           mine: 1,
+          bot: 2,
           items: items.slice(0, limitOf(settings, 5)),
         },
       };

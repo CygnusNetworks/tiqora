@@ -26,12 +26,17 @@ export interface ChatQueueData {
   oldest_waiting_since: string | null;
   /** The viewer's own chats; never sent to a wallboard link (it would be the link creator's). */
   mine?: number;
+  /** Chats the AI assistant is answering (not waiting for a human; counted up to 200, never
+   * listed). A team figure, so a wallboard shows it too. Absent from older servers. */
+  bot?: number;
   /** Absent on a wallboard without details. */
   items?: ChatQueueItem[];
 }
 
 /** The inbox cap of the provider; at the cap the count reads "200+". */
 export const CHAT_WAITING_CAP = 200;
+/** The inbox cap for chats the assistant answers (``INBOX_BOT_LIMIT``). */
+export const CHAT_BOT_CAP = 200;
 
 function secondsSince(iso: string | null | undefined): number | null {
   if (!iso) return null;
@@ -51,6 +56,7 @@ export function ChatQueueWidget({ settings, size, mode }: WidgetProps<ChatQueueS
           const oldest = secondsSince(d.oldest_waiting_since);
           const items = Array.isArray(d.items) ? d.items.slice(0, settings.limit) : [];
           const waitingText = d.waiting >= CHAT_WAITING_CAP ? `${CHAT_WAITING_CAP}+` : String(d.waiting);
+          const bot = typeof d.bot === "number" && d.bot > 0 ? d.bot : 0;
           return (
             <div className="flex h-full min-h-0 flex-col gap-3">
               <div className="flex items-end gap-6">
@@ -69,6 +75,11 @@ export function ChatQueueWidget({ settings, size, mode }: WidgetProps<ChatQueueS
                   </div>
                 )}
               </div>
+              {bot > 0 && (
+                <p className="text-xs text-muted" data-testid="chat-bot">
+                  {t("dashboards.widgets.chatQueue.bot", { n: bot >= CHAT_BOT_CAP ? `${CHAT_BOT_CAP}+` : String(bot) })}
+                </p>
+              )}
               {d.waiting > 0 && oldest !== null && (
                 <p className="text-xs text-muted" data-testid="chat-oldest">
                   {t("dashboards.widgets.chatQueue.oldest", { d: humanDuration(t, oldest) })}

@@ -3,6 +3,10 @@
 Reuses the agent inbox (:func:`tiqora.webchat.agent.list_inbox`), so the scoping is exactly the
 inbox's. ``waiting`` counts up to ``INBOX_WAITING_LIMIT`` (200). The dashboard filter does not
 apply, and the visitor's name never leaves this provider.
+
+``bot`` counts the chats the AI assistant is answering (status ``bot``, same ``rw`` filter, up to
+``INBOX_BOT_LIMIT``, 200). A bot chat is not waiting for a human, so it is never in ``waiting``
+or ``items``; the widget shows the count on its own (ruling M5: count only, never items).
 """
 
 from __future__ import annotations
@@ -43,6 +47,7 @@ async def run_chat_queue(ctx: ProviderContext, settings: ChatQueueSettings) -> d
             "waiting": 0,
             "oldest_waiting_since": None,
             "mine": 0,
+            "bot": 0,
             "items": [],
         }
     inbox = await list_inbox(ctx.session, user_id=ctx.user_id)
@@ -52,6 +57,7 @@ async def run_chat_queue(ctx: ProviderContext, settings: ChatQueueSettings) -> d
         "waiting": len(waiting),
         "oldest_waiting_since": _iso(waiting[0].waiting_since) if waiting else None,
         "mine": len(inbox.mine),
+        "bot": len(inbox.bot),
         "items": [
             {
                 "session_id": w.session_id,

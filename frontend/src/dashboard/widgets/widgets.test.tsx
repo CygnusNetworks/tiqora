@@ -738,6 +738,26 @@ describe("core.chat-queue", () => {
     expect(screen.queryByTestId("chat-mine")).toBeNull();
   });
 
+  it("counts the chats the assistant answers apart from the waiting ones, also on a wallboard", async () => {
+    await renderWidget("core.chat-queue", {}, { status: "ok", data: { enabled: true, waiting: 1, oldest_waiting_since: minutesAgo(2), mine: 0, bot: 3, items: [item(1, "A", 2)] } });
+    expect(screen.getByTestId("chat-waiting")).toHaveTextContent("1");
+    expect(screen.getByTestId("chat-bot")).toHaveTextContent("Mit KI im Gespräch: 3");
+    cleanup();
+    await renderWidget("core.chat-queue", {}, { status: "ok", data: { enabled: true, waiting: 0, oldest_waiting_since: null, bot: 250 } }, "wallboard", {}, () => {}, {
+      kiosk: true,
+    });
+    expect(screen.getByTestId("chat-bot")).toHaveTextContent("Mit KI im Gespräch: 200+");
+    expect(screen.queryByTestId(/^chat-item-/)).toBeNull();
+  });
+
+  it("shows no assistant line when no chat is with the AI or an older server sends no count", async () => {
+    await renderWidget("core.chat-queue", {}, { status: "ok", data: { enabled: true, waiting: 2, oldest_waiting_since: minutesAgo(3), mine: 0, bot: 0, items: [] } });
+    expect(screen.queryByTestId("chat-bot")).toBeNull();
+    cleanup();
+    await renderWidget("core.chat-queue", {}, { status: "ok", data: { enabled: true, waiting: 2, oldest_waiting_since: minutesAgo(3), mine: 0, items: [] } });
+    expect(screen.queryByTestId("chat-bot")).toBeNull();
+  });
+
   it("says so when the web chat is not set up", async () => {
     await renderWidget("core.chat-queue", {}, { status: "ok", data: { enabled: false, waiting: 0, oldest_waiting_since: null, mine: 0, items: [] } });
     expect(screen.getByText("Web-Chat ist nicht eingerichtet.")).toBeVisible();

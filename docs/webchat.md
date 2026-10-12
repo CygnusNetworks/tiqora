@@ -19,7 +19,8 @@ bot  -> ended/abandoned   visitor ends, agent ends, idle sweep
 ```
 
 `bot` is a live status: the sweep, uploads, typing, end and the agent inbox treat it like `waiting`/`active`.
-A bot chat is not "waiting": it does not ring and is not counted in `core.chat-queue.waiting`.
+A bot chat is not "waiting": it does not ring and is not counted in `core.chat-queue.waiting`. The dashboard
+widget counts it separately in `core.chat-queue.bot` (count only, never items; kept on wallboard links).
 
 ## Assistant availability
 

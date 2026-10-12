@@ -156,13 +156,17 @@ def test_chat_queue_drops_items_and_never_carries_a_visitor_name() -> None:
         "waiting": 2,
         "oldest_waiting_since": "2026-10-01T08:00:00Z",
         "mine": 1,
+        "bot": 4,
         "items": [{"session_id": "s", "tn": "1", "title": "t", "visitor_name": "Max Beispiel"}],
     }
     plain = redact("core.chat-queue", chat, show_details=False)
     assert plain.data is not None and "items" not in plain.data and plain.data["waiting"] == 2
+    # M5: the count of chats the AI answers is a team figure and stays on the wall
+    assert plain.data["bot"] == 4
     detailed = redact("core.chat-queue", chat, show_details=True)
     assert detailed.data is not None and "visitor_name" not in json.dumps(detailed.data)
     assert detailed.data["items"][0]["tn"] == "1"
+    assert detailed.data["bot"] == 4
 
 
 def test_ai_provider_costs_always_dropped() -> None:
