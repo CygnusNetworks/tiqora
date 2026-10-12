@@ -111,6 +111,83 @@ async def load_active_revision(session: AsyncSession, kind: RevisionKind) -> Loa
     return LoadedRevision(info=cached.info, dump=json.loads(cached.config))
 
 
+MAX_REVISION_LIST = 200
+
+
+async def list_revisions(
+    session: AsyncSession, kind: RevisionKind, limit: int = 50
+) -> list[RevisionInfo]:
+    """Newest revisions first, without ``config``; ``limit`` is clamped to 1..200."""
+    model = _model(kind)
+    rows = await session.execute(
+        select(
+            model.id,
+            model.source,
+            model.checksum,
+            model.entity_count,
+            model.deployed_at,
+            model.deployed_by,
+        )
+        .order_by(model.id.desc())
+        .limit(max(1, min(limit, MAX_REVISION_LIST)))
+    )
+    return [
+        RevisionInfo(
+            id=r.id,
+            kind=kind,
+            source=r.source,
+            checksum=r.checksum,
+            entity_count=r.entity_count,
+            deployed_at=r.deployed_at,
+            deployed_by=r.deployed_by,
+        )
+        for r in rows
+    ]
+
+
+async def load_revision(
+    session: AsyncSession, kind: RevisionKind, revision_id: int
+) -> LoadedRevision | None:
+    """One revision with its parsed dump, or ``None``. Not cached (history views are rare)."""
+    model = _model(kind)
+    row = (
+        await session.execute(
+            select(
+                model.id,
+                model.source,
+                model.checksum,
+                model.entity_count,
+                model.deployed_at,
+                model.deployed_by,
+                model.config,
+            ).where(model.id == revision_id)
+        )
+    ).first()
+    if row is None:
+        return None
+    info = RevisionInfo(
+        id=row.id,
+        kind=kind,
+        source=row.source,
+        checksum=row.checksum,
+        entity_count=row.entity_count,
+        deployed_at=row.deployed_at,
+        deployed_by=row.deployed_by,
+    )
+    return LoadedRevision(info=info, dump=json.loads(row.config))
+
+
+async def previous_revision_id(
+    session: AsyncSession, kind: RevisionKind, revision_id: int
+) -> int | None:
+    model = _model(kind)
+    return (
+        await session.execute(
+            select(model.id).where(model.id < revision_id).order_by(model.id.desc()).limit(1)
+        )
+    ).scalar_one_or_none()
+
+
 async def record_revision(
     session: AsyncSession,
     kind: RevisionKind,

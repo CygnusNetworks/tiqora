@@ -11,12 +11,14 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import select
 
 from tiqora.api.deps import AppSettings, DbSession
+from tiqora.api.v1.admin.deploy_status import RevisionOut
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.db.legacy.process_management import PmActivity, PmProcess
+from tiqora.deployed.store import list_revisions, previous_revision_id
 from tiqora.domain.ownership import get_ownership_state
 from tiqora.process.designer.catalog import build_designer_catalog
 from tiqora.process.designer.draft import (
@@ -31,6 +33,12 @@ from tiqora.process.designer.exchange import (
     ProcessImportOut,
     export_process_yaml,
     import_process_yaml,
+)
+from tiqora.process.designer.revisions import (
+    RestoreIn,
+    RevisionDiffOut,
+    diff_stored_revisions,
+    restore_process_from_revision,
 )
 from tiqora.process.designer.schemas import (
     DesignerCatalogOut,
@@ -272,6 +280,60 @@ async def import_process(
             ProcessWriter(session, user_id=admin.id),
             body.content,
             overwrite_existing=body.overwrite_existing,
+        )
+        await session.commit()
+        return result
+
+
+@router.get("/revisions", response_model=list[RevisionOut])
+async def get_revisions(
+    admin: AdminUser,
+    session: DbSession,
+    kind: Literal["process"] = "process",
+    limit: int = Query(50, ge=1, le=200),
+) -> list[RevisionOut]:
+    """Deployed process revisions, newest first."""
+    _ = admin
+    return [
+        RevisionOut(
+            id=r.id,
+            source=r.source,
+            entity_count=r.entity_count,
+            deployed_at=r.deployed_at,
+            deployed_by=r.deployed_by,
+        )
+        for r in await list_revisions(session, kind, limit)
+    ]
+
+
+@router.get("/revisions/{revision_id}/diff", response_model=RevisionDiffOut)
+async def get_revision_diff(
+    revision_id: int,
+    admin: AdminUser,
+    session: DbSession,
+    against: int | None = Query(None, ge=0),
+    process: str | None = None,
+) -> RevisionDiffOut:
+    """Compare a revision with ``against`` (default: the one before it; 0 = empty)."""
+    _ = admin
+    with _mapped_errors():
+        previous = await previous_revision_id(session, "process", revision_id)
+        return await diff_stored_revisions(
+            session, revision_id, against, process or None, previous=previous
+        )
+
+
+@router.post("/revisions/{revision_id}/restore", response_model=ProcessDraftOut)
+async def restore_revision(
+    revision_id: int, body: RestoreIn, admin: AdminUser, session: DbSession
+) -> ProcessDraftOut:
+    """Write one process of a deployed revision back as a draft (nothing is deleted)."""
+    with _mapped_errors():
+        result = await restore_process_from_revision(
+            session,
+            ProcessWriter(session, user_id=admin.id),
+            revision_id=revision_id,
+            process_entity_id=body.process_entity_id,
         )
         await session.commit()
         return result

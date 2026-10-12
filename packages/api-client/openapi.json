@@ -14317,6 +14317,47 @@
         "title": "EmailSecurityIn",
         "type": "object"
       },
+      "EntityChangeOut": {
+        "properties": {
+          "change": {
+            "enum": [
+              "added",
+              "removed",
+              "changed"
+            ],
+            "title": "Change",
+            "type": "string"
+          },
+          "changed_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Keys",
+            "type": "array"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "entity_type": {
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entity_type",
+          "entity_id",
+          "name",
+          "change",
+          "changed_keys"
+        ],
+        "title": "EntityChangeOut",
+        "type": "object"
+      },
       "EntityCreateIn": {
         "properties": {
           "config": {
@@ -27572,6 +27613,19 @@
         "title": "ResolvedCustomerLink",
         "type": "object"
       },
+      "RestoreIn": {
+        "properties": {
+          "process_entity_id": {
+            "title": "Process Entity Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "process_entity_id"
+        ],
+        "title": "RestoreIn",
+        "type": "object"
+      },
       "ResultColumnOut": {
         "properties": {
           "grain": {
@@ -27646,6 +27700,54 @@
           "label_key"
         ],
         "title": "ResultColumnOut",
+        "type": "object"
+      },
+      "RevisionDiffOut": {
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/EntityChangeOut"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "from_revision": {
+            "title": "From Revision",
+            "type": "integer"
+          },
+          "process_entity_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Entity Id"
+          },
+          "to_revision": {
+            "title": "To Revision",
+            "type": "integer"
+          },
+          "yaml_after": {
+            "title": "Yaml After",
+            "type": "string"
+          },
+          "yaml_before": {
+            "title": "Yaml Before",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from_revision",
+          "to_revision",
+          "process_entity_id",
+          "changes",
+          "yaml_before",
+          "yaml_after"
+        ],
+        "title": "RevisionDiffOut",
         "type": "object"
       },
       "RevisionOut": {
@@ -59030,6 +59132,292 @@
           }
         },
         "summary": "Get Validation",
+        "tags": [
+          "admin:process-designer"
+        ]
+      }
+    },
+    "/api/v1/admin/process-designer/revisions": {
+      "get": {
+        "description": "Deployed process revisions, newest first.",
+        "operationId": "get_revisions_api_v1_admin_process_designer_revisions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "const": "process",
+              "default": "process",
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RevisionOut"
+                  },
+                  "title": "Response Get Revisions Api V1 Admin Process Designer Revisions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Revisions",
+        "tags": [
+          "admin:process-designer"
+        ]
+      }
+    },
+    "/api/v1/admin/process-designer/revisions/{revision_id}/diff": {
+      "get": {
+        "description": "Compare a revision with ``against`` (default: the one before it; 0 = empty).",
+        "operationId": "get_revision_diff_api_v1_admin_process_designer_revisions__revision_id__diff_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "title": "Revision Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "against",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Against"
+            }
+          },
+          {
+            "in": "query",
+            "name": "process",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Process"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionDiffOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Revision Diff",
+        "tags": [
+          "admin:process-designer"
+        ]
+      }
+    },
+    "/api/v1/admin/process-designer/revisions/{revision_id}/restore": {
+      "post": {
+        "description": "Write one process of a deployed revision back as a draft (nothing is deleted).",
+        "operationId": "restore_revision_api_v1_admin_process_designer_revisions__revision_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "title": "Revision Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessDraftOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Revision",
         "tags": [
           "admin:process-designer"
         ]
