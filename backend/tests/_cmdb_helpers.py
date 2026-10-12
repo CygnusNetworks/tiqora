@@ -36,6 +36,7 @@ from sqlalchemy.pool import NullPool
 
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db, get_session_factory_dep
+from tiqora.cmdb.definition import AttributeDef, parse_attrs
 from tiqora.cmdb.seed import DEFAULT_CATALOG_ROWS, seed_defaults
 from tiqora.cmdb.views import create_cmdb_views, drop_cmdb_views
 from tiqora.config import Settings
@@ -46,6 +47,7 @@ from tiqora.itsm.link_type_defaults import DEFAULT_LINK_TYPES
 from tiqora.jobs.service import utc_now
 
 __all__ = [
+    "ATTRS",
     "CUSTOMER_A",
     "CUSTOMER_B",
     "GROUP_HIDDEN",
@@ -66,6 +68,7 @@ __all__ = [
     "client_for",
     "cmdb_db",
     "make_class",
+    "parse_attrs",
     "set_mode",
     "to_async_url",
 ]
@@ -139,6 +142,10 @@ SERVER_ATTRS: list[dict[str, Any]] = [
         sub=[_attr("Disk", "Disk", "text", count_max=4)],
     ),
 ]
+
+
+#: ``SERVER_ATTRS`` parsed into the typed attribute tree
+ATTRS: list[AttributeDef] = parse_attrs(SERVER_ATTRS)
 
 
 def to_async_url(url: str) -> str:
