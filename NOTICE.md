@@ -17,6 +17,7 @@ reimplementing it in Python/TypeScript. See
 | `packages/znuny-addon/TiqoraSync/` (Znuny add-on package) | **GPL-3.0-only** — see its [LICENSE](./packages/znuny-addon/TiqoraSync/LICENSE) |
 | `backend/tests/fixtures/znuny-schema/*.sql` (verbatim upstream DDL/seed files) | **GPL-3.0** — © Znuny GmbH / OTRS AG, unmodified, included as test fixtures (mere aggregation); see the [NOTICE in that directory](./backend/tests/fixtures/znuny-schema/README.md) |
 | `backend/tests/fixtures/legacy-schema/**/*.sql` (multi-version OTRS/Znuny DDL fixtures) | **GPL-3.0** — © Znuny GmbH / OTRS AG, unmodified upstream `scripts/database/` files renamed to Tiqora convention; see [legacy-schema README](./backend/tests/fixtures/legacy-schema/README.md) |
+| `backend/tests/fixtures/process_samples/*.yml` (verbatim upstream process export samples from `scripts/test/sample/ProcessManagement/`) | **GPL-3.0** — © Znuny GmbH / OTRS AG, unmodified, included as test fixtures (mere aggregation); see the [README in that directory](./backend/tests/fixtures/process_samples/README.md) |
 
 ## Why the exceptions?
 

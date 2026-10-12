@@ -25,6 +25,13 @@ from tiqora.process.designer.draft import (
     load_entity,
     load_process_draft,
 )
+from tiqora.process.designer.exchange import (
+    ImportRefused,
+    ProcessImportIn,
+    ProcessImportOut,
+    export_process_yaml,
+    import_process_yaml,
+)
 from tiqora.process.designer.schemas import (
     DesignerCatalogOut,
     DesignerEntityOut,
@@ -74,7 +81,7 @@ def _mapped_errors() -> Iterator[None]:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=CONFLICT_DETAIL) from None
     except ProcessNotInactive:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=NOT_INACTIVE_DETAIL) from None
-    except InvalidReference as exc:
+    except (InvalidReference, ImportRefused) as exc:
         raise HTTPException(422, detail=str(exc)) from None
 
 
@@ -239,3 +246,32 @@ async def delete_entity(
             detail="Wird noch verwendet von: " + ", ".join(names),
         ) from None
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/processes/{process_entity_id}/export")
+async def export_process(process_entity_id: str, admin: AdminUser, session: DbSession) -> Response:
+    """Znuny-format process file (``Export_ProcessEntityID_<id>.yml``), a plain download."""
+    _ = admin
+    with _mapped_errors():
+        filename, content = await export_process_yaml(session, process_entity_id)
+    return Response(
+        content=content,
+        media_type="application/x-yaml",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/import", response_model=ProcessImportOut)
+async def import_process(
+    body: ProcessImportIn, admin: AdminUser, session: DbSession
+) -> ProcessImportOut:
+    """Import a Znuny process file as a draft; all or nothing."""
+    with _mapped_errors():
+        result = await import_process_yaml(
+            session,
+            ProcessWriter(session, user_id=admin.id),
+            body.content,
+            overwrite_existing=body.overwrite_existing,
+        )
+        await session.commit()
+        return result

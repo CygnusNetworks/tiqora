@@ -381,6 +381,68 @@ class ProcessWriter:
             return self._written(entity_type, row)  # DB/Activity.pm:480-486: no write at all
         return await self._update(entity_type, row, name=name, config=dump_znuny_yaml(cfg))
 
+    async def import_entity(
+        self,
+        entity_type: EntityType,
+        entity_id: str,
+        *,
+        name: str,
+        config: Mapping[str, Any],
+        layout: Mapping[str, Any] | None = None,
+        state_entity_id: str = "",
+    ) -> tuple[WrittenEntity, bool]:
+        """Create or update one entity under a given id (``DB/Process.pm:1485-1860``).
+
+        The import stores the file's config as it is (stringified, ``Scope`` defaulted like
+        ``ActivityUpdate``, ``DB/Activity.pm:475``) and does not re-check references: the
+        caller remapped them and writes all entities in one transaction. Returns the written
+        entity and whether a new row was created. An unchanged row is not written.
+        """
+        if not ENTITY_ID_RE.match(entity_id):
+            raise InvalidReference(f"Ungültige Kennung: {entity_id}")
+        _check_name(name)
+        cfg: dict[str, Any] = stringify_scalars(_mapping(config))
+        layout_cfg = stringify_scalars(_mapping(layout))
+        if entity_type == "Process":
+            if state_entity_id not in _PROCESS_STATES:
+                raise InvalidReference(f"Unbekannter Prozessstatus: {state_entity_id}")
+        else:
+            _scope(cfg)
+        row = await self._row(entity_type, entity_id, lock=True)
+        if row is None:
+            if entity_type == "Process":
+                written = await self._insert(
+                    "Process",
+                    entity_id,
+                    name=name,
+                    config=dump_znuny_yaml(cfg),
+                    layout=dump_znuny_yaml(layout_cfg),
+                    state_entity_id=state_entity_id,
+                )
+            else:
+                written = await self._insert(
+                    entity_type, entity_id, name=name, config=dump_znuny_yaml(cfg)
+                )
+            return written, True
+        unchanged = name == row.name and stringify_scalars(_load_yaml_mapping(row.config)) == cfg
+        if entity_type == "Process":
+            unchanged = (
+                unchanged
+                and state_entity_id == row.state_entity_id
+                and stringify_scalars(_load_yaml_mapping(row.layout)) == layout_cfg
+            )
+        if unchanged:
+            return self._written(entity_type, row), False
+        written = await self._update(
+            entity_type,
+            row,
+            name=name,
+            config=dump_znuny_yaml(cfg),
+            layout=dump_znuny_yaml(layout_cfg) if entity_type == "Process" else "",
+            state_entity_id=state_entity_id,
+        )
+        return written, False
+
     async def delete_entity(self, entity_type: SubEntityType, entity_id: str) -> None:
         row = await self._require(entity_type, entity_id, lock=True)
         used_by = await self.entity_usage(entity_type, entity_id)

@@ -3930,6 +3930,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/process-designer/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Process
+         * @description Import a Znuny process file as a draft; all or nothing.
+         */
+        post: operations["import_process_api_v1_admin_process_designer_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/process-designer/processes": {
         parameters: {
             query?: never;
@@ -3978,6 +3998,26 @@ export interface paths {
         put?: never;
         /** Copy Process */
         post: operations["copy_process_api_v1_admin_process_designer_processes__process_entity_id__copy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/process-designer/processes/{process_entity_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Process
+         * @description Znuny-format process file (``Export_ProcessEntityID_<id>.yml``), a plain download.
+         */
+        get: operations["export_process_api_v1_admin_process_designer_processes__process_entity_id__export_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -18691,6 +18731,31 @@ export interface components {
                 [key: string]: components["schemas"]["ProcessDialogOptionOut"][];
             };
         };
+        /** ProcessImportIn */
+        ProcessImportIn: {
+            /** Content */
+            content: string;
+            /**
+             * Overwrite Existing
+             * @default false
+             */
+            overwrite_existing: boolean;
+        };
+        /** ProcessImportOut */
+        ProcessImportOut: {
+            /** Created */
+            created: {
+                [key: string]: number;
+            };
+            /** Name */
+            name: string;
+            /** Process Entity Id */
+            process_entity_id: string;
+            /** Updated */
+            updated: {
+                [key: string]: number;
+            };
+        };
         /** ProcessPathOut */
         ProcessPathOut: {
             /** Process Entity Id */
@@ -33329,6 +33394,43 @@ export interface operations {
             };
         };
     };
+    import_process_api_v1_admin_process_designer_import_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessImportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessImportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_processes_api_v1_admin_process_designer_processes_get: {
         parameters: {
             query?: never;
@@ -33528,6 +33630,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProcessDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_process_api_v1_admin_process_designer_processes__process_entity_id__export_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                process_entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

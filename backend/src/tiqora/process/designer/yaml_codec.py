@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime
 from typing import Any
 
 import yaml
@@ -24,6 +25,10 @@ def stringify_scalars(data: Any) -> Any:
         return [stringify_scalars(v) for v in data]
     if data is None:
         return ""
+    if isinstance(
+        data, datetime | date
+    ):  # PyYAML resolves ``2015-03-24 14:27:18``; Perl keeps text
+        return str(data)
     if isinstance(data, bool):
         return "1" if data else "0"
     if isinstance(data, (int, float)):

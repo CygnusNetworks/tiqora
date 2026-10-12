@@ -24262,6 +24262,59 @@
         "title": "ProcessFormOptionsOut",
         "type": "object"
       },
+      "ProcessImportIn": {
+        "properties": {
+          "content": {
+            "maxLength": 1000000,
+            "title": "Content",
+            "type": "string"
+          },
+          "overwrite_existing": {
+            "default": false,
+            "title": "Overwrite Existing",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "title": "ProcessImportIn",
+        "type": "object"
+      },
+      "ProcessImportOut": {
+        "properties": {
+          "created": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Created",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "process_entity_id": {
+            "title": "Process Entity Id",
+            "type": "string"
+          },
+          "updated": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Updated",
+            "type": "object"
+          }
+        },
+        "required": [
+          "process_entity_id",
+          "name",
+          "created",
+          "updated"
+        ],
+        "title": "ProcessImportOut",
+        "type": "object"
+      },
       "ProcessPathOut": {
         "properties": {
           "process_entity_id": {
@@ -58318,6 +58371,82 @@
         ]
       }
     },
+    "/api/v1/admin/process-designer/import": {
+      "post": {
+        "description": "Import a Znuny process file as a draft; all or nothing.",
+        "operationId": "import_process_api_v1_admin_process_designer_import_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProcessImportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessImportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import Process",
+        "tags": [
+          "admin:process-designer"
+        ]
+      }
+    },
     "/api/v1/admin/process-designer/processes": {
       "get": {
         "operationId": "list_processes_api_v1_admin_process_designer_processes_get",
@@ -58750,6 +58879,79 @@
           }
         },
         "summary": "Copy Process",
+        "tags": [
+          "admin:process-designer"
+        ]
+      }
+    },
+    "/api/v1/admin/process-designer/processes/{process_entity_id}/export": {
+      "get": {
+        "description": "Znuny-format process file (``Export_ProcessEntityID_<id>.yml``), a plain download.",
+        "operationId": "export_process_api_v1_admin_process_designer_processes__process_entity_id__export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "process_entity_id",
+            "required": true,
+            "schema": {
+              "title": "Process Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Process",
         "tags": [
           "admin:process-designer"
         ]
