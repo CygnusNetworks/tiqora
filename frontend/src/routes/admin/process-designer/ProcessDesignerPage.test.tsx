@@ -163,6 +163,21 @@ describe("ProcessDesignerPage", () => {
       await waitFor(() => expect(screen.getByTestId("process-designer-save")).toBeDisabled());
     });
 
+    it("changing the process state in the panel marks the draft dirty and is saved with the canvas", async () => {
+      updateProcess.mockResolvedValue({ ...draft, state_entity_id: "S3", process: { ...draft.process, version: "v2" } });
+      renderPage();
+      const save = await screen.findByTestId("process-designer-save");
+      expect(save).toBeDisabled();
+      fireEvent.click(await screen.findByTestId("process-panel-state"));
+      fireEvent.click(screen.getByTestId("process-panel-state-menu-option-S3"));
+      expect(save).toBeEnabled();
+      expect(screen.getByTestId("process-designer-dirty")).toBeInTheDocument();
+      fireEvent.click(save);
+      await waitFor(() => expect(updateProcess).toHaveBeenCalledTimes(1));
+      expect(updateProcess.mock.calls[0][1]).toMatchObject({ state_entity_id: "S3", name: "Bestellung" });
+      await waitFor(() => expect(screen.getByTestId("process-designer-save")).toBeDisabled());
+    });
+
     it("Ctrl+S saves", async () => {
       updateProcess.mockResolvedValue(draft);
       await editOnce();

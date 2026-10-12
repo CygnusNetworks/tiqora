@@ -2814,7 +2814,27 @@
       "canvasHint": "Drag a building block onto the canvas, then connect steps by dragging from one handle to another.",
       "selected": "Selected: {{name}}",
       "noSelection": "Nothing selected.",
-      "createError": "Could not create the entry."
+      "createError": "Could not create the entry.",
+      "newForm": "New form",
+      "panelProcess": {
+        "title": "Process",
+        "name": "Name",
+        "description": "Description",
+        "startStep": "Start step",
+        "startForm": "Start form",
+        "none": "None"
+      },
+      "panelActivity": {
+        "title": "Step",
+        "name": "Name",
+        "forms": "Forms (in order)",
+        "noForms": "No forms yet.",
+        "addExisting": "Add existing form",
+        "newForm": "New form",
+        "moveUp": "Move \"{{name}}\" up",
+        "moveDown": "Move \"{{name}}\" down",
+        "remove": "Remove \"{{name}}\" from the step"
+      }
     },
     "mailOutbound": {
       "title": "Појдовна е-пошта (SMTP)",

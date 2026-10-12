@@ -10,6 +10,9 @@ import { Badge } from "@/components/ui/Badge";
 import { DesignerCanvas, type Selection } from "@/components/process-designer/DesignerCanvas";
 import { EntityPalette } from "@/components/process-designer/EntityPalette";
 import { isDirty, shapeOf, type ProcessShape } from "@/components/process-designer/canvasModel";
+import { ProcessPanel, type ProcessFields, type ProcessStateId } from "@/components/process-designer/panels/ProcessPanel";
+import { ActivityPanel } from "@/components/process-designer/panels/ActivityPanel";
+import { NEW_DIALOG_CONFIG } from "@/components/process-designer/panels/activityModel";
 import { usePhoneWidth } from "@/components/process-designer/usePhoneWidth";
 
 /**
@@ -43,33 +46,54 @@ export function ProcessDesignerPage() {
 
   const stored = useMemo(() => (draft ? shapeOf(draft) : null), [draft]);
   const shape = edited ?? stored;
-  const dirty = !!(edited && stored && isDirty(edited, stored));
+  const storedFields = useMemo<ProcessFields | null>(
+    () =>
+      draft
+        ? {
+            name: draft.process.name,
+            description: (draft.process.config as { Description?: string }).Description ?? "",
+            stateEntityId: draft.state_entity_id as ProcessStateId,
+          }
+        : null,
+    [draft],
+  );
+  const [editedFields, setEditedFields] = useState<ProcessFields | null>(null);
+  const fields = editedFields ?? storedFields;
+  const fieldsDirty = !!(
+    editedFields &&
+    storedFields &&
+    (editedFields.name !== storedFields.name ||
+      editedFields.description !== storedFields.description ||
+      editedFields.stateEntityId !== storedFields.stateEntityId)
+  );
+  const dirty = fieldsDirty || !!(edited && stored && isDirty(edited, stored));
 
   const discard = useCallback(() => {
     setEdited(null);
+    setEditedFields(null);
     setSelection(null);
     setConflict(false);
     setSaveError(false);
   }, []);
 
   const save = useCallback(async () => {
-    if (!draft || !edited || !dirty || saving) return;
+    if (!draft || !shape || !fields || !dirty || saving) return;
     setSaving(true);
     setSaveError(false);
     try {
-      const cfg = draft.process.config as { Description?: string };
       const next = await processDesignerApi.updateProcess(processEntityId, {
         expected_version: draft.process.version,
-        name: draft.process.name,
-        description: cfg.Description ?? "",
-        state_entity_id: draft.state_entity_id as "S1" | "S2" | "S3",
-        path: edited.path,
-        layout: edited.layout,
-        start_activity: edited.startActivity,
-        start_activity_dialog: edited.startActivityDialog,
+        name: fields.name.trim() || draft.process.name,
+        description: fields.description,
+        state_entity_id: fields.stateEntityId,
+        path: shape.path,
+        layout: shape.layout,
+        start_activity: shape.startActivity,
+        start_activity_dialog: shape.startActivityDialog,
       });
       qc.setQueryData(draftKey, next);
       setEdited(null);
+      setEditedFields(null);
       setConflict(false);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) setConflict(true);
@@ -77,7 +101,7 @@ export function ProcessDesignerPage() {
     } finally {
       setSaving(false);
     }
-  }, [draft, edited, dirty, saving, processEntityId, qc, draftKey]);
+  }, [draft, shape, fields, dirty, saving, processEntityId, qc, draftKey]);
 
   const reload = useCallback(async () => {
     discard();
@@ -107,13 +131,15 @@ export function ProcessDesignerPage() {
 
   // New entities are created at once (like Znuny's popups) and added to the cached draft.
   const createEntity = useCallback(
-    async (type: "Activity" | "Transition", name: string, config: Record<string, unknown>) => {
+    async (type: "Activity" | "ActivityDialog" | "Transition", name: string, config: Record<string, unknown>) => {
       const created: DesignerEntity = await processDesignerApi.createEntity(type, { name, config });
       qc.setQueryData<ProcessDraft>(draftKey, (cur) =>
         cur
           ? type === "Activity"
             ? { ...cur, activities: [...cur.activities, created] }
-            : { ...cur, transitions: [...cur.transitions, created] }
+            : type === "ActivityDialog"
+              ? { ...cur, activity_dialogs: [...cur.activity_dialogs, created] }
+              : { ...cur, transitions: [...cur.transitions, created] }
           : cur,
       );
       return created.entity_id;
@@ -124,9 +150,25 @@ export function ProcessDesignerPage() {
     () => createEntity("Activity", t("admin.processDesigner.newStep"), { ActivityDialog: {} }),
     [createEntity, t],
   );
+  const createDialog = useCallback(
+    () => createEntity("ActivityDialog", t("admin.processDesigner.newForm"), { ...NEW_DIALOG_CONFIG }),
+    [createEntity, t],
+  );
   const createTransition = useCallback(
     (name: string) => createEntity("Transition", name, { ConditionLinking: "and", Condition: {} }),
     [createEntity],
+  );
+
+  const selectedActivity = useMemo(
+    () => (draft && selection?.kind === "activity" ? draft.activities.find((a) => a.entity_id === selection.id) : undefined),
+    [draft, selection],
+  );
+  const onActivitySaved = useCallback(
+    (saved: DesignerEntity) =>
+      qc.setQueryData<ProcessDraft>(draftKey, (cur) =>
+        cur ? { ...cur, activities: cur.activities.map((a) => (a.entity_id === saved.entity_id ? saved : a)) } : cur,
+      ),
+    [qc, draftKey],
   );
 
   const selectedName = useMemo(() => {
@@ -238,11 +280,31 @@ export function ProcessDesignerPage() {
                 <h2 className="text-xs font-medium uppercase tracking-wide text-muted">
                   {t("admin.processDesigner.panel")}
                 </h2>
-                <p className="mt-2 text-sm text-muted" data-testid="process-designer-selection">
-                  {selectedName
-                    ? t("admin.processDesigner.selected", { name: selectedName })
-                    : t("admin.processDesigner.noSelection")}
-                </p>
+                <div className="mt-2">
+                  {selectedActivity ? (
+                    <ActivityPanel
+                      key={`${selectedActivity.entity_id}:${selectedActivity.version}`}
+                      activity={selectedActivity}
+                      dialogs={draft.activity_dialogs}
+                      createDialog={createDialog}
+                      onSaved={onActivitySaved}
+                      onReload={() => void draftQ.refetch()}
+                    />
+                  ) : selection ? (
+                    <p className="text-sm text-muted" data-testid="process-designer-selection">
+                      {t("admin.processDesigner.selected", { name: selectedName })}
+                    </p>
+                  ) : shape && fields ? (
+                    <ProcessPanel
+                      fields={fields}
+                      shape={shape}
+                      activities={draft.activities}
+                      dialogs={draft.activity_dialogs}
+                      onFieldsChange={setEditedFields}
+                      onShapeChange={setEdited}
+                    />
+                  ) : null}
+                </div>
               </aside>
             </div>
           )}

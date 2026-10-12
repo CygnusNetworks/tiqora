@@ -2822,7 +2822,27 @@
       "canvasHint": "Ziehen Sie einen Baustein auf die Fläche und verbinden Sie Schritte, indem Sie von einem Anschluss zum nächsten ziehen.",
       "selected": "Ausgewählt: {{name}}",
       "noSelection": "Nichts ausgewählt.",
-      "createError": "Der Eintrag konnte nicht angelegt werden."
+      "createError": "Der Eintrag konnte nicht angelegt werden.",
+      "newForm": "Neues Formular",
+      "panelProcess": {
+        "title": "Prozess",
+        "name": "Name",
+        "description": "Beschreibung",
+        "startStep": "Startschritt",
+        "startForm": "Startformular",
+        "none": "Keine Auswahl"
+      },
+      "panelActivity": {
+        "title": "Schritt",
+        "name": "Name",
+        "forms": "Formulare (in Reihenfolge)",
+        "noForms": "Noch keine Formulare.",
+        "addExisting": "Vorhandenes Formular hinzufügen",
+        "newForm": "Neues Formular",
+        "moveUp": "„{{name}}“ nach oben",
+        "moveDown": "„{{name}}“ nach unten",
+        "remove": "„{{name}}“ aus dem Schritt entfernen"
+      }
     },
     "mailOutbound": {
       "title": "Ausgehende E-Mail (SMTP)",
