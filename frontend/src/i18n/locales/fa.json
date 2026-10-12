@@ -3427,6 +3427,14 @@
         "gi_debug_cleanup": {
           "name": "Clean up web service log",
           "description": "Deletes old entries of the web service log."
+        },
+        "scim_role_sync": {
+          "name": "Roles from provisioned groups",
+          "description": "Applies group changes from the identity provider to roles and groups in Tiqora."
+        },
+        "scim_events_purge": {
+          "name": "Clean up provisioning log",
+          "description": "Deletes SCIM log entries after the retention period."
         }
       },
       "takeoverBadge": "تصاحب",
@@ -4335,7 +4343,8 @@
         "mapping": "Mapping",
         "roles": "Roles from the sign-in service",
         "test": "Test sign-in",
-        "links": "Links"
+        "links": "Links",
+        "provisioning": "Provisioning (SCIM)"
       },
       "sections": {
         "general": "General",
@@ -4660,7 +4669,8 @@
         "managedAssignment": "Assignment",
         "managedSince": "Since",
         "managedRole": "Role {{name}}",
-        "managedGroup": "Group {{name}} ({{permission}})"
+        "managedGroup": "Group {{name}} ({{permission}})",
+        "scimHint": "For groups from provisioning: attribute scim:groups (group name) or scim:group_ids (ID at the identity provider)."
       },
       "links": {
         "intro": "These accounts signed in through this sign-in service. When a link is removed, the account is matched again on its next sign-in.",
@@ -4678,6 +4688,109 @@
         "kinds": {
           "agent": "Agent",
           "customer": "Customer"
+        }
+      },
+      "scim": {
+        "title": "Provisioning (SCIM)",
+        "intro": "The identity provider creates, changes and deactivates accounts and groups automatically. Enter the SCIM address and a key there.",
+        "enabled": "Provisioning active",
+        "enabledHelp": "While provisioning is off, Tiqora rejects every SCIM request.",
+        "adopt": "Adopt existing accounts",
+        "adoptHelp": "An account with the same login name is managed by the identity provider from the first sync on, even if it is deactivated. The system account (ID 1) is never adopted. The identity provider can deactivate adopted administrators.",
+        "baseUrl": "SCIM address",
+        "baseUrlMissing": "The public address of Tiqora is not set (TIQORA_PUBLIC_BASE_URL). Enter the external address of your installation plus /scim/v2 at the identity provider.",
+        "unavailable": "Provisioning is only available for OpenID Connect and SAML providers created in the admin area, not for LDAP.",
+        "envReadOnly": "This identity provider is configured through environment variables. Provisioning is only available for providers created in the admin area; re-create the provider there.",
+        "loadError": "Provisioning could not be loaded.",
+        "range": "{{from}}–{{to}} of {{total}}",
+        "prev": "Previous",
+        "next": "Next",
+        "kinds": {
+          "agent": "Agents",
+          "customer": "Customers"
+        },
+        "tokens": {
+          "title": "Keys",
+          "empty": "No key created yet.",
+          "create": "Create key",
+          "createdTitle": "Key created",
+          "name": "Name",
+          "userKind": "Kind",
+          "hint": "Key",
+          "expiresInDays": "Valid for (days)",
+          "daysRange": "Enter a whole number from 1 to {{max}}.",
+          "created": "Created",
+          "copyHint": "The key is shown only now. Please copy it and enter it at the identity provider.",
+          "done": "Done",
+          "cancel": "Cancel",
+          "createError": "The key could not be created.",
+          "revoke": "Revoke",
+          "revokeTitle": "Revoke key?",
+          "revokeConfirm": "The key \"{{name}}\" becomes invalid immediately. The identity provider can no longer sync accounts afterwards.",
+          "revokeError": "The key could not be revoked.",
+          "expires": "Valid until",
+          "lastUsed": "Last used",
+          "never": "never",
+          "status": "Status",
+          "activeState": "Active",
+          "revoked": "Revoked",
+          "expired": "Expired"
+        },
+        "counts": {
+          "users": "Accounts",
+          "active": "of which active",
+          "groups": "Groups",
+          "pending": "Role sync pending"
+        },
+        "accounts": {
+          "title": "Provisioned accounts",
+          "search": "Search",
+          "empty": "No accounts found.",
+          "active": "Active",
+          "inactive": "Deactivated",
+          "deleted": "Deleted",
+          "login": "Account",
+          "userName": "User name",
+          "externalId": "ID at the identity provider",
+          "changed": "Changed"
+        },
+        "groups": {
+          "title": "Groups from the identity provider",
+          "empty": "No groups pushed yet.",
+          "name": "Name",
+          "members": "Members",
+          "rulesHint": "Groups take effect through rules with the attribute scim:groups on the \"Roles\" tab."
+        },
+        "events": {
+          "title": "Log",
+          "empty": "No entries.",
+          "failuresOnly": "Errors only",
+          "more": "Load more",
+          "loadError": "The log could not be loaded.",
+          "time": "Time",
+          "request": "Request",
+          "operationLabel": "Operation",
+          "status": "Status",
+          "operation": {
+            "create": "Created",
+            "adopt": "Adopted",
+            "revive": "Re-created",
+            "replace": "Replaced",
+            "patch": "Changed",
+            "deactivate": "Deactivated",
+            "reactivate": "Reactivated",
+            "delete": "Deleted",
+            "conflict": "Conflict",
+            "rejected": "Rejected",
+            "auth_failed": "Authentication failed",
+            "rate_limited": "Rate limited",
+            "token_create": "Key created",
+            "token_revoke": "Key revoked",
+            "group_create": "Group created",
+            "group_replace": "Group replaced",
+            "group_patch": "Group changed",
+            "group_delete": "Group deleted"
+          }
         }
       }
     },

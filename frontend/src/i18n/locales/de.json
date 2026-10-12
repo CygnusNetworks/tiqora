@@ -3435,6 +3435,14 @@
         "gi_debug_cleanup": {
           "name": "Webservice-Protokoll aufräumen",
           "description": "Löscht alte Einträge des Webservice-Protokolls."
+        },
+        "scim_role_sync": {
+          "name": "Rollen aus Gruppen der Bereitstellung",
+          "description": "Überträgt Gruppenänderungen vom Anmeldedienst auf Rollen und Gruppen in Tiqora."
+        },
+        "scim_events_purge": {
+          "name": "Bereitstellungsprotokoll aufräumen",
+          "description": "Löscht Einträge des SCIM-Protokolls nach Ablauf der Aufbewahrungsfrist."
         }
       },
       "takeoverBadge": "Übernahme",
@@ -4343,7 +4351,8 @@
         "mapping": "Zuordnung",
         "roles": "Rollen aus dem Anmeldedienst",
         "test": "Testanmeldung",
-        "links": "Verknüpfungen"
+        "links": "Verknüpfungen",
+        "provisioning": "Bereitstellung (SCIM)"
       },
       "sections": {
         "general": "Allgemein",
@@ -4668,7 +4677,8 @@
         "managedAssignment": "Zuordnung",
         "managedSince": "Seit",
         "managedRole": "Rolle {{name}}",
-        "managedGroup": "Gruppe {{name}} ({{permission}})"
+        "managedGroup": "Gruppe {{name}} ({{permission}})",
+        "scimHint": "Für Gruppen aus der Bereitstellung: Attribut scim:groups (Gruppenname) oder scim:group_ids (Kennung beim Anmeldedienst)."
       },
       "links": {
         "intro": "Diese Konten haben sich über diesen Anmeldedienst angemeldet. Wird eine Verknüpfung gelöst, wird bei der nächsten Anmeldung neu zugeordnet, sofern das Konto wieder gefunden wird oder automatisches Anlegen aktiv ist. Sonst wird die Anmeldung abgewiesen.",
@@ -4686,6 +4696,109 @@
         "kinds": {
           "agent": "Agent",
           "customer": "Kunde"
+        }
+      },
+      "scim": {
+        "title": "Bereitstellung (SCIM)",
+        "intro": "Der Anmeldedienst legt Konten und Gruppen automatisch an, ändert und deaktiviert sie. Tragen Sie dort die SCIM-Adresse und einen Schlüssel ein.",
+        "enabled": "Bereitstellung aktiv",
+        "enabledHelp": "Solange die Bereitstellung aus ist, weist Tiqora alle SCIM-Anfragen ab.",
+        "adopt": "Vorhandene Konten übernehmen",
+        "adoptHelp": "Ein Konto mit gleichem Anmeldenamen wird beim ersten Abgleich vom Anmeldedienst verwaltet – auch deaktiviert. Das Systemkonto (ID 1) wird nie übernommen. Übernommene Administratoren kann der Anmeldedienst deaktivieren.",
+        "baseUrl": "SCIM-Adresse",
+        "baseUrlMissing": "Die öffentliche Adresse von Tiqora ist nicht eingestellt (TIQORA_PUBLIC_BASE_URL). Tragen Sie beim Anmeldedienst die externe Adresse Ihrer Installation mit dem Zusatz /scim/v2 ein.",
+        "unavailable": "Die Bereitstellung ist nur für OpenID-Connect- und SAML-Anmeldedienste aus der Verwaltung möglich, nicht für LDAP.",
+        "envReadOnly": "Dieser Anmeldedienst ist über Umgebungsvariablen eingerichtet. Die Bereitstellung steht nur für Anmeldedienste aus der Verwaltung zur Verfügung; legen Sie den Dienst dort neu an.",
+        "loadError": "Die Bereitstellung konnte nicht geladen werden.",
+        "range": "{{from}}–{{to}} von {{total}}",
+        "prev": "Zurück",
+        "next": "Weiter",
+        "kinds": {
+          "agent": "Agenten",
+          "customer": "Kunden"
+        },
+        "tokens": {
+          "title": "Schlüssel",
+          "empty": "Noch kein Schlüssel erzeugt.",
+          "create": "Schlüssel erzeugen",
+          "createdTitle": "Schlüssel erzeugt",
+          "name": "Name",
+          "userKind": "Art",
+          "hint": "Schlüssel",
+          "expiresInDays": "Gültigkeit in Tagen",
+          "daysRange": "Bitte geben Sie eine ganze Zahl von 1 bis {{max}} ein.",
+          "created": "Erzeugt",
+          "copyHint": "Der Schlüssel wird nur jetzt angezeigt. Bitte kopieren Sie ihn und tragen Sie ihn beim Anmeldedienst ein.",
+          "done": "Fertig",
+          "cancel": "Abbrechen",
+          "createError": "Der Schlüssel konnte nicht erzeugt werden.",
+          "revoke": "Widerrufen",
+          "revokeTitle": "Schlüssel widerrufen?",
+          "revokeConfirm": "Der Schlüssel „{{name}}“ wird sofort ungültig. Der Anmeldedienst kann danach keine Konten mehr abgleichen.",
+          "revokeError": "Der Schlüssel konnte nicht widerrufen werden.",
+          "expires": "Gültig bis",
+          "lastUsed": "Zuletzt benutzt",
+          "never": "nie",
+          "status": "Status",
+          "activeState": "Aktiv",
+          "revoked": "Widerrufen",
+          "expired": "Abgelaufen"
+        },
+        "counts": {
+          "users": "Konten",
+          "active": "davon aktiv",
+          "groups": "Gruppen",
+          "pending": "Rollenabgleich offen"
+        },
+        "accounts": {
+          "title": "Bereitgestellte Konten",
+          "search": "Suchen",
+          "empty": "Keine Konten gefunden.",
+          "active": "Aktiv",
+          "inactive": "Deaktiviert",
+          "deleted": "Gelöscht",
+          "login": "Konto",
+          "userName": "Benutzername",
+          "externalId": "Kennung beim Anmeldedienst",
+          "changed": "Geändert"
+        },
+        "groups": {
+          "title": "Gruppen vom Anmeldedienst",
+          "empty": "Noch keine Gruppen übertragen.",
+          "name": "Name",
+          "members": "Mitglieder",
+          "rulesHint": "Gruppen wirken über Regeln mit dem Attribut scim:groups im Reiter „Rollen“."
+        },
+        "events": {
+          "title": "Protokoll",
+          "empty": "Keine Einträge.",
+          "failuresOnly": "Nur Fehler",
+          "more": "Weitere laden",
+          "loadError": "Das Protokoll konnte nicht geladen werden.",
+          "time": "Zeit",
+          "request": "Anfrage",
+          "operationLabel": "Vorgang",
+          "status": "Status",
+          "operation": {
+            "create": "Angelegt",
+            "adopt": "Übernommen",
+            "revive": "Wieder angelegt",
+            "replace": "Ersetzt",
+            "patch": "Geändert",
+            "deactivate": "Deaktiviert",
+            "reactivate": "Reaktiviert",
+            "delete": "Gelöscht",
+            "conflict": "Konflikt",
+            "rejected": "Abgewiesen",
+            "auth_failed": "Anmeldung fehlgeschlagen",
+            "rate_limited": "Begrenzt",
+            "token_create": "Schlüssel erzeugt",
+            "token_revoke": "Schlüssel widerrufen",
+            "group_create": "Gruppe angelegt",
+            "group_replace": "Gruppe ersetzt",
+            "group_patch": "Gruppe geändert",
+            "group_delete": "Gruppe gelöscht"
+          }
         }
       }
     },

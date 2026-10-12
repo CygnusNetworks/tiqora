@@ -1898,6 +1898,46 @@ const identitySummaries = [
   { id: 3, slug: "adfs", kind: "saml", source: "db", name: "AD FS", audience: "agent", enabled: false, sort: 2, button_label: null, button_icon: "building", preset: "adfs", jit_enabled: false, read_only: false, metadata_error: null, link_count: 0 },
 ];
 
+const demoScimToken = {
+  id: 1,
+  name: "Entra ID",
+  user_kind: "agent" as const,
+  token_hint: "1a2b",
+  created_at: "2026-09-01T08:00:00Z",
+  created_by_name: "Jane Doe",
+  expires_at: "2027-09-01T08:00:00Z",
+  revoked_at: null,
+  last_used_at: "2026-10-12T07:15:00Z",
+  active: true,
+};
+const demoScimStatus = {
+  base_url: "https://demo.example.org/scim/v2",
+  available: true,
+  reason: null,
+  enabled: true,
+  adopt_existing: false,
+  tokens: [demoScimToken],
+  users: 3,
+  active_users: 2,
+  groups: 2,
+  pending_sync: 0,
+  last_activity_at: "2026-10-12T07:15:00Z",
+};
+const demoScimAccounts = [
+  { scim_id: "6f1c0a52-0000-4000-8000-000000000001", user_kind: "agent" as const, user_id: 11, login: "jane.doe", user_name: "jane.doe@example.org", external_id: "a1b2c3", active: true, deleted: false, changed: "2026-10-10T09:00:00Z" },
+  { scim_id: "6f1c0a52-0000-4000-8000-000000000002", user_kind: "agent" as const, user_id: 12, login: "max.muster", user_name: "max.muster@example.org", external_id: "d4e5f6", active: true, deleted: false, changed: "2026-10-11T09:00:00Z" },
+  { scim_id: "6f1c0a52-0000-4000-8000-000000000003", user_kind: "agent" as const, user_id: 13, login: "erika.beispiel", user_name: "erika.beispiel@example.org", external_id: null, active: false, deleted: false, changed: "2026-10-12T06:30:00Z" },
+];
+const demoScimGroups = [
+  { scim_id: "7a2d1b63-0000-4000-8000-000000000001", display_name: "support", external_id: "g-100", member_count: 2, changed: "2026-10-10T09:00:00Z" },
+  { scim_id: "7a2d1b63-0000-4000-8000-000000000002", display_name: "billing", external_id: "g-200", member_count: 1, changed: "2026-10-11T09:00:00Z" },
+];
+const demoScimEvents = [
+  { id: 3, created: "2026-10-12T07:15:00Z", method: "PATCH", resource: "Users", operation: "deactivate", status: 200, scim_id: "6f1c0a52-0000-4000-8000-000000000003", user_kind: "agent" as const, user_id: 13, login: "erika.beispiel", detail: null },
+  { id: 2, created: "2026-10-11T09:00:00Z", method: "POST", resource: "Users", operation: "conflict", status: 409, scim_id: null, user_kind: "agent" as const, user_id: null, login: null, detail: "uniqueness" },
+  { id: 1, created: "2026-10-10T09:00:00Z", method: "POST", resource: "Users", operation: "create", status: 201, scim_id: "6f1c0a52-0000-4000-8000-000000000001", user_kind: "agent" as const, user_id: 11, login: "jane.doe", detail: null },
+];
+
 function identityDetail(id: number) {
   const row = identitySummaries.find((r) => r.id === id) ?? identitySummaries[0];
   const config =
@@ -2487,6 +2527,13 @@ export function resolveData(path: string, method: string): unknown | undefined {
     return { saml_available: true, saml_missing: null, public_base_url_set: true, webauthn: true, session_idle_max_seconds: 28800, session_absolute_max_seconds: 86400, scim_base_url: "https://demo.example.org/scim/v2" };
   if (p.endsWith("/admin/identity-providers") && method === "GET") return identitySummaries;
   if (p.endsWith("/admin/identity-providers") && method === "POST") return identityDetail(1);
+  if (p.match(/\/admin\/identity-providers\/\d+\/scim$/)) return demoScimStatus;
+  if (p.match(/\/admin\/identity-providers\/\d+\/scim\/tokens$/) && method === "POST")
+    return { token: "tqscim_demo0000000000000000000000000000000000000000", record: demoScimStatus.tokens[0] };
+  if (p.match(/\/admin\/identity-providers\/\d+\/scim\/tokens\/\d+$/)) return {};
+  if (p.match(/\/admin\/identity-providers\/\d+\/scim\/accounts$/)) return { total: demoScimAccounts.length, items: demoScimAccounts };
+  if (p.match(/\/admin\/identity-providers\/\d+\/scim\/groups$/)) return { total: demoScimGroups.length, items: demoScimGroups };
+  if (p.match(/\/admin\/identity-providers\/\d+\/scim\/events$/)) return demoScimEvents;
   if (p.match(/\/admin\/identity-providers\/\d+\/preview$/)) return identityTestResult.plan;
   if (p.match(/\/admin\/identity-providers\/\d+\/managed-assignments$/)) return identityManaged;
   if (p.match(/\/admin\/identity-providers\/\d+\/links$/)) return identityLinks;

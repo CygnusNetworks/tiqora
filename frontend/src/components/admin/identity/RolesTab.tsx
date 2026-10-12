@@ -92,6 +92,11 @@ export function RolesTab({
       <section className="space-y-3 rounded-lg border border-hairline bg-surface p-4">
         <h2 className="text-sm font-semibold text-ink">{t("admin.identity.roles.rulesHeading")}</h2>
         <p className="text-xs text-muted">{t("admin.identity.roles.rulesHelp")}</p>
+        {values.role_rules.some((r) => r.attribute.startsWith("scim:")) && (
+          <p data-testid="identity-scim-hint" className="text-xs text-muted">
+            {t("admin.identity.roles.scimHint")}
+          </p>
+        )}
         {values.role_rules.length === 0 && (
           <p data-testid="identity-rules-empty" className="text-sm text-muted">
             {t("admin.identity.roles.rulesEmpty")}
