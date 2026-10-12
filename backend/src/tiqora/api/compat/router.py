@@ -48,6 +48,7 @@ from tiqora.api.compat.provider import (
     OperationFault,
     ProviderOutcome,
     error_status_code,
+    provider_log,
     render_rest,
     rest_fault_body,
     run_provider,
@@ -77,6 +78,10 @@ from tiqora.api.compat.webservices import (
 from tiqora.api.deps import DbSession, get_session_store
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.domain.auth import SessionStore
+from tiqora.gi.config import parse_debugger
+from tiqora.gi.debug_store import DbDebugSink
+from tiqora.gi.debugger import GiDebugger
+from tiqora.security.ratelimit import client_ip
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -87,6 +92,40 @@ _OPERATION_ALIASES: dict[str, str] = {"SessionDelete": "SessionRemove"}
 _CANONICAL_OPS: frozenset[str] = frozenset(OPERATION_TYPES.values()) | frozenset(_OPERATION_ALIASES)
 
 compat_router = APIRouter(prefix="/znuny-compat", tags=["znuny-compat"])
+
+
+async def _open_debugger(
+    request: Request, webservice: Webservice, *, name: str | None
+) -> GiDebugger:
+    """The provider debugger of one webservice request (Provider.pm: ``Debugger->new`` with
+    the webservice's ``Debugger`` config) plus its ``Communication sequence started`` line.
+
+    Lines go through :class:`DbDebugSink` (own sessions), so a rolled-back operation keeps
+    its trail. The remote IP honours ``TIQORA_TRUSTED_PROXIES``.
+    """
+    factory = getattr(request.app.state, "session_factory", None)
+    if factory is None:
+        from tiqora.db.engine import get_session_factory
+
+        factory = get_session_factory()
+    settings = getattr(request.app.state, "settings", None)
+    debugger = GiDebugger(
+        sink=DbDebugSink(factory),
+        config=parse_debugger(webservice.config),
+        webservice_id=webservice.id,
+        communication_type="Provider",
+        remote_ip=client_ip(request, getattr(settings, "trusted_proxies", None)),
+        name=name,
+    )
+    # Znuny logs %ENV here; the request line is what matters (no query string, no headers:
+    # both may carry credentials)
+    await provider_log(
+        debugger,
+        "debug",
+        "Communication sequence started",
+        {"RequestMethod": request.method, "RequestURI": request.url.path},
+    )
+    return debugger
 
 
 async def _merge_params(request: Request) -> dict[str, Any]:
@@ -407,6 +446,9 @@ async def _handle_soap_request(
     try:
         parsed = parse_soap_request(body_bytes, soap_action)
     except SoapCodecError as exc:
+        if webservice is not None:
+            debugger = await _open_debugger(request, webservice, name=None)
+            await provider_log(debugger, "error", str(exc))
         fault = build_soap_fault(str(exc), fault_code="Client")
         return _soap_response(fault, "1.1", status.HTTP_400_BAD_REQUEST)
 
@@ -417,7 +459,10 @@ async def _handle_soap_request(
                 handler, data, session, session_store, request, operation_config=op
             )
 
-        outcome = await run_provider(webservice, parsed.operation, parsed.data, run_operation=_run)
+        debugger = await _open_debugger(request, webservice, name=parsed.operation)
+        outcome = await run_provider(
+            webservice, parsed.operation, parsed.data, run_operation=_run, debugger=debugger
+        )
         return _render_soap(outcome, parsed.operation, parsed.version, namespace)
 
     if parsed.operation not in _CANONICAL_OPS:
@@ -526,15 +571,19 @@ async def _serve_webservice(
     try:
         matched = match_rest_route(ws, path, request.method)
     except RouteMatchError as exc:
-        return _text_error(500, f"HTTP::REST Error while determine Operation: {exc}")
+        message = f"HTTP::REST Error while determine Operation: {exc}"
+        await provider_log(await _open_debugger(request, ws, name=None), "error", message)
+        return _text_error(500, message)
     if matched is None:
-        return _text_error(
-            500, f"HTTP::REST Error while determine Operation for request URI '{path}'."
-        )
+        message = f"HTTP::REST Error while determine Operation for request URI '{path}'."
+        await provider_log(await _open_debugger(request, ws, name=None), "error", message)
+        return _text_error(500, message)
     operation, uri_data = matched
+    debugger = await _open_debugger(request, ws, name=operation)
     try:
         data = await build_rest_request_data(request, ws, uri_data)
     except RestRequestError as exc:
+        await provider_log(debugger, "error", exc.message)
         return _text_error(exc.status, exc.message)
 
     async def _run(handler: str, op_data: dict[str, Any], op: OperationConfig) -> dict[str, Any]:
@@ -542,7 +591,7 @@ async def _serve_webservice(
             handler, op_data, session, session_store, request, operation_config=op
         )
 
-    outcome = await run_provider(ws, operation, data, run_operation=_run)
+    outcome = await run_provider(ws, operation, data, run_operation=_run, debugger=debugger)
     return render_rest(outcome)
 
 
