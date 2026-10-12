@@ -298,6 +298,15 @@ schedule's `version`. A rollback restores the item parameters but does not bring
 deleted recipient rows. Removing an agent deletes their schedules, run history and run
 files, and drops them as a recipient of other schedules.
 
+Stored run files (`tiqora_report_run_file`: the PDF/XLSX/CSV that was mailed) hold the
+report data as it was at run time, including customer logins and names if the report
+shows them, and are not rewritten by an erasure. Like the job files they are kept for
+`reporting.run_retention_days` (default 90, at most 365) and then purged. The run
+history and `tiqora_mail_log` rows of deliveries contain no recipient addresses (only
+"n Empfänger (Bcc)" and anonymised problem texts), so there is nothing to scrub there.
+Scheduled mails do not redact personal columns for external recipients; whoever may
+share reports decides what leaves the system.
+
 ### Caveats
 
 - **Parallel operation with Znuny.** The admin API bypasses the ownership

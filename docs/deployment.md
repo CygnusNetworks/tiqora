@@ -407,6 +407,37 @@ sharing needs `rw` on the Znuny `stats` group (or admin); `stats_group` requires
 on that group to view and `rw` to save. Long runs (builder preview, saved report
 runs) use the job system, so the same one-worker and 90 s nginx notes apply.
 
+### PDF reports and scheduled delivery
+
+- **Image.** PDF rendering uses WeasyPrint (Python dependency `weasyprint>=63,<71`),
+  which needs native libraries. The runtime image installs `libpango-1.0-0`,
+  `libpangoft2-1.0-0`, `libharfbuzz0b`, `libharfbuzz-subset0`, `libfontconfig1` and
+  `fonts-dejavu-core` (the PDF font, also for umlauts); expect a noticeable size
+  increase (Pango, HarfBuzz and their dependencies; compare `docker images` before and
+  after on your platform). Custom images need
+  the same packages; CI sets `TIQORA_REQUIRE_PDF=1` so a missing library fails the
+  tests instead of skipping them.
+- **Worker services.** `report_scheduler` (queues due deliveries, interval
+  `TIQORA_REPORT_SCHEDULER_INTERVAL`, default 60 s, 15 to 3600) and `report_runs_purge`
+  (run-history retention); switches `daemon.report_scheduler.enabled` and
+  `daemon.report_runs_purge.enabled` (default on, they only write `tiqora_*` tables),
+  visible on the Admin Dienste page. Run one worker; deliveries are jobs in the default
+  lane and use one of its slots while rendering.
+- **Sender address.** A scheduled mail needs a usable sender: the Tiqora setting
+  `notification.sender_email`, else Znuny's `NotificationSenderEmail` when it is a real
+  address (the stock `znuny@<fqdn>` placeholder is not). Without one every run fails
+  with "Kein Absender für Berichte eingerichtet". Outbound SMTP is the same as for
+  article mails.
+- **Link in mails.** Set `TIQORA_PUBLIC_BASE_URL` (for example `https://tiqora.example.org`);
+  the footer links to the schedule. Empty means no link.
+- **Settings** (Admin, Berichte): `reporting.schedule_external_recipients` (default off:
+  only agents, groups and roles), `schedule_max_recipients` (50),
+  `run_retention_days` (90, max 365), `pdf_row_limit` (1000 per report),
+  `delivery_max_attachment_mb` (15).
+- **Znuny stats import** needs no configuration; it reads `xml_storage` read-only and runs
+  inline within the 75 s budget.
+- **Migration.** `20261010_0074` adds the schedule and run tables (`tiqora migrate upgrade`).
+
 ## Reverse proxy sketch
 
 ```
