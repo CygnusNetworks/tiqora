@@ -78,6 +78,11 @@ async def test_veto_is_permanent_550(monkeypatch: pytest.MonkeyPatch) -> None:
     assert smtp_reply_codes(exc.value) == [550]
     assert is_permanent_smtp_failure(exc.value)
     assert "Empfänger gesperrt" in str(exc.value)
+    # D9: the agent must see that an extension refused the mail, not the relay
+    text = str(exc.value)
+    assert text.startswith("Versand durch Erweiterung „")
+    assert "abgelehnt: Empfänger gesperrt" in text
+    assert "(550" not in text
     assert sent == []
 
 

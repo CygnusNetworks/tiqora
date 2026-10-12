@@ -115,6 +115,10 @@ class OutboundMailVetoed(aiosmtplib.SMTPResponseException):
     def __init__(self, message: str) -> None:
         super().__init__(550, message)
 
+    def __str__(self) -> str:
+        # SMTPResponseException prints "(550, '...')", which reads like a relay rejection.
+        return self.message
+
 
 @dataclass(slots=True)
 class OutboundMail:
@@ -310,9 +314,11 @@ async def run_outbound_filters(message: EmailMessage) -> dict[str, str]:
             timeout=budget.timeout_for(min(float(f.timeout_seconds), OUTBOUND_FILTER_CAP_SECONDS)),
         )
         if vetoes:
-            reason = vetoes[0].strip()[:_VETO_MAX] or "Versand durch eine Erweiterung abgelehnt"
+            reason = vetoes[0].strip()[:_VETO_MAX] or "ohne Begründung"
             logger.info("plugin_mail_vetoed", plugin=f.plugin_id, filter=f.key)
-            raise OutboundMailVetoed(reason)
+            raise OutboundMailVetoed(
+                f"Versand durch Erweiterung „{f.plugin_id}“ abgelehnt: {reason}"
+            )
         if outcome.ok:
             added.update(mail.added)
     return added
