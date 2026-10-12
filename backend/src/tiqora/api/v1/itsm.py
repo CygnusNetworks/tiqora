@@ -28,6 +28,11 @@ from tiqora.api.v1.itsm_schemas import (
     ItsmZnunyInfoOut,
     LinkedArticlesIn,
     LinkTypeOptionOut,
+    MajorIncidentDeclareIn,
+    MajorIncidentOut,
+    MajorIncidentUpdateIn,
+    MajorIncidentUpdateOut,
+    MajorTimelineEntryOut,
     MatrixOut,
     PrioritySuggestionOut,
     ProblemIn,
@@ -40,7 +45,9 @@ from tiqora.api.v1.itsm_schemas import (
     matrix_out,
     service_out,
 )
+from tiqora.db.engine import get_session_factory
 from tiqora.domain.schemas import TicketLinkTargetOut
+from tiqora.domain.ticket_write_service import TicketWriteService
 from tiqora.itsm.ci_provider import (
     CatalogValue,
     CiAttribute,
@@ -62,7 +69,17 @@ from tiqora.itsm.linked_articles import (
     enqueue_linked_articles,
     linked_ticket_ids,
 )
+from tiqora.itsm.major_incident import (
+    MajorIncidentError,
+    MajorIncidentView,
+    TimelineEntry,
+    declare,
+    end,
+    get_major_incident,
+    post_update,
+)
 from tiqora.itsm.mode import ItsmModeState, get_itsm_mode, require_itsm_enabled
+from tiqora.itsm.models import TiqoraItsmMajorIncidentUpdate
 from tiqora.itsm.priority import load_matrix, suggest_priority
 from tiqora.itsm.problem import (
     ProblemError,
@@ -720,6 +737,117 @@ async def post_close_incidents(
         )
     await session.commit()
     return JobAccepted(job_id=job.id, status="queued")
+
+
+# --- major incident (Task 20) -----------------------------------------------------------------
+
+
+@contextmanager
+def _major_errors() -> Iterator[None]:
+    try:
+        yield
+    except MajorIncidentError as exc:
+        raise HTTPException(exc.http_status, detail=exc.detail) from exc
+
+
+def _major_out(view: MajorIncidentView) -> MajorIncidentOut:
+    return MajorIncidentOut.model_validate(view.model_dump())
+
+
+@ticket_router.get("/{ticket_id}/major-incident", response_model=MajorIncidentOut)
+async def read_major_incident(
+    ticket_id: int, user: CurrentUser, session: DbSession
+) -> MajorIncidentOut:
+    """The declaration with its timeline. Needs ``ro``; 404 ``no_major_incident`` otherwise."""
+    await require_itsm_enabled(session)
+    with _major_errors():
+        return _major_out(await get_major_incident(session, ticket_id, user_id=user.id))
+
+
+@ticket_router.post(
+    "/{ticket_id}/major-incident",
+    response_model=MajorIncidentOut,
+    status_code=status.HTTP_200_OK,
+)
+async def post_major_incident(
+    ticket_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    body: MajorIncidentDeclareIn | None = None,
+) -> MajorIncidentOut:
+    """Declare the ticket a major incident (type change + banner). Idempotent. Needs ``rw``."""
+    await require_itsm_enabled(session)
+    cfg = await load_itsm_settings(session, settings)
+    with _major_errors():
+        view = await declare(
+            session,
+            ticket_id,
+            summary=body.summary if body else None,
+            user_id=user.id,
+            sysconfig=SysConfig(session),
+            cfg=cfg,
+        )
+    await session.commit()
+    return _major_out(view)
+
+
+@ticket_router.delete("/{ticket_id}/major-incident", response_model=MajorIncidentOut)
+async def delete_major_incident(
+    ticket_id: int, user: CurrentUser, session: DbSession
+) -> MajorIncidentOut:
+    """End the major incident (the ticket keeps its type). Needs ``rw``."""
+    await require_itsm_enabled(session)
+    with _major_errors():
+        view = await end(session, ticket_id, user_id=user.id)
+    await session.commit()
+    return _major_out(view)
+
+
+def _update_entry(update: TiqoraItsmMajorIncidentUpdate) -> MajorTimelineEntryOut:
+    return MajorTimelineEntryOut.model_validate(
+        TimelineEntry(
+            kind="update",
+            at=update.created_at,
+            by=update.created_by,
+            update_id=int(update.id),
+            mode=update.mode,  # type: ignore[arg-type]
+            body=update.body,
+            target_count=int(update.target_count),
+            job_id=None if update.job_id is None else int(update.job_id),
+        ).model_dump()
+    )
+
+
+@ticket_router.post(
+    "/{ticket_id}/major-incident/updates",
+    response_model=MajorIncidentUpdateOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_major_incident_update(
+    ticket_id: int,
+    body: MajorIncidentUpdateIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> MajorIncidentUpdateOut:
+    """Post a status update; ``note``/``reply`` also queue the job for the linked tickets."""
+    await require_itsm_enabled(session)
+    cfg = await load_itsm_settings(session, settings)
+    writer = TicketWriteService(session, get_session_factory(), SysConfig(session))
+    with _major_errors():
+        update, job = await post_update(
+            session,
+            writer,
+            ticket_id,
+            mode=body.mode,
+            body_html=body.body_html,
+            user_id=user.id,
+            cfg=cfg,
+        )
+    entry = _update_entry(update)
+    await session.commit()
+    return MajorIncidentUpdateOut(update=entry, job_id=None if job is None else int(job.id))
 
 
 # --- services (Task 17) ----------------------------------------------------------------------

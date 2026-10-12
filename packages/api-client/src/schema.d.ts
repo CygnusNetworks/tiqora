@@ -11226,6 +11226,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/major-incident": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Major Incident
+         * @description The declaration with its timeline. Needs ``ro``; 404 ``no_major_incident`` otherwise.
+         */
+        get: operations["read_major_incident_api_v1_tickets__ticket_id__major_incident_get"];
+        put?: never;
+        /**
+         * Post Major Incident
+         * @description Declare the ticket a major incident (type change + banner). Idempotent. Needs ``rw``.
+         */
+        post: operations["post_major_incident_api_v1_tickets__ticket_id__major_incident_post"];
+        /**
+         * Delete Major Incident
+         * @description End the major incident (the ticket keeps its type). Needs ``rw``.
+         */
+        delete: operations["delete_major_incident_api_v1_tickets__ticket_id__major_incident_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/major-incident/updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Major Incident Update
+         * @description Post a status update; ``note``/``reply`` also queue the job for the linked tickets.
+         */
+        post: operations["post_major_incident_update_api_v1_tickets__ticket_id__major_incident_updates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/mentions": {
         parameters: {
             query?: never;
@@ -11358,6 +11406,90 @@ export interface paths {
         get: operations["print_ticket_api_v1_tickets__ticket_id__print_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/problem": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Problem
+         * @description Root cause, workaround, known-error state and linked incidents. Needs ``ro``.
+         */
+        get: operations["read_problem_api_v1_tickets__ticket_id__problem_get"];
+        /**
+         * Put Problem
+         * @description Save root cause and workaround. Needs ``rw``; 409 ``not_a_problem`` on other types.
+         */
+        put: operations["put_problem_api_v1_tickets__ticket_id__problem_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/problem/close-incidents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Close Incidents
+         * @description Queue "close the linked incidents with workaround" (a note and the workaround state).
+         */
+        post: operations["post_close_incidents_api_v1_tickets__ticket_id__problem_close_incidents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/problem/incidents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Problem Incidents
+         * @description Link incidents to the problem (``ParentChild``, the problem is the parent); at most 50.
+         */
+        post: operations["post_problem_incidents_api_v1_tickets__ticket_id__problem_incidents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/problem/known-error": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Known Error
+         * @description Publish the problem as a known error: a KB article for review, linked to the ticket.
+         */
+        post: operations["post_known_error_api_v1_tickets__ticket_id__problem_known_error_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -15111,6 +15243,11 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** CloseIncidentsIn */
+        CloseIncidentsIn: {
+            /** Note Html */
+            note_html?: string | null;
+        };
         /** CompanyCreateOut */
         CompanyCreateOut: {
             /** Customer Id */
@@ -18514,6 +18651,23 @@ export interface components {
              */
             visible_for_customer: boolean;
         };
+        /** LinkedIncidentOut */
+        LinkedIncidentOut: {
+            /** Closed */
+            closed: boolean;
+            /** State */
+            state: string;
+            /** State Type */
+            state_type: string;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+            /** Type Name */
+            type_name: string;
+        };
         /**
          * LlmModelIn
          * @description POST and PUT (full replace).
@@ -19086,6 +19240,79 @@ export interface components {
             security?: ("none" | "starttls" | "ssl") | null;
             /** Timeout Seconds */
             timeout_seconds?: number | null;
+        };
+        /** MajorIncidentDeclareIn */
+        MajorIncidentDeclareIn: {
+            /** Summary */
+            summary?: string | null;
+        };
+        /** MajorIncidentOut */
+        MajorIncidentOut: {
+            /** Active */
+            active: boolean;
+            /**
+             * Declared At
+             * Format: date-time
+             */
+            declared_at: string;
+            /** Declared By */
+            declared_by: number;
+            /** Ended At */
+            ended_at: string | null;
+            /** Ended By */
+            ended_by: number | null;
+            /** Summary */
+            summary: string | null;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Timeline */
+            timeline: components["schemas"]["MajorTimelineEntryOut"][];
+        };
+        /** MajorIncidentUpdateIn */
+        MajorIncidentUpdateIn: {
+            /** Body Html */
+            body_html: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "internal" | "note" | "reply";
+        };
+        /** MajorIncidentUpdateOut */
+        MajorIncidentUpdateOut: {
+            /** Job Id */
+            job_id?: number | null;
+            update: components["schemas"]["MajorTimelineEntryOut"];
+        };
+        /** MajorTimelineEntryOut */
+        MajorTimelineEntryOut: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Body */
+            body?: string | null;
+            /** By */
+            by: number;
+            /** Job Id */
+            job_id?: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "declared" | "update" | "ended";
+            /** Mode */
+            mode?: ("internal" | "note" | "reply") | null;
+            /** Summary */
+            summary?: string | null;
+            /**
+             * Target Count
+             * @default 0
+             */
+            target_count: number;
+            /** Update Id */
+            update_id?: number | null;
         };
         /** ManagedAssignmentOut */
         ManagedAssignmentOut: {
@@ -20720,6 +20947,41 @@ export interface components {
             name?: string | null;
             /** Valid Id */
             valid_id?: number | null;
+        };
+        /** ProblemIn */
+        ProblemIn: {
+            /** Root Cause */
+            root_cause?: string | null;
+            /** Workaround */
+            workaround?: string | null;
+        };
+        /** ProblemIncidentsIn */
+        ProblemIncidentsIn: {
+            /** Incident Ticket Ids */
+            incident_ticket_ids: number[];
+        };
+        /** ProblemOut */
+        ProblemOut: {
+            /** Change By */
+            change_by: number | null;
+            /** Change Time */
+            change_time: string | null;
+            /** Incidents */
+            incidents: components["schemas"]["LinkedIncidentOut"][];
+            /** Known Error */
+            known_error: boolean;
+            /** Known Error Article Id */
+            known_error_article_id: number | null;
+            /** Known Error Article State */
+            known_error_article_state: string | null;
+            /** Known Error Since */
+            known_error_since: string | null;
+            /** Root Cause */
+            root_cause: string | null;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Workaround */
+            workaround: string | null;
         };
         /**
          * ProcessActivityOut
@@ -53341,6 +53603,154 @@ export interface operations {
             };
         };
     };
+    read_major_incident_api_v1_tickets__ticket_id__major_incident_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MajorIncidentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_major_incident_api_v1_tickets__ticket_id__major_incident_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["MajorIncidentDeclareIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MajorIncidentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_major_incident_api_v1_tickets__ticket_id__major_incident_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MajorIncidentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_major_incident_update_api_v1_tickets__ticket_id__major_incident_updates_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MajorIncidentUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MajorIncidentUpdateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_mentions_api_v1_tickets__ticket_id__mentions_get: {
         parameters: {
             query?: never;
@@ -53629,6 +54039,193 @@ export interface operations {
                 };
                 content: {
                     "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_problem_api_v1_tickets__ticket_id__problem_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_problem_api_v1_tickets__ticket_id__problem_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProblemIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_close_incidents_api_v1_tickets__ticket_id__problem_close_incidents_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseIncidentsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_problem_incidents_api_v1_tickets__ticket_id__problem_incidents_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProblemIncidentsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_known_error_api_v1_tickets__ticket_id__problem_known_error_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemOut"];
                 };
             };
             /** @description Validation Error */

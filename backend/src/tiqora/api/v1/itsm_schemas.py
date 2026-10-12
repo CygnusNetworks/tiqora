@@ -313,3 +313,46 @@ class ProblemIncidentsIn(BaseModel):
 class CloseIncidentsIn(BaseModel):
     #: the note written on every incident; a default text when omitted
     note_html: str | None = Field(None, max_length=200_000)
+
+
+# --- major incident (Task 20) ---------------------------------------------------------------
+
+
+class MajorIncidentDeclareIn(BaseModel):
+    summary: str | None = Field(None, max_length=500)
+
+
+class MajorIncidentUpdateIn(BaseModel):
+    #: internal = note on the major ticket only; note = + note on linked tickets;
+    #: reply = + e-mail reply to the customers of linked tickets (needs the admin setting)
+    mode: Literal["internal", "note", "reply"]
+    body_html: str = Field(min_length=1, max_length=200_000)
+
+
+class MajorTimelineEntryOut(BaseModel):
+    kind: Literal["declared", "update", "ended"]
+    at: UtcDateTime
+    by: int
+    update_id: int | None = None
+    mode: Literal["internal", "note", "reply"] | None = None
+    #: sanitised HTML (updates only)
+    body: str | None = None
+    target_count: int = 0
+    job_id: int | None = None
+    summary: str | None = None
+
+
+class MajorIncidentOut(BaseModel):
+    ticket_id: int
+    active: bool
+    summary: str | None
+    declared_at: UtcDateTime
+    declared_by: int
+    ended_at: UtcDateTime | None
+    ended_by: int | None
+    timeline: list[MajorTimelineEntryOut]
+
+
+class MajorIncidentUpdateOut(BaseModel):
+    update: MajorTimelineEntryOut
+    job_id: int | None = None
