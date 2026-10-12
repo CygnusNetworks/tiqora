@@ -184,8 +184,8 @@ function config() {
     portal_identity: portal !== null,
     bot_name: BOT_NAME,
     prechat_fields: [
-      { key: "name", kind: "text", label: "Name", required: true, options: [] },
-      { key: "email", kind: "email", label: "E-Mail", required: false, options: [] },
+      { key: "name", kind: "text", label: "Name", required: true, options: [], identity_supplied: true },
+      { key: "email", kind: "email", label: "E-Mail", required: false, options: [], identity_supplied: true },
     ],
     upload: { enabled: true, max_bytes: 5 * 1024 * 1024, types: UPLOAD_TYPES },
     max_message_length: 4000,
@@ -247,6 +247,7 @@ function sessionOut(s) {
     can_send: live(s),
     needs_contact: false,
     last_seq: s.messages.length,
+    identified: !!s.identity,
     identified_as: s.identity?.name ?? null,
     bot_name: s.status === "bot" ? BOT_NAME : null,
     can_handoff: s.status === "bot",

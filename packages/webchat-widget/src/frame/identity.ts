@@ -21,9 +21,13 @@ export function claimName(token: string): string | null {
   }
 }
 
-/** With a pending identity the fields that carry name and e-mail are not asked again. */
+/**
+ * With a pending identity the fields the identity supplies (mapped to name / e-mail on the
+ * server, `identity_supplied`) are not asked again; every other field stays, also a second
+ * e-mail field, because the server still requires it.
+ */
 export function visibleFields(fields: readonly Field[], signedIn: boolean): Field[] {
-  return signedIn ? fields.filter((f) => f.key !== "name" && f.kind !== "email") : [...fields];
+  return signedIn ? fields.filter((f) => !f.identity_supplied) : [...fields];
 }
 
 /**

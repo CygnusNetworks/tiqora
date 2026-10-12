@@ -6,7 +6,7 @@ import { createFrameBridge, type FrameBridge } from "./bridge";
 import { isRtl, loadMessages, type Translate } from "./i18n";
 import { SharedChatStream, type SharedStreamOptions } from "./shared-stream";
 import { endReason, type SseEvent } from "./sse";
-import { claimName, mayRestore } from "./identity";
+import { claimName, mayRestore, visibleFields } from "./identity";
 import { canStartNew, contiguousSeq, initial, isLive, maxSeq, reducer } from "./state";
 import { clearSession, loadSession, saveSession, visitorId, type StoredSession, type Store } from "./storage";
 import { applyTheme } from "./theme";
@@ -44,7 +44,7 @@ function applyPreview(base: ChatPublicConfig, p: PreviewConfig | null): ChatPubl
     ...base,
     greeting: p.greeting,
     theme: { ...base.theme, ...p.theme },
-    prechat_fields: p.prechat_fields,
+    prechat_fields: p.prechat_fields.map((f) => ({ ...f, identity_supplied: false })),
     topics: p.topics.map((t) => ({ ...t, ai_first: false, online: true })),
   };
 }
@@ -193,9 +193,10 @@ export function App(props: {
       if (!a) return;
       try {
         await api.identify(a.id, a.token, token);
+        // 204: the identity is attached (a token without a name has no identified_as)
+        bridgeRef.current?.post({ p: "tiqora-chat/1", type: "identity", verified: true });
         const session = await api.session(a.id, a.token);
         if (session) dispatch({ type: "session-refreshed", session });
-        bridgeRef.current?.post({ p: "tiqora-chat/1", type: "identity", verified: !!session?.identified_as });
       } catch (e) {
         if (!(e instanceof ChatApiError)) return;
         if (e.code === "identity_conflict") toStart(); // the chat belongs to somebody else
@@ -224,6 +225,11 @@ export function App(props: {
             toStart();
             return;
           }
+          if (e.code === "session_closed") {
+            // an ended chat cannot be signed in to: drop it, or every page view asks again
+            clearSession(params.k, props.store);
+            return;
+          }
           if (e.code === "invalid_identity") {
             dropIdentity();
             bridgeRef.current?.post({ p: "tiqora-chat/1", type: "identity", verified: false });
@@ -246,7 +252,7 @@ export function App(props: {
       seqFloor.current = maxSeq(all);
       seq.current = seqFloor.current;
       dispatch({ type: "session-restored", session, messages: all });
-      if (identified) bridgeRef.current?.post({ p: "tiqora-chat/1", type: "identity", verified: !!session.identified_as });
+      if (identified) bridgeRef.current?.post({ p: "tiqora-chat/1", type: "identity", verified: true });
     } catch (e) {
       if (e instanceof ChatApiError && e.status === 404) clearSession(params.k, props.store);
       // other failures: show the pre-chat form, the stored session survives for the next load
@@ -369,13 +375,13 @@ export function App(props: {
   }, [state.messages, live, params.k, props.store]);
 
   // The server says who the chat belongs to: remember it, so a reload needs a fresh sign-in.
-  const identifiedAs = state.session?.identified_as ?? null;
+  const identified = !!state.session?.identified;
   useEffect(() => {
     const a = auth.current;
-    if (!live || !a || !identifiedAs) return;
+    if (!live || !a || !identified) return;
     const stored = loadSession(params.k, props.store);
     if (stored && stored.sessionId === a.id && !stored.identified) saveSession(params.k, { ...stored, identified: true }, props.store);
-  }, [identifiedAs, live, params.k, props.store]);
+  }, [identified, live, params.k, props.store]);
 
   // --- live stream ------------------------------------------------------------------
   const sessionId = state.session?.session_id ?? null;
@@ -588,18 +594,25 @@ export function App(props: {
         try {
           const session = await api.session(created.session_id, created.token);
           if (session) dispatch({ type: "session-refreshed", session });
-          bridgeRef.current?.post({ p: "tiqora-chat/1", type: "identity", verified: !!session?.identified_as });
         } catch {
           // best effort: the next restore / refresh learns it
         }
+        // 201 with the identity: the server verified it (or it would have answered 422)
+        bridgeRef.current?.post({ p: "tiqora-chat/1", type: "identity", verified: true });
       }
     } catch (e) {
       if (e instanceof ChatApiError && e.status === 422 && e.code === "invalid_identity") {
         dropIdentity();
         dispatch({ type: "identity-invalid" });
         bridgeRef.current?.post({ p: "tiqora-chat/1", type: "identity", verified: false });
-      } else if (e instanceof ChatApiError && e.status === 422 && Object.keys(e.errors).length) setServerErrors(e.errors);
-      else if (t) setFormError(errorText(t, e));
+      } else if (e instanceof ChatApiError && e.status === 422 && Object.keys(e.errors).length) {
+        setServerErrors(e.errors);
+        // An error on a field the form does not show (e.g. hidden for a signed-in visitor)
+        // would vanish silently: say that something went wrong instead.
+        const fields = visibleFields(stateRef.current.config?.prechat_fields ?? [], !!stateRef.current.identity);
+        const shown = new Set(["message", "topic", ...fields.map((f) => f.key)]);
+        if (t && Object.keys(e.errors).some((k) => !shown.has(k))) setFormError(errorText(t, e));
+      } else if (t) setFormError(errorText(t, e));
     } finally {
       setBusy(false);
     }
@@ -638,7 +651,22 @@ export function App(props: {
   };
 
   // --- render -----------------------------------------------------------------------
-  if (!t || state.view === "loading" || state.view === "hidden") return <div class="tq-root" dir={dir} />;
+  if (!t || state.view === "loading") return <div class="tq-root" dir={dir} />;
+  if (state.view === "hidden") {
+    // Only reachable with the panel open after a forced reset (logout, identity_conflict)
+    // under `offline_mode: hide` with nobody online: never an empty panel.
+    return (
+      <div class="tq-root" dir={dir}>
+        {state.open && (
+          <main class="tq-main" ref={mainRef}>
+            <p class="tq-notice" role="status" tabIndex={-1}>
+              {t("offline.title")}
+            </p>
+          </main>
+        )}
+      </div>
+    );
+  }
   const formProps = {
     t,
     topic: state.topic ?? config?.topics.find((x) => x.online)?.key ?? null,

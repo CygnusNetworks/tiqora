@@ -398,7 +398,7 @@ describe("App", () => {
 
   const TOKEN = "aaa.bbb.ccc";
   const session = (over: Record<string, unknown> = {}) => ({
-    agent_name: null, bot_name: null, can_handoff: false, can_send: true, identified_as: null,
+    agent_name: null, bot_name: null, can_handoff: false, can_send: true, identified: false, identified_as: null,
     last_seq: 1, needs_contact: false, session_id: "sid1", status: "active", topic_label: null, ...over,
   });
   const botCreate = () =>
@@ -710,6 +710,88 @@ describe("App", () => {
     toHost({ p: "tiqora-chat/1", type: "open" });
     await fillAndStart(container, false);
     expect(loadSession("wc_key", store)?.identified).toBe(true);
+  });
+
+  it("a signed-in visitor still sees fields the identity does not supply; a 422 on a hidden field shows an error (final I1)", async () => {
+    const fields = [
+      { key: "name", kind: "text" as const, label: "Name", required: true, options: [], identity_supplied: true },
+      { key: "email", kind: "email" as const, label: "E-Mail", required: true, options: [], identity_supplied: true },
+      { key: "billing", kind: "email" as const, label: "Rechnungs-E-Mail", required: true, options: [], identity_supplied: false },
+    ];
+    const createSession = vi.fn(async (_b: Record<string, unknown>) => {
+      throw new ChatApiError(422, "invalid", { name: "required" });
+    });
+    const api = fakeApi({ config: vi.fn(async () => cfg({ prechat_fields: fields })), createSession });
+    const { container } = await mountHost({ api });
+    toHost({ p: "tiqora-chat/1", type: "identify", token: TOKEN });
+    toHost({ p: "tiqora-chat/1", type: "open" });
+    expect(() => byLabel(container, "Name")).toThrow();
+    expect(() => byLabel(container, "E-Mail")).toThrow();
+    input(byLabel(container, "Rechnungs-E-Mail"), "rechnung@example.org");
+    await fillAndStart(container, false);
+    expect((createSession.mock.calls[0][0] as { prechat: unknown }).prechat).toEqual({ billing: "rechnung@example.org" });
+    // the error belongs to a field that is not on screen: it must not vanish silently
+    expect(container.querySelector("[role=alert]")?.textContent).toBe("Etwas ist schiefgelaufen. Bitte versuchen Sie es noch einmal.");
+  });
+
+  it("logout then identify of the next visitor drops a restored anonymous chat before the sign-in (final I2)", async () => {
+    const store = memStore();
+    saveSession("wc_key", { sessionId: "sid1", token: "tok1", lastSeq: 1 }, store);
+    const identify = vi.fn(async () => undefined);
+    const api = fakeApi({ identify, messages: vi.fn(async () => [msg({ seq: 1, sender: "visitor", body: "Frage von A" })]) });
+    const { container } = await mountHost({ api, store });
+    expect(container.textContent).toContain("Frage von A"); // restored before `ready`, anonymous
+    // the loader flushes a queued logout() before the queued identify() of the next visitor
+    toHost({ p: "tiqora-chat/1", type: "logout" });
+    toHost({ p: "tiqora-chat/1", type: "identify", token: TOKEN });
+    await flush();
+    expect(identify).not.toHaveBeenCalled(); // B is never attached to A's chat
+    expect(container.textContent).not.toContain("Frage von A");
+    expect(loadSession("wc_key", store)).toBeNull();
+    expect(container.querySelector(".tq-signed")?.textContent).toBe("Angemeldet"); // B's sign-in, fresh form
+  });
+
+  it("a verified identity without a name is reported as verified and shown as signed in (final M1)", async () => {
+    const store = memStore();
+    saveSession("wc_key", { sessionId: "sid1", token: "tok1", lastSeq: 1 }, store);
+    const identify = vi.fn(async () => undefined);
+    const api = fakeApi({ identify, session: vi.fn(async () => session({ identified: true, identified_as: null })) });
+    const { container, posted } = await mountHost({ api, store });
+    toHost({ p: "tiqora-chat/1", type: "identify", token: TOKEN });
+    await flush();
+    expect(identify).toHaveBeenCalledWith("sid1", "tok1", TOKEN);
+    expect(posted).toContainEqual({ p: "tiqora-chat/1", type: "identity", verified: true });
+    expect(container.querySelector(".tq-chat .tq-signed")?.textContent).toBe("Angemeldet");
+  });
+
+  it("an ended signed-in chat is dropped from storage instead of being identified on every page view (final M6)", async () => {
+    const store = memStore();
+    saveSession("wc_key", { sessionId: "sid1", token: "tok1", lastSeq: 1, identified: true }, store);
+    const identify = vi.fn(async () => {
+      throw new ChatApiError(409, "session_closed");
+    });
+    const { container, api } = await mountHost({ store, api: fakeApi({ identify }) });
+    toHost({ p: "tiqora-chat/1", type: "identify", token: TOKEN });
+    toHost({ p: "tiqora-chat/1", type: "open" });
+    await flush();
+    expect(identify).toHaveBeenCalledTimes(1);
+    expect(api.session).not.toHaveBeenCalled();
+    expect(api.messages).not.toHaveBeenCalled();
+    expect(loadSession("wc_key", store)).toBeNull();
+    expect(container.querySelector(".tq-signed")).toBeTruthy(); // the signed-in pre-chat form
+  });
+
+  it("a logout under offline_mode hide with nobody online leaves no empty panel (final M4)", async () => {
+    const store = memStore();
+    saveSession("wc_key", { sessionId: "sid1", token: "tok1", lastSeq: 1 }, store);
+    const api = fakeApi({ config: vi.fn(async () => cfg({ online: false, offline_mode: "hide" })) });
+    const { container } = await mountHost({ api, store });
+    toHost({ p: "tiqora-chat/1", type: "open" });
+    expect(container.querySelector(".tq-log")).toBeTruthy();
+    toHost({ p: "tiqora-chat/1", type: "logout" });
+    await flush();
+    expect(container.querySelector(".tq-log")).toBeNull();
+    expect(container.querySelector(".tq-notice")?.textContent).toBe("Gerade ist niemand im Chat");
   });
 
   it("preview frames never ask for the portal identity and ignore the host's sign-in", async () => {

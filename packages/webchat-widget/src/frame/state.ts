@@ -85,18 +85,17 @@ export const initial: ChatState = {
   handoffBusy: false,
 };
 
+/** A chat can start right now: a human is online, or (`offline_mode: ai`) the assistant
+ * answers a topic on its own. */
+const chatOpen = (c: ChatPublicConfig) => c.online || (c.offline_mode === "ai" && c.topics.some((t) => t.ai_first));
+
 /** Whether a new chat (pre-chat or offline form) can be offered; under `offline_mode: hide`
  * with nobody online there is nothing to show, so an ended chat keeps its transcript. */
-export const canStartNew = (c: ChatPublicConfig | null) =>
-  !!c && (c.online || c.offline_mode === "form" || (c.offline_mode === "ai" && c.topics.some((t) => t.ai_first)));
+export const canStartNew = (c: ChatPublicConfig | null) => !!c && startView(c) !== "hidden";
 
 /** The view of a fresh start: chat form, offline form or nothing. */
 export const startView = (c: ChatPublicConfig): View =>
-  c.online || (c.offline_mode === "ai" && c.topics.some((t) => t.ai_first))
-    ? "prechat"
-    : c.offline_mode === "form"
-      ? "offline"
-      : "hidden";
+  chatOpen(c) ? "prechat" : c.offline_mode === "form" ? "offline" : "hidden";
 
 const LIVE = ["bot", "waiting", "active"];
 export const isLive = (status: string) => LIVE.includes(status);
@@ -175,6 +174,7 @@ export function reducer(s: ChatState, a: Action): ChatState {
         agent_name: null,
         can_handoff: c.status === "bot",
         can_send: true,
+        identified: false,
         identified_as: null,
         bot_name: null,
         last_seq: c.message.seq,

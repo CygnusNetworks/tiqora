@@ -8,8 +8,8 @@ export function cfg(over: Partial<ChatPublicConfig> = {}): ChatPublicConfig {
     offline_mode: "form",
     online: true,
     prechat_fields: [
-      { key: "name", kind: "text", label: "Name", required: true, options: [] },
-      { key: "email", kind: "email", label: "E-Mail", required: true, options: [] },
+      { key: "name", kind: "text", label: "Name", required: true, options: [], identity_supplied: true },
+      { key: "email", kind: "email", label: "E-Mail", required: true, options: [], identity_supplied: true },
     ],
     portal_identity: false,
     privacy_url: "https://example.org/privacy",

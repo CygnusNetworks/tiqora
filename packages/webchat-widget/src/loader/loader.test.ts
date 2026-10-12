@@ -242,6 +242,37 @@ describe("boot", () => {
     expect(ids).toEqual([{ verified: true }]);
   });
 
+  it("logout then identify before ready delivers both, in that order (shared computer)", () => {
+    boot(window, script);
+    chat().logout();
+    chat().identify("b.b.b");
+    vi.advanceTimersByTime(1600);
+    const iframe = document.querySelector("iframe") as HTMLIFrameElement;
+    const post = vi.spyOn(iframe.contentWindow!, "postMessage");
+    send(ready(), ORIGIN, iframe.contentWindow);
+    const sent = post.mock.calls
+      .map((c) => c[0] as { type: string; token?: string })
+      .filter((m) => m.type === "logout" || m.type === "identify");
+    expect(sent).toEqual([
+      { p: PROTOCOL, type: "logout" },
+      { p: PROTOCOL, type: "identify", token: "b.b.b" },
+    ]);
+  });
+
+  it("identify then logout before ready delivers only the logout", () => {
+    boot(window, script);
+    chat().identify("a.a.a");
+    chat().logout();
+    vi.advanceTimersByTime(1600);
+    const iframe = document.querySelector("iframe") as HTMLIFrameElement;
+    const post = vi.spyOn(iframe.contentWindow!, "postMessage");
+    send(ready(), ORIGIN, iframe.contentWindow);
+    const sent = post.mock.calls
+      .map((c) => c[0] as { type: string })
+      .filter((m) => m.type === "logout" || m.type === "identify");
+    expect(sent).toEqual([{ p: PROTOCOL, type: "logout" }]);
+  });
+
   it("a throwing host callback does not break the loader", () => {
     boot(window, script);
     vi.spyOn(console, "error").mockImplementation(() => undefined);

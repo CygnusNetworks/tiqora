@@ -37,8 +37,12 @@ export function ChatView(props: { state: ChatState; t: Translate; h: ChatHandler
       <p class="tq-status" role="status">
         {statusLine(state, t)}
       </p>
-      {state.session?.identified_as && (
-        <p class="tq-signed">{t("identity.signedIn", { name: state.session.identified_as })}</p>
+      {(state.session?.identified || state.session?.identified_as) && (
+        <p class="tq-signed">
+          {state.session.identified_as
+            ? t("identity.signedIn", { name: state.session.identified_as })
+            : t("identity.signedInAnon")}
+        </p>
       )}
       <MessageList
         botName={botName(state)}

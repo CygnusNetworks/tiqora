@@ -326,8 +326,9 @@ der Chat ab (bei einer Abmeldung über einen externen Anmeldedienst kann das aus
   erreichbar. Der Chat wurde an einen Mitarbeiter übergeben.“ Übernimmt ein Agent von sich aus, steht dort „Ein
   Mitarbeiter hat den Chat übernommen.“ Ist kein Agent da, endet der Chat mit der Frage nach der E-Mail-Adresse.
 - **Erkannter Besucher**: Hat die Website oder das Kundenportal den Besucher angemeldet, zeigt der Chat „Angemeldet
-  als *Name*“. Name und E-Mail-Adresse werden nicht mehr abgefragt; die übrigen Felder des Vorab-Formulars
-  schon.
+  als *Name*“ (ohne Namen in der Anmeldung nur „Angemeldet“). Die Felder, die dem Namen und der E-Mail-Adresse
+  zugeordnet sind, werden nicht mehr abgefragt; die übrigen Felder des Vorab-Formulars schon, auch ein zweites
+  E-Mail-Feld.
 - **Chat ausgeschaltet**: Besucher sehen den bisherigen Verlauf und den Hinweis, dass der Chat geschlossen ist.
   Weitere Nachrichten sind nicht mehr möglich.
 

@@ -20,7 +20,7 @@ export function OfflineForm(props: {
     ? config.prechat_fields.map((f) => (f.kind === "email" ? { ...f, required: true } : f))
     : [
         ...config.prechat_fields,
-        { key: "email", kind: "email" as const, label: t("contact.title"), required: true, options: [] },
+        { key: "email", kind: "email" as const, label: t("contact.title"), required: true, options: [], identity_supplied: false },
       ];
   return (
     <PrechatForm

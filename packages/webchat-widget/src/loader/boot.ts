@@ -59,6 +59,8 @@ export function boot(win: Win, script: HTMLScriptElement | null): void {
   let wantOpen = false; // host API call before `ready`
   let topic: string | null = null;
   let pendingToken: string | null = null; // identify() before `ready`: only the latest counts
+  // logout() before `ready`: delivered before any later identify(), never cancelled by it
+  // (a stored chat of the previous visitor must be dropped before the next one signs in)
   let pendingLogout = false;
   let launcher: Launcher | null = null;
   let panel: HTMLDivElement | null = null;
@@ -174,10 +176,7 @@ export function boot(win: Win, script: HTMLScriptElement | null): void {
         return;
       }
       if (ready) bridge?.post({ p: PROTOCOL, type: "identify", token });
-      else {
-        pendingToken = token;
-        pendingLogout = false;
-      }
+      else pendingToken = token;
     },
     logout() {
       if (ready) bridge?.post({ p: PROTOCOL, type: "logout" });

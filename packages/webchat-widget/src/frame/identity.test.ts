@@ -14,10 +14,17 @@ describe("identity helpers", () => {
     expect(claimName(`h.${b64({ name: "Ä".repeat(300) })}.s`)).toHaveLength(100);
   });
 
-  it("hides the name and e-mail fields only while signed in", () => {
-    const fields = [...cfg().prechat_fields, { key: "company", kind: "text" as const, label: "Firma", required: false, options: [] }, { key: "mail2", kind: "email" as const, label: "Mail", required: false, options: [] }];
-    expect(visibleFields(fields, false).map((f) => f.key)).toEqual(["name", "email", "company", "mail2"]);
-    expect(visibleFields(fields, true).map((f) => f.key)).toEqual(["company"]);
+  it("hides only the fields the identity supplies, and only while signed in", () => {
+    const fields = [
+      ...cfg().prechat_fields,
+      { key: "company", kind: "text" as const, label: "Firma", required: false, options: [], identity_supplied: false },
+      // a second e-mail field (maps_to none on the server) is still required there: it stays
+      { key: "mail2", kind: "email" as const, label: "Mail", required: true, options: [], identity_supplied: false },
+      // a field keyed "name" that is not mapped to the name stays as well
+      { key: "nick", kind: "text" as const, label: "Spitzname", required: false, options: [], identity_supplied: false },
+    ];
+    expect(visibleFields(fields, false).map((f) => f.key)).toEqual(["name", "email", "company", "mail2", "nick"]);
+    expect(visibleFields(fields, true).map((f) => f.key)).toEqual(["company", "mail2", "nick"]);
   });
 
   it("restores an identified chat only with a fresh identity", () => {
