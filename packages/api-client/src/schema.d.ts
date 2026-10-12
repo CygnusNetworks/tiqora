@@ -8012,7 +8012,7 @@ export interface paths {
         put?: never;
         /**
          * Preview Recurrence
-         * @description The next five occurrences and the German sentence (pure, bounded).
+         * @description The next five occurrences and the sentence in ``body.language`` (pure, bounded).
          */
         post: operations["preview_recurrence_api_v1_report_schedules_preview_recurrence_post"];
         delete?: never;
@@ -18930,6 +18930,12 @@ export interface components {
         };
         /** RecurrencePreviewIn */
         RecurrencePreviewIn: {
+            /**
+             * Language
+             * @default de
+             * @enum {string}
+             */
+            language: "de" | "en";
             recurrence: components["schemas"]["Recurrence"];
             /** Time Zone */
             time_zone?: string | null;
@@ -19394,6 +19400,8 @@ export interface components {
             paused_reason: string | null;
             /** Recurrence Text */
             recurrence_text: string;
+            /** Time Zone */
+            time_zone: string;
             /** Version */
             version: number;
         };

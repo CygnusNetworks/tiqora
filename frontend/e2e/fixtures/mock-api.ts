@@ -36,6 +36,7 @@ const user = {
   can_view_reports: true,
   can_create_reports: true,
   can_share_reports: true,
+  report_external_recipients: true,
 };
 
 const queues = [

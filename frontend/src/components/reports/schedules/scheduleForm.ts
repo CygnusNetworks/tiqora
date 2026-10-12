@@ -12,7 +12,14 @@ import type {
  */
 
 export const MAX_ITEMS = 10;
-export const MAX_RECIPIENT_LISTS = 50;
+
+/**
+ * The subject the server uses when none is set, in the schedule's language (copy of
+ * `mail.default_subject` in backend/src/tiqora/reporting/texts.py; keep the two in step).
+ */
+export function defaultSubjectHint(language: ScheduleFormState["language"]): string {
+  return language === "en" ? "Report: {{schedule}} ({{period}})" : "Bericht: {{schedule}} ({{period}})";
+}
 
 export type RecurrenceKind = Recurrence["kind"];
 

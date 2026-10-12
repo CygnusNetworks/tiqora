@@ -241,6 +241,7 @@ function toListItem(s: ReportSchedule): ReportScheduleListItem {
     format: s.format,
     items: s.items.map((i) => ({ report_key: i.report_key, title: i.title, title_key: i.title_key })),
     recurrence_text: s.recurrence_text,
+    time_zone: s.time_zone,
     next_run_at: s.next_run_at,
     last_run_at: s.last_run_at,
     last_status: s.last_status,
@@ -359,7 +360,11 @@ export function resolveSchedules(
   if (p === "/reports/import/znuny" && method === "GET") return { status: 200, body: demoZnunyPreview() };
   if (p === "/reports/import/znuny/file" && method === "POST") {
     // Any file previews as the first two demo stats; the content is not parsed in the demo.
-    return { status: 200, body: { stats: DEMO_ZNUNY_STATS.slice(0, 2), errors: [], truncated: false } satisfies ZnunyStatsPreview };
+    // Like the backend: stats read from a file have no Znuny id.
+    return {
+      status: 200,
+      body: { stats: DEMO_ZNUNY_STATS.slice(0, 2).map((s) => ({ ...s, stat_id: null })), errors: [], truncated: false } satisfies ZnunyStatsPreview,
+    };
   }
   if (p === "/reports/import/znuny/apply" && method === "POST") {
     const ids = Array.isArray(b.stat_ids) ? (b.stat_ids as number[]) : DEMO_ZNUNY_STATS.slice(0, 2).map((s) => s.stat_id as number);

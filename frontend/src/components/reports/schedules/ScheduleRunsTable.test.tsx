@@ -10,12 +10,12 @@ import { setDisplayTimeZone } from "@/lib/timeZone";
 import { ScheduleRunsTable } from "./ScheduleRunsTable";
 import { RUN_POLL_MS } from "./scheduleUi";
 
-function renderTable(canRun = true) {
+function renderTable(canRun = true, isOwner = true) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <I18nextProvider i18n={i18n}>
-        <ScheduleRunsTable scheduleId={1} canRun={canRun} />
+        <ScheduleRunsTable scheduleId={1} canRun={canRun} isOwner={isOwner} />
       </I18nextProvider>
     </QueryClientProvider>,
   );
@@ -97,6 +97,21 @@ describe("ScheduleRunsTable", () => {
     fireEvent.click(screen.getByTestId("schedule-run-now"));
     fireEvent.click(await screen.findByTestId("schedule-run-all"));
     await waitFor(() => expect(runNow).toHaveBeenLastCalledWith(1, false));
+  });
+
+  it("names the owner as test recipient when an admin opens someone else's schedule", async () => {
+    vi.spyOn(reportSchedulesApi, "runs").mockResolvedValue([]);
+    renderTable(true, false);
+    fireEvent.click(await screen.findByTestId("schedule-run-now"));
+    expect(await screen.findByTestId("schedule-run-test")).toHaveTextContent("Testversand an den Ersteller");
+  });
+
+  it("says 1 Zeile for a single row", async () => {
+    vi.spyOn(reportSchedulesApi, "runs").mockResolvedValue([run({ id: 42, status: "succeeded", row_count: 1, recipient_count: 1, files: [] })]);
+    renderTable();
+    const row = await screen.findByTestId("schedule-run-42");
+    expect(row).toHaveTextContent("1 Zeile");
+    expect(row).not.toHaveTextContent("1 Zeilen");
   });
 
   it("explains a 409: a delivery is already running", async () => {

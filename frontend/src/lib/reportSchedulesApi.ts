@@ -13,10 +13,8 @@ export type ReportScheduleUpdateIn = Schemas["ReportScheduleUpdateIn"];
 export type ScheduleItemIn = Schemas["ScheduleItemIn"];
 export type ScheduleItem = Schemas["ScheduleItemOut"];
 export type ScheduleRecipient = Schemas["ScheduleRecipientOut"];
-export type ScheduleRecipientsIn = Schemas["ScheduleRecipientsIn"];
 export type Recurrence = Schemas["Recurrence"];
 export type ReportRun = Schemas["ScheduleRunOut"];
-export type ReportRunFile = Schemas["ScheduleRunFileOut"];
 export type ScheduleRunAccepted = Schemas["ScheduleRunAccepted"];
 export type RecurrencePreview = Schemas["RecurrencePreviewOut"];
 
@@ -57,10 +55,10 @@ export const reportSchedulesApi = {
   fileUrl(runId: number, fileId: number) {
     return `/api/v1/report-runs/${runId}/files/${fileId}`;
   },
-  /** Next dates and a German/English sentence for a recurrence; saves nothing. */
-  previewRecurrence(recurrence: Recurrence, timeZone?: string | null, signal?: AbortSignal) {
+  /** Next dates and the sentence (in `language`, the schedule's mail language) for a recurrence; saves nothing. */
+  previewRecurrence(recurrence: Recurrence, timeZone?: string | null, language: "de" | "en" = "de", signal?: AbortSignal) {
     return api.request<RecurrencePreview>("POST", "/api/v1/report-schedules/preview-recurrence", {
-      body: { recurrence, time_zone: timeZone ?? null },
+      body: { recurrence, time_zone: timeZone ?? null, language },
       signal,
     });
   },

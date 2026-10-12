@@ -9,6 +9,7 @@ import { RecurrenceFields } from "@/components/reports/schedules/RecurrenceField
 import { ScheduleReportsPicker } from "@/components/reports/schedules/ScheduleReportsPicker";
 import { ScheduleRunsTable } from "@/components/reports/schedules/ScheduleRunsTable";
 import {
+  defaultSubjectHint,
   emptyForm,
   fromSchedule,
   recurrenceErrors,
@@ -259,6 +260,7 @@ function ScheduleEditor({
           onChange={(recurrence) => set({ recurrence })}
           timeZone={form.timeZone}
           onTimeZoneChange={(timeZone) => set({ timeZone })}
+          language={form.language}
           errors={recurrenceErr}
         />
       </Card>
@@ -282,7 +284,7 @@ function ScheduleEditor({
             className={cn(inputCls, "w-full max-w-xl")}
             value={form.subject}
             maxLength={250}
-            placeholder={t("reports.schedules.subjectHint")}
+            placeholder={defaultSubjectHint(form.language)}
             onChange={(e) => set({ subject: e.target.value })}
             disabled={!canEdit}
             data-testid="schedule-subject"
@@ -342,13 +344,15 @@ function EditorContent() {
   const params = useParams({ strict: false }) as { scheduleId?: string };
   const search = useSearch({ strict: false }) as ReportScheduleNewSearch;
   const id = params.scheduleId != null ? Number(params.scheduleId) : null;
+  // "/schedules/abc" never loads: say not found instead of waiting for a disabled query
+  const badId = id != null && !(Number.isSafeInteger(id) && id > 0);
   const qc = useQueryClient();
   const [reloads, setReloads] = useState(0);
 
   const scheduleQ = useQuery({
     queryKey: ["report-schedules", "get", id],
     queryFn: ({ signal }) => reportSchedulesApi.get(id!, signal),
-    enabled: id != null && Number.isInteger(id),
+    enabled: id != null && !badId,
     retry: false,
   });
 
@@ -358,9 +362,9 @@ function EditorContent() {
     </Link>
   );
 
-  if (id != null && scheduleQ.isPending) return <Spinner />;
-  if (id != null && (scheduleQ.isError || !scheduleQ.data)) {
-    const gone = scheduleQ.error instanceof ApiError && scheduleQ.error.status === 404;
+  if (id != null && !badId && scheduleQ.isPending) return <Spinner />;
+  if (id != null && (badId || scheduleQ.isError || !scheduleQ.data)) {
+    const gone = badId || (scheduleQ.error instanceof ApiError && scheduleQ.error.status === 404);
     return (
       <div className="space-y-3">
         {back}
@@ -372,10 +376,11 @@ function EditorContent() {
   }
 
   const schedule = id != null ? scheduleQ.data! : null;
+  if (!schedule && !user) return <Spinner />; // the gate renders this page for a signed-in agent only
   const initial = schedule
     ? fromSchedule(schedule)
     : emptyForm({
-        ownerId: user?.id ?? 0,
+        ownerId: user!.id,
         reportKey: search.report ?? null,
         timeZone: displayTimeZone(),
         language: i18n.language.startsWith("en") ? "en" : "de",
@@ -387,15 +392,16 @@ function EditorContent() {
       <h1 className="font-display text-2xl font-semibold tracking-tight text-ink" data-testid="schedule-title">
         {schedule ? schedule.name : t("reports.schedules.create")}
       </h1>
+      {/* No version in the key: after a save the refetched version must not remount the form (and drop the notice); a conflict reload remounts via `reloads`. */}
       <ScheduleEditor
-        key={`${schedule?.id ?? "new"}-${schedule?.version ?? 0}-${reloads}`}
+        key={`${schedule?.id ?? "new"}-${reloads}`}
         schedule={schedule}
         initial={initial}
         onReload={() => {
           void qc.invalidateQueries({ queryKey: ["report-schedules", "get", id] }).then(() => setReloads((n) => n + 1));
         }}
       />
-      {schedule && <ScheduleRunsTable scheduleId={schedule.id} canRun={schedule.can_edit} />}
+      {schedule && <ScheduleRunsTable scheduleId={schedule.id} canRun={schedule.can_edit} isOwner={schedule.is_owner} />}
     </div>
   );
 }
@@ -405,8 +411,8 @@ export function ReportScheduleEditorPage() {
   return (
     <SchedulesGate>
       <div className="mx-auto w-full max-w-4xl px-4 py-6" data-testid="report-schedule-editor-page">
-          <EditorContent />
-        </div>
-      </SchedulesGate>
+        <EditorContent />
+      </div>
+    </SchedulesGate>
   );
 }

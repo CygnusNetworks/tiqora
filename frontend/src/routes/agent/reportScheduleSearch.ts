@@ -2,5 +2,7 @@
 export type ReportScheduleNewSearch = { report?: string };
 
 export function validateScheduleNewSearch(s: Record<string, unknown>): ReportScheduleNewSearch {
-  return { report: typeof s.report === "string" && s.report.length > 0 && s.report.length <= 120 ? s.report : undefined };
+  // TanStack parses a hand-typed `?report=41` (a saved report key) to the number 41.
+  const raw = typeof s.report === "number" && Number.isSafeInteger(s.report) && s.report > 0 ? String(s.report) : s.report;
+  return { report: typeof raw === "string" && raw.length > 0 && raw.length <= 120 ? raw : undefined };
 }

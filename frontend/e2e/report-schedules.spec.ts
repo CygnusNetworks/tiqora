@@ -41,6 +41,11 @@ test.describe("report schedules, PDF export and Znuny import", () => {
     await expect(page.getByTestId("recurrence-weekday-1")).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByTestId("recurrence-weekday-5")).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByTestId("recurrence-time")).toHaveValue("07:00");
+    // external recipients are on for this agent: an address becomes a chip
+    const email = page.getByTestId("recipients-email-input");
+    await email.fill("extern@example.org");
+    await email.press("Enter");
+    await expect(page.getByTestId("recipients-emails")).toContainText("extern@example.org");
     await page.getByTestId("schedule-save").click();
 
     await expect(page).toHaveURL(/\/agent\/reports\/schedules\/\d+$/);

@@ -41,6 +41,14 @@ describe("ReportSchedulesPage", () => {
     expect(screen.getByTestId("schedule-row-2-reason")).toHaveTextContent("Angehalten: Angehalten nach 3 fehlgeschlagenen");
   });
 
+  it("adds the schedule zone to the rhythm when it differs from the shown zone", async () => {
+    const rows = demo.list(false);
+    vi.mocked(reportSchedulesApi.list).mockResolvedValue([{ ...rows[0]!, time_zone: "America/New_York" }, ...rows.slice(1)]);
+    render();
+    expect(await screen.findByTestId("schedule-row-1-recurrence")).toHaveTextContent("Jeden Montag um 07:30 Uhr (America/New_York)");
+    expect(screen.getByTestId("schedule-row-2-recurrence")).not.toHaveTextContent("(");
+  });
+
   it("toggles active with a PUT that carries the version of the schedule", async () => {
     const full = demo.get(1)!;
     vi.spyOn(reportSchedulesApi, "get").mockResolvedValue(full);

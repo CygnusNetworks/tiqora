@@ -127,6 +127,57 @@ describe("ReportScheduleEditorPage", () => {
     expect(screen.queryByTestId("schedule-conflict")).toBeNull();
   });
 
+  it("shows the success notice after an update although the refetch brings a new version", async () => {
+    const current = seed();
+    const saved = { ...current, name: "Neuer Name", version: current.version + 1 };
+    const get = vi.spyOn(reportSchedulesApi, "get").mockResolvedValue(current);
+    const update = vi.spyOn(reportSchedulesApi, "update").mockImplementation(async () => {
+      get.mockResolvedValue(saved);
+      return saved;
+    });
+    render("/agent/reports/schedules/1");
+    fireEvent.change(await screen.findByTestId("schedule-name"), { target: { value: "Neuer Name" } });
+    fireEvent.click(screen.getByTestId("schedule-save"));
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(get.mock.calls.length).toBeGreaterThan(1));
+    expect(await screen.findByTestId("schedule-message")).toHaveTextContent("Der Zeitplan wurde gespeichert.");
+    expect(screen.getByTestId("schedule-name")).toHaveValue("Neuer Name");
+    // the next save sends the new version
+    fireEvent.click(screen.getByTestId("schedule-save"));
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(2));
+    expect(update.mock.calls[1][1]).toMatchObject({ version: saved.version });
+  });
+
+  it("says not found for a schedule id that is no number", async () => {
+    const get = vi.spyOn(reportSchedulesApi, "get");
+    render("/agent/reports/schedules/abc");
+    expect(await screen.findByTestId("schedule-missing")).toHaveTextContent("existiert nicht");
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it("takes a numeric ?report= typed by hand as the saved report key", async () => {
+    render("/agent/reports/schedules/new?report=41");
+    await screen.findByTestId("schedule-editor");
+    const create = vi.spyOn(reportSchedulesApi, "create").mockResolvedValue({ ...seed(), id: 12 });
+    vi.spyOn(reportSchedulesApi, "get").mockResolvedValue({ ...seed(), id: 12 });
+    fireEvent.change(screen.getByTestId("schedule-name"), { target: { value: "Bericht 41" } });
+    fireEvent.click(screen.getByTestId("schedule-save"));
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    expect(create.mock.calls[0][0].items).toEqual([{ report_key: "41", overrides: {} }]);
+  });
+
+  it("shows the default subject of the schedule language and previews in that language", async () => {
+    render("/agent/reports/schedules/new?report=builtin.volume");
+    const subject = await screen.findByTestId("schedule-subject");
+    expect(subject).toHaveAttribute("placeholder", "Bericht: {{schedule}} ({{period}})");
+    const preview = vi.mocked(reportSchedulesApi.previewRecurrence);
+    await waitFor(() => expect(preview).toHaveBeenCalled());
+    expect(preview.mock.calls.at(-1)![2]).toBe("de");
+    fireEvent.click(within(screen.getByTestId("schedule-language")).getByText("English"));
+    expect(screen.getByTestId("schedule-subject")).toHaveAttribute("placeholder", "Report: {{schedule}} ({{period}})");
+    await waitFor(() => expect(preview.mock.calls.at(-1)![2]).toBe("en"));
+  });
+
   it("hides the e-mail input when external recipients are switched off", async () => {
     auth.user = { ...RIGHTS, report_external_recipients: false };
     render("/agent/reports/schedules/new?report=builtin.volume");

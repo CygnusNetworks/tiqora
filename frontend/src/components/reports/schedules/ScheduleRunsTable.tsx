@@ -26,7 +26,11 @@ const TONES: Record<ReportRun["status"], "default" | "success" | "warn" | "dange
  * Run history of one schedule (newest first) with the "Jetzt senden" menu. While a run is
  * queued or running the list is asked again every 5 s.
  */
-export function ScheduleRunsTable({ scheduleId, canRun }: { scheduleId: number; canRun: boolean }) {
+/**
+ * `isOwner` false (an admin on someone else's schedule): the owner-only test goes to the
+ * OWNER (the data is in the owner's scope), so the menu says so instead of "an mich".
+ */
+export function ScheduleRunsTable({ scheduleId, canRun, isOwner = true }: { scheduleId: number; canRun: boolean; isOwner?: boolean }) {
   const { t, i18n } = useTranslation();
   const bcp = toBcp47(i18n.resolvedLanguage ?? i18n.language ?? "de");
   const qc = useQueryClient();
@@ -82,7 +86,7 @@ export function ScheduleRunsTable({ scheduleId, canRun }: { scheduleId: number; 
             )}
           >
             <MenuItem testId="schedule-run-test" onSelect={() => runNow.mutate(true)} disabled={busy}>
-              {t("reports.schedules.testSend")}
+              {t(isOwner ? "reports.schedules.testSend" : "reports.schedules.testSendOwner")}
             </MenuItem>
             <MenuItem testId="schedule-run-all" onSelect={() => runNow.mutate(false)} disabled={busy}>
               {t("reports.schedules.sendToAll")}

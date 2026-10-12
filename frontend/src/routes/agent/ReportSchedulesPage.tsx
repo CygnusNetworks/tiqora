@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
 import { fromSchedule, toUpdateRequest } from "@/components/reports/schedules/scheduleForm";
 import { SchedulesGate } from "@/components/reports/schedules/SchedulesGate";
+import { zoneSuffix } from "@/components/reports/schedules/scheduleUi";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
 import { Switch } from "@/components/ui/Switch";
@@ -129,7 +130,9 @@ function ListContent() {
                     <span className="mt-0.5 block text-xs uppercase text-muted">{s.format}</span>
                   </td>
                   <td className="px-3 py-2 text-ink">{s.items.map((i) => itemTitle(i, t)).join(", ")}</td>
-                  <td className="px-3 py-2 text-ink">{s.recurrence_text}</td>
+                  <td className="px-3 py-2 text-ink" data-testid={`schedule-row-${s.id}-recurrence`}>
+                    {zoneSuffix(s.recurrence_text, s.time_zone)}
+                  </td>
                   <td className="px-3 py-2 text-ink">
                     {s.active ? formatDateTime(s.next_run_at, bcp) : <Badge tone="warn">{t("reports.schedules.paused")}</Badge>}
                     {s.paused_reason && (
@@ -171,8 +174,8 @@ export function ReportSchedulesPage() {
   return (
     <SchedulesGate>
       <div className="mx-auto w-full max-w-6xl px-4 py-6" data-testid="report-schedules-page">
-          <ListContent />
-        </div>
-      </SchedulesGate>
+        <ListContent />
+      </div>
+    </SchedulesGate>
   );
 }

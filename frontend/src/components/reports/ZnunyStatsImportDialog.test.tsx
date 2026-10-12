@@ -111,7 +111,12 @@ describe("ZnunyStatsImportDialog", () => {
     vi.spyOn(reportsApi, "znunyStatsPreview").mockResolvedValue({ stats: [], errors: [], truncated: false });
     const filePreview = vi
       .spyOn(reportsApi, "znunyStatsFilePreview")
-      .mockResolvedValue({ stats: [PREVIEW.stats[0]!], errors: [{ stat_id: null, message: "Eine Statistik ist nicht lesbar." }], truncated: false });
+      // the backend sends no stat id for a stat read from a file
+      .mockResolvedValue({
+        stats: [{ ...PREVIEW.stats[0]!, stat_id: null }, { ...PREVIEW.stats[2]!, stat_id: null }],
+        errors: [{ stat_id: null, message: "Eine Statistik ist nicht lesbar." }],
+        truncated: false,
+      });
     const apply = vi.spyOn(reportsApi, "znunyStatsApply").mockResolvedValue(APPLIED);
     renderDialog();
     fireEvent.click(await screen.findByRole("tab", { name: "Aus einer Exportdatei" }));
@@ -120,6 +125,9 @@ describe("ZnunyStatsImportDialog", () => {
     await waitFor(() => expect(filePreview).toHaveBeenCalledWith(file));
     expect(await screen.findByTestId("znuny-import-row-znuny.stat.1")).toBeInTheDocument();
     expect(screen.getByTestId("znuny-import-errors")).toHaveTextContent("Eine Statistik ist nicht lesbar.");
+    // the "none" stat is not counted
+    expect(screen.getByTestId("znuny-import-apply")).toBeEnabled();
+    expect(screen.getByTestId("znuny-import-apply")).toHaveTextContent("(1)");
     fireEvent.click(screen.getByTestId("znuny-import-apply"));
     await waitFor(() => expect(apply).toHaveBeenCalledTimes(1));
     expect(apply.mock.calls[0]![0]).toEqual({ file_content_base64: btoa("<otrs_config/>") });

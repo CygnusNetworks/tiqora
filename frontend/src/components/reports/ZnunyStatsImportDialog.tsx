@@ -156,7 +156,8 @@ export function ZnunyStatsImportDialog({ open, onClose, canCreate }: { open: boo
   // Already imported stats start unselected (a re-import overwrites the report's definition).
   const preview = tab === "db" ? dbQ.data : (filePreview ?? undefined);
   const stats = useMemo(() => preview?.stats ?? [], [preview]);
-  const importable = useMemo(() => stats.filter((s) => s.target !== "none" && s.stat_id != null), [stats]);
+  // A file is applied whole; its stats carry no Znuny id (stat_id is null), so only the target counts.
+  const importable = useMemo(() => stats.filter((s) => s.target !== "none"), [stats]);
 
   useEffect(() => {
     if (!open) {

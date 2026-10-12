@@ -56,12 +56,15 @@ export function RecurrenceFields({
   onChange,
   timeZone,
   onTimeZoneChange,
+  language = "de",
   errors,
 }: {
   value: RecurrenceState;
   onChange: (next: RecurrenceState) => void;
   timeZone: string;
   onTimeZoneChange: (zone: string) => void;
+  /** Language of the preview sentence: the schedule's mail language, like the list's text. */
+  language?: "de" | "en";
   errors: Record<string, string>;
 }) {
   const { t, i18n } = useTranslation();
@@ -70,10 +73,10 @@ export function RecurrenceFields({
   const set = (patch: Partial<RecurrenceState>) => onChange({ ...value, ...patch });
 
   const complete = Object.keys(recurrenceErrors(value)).length === 0;
-  const request = useDebounced(complete ? { recurrence: recurrenceRequest(value), timeZone } : null);
+  const request = useDebounced(complete ? { recurrence: recurrenceRequest(value), timeZone, language } : null);
   const previewQ = useQuery({
     queryKey: ["report-schedules", "preview", request],
-    queryFn: ({ signal }) => reportSchedulesApi.previewRecurrence(request!.recurrence, request!.timeZone, signal),
+    queryFn: ({ signal }) => reportSchedulesApi.previewRecurrence(request!.recurrence, request!.timeZone, request!.language, signal),
     enabled: request !== null,
     staleTime: 60_000,
     retry: false,
