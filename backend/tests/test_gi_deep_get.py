@@ -300,6 +300,16 @@ def _seed(sync_url: str) -> None:
                 "GenericInterface::Invoker::Ticket::Generic::PrepareRequest::Base64EncodedFields": {
                     "SendTicket": "Title; Articles->Subject",
                 },
+                # Znuny keeps one setting per preference group (``Name###Group``)
+                "PreferencesGroups###RefreshTime": {
+                    "PrefKey": "UserRefreshTime",
+                    "DataSelected": "0",
+                },
+                "PreferencesGroups###Mail": {"PrefKey": "UserEmail", "DataSelected": "dflt@x.test"},
+                "CustomerPreferencesGroups###ShowTickets": {
+                    "PrefKey": "UserShowTickets",
+                    "DataSelected": "25",
+                },
             },
         )
     engine.dispose()
@@ -371,6 +381,7 @@ async def test_deep_get_shape(sync_url: str) -> None:
     assert d["TicketID"] == TICKET and d["DynamicField_GiTag"] == "a" and d["TimeUnit"] == 1.5
     assert d["Title"] == "GI DeepGet" and d["Queue"] == "GI51080Queue"
     assert len(d["Articles"]) == 2 and d["Article"] == {}
+    assert all("TimeUnit" not in a for a in d["Articles"])  # operation-only key, not ArticleGet
     for part in (
         "CustomerUser",
         "CustomerCompany",
@@ -423,6 +434,22 @@ async def test_customer_user_merges_company_and_preferences(sync_url: str) -> No
     assert cu["CustomerCompanyName"] == "Example Corp" and cu["Source"] == "CustomerUser"
     assert cc["CustomerID"] == COMPANY and cc["CustomerCompanyStreet"] == "Main St 1"
     assert "UserPassword" not in cu
+
+
+async def test_preference_group_defaults_are_applied(sync_url: str) -> None:
+    async def run(session: AsyncSession, sc: SysConfig) -> dict[str, Any] | None:
+        return await ticket_deep_get(
+            session, TICKET, article_id=None, all_attachments=False, sysconfig=sc
+        )
+
+    d = await _with_session(sync_url, run)
+    assert d is not None
+    for part in ("OwnerData", "ResponsibleData"):
+        assert d[part]["UserRefreshTime"] == "0"
+    # a stored preference is never overwritten by DataSelected
+    assert d["OwnerData"]["UserEmail"] == "agent@example.org"
+    assert d["CustomerUser"]["UserShowTickets"] == "25"
+    assert "UserRefreshTime" not in d["CustomerUser"]
 
 
 async def test_ticket_without_related_objects_has_empty_parts(sync_url: str) -> None:

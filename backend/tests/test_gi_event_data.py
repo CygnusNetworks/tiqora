@@ -39,7 +39,7 @@ def _event(
         (_event("TicketQueueUpdate", "%%Raw%%1%%Misc%%2"), {"TicketID": 5}),
         (_event("ArticleCreate", article_id=9), {"TicketID": 5, "ArticleID": 9}),
         (_event("TicketAccountTime", "%%1", article_id=9), {"TicketID": 5, "ArticleID": 9}),
-        (_event("TicketAccountTime", "%%1"), {"TicketID": 5}),
+        (_event("TicketAccountTime", "%%1"), {"TicketID": 5, "ArticleID": None}),
         (
             _event("TicketDynamicFieldUpdate_GiTag", "%%FieldName%%GiTag%%Value%%a%%OldValue%%b"),
             {"TicketID": 5, "FieldName": "GiTag", "Value": "a", "OldValue": "b", "UserID": 7},

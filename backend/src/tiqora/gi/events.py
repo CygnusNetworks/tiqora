@@ -8,7 +8,9 @@ Tiqora derives the same hash from a ``ticket_history`` row (:class:`TicketEvent`
 * ``ArticleCreate`` / ``TicketAccountTime``: ``ArticleID``
 * ``TicketDynamicFieldUpdate_<Name>``: ``FieldName``, ``Value``, ``OldValue`` (parsed from the
   history name ``%%FieldName%%X%%Value%%Y%%OldValue%%Z``; both present as soon as the label is
-  there, ``""`` when empty) and ``UserID`` (the only ticket event whose data carries it)
+  there, ``""`` when empty; lossy: the history name holds the rendered value truncated to about
+  55 characters with ``[...]``, Znuny passes the raw value) and
+  ``UserID`` (the only ticket event whose data carries it)
 * ``TicketMerge``: ``TicketID`` is the merged ticket and ``MainTicketID`` the main ticket, both
   from the history name ``%%MergeTN%%MergeID%%MainTN%%MainID`` (the row exists on both tickets)
 
@@ -49,6 +51,8 @@ def event_data(event: TicketEvent) -> dict[str, Any]:
     if name in ("ArticleCreate", "TicketAccountTime"):
         if event.article_id:
             data["ArticleID"] = event.article_id
+        elif name == "TicketAccountTime":
+            data["ArticleID"] = None  # Znuny passes ArticleID => undef (key present)
     elif name.startswith(_DF_PREFIX):
         data["FieldName"] = name[len(_DF_PREFIX) :]
         values = split_history_name(event.name)

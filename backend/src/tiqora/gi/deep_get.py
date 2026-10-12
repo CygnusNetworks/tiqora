@@ -50,7 +50,7 @@ from tiqora.api.compat.ticket_get import (
 )
 from tiqora.domain.dynamic_field_values import get_df_values_bulk
 from tiqora.util.perl import perl_truthy
-from tiqora.znuny.sysconfig import SysConfig
+from tiqora.znuny.sysconfig import SysConfig, decode_effective_value
 
 __all__ = [
     "DEEP_GET_CLEANUP_RE",
@@ -202,10 +202,52 @@ async def _preferences(
     return {str(k): _text(v) for k, v in rows}
 
 
-def _apply_pref_defaults(data: dict[str, Any], groups: Any) -> None:
-    """``PreferencesGroups`` ``DataSelected`` defaults for keys that are not set."""
-    if not isinstance(groups, dict):
-        return
+async def _pref_groups(session: AsyncSession | None, prefix: str) -> dict[str, Any]:
+    """Every ``<prefix>###<Group>`` setting (``PreferencesGroups`` / ``CustomerPreferencesGroups``).
+
+    Znuny stores one setting per group, so ``SysConfig.get(prefix)`` never matches. The latest
+    system-wide ``sysconfig_modified`` row wins (``is_valid=0`` disables the group), then
+    ``sysconfig_default`` (valid rows only), as in ``SysConfig._fetch_effective_from_db``.
+    """
+    if session is None:
+        return {}
+    like = prefix + "###%"
+    modified = (
+        await session.execute(
+            text(
+                "SELECT name, is_valid, effective_value FROM sysconfig_modified"
+                " WHERE name LIKE :like AND user_id IS NULL ORDER BY id DESC"
+            ),
+            {"like": like},
+        )
+    ).fetchall()
+    default = (
+        await session.execute(
+            text(
+                "SELECT name, effective_value FROM sysconfig_default"
+                " WHERE name LIKE :like AND is_valid = 1"
+            ),
+            {"like": like},
+        )
+    ).fetchall()
+    raw: dict[str, Any] = {}
+    disabled: set[str] = set()
+    for name, is_valid, value in modified:
+        if name in raw or name in disabled:
+            continue
+        if int(is_valid) == 1:
+            raw[str(name)] = value
+        else:
+            disabled.add(str(name))
+    for name, value in default:
+        if name not in raw and name not in disabled:
+            raw[str(name)] = value
+    return {name.split("###", 1)[1]: decode_effective_value(raw[name]) for name in raw}
+
+
+async def _apply_pref_defaults(session: AsyncSession, data: dict[str, Any], prefix: str) -> None:
+    """``<prefix>###<Group>`` ``DataSelected`` defaults for keys that are not set."""
+    groups = await _pref_groups(session, prefix)
     for name in sorted(groups):
         group = groups[name]
         if not isinstance(group, dict) or group.get("DataSelected") is None:
@@ -281,7 +323,7 @@ async def _user_data(
     if not prefs.get("UserEmail"):
         prefs["UserEmail"] = data["UserLogin"]
     data.update(prefs)
-    _apply_pref_defaults(data, await sysconfig.get("PreferencesGroups"))
+    await _apply_pref_defaults(session, data, "PreferencesGroups")
     return data
 
 
@@ -552,7 +594,7 @@ async def _customer_user_data(
         str(customer[k]) for k in ("UserTitle", "UserFirstname", "UserLastname") if customer[k]
     ]
     customer["UserFullname"] = " ".join(name_parts)
-    _apply_pref_defaults(customer, await sysconfig.get("CustomerPreferencesGroups"))
+    await _apply_pref_defaults(session, customer, "CustomerPreferencesGroups")
 
     company: dict[str, Any] = {}
     if perl_truthy(await sysconfig.get("CustomerCompany", True)):
@@ -625,6 +667,8 @@ async def _articles(
     out: list[dict[str, Any]] = []
     for entry in entries:
         article_id = int(entry["ArticleID"])
+        # TimeUnit is added by the TicketGet *operation* only, not by ArticleGet
+        entry.pop("TimeUnit", None)
         # ArticleGet(RealNames => 1)
         for key in ("From", "To", "Cc", "Bcc"):
             value = entry.get(key)
