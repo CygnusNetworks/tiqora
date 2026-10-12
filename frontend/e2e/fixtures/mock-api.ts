@@ -1,5 +1,6 @@
 import { test, type Page, type Route } from "@playwright/test";
 import { GONE_SAVED_SEARCH_ID, createDemoDashboards, resolveDashboards, type DemoDashboards } from "../../src/demo/dashboardsMock";
+import { resolveKiosk } from "../../src/demo/kioskMock";
 import type { ReportRunIn } from "../../src/lib/reportsApi";
 // Reports reuse the demo's pure report data (catalogue definitions + deterministic results).
 import { DEMO_FACTS, DEMO_REPORT_CATALOGUE, demoReport, demoSources, resolveReportRun } from "../../src/demo/reportsMock";
@@ -606,8 +607,17 @@ export async function mockApi(page: Page) {
     const path = url.pathname;
     const method = req.method();
 
+    // Wallboard (public, header-authenticated): redacted view of the same per-test store.
+    if (path.includes("/api/v1/kiosk/")) {
+      const out = resolveKiosk(dashboardStore(), method, path, req.headers()["x-tiqora-kiosk"]);
+      if (out) {
+        await json(route, out.status, out.body);
+        return;
+      }
+    }
+
     // Dashboards (/agent home page): stateful per test, answered from the request body/query.
-    if (/\/api\/v1\/(dashboards|dashboard-widget-types|admin\/dashboard-templates)(\/|$)/.test(path)) {
+    if (/\/api\/v1\/(dashboards|dashboard-widget-types|admin\/dashboard-templates|admin\/dashboard-kiosk-links)(\/|$)/.test(path)) {
       const hasBody = method !== "GET" && method !== "DELETE";
       const out = resolveDashboards(dashboardStore(), method, path, hasBody ? req.postDataJSON() : undefined, url.searchParams);
       if (out) {

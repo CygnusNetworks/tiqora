@@ -20,8 +20,20 @@ export type WidgetType = Schemas["WidgetTypeOut"];
 export type DashboardShareIn = Schemas["DashboardShareIn"];
 export type ShareGroup = Schemas["ShareGroupOut"];
 export type DashboardData = { widgets: Record<string, WidgetResult> };
+export type DashboardFilters = Schemas["DashboardFilters"];
+export type DashboardFiltersIn = Schemas["DashboardFiltersIn"];
+export type DrillPage = Schemas["DrillPageOut"];
+export type TemplateUpdate = Schemas["TemplateUpdateOut"];
+export type TemplateUpdateHint = Schemas["TemplateUpdateHint"];
+export type TemplateUpdateApplyIn = Schemas["TemplateUpdateApplyIn"];
+export type KioskLink = Schemas["KioskLinkOut"];
+export type KioskLinkCreated = Schemas["KioskLinkCreatedOut"];
+export type KioskLinkIn = Schemas["KioskLinkIn"];
+export type JobAccepted = Schemas["JobAccepted"];
+export type DrillQuery = { offset?: number; limit?: number; sort?: string; order?: "asc" | "desc"; point?: string };
 
 const BASE = "/api/v1/dashboards";
+const KIOSK_LINKS = "/api/v1/admin/dashboard-kiosk-links";
 
 /** The dashboard was changed by someone else (or in another tab) since it was read. */
 export class DashboardConflictError extends Error {
@@ -88,6 +100,48 @@ export const dashboardsApi = {
   },
   remove(id: number) {
     return api.request<void>("DELETE", `${BASE}/${id}`);
+  },
+  /** Dashboard-wide filters; a stale `version` throws `DashboardConflictError`. */
+  patchFilters(id: number, body: DashboardFiltersIn) {
+    return guarded(api.request<Dashboard>("PATCH", `${BASE}/${id}/filters`, { body }));
+  },
+  /** Widgets a merge from the source role template would add (template copies only). */
+  templateUpdate(id: number, signal?: AbortSignal) {
+    return api.request<TemplateUpdate>("GET", `${BASE}/${id}/template-update`, { signal });
+  },
+  /** `merge` adds the new widgets, `dismiss` hides the hint; both answer the dashboard. */
+  applyTemplateUpdate(id: number, body: TemplateUpdateApplyIn) {
+    return guarded(api.request<Dashboard>("POST", `${BASE}/${id}/template-update`, { body }));
+  },
+  /** The tickets behind a widget (or one chart `point`), paged. */
+  drillTickets(id: number, widgetId: string, query: DrillQuery = {}, signal?: AbortSignal) {
+    return api.request<DrillPage>(
+      "GET",
+      `${BASE}/${id}/widgets/${encodeURIComponent(widgetId)}/tickets`,
+      { query, signal },
+    );
+  },
+  /** Runs a report widget's report in the background after it answered `deferred` (202). */
+  startReportJob(id: number, widgetId: string) {
+    return api.request<JobAccepted>(
+      "POST",
+      `${BASE}/${id}/widgets/${encodeURIComponent(widgetId)}/report-job`,
+    );
+  },
+  /** Admin wallboard links; the secret is in the create answer only. */
+  kioskLinks: {
+    list(signal?: AbortSignal) {
+      return api.request<KioskLink[]>("GET", KIOSK_LINKS, { signal });
+    },
+    create(body: KioskLinkIn) {
+      return api.request<KioskLinkCreated>("POST", KIOSK_LINKS, { body });
+    },
+    revoke(id: number) {
+      return api.request<KioskLink>("POST", `${KIOSK_LINKS}/${id}/revoke`);
+    },
+    remove(id: number) {
+      return api.request<void>("DELETE", `${KIOSK_LINKS}/${id}`);
+    },
   },
   order(ids: number[]) {
     return api.request<void>("PUT", `${BASE}/order`, { body: { ids } });

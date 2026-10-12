@@ -9,13 +9,25 @@
  * `spark`/`delta` so screenshots are stable; times in lists are relative to "now".
  */
 import type { Schemas } from "@tiqora/api-client";
+import { buildDemoResult, demoReport, demoRunOptions, resolveReportRun } from "./reportsMock";
 import type {
   Dashboard,
+  DashboardFilters,
+  DashboardFiltersIn,
   DashboardSaveIn,
   DashboardTab,
   DashboardTemplate,
   DashboardTemplateIn,
   DashboardWidgetRow,
+  DrillPage,
+  DrillQuery,
+  JobAccepted,
+  KioskLink,
+  KioskLinkCreated,
+  KioskLinkIn,
+  TemplateUpdate,
+  TemplateUpdateApplyIn,
+  TemplateUpdateHint,
   WidgetResult,
   WidgetType,
 } from "@/lib/dashboardsApi";
@@ -46,7 +58,7 @@ export function demoTab(over: Partial<DashboardTab> = {}): DashboardTab {
 
 /** A complete dashboard; overrides win (the tab fields plus `widgets`). */
 export function demoDashboard(over: Partial<Dashboard> = {}): Dashboard {
-  return { ...demoTab(), widgets: [], filters: { queue_ids: [], time_range: null }, ...over };
+  return { ...demoTab(), widgets: [], filters: { queue_ids: [], time_range: null }, template_update: null, ...over };
 }
 
 /** A complete role template; overrides win. */
@@ -97,14 +109,20 @@ export function demoDefaultWidgets(): DashboardWidgetRow[] {
 }
 
 const WIDGET_TYPES: WidgetType[] = [
+  { key: "core.ai-status", version: 1, has_data: true },
+  { key: "core.backlog-aging", version: 1, has_data: true },
   { key: "core.calendar-agenda", version: 1, has_data: true },
+  { key: "core.chat-queue", version: 1, has_data: true },
   { key: "core.counter", version: 1, has_data: true },
   { key: "core.escalations", version: 1, has_data: true },
+  { key: "core.heatmap", version: 1, has_data: true },
   { key: "core.links", version: 1, has_data: false },
   { key: "core.notes", version: 1, has_data: false },
-  { key: "core.queue-overview", version: 1, has_data: false },
+  { key: "core.queue-overview", version: 1, has_data: true },
   { key: "core.recent-views", version: 1, has_data: false },
   { key: "core.reminders", version: 1, has_data: true },
+  { key: "core.report", version: 1, has_data: true },
+  { key: "core.sla-gauge", version: 1, has_data: true },
   { key: "core.team-presence", version: 1, has_data: true },
   { key: "core.ticket-list", version: 1, has_data: true },
 ];
@@ -283,9 +301,137 @@ export function demoWidgetData(key: string, settings: Settings = {}): WidgetResu
       ];
       return { status: "ok", data: { online: online.slice(0, limitOf(settings, 8)), total_online: online.length } };
     }
+    case "core.queue-overview": {
+      const rows = DEMO_QUEUES.filter((q) => settings.only_with_work === false || q.open || q.new || q.escalated);
+      return { status: "ok", data: { queues: rows.slice(0, limitOf(settings, 8)), total: rows.length } };
+    }
+    case "core.report": {
+      const key = typeof settings.report_key === "string" ? settings.report_key : "builtin.volume_by_queue";
+      const maxRows = typeof settings.max_rows === "number" ? settings.max_rows : 10;
+      return { status: "ok", data: reportTile(key, settings.display === "table" ? "table" : "auto", maxRows) };
+    }
+    case "core.sla-gauge": {
+      const target = typeof settings.target_percent === "number" ? settings.target_percent : 90;
+      return {
+        status: "ok",
+        data: { ...reportTile("builtin.sla_compliance", "auto", 10), rate: 87, tickets: 412, target },
+      };
+    }
+    case "core.backlog-aging":
+      return { status: "ok", data: reportTile("builtin.backlog_aging", "auto", limitOf({ limit: settings.max_rows }, 8)) };
+    case "core.heatmap":
+      return { status: "ok", data: reportTile("builtin.created_heatmap", "auto", 200) };
+    case "core.chat-queue": {
+      const waitingSince = (minutes: number) => new Date(Date.now() - minutes * MIN * 1000).toISOString();
+      const items = [
+        { session_id: 301, ticket_id: 1401, tn: "2026101201", title: "Frage zum Rechnungsversand", topic_label: "Buchhaltung", waiting_since: waitingSince(4) },
+        { session_id: 302, ticket_id: 1402, tn: "2026101202", title: "Login im Portal nicht möglich", topic_label: "Support", waiting_since: waitingSince(2) },
+        { session_id: 303, ticket_id: 1403, tn: "2026101203", title: "Angebot für Wartungsvertrag", topic_label: "Vertrieb", waiting_since: waitingSince(1) },
+      ];
+      return {
+        status: "ok",
+        data: {
+          enabled: true,
+          waiting: 3,
+          oldest_waiting_since: items[0].waiting_since,
+          mine: 1,
+          items: items.slice(0, limitOf(settings, 5)),
+        },
+      };
+    }
+    case "core.ai-status":
+      return {
+        status: "ok",
+        data: {
+          ai_escalated: 1,
+          runs_today: { auto_reply: 14, summary: 31, draft: 9 },
+          budgets: [
+            { kind: "queue_tokens_day", subject_name: "Support", window: "day", used: 1_900_000, limit: 3_000_000, exhausted: false, resets_at: nextMidnightIso(), currency: null },
+            { kind: "queue_tokens_day", subject_name: "Buchhaltung", window: "day", used: 3_000_000, limit: 3_000_000, exhausted: true, resets_at: nextMidnightIso(), currency: null },
+            { kind: "provider_cost", subject_name: "Example Inference", window: "month", used: 42.5, limit: 100, exhausted: false, resets_at: nextMidnightIso(), currency: "EUR" },
+          ],
+        },
+      };
     default:
       return undefined;
   }
+}
+
+const DEMO_QUEUES = [
+  { id: 2, name: "Support", open: 14, new: 4, escalated: 2 },
+  { id: 3, name: "Buchhaltung", open: 6, new: 1, escalated: 1 },
+  { id: 4, name: "Vertrieb", open: 3, new: 2, escalated: 0 },
+  { id: 5, name: "Administration", open: 0, new: 0, escalated: 0 },
+];
+
+function nextMidnightIso(): string {
+  const d = new Date();
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1)).toISOString();
+}
+
+/** The data of a report tile (`core.report` and its siblings) from a built-in demo report. */
+function reportTile(reportKey: string, display: "auto" | "table", maxRows: number): Record<string, unknown> {
+  const report = demoReport(reportKey) ?? demoReport("builtin.volume_by_queue");
+  if (!report) throw notFound();
+  const result = { ...buildDemoResult(report, demoRunOptions(report)), report_key: report.key };
+  const wide = report.key === "builtin.created_heatmap";
+  const rows = wide ? result.rows : result.rows.slice(0, maxRows);
+  return {
+    report: { key: report.key, kind: "builtin", title_key: `reports.builtin.${report.key.slice("builtin.".length)}.title` },
+    display,
+    deferred: false,
+    definition: report.definition,
+    result: { ...result, rows, truncated: rows.length < result.rows.length },
+    ignored_filters: [],
+    drillable_dimensions: (report.definition.dimensions ?? []).map((d) => d.key),
+  };
+}
+
+// ---------------------------------------------------------------- template update (E8)
+
+/** The hint a template copy carries when its role template gained widgets (demo: two). */
+export function demoTemplateUpdateHint(over: Partial<TemplateUpdateHint> = {}): TemplateUpdateHint {
+  return { template_id: 100, template_name: "Support-Team", template_version: 2, new_widget_count: 2, ...over };
+}
+
+/** The two widgets the demo template update would add, already placed below the grid. */
+export function demoTemplateUpdate(hint: TemplateUpdateHint = demoTemplateUpdateHint(), y = 20): TemplateUpdate {
+  return {
+    template_id: hint.template_id,
+    template_name: hint.template_name,
+    template_version: hint.template_version,
+    widgets: [
+      widget("demo-tu-sla", "core.sla-gauge", [0, y, 4, 4], { time_range: "30d", target_percent: 90 }),
+      widget("demo-tu-chat", "core.chat-queue", [4, y, 4, 4], { limit: 5 }),
+    ],
+  };
+}
+
+// ---------------------------------------------------------------- drill-down (E5)
+
+const PRESET_TITLES: Record<string, string> = {
+  mine_open: "Meine offenen Tickets",
+  mine_new: "Meine neuen Tickets",
+  unowned_new: "Neue Tickets ohne Besitzer",
+  escalated: "Eskalierte Tickets",
+  ai_escalated: "Tickets mit KI-Übergabe",
+};
+
+/** The tickets behind a widget (or one chart point); the demo has no query engine, so it pages the preset list. */
+function demoDrill(row: DashboardWidgetRow, query: DrillQuery = {}): DrillPage {
+  const settings = row.settings ?? {};
+  const all = PRESET_ITEMS[customSource(settings) ? "mine_open" : presetOf(settings)];
+  const offset = query.offset ?? 0;
+  const limit = query.limit ?? 20;
+  const point = query.point;
+  const title = row.title_override ?? (point ? `${row.type_key === "core.report" ? "Bericht" : "Tickets"}: ${point}` : (PRESET_TITLES[presetOf(settings)] ?? "Gefilterte Tickets"));
+  return {
+    title,
+    items: all.slice(offset, offset + limit),
+    total: all.length,
+    filter: null,
+    note: point ? "Berichtsdaten können wenige Minuten hinter der Liste zurückliegen." : null,
+  };
 }
 
 // ---------------------------------------------------------------- stateful store
@@ -326,6 +472,8 @@ export function createDemoDashboards(options: DemoDashboardsOptions = {}) {
   let nextTemplateId = 100;
   let dashboards: Dashboard[] = [];
   let templates: DashboardTemplate[] = [];
+  let kioskLinks: KioskLink[] = [];
+  let nextLinkId = 1;
 
   const add = (name: string, widgets: DashboardWidgetRow[]): Dashboard => {
     const d = demoDashboard({ id: nextId++, name, sort: dashboards.length, widgets });
@@ -360,6 +508,7 @@ export function createDemoDashboards(options: DemoDashboardsOptions = {}) {
       const source = body.copy_from != null ? find(body.copy_from) : null;
       const d = add(body.name, source ? source.widgets.map((w) => ({ ...w, id: freshId() })) : []);
       d.icon = body.icon ?? null;
+      if (source) d.filters = { ...source.filters };
       return d;
     },
     save(id: number, body: DashboardSaveIn): Dashboard {
@@ -392,6 +541,76 @@ export function createDemoDashboards(options: DemoDashboardsOptions = {}) {
       const rest = sorted().map((d) => d.id).filter((id) => !ids.includes(id));
       const all = [...ids.filter((id) => dashboards.some((d) => d.id === id)), ...rest];
       dashboards = dashboards.map((d) => ({ ...d, sort: all.indexOf(d.id) }));
+    },
+    patchFilters(id: number, body: DashboardFiltersIn): Dashboard {
+      const d = find(id);
+      if (!d.can_edit) throw new DemoHttpError(403, { detail: "Dieses Dashboard ist schreibgeschützt." });
+      if (body.version !== d.version) throw conflict("Dieses Dashboard", d.version);
+      const filters: DashboardFilters = { queue_ids: body.filters.queue_ids ?? [], time_range: body.filters.time_range ?? null };
+      return replace({ ...d, filters, version: d.version + 1 });
+    },
+    templateUpdate(id: number): TemplateUpdate {
+      const d = find(id);
+      if (!d.template_update) throw notFound();
+      const bottom = d.widgets.reduce((m, w) => Math.max(m, (w.layout.lg?.y ?? 0) + (w.layout.lg?.h ?? 0)), 0);
+      return demoTemplateUpdate(d.template_update, bottom);
+    },
+    applyTemplateUpdate(id: number, body: TemplateUpdateApplyIn): Dashboard {
+      const d = find(id);
+      if (body.version !== d.version) throw conflict("Dieses Dashboard", d.version);
+      if (!d.template_update) throw notFound();
+      const added = body.action === "merge" ? store.templateUpdate(id).widgets : [];
+      return replace({ ...d, widgets: [...d.widgets, ...added], template_update: null, version: d.version + 1 });
+    },
+    drill(id: number, widgetId: string, query: DrillQuery = {}): DrillPage {
+      const row = find(id).widgets.find((w) => w.id === widgetId);
+      if (!row) throw notFound();
+      return demoDrill(row, query);
+    },
+    startReportJob(id: number, widgetId: string): JobAccepted {
+      const row = find(id).widgets.find((w) => w.id === widgetId);
+      if (!row) throw notFound();
+      const key = typeof row.settings?.report_key === "string" ? row.settings.report_key : "builtin.volume_by_queue";
+      const out = resolveReportRun({ report_key: key, force_job: true, compare_previous: false, no_cache: false });
+      if (!out.job) throw new DemoHttpError(422, { detail: { message: "Der Bericht läuft bereits.", path: "report_key" } });
+      return { job_id: out.job.job_id, status: "queued" };
+    },
+    kioskLinks: {
+      list: (): KioskLink[] => kioskLinks,
+      create(body: KioskLinkIn): KioskLinkCreated {
+        const id = nextLinkId++;
+        const now = new Date();
+        const link: KioskLink = {
+          id,
+          name: body.name,
+          dashboards: body.dashboard_ids.map((did) => ({ id: did, name: dashboards.find((d) => d.id === did)?.name ?? `Dashboard ${did}`, visible: true })),
+          rotate_seconds: body.rotate_seconds ?? 60,
+          show_details: body.show_details ?? false,
+          created_at: now.toISOString(),
+          created_by: 1,
+          created_by_name: "Alex Turner",
+          expires_at: new Date(now.getTime() + (body.expires_in_days ?? 90) * 86400_000).toISOString(),
+          last_used_at: null,
+          revoked_at: null,
+          active: true,
+          token_hint: "…demo",
+        };
+        kioskLinks = [...kioskLinks, link];
+        return { ...link, token: `demo-kiosk-token-${id}` };
+      },
+      revoke(id: number): KioskLink {
+        const link = kioskLinks.find((l) => l.id === id);
+        if (!link) throw notFound();
+        const revoked = { ...link, active: false, revoked_at: new Date().toISOString() };
+        kioskLinks = kioskLinks.map((l) => (l.id === id ? revoked : l));
+        return revoked;
+      },
+      remove(id: number): void {
+        const link = kioskLinks.find((l) => l.id === id);
+        if (!link) throw notFound();
+        if (link.active) throw new DemoHttpError(422, { detail: { message: "Bitte den Link zuerst widerrufen.", path: "link" } });
+        kioskLinks = kioskLinks.filter((l) => l.id !== id);
+      },
     },
     share(id: number, groupIds: number[]): Dashboard {
       const d = find(id);
@@ -482,6 +701,18 @@ export interface DemoResponse {
   body: unknown;
 }
 
+function drillQuery(query?: URLSearchParams): DrillQuery {
+  const num = (k: string) => (query?.get(k) != null ? Number(query.get(k)) : undefined);
+  const order = query?.get("order");
+  return {
+    offset: num("offset"),
+    limit: num("limit"),
+    sort: query?.get("sort") ?? undefined,
+    order: order === "asc" || order === "desc" ? order : undefined,
+    point: query?.get("point") ?? undefined,
+  };
+}
+
 const noContent: DemoResponse = { status: 204, body: null };
 const ok = (body: unknown, status = 200): DemoResponse => ({ status, body });
 
@@ -500,7 +731,7 @@ export function resolveDashboards(
   const i = path.indexOf("/api/v1/");
   if (i < 0) return undefined;
   const p = path.slice(i + "/api/v1".length).replace(/\/$/, "");
-  const isOurs = p === "/dashboards" || p.startsWith("/dashboards/") || p.startsWith("/dashboard-widget-types") || p.startsWith("/admin/dashboard-templates");
+  const isOurs = p === "/dashboards" || p.startsWith("/dashboards/") || p.startsWith("/dashboard-widget-types") || p.startsWith("/admin/dashboard-templates") || p.startsWith("/admin/dashboard-kiosk-links");
   if (!isOurs) return undefined;
   const b = (body ?? {}) as Record<string, unknown>;
   try {
@@ -525,6 +756,26 @@ export function resolveDashboards(
     }
     if ((m = /^\/dashboards\/(\d+)\/share$/.exec(p)) && method === "PUT")
       return ok(store.share(Number(m[1]), (b.group_ids as number[]) ?? []));
+    if ((m = /^\/dashboards\/(\d+)\/filters$/.exec(p)) && method === "PATCH")
+      return ok(store.patchFilters(Number(m[1]), b as unknown as DashboardFiltersIn));
+    if ((m = /^\/dashboards\/(\d+)\/template-update$/.exec(p))) {
+      if (method === "GET") return ok(store.templateUpdate(Number(m[1])));
+      if (method === "POST") return ok(store.applyTemplateUpdate(Number(m[1]), b as unknown as TemplateUpdateApplyIn));
+    }
+    if ((m = /^\/dashboards\/(\d+)\/widgets\/([^/]+)\/tickets$/.exec(p)) && method === "GET")
+      return ok(store.drill(Number(m[1]), decodeURIComponent(m[2]), drillQuery(query)));
+    if ((m = /^\/dashboards\/(\d+)\/widgets\/([^/]+)\/report-job$/.exec(p)) && method === "POST")
+      return ok(store.startReportJob(Number(m[1]), decodeURIComponent(m[2])), 202);
+    if (p === "/admin/dashboard-kiosk-links") {
+      if (method === "GET") return ok(store.kioskLinks.list());
+      if (method === "POST") return ok(store.kioskLinks.create(b as unknown as KioskLinkIn), 201);
+    }
+    if ((m = /^\/admin\/dashboard-kiosk-links\/(\d+)\/revoke$/.exec(p)) && method === "POST")
+      return ok(store.kioskLinks.revoke(Number(m[1])));
+    if ((m = /^\/admin\/dashboard-kiosk-links\/(\d+)$/.exec(p)) && method === "DELETE") {
+      store.kioskLinks.remove(Number(m[1]));
+      return noContent;
+    }
     if ((m = /^\/dashboards\/(\d+)\/data$/.exec(p)) && method === "GET") {
       const ids = query?.get("widgets")?.split(",").filter(Boolean);
       return ok(store.data(Number(m[1]), ids));
