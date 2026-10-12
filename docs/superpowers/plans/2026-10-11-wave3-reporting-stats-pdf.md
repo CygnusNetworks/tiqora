@@ -902,7 +902,7 @@ As wave-2 plan D13: module docstring naming band and seeds; `pytestmark = pytest
 ### Deviations from spec
 
 1. **Run files are stored in `tiqora_report_run_file`, not through `StorageBackend`** (spec §9). `StorageBackend` is the read-only article-attachment protocol; job files (`tiqora_job_file`) are purged after `jobs.retention_days` (14) and are creator-only. Own table with `run_retention_days` (90) and owner-or-admin download (A17).
-2. **One `tiqora_report_run` row per delivery**, holding the list of report keys, instead of one per report (spec: `report_id` per run). A delivery succeeds or fails as a whole (A15); per-report row counts go into `detail`.
+2. **One `tiqora_report_run` row per delivery**, holding the list of report keys, instead of one per report (spec: `report_id` per run). A delivery succeeds or fails as a whole (A15); the run stores the summed `row_count` of all its reports, and `detail` holds the recipient problems (D12 step 11), no per-report counts.
 3. **No `zip` format.** Formats are `pdf | xlsx | csv`; a CSV bundle of more than one report is zipped automatically.
 4. **Recurrence presets only, no cron** (A4); `tiqora/util/cron.py` stays GenericAgent's (it is naive UTC).
 5. **Znuny `Dynamic::TicketList` becomes a saved search** (A1); spec maps it to a definition.
@@ -912,6 +912,7 @@ As wave-2 plan D13: module docstring naming band and seeds; `pytestmark = pytest
 9. **HTML for the PDF is built with `html.escape`, no template engine** (Jinja2 is only a transitive dependency; nothing new to sandbox).
 10. **The ITSM stats** (CI/change, first-level solution rate) are not part of this import: the ITSM objects do not exist in Tiqora yet (wave 4).
 11. **Not in this plan:** NL questions and MCP tools (phase 4), report widgets / "show as dashboard widget" (dashboards plan, A14), XLSX streaming beyond the existing writer, dynamic-field report dimensions (A12), a ticket-list report source.
+12. **Schedule zone suffix only on wall-clock texts** (D15/Task 16 rule "schedule zone as suffix when different"). The suffix is added to the recurrence sentence (editor preview and the list's `recurrence_text`, which now carries `time_zone`). Instants (`next_run_at`, run times, the preview's next dates) are shown in the agent's display zone without a suffix: a schedule-zone label on a display-zone time would be wrong.
 
 ---
 
