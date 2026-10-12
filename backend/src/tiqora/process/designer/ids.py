@@ -8,6 +8,8 @@ from typing import Literal, get_args
 
 EntityType = Literal["Process", "Activity", "ActivityDialog", "Transition", "TransitionAction"]
 
+SubEntityType = Literal["Activity", "ActivityDialog", "Transition", "TransitionAction"]
+
 ENTITY_TYPES: tuple[EntityType, ...] = get_args(EntityType)
 SUB_ENTITY_TYPES: tuple[EntityType, ...] = tuple(t for t in ENTITY_TYPES if t != "Process")
 
