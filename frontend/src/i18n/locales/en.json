@@ -7977,6 +7977,80 @@
         "confirm": "Leave",
         "stay": "Stay"
       }
+    },
+    "links": {
+      "add": "Add link",
+      "remove": "Remove",
+      "removeFor": "Remove link to {{label}}",
+      "removeTitle": "Remove link?",
+      "removeMessage": "The “{{type}}” link to {{label}} is removed. The object itself stays.",
+      "removeFailed": "The link could not be removed.",
+      "groups": {
+        "ci": "Configuration items",
+        "ticket": "Tickets",
+        "service": "Services",
+        "customer_user": "Customers",
+        "customer_company": "Companies",
+        "kb_article": "Knowledge articles"
+      },
+      "kinds": {
+        "ci": "Configuration item",
+        "ticket": "Ticket",
+        "service": "Service",
+        "customer_user": "Customer",
+        "customer_company": "Company",
+        "kb_article": "Knowledge article"
+      },
+      "dialog": {
+        "title": "Add link",
+        "kind": "Kind of object",
+        "target": "Object",
+        "type": "Link type",
+        "direction": "Direction",
+        "thisCi": "This CI {{label}} …",
+        "submit": "Link",
+        "self": "A CI cannot be linked to itself.",
+        "failed": "The link could not be created. Check your permissions and try again.",
+        "typesFailed": "The link types could not be loaded.",
+        "noTypes": "No link type is enabled for this kind of object.",
+        "pickService": "Choose a service…",
+        "ticketSearch": "Search tickets by number or title…",
+        "kbSearch": "Search knowledge articles…"
+      }
+    },
+    "impact": {
+      "title": "Dependencies",
+      "depth": "Depth",
+      "direction": "Direction",
+      "directions": {
+        "both": "Both",
+        "down": "What it depends on",
+        "up": "What depends on it"
+      },
+      "truncated": "Section shortened: the graph is larger than the display limit. Reduce the depth or pick a direction.",
+      "empty": "This CI has no links to other CIs or services.",
+      "loadFailed": "The dependency graph could not be loaded.",
+      "listLabel": "Dependencies as a list",
+      "service": "Service",
+      "out": "{{type}} →",
+      "in": "← {{type}}",
+      "propagates": "passes incidents on",
+      "legend": "Solid lines pass incidents on, dashed lines do not. Click a CI to open it."
+    },
+    "affected": {
+      "title": "Impact of an incident",
+      "none": "An incident on this CI would not affect anything else.",
+      "loadFailed": "The affected objects could not be loaded.",
+      "counts": {
+        "ci": "Further CIs",
+        "services": "Services",
+        "customers": "Customers and companies",
+        "tickets": "Open tickets"
+      },
+      "services": "Affected services",
+      "customers": "Affected customers and companies",
+      "tickets": "Open tickets on affected CIs",
+      "truncated": "The list is shortened: more objects are affected than shown."
     }
   }
 }

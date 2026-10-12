@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
@@ -53,6 +53,12 @@ async function renderDetail(initial: string) {
   );
   return router;
 }
+
+beforeAll(() => {
+  // the dependency tab mounts the graph canvas, which measures with ResizeObserver
+  vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+  vi.stubGlobal("DOMMatrixReadOnly", class { m22 = 1; });
+});
 
 beforeEach(async () => {
   store = createDemoCmdb();
@@ -122,6 +128,20 @@ describe("CiDetailPage", () => {
     expect(within(list).getByRole("link", { name: /web-01/ })).toHaveAttribute("href", "/agent/cmdb/1");
     expect(list).toHaveTextContent("Kein Zugriff");
     expect(within(list).queryByRole("link", { name: /Kein Zugriff/ })).toBeNull();
+  });
+
+  it("loads the dependency graph and the affected objects on the 'Abhängigkeiten' tab", async () => {
+    await renderDetail("/agent/cmdb/3?tab=dependencies");
+    expect(await screen.findByTestId("ci-impact")).toBeInTheDocument();
+    expect(await screen.findByTestId("impact-list")).toHaveTextContent("web-01");
+    expect(await screen.findByTestId("ci-affected")).toBeInTheDocument();
+    expect(requests.some((r) => /\/cis\/3\/impact$/.test(r.path))).toBe(true);
+    expect(requests.some((r) => /\/cis\/3\/affected$/.test(r.path))).toBe(true);
+  });
+
+  it("offers adding a link on the 'Verknüpfungen' tab to writers", async () => {
+    await renderDetail("/agent/cmdb/3?tab=links");
+    expect(await screen.findByTestId("ci-link-add")).toBeInTheDocument();
   });
 
   it("deletes only after confirmation, then returns to the list", async () => {

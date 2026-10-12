@@ -46,7 +46,8 @@ type DemoCi = {
   attrs: Record<string, AttrEntry[]>;
   lockVersion: number;
 };
-type DemoLink = { id: number; type: string; source: number; target: number };
+/** CI-to-CI link; a link to a ticket, service, customer or article keeps the CI as `source` and the other end in `ext`. */
+type DemoLink = { id: number; type: string; source: number; target: number; ext?: { kind: LinkOut["other"]["kind"]; key: string; label: string; url: string | null } };
 
 export const DEMO_CATALOG_DEPLOYMENT = "ITSM::ConfigItem::DeploymentState";
 export const DEMO_CATALOG_INCIDENT = "ITSM::Core::IncidentState";
@@ -110,6 +111,12 @@ const CLASSES: CmdbClass[] = [
   { id: 1, class_key: "server", name: "Server", icon: "server", number_prefix: "SRV", group_id: 1, group_name: "users", portal_visible: true, valid: true, position: 1, lock_version: 1, can_write: true, current_definition_version: 1, definition: SERVER_DEF },
   { id: 2, class_key: "site", name: "Standort", icon: "building", number_prefix: "LOC", group_id: 1, group_name: "users", portal_visible: false, valid: true, position: 2, lock_version: 1, can_write: true, current_definition_version: 1, definition: SITE_DEF },
 ];
+const DEMO_EXT_LABELS: Record<string, Record<string, string>> = {
+  ticket: { "1": "2026100801 – Datenbank antwortet nicht", "2": "2026100802 – Backup-Fenster überschritten" },
+  service: { "1": "E-Mail", "2": "VPN", "3": "Arbeitsplatz" },
+  kb_article: { "700": "How to reset your password", "701": "Setting up the VPN client" },
+};
+
 const classOf = (id: number): CmdbClass => CLASSES.find((c) => c.id === id) ?? CLASSES[0];
 
 const LINK_TYPES: LinkType[] = [
@@ -316,6 +323,18 @@ function ciOut(store: DemoCmdb, ci: DemoCi): Ci {
 }
 
 function linkOut(store: DemoCmdb, link: DemoLink, ciId: number): LinkOut {
+  if (link.ext) {
+    const type = LINK_TYPES.find((t) => t.name === link.type) ?? LINK_TYPES[0];
+    return {
+      id: link.id,
+      link_type: link.type,
+      link_type_label: type.source_label ?? link.type,
+      direction: type.pointed ? "outgoing" : "undirected",
+      created_at: AT,
+      created_by: "agent",
+      other: { ...link.ext, hidden: false },
+    };
+  }
   const outgoing = link.source === ciId;
   const otherId = outgoing ? link.target : link.source;
   const other = store.cis.find((c) => c.id === otherId);
@@ -340,7 +359,7 @@ function impact(store: DemoCmdb, rootId: number): ImpactGraph {
   const queue = [rootId];
   while (queue.length) {
     const cur = queue.shift() as number;
-    for (const l of store.links.filter((x) => x.source === cur || x.target === cur)) {
+    for (const l of store.links.filter((x) => !x.ext && (x.source === cur || x.target === cur))) {
       const other = l.source === cur ? l.target : l.source;
       edges.push({ source: `ci:${l.source}`, target: `ci:${l.target}`, link_type: l.type, propagates: l.type === "DependsOn" });
       if (!seen.has(other)) {
@@ -827,8 +846,17 @@ export function resolveCmdb(
     return ok(ciOut(store, ci), 201);
   }
   if (sub === "/links" && method === "POST") {
-    const b = (body ?? {}) as { source_key: string; target_key: string; link_type: string };
-    const link: DemoLink = { id: store.nextLinkId++, type: b.link_type, source: Number(b.source_key), target: Number(b.target_key) };
+    const b = (body ?? {}) as { source_kind?: string; source_key: string; target_kind?: string; target_key: string; link_type: string };
+    const kindOf = (k: string | undefined) => (k ?? "ci") as LinkOut["other"]["kind"];
+    let link: DemoLink;
+    if (kindOf(b.source_kind) === "ci" && kindOf(b.target_kind) === "ci") {
+      link = { id: store.nextLinkId++, type: b.link_type, source: Number(b.source_key), target: Number(b.target_key) };
+    } else {
+      // the CI end is the source; the other end is only a label in the demo
+      const ciFirst = kindOf(b.source_kind) === "ci";
+      const [ciKey, kind, key] = ciFirst ? [b.source_key, kindOf(b.target_kind), b.target_key] : [b.target_key, kindOf(b.source_kind), b.source_key];
+      link = { id: store.nextLinkId++, type: b.link_type, source: Number(ciKey), target: 0, ext: { kind, key, label: DEMO_EXT_LABELS[kind]?.[key] ?? `${kind} ${key}`, url: kind === "ticket" ? `/agent/tickets/${key}` : null } };
+    }
     store.links.push(link);
     return ok(linkOut(store, link, link.source), 201);
   }
@@ -905,7 +933,7 @@ export function resolveCmdb(
       const page: CiHistoryPage = { has_more: all.length > limit, items: all.slice(0, limit) };
       return ok(page);
     }
-    if (part === "links") return ok(store.links.filter((l) => l.source === ci.id || l.target === ci.id).map((l) => linkOut(store, l, ci.id)));
+    if (part === "links") return ok(store.links.filter((l) => l.source === ci.id || (!l.ext && l.target === ci.id)).map((l) => linkOut(store, l, ci.id)));
     if (part === "tickets") return ok(ci.id === 3 ? [...TICKETS, CLOSED_TICKET].filter((tk) => query.get("open_only") !== "true" || tk.open) : []);
     if (part === "impact") return ok(impact(store, ci.id));
     if (part === "affected") {
