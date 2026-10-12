@@ -61,6 +61,11 @@ def register_core(registry: Registry) -> None:
     registry.add(JOB_HANDLERS, CMDB_BULK_JOB)
     registry.add(JOB_HANDLERS, CMDB_ARCHIVE_JOB)
 
+    from tiqora.cmdb.provider import tiqora_provider_factory
+    from tiqora.itsm.providers import CI_PROVIDERS
+
+    registry.add(CI_PROVIDERS, tiqora_provider_factory())
+
     from tiqora.reporting.semantic import REPORT_SOURCES
     from tiqora.reporting.sources import core_report_sources
 
