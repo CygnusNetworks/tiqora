@@ -22,7 +22,7 @@ from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 from urllib.parse import urlparse
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from tiqora.cmdb.definition import INT_ID_TYPES, AttributeDef
 
@@ -83,6 +83,8 @@ def _to_int(v: Any) -> int:
             raise _Bad("bad_type", "Eine ganze Zahl wird erwartet.")
         n = int(v)
     elif isinstance(v, str) and _INT.match(v.strip()):
+        if len(v.strip()) > 40:
+            raise _Bad("out_of_range", "Die Zahl ist zu groß.")
         n = int(v.strip())
     else:
         raise _Bad("bad_type", "Eine ganze Zahl wird erwartet.")
@@ -100,6 +102,9 @@ def _to_decimal(v: Any) -> Decimal:
         raise _Bad("bad_type", "Eine Zahl wird erwartet.") from exc
     if not d.is_finite():
         raise _Bad("bad_type", "Eine Zahl wird erwartet.")
+    if d != 0 and (d.adjusted() > 30 or d.adjusted() < -30 or len(d.as_tuple().digits) > 28):
+        # also keeps normalize() inside the default context precision (no silent rounding)
+        raise _Bad("out_of_range", "Die Zahl ist zu groß, zu klein oder zu genau.")
     return d
 
 
@@ -120,8 +125,14 @@ def _to_datetime(v: Any, tz: str) -> str:
     if dt.tzinfo is None:
         if not _DATETIME.match(s):
             raise _Bad("bad_format", "Format: JJJJ-MM-TTTHH:MM[:SS].")
-        dt = dt.replace(tzinfo=UTC if tz.upper() == "UTC" else ZoneInfo(tz))
-    return dt.astimezone(UTC).replace(tzinfo=None, microsecond=0).isoformat(timespec="seconds")
+        try:
+            dt = dt.replace(tzinfo=UTC if tz.upper() == "UTC" else ZoneInfo(tz))
+        except (ZoneInfoNotFoundError, ValueError, OSError):
+            dt = dt.replace(tzinfo=UTC)
+    try:
+        return dt.astimezone(UTC).replace(tzinfo=None, microsecond=0).isoformat(timespec="seconds")
+    except (OverflowError, ValueError) as exc:
+        raise _Bad("out_of_range", "Der Zeitpunkt liegt außerhalb des erlaubten Bereichs.") from exc
 
 
 def _coerce(a: AttributeDef, v: Any, tz: str) -> Any:
@@ -133,13 +144,18 @@ def _coerce(a: AttributeDef, v: Any, tz: str) -> Any:
         s = v.strip() if t not in ("text", "textarea") else v
         if t in ("text", "textarea") and not s.strip():
             raise _Bad("bad_type", "Ein Text wird erwartet.")
-        limit = a.options.max_length or _DEFAULT_MAX_LENGTH[t]
+        limit = a.options.max_length if a.options.max_length is not None else _DEFAULT_MAX_LENGTH[t]
         if len(s) > limit:
             raise _Bad("too_long", f"Höchstens {limit} Zeichen.")
         if t == "email" and not _EMAIL.match(s):
             raise _Bad("bad_format", "Keine gültige E-Mail-Adresse.")
         if t == "url":
-            parsed = urlparse(s)
+            try:
+                parsed = urlparse(s)
+            except ValueError as exc:
+                raise _Bad(
+                    "bad_format", "Eine Adresse mit http:// oder https:// wird erwartet."
+                ) from exc
             if parsed.scheme.lower() not in ("http", "https") or not parsed.netloc:
                 raise _Bad("bad_format", "Eine Adresse mit http:// oder https:// wird erwartet.")
         if t == "ip":
@@ -218,6 +234,10 @@ def _normalize_level(
                 except _Bad as bad:
                     value_bad = True
                     local.append(ValueIssue(epath, bad.code, bad.message))
+                except (ValueError, OverflowError, ArithmeticError):
+                    # last line of defence: untrusted input must never become a 500
+                    value_bad = True
+                    local.append(ValueIssue(epath, "bad_format", "Ungültiger Wert."))
             sub_vals: Values = {}
             raw_sub = entry.get("s")
             if a.sub:

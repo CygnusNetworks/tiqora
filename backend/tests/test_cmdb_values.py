@@ -232,3 +232,35 @@ def test_ref_types_cover_all_id_and_login_types() -> None:
 
 def test_unknown_top_level_keys() -> None:
     assert unknown_top_level_keys(ATTRS, {"Vendor": [], "Z": [], "A": []}) == ["A", "Z"]
+
+
+@pytest.mark.parametrize(
+    ("type_", "raw", "code"),
+    [
+        ("integer", "9" * 5000, "out_of_range"),
+        ("queue", "9" * 5000, "out_of_range"),
+        ("url", "http://[::1", "bad_format"),
+        ("datetime", "0001-01-01T00:00:00+14:00", "out_of_range"),
+        ("datetime", "9999-12-31T23:59:00-14:00", "out_of_range"),
+        ("decimal", "1E+99999999", "out_of_range"),
+        ("money", "1E-99999999", "out_of_range"),
+        ("decimal", "1" + "0" * 100000, "out_of_range"),
+    ],
+)
+def test_hostile_input_yields_issue_not_exception(type_: str, raw: str, code: str) -> None:
+    val, issues = _one(type_, raw)
+    assert val is None
+    assert issues == [("X[1]", code)]
+
+
+def test_unknown_timezone_falls_back_to_utc() -> None:
+    attrs = [AttributeDef(key="X", name="X", type="datetime")]
+    vals, issues = normalize_values(
+        attrs, {"X": [{"v": "2026-01-01T10:00"}]}, now_tz="Nowhere/Land"
+    )
+    assert issues == []
+    assert vals["X"] == [{"v": "2026-01-01T10:00:00"}]
+
+
+def test_max_length_zero_is_not_the_default() -> None:
+    assert _one("text", "a", options={"max_length": 0})[1] == [("X[1]", "too_long")]
