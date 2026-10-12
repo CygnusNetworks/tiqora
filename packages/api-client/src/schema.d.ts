@@ -3100,6 +3100,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/dynamic-fields/plugin-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Plugin Types
+         * @description Field types plugins offer (registered by a loaded plugin), for the create dialog.
+         */
+        get: operations["list_plugin_types_api_v1_admin_dynamic_fields_plugin_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/dynamic-fields/{field_id}": {
         parameters: {
             query?: never;
@@ -16036,6 +16056,8 @@ export interface components {
              * @enum {string}
              */
             object_type: "Ticket" | "Article" | "CustomerUser" | "CustomerCompany";
+            /** Plugin Type */
+            plugin_type?: string | null;
             /**
              * Valid Id
              * @default 1
@@ -16050,6 +16072,8 @@ export interface components {
             label: string;
             /** Name */
             name: string;
+            /** Plugin Type */
+            plugin_type?: string | null;
             /** Possible Values */
             possible_values: {
                 [key: string]: string;
@@ -16081,8 +16105,25 @@ export interface components {
             name: string;
             /** Object Type */
             object_type: string;
+            /** Plugin Type */
+            plugin_type?: string | null;
             /** Valid Id */
             valid_id: number;
+        };
+        /** DynamicFieldPluginTypeOut */
+        DynamicFieldPluginTypeOut: {
+            /** Base Type */
+            base_type: string;
+            /** Config Schema */
+            config_schema?: {
+                [key: string]: unknown;
+            } | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Plugin Id */
+            plugin_id: string;
         };
         /** DynamicFieldUpdate */
         DynamicFieldUpdate: {
@@ -32614,6 +32655,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DynamicFieldOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_plugin_types_api_v1_admin_dynamic_fields_plugin_types_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DynamicFieldPluginTypeOut"][];
                 };
             };
             /** @description Validation Error */

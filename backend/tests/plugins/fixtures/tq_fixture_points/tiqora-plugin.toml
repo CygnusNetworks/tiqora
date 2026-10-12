@@ -20,4 +20,5 @@ extension_points = [
   "core.process.condition_modules",
   "core.templates.placeholders",
   "core.tickets.number_generators",
+  "core.dynamic_fields.types",
 ]

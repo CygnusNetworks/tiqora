@@ -820,9 +820,20 @@ class DynamicFieldOut(BaseModel):
     field_type: str
     object_type: str
     config: dict[str, Any]
+    #: qualified name of the plugin type the field was created with (D8), else ``None``
+    plugin_type: str | None = None
     valid_id: int
     create_time: UtcDateTime | None
     change_time: UtcDateTime | None
+
+
+class DynamicFieldPluginTypeOut(BaseModel):
+    key: str
+    label: str
+    base_type: str
+    plugin_id: str
+    #: JSON schema of the type's settings (``TiqoraPluginConfig``), ``None`` when it has none
+    config_schema: dict[str, Any] | None = None
 
 
 class DynamicFieldCreate(BaseModel):
@@ -832,6 +843,8 @@ class DynamicFieldCreate(BaseModel):
     field_type: str
     object_type: Literal["Ticket", "Article", "CustomerUser", "CustomerCompany"] = "Ticket"
     config: dict[str, Any] = Field(default_factory=dict)
+    #: qualified name of a plugin field type; ``field_type`` must then be its base type
+    plugin_type: str | None = None
     valid_id: int = 1
 
 

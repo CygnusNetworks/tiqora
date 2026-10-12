@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from collections.abc import Mapping
 from typing import Any
 
+from pydantic import BaseModel
 from sqlalchemy import text
 
 from tiqora_sdk import PluginRegistry
+from tiqora_sdk.fields import DfBaseType
 from tiqora_sdk.hooks import (
     HookContext,
     OperationVetoed,
@@ -180,6 +183,53 @@ def _register_number_generators(registry: PluginRegistry) -> None:
     )
 
 
+class ContractConfig(BaseModel):
+    prefix: str = "V-"
+
+
+_CONTRACT_RE = re.compile(r"V-\d{1,6}")
+
+
+def _validate_contract(values: list[str], config: Mapping[str, Any]) -> list[str]:
+    """``MODE["df"]``: raise (RuntimeError) | hang (3 s) | badresult (not a list of str)."""
+    behaviour.CALLS.append(("df.validate", (list(values), dict(config))))
+    mode = behaviour.MODE.get("df", "ok")
+    if mode == "raise":
+        raise RuntimeError("kaputt")
+    if mode == "hang":
+        import time
+
+        time.sleep(3)
+    if mode == "badresult":
+        return 5  # type: ignore[return-value]
+    out: list[str] = []
+    for value in values:
+        upper = value.upper()
+        if not _CONTRACT_RE.fullmatch(upper):
+            raise ValueError("Vertragsnummer muss wie V-123 aussehen")
+        out.append(upper)
+    return out
+
+
+def _display_contract(values: list[str], config: Mapping[str, Any]) -> str:
+    if behaviour.MODE.get("df.display") == "raise":
+        raise RuntimeError("kaputt")
+    return ", ".join(f"Vertrag {v}" for v in values)
+
+
+def _register_df_types(registry: PluginRegistry) -> None:
+    """``Contract`` (base Text): ``V-<digits>``, upper-cased, shown as "Vertrag V-12"."""
+    base: DfBaseType = "Text"
+    registry.dynamic_field_type(
+        "Contract",
+        label="Vertragsnummer",
+        base_type=base,
+        validate=_validate_contract,
+        display=_display_contract,
+        config_model=ContractConfig,
+    )
+
+
 class PointsPlugin:
     def register(self, registry: PluginRegistry) -> None:
         # Each task of the plugin-points plan adds its ``_register_<point>(registry)`` call here.
@@ -187,6 +237,7 @@ class PointsPlugin:
         _register_process(registry)
         _register_placeholders(registry)
         _register_number_generators(registry)
+        _register_df_types(registry)
 
 
 plugin = PointsPlugin()

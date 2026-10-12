@@ -318,6 +318,10 @@ async def _checked_df_values(
             continue
         try:
             normalised = normalize_df_values(config.field_type, values)
+            if config.plugin_type is not None:
+                from tiqora.plugins.df_types import validate_plugin_values
+
+                normalised = await validate_plugin_values(config, normalised)
         except DynamicFieldValueError:
             extra.append(line)
             continue

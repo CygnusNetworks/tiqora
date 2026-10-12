@@ -26,13 +26,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.domain.dynamic_field_config import config_from_yaml
 from tiqora.domain.dynamic_field_values import (
     DynamicFieldConfig,
-    df_display_value,
     df_readable_value,
     get_df_values_bulk,
 )
 from tiqora.domain.settings_store import get_setting_bool
 from tiqora.domain.timezones import format_in_zone, resolve_user_time_zone
 from tiqora.plugins.calls import PluginCallBudget
+from tiqora.plugins.df_types import display_value_bounded
 from tiqora.plugins.placeholders import EXPAND_BUDGET_SECONDS, current_scope_budget
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -404,7 +404,9 @@ async def _fetch_ticket_df_entries(session: AsyncSession, ticket_id: int) -> dic
             continue
         key = f"dynamicfield_{df.name.lower()}"
         out[key] = df_readable_value(df.field_type, stored)
-        out[f"{key}_value"] = df_display_value(df.field_type, config_from_yaml(raw_config), stored)
+        out[f"{key}_value"] = await display_value_bounded(
+            df.field_type, config_from_yaml(raw_config), stored
+        )
     return out
 
 

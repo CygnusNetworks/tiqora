@@ -151,6 +151,8 @@ class DynamicFieldDefOut(BaseModel):
     required: bool
     #: Dropdown/Multiselect options ``{key: display value}``, else ``None``.
     possible_values: dict[str, str] | None
+    #: plugin field type (D8); the input of the base ``field_type`` is used either way
+    plugin_type: str | None = None
 
 
 class ComposeContextOut(BaseModel):
@@ -483,6 +485,11 @@ async def screen_dynamic_fields(
                 possible_values=(
                     {str(k): str(v) for k, v in possible.items()}
                     if isinstance(possible, dict)
+                    else None
+                ),
+                plugin_type=(
+                    config["TiqoraPluginType"]
+                    if isinstance(config.get("TiqoraPluginType"), str)
                     else None
                 ),
             )

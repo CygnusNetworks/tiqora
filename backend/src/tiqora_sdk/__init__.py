@@ -33,6 +33,7 @@ if _t.TYPE_CHECKING:
     from fastapi import APIRouter
     from pydantic import BaseModel
 
+    from tiqora.plugins.df_types import DfBaseType, DfDisplay, DfValidate
     from tiqora.plugins.number_generators import NumberBuild
     from tiqora.plugins.placeholders import PlaceholderResolve
     from tiqora.plugins.process_points import ConditionRun, TransitionActionRun
@@ -148,6 +149,17 @@ class PluginRegistry(_t.Protocol):
         pattern: str,
         uses_counter: bool = True,
         date_based: bool = False,
+    ) -> str: ...
+
+    def dynamic_field_type(
+        self,
+        name: str,
+        *,
+        label: str,
+        base_type: DfBaseType,
+        validate: DfValidate | None = None,
+        display: DfDisplay | None = None,
+        config_model: type[BaseModel] | None = None,
     ) -> str: ...
 
 

@@ -14511,6 +14511,17 @@
             "title": "Object Type",
             "type": "string"
           },
+          "plugin_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plugin Type"
+          },
           "valid_id": {
             "default": 1,
             "title": "Valid Id",
@@ -14539,6 +14550,17 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "plugin_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plugin Type"
           },
           "possible_values": {
             "anyOf": [
@@ -14628,6 +14650,17 @@
             "title": "Object Type",
             "type": "string"
           },
+          "plugin_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plugin Type"
+          },
           "valid_id": {
             "title": "Valid Id",
             "type": "integer"
@@ -14647,6 +14680,46 @@
           "change_time"
         ],
         "title": "DynamicFieldOut",
+        "type": "object"
+      },
+      "DynamicFieldPluginTypeOut": {
+        "properties": {
+          "base_type": {
+            "title": "Base Type",
+            "type": "string"
+          },
+          "config_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Schema"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "base_type",
+          "plugin_id"
+        ],
+        "title": "DynamicFieldPluginTypeOut",
         "type": "object"
       },
       "DynamicFieldUpdate": {
@@ -55550,6 +55623,76 @@
           }
         },
         "summary": "Create Dynamic Field",
+        "tags": [
+          "admin:dynamic-fields"
+        ]
+      }
+    },
+    "/api/v1/admin/dynamic-fields/plugin-types": {
+      "get": {
+        "description": "Field types plugins offer (registered by a loaded plugin), for the create dialog.",
+        "operationId": "list_plugin_types_api_v1_admin_dynamic_fields_plugin_types_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DynamicFieldPluginTypeOut"
+                  },
+                  "title": "Response List Plugin Types Api V1 Admin Dynamic Fields Plugin Types Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Plugin Types",
         "tags": [
           "admin:dynamic-fields"
         ]

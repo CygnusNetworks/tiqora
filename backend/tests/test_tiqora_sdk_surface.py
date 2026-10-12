@@ -5,6 +5,7 @@ from pathlib import Path
 
 from tiqora.channels.registry import CHANNELS
 from tiqora.jobs.registry import JOB_HANDLERS
+from tiqora.plugins.df_types import DYNAMIC_FIELD_TYPES
 from tiqora.plugins.events import EVENT_SUBSCRIBERS
 from tiqora.plugins.mcp import MCP_TOOLS
 from tiqora.plugins.number_generators import TICKET_NUMBER_GENERATORS
@@ -77,6 +78,7 @@ SUBMODULES: dict[str, set[str]] = {
         "NumberRequest",
         "NumberBuild",
     },
+    "tiqora_sdk.fields": {"DfBaseType", "DfValidate", "DfDisplay"},
 }
 
 
@@ -114,6 +116,7 @@ def test_registry_protocol_matches_registrar() -> None:
             "condition_module",
             "placeholder",
             "number_generator",
+            "dynamic_field_type",
         }
     )
 
@@ -139,6 +142,7 @@ def test_phase1_points_are_sdk_stable() -> None:
             CONDITION_MODULES,
             PLACEHOLDERS,
             TICKET_NUMBER_GENERATORS,
+            DYNAMIC_FIELD_TYPES,
         )
     )
     assert CHANNELS.sdk_stable is False

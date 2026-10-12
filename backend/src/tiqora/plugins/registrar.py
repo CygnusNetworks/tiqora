@@ -22,6 +22,14 @@ from pydantic import BaseModel
 from tiqora.extensions.registry import ExtensionPoint
 from tiqora.jobs.registry import JOB_HANDLERS, JobHandler
 from tiqora.plugins.context import PluginContext
+from tiqora.plugins.df_types import (
+    BASE_TYPES,
+    DYNAMIC_FIELD_TYPES,
+    DfBaseType,
+    DfDisplay,
+    DfValidate,
+    DynamicFieldType,
+)
 from tiqora.plugins.events import EVENT_SUBSCRIBERS, EventHandler, EventSubscriber
 from tiqora.plugins.manifest import PluginManifest
 from tiqora.plugins.mcp import CORE_MCP_TOOL_NAMES, MCP_TOOLS, McpTool
@@ -632,6 +640,66 @@ class PluginRegistrar:
                 )
 
         self._stage(TICKET_NUMBER_GENERATORS, item, check=check)
+        return qname
+
+    def dynamic_field_type(
+        self,
+        name: str,
+        *,
+        label: str,
+        base_type: DfBaseType,
+        validate: DfValidate | None = None,
+        display: DfDisplay | None = None,
+        config_model: type[BaseModel] | None = None,
+    ) -> str:
+        """Stage ``Plugin_<short_id>_<name>`` as a dynamic field type (D8).
+
+        Returns the qualified name an admin selects. Fields of the type are stored as
+        ``base_type``; ``validate`` and ``display`` are plain, fast ``def`` functions (they run
+        in a worker thread with a 1 s limit) and ``config_model`` describes the type's settings.
+        """
+        qname = qualified(self._manifest.short_id, name)
+        item = DynamicFieldType(
+            key=qname,
+            plugin_id=self.plugin_id,
+            label=label,
+            base_type=base_type,
+            validate=validate,
+            display=display,
+            config_model=config_model,
+            context=self._context,
+        )
+
+        def check() -> None:
+            if not isinstance(name, str) or not CAMEL_NAME_RE.fullmatch(name):
+                raise RegistrationRejected(
+                    f"Ungültiger Name „{name}“ für den Feldtyp: "
+                    "2 bis 41 Zeichen, A-Z, a-z und 0-9, beginnt mit einem Großbuchstaben"
+                )
+            if not isinstance(label, str) or not label.strip() or len(label) > 100:
+                raise RegistrationRejected(
+                    f"Der Feldtyp „{name}“ braucht eine Bezeichnung (höchstens 100 Zeichen)"
+                )
+            if base_type not in BASE_TYPES:
+                raise RegistrationRejected(
+                    f"Der Basistyp „{base_type}“ des Feldtyps „{name}“ ist nicht erlaubt; "
+                    f"erlaubt sind {', '.join(BASE_TYPES)}"
+                )
+            for what, fn in (("validate", validate), ("display", display)):
+                if fn is not None and (not callable(fn) or is_async_callable(fn)):
+                    raise RegistrationRejected(
+                        f"„{what}“ des Feldtyps „{name}“ muss eine gewöhnliche Funktion sein "
+                        "(def, nicht async def): sie läuft in einem Hilfsthread und muss "
+                        "schnell sein"
+                    )
+            if config_model is not None and not (
+                isinstance(config_model, type) and issubclass(config_model, BaseModel)
+            ):
+                raise RegistrationRejected(
+                    f"Das config_model des Feldtyps „{name}“ muss eine Pydantic-Modellklasse sein"
+                )
+
+        self._stage(DYNAMIC_FIELD_TYPES, item, check=check)
         return qname
 
 
