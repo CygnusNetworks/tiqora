@@ -98712,6 +98712,101 @@
         ]
       }
     },
+    "/api/v1/tickets/{ticket_id}/links/{target_id}": {
+      "delete": {
+        "description": "Remove the link(s) between this ticket and another. Requires ``rw`` on both.\n\nIdempotent like Znuny's ``LinkDelete``: 204 also when no such link existed.",
+        "operationId": "delete_ticket_link_api_v1_tickets__ticket_id__links__target_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "target_id",
+            "required": true,
+            "schema": {
+              "title": "Target Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Only remove this link type (default: every type between the two)",
+            "in": "query",
+            "name": "link_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only remove this link type (default: every type between the two)",
+              "title": "Link Type"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Ticket Link",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
     "/api/v1/tickets/{ticket_id}/mentions": {
       "get": {
         "description": "List agent mentions on a ticket (requires ticket ``ro``).",

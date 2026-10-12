@@ -201,6 +201,63 @@ class SysConfig:
         self._cache[name] = (now + self._ttl, value)
         return value
 
+    async def get_prefix(self, prefix: str) -> dict[str, Any]:
+        """Effective value of every setting whose name starts with *prefix*.
+
+        Same resolution as :meth:`get` but for a whole family (``LinkObject::Type###`` ...):
+        a valid system-wide ``sysconfig_modified`` row decides (the newest one; an admin who
+        disabled the setting there removes the name from the result), otherwise a valid
+        ``sysconfig_default`` row. Invalid / disabled settings are skipped. Names missing from
+        both tables are simply absent (no code defaults). With an injected ``fetch`` (tests)
+        or without a session the result is empty.
+        """
+        if self._session is None or not prefix:
+            return {}
+        key = f"prefix:{prefix}"
+        now = time.monotonic()
+        cached = self._cache.get(key)
+        if cached is not None and now < cached[0]:
+            return dict(cached[1])
+        # SUBSTR(...) = :p instead of LIKE: no wildcard/escape dialect differences (names carry
+        # "_" and "#"), and exact prefix match on both MariaDB and PostgreSQL.
+        params = {"n": len(prefix), "p": prefix}
+        defaults = (
+            await self._session.execute(
+                text(
+                    "SELECT name, effective_value FROM sysconfig_default"
+                    " WHERE is_valid = 1 AND SUBSTR(name, 1, :n) = :p"
+                ),
+                params,
+            )
+        ).all()
+        modified = (
+            await self._session.execute(
+                text(
+                    "SELECT name, is_valid, effective_value FROM sysconfig_modified"
+                    " WHERE user_id IS NULL AND SUBSTR(name, 1, :n) = :p ORDER BY id"
+                ),
+                params,
+            )
+        ).all()
+        raw: dict[str, Any] = {str(r[0]): r[1] for r in defaults if str(r[0]).startswith(prefix)}
+        for name_, is_valid, value in modified:  # ascending id: the newest row wins
+            name = str(name_)
+            if not name.startswith(prefix):
+                continue
+            if int(is_valid) == 1:
+                raw[name] = value
+            else:
+                raw.pop(name, None)
+        out: dict[str, Any] = {}
+        for name, value in raw.items():
+            decoded = decode_effective_value(value)
+            if decoded is None:
+                decoded = ZNUNY_SETTING_DEFAULTS.get(name)
+            if decoded is not None:
+                out[name] = decoded
+        self._cache[key] = (now + self._ttl, out)
+        return dict(out)
+
     async def get_str(self, name: str, default: str | None = None) -> str:
         """Return setting as string."""
         fallback = default if default is not None else str(ZNUNY_SETTING_DEFAULTS.get(name, ""))

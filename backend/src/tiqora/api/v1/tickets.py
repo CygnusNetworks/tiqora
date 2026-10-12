@@ -78,6 +78,7 @@ from tiqora.domain.ticket_write_service import (
     ArticleIn,
     ArticleNotDeletable,
     InvalidInput,
+    LinkConflict,
     TelegramSendOptions,
     TicketIn,
     TicketWriteService,
@@ -290,6 +291,8 @@ def _map_exc(exc: Exception) -> HTTPException:
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     if isinstance(exc, (TicketAccessDenied, WriteAccessDenied)):
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    if isinstance(exc, LinkConflict):
+        return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     if isinstance(exc, InvalidInput):
         return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
     if isinstance(exc, ArticleNotDeletable):
@@ -2169,6 +2172,34 @@ async def create_ticket_link(
     except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
         raise _map_exc(exc) from exc
     return Response(status_code=status.HTTP_201_CREATED)
+
+
+@router.delete(
+    "/{ticket_id}/links/{target_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
+async def delete_ticket_link(
+    ticket_id: int,
+    target_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    link_type: str | None = Query(
+        None, description="Only remove this link type (default: every type between the two)"
+    ),
+) -> Response:
+    """Remove the link(s) between this ticket and another. Requires ``rw`` on both.
+
+    Idempotent like Znuny's ``LinkDelete``: 204 also when no such link existed.
+    """
+    svc = _write_service(session, settings)
+    try:
+        async with session.begin():
+            await svc.unlink_tickets(user.id, ticket_id, target_id, link_type)
+    except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+        raise _map_exc(exc) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # ---------------------------------------------------------------------------

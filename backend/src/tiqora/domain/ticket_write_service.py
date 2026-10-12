@@ -32,7 +32,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, Literal
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -54,7 +54,7 @@ from tiqora.domain.dynamic_field_values import (
     values_outside_possible_values,
 )
 from tiqora.permissions.engine import PermissionEngine
-from tiqora.znuny.cache_invalidation import invalidate_ticket_cache
+from tiqora.znuny.cache_invalidation import invalidate_cache_type, invalidate_ticket_cache
 from tiqora.znuny.escalation import escalation_index_build
 from tiqora.znuny.history import (
     TYPE_ADD_NOTE,
@@ -109,6 +109,23 @@ class TicketAccessDenied(Exception):
 
 class InvalidInput(Exception):
     """Caller passed an invalid combination of parameters."""
+
+
+class LinkConflict(InvalidInput):
+    """``LinkObject.pm::LinkAdd`` refuses the link (Znuny logs and returns undef).
+
+    ``reason``: ``opposite_direction`` (pointed type already linked the other way round),
+    ``state`` (the pair already has a link of that type in another state), ``type_group``
+    (another link between the pair sits in the same ``LinkObject::TypeGroup``),
+    ``not_possible`` (the type is not a ``LinkObject::PossibleLink`` of the two objects).
+    """
+
+    def __init__(
+        self,
+        reason: Literal["opposite_direction", "state", "type_group", "not_possible"],
+    ) -> None:
+        super().__init__(f"Link not possible: {reason}")
+        self.reason = reason
 
 
 class ArticleNotDeletable(Exception):
@@ -2524,10 +2541,20 @@ async def _link_object_id(session: AsyncSession, name: str) -> int:
     return int(row[0])
 
 
-async def _link_type_id(session: AsyncSession, name: str) -> int:
-    row = (
-        await session.execute(text("SELECT id FROM link_type WHERE name = :n LIMIT 1"), {"n": name})
-    ).first()
+async def _link_type_id(session: AsyncSession, name: str, *, user_id: int | None = None) -> int:
+    """Resolve ``link_type.id``; with *user_id* an unseen name is inserted
+    (``LinkObject.pm::TypeLookup`` creates the row on first use)."""
+    q = text("SELECT id FROM link_type WHERE name = :n LIMIT 1")
+    row = (await session.execute(q, {"n": name})).first()
+    if row is None and user_id is not None:
+        await session.execute(
+            text(
+                "INSERT INTO link_type (name, valid_id, create_time, create_by, change_time,"
+                " change_by) VALUES (:n, 1, current_timestamp, :u, current_timestamp, :u)"
+            ),
+            {"n": name, "u": user_id},
+        )
+        row = (await session.execute(q, {"n": name})).first()
     if row is None:
         raise InvalidInput(f"Unknown link type: {name}")
     return int(row[0])
@@ -2544,6 +2571,108 @@ async def _link_state_id(session: AsyncSession, name: str) -> int:
     return int(row[0])
 
 
+@dataclass(frozen=True, slots=True)
+class _LinkConfig:
+    """``LinkObject::Type`` / ``PossibleLink`` / ``TypeGroup`` as the SysConfig defines them."""
+
+    pointed: dict[str, bool]  # type name -> SourceName ne TargetName
+    possible: list[tuple[str, str, str]]  # (Object1, Object2, Type)
+    groups: list[list[str]]
+
+
+# Framework.xml / Ticket.xml defaults, used when the sysconfig tables carry no link type at all
+# (a database that never had its configuration rebuilt).
+_DEFAULT_LINK_CONFIG: Final = _LinkConfig(
+    pointed={"Normal": False, "ParentChild": True},
+    possible=[("Ticket", "Ticket", "Normal"), ("Ticket", "Ticket", "ParentChild")],
+    groups=[["Normal", "ParentChild"]],
+)
+
+
+async def _link_config(session: AsyncSession) -> _LinkConfig:
+    """Port of ``LinkObject.pm`` ``TypeList`` / ``PossibleLinkList`` / ``TypeGroupList``."""
+    cfg = SysConfig(session)
+    raw_types = await cfg.get_prefix("LinkObject::Type###")
+    if not raw_types:
+        return _DEFAULT_LINK_CONFIG
+    pointed: dict[str, bool] = {}
+    for name, value in raw_types.items():
+        if not isinstance(value, dict):
+            continue
+        src = " ".join(str(value.get("SourceName") or "").split())
+        tgt = " ".join(str(value.get("TargetName") or "").split())
+        if src and tgt:  # TypeList drops a type without both names
+            pointed[name.removeprefix("LinkObject::Type###")] = src != tgt
+    possible: list[tuple[str, str, str]] = []
+    for _name, value in sorted((await cfg.get_prefix("LinkObject::PossibleLink###")).items()):
+        if not isinstance(value, dict):
+            continue
+        o1, o2, ty = (str(value.get(k) or "").strip() for k in ("Object1", "Object2", "Type"))
+        if o1 and o2 and ty in pointed:
+            possible.append((o1, o2, ty))
+    groups: list[list[str]] = []
+    for _name, value in sorted((await cfg.get_prefix("LinkObject::TypeGroup###")).items()):
+        if isinstance(value, list):
+            members = [str(t).strip() for t in value]
+            if members and all(m in pointed for m in members):
+                groups.append(members)
+    return _LinkConfig(pointed=pointed, possible=possible, groups=groups)
+
+
+def _type_possible(cfg: _LinkConfig, object1: str, object2: str, link_type: str) -> bool:
+    """``PossibleTypesList``: the pair is listed in either order for that type."""
+    return any(
+        ty == link_type and ((o1, o2) == (object1, object2) or (o2, o1) == (object1, object2))
+        for o1, o2, ty in cfg.possible
+    )
+
+
+def _same_type_group(cfg: _LinkConfig, type1: str, type2: str) -> bool:
+    """``LinkObject.pm::PossibleType`` is the negation: two types in one group cancel out."""
+    return any(type1 in g and type2 in g for g in cfg.groups)
+
+
+async def _link_object_id_if_exists(session: AsyncSession, name: str) -> int | None:
+    row = (
+        await session.execute(
+            text("SELECT id FROM link_object WHERE name = :n LIMIT 1"), {"n": name}
+        )
+    ).first()
+    return None if row is None else int(row[0])
+
+
+async def _ticket_link_history(
+    session: AsyncSession,
+    *,
+    history_type: str,
+    ticket_id: str,
+    other_ticket_id: str,
+    user_id: int,
+) -> None:
+    """``LinkObject/Ticket.pm`` ``LinkAddPost`` / ``LinkDeletePost``: history on *ticket_id*,
+    named ``%%<TN of the other ticket>%%<other id>%%<this id>``."""
+    if not (ticket_id.isdigit() and other_ticket_id.isdigit()):
+        return
+    rows = {
+        int(r[0]): str(r[1])
+        for r in (
+            await session.execute(
+                text("SELECT id, tn FROM ticket WHERE id IN (:a, :b)"),
+                {"a": int(ticket_id), "b": int(other_ticket_id)},
+            )
+        ).all()
+    }
+    if int(ticket_id) not in rows or int(other_ticket_id) not in rows:
+        return  # TicketNumberLookup of a vanished ticket -> nothing to write the history on
+    await history_add(
+        session,
+        ticket_id=int(ticket_id),
+        history_type=history_type,
+        name=f"%%{rows[int(other_ticket_id)]}%%{other_ticket_id}%%{ticket_id}",
+        user_id=user_id,
+    )
+
+
 async def link_objects(
     session: AsyncSession,
     *,
@@ -2557,16 +2686,27 @@ async def link_objects(
 ) -> bool:
     """Insert a ``link_relation`` row between any two linkable objects (idempotent).
 
-    Ports the ``link_relation`` write of Kernel/System/LinkObject.pm::LinkAdd: object, type
-    and state ids are resolved by name (an unseen object name gets its ``link_object`` row,
-    like Znuny's ObjectLookup), the stored direction is source -> target as given. Returns
-    ``False`` when nothing was written (self link, or the relation already exists).
+    Port of ``Kernel/System/LinkObject.pm::LinkAdd`` (``PossibleTypesList`` for the type,
+    the existing-link check in both directions, the ``TypeGroup`` check) plus
+    ``LinkObject/Ticket.pm::LinkAddPost`` (``TicketLinkAdd`` history on every Ticket end whose
+    other end is a Ticket, not for ``Temporary`` links). Object, type and state ids are resolved
+    by name (an unseen object or configured type gets its row, like Znuny's lookups); the stored
+    direction is source -> target as given.
+
+    Returns ``False`` when nothing was written (self link, or the pair already has this link:
+    an unpointed type in the other direction counts as the same link). Raises
+    :class:`LinkConflict` where Znuny logs a notice and refuses: type not possible for the two
+    objects, same type in another state, pointed type in the opposite direction, or another
+    type of the same ``TypeGroup``. Reads and writes run in the caller's transaction.
     """
     if source_object == target_object and str(source_key) == str(target_key):
         return False  # LinkObject.pm::LinkAdd: "Can't link an object with itself"
+    cfg = await _link_config(session)
+    if not _type_possible(cfg, source_object, target_object, link_type):
+        raise LinkConflict("not_possible")
     src_obj_id = await _link_object_id(session, source_object)
     tgt_obj_id = await _link_object_id(session, target_object)
-    type_id = await _link_type_id(session, link_type)
+    type_id = await _link_type_id(session, link_type, user_id=user_id)
     state_id = await _link_state_id(session, state)
     params = {
         "so": src_obj_id,
@@ -2576,16 +2716,51 @@ async def link_objects(
         "t": type_id,
     }
     existing = (
-        await session.execute(
-            text(
-                "SELECT 1 FROM link_relation WHERE source_object_id = :so AND source_key = :sk"
-                " AND target_object_id = :to AND target_key = :tk AND type_id = :t LIMIT 1"
-            ),
-            params,
+        (
+            await session.execute(
+                text(
+                    "SELECT source_object_id, source_key, state_id FROM link_relation"
+                    " WHERE ((source_object_id = :so AND source_key = :sk"
+                    " AND target_object_id = :to AND target_key = :tk)"
+                    " OR (source_object_id = :to AND source_key = :tk"
+                    " AND target_object_id = :so AND target_key = :sk))"
+                    " AND type_id = :t LIMIT 1"
+                ),
+                params,
+            )
         )
-    ).first()
+        .mappings()
+        .first()
+    )
     if existing is not None:
-        return False
+        if int(existing["state_id"]) != state_id:
+            raise LinkConflict("state")
+        if not cfg.pointed.get(link_type, False):
+            return False
+        if int(existing["source_object_id"]) == src_obj_id and str(existing["source_key"]) == str(
+            source_key
+        ):
+            return False
+        raise LinkConflict("opposite_direction")
+    # Type groups: another link of this state between the same two objects.
+    if cfg.groups:
+        others = (
+            await session.execute(
+                text(
+                    "SELECT DISTINCT lt.name FROM link_relation lr"
+                    " JOIN link_type lt ON lt.id = lr.type_id"
+                    " WHERE ((lr.source_object_id = :so AND lr.source_key = :sk"
+                    " AND lr.target_object_id = :to AND lr.target_key = :tk)"
+                    " OR (lr.source_object_id = :to AND lr.source_key = :tk"
+                    " AND lr.target_object_id = :so AND lr.target_key = :sk))"
+                    " AND lr.state_id = :s"
+                ),
+                {**params, "s": state_id},
+            )
+        ).all()
+        for (other_type,) in others:
+            if _same_type_group(cfg, str(other_type), link_type):
+                raise LinkConflict("type_group")
     await session.execute(
         text(
             "INSERT INTO link_relation (source_object_id, source_key, target_object_id,"
@@ -2594,6 +2769,23 @@ async def link_objects(
         ),
         {**params, "s": state_id, "uid": user_id},
     )
+    # LinkObject.pm clears Cache::LinkListRaw...; the Znuny side drops the whole CacheType.
+    await invalidate_cache_type(session, "LinkObject")
+    if state != "Temporary" and source_object == "Ticket" and target_object == "Ticket":
+        await _ticket_link_history(
+            session,
+            history_type="TicketLinkAdd",
+            ticket_id=str(source_key),
+            other_ticket_id=str(target_key),
+            user_id=user_id,
+        )
+        await _ticket_link_history(
+            session,
+            history_type="TicketLinkAdd",
+            ticket_id=str(target_key),
+            other_ticket_id=str(source_key),
+            user_id=user_id,
+        )
     # Both linked tickets must refresh in Znuny (link list on each side).
     if source_object == "Ticket" and str(source_key).isdigit():
         if target_object == "Ticket":
@@ -2612,6 +2804,84 @@ async def link_objects(
             )
         await invalidate_ticket_cache(session, int(target_key))
     return True
+
+
+async def unlink_objects(
+    session: AsyncSession,
+    *,
+    object1: str,
+    key1: str,
+    object2: str,
+    key2: str,
+    link_type: str,
+    user_id: int,
+) -> int:
+    """Delete the link of *link_type* between two objects, stored in either direction.
+
+    Port of ``Kernel/System/LinkObject.pm::LinkDelete`` (no state filter: a ``Valid`` and a
+    ``Temporary`` link go alike; a missing link is no error) plus
+    ``LinkObject/Ticket.pm::LinkDeletePost`` (``TicketLinkDelete`` history on every Ticket end
+    whose other end is a Ticket, not for ``Temporary`` links). Returns the number of rows
+    removed, ``0`` when there was nothing to remove.
+    """
+    obj1 = await _link_object_id_if_exists(session, object1)
+    obj2 = await _link_object_id_if_exists(session, object2)
+    type_row = (
+        await session.execute(
+            text("SELECT id FROM link_type WHERE name = :n LIMIT 1"), {"n": link_type}
+        )
+    ).first()
+    if obj1 is None or obj2 is None or type_row is None:
+        return 0
+    params = {"o1": obj1, "k1": str(key1), "o2": obj2, "k2": str(key2), "t": int(type_row[0])}
+
+    def _pair(alias: str) -> str:
+        return (
+            f" WHERE (({alias}source_object_id = :o1 AND {alias}source_key = :k1"
+            f" AND {alias}target_object_id = :o2 AND {alias}target_key = :k2)"
+            f" OR ({alias}source_object_id = :o2 AND {alias}source_key = :k2"
+            f" AND {alias}target_object_id = :o1 AND {alias}target_key = :k1))"
+            f" AND {alias}type_id = :t"
+        )
+
+    states = [
+        str(r[0])
+        for r in (
+            await session.execute(
+                text(
+                    "SELECT ls.name FROM link_relation lr"
+                    " JOIN link_state ls ON ls.id = lr.state_id" + _pair("lr.")
+                ),
+                params,
+            )
+        ).all()
+    ]
+    if not states:
+        return 0
+    result = await session.execute(text("DELETE FROM link_relation" + _pair("")), params)
+    removed = int(getattr(result, "rowcount", 0) or 0) or len(states)
+    await invalidate_cache_type(session, "LinkObject")
+    if any(st != "Temporary" for st in states) and object1 == "Ticket" and object2 == "Ticket":
+        for this, other in ((key1, key2), (key2, key1)):
+            await _ticket_link_history(
+                session,
+                history_type="TicketLinkDelete",
+                ticket_id=str(this),
+                other_ticket_id=str(other),
+                user_id=user_id,
+            )
+    for this_obj, this_key, other_obj, other_key in (
+        (object1, key1, object2, key2),
+        (object2, key2, object1, key1),
+    ):
+        if this_obj == "Ticket" and str(this_key).isdigit():
+            if other_obj == "Ticket":
+                data: dict[str, Any] = {"target_ticket_id": int(other_key)}
+            else:
+                data = {"target_object": other_obj, "target_key": str(other_key)}
+            await _emit_event(session, "LinkDelete", int(this_key), data)
+            await invalidate_ticket_cache(session, int(this_key))
+    return removed
 
 
 async def link_tickets(
@@ -3242,6 +3512,52 @@ class TicketWriteService:
             user_id=user_id,
         )
 
+    async def unlink_tickets(
+        self, user_id: int, ticket_id: int, target_ticket_id: int, link_type: str | None = None
+    ) -> int:
+        """Remove the link(s) between two tickets, whichever direction they are stored in.
+
+        ``rw`` on both tickets (same rule as :meth:`link_tickets`). *link_type* ``None`` removes
+        every type between the two. Returns the number of links removed (0 = none existed).
+        """
+        src = await _ticket_must_exist(self._session, ticket_id)
+        tgt = await _ticket_must_exist(self._session, target_ticket_id)
+        await self._assert_rw(user_id, int(src["queue_id"]))
+        await self._assert_rw(user_id, int(tgt["queue_id"]))
+        if link_type is not None:
+            types = [link_type]
+        else:
+            ticket_obj = await _link_object_id_if_exists(self._session, "Ticket")
+            if ticket_obj is None:
+                return 0
+            types = [
+                str(r[0])
+                for r in (
+                    await self._session.execute(
+                        text(
+                            "SELECT DISTINCT lt.name FROM link_relation lr"
+                            " JOIN link_type lt ON lt.id = lr.type_id"
+                            " WHERE lr.source_object_id = :o AND lr.target_object_id = :o"
+                            " AND ((lr.source_key = :a AND lr.target_key = :b)"
+                            " OR (lr.source_key = :b AND lr.target_key = :a))"
+                        ),
+                        {"o": ticket_obj, "a": str(ticket_id), "b": str(target_ticket_id)},
+                    )
+                ).all()
+            ]
+        removed = 0
+        for name in types:
+            removed += await unlink_objects(
+                self._session,
+                object1="Ticket",
+                key1=str(ticket_id),
+                object2="Ticket",
+                key2=str(target_ticket_id),
+                link_type=name,
+                user_id=user_id,
+            )
+        return removed
+
     async def list_links(self, user_id: int, ticket_id: int) -> list[dict[str, Any]]:
         """Tickets linked to *ticket_id*, as shown in the ticket header.
 
@@ -3332,12 +3648,15 @@ __all__ = [
     "create_ticket",
     "delete_article",
     "forward_article",
+    "link_objects",
     "link_tickets",
+    "LinkConflict",
     "lock_ticket",
     "merge_tickets",
     "move_queue",
     "resume_ai_automation",
     "set_customer",
+    "unlink_objects",
     "unlock_ticket",
     "unwatch_ticket",
     "update_dynamic_field",

@@ -10769,6 +10769,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/links/{target_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Ticket Link
+         * @description Remove the link(s) between this ticket and another. Requires ``rw`` on both.
+         *
+         *     Idempotent like Znuny's ``LinkDelete``: 204 also when no such link existed.
+         */
+        delete: operations["delete_ticket_link_api_v1_tickets__ticket_id__links__target_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/mentions": {
         parameters: {
             query?: never;
@@ -51327,6 +51349,43 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_ticket_link_api_v1_tickets__ticket_id__links__target_id__delete: {
+        parameters: {
+            query?: {
+                /** @description Only remove this link type (default: every type between the two) */
+                link_type?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                target_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
