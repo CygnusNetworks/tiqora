@@ -52,6 +52,7 @@ from tiqora.identity.saml_runtime import (
     import_saml2,
     saml_availability,
 )
+from tiqora.identity.step_up import STEP_UP_ATTRS
 from tiqora.identity.store import ProviderRecord
 from tiqora.identity.types import UserKind
 from tiqora.identity.urls import ProviderUrls, provider_urls
@@ -115,6 +116,10 @@ class SamlAssertionResult:
     session_index: str | None
     attributes: dict[str, tuple[str, ...]]
     destination: str | None
+    # every AuthnContextClassRef of the (signed) assertion's AuthnStatements
+    authn_context_class_refs: tuple[str, ...] = ()
+    # earliest AuthnStatement SessionNotOnOrAfter
+    session_not_on_or_after: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -356,6 +361,14 @@ class SamlServiceProvider:
 
         client = self._ensure()
         acs = self._urls.agent_acs_url if user_kind == "agent" else self._urls.customer_acs_url
+        extra: dict[str, Any] = {}
+        policy = self._record.mfa_policy
+        if policy.saml_request_authn_context and policy.saml_authn_context_classes:
+            # Comparison "minimum": the IdP may use a stronger method than the listed class.
+            extra["requested_authn_context"] = {
+                "authn_context_class_ref": list(policy.saml_authn_context_classes),
+                "comparison": "minimum",
+            }
         req_id, info = client.prepare_for_authenticate(
             entityid=self._idp_id(),
             relay_state=relay_state,
@@ -363,6 +376,7 @@ class SamlServiceProvider:
             nameid_format=NAME_ID_FORMATS[self._cfg.name_id_format],
             sign=self._cfg.sign_requests,
             assertion_consumer_service_url=acs,
+            **extra,
         )
         return SamlRedirect(request_id=str(req_id), url=_location(info))
 
@@ -452,7 +466,26 @@ class SamlServiceProvider:
         if not expiries:
             raise SamlResponseInvalid("no_expiry")
         attributes = normalize_attributes(dict(getattr(resp, "ava", None) or {}))
+        # an assertion attribute must never pose as one of our injected proof attributes
+        for reserved in STEP_UP_ATTRS:
+            attributes.pop(reserved, None)
         attributes["saml:name_id"] = (name_id,)
+        class_refs = tuple(
+            dict.fromkeys(
+                ref
+                for st in statements
+                if (
+                    ref := _text(
+                        getattr(getattr(st, "authn_context", None), "authn_context_class_ref", None)
+                    )
+                )
+            )
+        )
+        session_ends = [
+            e
+            for e in (_instant(getattr(st, "session_not_on_or_after", None)) for st in statements)
+            if e
+        ]
         return SamlAssertionResult(
             in_response_to=in_response_to,
             assertion_id=str(assertion.id),
@@ -464,6 +497,8 @@ class SamlServiceProvider:
             session_index=session_index,
             attributes=attributes,
             destination=destination,
+            authn_context_class_refs=class_refs,
+            session_not_on_or_after=min(session_ends) if session_ends else None,
         )
 
     # ------------------------------------------------------------------ logout

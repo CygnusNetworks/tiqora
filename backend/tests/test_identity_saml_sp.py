@@ -848,3 +848,90 @@ def test_saml_replay_ttl_never_truncates() -> None:
     not_after = datetime.now(UTC) + timedelta(seconds=300.4)
     assert _assertion_ttl(not_after, 120) >= 300.4 + 120
     assert _assertion_ttl(None, 120) == 86400 + 120
+
+
+# --------------------------------------------------------------------------- MFA evidence
+
+MOBILE_2FA = "urn:oasis:names:tc:SAML:2.0:ac:classes:MobileTwoFactorContract"
+PASSWORD_CLASS = "urn:oasis:names:tc:SAML:2.0:ac:classes:Password"
+
+
+async def test_saml_result_has_context_and_session_not_after(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    req_id, b64 = _good(idp, class_ref=MOBILE_2FA, session_not_on_or_after="2099-01-01T08:00:00Z")
+    res = await sp.parse_login_response(
+        b64, outstanding={req_id: AGENT_ACS}, expected_acs=AGENT_ACS
+    )
+    assert res.authn_context_class_refs == (MOBILE_2FA,)
+    assert res.session_not_on_or_after == datetime(2099, 1, 1, 8, 0, tzinfo=UTC)
+
+
+async def test_saml_result_defaults_without_session_end(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    req_id, b64 = _good(idp)
+    res = await sp.parse_login_response(
+        b64, outstanding={req_id: AGENT_ACS}, expected_acs=AGENT_ACS
+    )
+    assert res.authn_context_class_refs == (PASSWORD_CLASS,)
+    assert res.session_not_on_or_after is None
+
+
+async def test_saml_assertion_attribute_cannot_pose_as_proof(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    req_id, b64 = _good(
+        idp, attributes={**ATTRS, "saml:authn_context": [MOBILE_2FA], "oidc:amr": ["mfa"]}
+    )
+    res = await sp.parse_login_response(
+        b64, outstanding={req_id: AGENT_ACS}, expected_acs=AGENT_ACS
+    )
+    assert "saml:authn_context" not in res.attributes and "oidc:amr" not in res.attributes
+    assert res.attributes["mail"] == (MAIL,)
+
+
+def _authn_request_xml(url: str) -> str:
+    q = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
+    return zlib.decompress(base64.b64decode(q["SAMLRequest"][0]), -15).decode()
+
+
+async def test_saml_request_authn_context(idp: SamlTestIdp) -> None:
+    from dataclasses import replace  # noqa: PLC0415
+
+    from tiqora.identity.config_models import MfaPolicy  # noqa: PLC0415
+
+    base = saml_record(slug=SLUG, idp=idp, settings=S)
+    plain = await SamlServiceProvider(base, settings=S).login_redirect(
+        relay_state="rs", user_kind="agent"
+    )
+    assert "RequestedAuthnContext" not in _authn_request_xml(plain.url)
+
+    rec = replace(base, mfa_policy=MfaPolicy(saml_request_authn_context=True))
+    redirect = await SamlServiceProvider(rec, settings=S).login_redirect(
+        relay_state="rs", user_kind="agent"
+    )
+    xml = _authn_request_xml(redirect.url)
+    assert re.search(r'<(\w+:)?RequestedAuthnContext\b[^>]*Comparison="minimum"', xml), xml
+    assert MOBILE_2FA in xml
+
+
+async def test_idp_initiated_without_context_is_not_mfa(idp: SamlTestIdp) -> None:
+    from dataclasses import replace  # noqa: PLC0415
+
+    from tiqora.identity.config_models import MfaPolicy  # noqa: PLC0415
+    from tiqora.identity.step_up import SAML_AUTHN_CONTEXT_ATTR, check_mfa  # noqa: PLC0415
+
+    base = saml_record(slug=SLUG, idp=idp, settings=S, allow_idp_initiated=True)
+    provider = SamlServiceProvider(base, settings=S)
+    idp.trust_sp(provider.sp_metadata_xml())
+    _, b64 = _good(idp, in_response_to=None, class_ref=PASSWORD_CLASS)
+    res = await provider.parse_login_response(b64, outstanding={}, expected_acs=AGENT_ACS)
+    assert res.in_response_to is None
+    attrs = dict(res.attributes)
+    if res.authn_context_class_refs:
+        attrs[SAML_AUTHN_CONTEXT_ATTR] = res.authn_context_class_refs
+    rec = replace(base, require_mfa_claim=True, mfa_policy=MfaPolicy())
+    check = check_mfa(rec, attrs)
+    assert check.required and not check.satisfied
+    assert check.evidence == (PASSWORD_CLASS,)

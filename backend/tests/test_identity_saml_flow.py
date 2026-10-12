@@ -464,3 +464,39 @@ async def test_saml_admin_test_run_on_disabled_provider_applies_draft_and_writes
         )
     ).scalar_one()
     assert links == 0
+
+
+async def test_saml_acs_injects_authn_context_and_session_end(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from datetime import UTC, datetime  # noqa: PLC0415
+
+    from fastapi.responses import PlainTextResponse  # noqa: PLC0415
+
+    from tiqora.identity import sso_routes  # noqa: PLC0415
+
+    seen: list[Any] = []
+
+    async def fake_complete_login(*_a: Any, **kw: Any) -> PlainTextResponse:
+        seen.append(kw["identity"])
+        return PlainTextResponse("captured")
+
+    monkeypatch.setattr(sso_routes, "complete_login", fake_complete_login)
+    await _agent(env, 47101, "idp.saml.47101")
+    await _provider(env)
+    mobile = "urn:oasis:names:tc:SAML:2.0:ac:classes:MobileTwoFactorContract"
+    req_id, relay, _ = await env.start()
+    resp = await env.acs(
+        env.response_for(
+            req_id,
+            class_ref=mobile,
+            session_not_on_or_after="2099-01-01T08:00:00Z",
+            attributes={"uid": ["idp.saml.47101"], "saml:authn_context": ["spoofed"]},
+        ),
+        req_id=req_id,
+        relay=relay,
+    )
+    assert resp.text == "captured"
+    (identity,) = seen
+    assert identity.attributes["saml:authn_context"] == (mobile,)
+    assert identity.sso.session_not_on_or_after == datetime(2099, 1, 1, 8, 0, tzinfo=UTC)

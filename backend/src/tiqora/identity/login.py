@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Final, Literal
 
 from sqlalchemy import func, select
@@ -61,6 +62,7 @@ class SsoSessionDraft:
     sp_name_qualifier: str | None = None
     sid: str | None = None  # OIDC
     id_token_hint: str | None = field(default=None, repr=False)  # OIDC, for end_session
+    session_not_on_or_after: datetime | None = None  # SAML: earliest IdP session end
 
 
 @dataclass(frozen=True, slots=True)

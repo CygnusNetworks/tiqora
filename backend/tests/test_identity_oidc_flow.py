@@ -35,7 +35,7 @@ from tiqora.domain.auth import SessionStore
 from tiqora.domain.auth_config import AuthConfigService
 from tiqora.domain.oidc import OidcClientConfig, OIDCService
 from tiqora.identity import sso_routes
-from tiqora.identity.config_models import AttributeMap
+from tiqora.identity.config_models import AttributeMap, MfaPolicy
 from tiqora.identity.saml_runtime import saml_availability
 from tiqora.identity.store import ProviderChanges, update_provider
 
@@ -522,3 +522,96 @@ def test_sso_error_codes_cover_reject_codes() -> None:
 
     assert set(get_args(RejectCode)) <= set(SSO_ERROR_CODES)
     assert {"state", "saml_invalid", "oidc_failed", "idp_error", "config"} <= set(SSO_ERROR_CODES)
+
+
+# --------------------------------------------------------------------------- MFA evidence
+
+
+def _kc_id_token(env: Env, q: dict[str, list[str]], **extra: Any) -> str:
+    return env.idp.signer.id_token(
+        iss="https://kc.example.org/realms/y",
+        aud="tiqora",
+        sub="kc-sub",
+        nonce=q["nonce"][0],
+        **extra,
+    )
+
+
+async def _capture_identity(
+    env: Env, monkeypatch: pytest.MonkeyPatch, *, id_token_extra: dict[str, Any] | None
+) -> Any:
+    """Run an OIDC callback; return the ExternalIdentity handed to complete_login."""
+    from fastapi.responses import PlainTextResponse  # noqa: PLC0415
+
+    seen: list[Any] = []
+
+    async def fake_complete_login(*_a: Any, **kw: Any) -> PlainTextResponse:
+        seen.append(kw["identity"])
+        return PlainTextResponse("captured")
+
+    monkeypatch.setattr(sso_routes, "complete_login", fake_complete_login)
+    q = await env.start("/api/v1/auth/sso/idptest-kc/login")
+    if id_token_extra is not None:
+        env.idp.id_tokens["c"] = _kc_id_token(env, q, **id_token_extra)
+    resp = await env.client.get(
+        "/api/v1/auth/oidc/idptest-kc/callback", params={"code": "c", "state": q["state"][0]}
+    )
+    assert resp.text == "captured"
+    assert len(seen) == 1
+    return seen[0]
+
+
+async def test_amr_from_userinfo_is_ignored(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    await _kc(env)
+    env.idp.claims["c"] = {
+        "sub": "kc-sub",
+        "preferred_username": "x",
+        "amr": ["mfa"],
+        "acr": "gold",
+        "oidc:amr": ["mfa"],
+        "saml:authn_context": ["x"],
+    }
+    identity = await _capture_identity(env, monkeypatch, id_token_extra={})
+    assert "amr" not in identity.attributes and "acr" not in identity.attributes
+    assert identity.attributes.get("oidc:amr", ()) == ()
+    assert identity.attributes.get("oidc:acr", ()) == ()
+    assert "saml:authn_context" not in identity.attributes
+    assert identity.attributes["preferred_username"] == ("x",)
+
+
+async def test_no_id_token_means_no_mfa_proof(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    await _kc(env)
+    env.idp.claims["c"] = {"sub": "kc-sub", "preferred_username": "x", "amr": ["mfa"]}
+    identity = await _capture_identity(env, monkeypatch, id_token_extra=None)
+    assert identity.attributes.get("oidc:amr", ()) == ()
+    assert "amr" not in identity.attributes
+
+
+async def test_amr_from_verified_id_token(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    await _kc(env)
+    env.idp.claims["c"] = {"sub": "kc-sub", "preferred_username": "x", "amr": ["spoof"]}
+    identity = await _capture_identity(
+        env, monkeypatch, id_token_extra={"amr": ["pwd", "mfa"], "acr": "gold"}
+    )
+    assert identity.attributes["oidc:amr"] == ("pwd", "mfa")
+    assert identity.attributes["oidc:acr"] == ("gold",)
+    assert "amr" not in identity.attributes
+
+
+async def test_authorize_url_sends_acr_values(env: Env) -> None:
+    rec = await _kc(env)
+    plain = await env.start("/api/v1/auth/sso/idptest-kc/login")
+    assert "acr_values" not in plain
+    await update_provider(
+        env.session,
+        rec.id,
+        ProviderChanges(
+            require_mfa_claim=True, mfa_policy=MfaPolicy(oidc_request_acr_values="gold silver")
+        ),
+        secret_key=env.settings.secret_key,
+        actor_id=1,
+        settings=env.settings,
+    )
+    await env.session.commit()
+    q = await env.start("/api/v1/auth/sso/idptest-kc/login")
+    assert q["acr_values"] == ["gold silver"]

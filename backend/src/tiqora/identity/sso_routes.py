@@ -76,6 +76,12 @@ from tiqora.identity.saml_sp import (
     decode_saml_b64,
 )
 from tiqora.identity.sso_sessions import SsoSessionInfo, load_sso, revoke_sso_sessions
+from tiqora.identity.step_up import (
+    OIDC_ACR_ATTR,
+    OIDC_AMR_ATTR,
+    SAML_AUTHN_CONTEXT_ATTR,
+    STEP_UP_ATTRS,
+)
 from tiqora.identity.store import (
     ProviderRecord,
     ProviderValidationError,
@@ -318,7 +324,12 @@ async def start_sso_login(
         # PKCE per provider setting; the verifier lives server-side under the state key,
         # so it never touches the browser and only the initiating flow can redeem the code.
         verifier = secrets.token_urlsafe(64) if await oidc.use_pkce() else None
-        url = await oidc.authorize_url(state, code_verifier=verifier, nonce=nonce)
+        url = await oidc.authorize_url(
+            state,
+            code_verifier=verifier,
+            nonce=nonce,
+            acr_values=record.mfa_policy.oidc_request_acr_values or None,
+        )
     except (OIDCError, httpx.HTTPError, ValueError, KeyError) as exc:
         logger.warning("oidc_discovery_failed", slug=slug, error=str(exc))
         return fail("idp_error")
@@ -409,6 +420,22 @@ async def _start_saml_login(
         path="/",
     )
     return resp
+
+
+def _oidc_mfa_attributes(id_token_claims: dict[str, Any] | None) -> dict[str, tuple[str, ...]]:
+    """``amr`` / ``acr`` of the verified id_token as pseudo attributes (none without id_token)."""
+    out: dict[str, tuple[str, ...]] = {}
+    if not id_token_claims:
+        return out
+    amr = id_token_claims.get("amr")
+    if isinstance(amr, str):
+        amr = [amr]
+    if isinstance(amr, list):
+        out[OIDC_AMR_ATTR] = tuple(v for v in amr if isinstance(v, str) and v)
+    acr = id_token_claims.get("acr")
+    if isinstance(acr, str) and acr:
+        out[OIDC_ACR_ATTR] = (acr,)
+    return out
 
 
 def _picture(claims: dict[str, Any]) -> str | None:
@@ -596,6 +623,11 @@ async def _finish_oidc_callback(
         else ""
     )
     attributes = dict(normalize_attributes(claims))
+    # MFA proof comes from the VERIFIED id_token only: whatever userinfo says about amr/acr
+    # (or about our pseudo attributes) is dropped so it cannot be spoofed, then injected.
+    for spoofable in ("amr", "acr", *STEP_UP_ATTRS):
+        attributes.pop(spoofable, None)
+    attributes.update(_oidc_mfa_attributes(result.id_token_claims))
     if record.source == "env":
         # Production env OIDC: the configured login claim is mandatory, and a
         # provider without "sub" falls back to its value as the link subject.
@@ -996,8 +1028,16 @@ async def _finish_saml_acs(
     identity = ExternalIdentity(
         provider_id=record.id,
         subject=result.name_id,
-        attributes=result.attributes,
+        attributes={
+            **result.attributes,
+            **(
+                {SAML_AUTHN_CONTEXT_ATTR: result.authn_context_class_refs}
+                if result.authn_context_class_refs
+                else {}
+            ),
+        },
         sso=SsoSessionDraft(
+            session_not_on_or_after=result.session_not_on_or_after,
             session_index=result.session_index,
             name_id=result.name_id,
             name_id_format=result.name_id_format,
