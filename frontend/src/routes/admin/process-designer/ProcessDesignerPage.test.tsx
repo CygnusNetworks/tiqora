@@ -1,15 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import type { ReactNode } from "react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import i18n from "@/i18n";
+import { ApiError } from "@/lib/api";
+import type { ProcessShape } from "@/components/process-designer/canvasModel";
 import { ProcessDesignerPage } from "./ProcessDesignerPage";
 
 const getProcess = vi.fn();
 const getCatalog = vi.fn();
+const updateProcess = vi.fn();
 
 vi.mock("@tanstack/react-router", () => ({
   useParams: () => ({ processEntityId: "Process-1" }),
@@ -24,12 +27,23 @@ vi.mock("@/lib/processDesignerApi", () => ({
   processDesignerApi: {
     getProcess: (...args: unknown[]) => getProcess(...args),
     catalog: (...args: unknown[]) => getCatalog(...args),
+    updateProcess: (...args: unknown[]) => updateProcess(...args),
+    createEntity: vi.fn(),
   },
 }));
 
 // The canvas needs layout APIs jsdom lacks; its own rendering is covered by the e2e/demo check.
 vi.mock("@/components/process-designer/DesignerCanvas", () => ({
-  DesignerCanvas: () => <div data-testid="process-designer-canvas" />,
+  DesignerCanvas: ({ shape, onShapeChange }: { shape: ProcessShape; onShapeChange: (s: ProcessShape) => void }) => (
+    <div data-testid="process-designer-canvas">
+      <button
+        type="button"
+        onClick={() => onShapeChange({ ...shape, layout: { ...shape.layout, "Activity-a": { left: "10", top: "20" } } })}
+      >
+        mock-move
+      </button>
+    </div>
+  ),
 }));
 
 const entity = (entity_id: string, name: string, config: Record<string, unknown> = {}) => ({
@@ -115,6 +129,78 @@ describe("ProcessDesignerPage", () => {
     getProcess.mockRejectedValue(new Error("boom"));
     renderPage();
     expect(await screen.findByText(i18n.t("admin.processDesigner.loadError"))).toBeInTheDocument();
+  });
+
+  describe("editing", () => {
+    beforeEach(() => setViewport(false));
+
+    async function editOnce() {
+      renderPage();
+      fireEvent.click(await screen.findByText("mock-move"));
+    }
+
+    it("Speichern is disabled until the canvas is edited, then PUTs the shape with the version", async () => {
+      updateProcess.mockResolvedValue({ ...draft, process: { ...draft.process, version: "v2" } });
+      renderPage();
+      const save = await screen.findByTestId("process-designer-save");
+      expect(save).toBeDisabled();
+      fireEvent.click(screen.getByText("mock-move"));
+      expect(save).toBeEnabled();
+      expect(screen.getByTestId("process-designer-dirty")).toBeInTheDocument();
+      fireEvent.click(save);
+      await waitFor(() => expect(updateProcess).toHaveBeenCalledTimes(1));
+      const [eid, body] = updateProcess.mock.calls[0];
+      expect(eid).toBe("Process-1");
+      expect(body).toMatchObject({
+        expected_version: "v1",
+        name: "Bestellung",
+        state_entity_id: "S1",
+        path: {},
+        layout: { "Activity-a": { left: "10", top: "20" } },
+        start_activity: "",
+        start_activity_dialog: "",
+      });
+      await waitFor(() => expect(screen.getByTestId("process-designer-save")).toBeDisabled());
+    });
+
+    it("Ctrl+S saves", async () => {
+      updateProcess.mockResolvedValue(draft);
+      await editOnce();
+      fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+      await waitFor(() => expect(updateProcess).toHaveBeenCalledTimes(1));
+    });
+
+    it("409 shows the conflict banner and keeps the local edits", async () => {
+      updateProcess.mockRejectedValue(new ApiError(409, "version", "/x"));
+      await editOnce();
+      fireEvent.click(screen.getByTestId("process-designer-save"));
+      expect(await screen.findByTestId("process-designer-conflict")).toHaveTextContent(
+        i18n.t("admin.processDesigner.conflict"),
+      );
+      expect(screen.getByTestId("process-designer-save")).toBeEnabled();
+      expect(screen.getByTestId("process-designer-dirty")).toBeInTheDocument();
+    });
+
+    it("Verwerfen drops the local edits", async () => {
+      await editOnce();
+      fireEvent.click(screen.getByTestId("process-designer-discard"));
+      expect(screen.getByTestId("process-designer-save")).toBeDisabled();
+      expect(screen.queryByTestId("process-designer-dirty")).not.toBeInTheDocument();
+    });
+
+    it("registers beforeunload only while there are unsaved edits", async () => {
+      const add = vi.spyOn(window, "addEventListener");
+      renderPage();
+      await screen.findByText("mock-move");
+      expect(add.mock.calls.some(([type]) => type === "beforeunload")).toBe(false);
+      fireEvent.click(screen.getByText("mock-move"));
+      await waitFor(() => expect(add.mock.calls.some(([type]) => type === "beforeunload")).toBe(true));
+      const handler = add.mock.calls.find(([type]) => type === "beforeunload")?.[1] as (e: Event) => void;
+      const ev = new Event("beforeunload", { cancelable: true });
+      handler(ev);
+      expect(ev.defaultPrevented).toBe(true);
+      add.mockRestore();
+    });
   });
 
   it("designer route is lazy: the page module is not imported by router.tsx", () => {
