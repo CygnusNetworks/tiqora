@@ -147,6 +147,7 @@ export function reducer(s: ChatState, a: Action): ChatState {
       const c = a.created;
       const session: ChatSession = {
         agent_name: null,
+        can_handoff: false,
         can_send: true,
         last_seq: c.message.seq,
         needs_contact: false,

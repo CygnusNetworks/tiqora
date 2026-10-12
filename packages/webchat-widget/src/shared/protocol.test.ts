@@ -47,6 +47,26 @@ describe("protocol guards", () => {
     expect(isHostToFrame({ p: PROTOCOL, type: "close", extra: 1 })).toBe(false);
   });
 
+  it("identify, logout and the identity/bot frame messages", () => {
+    const tok = "a.b.c";
+    expect(isHostToFrame({ p: PROTOCOL, type: "identify", token: tok })).toBe(true);
+    expect(isHostToFrame({ p: PROTOCOL, type: "identify", token: "eyJ-_9.x_-.y0" })).toBe(true);
+    expect(isHostToFrame({ p: PROTOCOL, type: "identify", token: "a.b.c=" })).toBe(false);
+    expect(isHostToFrame({ p: PROTOCOL, type: "identify", token: "a.b. c" })).toBe(false);
+    expect(isHostToFrame({ p: PROTOCOL, type: "identify", token: "a.b" })).toBe(false);
+    expect(isHostToFrame({ p: PROTOCOL, type: "identify", token: 5 })).toBe(false);
+    expect(isHostToFrame({ p: PROTOCOL, type: "identify", token: tok, extra: 1 })).toBe(false);
+    const at = (n: number) => `a.b.${"c".repeat(n - 4)}`;
+    expect(isHostToFrame({ p: PROTOCOL, type: "identify", token: at(4096) })).toBe(true);
+    expect(isHostToFrame({ p: PROTOCOL, type: "identify", token: at(4097) })).toBe(false);
+    expect(isHostToFrame({ p: PROTOCOL, type: "logout" })).toBe(true);
+    expect(isHostToFrame({ p: PROTOCOL, type: "logout", x: 1 })).toBe(false);
+    expect(isFrameToHost({ p: PROTOCOL, type: "message", sender: "bot" })).toBe(true);
+    expect(isFrameToHost({ p: PROTOCOL, type: "identity", verified: true })).toBe(true);
+    expect(isFrameToHost({ p: PROTOCOL, type: "identity", verified: "yes" })).toBe(false);
+    expect(isFrameToHost({ p: PROTOCOL, type: "identity", verified: true, name: "x" })).toBe(false);
+  });
+
   it("preview config", () => {
     const config = {
       theme: { primary_color: "#112233", position: "left", mode: "dark", launcher_label: null },

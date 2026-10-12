@@ -15,7 +15,7 @@ describe("reducer", () => {
   it("a restore racing relayed events neither duplicates nor reorders (M12)", () => {
     let s = reducer(initial, { type: "message", message: msg({ seq: 4 }) });
     s = reducer(s, { type: "message", message: msg({ seq: 3 }) });
-    const session = { agent_name: null, can_send: true, last_seq: 5, needs_contact: false, session_id: "s", status: "active", topic_label: null };
+    const session = { agent_name: null, can_handoff: false, can_send: true, last_seq: 5, needs_contact: false, session_id: "s", status: "active", topic_label: null };
     s = reducer(s, { type: "session-restored", session, messages: [msg({ seq: 1 }), msg({ seq: 2 }), msg({ seq: 3 }), msg({ seq: 4 })] });
     s = reducer(s, { type: "message", message: msg({ seq: 5 }) });
     expect(s.messages.map((m) => m.seq)).toEqual([1, 2, 3, 4, 5]);
@@ -35,7 +35,7 @@ describe("reducer", () => {
   });
 
   it("a restart under offline_mode hide with nobody online keeps the ended chat (T16 M11)", () => {
-    const session = { agent_name: null, can_send: false, last_seq: 2, needs_contact: false, session_id: "s", status: "ended", topic_label: null };
+    const session = { agent_name: null, can_handoff: false, can_send: false, last_seq: 2, needs_contact: false, session_id: "s", status: "ended", topic_label: null };
     let s = reducer(initial, { type: "session-restored", session, messages: [msg({ seq: 1 })] });
     s = reducer(s, { type: "config-loaded", config: cfg({ online: false, offline_mode: "hide" }) });
     expect(s.view).toBe("ended");
@@ -65,7 +65,7 @@ describe("reducer", () => {
   });
 
   it("ended and abandoned sessions end the chat; an unknown status stays out of live", () => {
-    const session = { agent_name: null, can_send: true, last_seq: 0, needs_contact: false, session_id: "s", status: "active", topic_label: null };
+    const session = { agent_name: null, can_handoff: false, can_send: true, last_seq: 0, needs_contact: false, session_id: "s", status: "active", topic_label: null };
     let s = reducer(initial, { type: "session-restored", session, messages: [] });
     s = reducer(s, { type: "session-event", status: "abandoned", agentName: null });
     expect(s.view).toBe("ended");

@@ -62,13 +62,16 @@ export type FrameToHost =
   | Msg<"availability", { online: boolean }>
   | Msg<"close-request">
   | Msg<"unread", { count: number }>
-  | Msg<"message", { sender: "agent" | "system" }>;
+  | Msg<"message", { sender: "agent" | "bot" | "system" }>
+  | Msg<"identity", { verified: boolean }>;
 
 export type HostToFrame =
   | Msg<"open">
   | Msg<"close">
   | Msg<"set-topic", { topic: string }>
-  | Msg<"preview-config", { config: PreviewConfig }>;
+  | Msg<"preview-config", { config: PreviewConfig }>
+  | Msg<"identify", { token: string }>
+  | Msg<"logout">;
 
 // Same patterns/limits as backend webchat/models.py.
 export const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
@@ -81,6 +84,14 @@ const MAX_FIELDS = 15;
 const MAX_TOPICS = 20;
 const MAX_OPTIONS = 50;
 const MAX_UNREAD = 9999;
+const MAX_TOKEN = 4096;
+
+/** Shape of a host-signed identity token (compact JWT); the frame/server verify the signature. */
+export const IDENTITY_TOKEN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+
+export function isIdentityToken(v: unknown): v is string {
+  return typeof v === "string" && v.length <= MAX_TOKEN && IDENTITY_TOKEN.test(v);
+}
 
 type Rec = Record<string, unknown>;
 
@@ -202,7 +213,9 @@ export function isFrameToHost(data: unknown): data is FrameToHost {
         m.count <= MAX_UNREAD
       );
     case "message":
-      return hasExactKeys(m, ["p", "type", "sender"]) && oneOf(m.sender, ["agent", "system"] as const);
+      return hasExactKeys(m, ["p", "type", "sender"]) && oneOf(m.sender, ["agent", "bot", "system"] as const);
+    case "identity":
+      return hasExactKeys(m, ["p", "type", "verified"]) && isBool(m.verified);
     default:
       return false;
   }
@@ -224,6 +237,10 @@ export function isHostToFrame(data: unknown): data is HostToFrame {
       );
     case "preview-config":
       return hasExactKeys(m, ["p", "type", "config"]) && isPreviewConfig(m.config);
+    case "logout":
+      return hasExactKeys(m, ["p", "type"]);
+    case "identify":
+      return hasExactKeys(m, ["p", "type", "token"]) && isIdentityToken(m.token);
     default:
       return false;
   }
