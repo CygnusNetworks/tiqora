@@ -399,17 +399,93 @@ Differences (deliberate):
   and passkeys for password logins.
 - Customer 2FA tables are removed only by the GDPR erasure, not when a customer user is deleted.
 
+## Requester and invokers (Tiqora calls external systems)
+
+Tiqora can run the **invokers** of the webservices stored in `gi_webservice_config`: when a ticket
+changes, it calls the remote system exactly as Znuny's `Kernel::GenericInterface::Requester`
+would. It reads the same webservice YAML; there is no editor in Tiqora (Admin → Webservices is
+read-only plus dry run, debugger and a few Tiqora-only settings). The whole requester is **off**
+until you switch Znuny's event handler off and Tiqora's on (admin → Dienste → "Ausgehende
+Webservice-Aufrufe"); the procedure is in
+[parallel-operation.md](parallel-operation.md#taking-over-genericinterface-invokers).
+
+Tiqora verhält sich so: the requester runs in the worker, never inside the request that changed
+the ticket, so a slow or dead remote system cannot block an agent.
+
+### Supported
+
+| Area | Support |
+|---|---|
+| Invoker type | `Ticket::Generic` (the stock `Invoker::Ticket::Generic`). Other invoker types, including `Generic::Tunnel`, are shown as unsupported and never fire |
+| Transports | `HTTP::REST` (all methods except `CONNECT` and `TRACE`) and `HTTP::SOAP` |
+| Mappings | `Simple`, `XSLT`, `OutOfOffice` on request and response (same engine as the provider side). `Znuny` and `Test` mappings are not supported |
+| Events | All ticket events that Znuny writes to `ticket_history`, including `TicketDynamicFieldUpdate_<Name>`, `ArticleCreate`, `TicketMerge` and `TicketAccountTime`; synchronous (`Asynchronous: 0`) and background invokers |
+| Retries | `ErrorHandling` of type `RequestRetry` (interval, factor, maximum interval, maximum count, maximum period, `ScheduleRetry`) |
+| Conditions | Znuny's condition syntax (`Type`, `Fields`, `Fields->Match`, `Any`/`All`/`None`/`Only`, `and`/`or`/`xor`, regex `[Rr][Ee]#` and plain compare); evaluated with the ticket data at the time the worker processes the event |
+| Response actions | `OTRS_TicketTitleUpdate`, `OTRS_TicketServiceSet`, `OTRS_TicketTypeSet`, `OTRS_TicketQueueSet`, `OTRS_TicketSLASet`, `OTRS_TicketStateSet`, `OTRS_TicketPrioritySet`, `OTRS_TicketCustomerSet`, `OTRS_TicketOwnerSet`, `OTRS_TicketResponsibleSet`, `OTRS_TicketHistoryAdd`, `OTRS_TicketArticleAdd`, `OTRS_TicketCreate`, `OTRS_TicketDynamicFieldSet_<Name>`, `OTRS_AsynchronousInvokerExecution`. All writes go through the normal ticket services (history, escalation, events), as user 1 like Znuny |
+| `ExecuteInvoker` process action | Yes, see deviation 8 |
+
+### Authentication matrix
+
+| Method | REST | SOAP |
+|---|---|---|
+| None | yes | yes |
+| BasicAuth (user, password) | yes | yes |
+| Client certificate (`SSLCertificate`, `SSLKey`, `SSLPassword`, `SSLCAFile`, `SSLCADir`) | yes, files below `TIQORA_GI_CERT_DIRS` only | yes, same |
+| Proxy with `ProxyUser`/`ProxyPassword` | yes | yes |
+| `AdditionalHeaders` (REST) | yes | n/a |
+| JWT | **nein** (configuration error) | n/a |
+| NTLM | n/a | **nein** (configuration error) |
+
+### Not fired / not supported ("nein")
+
+| Item | Behaviour |
+|---|---|
+| `OTRS_TicketArticleCreateEvent` response action | **nein**: shown in the debugger as an error; no event is raised |
+| Events of objects other than tickets (`Appointment`, `ConfigItem`, `CustomerUser`, `User`, ... event object types) | **nein**: not fired, the webservice page marks such invokers "wird von Tiqora nicht ausgelöst" |
+| `Module` conditions | never match (Tiqora cannot load Perl modules) |
+| `jq#` condition fields | never match (Znuny without Jq behaves the same) |
+| JWT, NTLM | see matrix |
+
+### Deviations from Znuny
+
+Each is deliberate. Numbering is used in the code, the tests and the golden-master normaliser.
+
+1. **Debugger storage.** Tiqora writes its own tables (`tiqora_gi_debug_entry`, `tiqora_gi_debug_content`), shaped like Znuny's `gi_debugger_entry*`, and never writes Znuny's. The Tiqora debugger view shows both and marks the source ("Tiqora" or "Znuny"). Provider calls to `/znuny-compat` are logged too.
+2. **Event source.** Tiqora does not hook into ticket code; a follower reads new `ticket_history` rows and derives the events from them. The same rows already feed the plugin event system, so there is one source and no double events.
+3. **Synchronous invokers run in the worker**, on a single-slot lane that keeps the order of events, not inside the request that changed the ticket. Conditions therefore see the ticket a few seconds later than in Znuny.
+4. **The debugger never stores secrets.** Znuny's REST requester logs the raw request parameters including the `Authorization` header. Tiqora logs method, URL (user info and secret query parameters masked), masked headers and the body size, and masks every known secret value (Basic and proxy passwords, certificate passwords, all `AdditionalHeaders` values of four or more characters) in every row. Debugger content is JSON, not `Data::Dumper`. Znuny's own rows are masked on read with the same rules and marked "Von Tiqora maskiert".
+5. **Stricter outbound rules.** No redirects are followed, `CONNECT` and `TRACE` are refused, environment proxies are ignored. Targets in private, loopback, link-local or carrier-grade NAT ranges are refused unless the webservice's "Interne Ziele erlauben" list (Tiqora-only setting, one host or network per line) names them. Certificate files are read only from `TIQORA_GI_CERT_DIRS`. `SSLNoHostnameVerification` only works after an admin switches "Unsichere TLS-Verbindung erlauben" on for that webservice. Timeout and response size are capped by `TIQORA_GI_MAX_TIMEOUT_SECONDS` and `TIQORA_GI_MAX_RESPONSE_BYTES`.
+6. **`ReuseClient` and `KeepAlive` are ignored.** Every request uses a fresh connection, pinned to the address that was checked.
+7. **JWT (REST) and NTLM (SOAP)** are configuration errors with a plain message.
+8. **`ExecuteInvoker` is always queued.** The process action takes Znuny's parameters (`Webservice` by name, `Invoker`, `Asynchronous`, `UserID`), but `Asynchronous` is accepted and ignored: the call never runs inside the dialog submit. It also works without the takeover flag, because it is an explicit action and not an event handler that Znuny also runs.
+9. **`OldTicketData`** is not part of the event block (it cannot be rebuilt from history). `OTRS_TicketArticleCreateEvent` and non-ticket event objects are not supported (see above).
+10. **`Module` and `jq#` conditions** never match.
+11. **Retries are new jobs.** A retry is queued as a new job with a due time and the `PastExecutionData`, like Znuny's `TaskAdd`, instead of Znuny's in-place `JobRetry`. A job that was interrupted (worker crash) before the request was sent is claimed at most three times.
+12. **Two additions beyond Znuny.** "Erneut senden" in the debugger re-runs the invoker with the stored event data and the **current** ticket data. "Probelauf" builds the request for a ticket, shows method, URL, masked headers and body, and never sends it.
+13. **`Tunnel`.** Znuny 6.5 has no `ErrorHandling::Tunnel`; `Invoker::Generic::Tunnel` is an invoker type for provider-to-requester tunnelling and is out of scope (shown as unsupported).
+
+### Debugger
+
+Admin → Webservices → a webservice → Protokoll lists provider and requester calls from both
+sources in one view (filter by direction, source, time and IP). Tiqora writes to its own tables
+only; rows of Znuny's `gi_debugger_entry*` are read, masked and shown beside them. Entries
+older than `gi.debugger.retention_days` (default 14) are deleted by the worker (service
+"Webservice-Protokoll aufräumen"). The GDPR erasure deletes entries linked to the erased
+customer's tickets in every mode (not backed up); provider calls without a ticket id are only
+covered by the retention.
+
 ## What is not emulated (and why)
 
-Compat is a **Provider-side bridge** for the GenericTicketConnector surface
-and a few core ops — not a reimplementation of Znuny’s entire GenericInterface
-framework. Items below are intentionally incomplete or out of scope.
+The `/znuny-compat` routes are a **Provider-side bridge** for the GenericTicketConnector surface
+and a few core ops. The **Requester** side (Tiqora calling external systems) is a separate
+subsystem, see [Requester and invokers](#requester-and-invokers-tiqora-calls-external-systems).
+Items below are intentionally incomplete or out of scope.
 
 ### Out of scope (product / architecture)
 
 | Gap | Why deferred |
 |-----|----------------|
-| Requester / outbound invokers (Tiqora calling external SOAP/REST) | Only the **server** side is emulated; outbound is a separate subsystem |
 | Custom OPM operations (e.g. CMDB `ConfigItem*`) | Installation-specific; no stable core wire contract |
 | Package Manager remote install | Deploy/admin concern, not ticket integrator wire |
 | WSDL auto-serving | Znuny does not serve one either — see [SOAP transport](#soap-transport) |
@@ -828,7 +904,7 @@ narrower than Znuny), **by design** (deliberate platform choice).
 | Znuny feature | Status | Note |
 |---|---|---|
 | Webservice admin / editor | by design | Webservices are loaded from the database; no editor |
-| Requester side / invokers | by design | See [What is not emulated](#what-is-not-emulated-and-why) |
+| Requester side / invokers | partial | Ticket-event invokers (`Invoker::Ticket::Generic`) over REST and SOAP, retries, conditions, response actions and a debugger; see [Requester and invokers](#requester-and-invokers-tiqora-calls-external-systems). Off until the takeover flag is set ([parallel-operation.md](parallel-operation.md#taking-over-genericinterface-invokers)) |
 | Mappings `Simple`, `XSLT`, `OutOfOffice` | yes | `Znuny` and `Test` mappings are not supported, see [Mappings](#mappings) |
 | Hot reload of webservice configs | yes | Polling, no restart, see [Hot reload](#hot-reload) |
 | `TimeUnit`, multiple articles in TicketCreate/Update | yes | See [TicketCreate / TicketUpdate](#ticketcreate--ticketupdate) |
@@ -848,7 +924,7 @@ narrower than Znuny), **by design** (deliberate platform choice).
 | New process ticket (agent and portal), enroll via start dialog | yes | "Neues Prozessticket" / "Prozess starten"; Znuny's create order, `Process::Default*` for hidden fields, immediate first transition |
 | Compat (GenericInterface) API and ACLs | by design | No ACL filtering, exactly as Znuny's GenericInterface (it never calls `TicketAcl`) |
 | Smart tags in actions and conditions | yes | `<OTRS_TICKET_*>`, dynamic fields, first/last article, template placeholders; conditions of the Base types only, like Znuny |
-| `Module` conditions, `ExecuteInvoker`/`Appointment*`/`ConfigItemUpdate` actions | missing | Logged as unsupported |
+| `Module` conditions, `Appointment*`/`ConfigItemUpdate` actions | missing | Logged as unsupported. `ExecuteInvoker` is supported (always queued, see [Requester](#requester-and-invokers-tiqora-calls-external-systems)) |
 | Transitions after every ticket change | missing | Evaluated after process dialogs and new process tickets only |
 | Znuny 7.x process YAML | verified | Same format as 6.5 (no renamed keys); `pm_process_preferences` (7.2+) is snapshotted. Golden tests passed on Znuny 6.5 and on 7.3.5 |
 | GenericAgent execution | partial | Pragmatic subset: no absolute `TimeSlot`, `Next`/`After`, dynamic-field criteria; off by default |

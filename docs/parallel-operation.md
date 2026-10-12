@@ -310,6 +310,7 @@ Each of the following moves to Tiqora independently:
 | Escalation sweep | RebuildEscalationIndexOnline | escalation job |
 | Notifications | NotificationEvent | notification engine |
 | GenericAgent | GenericAgent | GA executor |
+| GenericInterface invokers | Znuny GI event handler | `gi_requester` |
 | Automatic unlock | TicketUnlockTimeout | unlock-timeout worker (`unlock_timeout`) |
 | Pending states and reminders | TicketPendingCheck | pending-check worker (`pending_check`) |
 | AI auto-reply / auto-summary | *(n/a — new capability)* | `ai-worker` |
@@ -758,6 +759,58 @@ action (double note, double state-flap history, etc.).
 - `daemon.generic_agent.allow_delete` (`tiqora_settings`, default unset =
   OFF) — required in addition to the takeover flag before any job's
   `NewDelete` action actually deletes a ticket.
+
+## Taking over GenericInterface invokers
+
+The requester (outgoing webservice calls on ticket events, see
+[compatibility.md](compatibility.md#requester-and-invokers-tiqora-calls-external-systems)) is a
+follower of `ticket_history`: for every new row it matches the invokers of the valid webservices
+and queues the calls as background jobs. It is **OFF by default** and **mutually exclusive** with
+Znuny's event handler `Ticket::EventModulePost###9900-GenericInterface`. Running both sends every
+call to the remote system twice.
+
+**Known gap until it is enabled:** Znuny only sees changes made in Znuny. Changes made in Tiqora
+(agent replies, state changes, new tickets) do not reach any outbound integration until the
+takeover is on. The page Admin → Dienste shows a warning for this case as soon as a valid
+webservice has an event invoker.
+
+### Enabling the takeover
+
+1. In Znuny SysConfig set `Ticket::EventModulePost###9900-GenericInterface` to **invalid**
+   and deploy. This stops Znuny from queuing new calls.
+2. Wait until Znuny's scheduler has no `GenericInterface` tasks left, so nothing is still being
+   retried by Znuny:
+   `SELECT COUNT(*) FROM scheduler_task WHERE task_type = 'GenericInterface';` must return `0`
+   (the Znuny daemon sends or fails them; stop the Znuny daemon only after this is `0`).
+3. Admin → Dienste → "Ausgehende Webservice-Aufrufe" on (or `daemon.gi_requester.enabled = 1` in
+   `tiqora_settings`).
+4. Verify with "Probelauf" on one invoker and, for a real ticket change, with the Protokoll tab:
+   one entry per change, source "Tiqora".
+
+Tiqora verhält sich so: switching the service on starts at the **current** end of
+`ticket_history`. History written while it was off is never replayed, including after a worker
+outage of more than a few minutes (the follower detects the gap and moves to the end instead of
+replaying).
+
+The Dienste page warns in the other direction too: flag on while Znuny's handler is still valid
+("every call is sent twice"). The latest system-wide SysConfig row decides, including
+`is_valid = 0`.
+
+### Rollback
+
+1. Set `daemon.gi_requester.enabled` back to `0`. The follower stops reading history; calls that
+   are already queued still run (retries included) until they finish.
+2. Set `Ticket::EventModulePost###9900-GenericInterface` valid again in Znuny and deploy.
+   Changes made in the gap between 1 and 2 are not sent by either side.
+
+### Safety flags
+
+- `daemon.gi_requester.enabled` (`tiqora_settings`, default unset = OFF).
+- Per webservice (Admin → Webservices → Einstellungen): "Interne Ziele erlauben" (allow list for
+  private networks, default empty) and "Unsichere TLS-Verbindung erlauben" (default off).
+- Environment: `TIQORA_GI_CERT_DIRS`, `TIQORA_GI_MAX_TIMEOUT_SECONDS`,
+  `TIQORA_GI_MAX_RESPONSE_BYTES`, see [deployment.md](deployment.md#genericinterface-requester).
+- `ExecuteInvoker` in a process works independently of the flag (it is an explicit action).
 
 ## Taking over automatic unlock
 

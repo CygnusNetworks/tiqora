@@ -1039,6 +1039,41 @@ MCP deliberately does **not** mirror admin/portal/calendar/BPM/stats/GDPR.
 no `time.sleep` anywhere in `mcp_server/`. Unavoidable sync operations (none currently)
 would use an executor helper.
 
+### GenericInterface requester (`tiqora.gi`)
+
+The outgoing side of the GenericInterface (user view:
+[compatibility.md](compatibility.md#requester-and-invokers-tiqora-calls-external-systems)).
+
+- **Loader** (`gi/loader.py`, `gi/config.py`): parses `gi_webservice_config` into immutable
+  webservice/invoker snapshots, shared with the provider registry's YAML rules.
+- **Follower loop** (`gi/follower.py`, worker service `gi_requester`, interval
+  `TIQORA_GI_REQUESTER_INTERVAL`): reads `ticket_history` above a cursor stored in
+  `tiqora_settings`, cuts at the gap-safe horizon, maps rows to Znuny event names
+  (`gi/events.py`), matches invokers and conditions (`gi/conditions.py`) and enqueues one job per
+  match, in one transaction with the cursor move. With the takeover flag off the cursor just
+  follows the end of history.
+- **Jobs and lanes** (`gi/jobs.py`): `core.gi_invoke` (lane `gi`, 2 slots, background invokers,
+  response actions, retries) and `core.gi_invoke_sync` (lane `gi_sync`, 1 slot, keeps the order
+  of synchronous invokers). Retries are new jobs with `due_at` (`enqueue_job(due_at=)`).
+  Dry run and resend are jobs too; no HTTP request handler ever makes an outbound call.
+- **Requester pipeline** (`gi/requester.py`, `gi/invoker_generic.py`, `gi/deep_get.py`): builds the
+  `TicketDeepGet` payload, maps it, sends it, maps the answer and runs the response actions
+  through the normal ticket write services.
+- **Transports** (`gi/transport_rest.py`, `gi/transport_soap.py`, `gi/soap_envelope.py`) on top
+  of the **egress guard** (`gi/egress.py`, `security/outbound.py`): the target is resolved,
+  checked against the blocklist and the per-webservice allow list, and the connection is pinned
+  to the checked address. No redirects, no environment proxies.
+- **Error handling** (`gi/error_handling.py`): `RequestRetry` decisions as a pure function.
+- **Debugger** (`gi/debugger.py`, `gi/debug_store.py`, `gi/redact.py`): a sink writes
+  `tiqora_gi_debug_entry` (one row per call: webservice, direction, remote IP, optional
+  `replay` data for "Erneut senden") and `tiqora_gi_debug_content` (the lines). Redaction runs
+  before anything is stored. The admin view merges these with Znuny's `gi_debugger_entry*`
+  (two queries merged in Python, never a JOIN across the two table families). Retention is the
+  worker service `gi_debug_cleanup`.
+- **Takeover** (`gi/takeover.py`): decides the notices on the Dienste page from the flag and
+  Znuny's SysConfig.
+- **Process action** (`gi/process_action.py`): `ExecuteInvoker`, always queued.
+
 ### GenericInterface compat layer
 
 Mounted at `/znuny-compat` in the main API process (same `tiqora-api`).

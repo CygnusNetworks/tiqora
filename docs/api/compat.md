@@ -137,12 +137,20 @@ doesn't serve one either).
    (see [`mcp.md`](mcp.md)) for new integrations — compat is a bridge, not
    the long-term integration surface.
 
+## Debugger for provider webservices
+
+Calls to `/znuny-compat` webservices are logged in the Tiqora debugger (Admin → Webservices →
+Protokoll, direction "Eingehend"), next to the entries Znuny wrote itself. Rows show the
+operation, remote IP and the request and response lines with secrets (passwords, session ids,
+tokens, `Authorization`) masked. Entries older than `gi.debugger.retention_days` (default 14)
+are removed. See [compatibility.md](../compatibility.md#debugger).
+
 ## What is not emulated
 
 Short list — full tables with rationale live in
 [`../compatibility.md#what-is-not-emulated-and-why`](../compatibility.md#what-is-not-emulated-and-why):
 
-- Requester/outbound GenericInterface (Provider only)
+- Requester/outbound GenericInterface is a separate, partial subsystem (see [Requester and invokers](../compatibility.md#requester-and-invokers-tiqora-calls-external-systems))
 - Custom OPM operations; Package Manager
 - `Mapping::Znuny` and `Mapping::Test` (500 fault "not supported")
 - `Force*`/`Exclude*` notification user ids are validated but not applied (as in Znuny)
