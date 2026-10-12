@@ -69,6 +69,7 @@ from tiqora.webchat.origins import (
     referer_origin,
     request_same_origin_ok,
 )
+from tiqora.webchat.prechat import IDENTITY_FIELD_TARGETS
 from tiqora.webchat.ratelimit import (
     AUTH_FAIL_LIMIT,
     AUTH_FAIL_SCOPE,
@@ -489,6 +490,7 @@ async def session_out(
         last_seq=int(chat.last_seq),
         # the display name only: never the login or the e-mail address
         identified_as=chat.visitor_name if chat.identity_source is not None else None,
+        identified=chat.identity_source is not None,
         # Only while the AI answers: afterwards the transcript lines carry their own names.
         bot_name=values.bot_name if chat.status == "bot" else None,
         can_handoff=chat.status == "bot",
@@ -546,7 +548,12 @@ def _public_config(
         offline_mode=values.offline_mode,
         prechat_fields=[
             ChatPublicFieldOut(
-                key=f.key, kind=f.kind, label=f.label, required=f.required, options=f.options
+                key=f.key,
+                kind=f.kind,
+                label=f.label,
+                required=f.required,
+                options=f.options,
+                identity_supplied=f.maps_to in IDENTITY_FIELD_TARGETS,
             )
             for f in values.prechat_fields
         ],

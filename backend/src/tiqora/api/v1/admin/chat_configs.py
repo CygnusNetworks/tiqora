@@ -421,6 +421,8 @@ async def chat_ai_status(
             topic=topic,
             queue_id=topic.queue_id,
             use_cache=False,
+            # a stopped worker is reported only when nothing else blocks (C8: a warning)
+            worker_last=True,
         )
         topics.append(
             ChatAiTopicStatusOut(

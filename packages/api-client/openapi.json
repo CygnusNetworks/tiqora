@@ -9022,6 +9022,11 @@
       },
       "ChatPublicFieldOut": {
         "properties": {
+          "identity_supplied": {
+            "default": false,
+            "title": "Identity Supplied",
+            "type": "boolean"
+          },
           "key": {
             "title": "Key",
             "type": "string"
@@ -9338,6 +9343,11 @@
           },
           "can_send": {
             "title": "Can Send",
+            "type": "boolean"
+          },
+          "identified": {
+            "default": false,
+            "title": "Identified",
             "type": "boolean"
           },
           "identified_as": {

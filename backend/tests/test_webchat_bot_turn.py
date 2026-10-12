@@ -49,6 +49,7 @@ from tiqora.webchat.bot import (
     BOT_ALIVE_KEY,
     BOT_CLAIM_STALE_SECONDS,
     claim_bot_turn,
+    close_bot_resolved_ticket,
     hand_off_chat,
     make_claim_owner,
     run_chat_bot_turn,
@@ -63,12 +64,18 @@ from tiqora.webchat.sessions import (
     post_visitor_message,
     set_contact,
 )
-from tiqora.webchat.store import config_values, load_config, load_messages_since
+from tiqora.webchat.store import (
+    config_values,
+    get_chat_session,
+    load_config,
+    load_messages_since,
+)
 from tiqora.znuny.sysconfig import SysConfig
 
 pytestmark = pytest.mark.db
 
 GROUP, QUEUE, SERVICE, AGENT = 54590, 54591, 54592, 54593
+QUEUE_MOVED = 54594  # no AI policy
 CONFIG = 54595
 CONFIG_IDS = range(54590, 54630)
 KEY = "wc_" + "f" * 32
@@ -112,7 +119,7 @@ def _cleanup(url: str) -> None:
         cleanup_band(
             conn,
             config_ids=CONFIG_IDS,
-            queue_ids=[QUEUE],
+            queue_ids=[QUEUE, QUEUE_MOVED],
             group_ids=[GROUP],
             user_ids=[SERVICE, AGENT],
         )
@@ -167,6 +174,15 @@ async def env(request: pytest.FixtureRequest) -> AsyncIterator[Env]:
         )
         # The queue's group is the service user's too (it writes the articles as that user).
         seed_queue_agent(conn, queue_id=QUEUE, group_id=GROUP, user_id=SERVICE, login="wc54-bot2")
+        conn.execute(
+            text(
+                "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
+                " signature_id, follow_up_id, follow_up_lock, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:q, 'wc54-queue-moved', :g, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1)"
+            ),
+            {"q": QUEUE_MOVED, "g": GROUP, "t": NOW},
+        )
         conn.execute(
             text(
                 "INSERT INTO users (id, login, pw, first_name, last_name, valid_id,"
@@ -641,6 +657,36 @@ async def test_lock_held_by_agent_draft_retries_without_counting(env: Env) -> No
     assert env.llm.calls == 0
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+async def test_takeover_during_turn_ends_the_turn_quietly(env: Env) -> None:
+    """Review Focus 1, turn level: after an agent took the chat mid-turn, the turn writes no
+    bot line, no handoff line or note, does not re-queue, and clears its claim."""
+    await _humans_online(env)
+    chat = await _start(env)
+    lines_before = await _lines(env, chat)
+
+    async def agent_accepts() -> None:
+        env.sql(
+            "UPDATE tiqora_chat_session SET status = 'active', accepted_at = :t,"
+            " assigned_user_id = :u WHERE id = :s",
+            t=NOW,
+            u=AGENT,
+            s=chat.id,
+        )
+
+    env.llm = ScriptedLlm([propose_response("reply", "Zu spät.")], on_call=agent_accepts)
+    env.redis._lists.pop(BOT_QUEUE_KEY, None)
+    assert await _turn(env, chat) == "skipped"
+    assert [m.id for m in await _lines(env, chat)] == [m.id for m in lines_before]
+    assert _notes(env, chat) == []
+    row = env.row(chat)
+    assert row[0] == "active"
+    assert (row[8], row[9]) == (None, None)  # no handoff reason, no handoff time
+    assert (row[6], row[7]) == (None, None)  # claim cleared
+    assert chat.id not in env.redis._lists.get(BOT_QUEUE_KEY, [])
+
+
 # -- claim, supersede, requeue ---------------------------------------------------------------
 
 
@@ -864,6 +910,25 @@ async def test_close_bot_resolved_ticket_on_visitor_end(env: Env) -> None:
         await db.commit()
     assert _ticket_state_id(env, chat) == expected
     assert env.row(chat)[0] == "ended"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+async def test_close_bot_resolved_ticket_uses_the_current_queue(env: Env) -> None:
+    """R-QUEUE-SOT: the ticket moved to a queue without an AI policy during the chat, so
+    nothing parks it (the topic's queue policy would have)."""
+    chat = await _start(env)
+    env.llm = ScriptedLlm([propose_response("reply", "Neu starten.")])
+    assert await _turn(env, chat) == "replied"
+    before = _ticket_state_id(env, chat)
+    env.sql("UPDATE ticket SET queue_id = :q WHERE id = :t", q=QUEUE_MOVED, t=int(chat.ticket_id))
+    async with env.factory() as db:
+        # the sweep's path: the session row still names the topic's queue
+        locked = await get_chat_session(db, chat.id, for_update=True)
+        assert locked is not None and int(locked.queue_id) == QUEUE
+        await close_bot_resolved_ticket(db, SysConfig(db), chat=locked)
+        await db.commit()
+    assert _ticket_state_id(env, chat) == before
 
 
 @pytest.mark.asyncio

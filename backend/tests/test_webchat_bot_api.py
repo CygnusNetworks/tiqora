@@ -460,13 +460,37 @@ async def test_handoff_rate_limit(env: Env) -> None:
 @pytest.mark.parametrize("env", _URLS, indirect=True)
 async def test_handoff_needs_the_session_token(env: Env) -> None:
     await _humans_online(env)
-    chat, _token = await _start(env)
+    chat, _token = await _start(env, 1)
+    control, control_token = await _start(env, 2)
     async with _visitor(env) as client:
         res = await client.post(
             f"{API}/sessions/{chat.id}/handoff", headers=_h(chat.id + "." + "A" * 43)
         )
+        # positive control: the route exists, and the right token is accepted
+        ok = await client.post(f"{API}/sessions/{control.id}/handoff", headers=_h(control_token))
     assert res.status_code == 404
     assert env.row(chat)[0] == "bot"
+    assert ok.status_code == 204
+    assert env.row(control)[0] == "waiting"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+async def test_public_config_over_http_has_ai_first_and_bot_name(env: Env) -> None:
+    async with _visitor(env) as client:
+        res = await client.get(f"{API}/config", params={"k": KEY, "origin": ORIGIN})
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["bot_name"] == "KI-Assistent"
+    assert body["offline_mode"] == "ai"
+    assert [(t["key"], t["ai_first"], t["online"]) for t in body["topics"]] == [
+        ("support", True, True)
+    ]
+    # the pre-chat fields name and e-mail come from a verified identity
+    assert {f["key"]: f["identity_supplied"] for f in body["prechat_fields"]} == {
+        "name": True,
+        "email": True,
+    }
 
 
 @pytest.mark.asyncio
@@ -742,6 +766,58 @@ async def test_fresh_bot_session_is_not_swept(env: Env) -> None:
     )
     res = await run_webchat_sweep_tick(session_factory=env.factory, redis_client=env.redis, now=NOW)
     assert res["abandoned"] == 0
+    assert env.row(chat)[0] == "bot"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+async def test_bot_chat_is_handed_off_when_the_ai_worker_is_gone(env: Env) -> None:
+    """Review Focus 2: a running bot chat is never left in silence by a stopped worker."""
+    await _humans_online(env)
+    chat, _token = await _start(env)
+    later = NOW + timedelta(seconds=61)
+    # the worker is alive: a pending line, however old, waits for it
+    res = await run_webchat_sweep_tick(
+        session_factory=env.factory, redis_client=env.redis, now=later
+    )
+    assert res["handed_off"] == 0
+    assert env.row(chat)[0] == "bot"
+    await env.redis.delete(BOT_ALIVE_KEY)
+    # the worker is gone, but the line is younger than 60 s: still the worker's turn
+    young = NOW + timedelta(seconds=30)
+    res = await run_webchat_sweep_tick(
+        session_factory=env.factory, redis_client=env.redis, now=young
+    )
+    assert res["handed_off"] == 0
+    assert env.row(chat)[0] == "bot"
+    env.redis.published.clear()
+    res = await run_webchat_sweep_tick(
+        session_factory=env.factory, redis_client=env.redis, now=later
+    )
+    assert res["handed_off"] == 1
+    row = env.row(chat)
+    assert (row[0], row[8]) == ("waiting", "unavailable")
+    assert (await _codes(env, chat))[-1] == ("handoff", {"reason": "unavailable"})
+    assert "chat_waiting" in [e.get("type") for e in _published(env)]
+    # once handed off, the next tick has nothing to do
+    res = await run_webchat_sweep_tick(
+        session_factory=env.factory, redis_client=env.redis, now=later
+    )
+    assert res["handed_off"] == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+async def test_answered_bot_chat_is_not_handed_off_without_the_worker(env: Env) -> None:
+    chat, _token = await _start(env)
+    env.llm = ScriptedLlm([propose_response("reply", "Neu starten.")])
+    assert await _turn(env, chat) == "replied"
+    await env.redis.delete(BOT_ALIVE_KEY)
+    later = NOW + timedelta(seconds=61)
+    res = await run_webchat_sweep_tick(
+        session_factory=env.factory, redis_client=env.redis, now=later
+    )
+    assert res["handed_off"] == 0
     assert env.row(chat)[0] == "bot"
 
 

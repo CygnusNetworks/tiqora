@@ -33,6 +33,7 @@ __all__ = [
     "CHECKBOX_NO",
     "CHECKBOX_YES",
     "EMAIL_RE",
+    "IDENTITY_FIELD_TARGETS",
     "MAX_TEXT_LENGTH",
     "MAX_TEXTAREA_LENGTH",
     "PrechatInvalid",
@@ -48,6 +49,8 @@ CHECKBOX_YES: Final = "Ja"
 CHECKBOX_NO: Final = "Nein"
 #: Key of the address when ``require_email`` is set and no field maps to ``email``.
 EMAIL_KEY: Final = "email"
+#: ``maps_to`` targets a verified identity supplies (the widget hides them, C9).
+IDENTITY_FIELD_TARGETS: Final = ("name", "email")
 #: Values beyond this are rejected as too long before any cleaning work is done.
 _HARD_CAP: Final = 20_000
 #: ``ticket.customer_id`` is VARCHAR(150); a longer free-text id would raise a DataError.
@@ -200,7 +203,7 @@ def validate_prechat(
     out = _Collector()
     email_field = next((f for f in fields if f.maps_to == "email"), None)
     for f in fields:
-        if identity_fields and f.maps_to in ("name", "email"):
+        if identity_fields and f.maps_to in IDENTITY_FIELD_TARGETS:
             continue
         required = f.required or (require_email and f is email_field)
         _field_value(f, values.get(f.key), out, required=required)

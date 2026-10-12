@@ -259,8 +259,8 @@ async def identify_session(
     # Unconditional: a typed prechat address must never stay behind a set identity_source,
     # or ticket_chat_info would report it as verified (R-NOTIFY b).
     locked.visitor_email = identity.email
-    if identity.name:
-        locked.visitor_name = identity.name[:200]
+    # Also unconditional: a typed prechat name must not show as the verified visitor's name.
+    locked.visitor_name = identity.name[:200] if identity.name else None
     await db.flush([locked])
     queue_wakeup(db, locked.id)
     return True

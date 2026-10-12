@@ -425,6 +425,31 @@ async def test_ai_status_reports_reasons(env: Env) -> None:
     assert missing.status_code == 404
 
 
+@pytest.mark.asyncio
+@parametrize_db
+async def test_ai_status_shows_a_missing_model_while_the_worker_is_down(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """C8: the worker state is a warning; it must not hide the later checks (T11 M1)."""
+    engine = create_engine(env.url)
+    with engine.begin() as conn:
+        seed_bot_queue(conn, queue_id=QUEUE, service_user_id=SERVICE)
+        insert_config(
+            conn,
+            config_id=STATUS_CONFIG,
+            queue_id=QUEUE,
+            public_key=STATUS_KEY,
+            origins=[ORIGIN],
+            topics=[ChatTopic(key="ok", label="Ok", queue_id=QUEUE, ai_mode="first_line")],
+        )
+    engine.dispose()
+    await env.redis.delete(BOT_ALIVE_KEY)
+    monkeypatch.setattr("tiqora.webchat.bot.build_task_llm", AsyncMock(return_value=None))
+    async with _client(env) as client:
+        body = (await client.get(f"{BASE}/{STATUS_CONFIG}/ai-status")).json()
+    assert [(t["ok"], t["reason"]) for t in body] == [(False, "llm_unavailable")]
+
+
 # -- access ----------------------------------------------------------------------------------
 
 

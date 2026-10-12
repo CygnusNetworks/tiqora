@@ -14,7 +14,8 @@ Checks in order, each with its reason when it fails:
 4. ``paused`` / ``gate`` — ``require_feature_allowed`` (``webchat`` is a Tiqora-only channel,
    so ``parallel`` operation passes; the kill switch never does).
 5. ``worker_down`` — the AI worker's bot loop refreshes ``BOT_ALIVE_KEY`` every 10 s (TTL 30 s);
-   no key or any Redis error means nobody would answer.
+   no key or any Redis error means nobody would answer. The admin status checks it last
+   (``worker_last``), so it does not hide steps 6 and 7.
 6. ``queue_rate_limit`` / ``global_rate_limit`` / ``budget_tokens_day`` — the queue-level caps
    (``ai.auto_run.auto_reply_queue_cap_reason``); per-ticket caps need a ticket and are
    checked by the turn.
@@ -142,6 +143,7 @@ async def _compute(
     *,
     topic: ChatTopic,
     queue_id: int,
+    worker_last: bool = False,
 ) -> BotAvailability:
     if topic.ai_mode != "first_line":
         return BotAvailability(False, "ai_mode_off")
@@ -160,12 +162,7 @@ async def _compute(
         return BotAvailability(False, "paused")
     except AiGateError:
         return BotAvailability(False, "gate")
-    try:
-        alive = await redis_client.exists(BOT_ALIVE_KEY)
-    except Exception:  # noqa: BLE001 - unknown worker state counts as down (fail closed)
-        logger.warning("chat_bot_alive_check_failed")
-        return BotAvailability(False, "worker_down")
-    if not alive:
+    if not worker_last and not await _worker_alive(redis_client):
         return BotAvailability(False, "worker_down")
     cap = await auto_reply_queue_cap_reason(db, queue_id=queue_id, policy=policy)
     if cap is not None:
@@ -176,7 +173,17 @@ async def _compute(
         return BotAvailability(False, "llm_unavailable")
     if task_llm is None:
         return BotAvailability(False, "llm_unavailable")
+    if worker_last and not await _worker_alive(redis_client):
+        return BotAvailability(False, "worker_down")
     return BotAvailability(True, None)
+
+
+async def _worker_alive(redis_client: Any) -> bool:
+    try:
+        return bool(await redis_client.exists(BOT_ALIVE_KEY))
+    except Exception:  # noqa: BLE001 - unknown worker state counts as down (fail closed)
+        logger.warning("chat_bot_alive_check_failed")
+        return False
 
 
 async def bot_availability(
@@ -188,11 +195,19 @@ async def bot_availability(
     topic: ChatTopic,
     queue_id: int,
     use_cache: bool = True,
+    worker_last: bool = False,
 ) -> BotAvailability:
     """Whether the bot can answer on *topic* of *config_id* with the policy of *queue_id*.
 
     *queue_id* is the queue the chat is on NOW (R-QUEUE-SOT: at creation the topic's queue, in a
     running chat the ticket's current queue). Never raises.
+
+    ``worker_last`` (the admin status, uncached) checks the AI worker after the caps and the
+    model, so a stopped worker does not hide a missing model or a reached limit; the verdict
+    (``ok``) is the same either way, only the reported reason differs.
+
+    A failing check runs in a savepoint: on PostgreSQL a failed statement would otherwise
+    abort the caller's transaction (``create_session``, ``GET /config``).
     """
     key = _cache_key(config_id, topic.key, queue_id)
     if use_cache:
@@ -205,8 +220,18 @@ async def bot_availability(
                     return BotAvailability(data["ok"], str(reason) if reason else None)
         except Exception:  # noqa: BLE001 - cache trouble must not hide the bot
             logger.warning("chat_bot_availability_cache_read_failed", config_id=config_id)
+    if worker_last:
+        use_cache = False  # a reason in a different order must not reach the public cache
     try:
-        result = await _compute(db, redis_client, settings, topic=topic, queue_id=queue_id)
+        async with db.begin_nested():
+            result = await _compute(
+                db,
+                redis_client,
+                settings,
+                topic=topic,
+                queue_id=queue_id,
+                worker_last=worker_last,
+            )
     except Exception as exc:  # noqa: BLE001 - availability is advisory, never a 500
         logger.warning(
             "chat_bot_availability_failed", config_id=config_id, error=exc.__class__.__name__
@@ -243,6 +268,10 @@ async def claim_bot_turn(db: AsyncSession, *, session_id: str, owner: str, now: 
     than ``BOT_CLAIM_STALE_SECONDS`` is taken over; the AI run lock that dead turn left
     behind (``chat-bot:`` owner) is released in the same transaction, so the new turn does
     not trip over the old turn's lock.
+
+    Exactly one ai-worker runs the turns (docs/deployment.md): a turn that is still alive
+    after ``BOT_CLAIM_STALE_SECONDS`` is indistinguishable from a dead one here, so a second
+    replica would retake it and both would answer.
     """
     stale = now - timedelta(seconds=BOT_CLAIM_STALE_SECONDS)
     result = await db.execute(
@@ -736,10 +765,14 @@ async def close_bot_resolved_ticket(
     try:
         # A savepoint: a failing ticket write must never fail (or half-commit) the chat end.
         async with db.begin_nested():
-            state_id = await _bot_park_state_id(db, chat)
+            from tiqora.webchat.sessions import current_queue_id
+
+            # R-QUEUE-SOT: the policy of the queue the ticket is on now, not the topic's.
+            queue_id = await current_queue_id(db, chat)
+            state_id = await _bot_park_state_id(db, chat, queue_id)
             if state_id is None:
                 return
-            policy = await get_queue_policy_by_queue(db, int(chat.queue_id))
+            policy = await get_queue_policy_by_queue(db, queue_id)
             if policy is None or policy.service_user_id is None:
                 return
             await domain_change_state(
@@ -757,7 +790,9 @@ async def close_bot_resolved_ticket(
     logger.info("webchat_bot_ticket_closed", session_id=chat.id, state_id=state_id)
 
 
-async def _bot_park_state_id(db: AsyncSession, chat: TiqoraChatSession) -> int | None:
+async def _bot_park_state_id(
+    db: AsyncSession, chat: TiqoraChatSession, queue_id: int
+) -> int | None:
     """The state to park in, or ``None`` when the ticket is not in ``new``/``open`` any more
     (an agent or an AI tool moved it to pending/closed/merged after the last bot answer) or
     the queue policy allows no suitable state."""
@@ -774,7 +809,7 @@ async def _bot_park_state_id(db: AsyncSession, chat: TiqoraChatSession) -> int |
     ).first()
     if current is None or str(current[0]) not in ("new", "open"):
         return None
-    policy = await get_queue_policy_by_queue(db, int(chat.queue_id))
+    policy = await get_queue_policy_by_queue(db, queue_id)
     if policy is None or policy.service_user_id is None:
         return None
     return await resolve_auto_state_id(

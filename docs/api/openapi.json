@@ -8097,6 +8097,68 @@
         "title": "ChatAgentStateOut",
         "type": "object"
       },
+      "ChatAiTopicStatusOut": {
+        "description": "Plan C8/C9: one entry per topic (``topic_key``, queue incl. name, verdict).",
+        "properties": {
+          "ai_mode": {
+            "enum": [
+              "off",
+              "first_line"
+            ],
+            "title": "Ai Mode",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "queue_id": {
+            "title": "Queue Id",
+            "type": "integer"
+          },
+          "queue_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Name"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "topic_key": {
+            "title": "Topic Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "topic_key",
+          "label",
+          "queue_id",
+          "queue_name",
+          "ai_mode",
+          "ok",
+          "reason"
+        ],
+        "title": "ChatAiTopicStatusOut",
+        "type": "object"
+      },
       "ChatAttachmentOut": {
         "properties": {
           "content_type": {
@@ -8169,6 +8231,10 @@
             "title": "Id",
             "type": "integer"
           },
+          "identity_secret_set": {
+            "title": "Identity Secret Set",
+            "type": "boolean"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -8195,6 +8261,7 @@
           "public_key",
           "valid",
           "values",
+          "identity_secret_set",
           "embed_snippet",
           "session_count",
           "created",
@@ -8444,6 +8511,20 @@
         "title": "ChatIdentifyIn",
         "type": "object"
       },
+      "ChatIdentitySecretOut": {
+        "description": "The plain website sign-in secret; only ever returned by the 201 that creates it.",
+        "properties": {
+          "secret": {
+            "title": "Secret",
+            "type": "string"
+          }
+        },
+        "required": [
+          "secret"
+        ],
+        "title": "ChatIdentitySecretOut",
+        "type": "object"
+      },
       "ChatInboxItemOut": {
         "properties": {
           "accepted_at": {
@@ -8534,6 +8615,13 @@
       },
       "ChatInboxOut": {
         "properties": {
+          "bot": {
+            "items": {
+              "$ref": "#/components/schemas/ChatInboxItemOut"
+            },
+            "title": "Bot",
+            "type": "array"
+          },
           "mine": {
             "items": {
               "$ref": "#/components/schemas/ChatInboxItemOut"
@@ -8934,6 +9022,11 @@
       },
       "ChatPublicFieldOut": {
         "properties": {
+          "identity_supplied": {
+            "default": false,
+            "title": "Identity Supplied",
+            "type": "boolean"
+          },
           "key": {
             "title": "Key",
             "type": "string"
@@ -9232,8 +9325,29 @@
             ],
             "title": "Agent Name"
           },
+          "bot_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bot Name"
+          },
+          "can_handoff": {
+            "default": false,
+            "title": "Can Handoff",
+            "type": "boolean"
+          },
           "can_send": {
             "title": "Can Send",
+            "type": "boolean"
+          },
+          "identified": {
+            "default": false,
+            "title": "Identified",
             "type": "boolean"
           },
           "identified_as": {
@@ -31571,6 +31685,17 @@
             ],
             "title": "Assigned User Id"
           },
+          "bot_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bot Name"
+          },
           "end_reason": {
             "anyOf": [
               {
@@ -31593,6 +31718,29 @@
               }
             ],
             "title": "Ended At"
+          },
+          "handoff_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handoff At"
+          },
+          "handoff_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handoff Reason"
           },
           "identity_source": {
             "anyOf": [
@@ -36063,6 +36211,57 @@
           }
         },
         "summary": "Post Chat End",
+        "tags": [
+          "webchat-public"
+        ]
+      }
+    },
+    "/api/chat/v1/sessions/{session_id}/handoff": {
+      "post": {
+        "description": "The visitor asks for a human while the AI answers.\n\n204 and the chat is ``waiting`` (the agents ring) or, when nobody is available, ended as\n``no_agent`` (the e-mail prompt follows). 409 ``not_bot`` when the AI is not answering\n(any other status, or an agent took over first). A running AI turn does not block it.",
+        "operationId": "post_chat_handoff_api_chat_v1_sessions__session_id__handoff_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Cross-origin request or website not allowed"
+          },
+          "404": {
+            "description": "Unknown, switched off or not yours"
+          },
+          "409": {
+            "description": "`not_bot`: the AI is not answering this chat"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited (Retry-After)"
+          },
+          "503": {
+            "description": "Chat temporarily unavailable (Retry-After)"
+          }
+        },
+        "summary": "Post Chat Handoff",
         "tags": [
           "webchat-public"
         ]
@@ -46272,6 +46471,225 @@
           }
         },
         "summary": "Update Chat Config",
+        "tags": [
+          "admin:chat-configs"
+        ]
+      }
+    },
+    "/api/v1/admin/chat-configs/{config_id}/ai-status": {
+      "get": {
+        "description": "Per topic: whether the chat assistant would answer there right now, else why not.",
+        "operationId": "chat_ai_status_api_v1_admin_chat_configs__config_id__ai_status_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ChatAiTopicStatusOut"
+                  },
+                  "title": "Response Chat Ai Status Api V1 Admin Chat Configs  Config Id  Ai Status Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Chat Ai Status",
+        "tags": [
+          "admin:chat-configs"
+        ]
+      }
+    },
+    "/api/v1/admin/chat-configs/{config_id}/identity-secret": {
+      "delete": {
+        "operationId": "delete_identity_secret_api_v1_admin_chat_configs__config_id__identity_secret_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Identity Secret",
+        "tags": [
+          "admin:chat-configs"
+        ]
+      },
+      "post": {
+        "description": "Create or rotate the website sign-in secret; the plain value is in this response only.\n\nTokens signed with the previous secret stop working at once on this replica and within the\nconfig cache TTL (10 s) on the others.",
+        "operationId": "create_identity_secret_api_v1_admin_chat_configs__config_id__identity_secret_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatIdentitySecretOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Identity Secret",
         "tags": [
           "admin:chat-configs"
         ]
@@ -70959,7 +71377,7 @@
     },
     "/api/v1/chat/inbox": {
       "get": {
-        "description": "Waiting chats the agent may accept and the agent's own active chats.",
+        "description": "Waiting chats the agent may accept, the agent's own active chats and the chats the AI\nis answering (section ``bot``, no ring).",
         "operationId": "get_chat_inbox_api_v1_chat_inbox_get",
         "parameters": [
           {
@@ -71025,7 +71443,7 @@
     },
     "/api/v1/chat/sessions/{session_id}/accept": {
       "post": {
-        "description": "Take a waiting chat (first accept wins; owner + lock like Znuny).",
+        "description": "Take a waiting chat or one the AI is answering (first accept wins; owner + lock like\nZnuny).",
         "operationId": "post_chat_accept_api_v1_chat_sessions__session_id__accept_post",
         "parameters": [
           {

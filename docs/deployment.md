@@ -436,8 +436,11 @@ The AI first line of the web chat ([setup](guide/webchat.md#5-ki-assistent-einri
   consumes the queue nor refreshes the alive key). The worker consumes the queue `tiqora:chat:bot:queue` (Redis
   list) and rescans the database every 15 s for chats whose last visitor line is unanswered, so a lost wake-up
   costs at most 15 s. It refreshes `tiqora:chat:bot:alive` (TTL 30 s); if it stops, new chats skip the assistant and
-  go to humans (the admin editor shows `worker_down`); a chat already with the assistant is answered once the
-  worker is back, or the visitor uses **Mit einem Menschen sprechen**. Redis must be reachable by both `tiqora-api` and `tiqora-ai-worker`.
+  go to humans (the admin editor shows `worker_down`); a chat already with the assistant whose visitor line has
+  waited more than 60 s is handed to the team by the chat sweep in `tiqora-worker` (reason `unavailable`, or ended
+  with `no_agent` when nobody is there). Redis must be reachable by both `tiqora-api` and `tiqora-ai-worker`.
+- **Run exactly one `tiqora-ai-worker`.** A chat turn is leased for 180 s; a second replica would take over a turn
+  that runs longer (slow model times several tool rounds) and both would answer the same chat.
 - **`TIQORA_CHAT_BOT_CONCURRENCY`** (default `4`, 1-32): assistant turns in parallel per `ai-worker` process. A turn
   holds one LLM call (up to `TIQORA_LLM_TIMEOUT`); raise it only with the provider's rate limit in mind.
 - **The queue policy decides.** The topic's queue needs auto-reply, an AI service user and a usable model (see the

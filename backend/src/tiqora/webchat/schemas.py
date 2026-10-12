@@ -96,6 +96,9 @@ class ChatPublicFieldOut(BaseModel):
     label: str
     required: bool
     options: list[PrechatOption]
+    # A verified identity supplies this field (``maps_to`` name/email): the widget hides it
+    # for a signed-in visitor, and the server neither requires nor reads it then.
+    identity_supplied: bool = False
 
 
 class ChatPublicUploadOut(BaseModel):
@@ -155,6 +158,8 @@ class ChatSessionOut(BaseModel):
     needs_contact: bool
     last_seq: int
     identified_as: str | None = None
+    # A verified identity is attached (also when it carries no display name).
+    identified: bool = False
     # The assistant's display name while the AI answers (``bot``), else ``None``.
     bot_name: str | None = None
     # The visitor may press "talk to a human": true exactly while the AI answers.

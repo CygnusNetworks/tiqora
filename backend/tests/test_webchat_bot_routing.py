@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, delete, insert, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tests._fake_redis import FakeRedis
@@ -31,10 +31,12 @@ from tests._webchat_fixtures import (
     seed_queue_agent,
 )
 from tiqora.ai.auto_run import auto_reply_queue_cap_reason
+from tiqora.ai.gate import AiGateError
 from tiqora.ai.models import TiqoraAiQueuePolicy
 from tiqora.config import get_settings
 from tiqora.db.tiqora.base import TiqoraBase
-from tiqora.db.tiqora.models import TiqoraChatConfig, TiqoraChatSession
+from tiqora.db.tiqora.models import TiqoraChatConfig, TiqoraChatSession, TiqoraSettings
+from tiqora.domain.settings_store import KEY_AI_GLOBAL_REPLIES_PER_HOUR
 from tiqora.webchat.availability import config_availability, mark_agent_online, set_agent_state
 from tiqora.webchat.bot import BOT_ALIVE_KEY, bot_availability
 from tiqora.webchat.models import ChatConfigValues, ChatTopic
@@ -86,6 +88,9 @@ def _cleanup(url: str) -> None:
     engine = create_engine(url)
     with engine.begin() as conn:
         cleanup_bot_queue(conn, queue_ids=[QUEUE, QUEUE_PLAIN])
+        conn.execute(
+            delete(TiqoraSettings).where(TiqoraSettings.key == KEY_AI_GLOBAL_REPLIES_PER_HOUR)
+        )
         cleanup_band(
             conn,
             config_ids=CONFIG_IDS,
@@ -468,10 +473,69 @@ async def test_bot_availability_reasons(env: Env, llm: AsyncMock) -> None:
     engine.dispose()
     assert await ask() == (False, "RuntimeError")
     llm.side_effect = None
+    # the global hourly limit (every queue's automatic replies count)
+    engine = _sync(env)
+    with engine.begin() as conn:
+        conn.execute(insert(TiqoraSettings).values(key=KEY_AI_GLOBAL_REPLIES_PER_HOUR, value="1"))
+    assert await ask() == (False, "global_rate_limit")
+    with engine.begin() as conn:
+        conn.execute(
+            delete(TiqoraSettings).where(TiqoraSettings.key == KEY_AI_GLOBAL_REPLIES_PER_HOUR)
+        )
+    engine.dispose()
+    assert await ask() == (True, None)
     await env.redis.delete(BOT_ALIVE_KEY)
     assert await ask() == (False, "worker_down")
     env.redis.fail = True
     assert await ask() == (False, "worker_down")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+async def test_bot_availability_gate_reason(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "tiqora.webchat.bot.require_feature_allowed",
+        AsyncMock(side_effect=AiGateError("operation mode")),
+    )
+    async with env.factory() as db:
+        got = await bot_availability(
+            db,
+            env.redis,
+            get_settings(),
+            config_id=CONFIG,
+            topic=FIRST_LINE,
+            queue_id=QUEUE,
+            use_cache=False,
+        )
+    assert (got.ok, got.reason) == (False, "gate")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+async def test_failing_availability_leaves_the_callers_transaction_usable(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T5 M5: on PostgreSQL a failed statement aborts the transaction; the savepoint keeps
+    ``create_session`` / ``GET /config`` working after an availability error."""
+
+    async def broken_policy(db: AsyncSession, _queue_id: int) -> Any:
+        await db.execute(text("SELECT * FROM tiqora_no_such_table_wc54"))
+
+    monkeypatch.setattr("tiqora.webchat.bot.get_queue_policy_by_queue", broken_policy)
+    async with env.factory() as db:
+        before = (await db.execute(text("SELECT 1"))).scalar_one()
+        got = await bot_availability(
+            db,
+            env.redis,
+            get_settings(),
+            config_id=CONFIG,
+            topic=FIRST_LINE,
+            queue_id=QUEUE,
+            use_cache=False,
+        )
+        assert got.ok is False
+        assert (await db.execute(text("SELECT 2"))).scalar_one() == 2
+    assert before == 1
 
 
 @pytest.mark.asyncio

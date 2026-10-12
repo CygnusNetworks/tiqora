@@ -250,6 +250,7 @@ async def test_create_with_valid_identity_201_and_identified_as(env: Env) -> Non
         res = await client.get(f"{API}/sessions/{created['session_id']}", headers=_h(created))
     assert res.status_code == 200
     assert res.json()["identified_as"] == "Erika Muster"
+    assert res.json()["identified"] is True
     for leaked in ("wc546-erika", "example.org"):
         assert leaked not in res.text and leaked not in json.dumps(created)
     row = env.sql(
@@ -272,6 +273,7 @@ async def test_create_without_identity_is_anonymous(env: Env) -> None:
         created = await _start(client)
         res = await client.get(f"{API}/sessions/{created['session_id']}", headers=_h(created))
     assert res.json()["identified_as"] is None
+    assert res.json()["identified"] is False
     row = env.sql(
         "SELECT identity_source FROM tiqora_chat_session WHERE id = :i", i=created["session_id"]
     )
@@ -350,6 +352,30 @@ async def test_identify_endpoint(env: Env) -> None:
     )[0]
     assert tuple(row) == ("wc546-erika", "website")
     assert env.fail_bucket() == 1
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_identify_without_a_name_is_identified_and_drops_the_typed_name(env: Env) -> None:
+    """T4 M1 / frontend M1: a token without ``name`` (allowed by the guide) is still a verified
+    identity: ``identified`` is true, and the typed pre-chat name is not shown for it."""
+    async with _client(env) as client:
+        created = await _start(client, prechat={"name": "Getippt Name"})
+        sid = created["session_id"]
+        before = (await client.get(f"{API}/sessions/{sid}", headers=_h(created))).json()
+        ok = await client.post(
+            f"{API}/sessions/{sid}/identify",
+            json={"identity": _website_token("wc546-nameless")},
+            headers=_h(created),
+        )
+        after = (await client.get(f"{API}/sessions/{sid}", headers=_h(created))).json()
+    assert (before["identified"], before["identified_as"]) == (False, None)
+    assert ok.status_code == 204
+    assert (after["identified"], after["identified_as"]) == (True, None)
+    row = env.sql(
+        "SELECT identity_source, visitor_name FROM tiqora_chat_session WHERE id = :i", i=sid
+    )[0]
+    assert tuple(row) == ("website", None)
 
 
 @pytest.mark.asyncio

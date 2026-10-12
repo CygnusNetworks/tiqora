@@ -13408,6 +13408,11 @@ export interface components {
         };
         /** ChatPublicFieldOut */
         ChatPublicFieldOut: {
+            /**
+             * Identity Supplied
+             * @default false
+             */
+            identity_supplied: boolean;
             /** Key */
             key: string;
             /**
@@ -13531,6 +13536,11 @@ export interface components {
             can_handoff: boolean;
             /** Can Send */
             can_send: boolean;
+            /**
+             * Identified
+             * @default false
+             */
+            identified: boolean;
             /** Identified As */
             identified_as?: string | null;
             /** Last Seq */

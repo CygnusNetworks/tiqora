@@ -236,7 +236,7 @@ async def test_waiting_timeout_ends_with_no_agent(env: Env) -> None:
 
     res = await _tick(env)
 
-    assert res == {"timed_out": 2, "abandoned": 0, "purged": 0}
+    assert res == {"timed_out": 2, "abandoned": 0, "handed_off": 0, "purged": 0}
     row = await _row(env, late)
     assert (row["status"], row["end_reason"], row["ended_at"]) == ("ended", "no_agent", NOW)
     assert (await _messages(env, late))[-1] == ("system", "no_agent", {"has_email": False})
@@ -275,7 +275,7 @@ async def test_idle_visitor_abandoned(env: Env) -> None:
 
     res = await _tick(env)
 
-    assert res == {"timed_out": 0, "abandoned": 2, "purged": 0}
+    assert res == {"timed_out": 0, "abandoned": 2, "handed_off": 0, "purged": 0}
     for sid in (active_gone, waiting_gone):
         row = await _row(env, sid)
         assert (row["status"], row["end_reason"], row["ended_at"]) == ("abandoned", "idle", NOW)
@@ -298,7 +298,7 @@ async def test_idle_bot_session_abandoned_with_the_active_cutoff(env: Env) -> No
 
     res = await _tick(env)
 
-    assert res == {"timed_out": 0, "abandoned": 1, "purged": 0}
+    assert res == {"timed_out": 0, "abandoned": 1, "handed_off": 0, "purged": 0}
     row = await _row(env, gone)
     assert (row["status"], row["end_reason"], row["ended_at"]) == ("abandoned", "idle", NOW)
     assert (await _messages(env, gone))[-1] == ("system", "idle_closed", {})
@@ -311,7 +311,7 @@ async def test_fresh_last_seen_without_marker_keeps_chat(env: Env) -> None:
     sid = await _start(env, 20)
     await _set(env, sid, status="active", assigned_user_id=AGENT, accepted_at=NOW)
     await _set(env, sid, visitor_last_seen=NOW - timedelta(seconds=90))
-    assert (await _tick(env)) == {"timed_out": 0, "abandoned": 0, "purged": 0}
+    assert (await _tick(env)) == {"timed_out": 0, "abandoned": 0, "handed_off": 0, "purged": 0}
     assert (await _row(env, sid))["status"] == "active"
     # ...but it goes once the last seen time is stale as well.
     later = NOW + timedelta(seconds=ACTIVE_IDLE_SECONDS)
@@ -339,7 +339,7 @@ async def test_retention_purges_messages_and_pii(env: Env) -> None:
 
     res = await _tick(env)
 
-    assert res == {"timed_out": 0, "abandoned": 0, "purged": 3}
+    assert res == {"timed_out": 0, "abandoned": 0, "handed_off": 0, "purged": 3}
     row = await _row(env, old)
     for col in ("visitor_name", "visitor_email", "page_url", "user_agent", "ip_hash"):
         assert row[col] is None, col
@@ -456,7 +456,7 @@ async def test_deleted_config_uses_defaults(env: Env) -> None:
         await db.execute(text("DELETE FROM tiqora_chat_config WHERE id = :c"), {"c": CONFIG})
         await db.commit()
     # Defaults: wait_timeout 180 s, retention 30 days.
-    assert await _tick(env) == {"timed_out": 1, "abandoned": 0, "purged": 1}
+    assert await _tick(env) == {"timed_out": 1, "abandoned": 0, "handed_off": 0, "purged": 1}
     assert (await _row(env, gone))["status"] == "ended"
     assert (await _row(env, fresh))["status"] == "waiting"
     assert (await _row(env, old))["purged_at"] == NOW
@@ -476,13 +476,13 @@ async def test_redis_failure_does_not_crash_tick(env: Env) -> None:
     env.redis.fail = True
     # Marker lookups and publishing fail; the database decides, the writes still commit.
     res = await _tick(env)
-    assert res == {"timed_out": 1, "abandoned": 1, "purged": 0}
+    assert res == {"timed_out": 1, "abandoned": 1, "handed_off": 0, "purged": 0}
     statuses = await _ids_of(env, gone, timed, live)
     assert statuses == {gone: "abandoned", timed: "ended", live: "active"}
     assert (await _messages(env, timed))[-1][1] == "no_agent"
     assert (await _messages(env, gone))[-1][1] == "idle_closed"
     env.redis.fail = False
-    assert (await _tick(env)) == {"timed_out": 0, "abandoned": 0, "purged": 0}
+    assert (await _tick(env)) == {"timed_out": 0, "abandoned": 0, "handed_off": 0, "purged": 0}
 
 
 @pytest.mark.asyncio
