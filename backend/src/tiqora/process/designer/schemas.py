@@ -46,7 +46,7 @@ class EntitySummaryOut(BaseModel):
     sync_state: SyncState
 
 
-class ProcessSummaryOut(EntitySummaryOut):
+class ProcessDraftSummaryOut(EntitySummaryOut):
     """``GET /processes`` row: a summary plus the process state (ruling: list shows drafts)."""
 
     state_entity_id: str

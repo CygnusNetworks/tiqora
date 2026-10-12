@@ -26,7 +26,7 @@ from tiqora.process.designer.schemas import (
     DesignerEntityOut,
     EntitySummaryOut,
     ProcessDraftOut,
-    ProcessSummaryOut,
+    ProcessDraftSummaryOut,
     SyncState,
 )
 from tiqora.process.designer.versioning import entity_version
@@ -260,7 +260,18 @@ async def list_entities(session: AsyncSession, entity_type: EntityType) -> list[
     ]
 
 
-async def list_process_summaries(session: AsyncSession) -> list[ProcessSummaryOut]:
+async def load_entity(
+    session: AsyncSession, entity_type: EntityType, entity_id: str
+) -> DesignerEntityOut:
+    """One entity as the designer sees it; :class:`EntityNotFound` when absent."""
+    rows = await _load_rows(session, entity_type, [entity_id])
+    row = rows.get(entity_id)
+    if row is None:
+        raise EntityNotFound(entity_id)
+    return _entity_out(entity_type, row, await load_sync_states(session))
+
+
+async def list_process_summaries(session: AsyncSession) -> list[ProcessDraftSummaryOut]:
     """Processes with state, drafts included (ruling: the designer list shows drafts)."""
     rows = (
         await session.execute(
@@ -271,7 +282,7 @@ async def list_process_summaries(session: AsyncSession) -> list[ProcessSummaryOu
     ).all()
     states = await load_sync_states(session)
     return [
-        ProcessSummaryOut(
+        ProcessDraftSummaryOut(
             entity_type="Process",
             entity_id=eid,
             name=name,

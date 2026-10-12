@@ -7754,6 +7754,118 @@
         "title": "CallerTicketOut",
         "type": "object"
       },
+      "CatalogActionOut": {
+        "properties": {
+          "module": {
+            "title": "Module",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "params": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogParamOut"
+            },
+            "title": "Params",
+            "type": "array"
+          },
+          "supported": {
+            "title": "Supported",
+            "type": "boolean"
+          },
+          "tiqora_only": {
+            "title": "Tiqora Only",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "module",
+          "supported",
+          "tiqora_only",
+          "params"
+        ],
+        "title": "CatalogActionOut",
+        "type": "object"
+      },
+      "CatalogFieldOut": {
+        "properties": {
+          "condition": {
+            "title": "Condition",
+            "type": "boolean"
+          },
+          "dialog": {
+            "title": "Dialog",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/ProcessDialogOptionOut"
+            },
+            "title": "Options",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "kind",
+          "dialog",
+          "condition"
+        ],
+        "title": "CatalogFieldOut",
+        "type": "object"
+      },
+      "CatalogParamOut": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "list_value": {
+            "title": "List Value",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "one_of": {
+            "items": {
+              "type": "string"
+            },
+            "title": "One Of",
+            "type": "array"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "required",
+          "one_of",
+          "list_value"
+        ],
+        "title": "CatalogParamOut",
+        "type": "object"
+      },
       "CategoryIn": {
         "properties": {
           "customer_visible": {
@@ -13349,6 +13461,134 @@
         "title": "DeployStatusOut",
         "type": "object"
       },
+      "DesignerCatalogOut": {
+        "properties": {
+          "account_time": {
+            "title": "Account Time",
+            "type": "boolean"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogActionOut"
+            },
+            "title": "Actions",
+            "type": "array"
+          },
+          "condition_modules": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Condition Modules",
+            "type": "array"
+          },
+          "condition_types": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Condition Types",
+            "type": "array"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogFieldOut"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "interfaces": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Interfaces",
+            "type": "array"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Permissions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "actions",
+          "condition_types",
+          "condition_modules",
+          "fields",
+          "interfaces",
+          "permissions",
+          "account_time"
+        ],
+        "title": "DesignerCatalogOut",
+        "type": "object"
+      },
+      "DesignerEntityOut": {
+        "properties": {
+          "changed_at": {
+            "format": "date-time",
+            "title": "Changed At",
+            "type": "string"
+          },
+          "changed_by": {
+            "title": "Changed By",
+            "type": "integer"
+          },
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "entity_type": {
+            "enum": [
+              "Process",
+              "Activity",
+              "ActivityDialog",
+              "Transition",
+              "TransitionAction"
+            ],
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "sync_state": {
+            "default": "synced",
+            "enum": [
+              "synced",
+              "not_sync",
+              "deleted"
+            ],
+            "title": "Sync State",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entity_type",
+          "entity_id",
+          "id",
+          "name",
+          "config",
+          "version",
+          "changed_at",
+          "changed_by"
+        ],
+        "title": "DesignerEntityOut",
+        "type": "object"
+      },
       "DialOut": {
         "properties": {
           "call_id": {
@@ -14075,6 +14315,101 @@
           "backend"
         ],
         "title": "EmailSecurityIn",
+        "type": "object"
+      },
+      "EntityCreateIn": {
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "config"
+        ],
+        "title": "EntityCreateIn",
+        "type": "object"
+      },
+      "EntitySummaryOut": {
+        "properties": {
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "entity_type": {
+            "enum": [
+              "Process",
+              "Activity",
+              "ActivityDialog",
+              "Transition",
+              "TransitionAction"
+            ],
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "sync_state": {
+            "enum": [
+              "synced",
+              "not_sync",
+              "deleted"
+            ],
+            "title": "Sync State",
+            "type": "string"
+          },
+          "used_by": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Used By",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entity_type",
+          "entity_id",
+          "name",
+          "used_by",
+          "sync_state"
+        ],
+        "title": "EntitySummaryOut",
+        "type": "object"
+      },
+      "EntityUpdateIn": {
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "expected_version": {
+            "title": "Expected Version",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "config",
+          "expected_version"
+        ],
+        "title": "EntityUpdateIn",
         "type": "object"
       },
       "ErasureSelectorIn": {
@@ -23527,6 +23862,27 @@
         "title": "ProcessActivityOut",
         "type": "object"
       },
+      "ProcessCreateIn": {
+        "properties": {
+          "description": {
+            "default": "",
+            "maxLength": 10000,
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ProcessCreateIn",
+        "type": "object"
+      },
       "ProcessDetailOut": {
         "description": "A single process's full graph: activities and their dialogs.\n\nTransition/condition internals are intentionally not exposed here \u2014 the\nfrontend does not need them to render a process, and Tiqora does not\nleak internal BPM routing logic to clients (see ``TicketProcessStateOut``).",
         "properties": {
@@ -23730,6 +24086,143 @@
         "title": "ProcessDialogOptionOut",
         "type": "object"
       },
+      "ProcessDraftOut": {
+        "properties": {
+          "activities": {
+            "items": {
+              "$ref": "#/components/schemas/DesignerEntityOut"
+            },
+            "title": "Activities",
+            "type": "array"
+          },
+          "activity_dialogs": {
+            "items": {
+              "$ref": "#/components/schemas/DesignerEntityOut"
+            },
+            "title": "Activity Dialogs",
+            "type": "array"
+          },
+          "layout": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Layout",
+            "type": "object"
+          },
+          "missing_references": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing References",
+            "type": "array"
+          },
+          "pending_changes": {
+            "title": "Pending Changes",
+            "type": "integer"
+          },
+          "process": {
+            "$ref": "#/components/schemas/DesignerEntityOut"
+          },
+          "state_entity_id": {
+            "title": "State Entity Id",
+            "type": "string"
+          },
+          "state_name": {
+            "title": "State Name",
+            "type": "string"
+          },
+          "transition_actions": {
+            "items": {
+              "$ref": "#/components/schemas/DesignerEntityOut"
+            },
+            "title": "Transition Actions",
+            "type": "array"
+          },
+          "transitions": {
+            "items": {
+              "$ref": "#/components/schemas/DesignerEntityOut"
+            },
+            "title": "Transitions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "process",
+          "state_entity_id",
+          "state_name",
+          "layout",
+          "activities",
+          "activity_dialogs",
+          "transitions",
+          "transition_actions",
+          "missing_references",
+          "pending_changes"
+        ],
+        "title": "ProcessDraftOut",
+        "type": "object"
+      },
+      "ProcessDraftSummaryOut": {
+        "description": "``GET /processes`` row: a summary plus the process state (ruling: list shows drafts).",
+        "properties": {
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "entity_type": {
+            "enum": [
+              "Process",
+              "Activity",
+              "ActivityDialog",
+              "Transition",
+              "TransitionAction"
+            ],
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "state_entity_id": {
+            "title": "State Entity Id",
+            "type": "string"
+          },
+          "state_name": {
+            "title": "State Name",
+            "type": "string"
+          },
+          "sync_state": {
+            "enum": [
+              "synced",
+              "not_sync",
+              "deleted"
+            ],
+            "title": "Sync State",
+            "type": "string"
+          },
+          "used_by": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Used By",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entity_type",
+          "entity_id",
+          "name",
+          "used_by",
+          "sync_state",
+          "state_entity_id",
+          "state_name"
+        ],
+        "title": "ProcessDraftSummaryOut",
+        "type": "object"
+      },
       "ProcessFormOptionsIn": {
         "properties": {
           "fields": {
@@ -23887,6 +24380,82 @@
           "state_entity_id"
         ],
         "title": "ProcessSummaryOut",
+        "type": "object"
+      },
+      "ProcessUpdateIn": {
+        "properties": {
+          "description": {
+            "default": "",
+            "maxLength": 10000,
+            "title": "Description",
+            "type": "string"
+          },
+          "expected_version": {
+            "title": "Expected Version",
+            "type": "string"
+          },
+          "layout": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            "title": "Layout",
+            "type": "object"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "object"
+            },
+            "title": "Path",
+            "type": "object"
+          },
+          "start_activity": {
+            "default": "",
+            "title": "Start Activity",
+            "type": "string"
+          },
+          "start_activity_dialog": {
+            "default": "",
+            "title": "Start Activity Dialog",
+            "type": "string"
+          },
+          "state_entity_id": {
+            "enum": [
+              "S1",
+              "S2",
+              "S3"
+            ],
+            "title": "State Entity Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_version",
+          "name",
+          "state_entity_id",
+          "path",
+          "layout"
+        ],
+        "title": "ProcessUpdateIn",
         "type": "object"
       },
       "ProviderChanges": {
@@ -57278,6 +57847,859 @@
         "summary": "Update Priority",
         "tags": [
           "admin:priorities"
+        ]
+      }
+    },
+    "/api/v1/admin/process-designer/catalog": {
+      "get": {
+        "operationId": "get_catalog_api_v1_admin_process_designer_catalog_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignerCatalogOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Catalog",
+        "tags": [
+          "admin:process-designer"
+        ]
+      }
+    },
+    "/api/v1/admin/process-designer/entities/{entity_type}": {
+      "get": {
+        "operationId": "list_entity_summaries_api_v1_admin_process_designer_entities__entity_type__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entity_type",
+            "required": true,
+            "schema": {
+              "enum": [
+                "Activity",
+                "ActivityDialog",
+                "Transition",
+                "TransitionAction"
+              ],
+              "title": "Entity Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EntitySummaryOut"
+                  },
+                  "title": "Response List Entity Summaries Api V1 Admin Process Designer Entities  Entity Type  Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Entity Summaries",
+        "tags": [
+          "admin:process-designer"
+        ]
+      },
+      "post": {
+        "operationId": "create_entity_api_v1_admin_process_designer_entities__entity_type__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entity_type",
+            "required": true,
+            "schema": {
+              "enum": [
+                "Activity",
+                "ActivityDialog",
+                "Transition",
+                "TransitionAction"
+              ],
+              "title": "Entity Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntityCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignerEntityOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Entity",
+        "tags": [
+          "admin:process-designer"
+        ]
+      }
+    },
+    "/api/v1/admin/process-designer/entities/{entity_type}/{entity_id}": {
+      "delete": {
+        "operationId": "delete_entity_api_v1_admin_process_designer_entities__entity_type___entity_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entity_type",
+            "required": true,
+            "schema": {
+              "enum": [
+                "Activity",
+                "ActivityDialog",
+                "Transition",
+                "TransitionAction"
+              ],
+              "title": "Entity Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entity_id",
+            "required": true,
+            "schema": {
+              "title": "Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Entity",
+        "tags": [
+          "admin:process-designer"
+        ]
+      },
+      "put": {
+        "operationId": "update_entity_api_v1_admin_process_designer_entities__entity_type___entity_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entity_type",
+            "required": true,
+            "schema": {
+              "enum": [
+                "Activity",
+                "ActivityDialog",
+                "Transition",
+                "TransitionAction"
+              ],
+              "title": "Entity Type",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entity_id",
+            "required": true,
+            "schema": {
+              "title": "Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntityUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignerEntityOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Entity",
+        "tags": [
+          "admin:process-designer"
+        ]
+      }
+    },
+    "/api/v1/admin/process-designer/processes": {
+      "get": {
+        "operationId": "list_processes_api_v1_admin_process_designer_processes_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProcessDraftSummaryOut"
+                  },
+                  "title": "Response List Processes Api V1 Admin Process Designer Processes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Processes",
+        "tags": [
+          "admin:process-designer"
+        ]
+      },
+      "post": {
+        "operationId": "create_process_api_v1_admin_process_designer_processes_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProcessCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessDraftOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Process",
+        "tags": [
+          "admin:process-designer"
+        ]
+      }
+    },
+    "/api/v1/admin/process-designer/processes/{process_entity_id}": {
+      "delete": {
+        "operationId": "delete_process_api_v1_admin_process_designer_processes__process_entity_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "process_entity_id",
+            "required": true,
+            "schema": {
+              "title": "Process Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Process",
+        "tags": [
+          "admin:process-designer"
+        ]
+      },
+      "get": {
+        "operationId": "get_process_api_v1_admin_process_designer_processes__process_entity_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "process_entity_id",
+            "required": true,
+            "schema": {
+              "title": "Process Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessDraftOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Process",
+        "tags": [
+          "admin:process-designer"
+        ]
+      },
+      "put": {
+        "operationId": "update_process_api_v1_admin_process_designer_processes__process_entity_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "process_entity_id",
+            "required": true,
+            "schema": {
+              "title": "Process Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProcessUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessDraftOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Process",
+        "tags": [
+          "admin:process-designer"
+        ]
+      }
+    },
+    "/api/v1/admin/process-designer/processes/{process_entity_id}/copy": {
+      "post": {
+        "operationId": "copy_process_api_v1_admin_process_designer_processes__process_entity_id__copy_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "process_entity_id",
+            "required": true,
+            "schema": {
+              "title": "Process Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessDraftOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Copy Process",
+        "tags": [
+          "admin:process-designer"
         ]
       }
     },

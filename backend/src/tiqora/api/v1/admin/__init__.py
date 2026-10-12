@@ -45,6 +45,7 @@ from tiqora.api.v1.admin import (
     plugins,
     postmaster_filters,
     priorities,
+    process_designer,
     queues,
     readonly,
     reporting,
@@ -83,6 +84,7 @@ admin_router.include_router(postmaster_filters.router)
 admin_router.include_router(acl.router)
 admin_router.include_router(deploy.router)
 admin_router.include_router(deploy_status.router)
+admin_router.include_router(process_designer.router)
 admin_router.include_router(ticket_attribute_relations.router)
 admin_router.include_router(readonly.router)
 admin_router.include_router(system_addresses.router)
