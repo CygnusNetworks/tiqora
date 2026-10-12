@@ -30,7 +30,7 @@ from sqlalchemy.orm import aliased
 
 from tiqora.cmdb.access import CmdbAccess, readable_class_ids
 from tiqora.cmdb.definition import AttributeDef, parse_definition_json
-from tiqora.cmdb.schemas import CiListItemOut, CiPage, CiRefOut, CiSearchIn
+from tiqora.cmdb.schemas import CiListItemOut, CiPage, CiRefOut, CiSearchCriteria, CiSearchIn
 from tiqora.cmdb.seed import DEPLOYMENT_STATE, INCIDENT_STATE
 from tiqora.db.tiqora.models import (
     TiqoraCmdbCatalog,
@@ -435,7 +435,12 @@ def compile_ci_search(
     return stmt
 
 
-async def search_cis(session: AsyncSession, access: CmdbAccess, body: CiSearchIn) -> CiPage:
+async def ci_search_statement(
+    session: AsyncSession, access: CmdbAccess, body: CiSearchCriteria
+) -> Select[Any] | None:
+    """The validated, compiled CI query for ``body`` (``None``: no readable class matches).
+
+    Raises :class:`FilterError` for a filter that is invalid or needs exactly one class."""
     readable = await readable_class_ids(session, access)
     scope = sorted(set(readable) & set(body.class_ids)) if body.class_ids else readable
     flt = body.filter
@@ -443,14 +448,20 @@ async def search_cis(session: AsyncSession, access: CmdbAccess, body: CiSearchIn
     if has_attr and len(set(body.class_ids)) != 1:
         raise FilterError("Attributfilter brauchen genau eine Klasse", path="where")
     if not scope:
-        return CiPage(items=[], total=0, total_capped=False)
+        return None
     class_id = body.class_ids[0] if has_attr else None
     fields = await _load_fields(session, class_id, readable)
     if flt is not None:
         validate_filter(flt, fields.get)
-    stmt = compile_ci_search(
+    return compile_ci_search(
         fields, flt, q=body.q, class_ids=body.class_ids, readable_class_ids=readable
     )
+
+
+async def search_cis(session: AsyncSession, access: CmdbAccess, body: CiSearchIn) -> CiPage:
+    stmt = await ci_search_statement(session, access, body)
+    if stmt is None:
+        return CiPage(items=[], total=0, total_capped=False)
     sort_col = _SORT_COLUMNS[body.sort]
     primary = sort_col.desc() if body.order == "desc" else sort_col.asc()
     rows = (
@@ -552,6 +563,7 @@ async def lookup_cis(
 __all__ = [
     "COUNT_CAP",
     "FieldSet",
+    "ci_search_statement",
     "cmdb_filter_fields",
     "compile_ci_search",
     "lookup_cis",

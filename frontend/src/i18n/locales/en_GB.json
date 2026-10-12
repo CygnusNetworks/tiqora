@@ -5637,7 +5637,9 @@
         "gi_invoke_sync": "Web service call",
         "report_delivery": "Report delivery",
         "cmdb_propagation": "Recalculate CMDB incident states",
-        "cmdb_import": "Import CMDB items"
+        "cmdb_import": "Import CMDB items",
+        "cmdb_export": "Export CMDB items",
+        "cmdb_bulk": "Edit CMDB items in bulk"
       },
       "gi_mail": "Send email from a web service request"
     },

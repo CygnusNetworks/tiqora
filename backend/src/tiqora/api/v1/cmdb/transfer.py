@@ -6,7 +6,7 @@ from typing import Annotated
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile, status
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from tiqora.api.uploads import read_upload_within_limit
 from tiqora.api.v1.cmdb.deps import Ctx, cmdb_http_error
@@ -14,12 +14,18 @@ from tiqora.cmdb.access import readable_class_ids, require_class_access
 from tiqora.cmdb.classes import ClassService
 from tiqora.cmdb.errors import CmdbError
 from tiqora.cmdb.schemas import (
+    CiSearchCriteria,
+    CmdbBulkIn,
+    CmdbExportIn,
     CmdbImportRequestIn,
     ImportTemplateIn,
     ImportTemplateOut,
     MappingRowIn,
 )
+from tiqora.cmdb.search import ci_search_statement
 from tiqora.cmdb.settings import load_cmdb_settings
+from tiqora.cmdb.transfer.bulk_job import CMDB_BULK_JOB, CmdbBulkPayload, invalid_state_ids
+from tiqora.cmdb.transfer.export_job import CMDB_EXPORT_JOB, CmdbExportPayload
 from tiqora.cmdb.transfer.import_job import (
     CMDB_IMPORT_JOB,
     INPUT_PREFIX,
@@ -40,6 +46,8 @@ from tiqora.cmdb.transfer.templates import (
     update_template,
 )
 from tiqora.db.tiqora.models import TiqoraJobFile
+from tiqora.filters import FilterError
+from tiqora.jobs.registry import JobHandler
 from tiqora.jobs.schemas import JobAccepted
 from tiqora.jobs.service import (
     count_active_jobs,
@@ -51,6 +59,8 @@ from tiqora.jobs.service import (
 router = APIRouter()
 
 MAX_ACTIVE_IMPORTS_PER_USER = 3
+MAX_ACTIVE_EXPORTS_PER_USER = 3
+MAX_ACTIVE_BULKS_PER_USER = 3
 _MIB = 1024 * 1024
 
 
@@ -249,6 +259,67 @@ async def start_import(
     await session.flush()
     await session.commit()
     return JobAccepted(job_id=job.id, status="queued")
+
+
+# --- export and bulk jobs ------------------------------------------------------------------------
+
+
+async def _enqueue_limited(
+    ctx: Ctx, handler: JobHandler, payload: BaseModel, *, limit: int, what: str
+) -> JobAccepted:
+    session = ctx.session
+    await session.rollback()  # fresh transaction whose first statement locks the user's row
+    await lock_user_job_quota(session, ctx.user.id)
+    if await count_active_jobs(session, kind=handler.kind, created_by=ctx.user.id) >= limit:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            {
+                "code": "too_many_jobs",
+                "message": (
+                    f"Es laufen bereits {limit} {what}. Bitte warten Sie, bis einer fertig ist."
+                ),
+            },
+        )
+    job = await enqueue_job(session, kind=handler.kind, payload=payload, created_by=ctx.user.id)
+    await session.commit()
+    return JobAccepted(job_id=job.id, status="queued")
+
+
+@router.post("/export-jobs", response_model=JobAccepted, status_code=status.HTTP_202_ACCEPTED)
+async def start_export(body: CmdbExportIn, ctx: Ctx) -> JobAccepted:
+    """Queue the export of one class (CSV or XLSX); the permission is checked again when the
+    worker runs the job. The file re-imports with the default mapping."""
+    try:
+        await require_class_access(ctx.session, ctx.access, body.class_id, "ro")
+        await ci_search_statement(
+            ctx.session,
+            ctx.access,
+            CiSearchCriteria(class_ids=[body.class_id], filter=body.filter, q=body.q),
+        )
+    except (CmdbError, FilterError) as exc:
+        raise cmdb_http_error(exc) from exc
+    payload = CmdbExportPayload(
+        user_id=ctx.user.id,
+        class_id=body.class_id,
+        filter=body.filter,
+        q=body.q,
+        file_format=body.file_format,
+    )
+    return await _enqueue_limited(
+        ctx, CMDB_EXPORT_JOB, payload, limit=MAX_ACTIVE_EXPORTS_PER_USER, what="Exporte"
+    )
+
+
+@router.post("/bulk-jobs", response_model=JobAccepted, status_code=status.HTTP_202_ACCEPTED)
+async def start_bulk(body: CmdbBulkIn, ctx: Ctx) -> JobAccepted:
+    """Queue a bulk edit: CIs without ``rw`` are skipped (and reported) when the job runs."""
+    problem = await invalid_state_ids(ctx.session, body.deployment_state_id, body.incident_state_id)
+    if problem:
+        raise _bad_request("invalid_state", problem)
+    payload = CmdbBulkPayload(user_id=ctx.user.id, **body.model_dump())
+    return await _enqueue_limited(
+        ctx, CMDB_BULK_JOB, payload, limit=MAX_ACTIVE_BULKS_PER_USER, what="Sammelbearbeitungen"
+    )
 
 
 __all__ = ["MAX_ACTIVE_IMPORTS_PER_USER", "router"]

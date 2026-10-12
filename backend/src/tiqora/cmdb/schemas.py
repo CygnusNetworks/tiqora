@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from tiqora.cmdb.definition import AttributeDef, AttributeType
 from tiqora.cmdb.render import RefKind
-from tiqora.cmdb.transfer.mapping import ImportOptions
+from tiqora.cmdb.transfer.mapping import ImportOptions, MappingRowIn
 from tiqora.domain.field_options import FieldOptionOut
 from tiqora.domain.schemas import UtcDateTime
 from tiqora.filters.model import Filter
@@ -509,13 +509,6 @@ class CmdbSavedSearchOut(BaseModel):
     changed_at: UtcDateTime
 
 
-class MappingRowIn(BaseModel):
-    """One import column: its header text (or 1-based position) and the target it fills."""
-
-    column: str | int
-    target: str = Field(min_length=1, max_length=300)
-
-
 class ImportTemplateIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     class_id: int = Field(ge=1)
@@ -542,6 +535,40 @@ class ImportTemplateOut(BaseModel):
     changed_at: UtcDateTime
 
 
+class CmdbExportIn(BaseModel):
+    """``POST /export-jobs``: one class (attribute columns need one definition)."""
+
+    class_id: int = Field(ge=1)
+    filter: Filter | None = None
+    q: str | None = Field(default=None, max_length=200)
+    file_format: Literal["csv", "xlsx"] = "csv"
+
+
+class BulkLinkIn(BaseModel):
+    """The link every CI of a bulk edit gets; ``ci_side`` says which end the CI is."""
+
+    link_type_key: str = Field(min_length=1, max_length=50)
+    target_kind: LinkKind
+    target_key: str = Field(min_length=1, max_length=100)
+    ci_side: Literal["source", "target"] = "source"
+
+
+class CmdbBulkIn(BaseModel):
+    """``POST /bulk-jobs``: up to 5000 CIs get the same states and/or the same link."""
+
+    ci_ids: list[int] = Field(min_length=1, max_length=5000)
+    deployment_state_id: int | None = Field(default=None, ge=1)
+    incident_state_id: int | None = Field(default=None, ge=1)
+    link: BulkLinkIn | None = None
+    change_note: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def _something_to_do(self) -> CmdbBulkIn:
+        if self.deployment_state_id is None and self.incident_state_id is None and not self.link:
+            raise ValueError("Es fehlt eine Änderung: Status oder Verknüpfung.")
+        return self
+
+
 class CmdbImportRequestIn(BaseModel):
     """The ``request`` form field of ``POST /import-jobs``: a saved template, or mapping and
     options spelled out. Without both the columns are mapped by their header text."""
@@ -561,6 +588,9 @@ __all__ = [
     "ImportOptions",
     "ImportTemplateIn",
     "ImportTemplateOut",
+    "BulkLinkIn",
+    "CmdbBulkIn",
+    "CmdbExportIn",
     "MappingRowIn",
     "AffectedOut",
     "CiTicketOut",

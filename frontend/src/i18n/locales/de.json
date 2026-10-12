@@ -5637,7 +5637,9 @@
         "gi_invoke_sync": "Webservice-Aufruf",
         "report_delivery": "Berichtsversand",
         "cmdb_propagation": "CMDB-Vorfallstatus neu berechnen",
-        "cmdb_import": "CMDB-Import"
+        "cmdb_import": "CMDB-Import",
+        "cmdb_export": "CMDB-Export",
+        "cmdb_bulk": "CMDB-Sammelbearbeitung"
       },
       "gi_mail": "E-Mail aus einer Webservice-Anfrage versenden"
     },

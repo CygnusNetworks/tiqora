@@ -6,6 +6,7 @@ Pure module (no database). Positions are 1-based; a missing ``[n]`` means ``[1]`
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final, Literal
 
@@ -77,6 +78,27 @@ def format_target(target: ColumnTarget) -> str:
     return "attr:" + ".".join(k if i == 1 else f"{k}[{i}]" for k, i in target.path)
 
 
+class MappingRowIn(BaseModel):
+    """One import column: its header text (or 1-based position) and the target it fills."""
+
+    column: str | int
+    target: str = Field(min_length=1, max_length=300)
+
+
+def default_mapping_for_header(header: Sequence[str]) -> list[MappingRowIn]:
+    """Columns whose header is itself a valid target (the export's headers) map to it, the
+    others are ignored: a file exported by the CMDB re-imports without a mapping."""
+    out: list[MappingRowIn] = []
+    for h in header:
+        try:
+            parse_target(h)
+        except TargetError:
+            out.append(MappingRowIn(column=h, target="ignore"))
+        else:
+            out.append(MappingRowIn(column=h, target=h))
+    return out
+
+
 class ImportOptions(BaseModel):
     delimiter: Literal[";", ",", "\t", "|"] = ";"
     encoding: Literal["utf-8", "cp1252"] = "utf-8"
@@ -93,8 +115,10 @@ class ImportOptions(BaseModel):
 __all__ = [
     "ColumnTarget",
     "ImportOptions",
+    "MappingRowIn",
     "TargetError",
     "TargetKind",
+    "default_mapping_for_header",
     "format_target",
     "parse_target",
 ]

@@ -7156,6 +7156,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cmdb/bulk-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Bulk
+         * @description Queue a bulk edit: CIs without ``rw`` are skipped (and reported) when the job runs.
+         */
+        post: operations["start_bulk_api_v1_cmdb_bulk_jobs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cmdb/catalog": {
         parameters: {
             query?: never;
@@ -7444,6 +7464,27 @@ export interface paths {
         get: operations["lookup_companies_api_v1_cmdb_companies_lookup_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cmdb/export-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Export
+         * @description Queue the export of one class (CSV or XLSX); the permission is checked again when the
+         *     worker runs the job. The file re-imports with the default mapping.
+         */
+        post: operations["start_export_api_v1_cmdb_export_jobs_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -14684,6 +14725,27 @@ export interface components {
             /** To Address */
             to_address: string;
         };
+        /**
+         * BulkLinkIn
+         * @description The link every CI of a bulk edit gets; ``ci_side`` says which end the CI is.
+         */
+        BulkLinkIn: {
+            /**
+             * Ci Side
+             * @default source
+             * @enum {string}
+             */
+            ci_side: "source" | "target";
+            /** Link Type Key */
+            link_type_key: string;
+            /** Target Key */
+            target_key: string;
+            /**
+             * Target Kind
+             * @enum {string}
+             */
+            target_kind: "ci" | "ticket" | "service" | "kb_article" | "customer_user" | "customer_company";
+        };
         /** CalendarOut */
         CalendarOut: {
             /** Color */
@@ -15887,6 +15949,21 @@ export interface components {
             size_bytes: number;
         };
         /**
+         * CmdbBulkIn
+         * @description ``POST /bulk-jobs``: up to 5000 CIs get the same states and/or the same link.
+         */
+        CmdbBulkIn: {
+            /** Change Note */
+            change_note?: string | null;
+            /** Ci Ids */
+            ci_ids: number[];
+            /** Deployment State Id */
+            deployment_state_id?: number | null;
+            /** Incident State Id */
+            incident_state_id?: number | null;
+            link?: components["schemas"]["BulkLinkIn"] | null;
+        };
+        /**
          * CmdbClassIn
          * @description ``class_key`` is immutable after create (a PUT must repeat it).
          */
@@ -16003,6 +16080,23 @@ export interface components {
             id: number;
             /** Version */
             version: number;
+        };
+        /**
+         * CmdbExportIn
+         * @description ``POST /export-jobs``: one class (attribute columns need one definition).
+         */
+        CmdbExportIn: {
+            /** Class Id */
+            class_id: number;
+            /**
+             * File Format
+             * @default csv
+             * @enum {string}
+             */
+            file_format: "csv" | "xlsx";
+            filter?: components["schemas"]["Filter"] | null;
+            /** Q */
+            q?: string | null;
         };
         /** CmdbFilterFieldOut */
         CmdbFilterFieldOut: {
@@ -45714,6 +45808,43 @@ export interface operations {
             };
         };
     };
+    start_bulk_api_v1_cmdb_bulk_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CmdbBulkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_catalog_api_v1_cmdb_catalog_get: {
         parameters: {
             query: {
@@ -46390,6 +46521,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CmdbNamedRefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_export_api_v1_cmdb_export_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CmdbExportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
                 };
             };
             /** @description Validation Error */

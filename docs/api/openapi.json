@@ -8049,6 +8049,51 @@
         "title": "BounceRequest",
         "type": "object"
       },
+      "BulkLinkIn": {
+        "description": "The link every CI of a bulk edit gets; ``ci_side`` says which end the CI is.",
+        "properties": {
+          "ci_side": {
+            "default": "source",
+            "enum": [
+              "source",
+              "target"
+            ],
+            "title": "Ci Side",
+            "type": "string"
+          },
+          "link_type_key": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Link Type Key",
+            "type": "string"
+          },
+          "target_key": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Target Key",
+            "type": "string"
+          },
+          "target_kind": {
+            "enum": [
+              "ci",
+              "ticket",
+              "service",
+              "kb_article",
+              "customer_user",
+              "customer_company"
+            ],
+            "title": "Target Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "link_type_key",
+          "target_kind",
+          "target_key"
+        ],
+        "title": "BulkLinkIn",
+        "type": "object"
+      },
       "CalendarOut": {
         "properties": {
           "color": {
@@ -11275,6 +11320,71 @@
         "title": "CmdbAttachmentOut",
         "type": "object"
       },
+      "CmdbBulkIn": {
+        "description": "``POST /bulk-jobs``: up to 5000 CIs get the same states and/or the same link.",
+        "properties": {
+          "change_note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Note"
+          },
+          "ci_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 5000,
+            "minItems": 1,
+            "title": "Ci Ids",
+            "type": "array"
+          },
+          "deployment_state_id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployment State Id"
+          },
+          "incident_state_id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incident State Id"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BulkLinkIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "ci_ids"
+        ],
+        "title": "CmdbBulkIn",
+        "type": "object"
+      },
       "CmdbClassIn": {
         "description": "``class_key`` is immutable after create (a PUT must repeat it).",
         "properties": {
@@ -11604,6 +11714,52 @@
           "created_at"
         ],
         "title": "CmdbDefinitionOut",
+        "type": "object"
+      },
+      "CmdbExportIn": {
+        "description": "``POST /export-jobs``: one class (attribute columns need one definition).",
+        "properties": {
+          "class_id": {
+            "minimum": 1.0,
+            "title": "Class Id",
+            "type": "integer"
+          },
+          "file_format": {
+            "default": "csv",
+            "enum": [
+              "csv",
+              "xlsx"
+            ],
+            "title": "File Format",
+            "type": "string"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Filter"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "q": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Q"
+          }
+        },
+        "required": [
+          "class_id"
+        ],
+        "title": "CmdbExportIn",
         "type": "object"
       },
       "CmdbFilterFieldOut": {
@@ -82914,6 +83070,82 @@
         ]
       }
     },
+    "/api/v1/cmdb/bulk-jobs": {
+      "post": {
+        "description": "Queue a bulk edit: CIs without ``rw`` are skipped (and reported) when the job runs.",
+        "operationId": "start_bulk_api_v1_cmdb_bulk_jobs_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CmdbBulkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Bulk",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
     "/api/v1/cmdb/catalog": {
       "get": {
         "operationId": "list_catalog_api_v1_cmdb_catalog_get",
@@ -84529,6 +84761,82 @@
           }
         },
         "summary": "Lookup Companies",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/export-jobs": {
+      "post": {
+        "description": "Queue the export of one class (CSV or XLSX); the permission is checked again when the\nworker runs the job. The file re-imports with the default mapping.",
+        "operationId": "start_export_api_v1_cmdb_export_jobs_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CmdbExportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Export",
         "tags": [
           "cmdb"
         ]

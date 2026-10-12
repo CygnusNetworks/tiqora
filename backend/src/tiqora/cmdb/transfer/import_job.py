@@ -41,14 +41,15 @@ from tiqora.cmdb.classes import ClassService
 from tiqora.cmdb.definition import AttributeDef, iter_attribute_paths
 from tiqora.cmdb.errors import CmdbError, CmdbForbidden, CmdbNotFound
 from tiqora.cmdb.propagation import recompute_from
-from tiqora.cmdb.schemas import MappingRowIn
 from tiqora.cmdb.seed import DEPLOYMENT_STATE, INCIDENT_STATE
 from tiqora.cmdb.service import CiService, InvalidValues, system_access
 from tiqora.cmdb.settings import CmdbSettings, load_cmdb_settings
 from tiqora.cmdb.transfer.mapping import (
     ColumnTarget,
     ImportOptions,
+    MappingRowIn,
     TargetError,
+    default_mapping_for_header,
     format_target,
     parse_target,
 )
@@ -115,17 +116,7 @@ class ResolvedColumn:
     row: int  #: 1-based position in the mapping list
 
 
-def default_mapping(header: Sequence[str]) -> list[MappingRowIn]:
-    """Columns whose header is itself a valid target (the export's headers) map to it."""
-    out: list[MappingRowIn] = []
-    for h in header:
-        try:
-            parse_target(h)
-        except TargetError:
-            out.append(MappingRowIn(column=h, target="ignore"))
-        else:
-            out.append(MappingRowIn(column=h, target=h))
-    return out
+default_mapping = default_mapping_for_header
 
 
 def resolve_columns(
