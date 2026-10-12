@@ -2183,7 +2183,8 @@
       "reporting": "Berichtsdaten",
       "webchat": "Web-Chat",
       "plugins": "Erweiterungen",
-      "dashboardTemplates": "Dashboard-Vorlagen"
+      "dashboardTemplates": "Dashboard-Vorlagen",
+      "dashboardKioskLinks": "Wallboard-Links"
     },
     "table": {
       "id": "ID",
@@ -3513,7 +3514,8 @@
       "settingsReporting": "Berichte: Zeitzone, Zugriff, Zwischenspeicher sowie Grenzen für Ergebnisse und Exporte.",
       "webchat": "Chats für Websites einrichten, Aussehen festlegen und den Einbettungscode holen.",
       "plugins": "Installierte Erweiterungen ein- und ausschalten, Zustand prüfen und einstellen.",
-      "dashboardTemplates": "Startseiten je Rolle als Vorlage festlegen, optional verbindlich."
+      "dashboardTemplates": "Startseiten je Rolle als Vorlage festlegen, optional verbindlich.",
+      "dashboardKioskLinks": "Links für Wallboards ohne Anmeldung erstellen, prüfen und widerrufen."
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -4519,6 +4521,38 @@
       "deleteTitle": "Vorlage „{{name}}“ löschen?",
       "deleteMessage": "Dashboards, die Benutzer bereits aus dieser Vorlage erhalten haben, bleiben bestehen.",
       "deleteFailed": "Die Vorlage konnte nicht gelöscht werden."
+    },
+    "kioskLinks": {
+      "title": "Wallboard-Links",
+      "subtitle": "Links, mit denen Dashboards ohne Anmeldung auf einem Bildschirm laufen.",
+      "new": "Wallboard-Link erstellen",
+      "loadFailed": "Die Wallboard-Links konnten nicht geladen werden.",
+      "empty": "Es gibt noch keine Wallboard-Links. Erstellen Sie den ersten Link.",
+      "columns": {
+        "name": "Name",
+        "dashboards": "Dashboards",
+        "status": "Status",
+        "usage": "Nutzung",
+        "actions": "Aktionen"
+      },
+      "active": "Aktiv",
+      "revoked": "Widerrufen",
+      "expired": "Abgelaufen",
+      "withDetails": "mit Details",
+      "lastUsed": "zuletzt verwendet {{when}}",
+      "neverUsed": "noch nie verwendet",
+      "expiresAt": "läuft ab {{when}}",
+      "expiredAt": "abgelaufen {{when}}",
+      "revokedAt": "widerrufen {{when}}",
+      "createdBy": "von {{name}}",
+      "hidden": "nicht mehr sichtbar",
+      "revoke": "Widerrufen",
+      "delete": "Löschen",
+      "revokeTitle": "Link „{{name}}“ widerrufen?",
+      "revokeMessage": "Der Link zeigt sofort nichts mehr an. Bildschirme, auf denen er läuft, verlieren den Zugriff.",
+      "deleteTitle": "Link „{{name}}“ löschen?",
+      "deleteMessage": "Der widerrufene Link wird aus der Liste entfernt.",
+      "actionFailed": "Das hat nicht geklappt. Bitte versuchen Sie es erneut."
     }
   },
   "kb": {
@@ -6452,7 +6486,8 @@
       "deleteTitle": "Dashboard „{{name}}“ löschen?",
       "deleteMessage": "Das Dashboard und alle seine Widgets werden gelöscht. Das lässt sich nicht rückgängig machen.",
       "actionFailed": "Das hat nicht geklappt. Bitte versuchen Sie es noch einmal.",
-      "wallboard": "Als Wallboard anzeigen"
+      "wallboard": "Als Wallboard anzeigen",
+      "wallboardLink": "Wallboard-Link erstellen …"
     },
     "share": {
       "title": "Dashboard teilen",
@@ -6523,6 +6558,36 @@
       "none": "Es ist kein Dashboard zum Anzeigen vorhanden.",
       "invalidLink": "Dieser Wallboard-Link ist ungültig oder abgelaufen.",
       "unavailable": "Auf dem Wallboard nicht verfügbar"
+    },
+    "kiosk": {
+      "title": "Wallboard-Link erstellen",
+      "name": "Name",
+      "nameRequired": "Bitte einen Namen eingeben.",
+      "dashboards": "Dashboards",
+      "dashboardsRequired": "Bitte mindestens ein Dashboard wählen.",
+      "dashboardsMax": "Höchstens 10 Dashboards pro Link.",
+      "rotate": "Wechsel alle",
+      "seconds": "Sekunden",
+      "rotateRange": "Zwischen 15 und 900 Sekunden.",
+      "expires": "Gültig für",
+      "days": "Tage",
+      "expiresRange": "Zwischen 1 und 365 Tagen.",
+      "details": "Details anzeigen (Tickettitel, Kunden, Namen)",
+      "rights": "Der Link zeigt die Daten so, wie Sie sie sehen. Wer den Link hat, sieht das Wallboard ohne Anmeldung.",
+      "tooTall": "„{{name}}“ ist zu hoch für ein Wallboard (mehr als 14 Zeilen). Die Kacheln werden dort sehr klein.",
+      "mine": "„{{name}}“ enthält Kacheln mit „Meine Tickets“. Zeigt die Tickets der Person, die den Link erstellt.",
+      "create": "Link erstellen",
+      "cancel": "Abbrechen",
+      "createFailed": "Der Link konnte nicht erstellt werden.",
+      "createdTitle": "Wallboard-Link erstellt",
+      "oneTime": "Dieser Link wird nur jetzt angezeigt.",
+      "linkLabel": "Wallboard-Link",
+      "copy": "Kopieren",
+      "copied": "Kopiert",
+      "copyHint": "Kopieren war nicht möglich. Der Link ist markiert, bitte kopieren Sie ihn von Hand.",
+      "close": "Schließen",
+      "manageAll": "Alle Wallboard-Links verwalten",
+      "loadFailed": "Die Dashboards konnten nicht geladen werden."
     }
   },
   "filters": {

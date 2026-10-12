@@ -620,6 +620,14 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     descriptionKey: "admin.pageDescriptions.dashboardTemplates",
     keywords: ["startseite", "vorlage", "dashboard", "widgets", "rolle"],
   },
+  {
+    slug: "dashboard-kiosk-links",
+    route: "/admin/dashboard-kiosk-links",
+    group: "system",
+    nameKey: "admin.nav.dashboardKioskLinks",
+    descriptionKey: "admin.pageDescriptions.dashboardKioskLinks",
+    keywords: ["wallboard", "kiosk", "tv", "bildschirm", "link", "anzeigetafel"],
+  },
 ];
 
 export function adminPagesByGroup(group: AdminPageGroup): AdminPageEntry[] {

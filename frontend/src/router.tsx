@@ -123,6 +123,7 @@ import { SubjectConfigPage } from "@/routes/admin/SubjectConfigPage";
 import { SettingsSectionPage } from "@/routes/admin/SettingsSectionPage";
 import { DaemonsPage } from "@/routes/admin/DaemonsPage";
 import { PluginsPage } from "@/routes/admin/PluginsPage";
+import { DashboardKioskLinksPage } from "@/routes/admin/DashboardKioskLinksPage";
 import { DashboardTemplatesPage } from "@/routes/admin/DashboardTemplatesPage";
 import { ReportingAdminPage } from "@/routes/admin/ReportingAdminPage";
 import { SystemInfoPage } from "@/routes/admin/SystemInfoPage";
@@ -1147,6 +1148,12 @@ const adminDashboardTemplatesRoute = createRoute({
   component: DashboardTemplatesPage,
 });
 
+const adminDashboardKioskLinksRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/dashboard-kiosk-links",
+  component: DashboardKioskLinksPage,
+});
+
 const adminSettingsSectionRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/settings/$section",
@@ -1347,6 +1354,7 @@ const routeTree = rootRoute.addChildren([
     adminPluginsRoute,
     adminReportingRoute,
     adminDashboardTemplatesRoute,
+    adminDashboardKioskLinksRoute,
     adminSettingsSectionRoute,
     adminSystemRoute,
     adminAiRoute,
