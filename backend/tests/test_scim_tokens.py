@@ -20,7 +20,7 @@ from tests._identity_helpers import make_provider
 from tests.test_identity_store import _to_async_url
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
-from tiqora.db.tiqora.models import TiqoraScimEvent, TiqoraScimToken
+from tiqora.db.tiqora.models import TiqoraScimToken
 from tiqora.identity.scim import tokens as tokens_mod
 from tiqora.identity.scim.tokens import (
     ScimTokenError,
@@ -283,6 +283,31 @@ async def test_authenticate_rejects(db: AsyncSession, case: str, reason: str) ->
 
 
 @pytest.mark.asyncio
+async def test_last_used_write_failure_does_not_fail_auth(
+    db: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    p = await _provider(db, "lufail")
+    rec, raw = await _token(db, p)
+    real_commit = db.commit
+    calls = 0
+
+    async def boom() -> None:
+        nonlocal calls
+        calls += 1
+        raise RuntimeError("lock wait timeout")
+
+    monkeypatch.setattr(db, "commit", boom)
+    out = await authenticate_token(db, raw, settings=SETTINGS)
+    monkeypatch.setattr(db, "commit", real_commit)
+    assert calls == 1
+    assert out.reason == "ok" and out.tenant is not None
+    assert out.token_id == rec.id and out.provider_id == p.id
+    assert out.tenant.token_id == rec.id
+    assert await _last_used(db, rec.id) is None  # write rolled back
+    assert (await authenticate_token(db, raw, settings=SETTINGS)).reason == "ok"
+
+
+@pytest.mark.asyncio
 async def test_authenticate_uses_compare_digest(
     db: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -310,6 +335,7 @@ async def test_revoke_is_idempotent_and_audited(db: AsyncSession) -> None:
     again = await revoke_token(db, provider_id=p.id, token_id=rec.id, actor_id=ACTOR + 1)
     await db.commit()
     assert first.revoked_at is not None and again.revoked_at is not None
+    # MariaDB DATETIME drops microseconds on reload; the second revoke must not move it.
     assert again.revoked_at.replace(microsecond=0) == first.revoked_at.replace(microsecond=0)
     assert not again.active
     ops = (
@@ -326,4 +352,10 @@ async def test_revoke_is_idempotent_and_audited(db: AsyncSession) -> None:
     other = await _provider(db, "revoke-other")
     with pytest.raises(ScimTokenError):
         await revoke_token(db, provider_id=other.id, token_id=rec.id, actor_id=ACTOR)
-    assert await db.get(TiqoraScimEvent, 0) is None
+    count = (
+        await db.execute(
+            text("SELECT COUNT(*) FROM tiqora_scim_event WHERE provider_id = :p"), {"p": other.id}
+        )
+    ).scalar_one()
+    assert count == 0  # the refused revoke wrote no event
+    await db.rollback()

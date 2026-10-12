@@ -262,20 +262,26 @@ async def authenticate_token(session: AsyncSession, raw: str, *, settings: Setti
     if not audience_includes(provider.audience, kind):
         return _fail("audience_changed", row)
 
+    # Plain locals: rollback() below expires the ORM row, and touching it afterwards
+    # would trigger a lazy refresh (MissingGreenlet on AsyncSession).
+    token_id = int(row.id)
+    provider_id = int(row.provider_id)
     if row.last_used_at is None or (now - row.last_used_at).total_seconds() >= (
         LAST_USED_WRITE_INTERVAL
     ):
         try:
             await session.execute(
-                update(TiqoraScimToken).where(TiqoraScimToken.id == row.id).values(last_used_at=now)
+                update(TiqoraScimToken)
+                .where(TiqoraScimToken.id == token_id)
+                .values(last_used_at=now)
             )
             await session.commit()
         except Exception:  # noqa: BLE001 — a bookkeeping write must not fail the request
-            logger.warning("scim_last_used_write_failed", token_id=int(row.id))
+            logger.warning("scim_last_used_write_failed", token_id=token_id)
             await session.rollback()
     return AuthOutcome(
-        tenant=ScimTenant(provider=provider, user_kind=kind, token_id=int(row.id)),
-        token_id=int(row.id),
-        provider_id=int(row.provider_id),
+        tenant=ScimTenant(provider=provider, user_kind=kind, token_id=token_id),
+        token_id=token_id,
+        provider_id=provider_id,
         reason="ok",
     )
