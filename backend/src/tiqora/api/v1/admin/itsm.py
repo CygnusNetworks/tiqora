@@ -21,10 +21,13 @@ from tiqora.api.v1.admin.itsm_schemas import (
     LinkTypeOut,
     LinkTypePatchIn,
     LinkTypeSyncOut,
+    MatrixIn,
     SetupApplyIn,
     SetupItemOut,
     SetupOut,
 )
+from tiqora.api.v1.itsm_schemas import MatrixOut, matrix_out
+from tiqora.itsm.ci_provider import CiReadOnly, CiUnavailable
 from tiqora.itsm.link_types import (
     LinkTypeError,
     ZnunyLinkType,
@@ -44,6 +47,7 @@ from tiqora.itsm.mode import (
     set_itsm_mode,
 )
 from tiqora.itsm.models import TiqoraItsmLinkType
+from tiqora.itsm.priority import InvalidMatrix, MatrixCell, load_matrix, save_matrix
 from tiqora.itsm.providers import tiqora_cmdb_empty
 from tiqora.itsm.settings import load_itsm_settings
 from tiqora.itsm.setup import SetupItem, apply_setup, plan_setup
@@ -255,5 +259,42 @@ async def post_setup(
     cfg = await load_itsm_settings(session, settings)
     items = await apply_setup(session, cfg, groups=set(body.groups), user_id=admin.id)
     out = _setup_out(items)
+    await session.commit()
+    return out
+
+
+@router.get("/priority-matrix", response_model=MatrixOut)
+async def get_priority_matrix(
+    _admin: AdminUser, session: DbSession, settings: AppSettings
+) -> MatrixOut:
+    """The matrix of the current mode; Mode A shows Znuny's ``cip_allocate`` read-only."""
+    cfg = await load_itsm_settings(session, settings)
+    try:
+        view = await load_matrix(session, await get_itsm_mode(session), cfg)
+    except CiUnavailable as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail={"code": exc.code}) from exc
+    return matrix_out(view, enabled=cfg.priority_matrix_enabled)
+
+
+@router.put("/priority-matrix", response_model=MatrixOut)
+async def put_priority_matrix(
+    body: MatrixIn, admin: AdminUser, session: DbSession, settings: AppSettings
+) -> MatrixOut:
+    """Replace Tiqora's matrix (409 ``read_only`` in Mode A, 422 for an invalid cell set)."""
+    try:
+        await save_matrix(
+            session,
+            [MatrixCell(c.criticality, c.impact, c.priority_id) for c in body.cells],
+            user_id=admin.id,
+        )
+    except CiReadOnly as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail={"code": "read_only"}) from exc
+    except InvalidMatrix as exc:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"code": exc.reason}
+        ) from exc
+    cfg = await load_itsm_settings(session, settings)
+    view = await load_matrix(session, await get_itsm_mode(session), cfg)
+    out = matrix_out(view, enabled=cfg.priority_matrix_enabled)
     await session.commit()
     return out

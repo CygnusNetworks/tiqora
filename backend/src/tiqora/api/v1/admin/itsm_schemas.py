@@ -137,3 +137,15 @@ class SetupApplyIn(BaseModel):
         default_factory=lambda: ["incident_problem"],  # type: ignore[arg-type]
         min_length=1,
     )
+
+
+class MatrixCellIn(BaseModel):
+    criticality: str = Field(min_length=1, max_length=200)
+    impact: str = Field(min_length=1, max_length=200)
+    priority_id: int = Field(ge=1)
+
+
+class MatrixIn(BaseModel):
+    """Replaces every cell of Tiqora's matrix (``PUT /admin/itsm/priority-matrix``)."""
+
+    cells: list[MatrixCellIn] = Field(max_length=400)

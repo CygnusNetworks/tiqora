@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from tiqora.api.v1.admin.itsm_schemas import LinkPropagation
 from tiqora.domain.schemas import UtcDateTime
+from tiqora.itsm.priority import MatrixView
 
 
 class LinkTypeOptionOut(BaseModel):
@@ -144,3 +145,42 @@ class CiTicketLinkIn(BaseModel):
     ci: str = Field(min_length=3, max_length=40)
     #: default: ``ItsmSettings.ci_ticket_link_type``
     link_type: str | None = Field(None, max_length=200)
+
+
+# --- priority matrix (Task 16) -------------------------------------------------------------
+
+
+class MatrixCellOut(BaseModel):
+    criticality: str
+    impact: str
+    priority_id: int
+
+
+class MatrixOut(BaseModel):
+    """The criticality x impact grid; source "znuny" is ``cip_allocate`` (read-only)."""
+
+    source: Literal["znuny", "tiqora"]
+    editable: bool
+    #: whether the matrix is applied to tickets (setting ``priority_matrix_enabled``, mode not off)
+    enabled: bool
+    criticality_values: list[str]
+    impact_values: list[str]
+    cells: list[MatrixCellOut]
+
+
+class PrioritySuggestionOut(BaseModel):
+    priority_id: int | None
+
+
+def matrix_out(view: MatrixView, *, enabled: bool) -> MatrixOut:
+    return MatrixOut(
+        source=view.source,
+        editable=view.editable,
+        enabled=enabled,
+        criticality_values=list(view.criticality_values),
+        impact_values=list(view.impact_values),
+        cells=[
+            MatrixCellOut(criticality=c.criticality, impact=c.impact, priority_id=c.priority_id)
+            for c in view.cells
+        ],
+    )

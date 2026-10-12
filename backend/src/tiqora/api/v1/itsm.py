@@ -26,6 +26,9 @@ from tiqora.api.v1.itsm_schemas import (
     ItsmStatusOut,
     ItsmZnunyInfoOut,
     LinkTypeOptionOut,
+    MatrixOut,
+    PrioritySuggestionOut,
+    matrix_out,
 )
 from tiqora.domain.schemas import TicketLinkTargetOut
 from tiqora.itsm.ci_provider import (
@@ -45,6 +48,7 @@ from tiqora.itsm.ci_provider import (
 )
 from tiqora.itsm.link_types import LinkPair, offered_link_types
 from tiqora.itsm.mode import ItsmModeState, get_itsm_mode, require_itsm_enabled
+from tiqora.itsm.priority import load_matrix, suggest_priority
 from tiqora.itsm.providers import get_ci_provider
 from tiqora.itsm.settings import ItsmSettings, load_itsm_settings
 from tiqora.permissions.engine import PermissionEngine
@@ -282,6 +286,38 @@ async def get_status(user: CurrentUser, session: DbSession, settings: AppSetting
     _ = user
     state = await get_itsm_mode(session)
     return await _status(session, state, await load_itsm_settings(session, settings))
+
+
+@router.get("/priority-matrix", response_model=MatrixOut)
+async def get_priority_matrix(
+    user: CurrentUser, session: DbSession, settings: AppSettings
+) -> MatrixOut:
+    """The criticality x impact grid of the current mode (Znuny's in Mode A)."""
+    _ = user
+    state = await require_itsm_enabled(session)
+    cfg = await load_itsm_settings(session, settings)
+    with _ci_errors():
+        view = await load_matrix(session, state, cfg)
+    return matrix_out(view, enabled=cfg.priority_matrix_enabled)
+
+
+@router.get("/priority-suggestion", response_model=PrioritySuggestionOut)
+async def get_priority_suggestion(
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    criticality: Annotated[str | None, Query(max_length=200)] = None,
+    impact: Annotated[str | None, Query(max_length=200)] = None,
+) -> PrioritySuggestionOut:
+    """What the matrix says for the pair, or ``null`` (unknown pair, matrix disabled)."""
+    _ = user
+    state = await require_itsm_enabled(session)
+    cfg = await load_itsm_settings(session, settings)
+    return PrioritySuggestionOut(
+        priority_id=await suggest_priority(
+            session, state, cfg, criticality=criticality, impact=impact
+        )
+    )
 
 
 @router.get("/catalog", response_model=CatalogOut)
