@@ -120,6 +120,18 @@ class LinkRow:
 
 
 @dataclass(frozen=True, slots=True)
+class ObjectCiLink:
+    """A ``link_relation`` row between another object (Ticket, Service) and a CI."""
+
+    object_id: int  # the key of the other object (ticket id / service id)
+    ci_id: int
+    link_type: str
+    object_is_source: bool
+    state: str
+    created_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
 class CipRow:
     criticality: str
     impact: str
@@ -465,6 +477,68 @@ class ZnunyItsmReader:
             )
             for r in rows
         ]
+
+    async def object_ci_links(
+        self,
+        session: AsyncSession,
+        *,
+        object_name: str,
+        object_ids: Collection[int] = (),
+        ci_id: int | None = None,
+        valid_only: bool = True,
+    ) -> list[ObjectCiLink]:
+        """Links between ``object_name`` (``Ticket`` / ``Service``) and CIs, either direction.
+
+        Filter by the other object's ids and / or by one CI; at least one of them is required.
+        ``valid_only=False`` also returns ``Temporary`` links (removal has to find them too).
+        Numeric keys only: a temporary ticket key like ``123.456`` is skipped.
+        """
+        if not object_ids and ci_id is None:
+            raise ValueError("object_ci_links needs object_ids or ci_id")
+        keys = sorted({str(int(i)) for i in object_ids})
+        out: list[ObjectCiLink] = []
+        for object_is_source, obj_col, ci_col, obj_side, ci_side in (
+            (True, "r.source_key", "r.target_key", "source_object_id", "target_object_id"),
+            (False, "r.target_key", "r.source_key", "target_object_id", "source_object_id"),
+        ):
+            sql = (
+                f"SELECT {obj_col}, {ci_col}, lt.name, ls.name, r.create_time"
+                " FROM link_relation r"
+                " JOIN link_type lt ON lt.id = r.type_id"
+                " JOIN link_state ls ON ls.id = r.state_id"
+                f" WHERE r.{obj_side} = (SELECT id FROM link_object WHERE name = :obj)"
+                f" AND r.{ci_side} = (SELECT id FROM link_object WHERE name = :ci_obj)"
+            )
+            if valid_only:
+                sql += " AND ls.name = 'Valid'"
+            base: dict[str, Any] = {"obj": object_name, "ci_obj": self.profile.ci_link_object}
+            if ci_id is not None:
+                sql += f" AND {ci_col} = :ci"
+                base["ci"] = str(ci_id)
+            batches: list[list[str] | None] = (
+                [keys[i : i + 500] for i in range(0, len(keys), 500)] if keys else [None]
+            )
+            for part in batches:
+                stmt_sql = sql if part is None else sql + f" AND {obj_col} IN :keys"
+                stmt = _expanding(stmt_sql, "keys") if part is not None else text(stmt_sql)
+                params = base if part is None else {**base, "keys": part}
+                for obj_key, ci_key, link_type, state, created in (
+                    await session.execute(stmt, params)
+                ).all():
+                    if not (str(obj_key).isdigit() and str(ci_key).isdigit()):
+                        continue
+                    out.append(
+                        ObjectCiLink(
+                            object_id=int(obj_key),
+                            ci_id=int(ci_key),
+                            link_type=str(link_type),
+                            object_is_source=object_is_source,
+                            state=str(state),
+                            created_at=created,
+                        )
+                    )
+        out.sort(key=lambda link: (link.object_id, link.ci_id, link.link_type))
+        return out
 
     async def cip_allocate(self, session: AsyncSession) -> list[CipRow]:
         """The criticality x impact -> priority matrix, in table order."""

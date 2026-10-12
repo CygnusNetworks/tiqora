@@ -34,6 +34,11 @@ def register_core(registry: Registry) -> None:
         validate_section_schema(section)
         registry.add(SETTINGS_SECTIONS, section)
 
+    from tiqora.itsm.providers import CI_PROVIDERS, CiProviderFactory
+    from tiqora.itsm.znuny_adapter.provider import ZnunyCiProvider
+
+    registry.add(CI_PROVIDERS, CiProviderFactory(mode="znuny_readthrough", create=ZnunyCiProvider))
+
     from tiqora.gi.jobs import GI_INVOKE_JOB, GI_INVOKE_SYNC_JOB
     from tiqora.jobs.handlers.gi_mail import GI_MAIL_JOB
     from tiqora.jobs.handlers.ticket_export import TICKET_EXPORT_JOB

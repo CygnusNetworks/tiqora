@@ -34,6 +34,8 @@ class SchemaProfile:
     ci_link_object: str
     #: role -> ``general_catalog.general_catalog_class``
     catalog_classes: Mapping[str, str]
+    #: Znuny tables Mode A must never change (checksum guard of the provider tests, F34)
+    readonly_tables: tuple[str, ...] = ()
 
     def current_xml_type(self, class_id: int) -> str:
         """``xml_storage.xml_type`` of the attributes of a CI's current version."""
@@ -53,6 +55,22 @@ _CATALOG_CLASSES: Final[Mapping[str, str]] = {
 }
 
 
+# Tables of the ITSM packages (and the service / SLA rows they extend): Mode A reads them only.
+_READONLY_TABLES: Final[tuple[str, ...]] = (
+    "configitem",
+    "configitem_version",
+    "configitem_definition",
+    "configitem_history",
+    "general_catalog",
+    "general_catalog_preferences",
+    "xml_storage",
+    "cip_allocate",
+    "service",
+    "service_preferences",
+    "sla",
+)
+
+
 def _profile(name: str, spec: str) -> SchemaProfile:
     return SchemaProfile(
         name=name,
@@ -67,6 +85,7 @@ def _profile(name: str, spec: str) -> SchemaProfile:
         sla_itsm_columns=("type_id", "min_time_bet_incidents"),
         ci_link_object="ITSMConfigItem",
         catalog_classes=_CATALOG_CLASSES,
+        readonly_tables=_READONLY_TABLES,
     )
 
 
