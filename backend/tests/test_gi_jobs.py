@@ -443,6 +443,43 @@ async def test_future_task_time_diff_fallback(
     assert second["due_at"] - before < timedelta(seconds=310)
 
 
+async def test_dry_run_is_never_rescheduled(
+    env: Env, mock: Mock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install(env.sync_url, error_handling=RETRY)
+    past = PastExecutionData(_naive_now(), 1, None, None)
+
+    async def fake_requester(**kwargs: Any) -> RequesterOutcome:
+        return RequesterOutcome(
+            False, "Mapping kaputt", None, RetryDecision(True, None, past, {}), "c" * 32
+        )
+
+    monkeypatch.setattr(gi_jobs, "run_requester", fake_requester)
+    job_id = await env.enqueue(_payload(origin="dry_run", dry_run=True, history_id=None))
+    await env.run(job_id)
+    (job,) = env.jobs()  # exactly one job: no follow-up chain
+    assert job["status"] == "failed" and "Mapping kaputt" in job["error"]
+    assert mock.seen == []
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [("120", 120), (60, 60), ("abc", 300), ("0", 300), ("-5", 300), (None, 300)],
+)
+async def test_future_task_time_diff_configured_and_invalid(
+    monkeypatch: pytest.MonkeyPatch, raw: Any, expected: int
+) -> None:
+    class FakeSysConfig:
+        def __init__(self, session: Any) -> None: ...
+
+        async def get(self, name: str) -> Any:
+            assert name == gi_jobs.FUTURE_TASK_TIME_DIFF_SETTING
+            return raw
+
+    monkeypatch.setattr(gi_jobs, "SysConfig", FakeSysConfig)
+    assert await gi_jobs._future_task_time_diff(object()) == expected  # type: ignore[arg-type]
+
+
 async def test_response_action_enqueue_creates_follow_up_job(env: Env, mock: Mock) -> None:
     _install(env.sync_url)
     mock.handler = lambda request: httpx.Response(

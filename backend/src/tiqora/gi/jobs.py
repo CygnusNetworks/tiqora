@@ -174,7 +174,13 @@ async def run_gi_invoke(ctx: JobContext, payload: GiInvokePayload) -> dict[str, 
         return {"communication_id": outcome.communication_id, "status": "ok"}
 
     decision = outcome.reschedule
-    if decision is not None and decision.reschedule and decision.past is not None:
+    # A dry run never schedules a follow-up call: it fails with the error shown to the admin.
+    if (
+        not payload.dry_run
+        and decision is not None
+        and decision.reschedule
+        and decision.past is not None
+    ):
         async with ctx.session_factory() as session:
             next_at = decision.execution_time
             if next_at is None:
