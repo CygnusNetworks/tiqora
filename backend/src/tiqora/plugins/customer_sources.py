@@ -280,12 +280,15 @@ async def materialize(session: AsyncSession, ext: ExternalCustomer, *, actor_id:
     if not login or len(login) > _LOGIN_MAX:
         raise CustomerSourceConflict("Das Kundenverzeichnis liefert keinen gültigen Login.")
     existing = (
-        (await session.execute(select(CustomerUser.login).where(CustomerUser.login == login)))
-        .scalars()
-        .first()
-    )
+        await session.execute(
+            select(CustomerUser.login, CustomerUser.email).where(CustomerUser.login == login)
+        )
+    ).first()
     if existing is not None:
-        return str(existing)
+        # a login that exists under another e-mail is another person: never hand it back
+        if (existing.email or "").strip().lower() != email.lower():
+            raise CustomerSourceConflict("Der Login gehört schon zu einem anderen Kunden.")
+        return str(existing.login)
     if not email or len(email) > _EMAIL_MAX:
         raise CustomerSourceConflict("Das Kundenverzeichnis liefert keine gültige E-Mail-Adresse.")
     if not last_name or len(last_name) > _NAME_MAX or len(first_name) > _NAME_MAX:
@@ -303,6 +306,32 @@ async def materialize(session: AsyncSession, ext: ExternalCustomer, *, actor_id:
     )
     if owner is not None:
         raise CustomerSourceConflict("Diese E-Mail-Adresse gehört schon zu einem anderen Kunden.")
+
+    for value, limit in (
+        (ext.title, 50),
+        (ext.phone, 150),
+        (ext.mobile, 150),
+        (ext.street, 150),
+        (ext.zip, 200),
+        (ext.city, 200),
+        (ext.country, 200),
+        *(
+            (v, 200)
+            for v in (
+                (
+                    ext.company.street,
+                    ext.company.zip,
+                    ext.company.city,
+                    ext.company.country,
+                    ext.company.url,
+                )
+                if ext.company
+                else ()
+            )
+        ),
+    ):
+        if value is not None and len(value.strip()) > limit:
+            raise CustomerSourceConflict("Das Kundenverzeichnis liefert zu lange Angaben.")
 
     company = ext.company
     customer_id = (

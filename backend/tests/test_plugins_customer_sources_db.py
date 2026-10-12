@@ -387,3 +387,44 @@ async def test_inbound_email_conflict_keeps_old_behaviour(env: Env) -> None:
     assert stats["created"] == 1
     assert env.ticket_customers() == [("pp55-local", "pp55-local-1")]
     assert _calls("customers.by_email") == []
+
+
+async def test_inbound_login_of_unrelated_local_customer_is_not_taken_over(env: Env) -> None:
+    # the directory's pp55-ext1 is another person than the local login of the same name
+    env.add_local_customer("pp55-ext1", "pp55-andere@example.org")
+    stats = await env.deliver("pp55-ext1@example.org")
+    assert stats["created"] == 1
+    assert env.ticket_customers() == [("pp55-ext1@example.org", "pp55-ext1@example.org")]
+    (row,) = _sql(env.url, "SELECT email FROM customer_user WHERE login = 'pp55-ext1'")
+    assert row[0] == "pp55-andere@example.org"
+
+
+async def test_import_login_of_unrelated_local_customer_is_409(env: Env) -> None:
+    env.add_local_customer("pp55-ext1", "pp55-andere@example.org")
+    async with env.client() as client:
+        r = await client.post(
+            "/api/v1/customers/external-import", json={"source": SOURCE, "login": "pp55-ext1"}
+        )
+    assert r.status_code == 409, r.text
+    assert "Login" in r.json()["detail"]
+    (row,) = _sql(env.url, "SELECT email FROM customer_user WHERE login = 'pp55-ext1'")
+    assert row[0] == "pp55-andere@example.org"
+
+
+async def test_materialize_rejects_over_long_optional_fields(env: Env) -> None:
+    from tiqora.plugins.customer_sources import (
+        CustomerSourceConflict,
+        ExternalCustomer,
+        materialize,
+    )
+
+    ext = ExternalCustomer(
+        login="pp55-lang",
+        email="pp55-lang@example.org",
+        first_name="Lang",
+        last_name="Wert",
+        title="x" * 51,
+    )
+    async with env.factory() as session:
+        with pytest.raises(CustomerSourceConflict):
+            await materialize(session, ext, actor_id=1)
