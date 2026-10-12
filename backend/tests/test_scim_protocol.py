@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -174,4 +174,3 @@ def test_meta_version_is_weak_etag() -> None:
     assert m["created"] == "2026-10-01T08:30:05Z"
     assert m["lastModified"] == "2026-10-02T08:00:00Z"
     assert m["resourceType"] == "User"
-    assert datetime(2026, 1, 1, tzinfo=UTC)  # tz import sanity
