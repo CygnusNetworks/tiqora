@@ -202,6 +202,14 @@ class LoginResponse(BaseModel):
     passkey_enrolled: bool = False
 
 
+class PendingLoginOut(BaseModel):
+    """What the login page needs after an SSO login that still owes a second factor."""
+
+    state: Literal["none", "pending_2fa", "must_enroll_2fa"]
+    totp_enrolled: bool = False
+    passkey_enrolled: bool = False
+
+
 class QueueCounts(BaseModel):
     open: int = 0
     """Viewable total: state type in {new, open, pending reminder, pending auto}."""

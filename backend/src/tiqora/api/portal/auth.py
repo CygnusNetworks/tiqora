@@ -15,7 +15,7 @@ from tiqora.api.portal.deps import (
     get_customer_auth_service,
 )
 from tiqora.domain.customer_auth import CustomerAuthService, customer_to_dict
-from tiqora.domain.schemas import CustomerLoginResponse, CustomerMe, LoginRequest
+from tiqora.domain.schemas import CustomerLoginResponse, CustomerMe, LoginRequest, PendingLoginOut
 from tiqora.identity.ldap_login import LdapSignInUnavailable, ldap_sign_in
 from tiqora.identity.sso_routes import session_sso_state
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
@@ -54,6 +54,26 @@ def _too_many(retry_after: int | None) -> HTTPException:
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         detail="Too many failed login attempts; try again later",
         headers=headers,
+    )
+
+
+@router.get("/pending", response_model=PendingLoginOut)
+async def pending_login(
+    request: Request,
+    auth: Annotated[CustomerAuthService, Depends(get_customer_auth_service)],
+    totp: CustomerTOTPServiceDep,
+    webauthn: CustomerWebAuthnServiceDep,
+    settings: AppSettings,
+) -> PendingLoginOut:
+    """State of the login behind the portal cookie (read-only; never touches TTLs)."""
+    token = request.cookies.get(settings.customer_session_cookie_name)
+    pending = await auth.get_pending_session(token) if token else None
+    if pending is None:
+        return PendingLoginOut(state="none")
+    return PendingLoginOut(
+        state="pending_2fa",
+        totp_enrolled=await totp.is_enabled(pending[0]),
+        passkey_enrolled=await webauthn.has_passkey(pending[0]),
     )
 
 

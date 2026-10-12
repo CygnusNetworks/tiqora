@@ -332,7 +332,14 @@ class SessionStore:
         )
         await drop_sso(self._client, "a", token)
 
-    async def create_pending(self, user_id: int, login: str, ttl_seconds: int) -> str:
+    async def create_pending(
+        self,
+        user_id: int,
+        login: str,
+        ttl_seconds: int,
+        *,
+        sso: SsoSessionInfo | None = None,
+    ) -> str:
         """Create a short-lived 'pending 2FA' session (not resolvable by :meth:`get`).
 
         The payload is tagged with a ``PENDING:`` prefix so that
@@ -349,6 +356,9 @@ class SessionStore:
             index_key = self._user_index_key(user_id)
             await self._client.sadd(index_key, token)
             await self._client.expire(index_key, self._absolute_ttl)
+        if sso is not None:
+            # An IdP logout during the second-factor step must kill the pending token too.
+            await store_sso(self._client, "a", token, sso, ttl_seconds)
         return token
 
     async def get_pending(self, token: str) -> tuple[int, str] | None:
@@ -371,14 +381,22 @@ class SessionStore:
         if data is None:
             return None
         user_id, login = data
+        sso = await load_sso(self._client, "a", token)  # before delete() drops it
         # DEL's reply is the atomic claim: of two parallel promotions only one
         # sees the key (a fake returning None counts as "removed").
         if await self._client.delete(self._key(token)) == 0:
             return None
         await self.delete(token)
-        return await self.create(user_id, login, avatar_url=avatar_url)
+        return await self.create(user_id, login, avatar_url=avatar_url, sso=sso)
 
-    async def create_enroll(self, user_id: int, login: str, ttl_seconds: int) -> str:
+    async def create_enroll(
+        self,
+        user_id: int,
+        login: str,
+        ttl_seconds: int,
+        *,
+        sso: SsoSessionInfo | None = None,
+    ) -> str:
         """Create a short-lived 'must-enroll-2FA' session (not resolvable by :meth:`get`).
 
         Mirrored after :meth:`create_pending`: the ``ENROLL:`` prefix makes the
@@ -395,6 +413,8 @@ class SessionStore:
             index_key = self._user_index_key(user_id)
             await self._client.sadd(index_key, token)
             await self._client.expire(index_key, self._absolute_ttl)
+        if sso is not None:
+            await store_sso(self._client, "a", token, sso, ttl_seconds)
         return token
 
     async def get_enroll(self, token: str) -> tuple[int, str] | None:
@@ -417,13 +437,14 @@ class SessionStore:
         if data is None:
             return None
         user_id, login = data
+        sso = await load_sso(self._client, "a", token)  # before delete() drops it
         # Atomic claim, as in promote_pending: only one of two parallel promotions wins.
         if await self._client.delete(self._key(token)) == 0:
             return None
         await self.delete(token)
         with contextlib.suppress(Exception):
             await self._client.srem(self._user_index_key(user_id), token)
-        return await self.create(user_id, login, avatar_url=avatar_url)
+        return await self.create(user_id, login, avatar_url=avatar_url, sso=sso)
 
 
 def hash_api_key(raw_key: str) -> str:
@@ -666,7 +687,11 @@ class AuthService:
         return await self._sessions.get_pending(token)
 
     async def create_pending_session(
-        self, user: AuthenticatedUser, *, avatar_url: str | None = None
+        self,
+        user: AuthenticatedUser,
+        *,
+        avatar_url: str | None = None,
+        sso: SsoSessionInfo | None = None,
     ) -> str:
         """Create a short-lived pending-2FA session (password/SSO/SPNEGO step 1).
 
@@ -676,7 +701,7 @@ class AuthService:
         """
         _ = avatar_url
         return await self._sessions.create_pending(
-            user.id, user.login, self._settings.totp_pending_ttl_seconds
+            user.id, user.login, self._settings.totp_pending_ttl_seconds, sso=sso
         )
 
     async def promote_pending_session(
@@ -706,10 +731,12 @@ class AuthService:
     async def get_enroll_session(self, token: str) -> tuple[int, str] | None:
         return await self._sessions.get_enroll(token)
 
-    async def create_enroll_session(self, user: AuthenticatedUser) -> str:
+    async def create_enroll_session(
+        self, user: AuthenticatedUser, *, sso: SsoSessionInfo | None = None
+    ) -> str:
         """Create a short-lived must-enroll-2FA session (password login step)."""
         return await self._sessions.create_enroll(
-            user.id, user.login, self._settings.totp_pending_ttl_seconds
+            user.id, user.login, self._settings.totp_pending_ttl_seconds, sso=sso
         )
 
     async def promote_enroll_session(

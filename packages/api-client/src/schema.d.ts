@@ -515,6 +515,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portal/auth/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pending Login
+         * @description State of the login behind the portal cookie (read-only; never touches TTLs).
+         */
+        get: operations["pending_login_api_portal_auth_pending_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portal/auth/saml/{slug}/acs": {
         parameters: {
             query?: never;
@@ -6105,6 +6125,26 @@ export interface paths {
          * @description Public: is this one-time link still good?
          */
         get: operations["check_password_setup_api_v1_auth_password_setup__token__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pending Login
+         * @description State of the login behind the session cookie (read-only; never touches TTLs).
+         */
+        get: operations["pending_login_api_v1_auth_pending_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -17138,6 +17178,15 @@ export interface components {
              */
             source: "db" | "env";
         };
+        /** IdentityTestMfaOut */
+        IdentityTestMfaOut: {
+            /** Evidence */
+            evidence: string[];
+            /** Required */
+            required: boolean;
+            /** Satisfied */
+            satisfied: boolean;
+        };
         /** IdentityTestResultOut */
         IdentityTestResultOut: {
             /** Attributes */
@@ -17146,6 +17195,7 @@ export interface components {
             };
             /** Error */
             error: string | null;
+            mfa?: components["schemas"]["IdentityTestMfaOut"] | null;
             plan: components["schemas"]["LoginPlanOut"] | null;
             /**
              * Status
@@ -18336,6 +18386,41 @@ export interface components {
             main_ticket_id: number;
         };
         /**
+         * MfaPolicy
+         * @description What counts as an IdP-side second factor and what happens without proof.
+         */
+        MfaPolicy: {
+            /**
+             * Fallback
+             * @default local_second_factor
+             * @enum {string}
+             */
+            fallback: "local_second_factor" | "reject" | "local_second_factor_or_enroll";
+            /** Oidc Acr Values */
+            oidc_acr_values?: string[];
+            /** Oidc Amr Values */
+            oidc_amr_values?: string[];
+            /**
+             * Oidc Request Acr Values
+             * @default
+             */
+            oidc_request_acr_values: string;
+            /** Saml Authn Context Classes */
+            saml_authn_context_classes?: string[];
+            /**
+             * Saml Mfa Attribute
+             * @default http://schemas.microsoft.com/claims/authnmethodsreferences
+             */
+            saml_mfa_attribute: string;
+            /** Saml Mfa Attribute Values */
+            saml_mfa_attribute_values?: string[];
+            /**
+             * Saml Request Authn Context
+             * @default false
+             */
+            saml_request_authn_context: boolean;
+        };
+        /**
          * MutationRequest
          * @description Generic mutation payload (flexible).
          */
@@ -19112,6 +19197,27 @@ export interface components {
             password: string;
             /** Token */
             token: string;
+        };
+        /**
+         * PendingLoginOut
+         * @description What the login page needs after an SSO login that still owes a second factor.
+         */
+        PendingLoginOut: {
+            /**
+             * Passkey Enrolled
+             * @default false
+             */
+            passkey_enrolled: boolean;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "none" | "pending_2fa" | "must_enroll_2fa";
+            /**
+             * Totp Enrolled
+             * @default false
+             */
+            totp_enrolled: boolean;
         };
         /** PgpImportIn */
         PgpImportIn: {
@@ -20081,12 +20187,23 @@ export interface components {
             jit_enabled?: boolean | null;
             /** Match By */
             match_by?: ("login" | "email") | null;
+            mfa_policy?: components["schemas"]["MfaPolicy"] | null;
             /** Name */
             name?: string | null;
+            /** Require Mfa Claim */
+            require_mfa_claim?: boolean | null;
             /** Require Sso Opt In */
             require_sso_opt_in?: boolean | null;
             /** Role Rules */
             role_rules?: components["schemas"]["RoleRule"][] | null;
+            /** Scim Adopt Existing */
+            scim_adopt_existing?: boolean | null;
+            /** Scim Enabled */
+            scim_enabled?: boolean | null;
+            /** Session Absolute Seconds */
+            session_absolute_seconds?: number | null;
+            /** Session Idle Seconds */
+            session_idle_seconds?: number | null;
             /** Slug */
             slug?: string | null;
             /** Sort */
@@ -25793,6 +25910,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pending_login_api_portal_auth_pending_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingLoginOut"];
                 };
             };
         };
@@ -41345,6 +41482,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pending_login_api_v1_auth_pending_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingLoginOut"];
                 };
             };
         };

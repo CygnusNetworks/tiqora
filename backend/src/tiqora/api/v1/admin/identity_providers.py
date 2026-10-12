@@ -34,6 +34,7 @@ from tiqora.api.v1.admin.identity_schemas import (
     IdentityProviderCreate,
     IdentityProviderOut,
     IdentityProviderSummaryOut,
+    IdentityTestMfaOut,
     IdentityTestResultOut,
     IdentityTestStartIn,
     IdentityTestStartOut,
@@ -584,6 +585,7 @@ async def get_identity_test(
         subject=result.subject if result else None,
         attributes=result.attributes if result else {},
         plan=await plan_to_out(session, result.plan) if result else None,
+        mfa=IdentityTestMfaOut.model_validate(result.mfa) if result and result.mfa else None,
     )
 
 

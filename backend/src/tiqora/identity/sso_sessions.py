@@ -114,10 +114,13 @@ async def store_sso(
     redis: Any, audience: AudienceKey, token: str, info: SsoSessionInfo, ttl: int
 ) -> None:
     await redis.set(sso_key(audience, token), info.to_json(), ex=ttl)
-    with contextlib.suppress(Exception):
-        for key in _index_keys(audience, info):
+    for key in _index_keys(audience, info):
+        with contextlib.suppress(Exception):
             await redis.sadd(key, token)
-            await redis.expire(key, ttl)
+            # The shared index outlives its longest-lived member: a short-lived (pending)
+            # token must not shorten the revocation lookup of a full session.
+            current = await redis.ttl(key)
+            await redis.expire(key, max(ttl, current) if isinstance(current, int) else ttl)
 
 
 async def load_sso(redis: Any, audience: AudienceKey, token: str) -> SsoSessionInfo | None:

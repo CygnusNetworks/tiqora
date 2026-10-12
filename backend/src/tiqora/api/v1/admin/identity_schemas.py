@@ -126,12 +126,19 @@ class IdentityTestStartOut(BaseModel):
     login_url: str
 
 
+class IdentityTestMfaOut(BaseModel):
+    required: bool
+    satisfied: bool
+    evidence: list[str]
+
+
 class IdentityTestResultOut(BaseModel):
     status: Literal["started", "done", "failed"]
     error: str | None
     subject: str | None
     attributes: dict[str, list[str]]
     plan: LoginPlanOut | None
+    mfa: IdentityTestMfaOut | None = None
 
 
 class MappingPreviewIn(BaseModel):

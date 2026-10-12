@@ -17600,6 +17600,32 @@
         "title": "IdentityProviderSummaryOut",
         "type": "object"
       },
+      "IdentityTestMfaOut": {
+        "properties": {
+          "evidence": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          },
+          "satisfied": {
+            "title": "Satisfied",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "required",
+          "satisfied",
+          "evidence"
+        ],
+        "title": "IdentityTestMfaOut",
+        "type": "object"
+      },
       "IdentityTestResultOut": {
         "properties": {
           "attributes": {
@@ -17622,6 +17648,16 @@
               }
             ],
             "title": "Error"
+          },
+          "mfa": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdentityTestMfaOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "plan": {
             "anyOf": [
@@ -21163,6 +21199,69 @@
         "title": "MergeRequest",
         "type": "object"
       },
+      "MfaPolicy": {
+        "additionalProperties": false,
+        "description": "What counts as an IdP-side second factor and what happens without proof.",
+        "properties": {
+          "fallback": {
+            "default": "local_second_factor",
+            "enum": [
+              "local_second_factor",
+              "reject",
+              "local_second_factor_or_enroll"
+            ],
+            "title": "Fallback",
+            "type": "string"
+          },
+          "oidc_acr_values": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Oidc Acr Values",
+            "type": "array"
+          },
+          "oidc_amr_values": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Oidc Amr Values",
+            "type": "array"
+          },
+          "oidc_request_acr_values": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Oidc Request Acr Values",
+            "type": "string"
+          },
+          "saml_authn_context_classes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Saml Authn Context Classes",
+            "type": "array"
+          },
+          "saml_mfa_attribute": {
+            "default": "http://schemas.microsoft.com/claims/authnmethodsreferences",
+            "maxLength": 200,
+            "title": "Saml Mfa Attribute",
+            "type": "string"
+          },
+          "saml_mfa_attribute_values": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Saml Mfa Attribute Values",
+            "type": "array"
+          },
+          "saml_request_authn_context": {
+            "default": false,
+            "title": "Saml Request Authn Context",
+            "type": "boolean"
+          }
+        },
+        "title": "MfaPolicy",
+        "type": "object"
+      },
       "MutationRequest": {
         "description": "Generic mutation payload (flexible).",
         "properties": {
@@ -23345,6 +23444,35 @@
           "password"
         ],
         "title": "PasswordSetupIn",
+        "type": "object"
+      },
+      "PendingLoginOut": {
+        "description": "What the login page needs after an SSO login that still owes a second factor.",
+        "properties": {
+          "passkey_enrolled": {
+            "default": false,
+            "title": "Passkey Enrolled",
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "none",
+              "pending_2fa",
+              "must_enroll_2fa"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "totp_enrolled": {
+            "default": false,
+            "title": "Totp Enrolled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "PendingLoginOut",
         "type": "object"
       },
       "PgpImportIn": {
@@ -25971,6 +26099,16 @@
             ],
             "title": "Match By"
           },
+          "mfa_policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MfaPolicy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "name": {
             "anyOf": [
               {
@@ -25981,6 +26119,17 @@
               }
             ],
             "title": "Name"
+          },
+          "require_mfa_claim": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Require Mfa Claim"
           },
           "require_sso_opt_in": {
             "anyOf": [
@@ -26006,6 +26155,50 @@
               }
             ],
             "title": "Role Rules"
+          },
+          "scim_adopt_existing": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scim Adopt Existing"
+          },
+          "scim_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scim Enabled"
+          },
+          "session_absolute_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Absolute Seconds"
+          },
+          "session_idle_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Idle Seconds"
           },
           "slug": {
             "anyOf": [
@@ -40871,6 +41064,28 @@
           }
         },
         "summary": "Passkey Delete",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/pending": {
+      "get": {
+        "description": "State of the login behind the portal cookie (read-only; never touches TTLs).",
+        "operationId": "pending_login_api_portal_auth_pending_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingLoginOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Pending Login",
         "tags": [
           "portal-auth"
         ]
@@ -74866,6 +75081,28 @@
           }
         },
         "summary": "Check Password Setup",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/pending": {
+      "get": {
+        "description": "State of the login behind the session cookie (read-only; never touches TTLs).",
+        "operationId": "pending_login_api_v1_auth_pending_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingLoginOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Pending Login",
         "tags": [
           "auth"
         ]

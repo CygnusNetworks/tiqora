@@ -34,6 +34,9 @@ from tiqora.domain.oidc import (
     OIDCService,
     oidc_client_config,
 )
+from tiqora.domain.passkey import WebAuthnService
+from tiqora.domain.totp import TOTPService
+from tiqora.domain.two_factor_subject import CUSTOMER_2FA
 from tiqora.identity import flow_state, oidc_backchannel
 from tiqora.identity.config_models import OidcProviderConfig, SamlProviderConfig
 from tiqora.identity.env_providers import (
@@ -81,6 +84,7 @@ from tiqora.identity.step_up import (
     OIDC_AMR_ATTR,
     SAML_AUTHN_CONTEXT_ATTR,
     STEP_UP_ATTRS,
+    check_mfa,
 )
 from tiqora.identity.store import (
     ProviderRecord,
@@ -144,6 +148,12 @@ def _reject_fail(code: str, *, value: str = "") -> _Fail:
     if code == "sso_not_enabled":
         return _Fail(
             code, http_status=status.HTTP_403_FORBIDDEN, detail="SSO not enabled for this account"
+        )
+    if code == "mfa_required":
+        return _Fail(
+            code,
+            http_status=status.HTTP_403_FORBIDDEN,
+            detail="The identity provider did not confirm a second factor",
         )
     return _Fail(
         code,
@@ -705,6 +715,45 @@ async def complete_login(
         )
 
 
+async def _second_factors(
+    session: AsyncSession,
+    redis: Any,
+    settings: Settings,
+    *,
+    user_kind: UserKind,
+    user_id: int | None,
+) -> tuple[bool, bool]:
+    """``(has_totp, has_passkey)`` of the account; ``(False, False)`` for a not-yet-created one."""
+    if user_id is None:
+        return False, False
+    subject = {} if user_kind == "agent" else {"subject": CUSTOMER_2FA}
+    totp = TOTPService(session, settings, redis, **subject)
+    webauthn = WebAuthnService(session, redis, settings, **subject)
+    return await totp.is_enabled(user_id), await webauthn.has_passkey(user_id)
+
+
+def _step_up_response(
+    token: str,
+    *,
+    user_kind: UserKind,
+    next_path: str,
+    settings: Settings,
+    landing_html: bool,
+) -> Response:
+    """Answer an SSO login that still owes a second factor: cookie holds a PENDING/ENROLL token."""
+    # Env-configured providers cannot require an IdP-side factor, so a step-up is always
+    # a browser flow (redirect); there is no JSON variant.
+    base = "/login" if user_kind == "agent" else "/portal/login"
+    target = f"{base}?sso_step_up=1&next={quote(next_path, safe='')}"
+    response: Response = (
+        login_landing_response(target)
+        if landing_html
+        else RedirectResponse(target, status_code=status.HTTP_302_FOUND)
+    )
+    set_session_cookie(response, settings, token, user_kind=user_kind)
+    return response
+
+
 async def _complete_login(
     request: Request,
     *,
@@ -721,6 +770,7 @@ async def _complete_login(
 ) -> Response:
     redis = await get_redis(request)
     plan = await plan_login(session, record, identity, user_kind=user_kind, settings=settings)
+    check = check_mfa(record, identity.attributes)
 
     if test_id:
         # Admin test: show what WOULD happen; never apply, never create a session.
@@ -734,6 +784,11 @@ async def _complete_login(
             subject=identity.subject,
             attributes={k: list(v) for k, v in identity.attributes.items()},
             plan=plan_to_dict(plan),
+            mfa={
+                "required": check.required,
+                "satisfied": check.satisfied,
+                "evidence": list(check.evidence),
+            },
         )
         await flow_state.put_test(redis, test_id, run, secret_key=settings.secret_key)
         return _admin_test_redirect(record.id, test_id)
@@ -742,6 +797,23 @@ async def _complete_login(
         raise _reject_fail(
             plan.reject_code or "no_match", value=plan.profile.login or identity.subject
         )
+
+    # Step-up MFA is decided before anything is written: a refused login must not provision.
+    step_up = "none"  # "none" (full session) | "pending" | "enroll"
+    if not check.satisfied:
+        fallback = record.mfa_policy.fallback
+        if fallback == "reject":
+            raise _reject_fail("mfa_required")
+        has_totp, has_passkey = await _second_factors(
+            session, redis, settings, user_kind=user_kind, user_id=plan.user_id
+        )
+        if has_totp or has_passkey:
+            step_up = "pending"
+        elif user_kind == "agent" and fallback == "local_second_factor_or_enroll":
+            step_up = "enroll"
+        else:
+            raise _reject_fail("mfa_required")
+
     try:
         user_id, _login = await apply_login(session, record, identity, plan, settings=settings)
     except LoginRejected as exc:
@@ -761,14 +833,18 @@ async def _complete_login(
         sid=draft.sid,
         id_token_hint=draft.id_token_hint,
     )
-    # SSO is the strong factor: no TOTP/passkey step, a full session right away.
     agent_user = None
     if user_kind == "agent":
         auth = AuthService(session, SessionStore(redis, settings), settings)
         agent_user = await auth.get_user_by_id(user_id)
         if agent_user is None:
             raise _reject_fail("user_invalid")
-        token = await auth.create_session(agent_user, avatar_url=avatar_url, sso=sso)
+        if step_up == "pending":
+            token = await auth.create_pending_session(agent_user, sso=sso)
+        elif step_up == "enroll":
+            token = await auth.create_enroll_session(agent_user, sso=sso)
+        else:
+            token = await auth.create_session(agent_user, avatar_url=avatar_url, sso=sso)
     else:
         customer_auth = CustomerAuthService(
             session, CustomerSessionStore(redis, settings), settings
@@ -776,7 +852,19 @@ async def _complete_login(
         customer = await customer_auth.get_customer_by_id(user_id)
         if customer is None:
             raise _reject_fail("user_invalid")
-        token = await customer_auth.create_session(customer, sso=sso)
+        if step_up == "pending":
+            token = await customer_auth.create_pending_session(customer, sso=sso)
+        else:
+            token = await customer_auth.create_session(customer, sso=sso)
+
+    if step_up != "none":
+        return _step_up_response(
+            token,
+            user_kind=user_kind,
+            next_path=next_path,
+            settings=settings,
+            landing_html=landing_html,
+        )
 
     response: Response
     if json_response and agent_user is not None:

@@ -110,7 +110,14 @@ class CustomerSessionStore:
         except (TypeError, ValueError):
             return None
 
-    async def create_pending(self, customer_id: int, login: str, ttl_seconds: int) -> str:
+    async def create_pending(
+        self,
+        customer_id: int,
+        login: str,
+        ttl_seconds: int,
+        *,
+        sso: SsoSessionInfo | None = None,
+    ) -> str:
         """Short-lived 'pending 2FA' session, invisible to :meth:`get`.
 
         No born marker is written and the payload carries ``PENDING:``, so
@@ -126,6 +133,8 @@ class CustomerSessionStore:
             index_key = self._user_index_key(customer_id)
             await self._client.sadd(index_key, token)
             await self._client.expire(index_key, self._absolute_ttl)
+        if sso is not None:
+            await store_sso(self._client, "c", token, sso, ttl_seconds)
         return token
 
     async def get_pending(self, token: str) -> tuple[int, str] | None:
@@ -148,6 +157,7 @@ class CustomerSessionStore:
         if data is None:
             return None
         customer_id, login = data
+        sso = await load_sso(self._client, "c", token)  # before delete() drops it
         # DEL's reply is the atomic claim: of two parallel promotions only one
         # sees the key (a fake returning None counts as "removed").
         if await self._client.delete(self._key(token)) == 0:
@@ -155,7 +165,7 @@ class CustomerSessionStore:
         await self.delete(token)
         with contextlib.suppress(Exception):
             await self._client.srem(self._user_index_key(customer_id), token)
-        return await self.create(customer_id, login)
+        return await self.create(customer_id, login, sso=sso)
 
     async def revoke_customer_sessions(
         self, customer_id: int, *, keep_token: str | None = None
@@ -284,9 +294,11 @@ class CustomerAuthService:
     ) -> str:
         return await self._sessions.create(customer.id, customer.login, sso=sso)
 
-    async def create_pending_session(self, customer: AuthenticatedCustomer) -> str:
+    async def create_pending_session(
+        self, customer: AuthenticatedCustomer, *, sso: SsoSessionInfo | None = None
+    ) -> str:
         return await self._sessions.create_pending(
-            customer.id, customer.login, self._settings.totp_pending_ttl_seconds
+            customer.id, customer.login, self._settings.totp_pending_ttl_seconds, sso=sso
         )
 
     async def get_pending_session(self, token: str) -> tuple[int, str] | None:
