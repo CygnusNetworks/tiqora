@@ -1,8 +1,10 @@
+import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import type { WidgetProps } from "@/plugins/dashboardWidgets";
 import { cn } from "@/lib/cn";
 import { useWidgetData } from "../data";
-import { WidgetFrame } from "../chrome/WidgetFrame";
+import { WidgetFrame, useWidgetChrome } from "../chrome/WidgetFrame";
+import { useDrill } from "../drill/useDrill";
 import { WidgetDataBody } from "../chrome/WidgetDataBody";
 import { Sparkline } from "../chrome/Sparkline";
 import { ChooseSourceAction } from "./SourceAction";
@@ -30,17 +32,20 @@ function signed(n: number): string {
 
 /** KPI tile: label, change against the last earlier day with a sample (not always yesterday —
  * weekends and days without a visit have none), mono value and a 14-day sparkline. */
-export function CounterWidget({ settings, size, mode }: WidgetProps<CounterSettings>) {
+export function CounterWidget({ instanceId, settings, size, mode }: WidgetProps<CounterSettings>) {
   const { t } = useTranslation();
+  const drill = useDrill(instanceId, mode);
+  const chrome = useWidgetChrome();
   const { status, data } = useWidgetData<CounterData>();
   // Saved searches and own filters have no preset: the tile is named by its title override or the type.
   const preset = isCustomSource(settings.source) ? null : (presetOf(settings.source) ?? "mine_open");
   const tone = settings.tone in VALUE_TONE ? settings.tone : "neutral";
   const delta = status === "ok" && typeof data?.delta === "number" ? data.delta : null;
+  const title = preset ? t(`dashboards.presets.${preset}.counter`) : t("dashboards.widgets.counter.title");
   const deltaGood = delta != null && delta < 0 && preset !== null && FEWER_IS_BETTER.has(preset);
   return (
     <WidgetFrame
-      title={preset ? t(`dashboards.presets.${preset}.counter`) : t("dashboards.widgets.counter.title")}
+      title={title}
       variant="kpi"
       mode={mode}
       testId="counter-widget"
@@ -58,6 +63,15 @@ export function CounterWidget({ settings, size, mode }: WidgetProps<CounterSetti
       <WidgetDataBody<CounterData> h={size.h} forbiddenAction={<ChooseSourceAction mode={mode} />}>
         {(d) => (
           <div className="flex h-full items-end justify-between gap-3">
+            {drill && (
+              // The whole tile is the link: stretched over the card (the frame is its positioned ancestor).
+              <Link
+                {...drill()}
+                aria-label={t("dashboards.drill.title", { title: chrome.titleOverride?.trim() || title })}
+                className="absolute inset-0 rounded-[14px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                data-testid="counter-drill"
+              />
+            )}
             <span
               className={cn(
                 "font-mono text-[30px] font-semibold leading-none tracking-tight tabular-nums",

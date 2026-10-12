@@ -5,7 +5,9 @@ import { humanDuration } from "@/lib/status";
 import { cn } from "@/lib/cn";
 import { ticketCustomer } from "@/components/agent/dashboard/ticketCustomer";
 import { formatDurationSince } from "../legacy";
-import { WidgetFrame } from "../chrome/WidgetFrame";
+import { WidgetFrame, type FrameLink } from "../chrome/WidgetFrame";
+import { useDrill } from "../drill/useDrill";
+import { useWidgetData } from "../data";
 import { WidgetDataBody, WidgetEmpty } from "../chrome/WidgetDataBody";
 import { TicketLink } from "../chrome/TicketLink";
 
@@ -26,11 +28,16 @@ export interface EscalationsData {
 const KINDS: readonly string[] = ["first_response", "update", "solution", "escalation"];
 
 /** Breached and upcoming deadlines, nearest first: kind · customer and the signed time. */
-export function EscalationsWidget({ settings, size, mode }: WidgetProps<EscalationsSettings>) {
+export function EscalationsWidget({ instanceId, settings, size, mode }: WidgetProps<EscalationsSettings>) {
   const { t } = useTranslation();
+  const drill = useDrill(instanceId, mode);
+  const { status, data } = useWidgetData<EscalationsData>();
+  const total = status === "ok" && typeof data?.total === "number" ? data.total : 0;
+  const link: FrameLink | undefined = drill && total > 0 ? { label: t("dashboards.state.showAll", { count: total }), ...drill() } : undefined;
   return (
     <WidgetFrame
       title={t("dashboards.widgets.escalations.title")}
+      link={link}
       mode={mode}
       testId="escalations-widget"
       actions={<span className="shrink-0 text-xs text-muted">{t("dashboards.widgets.escalations.order")}</span>}

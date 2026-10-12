@@ -399,3 +399,93 @@ describe("ReportView", () => {
     expect(screen.queryByTestId("report-view-pivot-tickets-grand")).not.toBeInTheDocument();
   });
 });
+
+describe("ReportView drill-down marks", () => {
+  const queueResult = resultOf({
+    columns: [
+      { key: "queue", role: "dimension", type: "id", label_key: "reports.dimensions.queue", grain: null, i18n_values: null },
+      { key: "tickets", role: "measure", type: "count", label_key: "reports.measures.tickets", grain: null, i18n_values: null },
+    ],
+    rows: [
+      [1, 12],
+      [2, 7],
+      ["__other__", 3],
+    ],
+    labels: { queue: { "1": "Support", "2": "Vertrieb" } },
+  });
+  const def = (type: string, extra: Record<string, unknown> = {}) =>
+    ({
+      ...volumeDef,
+      source: "tickets",
+      dimensions: [{ key: "queue" }],
+      visualization: { type, ...extra },
+    }) as unknown as ReportDefinition;
+  const show = (ui: ReactNode) => render(<Providers>{ui}</Providers>);
+
+  it("ranking bars are buttons only for drillable dimensions and report the raw value", () => {
+    const onSelectPoint = vi.fn();
+    const { unmount } = show(
+      <ReportView report={{ key: null, definition: def("bar") }} result={queueResult} onSelectPoint={onSelectPoint} drillableDimensions={["queue"]} />,
+    );
+    const rows = screen.getAllByRole("button").filter((b) => b.getAttribute("aria-label")?.includes(":"));
+    expect(rows).toHaveLength(2); // the folded "other" bucket is no button
+    fireEvent.click(rows[0]);
+    expect(onSelectPoint).toHaveBeenLastCalledWith({ queue: 1 });
+    fireEvent.keyDown(rows[1], { key: "Enter" });
+    expect(onSelectPoint).toHaveBeenLastCalledWith({ queue: 2 });
+    unmount();
+    onSelectPoint.mockClear();
+    // not drillable (a person dimension, other source ...): plain images, nothing fires
+    show(<ReportView report={{ key: null, definition: def("bar") }} result={queueResult} onSelectPoint={onSelectPoint} drillableDimensions={[]} />);
+    expect(screen.queryAllByRole("button").filter((b) => b.getAttribute("aria-label")?.includes(":"))).toHaveLength(0);
+    expect(onSelectPoint).not.toHaveBeenCalled();
+  });
+
+  it("charts without onSelectPoint render exactly as before: marks are images, no extra tab stops", () => {
+    show(<ReportView report={{ key: null, definition: def("bar") }} result={queueResult} drillableDimensions={["queue"]} />);
+    expect(screen.getAllByRole("img").length).toBeGreaterThanOrEqual(3);
+    expect(screen.queryAllByRole("button").filter((b) => b.getAttribute("aria-label")?.includes(":"))).toHaveLength(0);
+  });
+
+  it("donut slices report the category's raw value", () => {
+    const onSelectPoint = vi.fn();
+    show(<ReportView report={{ key: null, definition: def("donut") }} result={queueResult} onSelectPoint={onSelectPoint} drillableDimensions={["queue"]} />);
+    fireEvent.click(screen.getByTestId("report-view-donut-slice-2"));
+    expect(onSelectPoint).toHaveBeenCalledWith({ queue: 2 });
+    expect(screen.getByTestId("report-view-donut-slice-__other__")).toHaveAttribute("role", "img");
+  });
+
+  it("stacked segments report category and series; both dimensions must be drillable", () => {
+    const onSelectPoint = vi.fn();
+    const stacked = { ...volumeDef, source: "tickets", visualization: { type: "stacked_bar", series_dimension: 1 } } as unknown as ReportDefinition;
+    const { unmount } = show(
+      <ReportView report={{ key: null, definition: stacked }} result={volumeResult} onSelectPoint={onSelectPoint} drillableDimensions={["occurred", "kind"]} />,
+    );
+    fireEvent.click(screen.getByTestId("report-view-stacked-select-2024-06-10-close"));
+    expect(onSelectPoint).toHaveBeenCalledWith({ occurred: "2024-06-10", kind: "close" });
+    unmount();
+    show(<ReportView report={{ key: null, definition: stacked }} result={volumeResult} onSelectPoint={onSelectPoint} drillableDimensions={["occurred"]} />);
+    expect(screen.queryByTestId("report-view-stacked-select-2024-06-10-close")).toBeNull();
+  });
+
+  it("heatmap cells with data report both dimensions", () => {
+    const onSelectPoint = vi.fn();
+    const result = resultOf({
+      columns: [
+        { key: "queue", role: "dimension", type: "id", label_key: "reports.dimensions.queue", grain: null, i18n_values: null },
+        { key: "priority", role: "dimension", type: "id", label_key: "reports.dimensions.priority", grain: null, i18n_values: null },
+        { key: "tickets", role: "measure", type: "count", label_key: "reports.measures.tickets", grain: null, i18n_values: null },
+      ],
+      rows: [
+        [1, 3, 4],
+        [2, 5, 6],
+      ],
+    });
+    const heat = { ...volumeDef, source: "tickets", visualization: { type: "heatmap" } } as unknown as ReportDefinition;
+    show(<ReportView report={{ key: null, definition: heat }} result={result} onSelectPoint={onSelectPoint} drillableDimensions={["queue", "priority"]} />);
+    fireEvent.click(screen.getByTestId("report-view-heatmap-cell-1-1"));
+    expect(onSelectPoint).toHaveBeenCalledWith({ queue: 2, priority: 5 });
+    // the empty cell (queue 1 x priority 5) is no button
+    expect(screen.getByTestId("report-view-heatmap-cell-0-1")).toHaveAttribute("role", "img");
+  });
+});

@@ -6486,6 +6486,18 @@
       "conflict": "The dashboard was changed in the meantime. It is being reloaded.",
       "saveFailed": "The filter could not be saved.",
       "pinned": "Dashboard filters do not apply here"
+    },
+    "drill": {
+      "title": "Tickets for “{{title}}”",
+      "back": "Back to the dashboard",
+      "saveSearch": "Save as search",
+      "addWidget": "Add as widget",
+      "added": "The list is now a widget on your dashboard.",
+      "conflict": "The dashboard was changed in the meantime. Please try again.",
+      "addFailed": "The widget could not be added.",
+      "loadFailed": "The ticket list could not be loaded.",
+      "gone": "This widget no longer exists.",
+      "invalid": "This ticket list is no longer valid."
     }
   },
   "filters": {

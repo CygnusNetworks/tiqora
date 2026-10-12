@@ -6486,6 +6486,18 @@
       "conflict": "Das Dashboard wurde inzwischen geändert. Es wird neu geladen.",
       "saveFailed": "Der Filter konnte nicht gespeichert werden.",
       "pinned": "Dashboard-Filter gelten hier nicht"
+    },
+    "drill": {
+      "title": "Tickets zu „{{title}}“",
+      "back": "Zurück zum Dashboard",
+      "saveSearch": "Als Suche speichern",
+      "addWidget": "Als Widget hinzufügen",
+      "added": "Die Liste ist jetzt ein Widget auf Ihrem Dashboard.",
+      "conflict": "Das Dashboard wurde inzwischen geändert. Bitte erneut versuchen.",
+      "addFailed": "Das Widget konnte nicht hinzugefügt werden.",
+      "loadFailed": "Die Ticketliste konnte nicht geladen werden.",
+      "gone": "Dieses Widget gibt es nicht mehr.",
+      "invalid": "Diese Ticketliste ist nicht mehr gültig."
     }
   },
   "filters": {

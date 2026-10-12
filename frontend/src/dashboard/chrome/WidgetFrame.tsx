@@ -5,6 +5,7 @@ import { PinIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { useTranslation } from "react-i18next";
 import { useDashboardFilters } from "../filters/filtersContext";
+import { DRILL_PATH, type DrillSearch } from "../drill/drillLinks";
 import { isInteractive, linkTabIndex, rendersLinks } from "./mode";
 
 /**
@@ -51,6 +52,7 @@ export interface QueueLinkSearch {
 export type FrameLink =
   | { label: string; to: "/agent/queues"; search?: QueueLinkSearch }
   | { label: string; to: "/agent/calendar" }
+  | { label: string; to: typeof DRILL_PATH; search: DrillSearch }
   | { label: string; to: "/agent/searches/$searchId"; params: { searchId: string } };
 
 const LINK_CLASS =
@@ -63,6 +65,12 @@ function HeaderLink({ link, mode }: { link: FrameLink; mode: WidgetMode }) {
   if (link.to === "/agent/calendar")
     return (
       <Link to="/agent/calendar" tabIndex={tabIndex} className={cn(LINK_CLASS, inert)}>
+        {link.label}
+      </Link>
+    );
+  if (link.to === DRILL_PATH)
+    return (
+      <Link to={DRILL_PATH} search={link.search} tabIndex={tabIndex} className={cn(LINK_CLASS, inert)}>
         {link.label}
       </Link>
     );
@@ -114,7 +122,7 @@ export function WidgetFrame({
     <article
       data-testid={testId}
       aria-labelledby={headingId}
-      className="flex h-full min-h-0 min-w-0 flex-col gap-2 rounded-[14px] border border-hairline bg-surface px-[18px] py-4"
+      className="relative flex h-full min-h-0 min-w-0 flex-col gap-2 rounded-[14px] border border-hairline bg-surface px-[18px] py-4"
     >
       <header className="flex min-w-0 items-center justify-between gap-2">
         {editing && chrome.handle}

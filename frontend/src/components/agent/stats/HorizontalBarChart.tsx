@@ -1,10 +1,13 @@
 import { useChartFormat } from "./chartLocale";
 import { EmptyChart } from "./chartKit";
+import { markButtonProps } from "./markButton";
 
 export type HorizontalBarDatum = {
   label: string;
   /** `null` = no data: no bar, "—" as text. */
   value: number | null;
+  /** With `onSelect`: false = this row is not a button (e.g. the folded "other" bucket). */
+  selectable?: boolean;
 };
 
 export type HorizontalBarChartProps = {
@@ -13,6 +16,8 @@ export type HorizontalBarChartProps = {
   emptyLabel?: string;
   testId?: string;
   formatValue?: (v: number) => string;
+  /** Additive: rows become buttons (keyboard reachable) and report their index. */
+  onSelect?: (index: number) => void;
 };
 
 /**
@@ -28,6 +33,7 @@ export function HorizontalBarChart({
   emptyLabel,
   testId,
   formatValue,
+  onSelect,
 }: HorizontalBarChartProps) {
   const { t, number } = useChartFormat();
   const fmt = formatValue ?? number;
@@ -48,8 +54,9 @@ export function HorizontalBarChart({
         {data.map((d, i) => (
           <div
             key={`${i}-${d.label}`}
-            tabIndex={data.length > 12 ? -1 : 0}
-            role="img"
+            {...(onSelect && d.selectable !== false
+              ? markButtonProps(() => onSelect(i))
+              : { tabIndex: data.length > 12 ? -1 : 0, role: "img" })}
             aria-label={`${d.label}: ${text(d.value)}`}
             className="grid grid-cols-[minmax(5rem,10rem)_1fr_auto] items-center gap-2 rounded text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             data-testid={testId ? `${testId}-row-${i}` : undefined}

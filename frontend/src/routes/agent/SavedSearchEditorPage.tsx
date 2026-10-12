@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams, useRouterState } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
 import { TicketTable } from "@/components/agent/TicketTable";
@@ -31,6 +31,15 @@ function Notice({ testId, children }: { testId: string; children: React.ReactNod
   );
 }
 
+/** Criteria (and a name) handed over in router state, e.g. by the dashboard drill page; never from the URL. */
+function initialFromState(state: unknown): { criteria: TicketFilter; name: string } | null {
+  if (typeof state !== "object" || state === null) return null;
+  const { criteria, name } = state as { criteria?: unknown; name?: unknown };
+  if (typeof criteria !== "object" || criteria === null || Array.isArray(criteria)) return null;
+  if ((criteria as { version?: unknown }).version !== 1) return null;
+  return { criteria: criteria as TicketFilter, name: typeof name === "string" ? name.slice(0, 200) : "" };
+}
+
 function Editor({
   existing,
   onReload,
@@ -55,8 +64,10 @@ function Editor({
   const brokenCriteria = existing != null && existing.criteria == null;
   const [criteriaTouched, setCriteriaTouched] = useState(false);
 
-  const [name, setName] = useState(existing?.name ?? "");
-  const [criteria, setCriteria] = useState<TicketFilter>(existing?.criteria ?? EMPTY_FILTER);
+  const handedOver = useRouterState({ select: (r) => r.location.state });
+  const [initial] = useState(() => (existing ? null : initialFromState(handedOver)));
+  const [name, setName] = useState(existing?.name ?? initial?.name ?? "");
+  const [criteria, setCriteria] = useState<TicketFilter>(existing?.criteria ?? initial?.criteria ?? EMPTY_FILTER);
   const [sortBy, setSortBy] = useState<TicketSortKey>(existing?.sort_by ?? "activity");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">(existing?.sort_order ?? "desc");
   const [includeArchived, setIncludeArchived] = useState(existing?.include_archived ?? false);

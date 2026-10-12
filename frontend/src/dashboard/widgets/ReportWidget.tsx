@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import type { WidgetMode, WidgetProps } from "@/plugins/dashboardWidgets";
 import { ReportView } from "@/components/reports/ReportView";
@@ -8,6 +9,7 @@ import { ApiError } from "@/lib/api";
 import { dashboardsApi, settingsHash } from "@/lib/dashboardsApi";
 import { reportErrorMessage, reportsApi, type ReportDefinition, type ReportResult } from "@/lib/reportsApi";
 import { useWidgetData } from "../data";
+import { useDrill } from "../drill/useDrill";
 import { useDashboardFilters } from "../filters/filtersContext";
 import { WidgetFrame, useWidgetChrome } from "../chrome/WidgetFrame";
 import { WidgetDataBody, WidgetEmpty } from "../chrome/WidgetDataBody";
@@ -160,12 +162,18 @@ function shownDefinition(definition: ReportDefinition, display: "auto" | "table"
 }
 
 /** How a tile draws a finished result; `fromJob` marks the background job's own (uncapped) result. */
-export type TileRender = (args: {
+export type TileRender = (args: TileRenderArgs) => ReactNode;
+
+type TileRenderArgs = {
   definition: ReportDefinition;
   result: ReportResult;
   tile: ReportTileData | undefined;
   fromJob: boolean;
-}) => ReactNode;
+  /** Set where a chart mark may open the tickets behind it (view mode, a stored dashboard). */
+  onSelectPoint?: (point: Record<string, string | number | null>) => void;
+  /** Dimensions the server can turn into a ticket list (`drillable_dimensions` of the answer). */
+  drillableDimensions?: readonly string[];
+};
 
 function ReportBody({
   data,
@@ -177,6 +185,7 @@ function ReportBody({
   bg,
   jobDefinition,
   dashboardId,
+  onSelectPoint,
 }: {
   data: ReportTileData | undefined;
   render: TileRender;
@@ -187,6 +196,7 @@ function ReportBody({
   bg: ReturnType<typeof useBackgroundRun>;
   jobDefinition: ReportDefinition | undefined;
   dashboardId: number | undefined;
+  onSelectPoint: TileRenderArgs["onSelectPoint"];
 }) {
   const { t } = useTranslation();
   if (!data) {
@@ -226,7 +236,14 @@ function ReportBody({
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
       <div className="min-h-0 flex-1 overflow-auto">
-        {render({ definition: data.definition, result: data.result, tile: data, fromJob: false })}
+        {render({
+          definition: data.definition,
+          result: data.result,
+          tile: data,
+          fromJob: false,
+          onSelectPoint,
+          drillableDimensions: data.drillable_dimensions,
+        })}
       </div>
       {ignored.includes("queue") && (
         <p className="text-xs text-muted" data-testid="report-ignored-filters">
@@ -263,6 +280,9 @@ export function ReportTileWidget({
 }) {
   const { status, data, refetch } = useWidgetData<ReportTileData>();
   const chrome = useWidgetChrome();
+  const navigate = useNavigate();
+  const drill = useDrill(instanceId, mode);
+  const onSelectPoint = drill ? (point: Record<string, string | number | null>) => void navigate(drill(point)) : undefined;
   const { filters } = useDashboardFilters();
   const tile = status === "ok" ? data : undefined;
   const deferred = tile?.deferred === true;
@@ -297,6 +317,7 @@ export function ReportTileWidget({
             bg={bg}
             jobDefinition={reportQ.data?.definition ?? undefined}
             dashboardId={chrome.dashboardId}
+            onSelectPoint={onSelectPoint}
           />
         )}
       </WidgetDataBody>
@@ -307,12 +328,14 @@ export function ReportTileWidget({
 /** A report on the dashboard: the report's own visualisation (compact) or a table; large reports run as a background job. */
 export function ReportWidget({ instanceId, settings, size, mode }: WidgetProps<ReportWidgetSettings>) {
   const { t } = useTranslation();
-  const render: TileRender = ({ definition, result, tile, fromJob }) => (
+  const render: TileRender = ({ definition, result, tile, fromJob, onSelectPoint, drillableDimensions }) => (
     <ReportView
       report={{ key: tile?.report?.key ?? settings.report_key ?? null, definition: shownDefinition(definition, settings.display) }}
       result={fromJob ? { ...result, rows: result.rows.slice(0, settings.max_rows) } : result}
       compact
       testId="report-widget-view"
+      onSelectPoint={onSelectPoint}
+      drillableDimensions={drillableDimensions}
     />
   );
   return (

@@ -10,11 +10,13 @@ export interface HeatmapSettings {
 /** Created tickets by weekday (Monday first) and hour of day. */
 export function HeatmapWidget({ instanceId, settings, size, mode }: WidgetProps<HeatmapSettings>) {
   const { t } = useTranslation();
-  const render: TileRender = ({ definition, result, tile }) => (
+  const render: TileRender = ({ definition, result, tile, onSelectPoint, drillableDimensions }) => (
     <ReportView
       report={{ key: tile?.report?.key ?? "builtin.created_heatmap", definition }}
       result={result}
       compact
+      onSelectPoint={onSelectPoint}
+      drillableDimensions={drillableDimensions}
       testId="heatmap-view"
     />
   );

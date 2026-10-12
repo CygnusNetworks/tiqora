@@ -3,6 +3,7 @@ import { useChartFormat } from "./chartLocale";
 import { ChartLegend } from "./ChartLegend";
 import { ChartTooltip } from "./ChartTooltip";
 import { ChartFrame, EmptyChart, GridLines, YAxisLabels } from "./chartKit";
+import { markButtonProps } from "./markButton";
 import { barPath, niceTicks } from "./chartMath";
 
 export type StackedSeries = {
@@ -10,16 +11,20 @@ export type StackedSeries = {
   label: string;
   color: string;
   values: (number | null)[];
+  /** With `onSelect`: false = this series is not clickable (e.g. the folded "other" bucket). */
+  selectable?: boolean;
 };
 
 export type StackedBarChartProps = {
-  categories: { key: string; label: string }[];
+  categories: { key: string; label: string; selectable?: boolean }[];
   /** Stack order = array order (bottom to top), kept stable across categories. */
   series: StackedSeries[];
   height?: number;
   emptyLabel?: string;
   testId?: string;
   formatValue?: (v: number) => string;
+  /** Additive: every segment becomes a button (keyboard reachable) and reports its category and series. */
+  onSelect?: (point: { category: string; series: string }) => void;
 };
 
 /**
@@ -33,6 +38,7 @@ export function StackedBarChart({
   emptyLabel,
   testId,
   formatValue,
+  onSelect,
 }: StackedBarChartProps) {
   const { t, number } = useChartFormat();
   const fmt = formatValue ?? number;
@@ -125,6 +131,35 @@ export function StackedBarChart({
             data-testid={testId ? `${testId}-hit-${ci}` : undefined}
           />
         ))}
+        {onSelect &&
+          categories.map((c, ci) => {
+            if (c.selectable === false) return null;
+            let acc = 0;
+            return series.map((s) => {
+              const v = Math.max(0, s.values[ci] ?? 0);
+              if (v === 0) return null;
+              const y = yOf(acc + v);
+              acc += v;
+              if (s.selectable === false) return null;
+              return (
+                <rect
+                  key={`b-${c.key}-${s.key}`}
+                  x={ci * band + (band - barW) / 2}
+                  y={y}
+                  width={barW}
+                  height={v * scale}
+                  fill="transparent"
+                  {...markButtonProps(() => onSelect({ category: c.key, series: s.key }))}
+                  aria-label={`${c.label} · ${s.label}: ${fmt(s.values[ci] as number)}`}
+                  onFocus={() => setHover(ci)}
+                  onBlur={() => setHover(null)}
+                  onMouseEnter={() => setHover(ci)}
+                  onMouseMove={() => setHover(ci)}
+                  data-testid={testId ? `${testId}-select-${c.key}-${s.key}` : undefined}
+                />
+              );
+            });
+          })}
       </svg>
       {hover !== null && (
         <ChartTooltip

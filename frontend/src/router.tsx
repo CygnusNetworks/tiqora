@@ -16,6 +16,8 @@ import { ReportViewPage } from "@/routes/agent/ReportViewPage";
 import { validateReportViewSearch } from "@/routes/agent/reportViewSearch";
 import { SavedSearchPage } from "@/routes/agent/SavedSearchPage";
 import { SavedSearchEditorPage } from "@/routes/agent/SavedSearchEditorPage";
+import { DrillPage } from "@/dashboard/drill/DrillPage";
+import { validateDrillSearch } from "@/dashboard/drill/drillLinks";
 import { validateSavedSearchSearch } from "@/routes/agent/savedSearchSearch";
 import { QueuesPage, type QueuesSearch } from "@/routes/agent/QueuesPage";
 import { TicketZoomPage } from "@/routes/agent/TicketZoomPage";
@@ -339,6 +341,14 @@ const agentNewProcessTicketRoute = createRoute({
     process: typeof s.process === "string" && s.process !== "" ? s.process : undefined,
   }),
   component: NewProcessTicketPage,
+});
+
+// Literal path, registered before "$ticketId" so "drill" is never read as a ticket id.
+const agentDrillRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/tickets/drill",
+  validateSearch: validateDrillSearch,
+  component: DrillPage,
 });
 
 const agentTicketRoute = createRoute({
@@ -1219,6 +1229,7 @@ const routeTree = rootRoute.addChildren([
     agentQueuesRoute,
     agentNewTicketRoute,
     agentNewProcessTicketRoute,
+    agentDrillRoute,
     agentTicketRoute,
     agentSearchRoute,
     agentKbRoute,

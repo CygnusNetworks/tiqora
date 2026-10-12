@@ -127,7 +127,7 @@ async function renderWidget(
     </WidgetChromeProvider>
   );
   const rootRoute = createRootRoute({ component: () => ui });
-  const children = ["/agent/tickets/$ticketId", "/agent/queues", "/agent/calendar", "/agent/searches/$searchId"].map((path) =>
+  const children = ["/agent/tickets/drill", "/agent/tickets/$ticketId", "/agent/queues", "/agent/calendar", "/agent/searches/$searchId"].map((path) =>
     createRoute({ getParentRoute: () => rootRoute, path }),
   );
   const router = createRouter({
@@ -282,13 +282,32 @@ describe("core.counter", () => {
     expect(container.querySelector("polyline")).toBeNull();
   });
 
-  it("is not a link (phase 1 has no drill-down) and uses the host's title override as label", async () => {
+  it("uses the host's title override as label; outside a stored dashboard it is no link", async () => {
     await renderWidget("core.counter", preset("mine_new"), { status: "ok", data: { value: 3, delta: 0, spark: [3, 3] } }, "view", {
       titleOverride: "Neu bei mir",
     });
     expect(screen.getByText("Neu bei mir")).toBeVisible();
     expect(screen.getByText("3")).toBeVisible();
     expect(screen.queryByRole("link")).toBeNull();
+  });
+
+  it("links the whole tile to the drill page in view and TV mode, not in edit or preview", async () => {
+    const data: WidgetDataState = { status: "ok", data: { value: 3, delta: 0, spark: [3, 3] } };
+    await renderWidget("core.counter", preset("mine_new"), data, "view", { dashboardId: 7, titleOverride: "Neu bei mir" });
+    const link = screen.getByRole("link", { name: "Tickets zu „Neu bei mir“" });
+    const href = link.getAttribute("href") ?? "";
+    expect(href).toContain("/agent/tickets/drill");
+    expect(href).toContain("d=7");
+    expect(href).toContain("w=w-test");
+    expect(href).not.toContain("filter");
+    cleanup();
+    await renderWidget("core.counter", preset("mine_new"), data, "wallboard", { dashboardId: 7 });
+    expect(screen.getByRole("link", { name: /Tickets zu/ })).toBeInTheDocument();
+    for (const mode of ["edit", "preview"] as const) {
+      cleanup();
+      await renderWidget("core.counter", preset("mine_new"), data, mode, { dashboardId: 7 });
+      expect(screen.queryByRole("link")).toBeNull();
+    }
   });
 });
 
@@ -364,33 +383,36 @@ describe("core.ticket-list", () => {
     expect(screen.getByTestId("dashboard-ticket-7-customer")).toHaveTextContent("kunde@example.org");
   });
 
-  it("offers 'Alle 12 anzeigen' only when total > rows, linking to the matching queue view", async () => {
-    await renderWidget("core.ticket-list", preset("mine_new"), { status: "ok", data: { items: rows(8), total: 12 } });
-    const link = screen.getByRole("link", { name: "Alle 12 anzeigen" });
-    expect(link.getAttribute("href")).toContain("/agent/queues");
-    expect(link.getAttribute("href")).toContain("owner_id=5");
-    expect(link.getAttribute("href")).toContain("state_type=new");
+  it("footer 'Alle 12 anzeigen' appears only when total > rows and always links to the drill page", async () => {
+    const drill = { dashboardId: 7 };
+    for (const source of [
+      { kind: "preset", preset: "mine_new" },
+      { kind: "preset", preset: "mine_open" },
+      { kind: "preset", preset: "escalated" },
+      { kind: "saved_search", id: 9 },
+      { kind: "filter", filter: { version: 1 } },
+    ]) {
+      cleanup();
+      await renderWidget("core.ticket-list", { source, limit: 8 }, { status: "ok", data: { items: rows(8), total: 12 } }, "view", drill);
+      const href = screen.getByRole("link", { name: "Alle 12 anzeigen" }).getAttribute("href") ?? "";
+      expect(href).toContain("/agent/tickets/drill");
+      expect(href).toContain("d=7");
+      expect(href).toContain("w=w-test");
+    }
     cleanup();
-    await renderWidget("core.ticket-list", preset("mine_new"), { status: "ok", data: { items: rows(3), total: 3 } });
-    expect(screen.queryByText(/Alle \d+ anzeigen/)).toBeNull();    expect(screen.queryByText(/insgesamt/)).toBeNull();
+    await renderWidget("core.ticket-list", preset("mine_new"), { status: "ok", data: { items: rows(3), total: 3 } }, "view", drill);
+    expect(screen.queryByText(/Alle \d+ anzeigen/)).toBeNull();
+    expect(screen.queryByText(/insgesamt/)).toBeNull();
   });
 
-  it("shows the total as text, not a link, where no queue view lists the same tickets", async () => {
+  it("without a stored dashboard (or in preview) the total is plain text", async () => {
     await renderWidget("core.ticket-list", preset("mine_open"), { status: "ok", data: { items: rows(8), total: 12 } });
     expect(screen.getByText("12 insgesamt")).toBeVisible();
     expect(screen.queryByRole("link", { name: /anzeigen/ })).toBeNull();
     cleanup();
-    await renderWidget("core.ticket-list", preset("escalated"), { status: "ok", data: { items: rows(8), total: 9 } });
-    expect(screen.getByText("9 insgesamt")).toBeVisible();
-  });
-
-  it("'Alle 12 anzeigen' of a saved-search list links to /agent/searches/<id>; an own filter has no link", async () => {
-    await renderWidget("core.ticket-list", { source: { kind: "saved_search", id: 9 }, limit: 8 }, { status: "ok", data: { items: rows(8), total: 12 } });
-    expect(screen.getByText("Alle 12 anzeigen").closest("a")).toHaveAttribute("href", "/agent/searches/9");
-    cleanup();
-    await renderWidget("core.ticket-list", { source: { kind: "filter", filter: { version: 1 } }, limit: 8 }, { status: "ok", data: { items: rows(8), total: 12 } });
-    expect(screen.queryByText("Alle 12 anzeigen")).toBeNull();
+    await renderWidget("core.ticket-list", preset("mine_open"), { status: "ok", data: { items: rows(8), total: 12 } }, "preview", { dashboardId: 7 });
     expect(screen.getByText("12 insgesamt")).toBeVisible();
+    expect(screen.queryByRole("link", { name: /anzeigen/ })).toBeNull();
   });
 
   it("keeps a saved-search or filter source instead of resetting it to the default preset", async () => {
@@ -465,6 +487,15 @@ describe("core.escalations", () => {
     expect(screen.getByText(/^Erste Antwort · /)).toBeVisible();
   });
 
+  it("the header link opens the drill page with the widget's total; none while empty", async () => {
+    const items = [{ ticket: ticket(1), epoch: 1, kind: "solution" }];
+    await renderWidget("core.escalations", {}, { status: "ok", data: { items, total: 5, oldest_epoch: 1 } }, "view", { dashboardId: 7 });
+    expect(screen.getByRole("link", { name: "Alle 5 anzeigen" }).getAttribute("href")).toContain("/agent/tickets/drill?d=7&w=w-test");
+    cleanup();
+    await renderWidget("core.escalations", {}, { status: "ok", data: { items: [], total: 0, oldest_epoch: null } }, "view", { dashboardId: 7 });
+    expect(screen.queryByRole("link", { name: /anzeigen/ })).toBeNull();
+  });
+
   it("has an empty state that matches the setting", async () => {
     await renderWidget("core.escalations", { within_hours: 0 }, { status: "ok", data: { items: [], total: 0, oldest_epoch: null } });
     expect(screen.getByText("Keine eskalierten Tickets.")).toBeVisible();
@@ -477,6 +508,13 @@ describe("core.escalations", () => {
 // ---------------------------------------------------------------- reminders
 
 describe("core.reminders", () => {
+  it("the header link opens the drill page with the widget's total", async () => {
+    await renderWidget("core.reminders", {}, { status: "ok", data: { items: [{ ticket: ticket(1), until: 1, overdue: true }], total: 4 } }, "view", {
+      dashboardId: 7,
+    });
+    expect(screen.getByRole("link", { name: "Alle 4 anzeigen" }).getAttribute("href")).toContain("/agent/tickets/drill?d=7&w=w-test");
+  });
+
   it("colours overdue entries danger", async () => {
     await renderWidget("core.reminders", {}, {
       status: "ok",

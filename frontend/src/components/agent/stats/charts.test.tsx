@@ -395,3 +395,33 @@ describe("charts", () => {
     expect(d).toHaveClass("text-green");
   });
 });
+
+describe("charts: additive onSelect", () => {
+  it("without onSelect the marks stay images, exactly as before", () => {
+    render(<BarChart testId="bc" data={[{ label: "A", value: 1 }]} />);
+    expect(screen.getByTestId("bc-hit-0")).toHaveAttribute("role", "img");
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("bars become buttons: click and Enter/Space select, an opted-out bar stays an image", () => {
+    const onSelect = vi.fn();
+    render(
+      <BarChart
+        testId="bc"
+        data={[
+          { label: "A", value: 1 },
+          { label: "B", value: 2 },
+          { label: "Weitere", value: 3, selectable: false },
+        ]}
+        onSelect={onSelect}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("bc-hit-0"));
+    expect(onSelect).toHaveBeenLastCalledWith(0);
+    fireEvent.keyDown(screen.getByTestId("bc-hit-1"), { key: " " });
+    expect(onSelect).toHaveBeenLastCalledWith(1);
+    expect(screen.getByTestId("bc-hit-1")).toHaveAttribute("tabindex", "0");
+    expect(screen.getByTestId("bc-hit-2")).toHaveAttribute("role", "img");
+    expect(onSelect).toHaveBeenCalledTimes(2);
+  });
+});

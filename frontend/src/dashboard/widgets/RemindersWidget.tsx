@@ -6,7 +6,9 @@ import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import { DashboardTicketRow } from "@/components/agent/dashboard/DashboardTicketRow";
 import { rowLinkMode } from "../chrome/mode";
-import { WidgetFrame } from "../chrome/WidgetFrame";
+import { WidgetFrame, type FrameLink } from "../chrome/WidgetFrame";
+import { useDrill } from "../drill/useDrill";
+import { useWidgetData } from "../data";
 import { WidgetDataBody, WidgetEmpty } from "../chrome/WidgetDataBody";
 
 export interface RemindersSettings {
@@ -20,11 +22,15 @@ export interface RemindersData {
 }
 
 /** Waiting tickets whose reminder is overdue or due soon (today's rows; overdue in danger). */
-export function RemindersWidget({ size, mode }: WidgetProps<RemindersSettings>) {
+export function RemindersWidget({ instanceId, size, mode }: WidgetProps<RemindersSettings>) {
   const { t, i18n } = useTranslation();
   const locale = toBcp47(i18n.language);
+  const drill = useDrill(instanceId, mode);
+  const { status, data } = useWidgetData<RemindersData>();
+  const total = status === "ok" && typeof data?.total === "number" ? data.total : 0;
+  const link: FrameLink | undefined = drill && total > 0 ? { label: t("dashboards.state.showAll", { count: total }), ...drill() } : undefined;
   return (
-    <WidgetFrame title={t("dashboards.widgets.reminders.title")} mode={mode} testId="reminders-widget">
+    <WidgetFrame title={t("dashboards.widgets.reminders.title")} link={link} mode={mode} testId="reminders-widget">
       <WidgetDataBody<RemindersData> h={size.h}>
         {(data) => {
           const items = Array.isArray(data?.items) ? data.items : [];
