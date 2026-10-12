@@ -64,8 +64,8 @@ const ticketChat116 = {
 const configValues = {
   allowed_origins: ["https://www.example.org"],
   topics: [
-    { key: "support", label: "Support", queue_id: 1, priority_id: null },
-    { key: "billing", label: "Rechnung & Vertrag", queue_id: 2, priority_id: 3 },
+    { key: "support", label: "Support", queue_id: 1, priority_id: null, ai_mode: "first_line" },
+    { key: "billing", label: "Rechnung & Vertrag", queue_id: 2, priority_id: 3, ai_mode: "off" },
   ],
   greeting: "Hallo! Wie können wir Ihnen helfen?",
   privacy_url: "https://www.example.org/datenschutz",
@@ -74,6 +74,10 @@ const configValues = {
   default_customer_user: null,
   retention_days: 30,
   show_agent_names: true,
+  bot_name: "KI-Assistent",
+  bot_tone_prompt: null,
+  show_on_portal: false,
+  identity_create_customers: false,
   wait_timeout_seconds: 180,
   prechat_fields: [
     { key: "name", kind: "text", label: "Name", required: false, maps_to: "name", options: [], dynamic_field: null },
@@ -93,9 +97,16 @@ const configValues = {
 const config = {
   id: 1, name: "Website", valid: true, public_key: "demo0000000000000000000000000000",
   embed_snippet: '<script src="https://tickets.example.org/chat/v1/loader.js" data-key="demo0000000000000000000000000000" async></script>',
+  identity_secret_set: false,
   session_count: 12, created: "2026-07-01T08:00:00Z", changed: "2026-07-20T09:00:00Z",
   values: configValues,
 };
+
+const aiStatus = [
+  { topic_key: "support", label: "Support", queue_id: 1, queue_name: "Support", ai_mode: "first_line", ok: true, reason: null },
+  { topic_key: "billing", label: "Rechnung & Vertrag", queue_id: 2, queue_name: "Buchhaltung", ai_mode: "off", ok: false, reason: "ai_mode_off" },
+];
+let identitySecretSet = false;
 
 /** `undefined` = not a web chat path (the caller continues with its own branches). */
 export function resolveWebchatData(p: string, method: string): unknown | undefined {
@@ -119,11 +130,16 @@ export function resolveWebchatData(p: string, method: string): unknown | undefin
   if (p.endsWith("/api/v1/admin/channels/webchat")) return { channel: "webchat", enabled: true, config: {} };
   if (p.includes("/api/v1/admin/chat-configs")) {
     if (p.endsWith("/chat-configs")) return method === "GET" ? [config] : config;
+    if (p.endsWith("/ai-status")) return aiStatus;
+    if (p.endsWith("/identity-secret")) {
+      identitySecretSet = method !== "DELETE";
+      return method === "DELETE" ? {} : { secret: "demo-" + Math.random().toString(36).slice(2, 30).padEnd(28, "0") };
+    }
     if (p.endsWith("/rotate-key")) {
       const key = "demo" + Math.random().toString(36).slice(2, 30).padEnd(28, "0");
       return { ...config, public_key: key, embed_snippet: config.embed_snippet.replace(config.public_key, key) };
     }
-    return method === "DELETE" ? {} : config;
+    return method === "DELETE" ? {} : { ...config, identity_secret_set: identitySecretSet };
   }
   return undefined;
 }

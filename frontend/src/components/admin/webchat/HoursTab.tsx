@@ -22,6 +22,7 @@ export function HoursTab({ draft, errors, onDraft }: TabProps) {
     { value: "default", label: t("webchat.admin.hours.defaultCalendar") },
     ...CALENDARS.map((n) => ({ value: n, label: t("webchat.admin.hours.calendarN", { n }) })),
   ];
+  const anyAiTopic = v.topics.some((tp) => tp.ai_mode === "first_line");
   return (
     <div className="space-y-5" data-testid="webchat-tab-hours">
       <Field id="calendar" label={t("webchat.admin.hours.hours")} hint={t("webchat.admin.hours.hoursHint")} error={errors.business_calendar}>
@@ -58,11 +59,24 @@ export function HoursTab({ draft, errors, onDraft }: TabProps) {
           aria-labelledby="webchat-offline-label"
           items={[
             { value: "form", label: t("webchat.admin.hours.offlineForm") },
+            { value: "ai", label: t("webchat.admin.hours.offlineAi"), disabled: !anyAiTopic },
             { value: "hide", label: t("webchat.admin.hours.offlineHide") },
           ]}
           value={v.offline_mode}
+          invalid={!!errors.offline_mode}
+          aria-describedby={errors.offline_mode ? "webchat-offline-error" : !anyAiTopic ? "webchat-offline-hint" : undefined}
           onChange={(offline_mode) => onDraft(setValues(draft, { offline_mode }))}
         />
+        {!anyAiTopic && (
+          <p id="webchat-offline-hint" data-testid="webchat-offline-ai-hint" className="mt-1 text-xs text-muted">
+            {t("webchat.admin.hours.offlineAiNeedsTopic")}
+          </p>
+        )}
+        {errors.offline_mode && (
+          <p role="alert" id="webchat-offline-error" data-testid="webchat-offline-error" className="mt-1 text-xs text-danger">
+            {errors.offline_mode}
+          </p>
+        )}
       </div>
       <Field
         id="default-customer"

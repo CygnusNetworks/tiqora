@@ -50,6 +50,7 @@ const config: ChatConfig = {
   id: 1,
   name: "Website",
   valid: true,
+  identity_secret_set: false,
   public_key: "wc_key",
   embed_snippet: "<script></script>",
   session_count: 12,

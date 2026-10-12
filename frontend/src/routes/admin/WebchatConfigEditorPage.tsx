@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import {
+  chatAiStatusKey,
   chatConfigsKey,
   webchatApi,
   type ChatConfig,
@@ -24,13 +25,14 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Tabs, type TabItem } from "@/components/ui/Tabs";
 import { GeneralTab } from "@/components/admin/webchat/GeneralTab";
 import { HoursTab } from "@/components/admin/webchat/HoursTab";
+import { AiTab } from "@/components/admin/webchat/AiTab";
 import { PrechatTab } from "@/components/admin/webchat/PrechatTab";
 import { LookTab } from "@/components/admin/webchat/LookTab";
 import { ProtectionTab } from "@/components/admin/webchat/ProtectionTab";
 import { EmbedTab } from "@/components/admin/webchat/EmbedTab";
 
 const PRECHAT_DF_TYPES = new Set(["Text", "TextArea", "Dropdown", "Checkbox"]);
-const TAB_ORDER: EditorTab[] = ["general", "hours", "prechat", "look", "protection", "embed"];
+const TAB_ORDER: EditorTab[] = ["general", "hours", "ai", "prechat", "look", "protection", "embed"];
 
 function WebchatConfigEditor({ configId }: { configId: number | null }) {
   const { t } = useTranslation();
@@ -102,6 +104,7 @@ function WebchatConfigEditor({ configId }: { configId: number | null }) {
   const onSaved = (cfg: ChatConfig) => {
     qc.setQueryData([...chatConfigsKey, cfg.id], cfg);
     void qc.invalidateQueries({ queryKey: chatConfigsKey, exact: true });
+    void qc.invalidateQueries({ queryKey: chatAiStatusKey(cfg.id) });
     loadedFor.current = cfg.id;
     setDraftState(draftFromConfig(cfg));
     setDirty(false);
@@ -214,11 +217,13 @@ function WebchatConfigEditor({ configId }: { configId: number | null }) {
       <div role="tabpanel" aria-label={t(`webchat.admin.tabs.${tab}`)} className="rounded-lg border border-hairline bg-surface p-4">
         {tab === "general" && <GeneralTab {...common} queues={queues} priorities={priorities} />}
         {tab === "hours" && <HoursTab {...common} />}
+        {tab === "ai" && <AiTab {...common} configId={config?.id ?? null} />}
         {tab === "prechat" && <PrechatTab {...common} dynamicFields={dynamicFields} />}
         {tab === "look" && <LookTab {...common} publicKey={config?.public_key ?? null} />}
         {tab === "protection" && <ProtectionTab {...common} />}
         {tab === "embed" && (
           <EmbedTab
+            {...common}
             config={config}
             onRotated={(next) => {
               qc.setQueryData([...chatConfigsKey, next.id], next);

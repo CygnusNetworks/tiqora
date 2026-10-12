@@ -210,6 +210,9 @@ export function validateDraft(draft: Draft): FormErrors {
 
   if (!inRange(v.wait_timeout_seconds, 30, 3600)) e.wait_timeout_seconds = boundMsg(30, 3600);
   if (!inRange(v.retention_days, 1, 3650)) e.retention_days = boundMsg(1, 3650);
+  if (!v.bot_name.trim()) e.bot_name = tr("botNameRequired");
+  else if (v.bot_name.trim().length > 80) e.bot_name = tr("botNameLong");
+  if ((v.bot_tone_prompt ?? "").length > 2000) e.bot_tone_prompt = tr("toneLong");
   if ((v.default_customer_user ?? "").length > 200) e.default_customer_user = tr("valueLong");
 
   if (!HEX_COLOR.test(v.theme.primary_color)) e["theme.primary_color"] = tr("colorInvalid");
@@ -292,6 +295,8 @@ export function buildValues(draft: Draft): Values {
     greeting: nullIfEmpty(v.greeting),
     privacy_url: nullIfEmpty(v.privacy_url),
     default_customer_user: nullIfEmpty(v.default_customer_user),
+    bot_name: v.bot_name.trim(),
+    bot_tone_prompt: nullIfEmpty(v.bot_tone_prompt),
     theme: { ...v.theme, launcher_label: nullIfEmpty(v.theme.launcher_label) },
     prechat_fields: v.prechat_fields.map((f) => ({
       key: f.key,
@@ -318,11 +323,18 @@ export function serverFieldErrors(err: unknown): FormErrors | null {
   return Object.keys(out).length ? out : null;
 }
 
-export type EditorTab = "general" | "hours" | "prechat" | "look" | "protection" | "embed";
+export type EditorTab = "general" | "hours" | "ai" | "prechat" | "look" | "protection" | "embed";
 
 export function tabOfPath(path: string): EditorTab {
   const head = path.split(".")[0];
+  if (head === "topics" && path.endsWith(".ai_mode")) return "ai";
   switch (head) {
+    case "bot_name":
+    case "bot_tone_prompt":
+      return "ai";
+    case "show_on_portal":
+    case "identity_create_customers":
+      return "embed";
     case "business_calendar":
     case "wait_timeout_seconds":
     case "offline_mode":

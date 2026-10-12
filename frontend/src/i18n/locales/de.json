@@ -5711,7 +5711,8 @@
         "prechat": "Vorab-Formular",
         "look": "Aussehen",
         "protection": "Schutz",
-        "embed": "Einbetten"
+        "embed": "Einbetten",
+        "ai": "KI"
       },
       "list": {
         "title": "Web-Chat",
@@ -5759,7 +5760,9 @@
         "offlineForm": "Nachrichtenformular",
         "offlineHide": "Chat ausblenden",
         "defaultCustomer": "Standard-Kunde (optional)",
-        "defaultCustomerHint": "Kundenbenutzer, dem Chats ohne E-Mail-Adresse zugeordnet werden."
+        "defaultCustomerHint": "Kundenbenutzer, dem Chats ohne E-Mail-Adresse zugeordnet werden.",
+        "offlineAi": "KI antwortet allein",
+        "offlineAiNeedsTopic": "Verfügbar, sobald im Reiter „KI“ mindestens ein Thema „KI antwortet zuerst“ nutzt."
       },
       "prechat": {
         "hint": "Diese Felder fragt der Chat ab, bevor das Gespräch beginnt. „Übernehmen in“ legt fest, wohin die Antwort im Ticket wandert.",
@@ -5883,7 +5886,79 @@
         "mapsNameTwice": "Nur ein Feld darf in „Name“ übernommen werden.",
         "mapsEmailKind": "Ein Feld für die E-Mail-Adresse muss die Art „E-Mail“ haben.",
         "mapsNameKind": "Ein Feld für den Namen muss die Art „Text“ haben.",
-        "dynamicRequired": "Bitte ein Dynamisches Feld wählen."
+        "dynamicRequired": "Bitte ein Dynamisches Feld wählen.",
+        "botNameRequired": "Bitte einen Namen für den Assistenten angeben.",
+        "botNameLong": "Der Name ist zu lang (höchstens 80 Zeichen).",
+        "toneLong": "Der Text ist zu lang (höchstens 2000 Zeichen)."
+      },
+      "ai": {
+        "intro": "Der KI-Assistent beantwortet die ersten Nachrichten eines Besuchers und übergibt bei Bedarf an Ihr Team. Er antwortet nur, wenn die Queue des Themas automatische Antworten erlaubt.",
+        "topicsTitle": "KI antwortet zuerst",
+        "topicMode": "KI antwortet zuerst: {{topic}}",
+        "modeOff": "Aus",
+        "modeOn": "Ja",
+        "noTopicLabel": "(ohne Bezeichnung)",
+        "nameTitle": "Der Assistent",
+        "botName": "Name des Assistenten",
+        "botNameHint": "So stellt sich die KI den Besuchern vor.",
+        "botTone": "Tonfall (optional)",
+        "botToneHint": "Zum Beispiel: „Freundlich, kurz, per Sie.“ Höchstens 2000 Zeichen.",
+        "statusTitle": "Status je Thema",
+        "statusUnsaved": "Der Status erscheint nach dem ersten Speichern.",
+        "statusNote": "Der Status gilt für den gespeicherten Stand.",
+        "statusLoading": "Status wird geladen …",
+        "statusFailed": "Der Status konnte nicht geladen werden.",
+        "ok": "Bereit",
+        "queueLink": "KI-Einstellungen der Queue öffnen",
+        "queue": "Queue: {{name}}",
+        "reasonUnknown": "Die KI ist hier derzeit nicht verfügbar ({{code}}).",
+        "reasons": {
+          "ai_mode_off": "Für dieses Thema ist „KI antwortet zuerst“ ausgeschaltet.",
+          "no_policy": "Die Queue hat noch keine KI-Einstellungen.",
+          "auto_reply_off": "In den KI-Einstellungen der Queue sind automatische Antworten ausgeschaltet.",
+          "no_service_user": "In den KI-Einstellungen der Queue fehlt der Dienstbenutzer.",
+          "autonomy_off": "Die Autonomie der Queue steht auf „Aus“, die KI würde nur Entwürfe schreiben.",
+          "gate": "Die KI-Antworten sind für diesen Kanal gesperrt.",
+          "paused": "Die automatischen KI-Antworten sind derzeit pausiert.",
+          "worker_down": "Der KI-Dienst (tiqora-ai-worker) läuft gerade nicht. Neue Chats gehen an Ihr Team.",
+          "queue_rate_limit": "Das Stundenlimit der Queue für KI-Antworten ist erreicht.",
+          "global_rate_limit": "Das allgemeine Stundenlimit für KI-Antworten ist erreicht.",
+          "budget_tokens_day": "Das Tagesbudget der Queue für die KI ist aufgebraucht.",
+          "llm_unavailable": "Es ist kein KI-Modell erreichbar."
+        }
+      },
+      "identity": {
+        "title": "Website-Anmeldung",
+        "intro": "Wenn Ihre Website die Besucher kennt, kann sie sie dem Chat mit einer signierten Anmeldung vorstellen. Der Chat ordnet sie dann dem richtigen Kunden zu und zeigt „Identität bestätigt“.",
+        "keyTitle": "Schlüssel für die Website-Anmeldung",
+        "keyNone": "Es gibt noch keinen Schlüssel.",
+        "keySet": "Ein Schlüssel ist eingerichtet. Aus Sicherheitsgründen wird er nicht erneut angezeigt.",
+        "create": "Schlüssel erzeugen",
+        "regenerate": "Neu erzeugen",
+        "regenerateConfirm": "Bestehende Anmeldungen auf Ihrer Website funktionieren erst wieder, wenn Sie den neuen Schlüssel dort eintragen.",
+        "remove": "Entfernen",
+        "removeConfirm": "Danach kann sich niemand mehr über Ihre Website anmelden. Der Chat selbst funktioniert weiter.",
+        "removed": "Der Schlüssel wurde entfernt.",
+        "shownOnce": "Nur jetzt sichtbar",
+        "shownOnceHint": "Kopieren Sie den Schlüssel jetzt und tragen Sie ihn auf Ihrem Server ein. Er wird nicht noch einmal angezeigt.",
+        "secretLabel": "Neuer Schlüssel",
+        "copy": "Kopieren",
+        "copied": "Kopiert.",
+        "copyFailed": "Kopieren nicht möglich. Bitte markieren Sie den Schlüssel und kopieren Sie ihn mit Strg/Cmd+C.",
+        "failed": "Das hat nicht geklappt. Bitte versuchen Sie es erneut.",
+        "samplesTitle": "So signieren Sie die Anmeldung",
+        "samplesHint": "Erzeugen Sie auf Ihrem Server pro Besucher eine kurze signierte Anmeldung (HS256) mit E-Mail-Adresse oder Kennung, Name und Ablaufzeit. Geben Sie den Schlüssel niemals im Browser oder im Seitenquelltext aus.",
+        "samplesCall": "Übergeben Sie das Ergebnis im Browser an den Chat:",
+        "sampleTabs": "Programmiersprache",
+        "customersTitle": "Kunden",
+        "createCustomers": "Unbekannte Kunden anlegen",
+        "createCustomersHint": "Ist die bestätigte E-Mail-Adresse noch kein Kunde, legt Tiqora einen Kundenbenutzer an. Sonst wird die Adresse nur am Ticket vermerkt.",
+        "warning": "Wer den Schlüssel kennt, kann sich auf Ihrer Website als jeder Kunde anmelden."
+      },
+      "portal": {
+        "title": "Kundenportal",
+        "show": "Im Kundenportal anzeigen",
+        "showHint": "Angemeldete Kunden sehen den Chat im Portal und sind darin automatisch bestätigt. Es kann nur ein Chat im Kundenportal angezeigt werden."
       }
     }
   },

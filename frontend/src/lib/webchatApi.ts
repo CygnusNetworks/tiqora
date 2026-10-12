@@ -10,6 +10,7 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import type { Schemas } from "@tiqora/api-client";
 import { api, ApiError } from "./api";
+import { portalApi } from "./portalApi";
 
 export type ChatAgentState = Schemas["ChatAgentStateOut"];
 export type ChatAgentStateIn = Schemas["ChatAgentStateIn"];
@@ -22,11 +23,17 @@ export type ChatConfigValues = Schemas["ChatConfigValues"];
 export type ChatConfigCreate = Schemas["ChatConfigCreateIn"];
 export type ChatConfigUpdate = Schemas["ChatConfigUpdateIn"];
 export type ChatAccept = Schemas["ChatAcceptOut"];
+export type ChatAiStatus = Schemas["ChatAiTopicStatusOut"];
+export type PortalWebchat = Schemas["PortalWebchatOut"];
 
 export const chatAgentStateKey = ["chat", "agent-state"] as const;
 export const chatInboxKey = ["chat", "inbox"] as const;
 export const chatTopicsKey = ["chat", "topics"] as const;
 export const chatConfigsKey = ["admin", "chat-configs"] as const;
+export function chatAiStatusKey(configId: number) {
+  return ["admin", "chat-configs", configId, "ai-status"] as const;
+}
+export const portalWebchatKey = ["portal", "webchat"] as const;
 export function ticketChatKey(ticketId: number) {
   return ["tickets", ticketId, "chat"] as const;
 }
@@ -75,6 +82,16 @@ export const webchatApi = {
   deleteConfig(id: number) {
     return api.request<void>("DELETE", `/api/v1/admin/chat-configs/${id}`);
   },
+  aiStatus(id: number, signal?: AbortSignal) {
+    return api.request<ChatAiStatus[]>("GET", `/api/v1/admin/chat-configs/${id}/ai-status`, { signal });
+  },
+  /** The plain secret is in this response only; a later read never has it. */
+  createIdentitySecret(id: number) {
+    return api.request<{ secret: string }>("POST", `/api/v1/admin/chat-configs/${id}/identity-secret`);
+  },
+  deleteIdentitySecret(id: number) {
+    return api.request<void>("DELETE", `/api/v1/admin/chat-configs/${id}/identity-secret`);
+  },
   rotateKey(id: number) {
     return api.request<ChatConfig>("POST", `/api/v1/admin/chat-configs/${id}/rotate-key`);
   },
@@ -118,4 +135,22 @@ export function chatErrorCode(err: unknown): string | null {
   if (!(err instanceof ApiError) || err.detail === null || typeof err.detail !== "object") return null;
   const d = (err.detail as { detail?: unknown }).detail;
   return typeof d === "string" ? d : null;
+}
+
+/** The chat shown in the customer portal (portal session); `null` when there is none (404). */
+export function usePortalWebchat(enabled = true): UseQueryResult<PortalWebchat | null> {
+  return useQuery<PortalWebchat | null>({
+    queryKey: portalWebchatKey,
+    enabled,
+    retry: false,
+    staleTime: 5 * 60_000,
+    queryFn: async ({ signal }) => {
+      try {
+        return await portalApi.request<PortalWebchat>("GET", "/api/portal/webchat", { signal });
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      }
+    },
+  });
 }

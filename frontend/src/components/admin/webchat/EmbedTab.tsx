@@ -4,14 +4,22 @@ import { useTranslation } from "react-i18next";
 import { copyText } from "@/components/admin/identity/copyText";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { Switch } from "@/components/ui/Switch";
 import { webchatApi, type ChatConfig } from "@/lib/webchatApi";
+import { setValues } from "@/lib/webchatForm";
+import { IdentitySecretSection } from "./IdentitySecretSection";
+import type { TabProps } from "./shared";
 
 /** The embed code of a saved chat, a hint for the website's CSP and key rotation. */
 export function EmbedTab({
   config,
   onRotated,
-}: {
+  draft,
+  errors,
+  onDraft,
+}: TabProps & {
   config: ChatConfig | null;
+  /** The saved config changed on the server (new key, secret created or removed). */
   onRotated: (next: ChatConfig) => void;
 }) {
   const { t } = useTranslation();
@@ -111,6 +119,55 @@ export function EmbedTab({
           </p>
         )}
       </section>
+
+      <section className="space-y-3" data-testid="webchat-portal-section">
+        <h3 className="text-sm font-semibold text-ink">{t("webchat.admin.portal.title")}</h3>
+        <div className="flex items-start gap-3">
+          <Switch
+            checked={draft.values.show_on_portal}
+            onChange={(show_on_portal) => onDraft(setValues(draft, { show_on_portal }))}
+            testId="webchat-show-on-portal"
+            aria-labelledby="webchat-show-on-portal-label"
+            aria-describedby="webchat-show-on-portal-hint"
+          />
+          <div>
+            <span id="webchat-show-on-portal-label" className="text-sm text-ink">
+              {t("webchat.admin.portal.show")}
+            </span>
+            <p id="webchat-show-on-portal-hint" className="text-xs text-muted">
+              {t("webchat.admin.portal.showHint")}
+            </p>
+            {errors.show_on_portal && (
+              <p role="alert" data-testid="webchat-show-on-portal-error" className="mt-1 text-xs text-danger">
+                {errors.show_on_portal}
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <IdentitySecretSection
+        configId={config.id}
+        isSet={config.identity_secret_set}
+        onChanged={(isSet) => onRotated({ ...config, identity_secret_set: isSet })}
+      />
+      <div className="flex items-start gap-3" data-testid="webchat-create-customers-row">
+        <Switch
+          checked={draft.values.identity_create_customers}
+          onChange={(identity_create_customers) => onDraft(setValues(draft, { identity_create_customers }))}
+          testId="webchat-create-customers"
+          aria-labelledby="webchat-create-customers-label"
+          aria-describedby="webchat-create-customers-hint"
+        />
+        <div>
+          <span id="webchat-create-customers-label" className="text-sm text-ink">
+            {t("webchat.admin.identity.createCustomers")}
+          </span>
+          <p id="webchat-create-customers-hint" className="text-xs text-muted">
+            {t("webchat.admin.identity.createCustomersHint")}
+          </p>
+        </div>
+      </div>
       {dialog}
     </div>
   );
