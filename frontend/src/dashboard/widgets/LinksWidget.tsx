@@ -3,6 +3,7 @@ import { useRouter } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import type { WidgetProps } from "@/plugins/dashboardWidgets";
 import { linkTabIndex, rendersLinks } from "../chrome/mode";
+import { useIsKiosk } from "../wallboard/kioskContext";
 import { WidgetFrame } from "../chrome/WidgetFrame";
 import { WidgetEmpty } from "../chrome/WidgetDataBody";
 import { isSafeLinkUrl, linkKind } from "./linkUrl";
@@ -18,6 +19,7 @@ const ITEM_CLASS =
 export function LinksWidget({ settings, mode }: WidgetProps<LinksSettings>) {
   const { t } = useTranslation();
   const router = useRouter();
+  const kiosk = useIsKiosk();
   const items = (Array.isArray(settings.items) ? settings.items : []).filter(
     (i): i is { label: string; url: string } =>
       !!i && typeof i.label === "string" && i.label.trim() !== "" && isSafeLinkUrl(i.url),
@@ -37,7 +39,7 @@ export function LinksWidget({ settings, mode }: WidgetProps<LinksSettings>) {
             const kind = linkKind(item.url);
             return (
               <li key={`${i}-${item.url}`}>
-                {!rendersLinks(mode) ? (
+                {!rendersLinks(mode, kiosk) ? (
                   <span className={ITEM_CLASS}>{item.label}</span>
                 ) : (
                   <a

@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import { DashboardTicketRow } from "@/components/agent/dashboard/DashboardTicketRow";
 import { rowLinkMode } from "../chrome/mode";
+import { useIsKiosk } from "../wallboard/kioskContext";
 import { WidgetFrame, type FrameLink } from "../chrome/WidgetFrame";
 import { useDrill } from "../drill/useDrill";
 import { useWidgetData } from "../data";
@@ -24,6 +25,7 @@ export interface RemindersData {
 /** Waiting tickets whose reminder is overdue or due soon (today's rows; overdue in danger). */
 export function RemindersWidget({ instanceId, size, mode }: WidgetProps<RemindersSettings>) {
   const { t, i18n } = useTranslation();
+  const kiosk = useIsKiosk();
   const locale = toBcp47(i18n.language);
   const drill = useDrill(instanceId, mode);
   const { status, data } = useWidgetData<RemindersData>();
@@ -41,7 +43,7 @@ export function RemindersWidget({ instanceId, size, mode }: WidgetProps<Reminder
                 <DashboardTicketRow
                   key={ticket.id}
                   ticket={ticket}
-                  linkMode={rowLinkMode(mode)}
+                  linkMode={rowLinkMode(mode, kiosk)}
                   trailing={
                     <span data-testid={`reminder-${ticket.id}-due`} className={cn(overdue && "text-danger")}>
                       {overdue && (

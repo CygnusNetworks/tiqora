@@ -23,11 +23,14 @@ export function ManagedDashboardTabs({
   selectedId,
   onSelect,
   panelId,
+  onWallboard,
 }: {
   tabs: DashboardTab[];
   selectedId: number | null;
   onSelect: (id: number) => void;
   panelId?: string;
+  /** Opens the TV mode of a dashboard ("Als Wallboard anzeigen"). */
+  onWallboard?: (tab: DashboardTab) => void;
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -152,6 +155,7 @@ export function ManagedDashboardTabs({
             onMove: (tab, dir) => void move(tab, dir),
             onDelete: setDeleting,
             onCopy: (tab) => void copy(tab),
+            onWallboard,
           }}
         />
       </div>

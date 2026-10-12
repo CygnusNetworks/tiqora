@@ -251,7 +251,13 @@ export function DashboardPage() {
             <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">{greeting}</h1>
             <p className="mt-1 text-sm text-muted">{today}</p>
           </div>
-          {tabs && tabs.length > 0 && <ManagedDashboardTabs tabs={tabs} selectedId={selectedId} onSelect={onSelect} panelId={panelId} />}
+          {tabs && tabs.length > 0 && <ManagedDashboardTabs
+              tabs={tabs}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              panelId={panelId}
+              onWallboard={(tab) => void navigate({ to: "/agent/wallboard", search: { ids: String(tab.id) } })}
+            />}
         </div>
         {dashboard && (dashboard.can_share || dashboard.can_edit) && (
           <div className="flex gap-2">

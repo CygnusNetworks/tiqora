@@ -6034,7 +6034,8 @@
           "open": "offen",
           "new": "neu",
           "escalated": "eskaliert"
-        }
+        },
+        "wallboardCounts": "{{open}} / {{new}} neu"
       },
       "escalations": {
         "title": "Eskalationen",
@@ -6049,7 +6050,8 @@
           "update": "Aktualisierung",
           "solution": "Lösungszeit",
           "escalation": "Eskalation"
-        }
+        },
+        "nextDeadline": "Nächste Frist: {{what}} · {{when}}"
       },
       "reminders": {
         "title": "Erinnerungen fällig",
@@ -6086,7 +6088,8 @@
         "countAvailable_one": "{{count}} verfügbar",
         "countAvailable_other": "{{count}} verfügbar",
         "countInChat_one": "{{count}} im Chat",
-        "countInChat_other": "{{count}} im Chat"
+        "countInChat_other": "{{count}} im Chat",
+        "statusAvailable": "verfügbar"
       },
       "notes": {
         "title": "Notizen",
@@ -6448,7 +6451,8 @@
       "copyName": "{{name}} (Kopie)",
       "deleteTitle": "Dashboard „{{name}}“ löschen?",
       "deleteMessage": "Das Dashboard und alle seine Widgets werden gelöscht. Das lässt sich nicht rückgängig machen.",
-      "actionFailed": "Das hat nicht geklappt. Bitte versuchen Sie es noch einmal."
+      "actionFailed": "Das hat nicht geklappt. Bitte versuchen Sie es noch einmal.",
+      "wallboard": "Als Wallboard anzeigen"
     },
     "share": {
       "title": "Dashboard teilen",
@@ -6504,6 +6508,19 @@
       "loadFailed": "Die Ticketliste konnte nicht geladen werden.",
       "gone": "Dieses Widget gibt es nicht mehr.",
       "invalid": "Diese Ticketliste ist nicht mehr gültig."
+    },
+    "wallboard": {
+      "label": "Wallboard",
+      "loading": "Wird geladen …",
+      "updatedSeconds": "aktualisiert vor {{count}} s",
+      "updatedMinutes": "aktualisiert vor {{count}} min",
+      "updatedHours": "aktualisiert vor {{count}} h",
+      "stale": "Verbindung unterbrochen – Stand {{time}}",
+      "position": "{{index}} / {{count}}",
+      "fullscreen": "Vollbild",
+      "exit": "Beenden",
+      "loadFailed": "Dieses Dashboard konnte nicht geladen werden.",
+      "none": "Es ist kein Dashboard zum Anzeigen vorhanden."
     }
   },
   "filters": {

@@ -9,6 +9,7 @@ import {
 import { SetPasswordPage } from "@/routes/SetPasswordPage";
 import { LoginPage } from "@/routes/LoginPage";
 import { DashboardPage, type DashboardSearch } from "@/routes/agent/DashboardPage";
+import { WallboardPage } from "@/routes/agent/WallboardPage";
 import { ReportsPage, type ReportsSearch } from "@/routes/agent/ReportsPage";
 import { ReportBuilderPage } from "@/routes/agent/ReportBuilderPage";
 import { validateReportBuilderSearch } from "@/routes/agent/reportBuilderSearch";
@@ -18,6 +19,7 @@ import { SavedSearchPage } from "@/routes/agent/SavedSearchPage";
 import { SavedSearchEditorPage } from "@/routes/agent/SavedSearchEditorPage";
 import { DrillPage } from "@/dashboard/drill/DrillPage";
 import { validateDrillSearch } from "@/dashboard/drill/drillLinks";
+import { validateWallboardSearch } from "@/dashboard/wallboard/search";
 import { validateSavedSearchSearch } from "@/routes/agent/savedSearchSearch";
 import { QueuesPage, type QueuesSearch } from "@/routes/agent/QueuesPage";
 import { TicketZoomPage } from "@/routes/agent/TicketZoomPage";
@@ -217,6 +219,14 @@ const agentIndexRoute = createRoute({
     return typeof raw === "number" && Number.isSafeInteger(raw) && raw > 0 ? { d: raw } : {};
   },
   component: DashboardPage,
+});
+
+// TV mode: `?ids=7,9` (at most 10) and `?rotate=` seconds (15..900).
+const agentWallboardRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/wallboard",
+  validateSearch: validateWallboardSearch,
+  component: WallboardPage,
 });
 
 const agentQueuesRoute = createRoute({
@@ -1226,6 +1236,7 @@ const routeTree = rootRoute.addChildren([
   setPasswordRoute,
   agentLayoutRoute.addChildren([
     agentIndexRoute,
+    agentWallboardRoute,
     agentQueuesRoute,
     agentNewTicketRoute,
     agentNewProcessTicketRoute,

@@ -16,6 +16,7 @@ import { DASHBOARD_WIDGETS, type WidgetMode } from "@/plugins/dashboardWidgets";
 import { CORE_WIDGET_KEYS, settingsWithDefaults } from "../definitions";
 import { WidgetDataProvider, type WidgetDataValue } from "../data";
 import { WidgetChromeProvider, type WidgetChrome } from "../chrome/WidgetFrame";
+import { KioskProvider } from "../wallboard/kioskContext";
 import { registerCoreWidgets } from "./index";
 
 vi.mock("@/auth/AuthContext", async () => {
@@ -109,23 +110,25 @@ async function renderWidget(
   mode: WidgetMode = "view",
   chrome: WidgetChrome = {},
   refetch: () => void = () => {},
+  opts: { size?: { w: number; h: number }; kiosk?: boolean } = {},
 ) {
   const def = DASHBOARD_WIDGETS.get(key);
   if (!def) throw new Error(`widget ${key} is not registered`);
   const Component = def.component;
-  const ui = (
+  const inner = (
     <WidgetChromeProvider value={chrome}>
       <WidgetDataProvider value={{ ...state, refetch }}>
         <Component
           instanceId="w-test"
           settings={settingsWithDefaults(def, settings, def.version)}
-          size={{ w: def.size.default[0], h: def.size.default[1] }}
+          size={opts.size ?? { w: def.size.default[0], h: def.size.default[1] }}
           filters={{}}
           mode={mode}
         />
       </WidgetDataProvider>
     </WidgetChromeProvider>
   );
+  const ui = opts.kiosk ? <KioskProvider>{inner}</KioskProvider> : inner;
   const rootRoute = createRootRoute({ component: () => ui });
   const children = ["/agent/tickets/drill", "/agent/tickets/$ticketId", "/agent/queues", "/agent/calendar", "/agent/searches/$searchId"].map((path) =>
     createRoute({ getParentRoute: () => rootRoute, path }),
@@ -918,6 +921,114 @@ describe("edit and preview modes across widgets", () => {
     for (const a of screen.getAllByRole("link", { hidden: true })) expect(a).toHaveAttribute("tabindex", "-1");
     cleanup();
     await renderWidget("core.ticket-list", preset("mine_new"), { status: "ok", data: { items: rows(8), total: 12 } }, "preview");
+    expect(screen.queryByRole("link", { hidden: true })).toBeNull();
+    expect(screen.getAllByText("Ticket 1").length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------- wallboard styles (Task 19)
+
+describe("wallboard mode", () => {
+  it("counter: 96px mono value, a sub line with the change, no sparkline", async () => {
+    await renderWidget("core.counter", preset("mine_open"), { status: "ok", data: { value: 12, delta: 6, spark: [1, 2, 3, 4] } }, "wallboard");
+    const value = screen.getByTestId("counter-value");
+    expect(value).toHaveTextContent("12");
+    expect(value.className).toContain("96px");
+    expect(value).toHaveClass("font-mono");
+    expect(screen.getByTestId("counter-sub")).toHaveTextContent("+6 seit dem letzten Stand");
+    expect(screen.getByTestId("counter-sub").className).toContain("20px");
+    expect(document.querySelector("svg polyline")).toBeNull();
+    cleanup();
+    // the same data in view mode still draws the sparkline
+    await renderWidget("core.counter", preset("mine_open"), { status: "ok", data: { value: 12, delta: 6, spark: [1, 2, 3, 4] } }, "view");
+    expect(document.querySelector("svg")).not.toBeNull();
+  });
+
+  it("escalations at h <= 2 render the single 'Nächste Frist' banner, taller ones the list", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-10T12:00:00Z"));
+    const soon = Date.parse("2026-10-10T12:25:00Z") / 1000;
+    const later = Date.parse("2026-10-10T15:00:00Z") / 1000;
+    const data = {
+      status: "ok" as const,
+      data: {
+        items: [
+          { ticket: ticket(1, { title: "VPN gesperrt", customer_id: "Beispiel GmbH", customer_email: null }), epoch: soon, kind: "solution" },
+          { ticket: ticket(2, { title: "Backup-Fehler" }), epoch: later, kind: "first_response" },
+        ],
+        total: 2,
+        oldest_epoch: soon,
+      },
+    };
+    await renderWidget("core.escalations", {}, data, "wallboard", {}, () => {}, { size: { w: 4, h: 2 } });
+    const banner = screen.getByTestId("escalation-banner");
+    expect(banner).toHaveTextContent("Nächste Frist: VPN gesperrt · Beispiel GmbH · in 25 Min.");
+    expect(banner).toHaveClass("text-danger");
+    expect(screen.queryByText("Backup-Fehler")).toBeNull();
+    cleanup();
+    await renderWidget("core.escalations", {}, data, "wallboard", {}, () => {}, { size: { w: 4, h: 4 } });
+    expect(screen.queryByTestId("escalation-banner")).toBeNull();
+    expect(screen.getByText("Backup-Fehler")).toBeVisible();
+  });
+
+  it("escalations banner without details names the ticket number only", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-10T12:00:00Z"));
+    const soon = Date.parse("2026-10-10T12:25:00Z") / 1000;
+    await renderWidget(
+      "core.escalations",
+      {},
+      { status: "ok", data: { items: [{ ticket: ticket(1, { title: null as unknown as string, tn: "2026101001", customer_id: null, customer_email: null }), epoch: soon, kind: "solution" }], total: 1, oldest_epoch: soon } },
+      "wallboard",
+      {},
+      () => {},
+      { size: { w: 4, h: 2 } },
+    );
+    expect(screen.getByTestId("escalation-banner")).toHaveTextContent("Nächste Frist: #2026101001 · in 25 Min.");
+  });
+
+  it("queue overview: name, three-segment bar, 'open / new neu' and the legend", async () => {
+    await renderWidget(
+      "core.queue-overview",
+      {},
+      { status: "ok", data: { queues: [{ id: 3, name: "Support::Netz", open: 82, new: 19, escalated: 4 }], total: 1 } },
+      "wallboard",
+    );
+    const row = screen.getByTestId("queue-row-3");
+    expect(row).toHaveTextContent("Netz");
+    expect(row).toHaveTextContent("82 / 19 neu");
+    expect(row.querySelector("[data-segment=open]")).not.toBeNull();
+    expect(row.querySelector("[data-segment=new]")).not.toBeNull();
+    expect(row.querySelector("[data-segment=escalated]")).not.toBeNull();
+    expect(screen.getByTestId("queue-overview-legend")).toHaveTextContent("offen");
+    expect(screen.getByTestId("queue-overview-legend")).toHaveTextContent("eskaliert");
+  });
+
+  it("team presence: two-column cards with a status dot and 'verfügbar' / 'im Chat'", async () => {
+    await renderWidget(
+      "core.team-presence",
+      {},
+      { status: "ok", data: { online: [{ ...agent("Clara Lenz", 1), status: "available" }, { ...agent("Ben Krause", 2), status: "in_chat" }], total_online: 2 } },
+      "wallboard",
+    );
+    const free = screen.getByTestId("presence-card-1");
+    const chat = screen.getByTestId("presence-card-2");
+    expect(free).toHaveTextContent("Clara Lenz");
+    expect(free).toHaveTextContent("verfügbar");
+    expect(free.querySelector("[data-status=available]")).toHaveClass("bg-green");
+    expect(chat).toHaveTextContent("im Chat");
+    expect(chat.querySelector("[data-status=in_chat]")).toHaveClass("bg-accent");
+  });
+
+  it("no hover actions and, on a kiosk, no links at all", async () => {
+    const items = [{ ticket: ticket(1), epoch: 1, kind: "solution" }];
+    await renderWidget("core.escalations", {}, { status: "ok", data: { items, total: 5, oldest_epoch: 1 } }, "wallboard", { dashboardId: 7 }, () => {}, { size: { w: 4, h: 4 } });
+    expect(screen.getAllByRole("link").length).toBeGreaterThan(0); // TV mode of a logged-in agent keeps links
+    cleanup();
+    await renderWidget("core.escalations", {}, { status: "ok", data: { items, total: 5, oldest_epoch: 1 } }, "wallboard", { dashboardId: 7 }, () => {}, { size: { w: 4, h: 4 }, kiosk: true });
+    expect(screen.queryByRole("link")).toBeNull();
+    cleanup();
+    await renderWidget("core.ticket-list", preset("mine_new"), { status: "ok", data: { items: rows(4), total: 4 } }, "wallboard", { dashboardId: 7 }, () => {}, { kiosk: true });
     expect(screen.queryByRole("link", { hidden: true })).toBeNull();
     expect(screen.getAllByText("Ticket 1").length).toBeGreaterThan(0);
   });

@@ -9,6 +9,7 @@ import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
 import { DashboardTicketRow } from "@/components/agent/dashboard/DashboardTicketRow";
 import { ticketCustomer } from "@/components/agent/dashboard/ticketCustomer";
 import { linkTabIndex, rowLinkMode } from "../chrome/mode";
+import { useIsKiosk } from "../wallboard/kioskContext";
 import { useWidgetData } from "../data";
 import type { ColumnKey } from "../definitions";
 import { WidgetFrame, useWidgetChrome, type FrameLink } from "../chrome/WidgetFrame";
@@ -125,6 +126,7 @@ export function TicketListWidget({ instanceId, settings, size, mode }: WidgetPro
   const { t, i18n } = useTranslation();
   const locale = toBcp47(i18n.language);
   const chrome = useWidgetChrome();
+  const kiosk = useIsKiosk();
   const drill = useDrill(instanceId, mode);
   const { status, data } = useWidgetData<TicketListData>();
   const preset = presetOf(settings.source);
@@ -222,7 +224,7 @@ export function TicketListWidget({ instanceId, settings, size, mode }: WidgetPro
                     ticket={ticket}
                     density={density}
                     columns={settings.columns}
-                    linkMode={rowLinkMode(mode)}
+                    linkMode={rowLinkMode(mode, kiosk)}
                     trailing={settings.columns.includes("due") ? <DueText ticket={ticket} /> : undefined}
                   />
                 ))}

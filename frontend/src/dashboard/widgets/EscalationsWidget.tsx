@@ -33,14 +33,16 @@ export function EscalationsWidget({ instanceId, settings, size, mode }: WidgetPr
   const drill = useDrill(instanceId, mode);
   const { status, data } = useWidgetData<EscalationsData>();
   const total = status === "ok" && typeof data?.total === "number" ? data.total : 0;
+  const board = mode === "wallboard";
   const link: FrameLink | undefined = drill && total > 0 ? { label: t("dashboards.state.showAll", { count: total }), ...drill() } : undefined;
   return (
     <WidgetFrame
       title={t("dashboards.widgets.escalations.title")}
       link={link}
       mode={mode}
+      scaleBody={!board}
       testId="escalations-widget"
-      actions={<span className="shrink-0 text-xs text-muted">{t("dashboards.widgets.escalations.order")}</span>}
+      actions={board ? undefined : <span className="shrink-0 text-xs text-muted">{t("dashboards.widgets.escalations.order")}</span>}
     >
       <WidgetDataBody<EscalationsData> h={size.h}>
         {(data) => {
@@ -55,8 +57,26 @@ export function EscalationsWidget({ instanceId, settings, size, mode }: WidgetPr
             );
           const now = Date.now() / 1000;
           const navIds = items.map((x) => x.ticket.id);
+          if (board && size.h <= 2) {
+            // One banner with the next deadline (the server sorts nearest first).
+            const { ticket, epoch } = items[0];
+            const breached = epoch <= now;
+            const customer = ticketCustomer(ticket).label;
+            const what = ticket.title ? (customer ? `${ticket.title} · ${customer}` : ticket.title) : `#${ticket.tn}`;
+            const when = breached
+              ? t("dashboards.due.since", { duration: formatDurationSince(epoch) })
+              : t("dashboards.due.in", { duration: humanDuration(t, epoch - now) });
+            return (
+              <p
+                data-testid="escalation-banner"
+                className="flex h-full min-w-0 items-center truncate rounded-[0.6em] border border-danger/30 bg-danger/10 px-[0.8em] text-[length:calc(22px*var(--wb-zoom,1))] font-medium text-danger"
+              >
+                <span className="truncate">{t("dashboards.widgets.escalations.nextDeadline", { what, when })}</span>
+              </p>
+            );
+          }
           return (
-            <ul className="flex flex-col gap-2">
+            <ul className={cn("flex flex-col", board ? "gap-[0.6em] text-[length:calc(20px*var(--wb-zoom,1))]" : "gap-2")}>
               {items.map(({ ticket, epoch, kind }) => {
                 const breached = epoch <= now;
                 const customer = ticketCustomer(ticket).label;
@@ -75,14 +95,14 @@ export function EscalationsWidget({ instanceId, settings, size, mode }: WidgetPr
                         className={cn("w-1 self-stretch rounded-sm", breached ? "bg-danger" : "bg-escalation")}
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">{ticket.title}</span>
-                        <span className="block truncate text-xs text-muted">
+                        <span className={cn("block truncate font-medium", board ? "text-[1em]" : "text-sm")}>{ticket.title}</span>
+                        <span className={cn("block truncate text-muted", board ? "text-[0.8em]" : "text-xs")}>
                           {customer ? `${kindLabel} · ${customer}` : kindLabel}
                         </span>
                       </span>
                       <span
                         className={cn(
-                          "shrink-0 font-mono text-xs font-semibold tabular-nums",
+                          "shrink-0 font-mono font-semibold tabular-nums", board ? "text-[0.8em]" : "text-xs",
                           breached ? "text-danger" : "text-escalation",
                         )}
                       >

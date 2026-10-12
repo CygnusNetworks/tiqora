@@ -1,5 +1,6 @@
 import type { WidgetMode } from "@/plugins/dashboardWidgets";
 import { useWidgetChrome } from "../chrome/WidgetFrame";
+import { useIsKiosk } from "../wallboard/kioskContext";
 import { canDrill, drillHref, type DrillPoint } from "./drillLinks";
 
 /**
@@ -8,6 +9,7 @@ import { canDrill, drillHref, type DrillPoint } from "./drillLinks";
  */
 export function useDrill(widgetId: string, mode: WidgetMode): ((point?: DrillPoint) => ReturnType<typeof drillHref>) | null {
   const { dashboardId } = useWidgetChrome();
-  if (dashboardId === undefined || !canDrill(mode)) return null;
+  const kiosk = useIsKiosk();
+  if (kiosk || dashboardId === undefined || !canDrill(mode)) return null;
   return (point) => drillHref(dashboardId, widgetId, point);
 }

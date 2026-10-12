@@ -5,9 +5,9 @@ export function isInteractive(mode: WidgetMode): boolean {
   return mode === "view" || mode === "wallboard";
 }
 
-/** Preview renders no links at all (plain text instead). */
-export function rendersLinks(mode: WidgetMode): boolean {
-  return mode !== "preview";
+/** Preview and the public wallboard (`kiosk`) render no links at all (plain text instead). */
+export function rendersLinks(mode: WidgetMode, kiosk = false): boolean {
+  return mode !== "preview" && !kiosk;
 }
 
 /** `tabIndex` for a link inside a widget: not a tab stop while editing. */
@@ -16,8 +16,8 @@ export function linkTabIndex(mode: WidgetMode): number | undefined {
 }
 
 /** `DashboardTicketRow`'s `linkMode` for a widget mode. */
-export function rowLinkMode(mode: WidgetMode): "link" | "inert" | "none" {
-  if (!rendersLinks(mode)) return "none";
+export function rowLinkMode(mode: WidgetMode, kiosk = false): "link" | "inert" | "none" {
+  if (!rendersLinks(mode, kiosk)) return "none";
   return isInteractive(mode) ? "link" : "inert";
 }
 

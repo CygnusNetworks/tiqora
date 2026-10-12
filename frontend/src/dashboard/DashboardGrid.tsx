@@ -30,6 +30,8 @@ import { skeletonRows } from "./chrome/mode";
 import { usePreviewData, WidgetDataProvider, type WidgetDataState } from "./data";
 import { canUseWidget, settingsWithDefaults } from "./definitions";
 import { GearIcon, PhoneControls } from "./edit/PhoneControls";
+import { useIsKiosk } from "./wallboard/kioskContext";
+import { usePrefersReducedMotion } from "./wallboard/useReducedMotion";
 import { useDragResize, type DragCommit } from "./edit/useDragResize";
 import { WIDGET_DRAG_TYPE } from "./gallery/galleryModel";
 import { layoutForBreakpoint } from "./layout/breakpoints";
@@ -144,6 +146,8 @@ function GridCell({
   const { t } = useTranslation();
   const { ready: pluginsReady } = usePlugins();
   const user = useOptionalAuth()?.user;
+  // The public wallboard has no login: the server already decided what the link may show.
+  const kiosk = useIsKiosk();
   const settings = useMemo(
     () => (def ? settingsWithDefaults(def, widget.settings, widget.type_version) : {}),
     [def, widget.settings, widget.type_version],
@@ -181,7 +185,7 @@ function GridCell({
           />
         </WidgetChromeProvider>
       );
-  } else if (!canUseWidget(def, { is_admin: user?.is_admin === true, can_view_reports: user?.can_view_reports === true })) {
+  } else if (!kiosk && !canUseWidget(def, { is_admin: user?.is_admin === true, can_view_reports: user?.can_view_reports === true })) {
     body = (
       <WidgetChromeProvider value={chrome}>
         <WidgetFrame title={widget.title_override?.trim() || defTitle} mode={mode} testId="widget-forbidden">
@@ -253,29 +257,6 @@ function PreviewGridCell(props: Omit<Parameters<typeof GridCell>[0], "state" | "
   return <GridCell {...props} state={state} retry={refetch} />;
 }
 
-function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(() => {
-    try {
-      return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-    } catch {
-      return false;
-    }
-  });
-  useEffect(() => {
-    let query: MediaQueryList | undefined;
-    try {
-      query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    } catch {
-      query = undefined;
-    }
-    if (!query?.addEventListener) return;
-    const onChange = () => setReduced(query!.matches);
-    query.addEventListener("change", onChange);
-    return () => query!.removeEventListener("change", onChange);
-  }, []);
-  return reduced;
-}
-
 const ICON_BTN =
   "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] border border-hairline bg-surface text-muted transition-colors hover:bg-surface-subtle hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40";
 
@@ -317,17 +298,22 @@ export function DashboardGrid({
   onRetry,
   edit,
   onConfigureWidget,
+  rowHeight = ROW_H,
+  gap = GAP,
 }: {
   widgets: EditWidget[];
-  mode: "view" | "edit";
+  /** `wallboard`: the lg layout with `rowHeight` / `gap` (the wallboard view computes them), no editing. */
+  mode: "view" | "edit" | "wallboard";
   breakpoint: Breakpoint;
-  dashboardId: number;
+  dashboardId?: number;
   canEdit: boolean;
   data: Record<string, WidgetDataState>;
   onRetry: (id: string) => void;
   edit?: EditHandlers;
   /** View mode, editors only: a tile's "Suche wählen" / "Filter ändern" opens that widget's settings in edit mode. */
   onConfigureWidget?: (id: string) => void;
+  rowHeight?: number;
+  gap?: number;
 }) {
   const { t } = useTranslation();
   const defs = useDashboardWidgetDefinitions();
@@ -664,8 +650,8 @@ export function DashboardGrid({
   const gridStyle: CSSProperties = {
     display: "grid",
     gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-    gridAutoRows: `${ROW_H}px`,
-    gap: `${GAP}px`,
+    gridAutoRows: `${rowHeight}px`,
+    gap: `${gap}px`,
   };
   if (!editing) {
     return (

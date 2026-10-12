@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import type { WidgetMode } from "@/plugins/dashboardWidgets";
 import { setTicketNavContext } from "@/lib/ticketNavContext";
+import { useIsKiosk } from "../wallboard/kioskContext";
 import { linkTabIndex, rendersLinks } from "./mode";
 
 /** A ticket link inside a widget: not a tab stop in edit mode, plain text in preview. */
@@ -23,7 +24,8 @@ export function TicketLink({
   testId?: string;
 }) {
   const { t } = useTranslation();
-  if (!rendersLinks(mode))
+  const kiosk = useIsKiosk();
+  if (!rendersLinks(mode, kiosk))
     return (
       <span className={className} data-testid={testId}>
         {children}
