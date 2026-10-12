@@ -648,8 +648,9 @@ User guide: [dashboards.md](dashboards.md).
     and is rate limited per address (240/min) and per misses (30/10 min) through Redis; behind a proxy
     `trusted_proxies` decides the address. Widgets run as the link creator, but only types with a rule
     in `KIOSK_RULES` run at all. Results are cached 20 s per link and dashboard version (5 s with
-    `pending` widgets), computed under a lock while waiters poll, and the last good value per widget is
-    kept for 6 h and merged into `pending` ones.
+    `pending` widgets), computed under a lock (a per-request token; only the holder releases it) while
+    waiters poll, and the last good value per widget is kept for 30 min and merged into `pending` ones
+    (it carries no stale marker). Without details an `error` tile carries the generic error text.
   - *Redaction whitelist.* `KIOSK_SETTINGS_WHITELIST` lists the settings keys per widget type that may
     leave (for example counter `tone`, ticket list `columns`/`limit`/`density`/`sort`, report
     `display`/`max_rows`); never `source`, notes, links, `parameters` or `report_key`. Without details,

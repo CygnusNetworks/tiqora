@@ -130,9 +130,9 @@ Einstellungen: Sie wählen einen Standardbericht oder einen gespeicherten Berich
 (Diagramm oder Tabelle), Zeilenzahl, Aufteilung und Parameter. Bricht man die Einstellungen für ein
 neu hinzugefügtes Berichts-Widget ab, entfällt das Widget wieder. Kleine Berichte erscheinen sofort.
 Ist ein Bericht zu umfangreich für den direkten Aufruf, rechnet Tiqora ihn im Hintergrund
-(„Wird im Hintergrund berechnet …“); das Ergebnis erscheint danach in der Kachel. Auf einem
-Wallboard bleiben Berichtskacheln leer, deren Ergebnis nicht im Zwischenspeicher liegt; das
-Ergebnis-Caching der Auswertung (Redis) ist dafür Voraussetzung.
+(„Wird im Hintergrund berechnet …“); das Ergebnis erscheint danach in der Kachel, auch im
+TV-Modus. Auf einem Wallboard-Link bleiben Berichtskacheln leer, deren Ergebnis nicht im
+Zwischenspeicher liegt; das Ergebnis-Caching der Auswertung (Redis) ist dafür Voraussetzung.
 
 ### Drill-down
 
@@ -172,8 +172,11 @@ und erreicht dadurch weder Server-Logs noch Referrer. Verwaltung: Widerrufen und
   Zeilenzahl einer Ticketliste), nie Quelle, Suchen, Filterbedingungen, Notizen oder Links.
   Notizen und Links zeigen „Auf dem Wallboard nicht verfügbar“. Eigene Titel von Kacheln erscheinen
   nur mit **Details anzeigen**.
-- Ohne Details entfallen Tickettitel, Kunden und Namen in Listen. Widget-Arten ohne
+- Ohne Details entfallen Tickettitel, Kunden und Namen in Listen; Fehlermeldungen von Kacheln
+  lauten dann allgemein „Diese Daten konnten nicht geladen werden.“ Widget-Arten ohne
   Wallboard-Regel (Plugins) erscheinen als „Auf dem Wallboard ausgeblendet“ und laufen nicht.
+- Die Web-Chat-Kachel zeigt auf dem Wallboard nur die wartenden Chats, nicht „Meine Chats“ des
+  Erstellers. Die KI-Kachel zeigt die Token-Budgets der Queues, nie die Kosten der KI-Anbieter.
 - Abgelaufene, widerrufene oder unbekannte Links zeigen dieselbe Meldung („Dieser Wallboard-Link
   ist ungültig oder abgelaufen“); wiederholtes Raten wird begrenzt.
 
