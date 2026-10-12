@@ -43,6 +43,7 @@ from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraChatMessage, TiqoraChatSession, TiqoraSettings
 from tiqora.domain.settings_store import KEY_AI_GLOBAL_REPLIES_PER_HOUR
 from tiqora.jobs.service import utc_now
+from tiqora.webchat.agent import end_session_by_agent
 from tiqora.webchat.availability import mark_agent_online, set_agent_state
 from tiqora.webchat.bot import (
     BOT_ALIVE_KEY,
@@ -447,6 +448,9 @@ async def test_ai_escalation_hands_off_with_ai_note(env: Env) -> None:
     assert _notes(env, chat) == ["Escalated to human: Kunde braucht eine Vertragsänderung"]
     codes = await _codes(env, chat)
     assert codes[-1] == "handoff" and "no_agent" not in codes
+    lines = await _lines(env, chat)
+    handoff = [m for m in lines if m.sender == "system" and m.body == "handoff"]
+    assert [json.loads(m.meta or "{}") for m in handoff] == [{"reason": "ai"}]
     flagged = env.sql(
         "SELECT ai_escalated_at FROM tiqora_ai_ticket_state WHERE ticket_id = :t",
         t=int(chat.ticket_id),
@@ -482,6 +486,7 @@ async def test_handoff_without_humans_ends_no_agent(env: Env) -> None:
     system = [(m.body, json.loads(m.meta or "{}")) for m in lines if m.sender == "system"]
     assert [c for c, _ in system][-2:] == ["handoff", "no_agent"]
     assert system[-1][1] == {"has_email": True}
+    assert system[-2][1] == {"reason": "ai"}
     assert any(p.get("type") == "chat_ended" for p in _published(env))
     assert not any(p.get("type") == "chat_waiting" for p in _published(env))
 
@@ -728,17 +733,7 @@ async def test_visitor_burst_supersedes_then_one_answer(env: Env) -> None:
 @pytest.mark.parametrize("env", _URLS, indirect=True)
 async def test_pending_line_after_a_reply_queues_the_next_turn(env: Env) -> None:
     chat = await _start(env)
-    late: list[bool] = []
-
-    async def line_after_answer_was_planned() -> None:
-        # stored while the turn is running, but only after the model was asked: the turn's
-        # freshness check passes before this runs, so this line is NOT covered by the answer
-        if not late:
-            late.append(True)
-
-    env.llm = ScriptedLlm(
-        [propose_response("reply", "Neu starten.")], on_call=line_after_answer_was_planned
-    )
+    env.llm = ScriptedLlm([propose_response("reply", "Neu starten.")])
     assert await _turn(env, chat) == "replied"
     env.redis._lists.pop(BOT_QUEUE_KEY, None)
     # a line that is stored after the answer leaves the session pending and queued
@@ -895,3 +890,74 @@ async def test_visitor_end_without_any_bot_answer_leaves_ticket_state(env: Env) 
         await end_by_visitor(db, chat=chat, now=NOW)
         await db.commit()
     assert _ticket_state_id(env, chat) == before
+
+
+def _set_ticket_state_type(env: Env, chat: TiqoraChatSession, type_name: str) -> int:
+    state_id = int(
+        env.sql(
+            "SELECT ts.id FROM ticket_state ts JOIN ticket_state_type tst ON tst.id = ts.type_id"
+            " WHERE LOWER(tst.name) = :n AND ts.valid_id = 1 ORDER BY ts.id LIMIT 1",
+            n=type_name,
+        )[0][0]
+    )
+    env.sql(
+        "UPDATE ticket SET ticket_state_id = :s WHERE id = :t", s=state_id, t=int(chat.ticket_id)
+    )
+    return state_id
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+@pytest.mark.parametrize("type_name", ["closed", "merged", "pending reminder"])
+async def test_visitor_end_keeps_a_state_set_after_the_bot_answer(env: Env, type_name: str) -> None:
+    chat = await _start(env)
+    env.llm = ScriptedLlm([propose_response("reply", "Neu starten.")])
+    assert await _turn(env, chat) == "replied"
+    moved = _set_ticket_state_type(env, chat, type_name)
+    async with env.factory() as db:
+        await end_by_visitor(db, chat=chat, now=NOW)
+        await db.commit()
+    assert _ticket_state_id(env, chat) == moved
+    assert env.row(chat)[0] == "ended"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+async def test_failing_ticket_write_does_not_fail_the_visitor_end(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    chat = await _start(env)
+    env.llm = ScriptedLlm([propose_response("reply", "Neu starten.")])
+    assert await _turn(env, chat) == "replied"
+    before = _ticket_state_id(env, chat)
+
+    async def boom(*_a: Any, **_k: Any) -> None:
+        raise RuntimeError("index down")
+
+    monkeypatch.setattr("tiqora.webchat.bot.domain_change_state", boom)
+    async with env.factory() as db:
+        await end_by_visitor(db, chat=chat, now=NOW)
+        await db.commit()
+    assert env.row(chat)[0] == "ended"
+    assert _ticket_state_id(env, chat) == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+async def test_agent_end_parks_a_bot_resolved_ticket(env: Env) -> None:
+    chat = await _start(env)
+    env.llm = ScriptedLlm([propose_response("reply", "Neu starten.")])
+    assert await _turn(env, chat) == "replied"
+    before = _ticket_state_id(env, chat)
+    async with env.factory() as db:
+        expected = await resolve_auto_state_id(
+            db, kind="reply", allowed_state_types=["open", "closed"]
+        )
+    async with env.factory() as db:
+        await end_session_by_agent(
+            db, SysConfig(db), session_id=chat.id, user_id=AGENT, close_ticket=False, now=NOW
+        )
+        await db.commit()
+    assert expected is not None and expected != before
+    assert _ticket_state_id(env, chat) == expected
+    assert env.row(chat)[0] == "ended"

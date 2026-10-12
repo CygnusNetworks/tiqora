@@ -45,7 +45,7 @@ from datetime import datetime, timedelta
 from typing import Any, Final, Literal
 
 import structlog
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.ai.auto_run import (
@@ -691,7 +691,7 @@ async def hand_off_chat(
             sysconfig=sysconfig,
         )
     await mark_ai_escalated(db, ticket_id, reason=f"webchat_{reason}")
-    await add_system_message(db, chat=locked, code="handoff", params={}, now=now)
+    await add_system_message(db, chat=locked, code="handoff", params={"reason": reason}, now=now)
     event: dict[str, Any] = {
         "session_id": locked.id,
         "ticket_id": ticket_id,
@@ -733,21 +733,52 @@ async def close_bot_resolved_ticket(
     """
     if chat.bot_outcome != "replied" or chat.handoff_at is not None:
         return
+    try:
+        # A savepoint: a failing ticket write must never fail (or half-commit) the chat end.
+        async with db.begin_nested():
+            state_id = await _bot_park_state_id(db, chat)
+            if state_id is None:
+                return
+            policy = await get_queue_policy_by_queue(db, int(chat.queue_id))
+            if policy is None or policy.service_user_id is None:
+                return
+            await domain_change_state(
+                db,
+                ticket_id=int(chat.ticket_id),
+                new_state_id=state_id,
+                user_id=int(policy.service_user_id),
+                sysconfig=sysconfig,
+            )
+    except Exception as exc:
+        logger.warning(
+            "webchat_bot_ticket_close_failed", session_id=chat.id, error=type(exc).__name__
+        )
+        return
+    logger.info("webchat_bot_ticket_closed", session_id=chat.id, state_id=state_id)
+
+
+async def _bot_park_state_id(db: AsyncSession, chat: TiqoraChatSession) -> int | None:
+    """The state to park in, or ``None`` when the ticket is not in ``new``/``open`` any more
+    (an agent or an AI tool moved it to pending/closed/merged after the last bot answer) or
+    the queue policy allows no suitable state."""
+    current = (
+        await db.execute(
+            text(
+                "SELECT LOWER(tst.name) FROM ticket t"
+                " JOIN ticket_state ts ON ts.id = t.ticket_state_id"
+                " JOIN ticket_state_type tst ON tst.id = ts.type_id"
+                " WHERE t.id = :t"
+            ),
+            {"t": int(chat.ticket_id)},
+        )
+    ).first()
+    if current is None or str(current[0]) not in ("new", "open"):
+        return None
     policy = await get_queue_policy_by_queue(db, int(chat.queue_id))
     if policy is None or policy.service_user_id is None:
-        return
-    state_id = await resolve_auto_state_id(
+        return None
+    return await resolve_auto_state_id(
         db,
         kind=DRAFT_KIND_REPLY,
         allowed_state_types=resolve_allowed_state_types(policy.allowed_state_types),
     )
-    if state_id is None:
-        return
-    await domain_change_state(
-        db,
-        ticket_id=int(chat.ticket_id),
-        new_state_id=state_id,
-        user_id=int(policy.service_user_id),
-        sysconfig=sysconfig,
-    )
-    logger.info("webchat_bot_ticket_closed", session_id=chat.id, state_id=state_id)
