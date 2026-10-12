@@ -720,4 +720,3 @@ async def test_create_in_invalid_class_is_rejected(cmdb_db: CmdbWorld) -> None:
                 attributes={},
             )
         assert e.value.issues[0].code == "class_invalid"
-
