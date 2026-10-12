@@ -65,6 +65,9 @@ const CORE_FORM_NAMES: Record<string, string> = {
   "core.recent-views": "recentViews",
   "core.calendar-agenda": "calendarAgenda",
   "core.team-presence": "teamPresence",
+  "core.sla-gauge": "slaGauge",
+  "core.backlog-aging": "backlogAging",
+  "core.heatmap": "heatmap",
 };
 
 const identity = {

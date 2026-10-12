@@ -5,15 +5,18 @@
  */
 import { DASHBOARD_WIDGETS, type WidgetDefinition } from "@/plugins/dashboardWidgets";
 import { COLUMN_KEYS, TICKET_PRESETS, defineCoreWidget } from "../definitions";
+import { BacklogAgingWidget, type BacklogAgingSettings } from "./BacklogAgingWidget";
 import { CalendarAgendaWidget, type CalendarAgendaSettings } from "./CalendarAgendaWidget";
 import { CounterWidget, type CounterSettings } from "./CounterWidget";
 import { EscalationsWidget, type EscalationsSettings } from "./EscalationsWidget";
+import { HeatmapWidget, type HeatmapSettings } from "./HeatmapWidget";
 import { LinksWidget, type LinksSettings } from "./LinksWidget";
 import { NotesWidget, type NotesSettings } from "./NotesWidget";
 import { QueueOverviewWidget, type QueueOverviewSettings } from "./QueueOverviewWidget";
 import { RecentViewsWidget, type RecentViewsSettings } from "./RecentViewsWidget";
 import { RemindersWidget, type RemindersSettings } from "./RemindersWidget";
 import { ReportWidget, type ReportWidgetSettings } from "./ReportWidget";
+import { SlaGaugeWidget, type SlaGaugeSettings } from "./SlaGaugeWidget";
 import { TeamPresenceWidget, type TeamPresenceSettings } from "./TeamPresenceWidget";
 import { TicketListWidget, type TicketListSettings } from "./TicketListWidget";
 import { TIME_RANGE_PRESETS } from "../filters/timeRanges";
@@ -210,6 +213,48 @@ export const CORE_WIDGETS: WidgetDefinition<any>[] = [
     refreshOn: ["interval:300"],
     permission: "stats",
     component: ReportWidget,
+  }),
+  defineCoreWidget<SlaGaugeSettings>({
+    key: "core.sla-gauge",
+    version: 1,
+    ...texts("slaGauge"),
+    category: "reports",
+    icon: "gauge",
+    size: { default: [3, 3], min: [3, 3], max: [6, 5] },
+    settings: object({
+      time_range: { type: "string", enum: [...TIME_RANGE_PRESETS], default: "30d" },
+      target_percent: int(50, 100, 90),
+    }),
+    data: { endpoint: "core.sla-gauge" },
+    refreshOn: ["interval:300"],
+    permission: "stats",
+    component: SlaGaugeWidget,
+  }),
+  defineCoreWidget<BacklogAgingSettings>({
+    key: "core.backlog-aging",
+    version: 1,
+    ...texts("backlogAging"),
+    category: "reports",
+    icon: "layers",
+    size: { default: [6, 5], min: [4, 4], max: [12, 8] },
+    settings: object({ max_rows: int(1, 15, 8) }),
+    data: { endpoint: "core.backlog-aging" },
+    refreshOn: ["interval:300"],
+    permission: "stats",
+    component: BacklogAgingWidget,
+  }),
+  defineCoreWidget<HeatmapSettings>({
+    key: "core.heatmap",
+    version: 1,
+    ...texts("heatmap"),
+    category: "reports",
+    icon: "grid",
+    size: { default: [6, 4], min: [6, 4], max: [12, 6] },
+    settings: object({ time_range: { type: "string", enum: ["30d", "90d"], default: "90d" } }),
+    data: { endpoint: "core.heatmap" },
+    refreshOn: ["interval:900"],
+    permission: "stats",
+    component: HeatmapWidget,
   }),
 ];
 

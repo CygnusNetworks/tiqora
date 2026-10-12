@@ -5445,7 +5445,9 @@
       "deltaFlat": "Unchanged",
       "points": "{{value}} pp",
       "ofTotal": "{{percent}} of total",
-      "total": "Total"
+      "total": "Total",
+      "gaugeNoData": "No tickets in this period",
+      "gaugeTarget": "Target {{value}}"
     },
     "openReport": "Open report",
     "retry": "Try again",
@@ -6096,6 +6098,24 @@
         "tooLargePreview": "Too large for the preview – it is calculated in the background after saving.",
         "tooLargeWallboard": "This report is too large for the wallboard.",
         "queueIgnored": "The queue filter does not apply to this report."
+      },
+      "slaGauge": {
+        "title": "SLA compliance",
+        "description": "Share of tickets that met their SLA, against the target",
+        "label": "SLA compliance",
+        "noTickets": "No tickets in this period",
+        "tickets_one": "{{count}} ticket in this period",
+        "tickets_other": "{{count}} tickets in this period"
+      },
+      "backlogAging": {
+        "title": "Backlog by age",
+        "description": "Open tickets per queue, stacked by age",
+        "empty": "No open tickets."
+      },
+      "heatmap": {
+        "title": "Arrivals by time",
+        "description": "New tickets by weekday and hour",
+        "empty": "No tickets in this period."
       }
     },
     "tabs": {
@@ -6294,6 +6314,44 @@
           "fields": {
             "limit": {
               "label": "Number of people"
+            }
+          }
+        },
+        "slaGauge": {
+          "fields": {
+            "time_range": {
+              "label": "Time range",
+              "help": "The dashboard can override the time range.",
+              "options": {
+                "today": "Today",
+                "7d": "Last 7 days",
+                "30d": "Last 30 days",
+                "90d": "Last 90 days",
+                "this_month": "This month",
+                "last_month": "Last month"
+              }
+            },
+            "target_percent": {
+              "label": "Target in percent"
+            }
+          }
+        },
+        "backlogAging": {
+          "fields": {
+            "max_rows": {
+              "label": "Number of queues"
+            }
+          }
+        },
+        "heatmap": {
+          "fields": {
+            "time_range": {
+              "label": "Time range",
+              "help": "The dashboard can override the time range.",
+              "options": {
+                "30d": "Last 30 days",
+                "90d": "Last 90 days"
+              }
             }
           }
         }

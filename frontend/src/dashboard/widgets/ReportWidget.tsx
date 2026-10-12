@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { WidgetMode, WidgetProps } from "@/plugins/dashboardWidgets";
@@ -159,31 +159,39 @@ function shownDefinition(definition: ReportDefinition, display: "auto" | "table"
   return { ...definition, visualization: { ...(definition.visualization ?? {}), type: "table" } } as ReportDefinition;
 }
 
+/** How a tile draws a finished result; `fromJob` marks the background job's own (uncapped) result. */
+export type TileRender = (args: {
+  definition: ReportDefinition;
+  result: ReportResult;
+  tile: ReportTileData | undefined;
+  fromJob: boolean;
+}) => ReactNode;
+
 function ReportBody({
   data,
-  settings,
+  render,
+  emptyText,
   mode,
   size,
   refetch,
   bg,
   jobDefinition,
-  reportKey,
   dashboardId,
 }: {
   data: ReportTileData | undefined;
-  settings: ReportWidgetSettings;
+  render: TileRender;
+  emptyText: string;
   mode: WidgetMode;
   size: { h: number };
   refetch: () => void;
   bg: ReturnType<typeof useBackgroundRun>;
   jobDefinition: ReportDefinition | undefined;
-  reportKey: string | null;
   dashboardId: number | undefined;
 }) {
   const { t } = useTranslation();
   if (!data) {
     return (
-      <WidgetEmpty action={<ChooseSourceAction mode={mode} />}>{t("dashboards.widgets.report.empty")}</WidgetEmpty>
+      <WidgetEmpty action={<ChooseSourceAction mode={mode} />}>{emptyText}</WidgetEmpty>
     );
   }
 
@@ -193,14 +201,7 @@ function ReportBody({
       return <Waiting>{t("dashboards.widgets.report.tooLargePreview")}</Waiting>;
     }
     if (bg.jobResult && jobDefinition) {
-      return (
-        <ReportView
-          report={{ key: reportKey, definition: shownDefinition(jobDefinition, settings.display) }}
-          result={{ ...bg.jobResult, rows: bg.jobResult.rows.slice(0, settings.max_rows) }}
-          compact
-          testId="report-widget-view"
-        />
-      );
+      return <>{render({ definition: jobDefinition, result: bg.jobResult, tile: data, fromJob: true })}</>;
     }
     if (bg.run?.error) {
       return (
@@ -225,12 +226,7 @@ function ReportBody({
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
       <div className="min-h-0 flex-1 overflow-auto">
-        <ReportView
-          report={{ key: data.report?.key ?? null, definition: shownDefinition(data.definition, settings.display) }}
-          result={data.result}
-          compact
-          testId="report-widget-view"
-        />
+        {render({ definition: data.definition, result: data.result, tile: data, fromJob: false })}
       </div>
       {ignored.includes("queue") && (
         <p className="text-xs text-muted" data-testid="report-ignored-filters">
@@ -241,9 +237,30 @@ function ReportBody({
   );
 }
 
-/** A report on the dashboard: the report's own visualisation (compact) or a table; large reports run as a background job. */
-export function ReportWidget({ instanceId, settings, size, mode }: WidgetProps<ReportWidgetSettings>) {
-  const { t } = useTranslation();
+/**
+ * The shared shell of every report-backed tile (report, SLA gauge, backlog aging, heatmap): the data gate,
+ * the background run of a deferred result and the job's own result; `render` draws a finished result.
+ */
+export function ReportTileWidget({
+  instanceId,
+  settings,
+  size,
+  mode,
+  title,
+  emptyText,
+  testId,
+  render,
+}: {
+  instanceId: string;
+  /** Hashed (with the dashboard filters) as the one-job guard key; `report_key` names the report of a deferred job. */
+  settings: Record<string, unknown> & { report_key?: string };
+  size: { h: number };
+  mode: WidgetMode;
+  title: (tile: ReportTileData | undefined) => string;
+  emptyText: string;
+  testId: string;
+  render: TileRender;
+}) {
   const { status, data, refetch } = useWidgetData<ReportTileData>();
   const chrome = useWidgetChrome();
   const { filters } = useDashboardFilters();
@@ -266,25 +283,50 @@ export function ReportWidget({ instanceId, settings, size, mode }: WidgetProps<R
     enabled: deferred && bg.jobResult !== undefined && reportKey !== null,
     retry: false,
   });
-  const title =
-    (tile?.report?.name ?? "") || (tile?.report?.title_key ? t(tile.report.title_key) : "") || t("dashboards.widgets.report.title");
   return (
-    <WidgetFrame title={title} mode={mode} testId="report-widget">
+    <WidgetFrame title={title(tile)} mode={mode} testId={testId}>
       <WidgetDataBody<ReportTileData> h={size.h}>
         {(d) => (
           <ReportBody
             data={status === "ok" ? d : undefined}
-            settings={settings}
+            render={render}
+            emptyText={emptyText}
             mode={mode}
             size={size}
             refetch={refetch}
             bg={bg}
             jobDefinition={reportQ.data?.definition ?? undefined}
-            reportKey={reportKey}
             dashboardId={chrome.dashboardId}
           />
         )}
       </WidgetDataBody>
     </WidgetFrame>
+  );
+}
+
+/** A report on the dashboard: the report's own visualisation (compact) or a table; large reports run as a background job. */
+export function ReportWidget({ instanceId, settings, size, mode }: WidgetProps<ReportWidgetSettings>) {
+  const { t } = useTranslation();
+  const render: TileRender = ({ definition, result, tile, fromJob }) => (
+    <ReportView
+      report={{ key: tile?.report?.key ?? settings.report_key ?? null, definition: shownDefinition(definition, settings.display) }}
+      result={fromJob ? { ...result, rows: result.rows.slice(0, settings.max_rows) } : result}
+      compact
+      testId="report-widget-view"
+    />
+  );
+  return (
+    <ReportTileWidget
+      instanceId={instanceId}
+      settings={settings as unknown as Record<string, unknown>}
+      size={size}
+      mode={mode}
+      title={(tile) =>
+        (tile?.report?.name ?? "") || (tile?.report?.title_key ? t(tile.report.title_key) : "") || t("dashboards.widgets.report.title")
+      }
+      emptyText={t("dashboards.widgets.report.empty")}
+      testId="report-widget"
+      render={render}
+    />
   );
 }

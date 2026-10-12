@@ -171,12 +171,14 @@ afterEach(() => {
 
 // ---------------------------------------------------------------- registry wiring
 
+const REPORT_WIDGET_KEYS = ["core.report", "core.sla-gauge", "core.backlog-aging", "core.heatmap"];
+
 describe("registerCoreWidgets", () => {
-  it("registers exactly the ten phase-1 core keys and core.report once, owned by core, with the D9 sizes, and is idempotent", () => {
+  it("registers exactly the ten phase-1 core keys and the report widgets once, owned by core, with the D9 sizes, and is idempotent", () => {
     DASHBOARD_WIDGETS.clearForTests();
     registerCoreWidgets();
     registerCoreWidgets();
-    expect(DASHBOARD_WIDGETS.list().map((w) => w.key).sort()).toEqual([...CORE_WIDGET_KEYS, "core.report"].sort());
+    expect(DASHBOARD_WIDGETS.list().map((w) => w.key).sort()).toEqual([...CORE_WIDGET_KEYS, ...REPORT_WIDGET_KEYS].sort());
     expect(CORE_WIDGET_KEYS).toHaveLength(10);
     expect(DASHBOARD_WIDGETS.get("core.counter")!.size).toEqual({ default: [3, 2], min: [2, 2], max: [4, 3] });
     expect(DASHBOARD_WIDGETS.get("core.ticket-list")!.size).toEqual({ default: [6, 5], min: [4, 3], max: [12, 10] });
@@ -204,7 +206,7 @@ describe("registerCoreWidgets", () => {
     DASHBOARD_WIDGETS.register(counter, "org.example");
     expect(() => registerCoreWidgets()).not.toThrow();
     expect(DASHBOARD_WIDGETS.owner("core.counter")).toBe("org.example");
-    expect(DASHBOARD_WIDGETS.list()).toHaveLength(11);
+    expect(DASHBOARD_WIDGETS.list()).toHaveLength(10 + REPORT_WIDGET_KEYS.length);
   });
 });
 

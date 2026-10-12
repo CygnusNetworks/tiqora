@@ -5445,7 +5445,9 @@
       "deltaFlat": "Unverändert",
       "points": "{{value}} Pp.",
       "ofTotal": "{{percent}} vom Gesamtwert",
-      "total": "Gesamt"
+      "total": "Gesamt",
+      "gaugeNoData": "Keine Tickets im Zeitraum",
+      "gaugeTarget": "Ziel {{value}}"
     },
     "openReport": "Bericht öffnen",
     "retry": "Erneut versuchen",
@@ -6096,6 +6098,24 @@
         "tooLargePreview": "Zu umfangreich für die Vorschau – wird nach dem Speichern im Hintergrund berechnet.",
         "tooLargeWallboard": "Dieser Bericht ist für das Wallboard zu umfangreich.",
         "queueIgnored": "Der Queue-Filter gilt für diesen Bericht nicht."
+      },
+      "slaGauge": {
+        "title": "SLA-Erfüllung",
+        "description": "Anteil der Tickets, die ihre SLA eingehalten haben, gegen das Ziel",
+        "label": "SLA-Erfüllung",
+        "noTickets": "Keine Tickets im Zeitraum",
+        "tickets_one": "{{count}} Ticket im Zeitraum",
+        "tickets_other": "{{count}} Tickets im Zeitraum"
+      },
+      "backlogAging": {
+        "title": "Rückstand nach Alter",
+        "description": "Offene Tickets je Queue, nach Alter gestapelt",
+        "empty": "Keine offenen Tickets."
+      },
+      "heatmap": {
+        "title": "Eingang nach Zeit",
+        "description": "Neue Tickets nach Wochentag und Uhrzeit",
+        "empty": "Keine Tickets im Zeitraum."
       }
     },
     "tabs": {
@@ -6294,6 +6314,44 @@
           "fields": {
             "limit": {
               "label": "Anzahl Personen"
+            }
+          }
+        },
+        "slaGauge": {
+          "fields": {
+            "time_range": {
+              "label": "Zeitraum",
+              "help": "Das Dashboard kann den Zeitraum überschreiben.",
+              "options": {
+                "today": "Heute",
+                "7d": "Letzte 7 Tage",
+                "30d": "Letzte 30 Tage",
+                "90d": "Letzte 90 Tage",
+                "this_month": "Dieser Monat",
+                "last_month": "Letzter Monat"
+              }
+            },
+            "target_percent": {
+              "label": "Ziel in Prozent"
+            }
+          }
+        },
+        "backlogAging": {
+          "fields": {
+            "max_rows": {
+              "label": "Anzahl Queues"
+            }
+          }
+        },
+        "heatmap": {
+          "fields": {
+            "time_range": {
+              "label": "Zeitraum",
+              "help": "Das Dashboard kann den Zeitraum überschreiben.",
+              "options": {
+                "30d": "Letzte 30 Tage",
+                "90d": "Letzte 90 Tage"
+              }
             }
           }
         }

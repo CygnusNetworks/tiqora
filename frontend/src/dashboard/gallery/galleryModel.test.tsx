@@ -43,7 +43,7 @@ describe("buildGallery", () => {
   it("groups appear as Tickets, Für mich, Team, Berichte in that order; widgets of category 'reports' land in Berichte", () => {
     const g = buildGallery([...core, pluginReports()], "", t, all);
     expect(g.map((x) => x.id)).toEqual(["tickets", "me", "team", "reports"]);
-    expect(g[3].items.map((d) => d.key).sort()).toEqual(["core.report", "org.example.chart"]);
+    expect(g[3].items.map((d) => d.key).sort()).toEqual(["core.backlog-aging", "core.heatmap", "core.report", "core.sla-gauge", "org.example.chart"]);
     expect(t("dashboards.gallery.groups.reports")).toBe("Berichte");
     expect(g[0].items.map((d) => d.key).sort()).toEqual(
       ["core.counter", "core.escalations", "core.queue-overview", "core.ticket-list"],
