@@ -64,5 +64,14 @@ services:
       retries: 36
       start_period: 90s
 
+  # Recording HTTP sink for the GenericInterface requester golden tests (host port 8199).
+  gisink:
+    image: python:3.12-slim
+    command: ["python", "/app/gi_sink.py"]
+    volumes:
+      - ./gi_sink.py:/app/gi_sink.py:ro
+    ports:
+      - "8199:8080"
+
 volumes:
   tiqora_golden_mariadb_data:
