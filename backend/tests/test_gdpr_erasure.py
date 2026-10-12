@@ -2559,3 +2559,169 @@ async def test_hard_delete_and_anonymize_remove_chat_rows(
                 {"p": "ERASE-CHAT-%"},
             )
         sync_engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+@pytest.mark.parametrize("mode", ["anonymize", "delete"])
+async def test_gdpr_erasure_removes_itsm_rows(
+    url_fixture: str, mode: str, request: pytest.FixtureRequest
+) -> None:
+    """Problem and major-incident rows (root cause, workaround, update bodies) of an erased
+    customer's ticket are removed in both modes on both dialects and come back unchanged on
+    rollback; rows of another ticket stay."""
+    from sqlalchemy import create_engine
+
+    from tests._row_cleanup import delete_above_marks, snapshot_marks
+
+    url = request.getfixturevalue(url_fixture)
+    mysql = _is_mysql(url)
+    mark_tables = (
+        "tiqora_gdpr_backup",
+        "tiqora_gdpr_job",
+        "tiqora_gdpr_audit",
+        "tiqora_cache_invalidation",
+        "tiqora_event_outbox",
+        "ticket_history",
+        "article_search_index",
+        "article_data_mime_attachment",
+        "article_data_mime_plain",
+        "article_data_mime",
+        "article",
+        "ticket",
+        "customer_user",
+    )
+    marks = snapshot_marks(url, mark_tables)
+    engine, factory = await _factory(url)
+    tag = f"{url_fixture[:2]}{mode}"
+    login = f"erase.itsm.{tag}@example.com"
+    company = f"ERASE-ITSM-{tag.upper()}"
+    other_tid = 940011 if mode == "anonymize" else 940012  # a ticket that is not erased
+    created: list[int] = []
+
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session, mysql=mysql)
+            await _insert_company(session, customer_id=company, name=f"Acme Itsm {tag}")
+            cuid = await _insert_customer(session, login=login, customer_id=company)
+            tid = await _insert_ticket(
+                session, customer_user_id=login, customer_id=company, tn=f"2026IT{tag}{cuid}"
+            )
+            await _insert_article_bundle(session, ticket_id=tid, from_addr=login, body="Problem")
+            created.extend([tid, other_tid])
+            for ticket_id in (tid, other_tid):
+                await session.execute(
+                    text(
+                        "INSERT INTO tiqora_itsm_problem (ticket_id, root_cause, workaround,"
+                        " known_error, change_time, change_by)"
+                        " VALUES (:t, 'Cause of ticket', 'Workaround text', :ke, :now, 1)"
+                    ),
+                    {"t": ticket_id, "ke": True, "now": NOW},
+                )
+                await session.execute(
+                    text(
+                        "INSERT INTO tiqora_itsm_major_incident (ticket_id, summary,"
+                        " declared_at, declared_by) VALUES (:t, 'Mail down', :now, 1)"
+                    ),
+                    {"t": ticket_id, "now": NOW},
+                )
+                for body in ("first update", "second update"):
+                    await session.execute(
+                        text(
+                            "INSERT INTO tiqora_itsm_major_incident_update (ticket_id,"
+                            " created_at, created_by, mode, body, target_count)"
+                            " VALUES (:t, :now, 1, 'internal', :b, 0)"
+                        ),
+                        {"t": ticket_id, "now": NOW, "b": body},
+                    )
+            await session.commit()
+
+        async def _state(ticket_id: int) -> tuple[int, int, list[str]]:
+            async with factory() as session:
+                problems = (
+                    await session.execute(
+                        text("SELECT COUNT(*) FROM tiqora_itsm_problem WHERE ticket_id = :t"),
+                        {"t": ticket_id},
+                    )
+                ).scalar_one()
+                majors = (
+                    await session.execute(
+                        text(
+                            "SELECT COUNT(*) FROM tiqora_itsm_major_incident WHERE ticket_id = :t"
+                        ),
+                        {"t": ticket_id},
+                    )
+                ).scalar_one()
+                bodies = (
+                    (
+                        await session.execute(
+                            text(
+                                "SELECT body FROM tiqora_itsm_major_incident_update"
+                                " WHERE ticket_id = :t ORDER BY id"
+                            ),
+                            {"t": ticket_id},
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+            return int(problems), int(majors), list(bodies)
+
+        before = await _state(tid)
+        assert before == (1, 1, ["first update", "second update"])
+        other_before = await _state(other_tid)
+        assert other_before == before
+        result = await run_erasure(
+            factory,
+            Settings(),
+            customer_user_ids=[cuid],
+            mode="delete" if mode == "delete" else "anonymize",
+            seed=23,
+            force_parallel=True,
+            actor="test",
+            delete_tickets=mode == "delete",
+        )
+        assert result.counts["tiqora_itsm_problem"] == 1
+        assert result.counts["tiqora_itsm_major_incident"] == 1
+        assert result.counts["tiqora_itsm_major_incident_update"] == 2
+        assert await _state(tid) == (0, 0, [])
+        assert await _state(other_tid) == other_before
+
+        await rollback_job(factory, Settings(), result.job_id, force_parallel=True, actor="test")
+        assert await _state(tid) == before
+        assert await _state(other_tid) == other_before
+    finally:
+        async with factory() as session:
+            for ticket_id in created:
+                for table in (
+                    "tiqora_itsm_major_incident_update",
+                    "tiqora_itsm_major_incident",
+                    "tiqora_itsm_problem",
+                ):
+                    await session.execute(
+                        text(f"DELETE FROM {table} WHERE ticket_id = :t"), {"t": ticket_id}
+                    )
+            await session.commit()
+        await engine.dispose()
+        delete_above_marks(
+            url,
+            marks,
+            first=[
+                (
+                    "DELETE FROM tiqora_report_dirty_ticket WHERE ticket_id > :m",
+                    {"m": marks["ticket"]},
+                )
+            ],
+        )
+        sync_engine = create_engine(url)
+        with sync_engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM customer_user_customer WHERE user_id LIKE :p"),
+                {"p": "erase.itsm.%"},
+            )
+            conn.execute(
+                text("DELETE FROM customer_company WHERE customer_id LIKE :p"),
+                {"p": "ERASE-ITSM-%"},
+            )
+        sync_engine.dispose()
