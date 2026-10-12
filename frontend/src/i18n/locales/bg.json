@@ -6156,6 +6156,12 @@
       "widgetCrashed": "This widget could not be shown.",
       "templateBanner": "You are viewing the template “{{name}}”. Changes apply to everyone who gets it through their role.",
       "lockedHint": "This dashboard is mandatory for your role and cannot be customized.",
+      "updateBanner_one": "New version of the template “{{name}}”: {{count}} new widget.",
+      "updateBanner_other": "New version of the template “{{name}}”: {{count}} new widgets.",
+      "updateMerge": "Apply",
+      "updateDismiss": "Dismiss",
+      "updateConflict": "The dashboard has been changed in the meantime.",
+      "updateFailed": "That did not work. Please try again.",
       "empty": "There is nothing on this dashboard yet.",
       "emptyEdit": "There is nothing on this dashboard yet. Use “Customize” to add widgets."
     },

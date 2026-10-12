@@ -22,7 +22,7 @@ import {
 import { handleSSEMessage } from "@/lib/useSSE";
 import { setDisplayTimeZone } from "@/lib/timeZone";
 import { DASHBOARD_WIDGETS, defineWidget, type WidgetProps } from "@/plugins/dashboardWidgets";
-import { demoDashboard, demoDefaultWidgets, demoTab, demoWidgetData } from "@/demo/dashboardsMock";
+import { demoDashboard, demoDefaultWidgets, demoTab, demoTemplateUpdateHint, demoWidgetData } from "@/demo/dashboardsMock";
 import { makeUser } from "@/test/fireUser";
 import { savedSearchesApi } from "@/lib/savedSearchesApi";
 import { reportsApi } from "@/lib/reportsApi";
@@ -318,6 +318,23 @@ describe("DashboardPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Mein Start" }));
     expect(screen.getByRole("tab", { name: "Mein Start", selected: true })).toBeVisible();
     expect(await screen.findByTestId("widget-w-counter-1")).toBeVisible();
+  });
+
+  it("template update banner: 'Übernehmen' merges and the new widget appears; it is gone in edit mode", async () => {
+    mockDashboard({ source_template_id: 100, template_update: demoTemplateUpdateHint({ new_widget_count: 1 }) });
+    const merged = demoDashboard({
+      ...DEFAULT_DASHBOARD,
+      version: DEFAULT_DASHBOARD.version + 1,
+      template_update: null,
+      widgets: [...DEFAULT_WIDGETS, wire("w-new", "core.notes", { lg: { x: 0, y: 20, w: 4, h: 2 } }, { markdown: "Neu" })],
+    });
+    const apply = vi.spyOn(dashboardsApi, "applyTemplateUpdate").mockResolvedValue(merged);
+    await renderPage();
+    expect(await screen.findByRole("status", { name: "" })).toHaveTextContent("Neue Version der Vorlage");
+    fireEvent.click(screen.getByRole("button", { name: "Übernehmen" }));
+    expect(await screen.findByTestId("widget-w-new")).toBeVisible();
+    expect(apply).toHaveBeenCalledWith(1, { action: "merge", version: DEFAULT_DASHBOARD.version });
+    expect(screen.queryByText(/Neue Version der Vorlage/)).toBeNull();
   });
 
   it("picking a tab drops ?d= from the address, so a reload opens the picked dashboard", async () => {

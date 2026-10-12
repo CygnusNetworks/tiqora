@@ -6164,6 +6164,12 @@
       "widgetCrashed": "Dieses Widget konnte nicht angezeigt werden.",
       "templateBanner": "Sie sehen die Vorlage „{{name}}“. Änderungen gelten für alle, die sie über ihre Rolle bekommen.",
       "lockedHint": "Dieses Dashboard ist für Ihre Rolle verbindlich und lässt sich nicht anpassen.",
+      "updateBanner_one": "Neue Version der Vorlage „{{name}}“: {{count}} neues Widget.",
+      "updateBanner_other": "Neue Version der Vorlage „{{name}}“: {{count}} neue Widgets.",
+      "updateMerge": "Übernehmen",
+      "updateDismiss": "Ausblenden",
+      "updateConflict": "Das Dashboard wurde inzwischen geändert.",
+      "updateFailed": "Das hat nicht geklappt. Bitte versuchen Sie es noch einmal.",
       "empty": "Auf diesem Dashboard ist noch nichts.",
       "emptyEdit": "Auf diesem Dashboard ist noch nichts. Mit „Anpassen“ fügen Sie Widgets hinzu."
     },

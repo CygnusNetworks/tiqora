@@ -15,6 +15,7 @@ import { FilterBar } from "@/dashboard/filters/FilterBar";
 import { DashboardFiltersProvider } from "@/dashboard/filters/filtersContext";
 import { greetingKey } from "@/dashboard/legacy";
 import { toEditWidget } from "@/dashboard/model";
+import { TemplateUpdateBanner } from "@/dashboard/template/TemplateUpdateBanner";
 import { ShareDialog } from "@/dashboard/tabs/ShareDialog";
 import { ManagedDashboardTabs } from "@/dashboard/tabs/ManagedDashboardTabs";
 import { useGridBreakpoint } from "@/dashboard/useGridBreakpoint";
@@ -279,6 +280,8 @@ export function DashboardPage() {
       )}
 
       {dashboard && <FilterBar dashboard={dashboard} disabled={isEditing} />}
+
+      {dashboard && <TemplateUpdateBanner dashboard={dashboard} editing={isEditing} />}
 
       {!isEditing && dashboard?.kind === "template" && dashboard.can_edit && (
         <p className="rounded-[14px] border border-accent/30 bg-accent/10 px-4 py-2.5 text-sm text-ink">
