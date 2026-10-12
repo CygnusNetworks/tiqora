@@ -148,7 +148,7 @@ export function reportDescription(report: ReportItem, t: TFunction): string {
   return report.description_key ? t(report.description_key) : "";
 }
 
-function fileToBase64(file: File): Promise<string> {
+export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(reader.error ?? new Error("file read failed"));

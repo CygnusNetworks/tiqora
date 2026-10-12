@@ -5754,7 +5754,22 @@
       "notImported": "Nicht übernommen",
       "approximated": "Angepasst",
       "issues": "Hinweise",
-      "noIssues": "Keine Hinweise"
+      "noIssues": "Keine Hinweise",
+      "details": "Details",
+      "hideDetails": "Details ausblenden",
+      "empty": "In Znuny sind keine Statistiken gespeichert, die Sie sehen dürfen.",
+      "needsCreate": "Zum Übernehmen von Statistiken fehlt Ihnen die Berechtigung, Berichte anzulegen.",
+      "apply": "Übernehmen ({{count}})",
+      "alreadyImportedUpdate": "Bereits übernommen – wird aktualisiert",
+      "fileHint": "Die ganze Datei wird übernommen; nicht abbildbare Statistiken werden übersprungen.",
+      "fileLoadFailed": "Die Datei konnte nicht gelesen werden.",
+      "resultTitle": "Ergebnis",
+      "close": "Schließen",
+      "dropped": "Nicht übernommen",
+      "issueLine": "{{element}}: {{value}}",
+      "loadErrors": "Ladefehler",
+      "open": "Öffnen",
+      "select": "{{title}} auswählen"
     }
   },
   "webchat": {

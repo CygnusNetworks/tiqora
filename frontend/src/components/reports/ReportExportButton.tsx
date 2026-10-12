@@ -29,7 +29,7 @@ export function ReportExportButton({
   infoLines: string[];
   testId?: string;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [jobId, setJobId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +44,8 @@ export function ReportExportButton({
         format,
         title: title.slice(0, 120),
         info_lines: infoLines.map((l) => l.slice(0, 300)).slice(0, 20),
+        // the PDF is written by the server in the language of the UI
+        locale: i18n.language.slice(0, 10),
         ...exportLabels(result, t),
       });
       setJobId(accepted.job_id);
@@ -74,6 +76,15 @@ export function ReportExportButton({
           data-testid={`${testId}-csv`}
         >
           {t("reports.exportCsv")}
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={!result || busy}
+          onClick={() => void start("pdf")}
+          data-testid={`${testId}-pdf`}
+        >
+          {t("reports.exportPdf")}
         </Button>
       </div>
       {error && (

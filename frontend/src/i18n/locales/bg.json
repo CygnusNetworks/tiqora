@@ -5746,7 +5746,22 @@
       "notImported": "Not imported",
       "approximated": "Adjusted",
       "issues": "Notes",
-      "noIssues": "No notes"
+      "noIssues": "No notes",
+      "details": "Details",
+      "hideDetails": "Hide details",
+      "empty": "There are no statistics stored in Znuny that you may see.",
+      "needsCreate": "You need the right to create reports to import statistics.",
+      "apply": "Import ({{count}})",
+      "alreadyImportedUpdate": "Already imported – will be updated",
+      "fileHint": "The whole file is imported; statistics that cannot be mapped are skipped.",
+      "fileLoadFailed": "The file could not be read.",
+      "resultTitle": "Result",
+      "close": "Close",
+      "dropped": "Not imported",
+      "issueLine": "{{element}}: {{value}}",
+      "loadErrors": "Load errors",
+      "open": "Open",
+      "select": "Select {{title}}"
     }
   },
   "webchat": {
