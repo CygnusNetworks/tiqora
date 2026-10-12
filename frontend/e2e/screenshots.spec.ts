@@ -237,6 +237,8 @@ test("admin screenshots", async ({ page }) => {
     ["/admin/role-groups", "admin-role-groups"],
     ["/admin/auth-config", "admin-2fa"],
     ["/admin/gdpr", "admin-gdpr"],
+    // Process designer: canvas, form panel, check and deploy status (demo process).
+    ["/admin/processes/Process-demo", "admin-process-designer"],
     // AI subsystem administration.
     ["/admin/ai", "admin-ai-settings"],
     ["/admin/ai/providers", "admin-ai-providers"],
