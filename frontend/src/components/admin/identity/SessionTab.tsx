@@ -166,6 +166,11 @@ export function SessionTab({
           <Switch testId="session-require-mfa" aria-labelledby="session-mfa-label" checked={requireMfa} onChange={setRequireMfa} />
         </div>
 
+        {errors["mfa_policy"] && (
+          <p role="alert" data-testid="session-mfa-policy-error" className="text-xs text-danger">
+            {errors["mfa_policy"]}
+          </p>
+        )}
         {requireMfa && (
           <div className="space-y-4" data-testid="session-mfa-policy">
             <fieldset>

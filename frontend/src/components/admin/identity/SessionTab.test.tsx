@@ -123,6 +123,27 @@ describe("SessionTab", () => {
     expect(screen.queryByTestId("session-save-error")).toBeNull();
   });
 
+  it("shows the backend's single mfa_policy error", async () => {
+    update.mockRejectedValue(
+      new ApiError(422, { detail: { message: "invalid", errors: { mfa_policy: "Höchstens 20 Einträge je Liste." } } }, "/x"),
+    );
+    wrap(<SessionTab provider={oidc} onSaved={vi.fn()} />);
+    fireEvent.change(await screen.findByTestId("session-oidc-request-acr"), { target: { value: "bad" } });
+    fireEvent.click(screen.getByTestId("session-save"));
+    expect(await screen.findByTestId("session-mfa-policy-error")).toHaveTextContent("Höchstens 20 Einträge je Liste.");
+  });
+
+  it("shows the lifetime cross-check error on the idle field", async () => {
+    update.mockRejectedValue(
+      new ApiError(422, { detail: { message: "invalid", errors: { session_idle_seconds: "Leerlauf darf nicht länger sein." } } }, "/x"),
+    );
+    wrap(<SessionTab provider={oidc} onSaved={vi.fn()} />);
+    fireEvent.click(await screen.findByTestId("session-use-global"));
+    fireEvent.change(screen.getByTestId("session-idle"), { target: { value: "10" } });
+    fireEvent.click(screen.getByTestId("session-save"));
+    expect(await screen.findByText("Leerlauf darf nicht länger sein.")).toBeInTheDocument();
+  });
+
   it("is read-only for environment providers", async () => {
     wrap(<SessionTab provider={makeProvider({ source: "env", read_only: true })} onSaved={vi.fn()} />);
     expect(await screen.findByTestId("session-env-readonly")).toBeInTheDocument();

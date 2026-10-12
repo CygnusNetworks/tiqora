@@ -4810,7 +4810,7 @@
         }
       },
       "session": {
-        "envReadOnly": "Dieser Anbieter stammt aus Umgebungsvariablen. Sitzungseinstellungen setzen einen hier im Adminbereich angelegten Anbieter voraus; legen Sie ihn dort neu an.",
+        "envReadOnly": "Dieser Anbieter stammt aus Umgebungsvariablen. Sitzungseinstellungen setzen einen im Adminbereich angelegten Anbieter voraus; legen Sie ihn im Adminbereich neu an.",
         "loadError": "Die Einstellungen konnten nicht geladen werden.",
         "requireMfa": "Zweiten Faktor vom Anmeldedienst verlangen",
         "requireMfaHelp": "Anmeldungen ohne Nachweis eines zweiten Faktors vom Anmeldedienst werden nicht als vertrauenswürdig behandelt. Entra ID meldet ihn als amr \"mfa\", Okta als amr \"mfa\" oder \"otp\", Keycloak als acr \"2\" oder höher (mit Step-up-Flows).",
