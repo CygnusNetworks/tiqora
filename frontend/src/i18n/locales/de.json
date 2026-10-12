@@ -6520,7 +6520,9 @@
       "fullscreen": "Vollbild",
       "exit": "Beenden",
       "loadFailed": "Dieses Dashboard konnte nicht geladen werden.",
-      "none": "Es ist kein Dashboard zum Anzeigen vorhanden."
+      "none": "Es ist kein Dashboard zum Anzeigen vorhanden.",
+      "invalidLink": "Dieser Wallboard-Link ist ungültig oder abgelaufen.",
+      "unavailable": "Auf dem Wallboard nicht verfügbar"
     }
   },
   "filters": {

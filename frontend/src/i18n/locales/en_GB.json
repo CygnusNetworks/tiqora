@@ -6520,7 +6520,9 @@
       "fullscreen": "Full screen",
       "exit": "Exit",
       "loadFailed": "This dashboard could not be loaded.",
-      "none": "There is no dashboard to show."
+      "none": "There is no dashboard to show.",
+      "invalidLink": "This wallboard link is invalid or has expired.",
+      "unavailable": "Not available on the wallboard"
     }
   },
   "filters": {

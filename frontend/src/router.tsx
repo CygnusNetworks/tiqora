@@ -10,6 +10,7 @@ import { SetPasswordPage } from "@/routes/SetPasswordPage";
 import { LoginPage } from "@/routes/LoginPage";
 import { DashboardPage, type DashboardSearch } from "@/routes/agent/DashboardPage";
 import { WallboardPage } from "@/routes/agent/WallboardPage";
+import { KioskWallboardPage } from "@/routes/KioskWallboardPage";
 import { ReportsPage, type ReportsSearch } from "@/routes/agent/ReportsPage";
 import { ReportBuilderPage } from "@/routes/agent/ReportBuilderPage";
 import { validateReportBuilderSearch } from "@/routes/agent/reportBuilderSearch";
@@ -185,6 +186,14 @@ const loginRoute = createRoute({
     logged_out: searchFlag(s.logged_out) === "1" ? "1" : undefined,
   }),
   component: LoginPage,
+});
+
+// Public wallboard: the link's secret is the URL fragment, no auth gate and not inside the agent
+// layout (like /login). Everything it loads comes from /api/v1/kiosk.
+const kioskWallboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/wallboard",
+  component: KioskWallboardPage,
 });
 
 // Public: the one-time link a new agent gets by mail. No auth gate — the
@@ -1234,6 +1243,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
   setPasswordRoute,
+  kioskWallboardRoute,
   agentLayoutRoute.addChildren([
     agentIndexRoute,
     agentWallboardRoute,

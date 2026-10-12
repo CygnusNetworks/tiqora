@@ -23,6 +23,7 @@ import {
   type WidgetMode,
 } from "@/plugins/dashboardWidgets";
 import { WidgetChromeProvider, WidgetFrame, type WidgetChrome } from "./chrome/WidgetFrame";
+import { WidgetEmpty } from "./chrome/WidgetDataBody";
 import { WidgetForbidden } from "./chrome/WidgetError";
 import { WidgetSkeleton } from "./chrome/WidgetSkeleton";
 import { WidgetUnavailable } from "./chrome/WidgetUnavailable";
@@ -169,7 +170,16 @@ function GridCell({
   const defTitle = def ? t(def.titleKey, { ns: def.ns, defaultValue: def.key }) : t("dashboards.state.unavailable");
 
   let body: ReactNode;
-  if (!def) {
+  if (kiosk && (!def || def.dataEndpoint == null)) {
+    // Plugin widgets and widgets without server data (recent views, notes, links) have nothing to show to a link.
+    body = (
+      <WidgetChromeProvider value={chrome}>
+        <WidgetFrame title={defTitle} mode={mode} testId="widget-kiosk-unavailable">
+          <WidgetEmpty>{t("dashboards.wallboard.unavailable")}</WidgetEmpty>
+        </WidgetFrame>
+      </WidgetChromeProvider>
+    );
+  } else if (!def) {
     // Plugin types register once the plugin list arrived; until then the slot only waits.
     body =
       !pluginsReady && !widget.type_key.startsWith("core.") ? (
