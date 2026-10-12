@@ -32,6 +32,7 @@ API_KEY_AREAS: tuple[str, ...] = (
     "channels",
     "events",
     "agents",
+    "cmdb",
     "admin",
     "mcp",
     "compat",
@@ -88,6 +89,10 @@ _PATH_PREFIX_TO_AREA: tuple[tuple[str, str], ...] = (
     ("/api/v1/events", "events"),
     ("/api/v1/phone", "events"),
     ("/api/v1/agents", "agents"),
+    # CMDB (Mode B) and the mode-agnostic ITSM API (CIs, status): one area "CMDB / ITSM".
+    # Ticket sub-resources (/tickets/{id}/cis, …) stay ``tickets``; /admin/itsm stays ``admin``.
+    ("/api/v1/cmdb", "cmdb"),
+    ("/api/v1/itsm", "cmdb"),
     ("/api/v1/sse", "events"),
     ("/znuny-compat", "compat"),
     # Plugin routes (third-party code) mount outside /api/v1; they need an explicit grant.

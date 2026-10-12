@@ -16,6 +16,7 @@ export const API_KEY_AREAS = [
   "channels",
   "events",
   "agents",
+  "cmdb",
   "admin",
   "mcp",
   "compat",

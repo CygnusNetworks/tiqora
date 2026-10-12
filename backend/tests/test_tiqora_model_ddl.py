@@ -249,3 +249,41 @@ def test_gi_debug_ddl() -> None:
     assert "LONGBLOB" in _column_ddl(TiqoraGiDebugContent.__table__, "content", mysql.dialect())
     assert "BYTEA" in _column_ddl(TiqoraGiDebugContent.__table__, "content", postgresql.dialect())
     assert "MEDIUMTEXT" in _column_ddl(TiqoraGiDebugEntry.__table__, "replay", mysql.dialect())
+
+
+def test_itsm_link_type_ddl() -> None:
+    """``tiqora_itsm_link_type`` (step 0, migration ``20261010_0077``): the ORM carries the
+    same server defaults as the migration, so rows inserted through either path agree."""
+    from tiqora.itsm.models import TiqoraItsmLinkType
+
+    table = TiqoraItsmLinkType.__table__
+    for dialect in (mysql.dialect(), postgresql.dialect()):
+        assert "VARCHAR(50) NOT NULL" in _column_ddl(table, "name", dialect)
+        assert "VARCHAR(10) NOT NULL" in _column_ddl(table, "origin", dialect)
+        assert "NOT NULL" not in _column_ddl(table, "source_label", dialect)
+        assert "DEFAULT 'none'" in _column_ddl(table, "propagation", dialect)
+        assert "DEFAULT '0'" in _column_ddl(table, "position", dialect)
+        for col in (
+            "pointed",
+            "offer_ticket_ticket",
+            "offer_ticket_ci",
+            "offer_ci_ci",
+            "offer_ci_service",
+        ):
+            assert "DEFAULT false" in _column_ddl(table, col, dialect), col
+        assert "DEFAULT true" in _column_ddl(table, "valid", dialect)
+        assert "DEFAULT" not in _column_ddl(table, "create_time", dialect)
+    unique = {
+        (c.name, tuple(col.name for col in c.columns))
+        for c in table.constraints
+        if isinstance(c, UniqueConstraint)
+    }
+    assert unique == {("uq_tiqora_itsm_link_type_name", ("name",))}
+    assert not table.foreign_keys
+    migration = (
+        Path(__file__).parent.parent / "alembic/versions_tiqora/20261010_0077_itsm_link_type.py"
+    ).read_text()
+    assert 'server_default="none"' in migration
+    assert 'server_default="0"' in migration
+    assert migration.count("server_default=sa.false()") == 5
+    assert migration.count("server_default=sa.true()") == 1

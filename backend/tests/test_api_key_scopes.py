@@ -402,3 +402,37 @@ def test_agent_chat_api_maps_to_tickets() -> None:
     with pytest.raises(HTTPException) as exc:
         assert_scope_allows(kb, method="GET", path="/api/v1/chat/inbox")
     assert exc.value.detail == "API key lacks tickets:ro scope"
+
+
+def test_cmdb_area_covers_cmdb_and_itsm_paths() -> None:
+    """Area ``cmdb`` ("CMDB / ITSM", wave-4 step 0): ``/api/v1/cmdb/*`` and ``/api/v1/itsm/*``.
+
+    Before, ``/api/v1/itsm/*`` mapped to ``_unknown`` and every scoped key got 403 there. Ticket
+    sub-resources (``/tickets/{id}/cis`` …) and the ITSM admin API keep their own areas.
+    """
+    assert "cmdb" in API_KEY_AREAS
+    assert path_to_area("/api/v1/cmdb") == "cmdb"
+    assert path_to_area("/api/v1/cmdb/cis/12") == "cmdb"
+    assert path_to_area("/api/v1/cmdb/links?x=1") == "cmdb"
+    assert path_to_area("/api/v1/itsm") == "cmdb"
+    assert path_to_area("/api/v1/itsm/status") == "cmdb"
+    assert path_to_area("/api/v1/itsm/cis/znuny/7") == "cmdb"
+    assert path_to_area("/api/v1/tickets/12/cis") == "tickets"
+    assert path_to_area("/api/v1/tickets/12/link-graph") == "tickets"
+    assert path_to_area("/api/v1/admin/itsm/link-types") == "admin"
+    assert path_to_area("/api/v1/cmdbx") == "_unknown"
+    assert path_to_area("/api/v1/itsmfoo/x") == "_unknown"
+
+
+def test_cmdb_area_levels_and_legacy_expansion() -> None:
+    path = "/api/v1/cmdb/cis"
+    assert scopes_allow(frozenset({"cmdb:ro"}), method="GET", path="/api/v1/itsm/status")
+    assert not scopes_allow(frozenset({"cmdb:ro"}), method="POST", path=path)
+    assert scopes_allow(frozenset({"cmdb:rw"}), method="POST", path=path)
+    assert not scopes_allow(frozenset({"tickets:rw"}), method="GET", path=path)
+    # a REST area: legacy read/write expand to it, the read-only preset includes it
+    assert expand_scopes(frozenset({"read"})) is not None
+    assert expand_scopes(frozenset({"read"}))["cmdb"] == "ro"  # type: ignore[index]
+    assert expand_scopes(frozenset({"write"}))["cmdb"] == "rw"  # type: ignore[index]
+    assert "cmdb:ro" in all_areas_read_only_scopes().split(",")
+    assert normalize_scopes("CMDB:rw, tickets:ro") == "cmdb:rw,tickets:ro"

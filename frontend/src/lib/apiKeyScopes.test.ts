@@ -41,3 +41,18 @@ describe("apiKeyScopes: plugins are an explicit opt-in", () => {
     expect(selection.plugins).toBe("ro");
   });
 });
+
+describe("apiKeyScopes: cmdb area (CMDB / ITSM)", () => {
+  it("is part of the read-only preset and of legacy expansion", () => {
+    expect(selectionToScopes("read_only", allReadOnlySelection())).toContain("cmdb:ro");
+    expect(parseScopesToMode("read").selection.cmdb).toBe("ro");
+    expect(parseScopesToMode("write").selection.cmdb).toBe("rw");
+  });
+
+  it("keeps an explicit grant", () => {
+    const { mode, selection } = parseScopesToMode("cmdb:rw");
+    expect(mode).toBe("custom");
+    expect(selection.cmdb).toBe("rw");
+    expect(selection.tickets).toBe("off");
+  });
+});
