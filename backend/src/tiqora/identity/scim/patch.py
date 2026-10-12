@@ -25,7 +25,7 @@ _FILTER_RE: Final = re.compile(
 )
 _MULTI: Final = {"emails": "emails", "phonenumbers": "phoneNumbers"}
 # Attributes IdPs send with their default mappings (Entra customappsso, Okta) that Tiqora does not
-# store. PATCH is atomic, so rejecting them would also fail a coinciding deactivation (S6a amendment).
+# store. PATCH is atomic, so rejecting them would also fail a coinciding deactivation (S6a).
 # Read-only keys (id, schemas, meta, groups) and password are ignored as well; ``nickName`` stays
 # invalidPath.
 _IGNORED_ATTRS: Final = frozenset(
