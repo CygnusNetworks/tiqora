@@ -8,18 +8,38 @@ it imports neither of them (dependencies point one way).
   counters behind the hourly, global and daily-budget limits.
 - ``auto_reply_queue_cap_reason`` is the part of the cap check that needs no ticket, so a
   chat can ask it before its ticket exists.
+- ``auto_reply_cap_reason`` is the full per-ticket check the auto worker runs.
+- ``prepare_auto_run`` resolves the agent chain and the knowledge-base wiring for a run.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any, Final
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.ai.customer_pause import SKIP_REASON as CUSTOMER_PAUSE_SKIP_REASON
+from tiqora.ai.customer_pause import active_pause_for_ticket
+from tiqora.ai.kb_wiring import kb_bundle, kb_get_article_fn, kb_search_fn
 from tiqora.ai.limits import queue_tokens_used_today
+from tiqora.ai.llm import LlmClient
+from tiqora.ai.llm_routing import TASK_AGENT, ChainModel, build_task_llm
 from tiqora.ai.models import FEATURE_AUTO_REPLY, TiqoraAiQueuePolicy, TiqoraAiUsage
+from tiqora.config import Settings
 from tiqora.domain.settings_store import KEY_AI_GLOBAL_REPLIES_PER_HOUR, get_setting
+
+#: Caps that end automation for one ticket for good (unlike rate limits and budgets, which lift
+#: again on their own) -- hitting one is a handoff.
+TICKET_CAP_REASONS: Final = frozenset({"max_clarifications", "max_auto_replies", "grant_used"})
+#: The queue-level limits :func:`auto_reply_queue_cap_reason` can return.
+QUEUE_CAP_REASONS: Final = frozenset({"queue_rate_limit", "global_rate_limit", "budget_tokens_day"})
+
+
+class NoAgentProfile(Exception):  # noqa: N818 -- name fixed by the plan
+    """The queue policy resolves no agent LLM profile at all (not even an unusable one)."""
 
 
 async def global_replies_per_hour_cap(session: AsyncSession) -> int | None:
@@ -82,9 +102,97 @@ async def auto_reply_queue_cap_reason(
     return None
 
 
+async def auto_reply_cap_reason(
+    session: AsyncSession, *, ticket_id: int, queue_id: int, policy: TiqoraAiQueuePolicy, state: Any
+) -> str | None:
+    """Return a short reason string if anything blocks this run, else None."""
+    # A handoff has to actually hand off. `escalate_to_human` sets
+    # `ai_escalated_at` and writes an internal note, but until this check
+    # existed nothing consumed the flag: the next customer message started a
+    # fresh run, and under `full` autonomy that answer went straight back to
+    # the customer -- right after the AI had said a human would take over.
+    # The flag stays until someone switches the autopilot back on (or the
+    # ticket is closed/merged/removed, see domain.ticket_write_service); an
+    # agent's reply does not lift it.
+    # Manual Assist is unaffected: it never runs through this worker.
+    if getattr(state, "ai_escalated_at", None) is not None:
+        return "escalated_to_human"
+    # An agent paused all automatic AI actions for this ticket. Unlike the
+    # handoff flag above, nothing clears this on its own.
+    if getattr(state, "ai_paused_at", None) is not None:
+        return "ai_paused"
+    # The same for the customer: an agent switched the automation off for
+    # this customer user / company (indefinitely or until a date).
+    if await active_pause_for_ticket(session, ticket_id) is not None:
+        return CUSTOMER_PAUSE_SKIP_REASON
+    # A release an agent granted by hand replaces the per-ticket caps until
+    # it is used up; rate limits and budgets below still apply.
+    grant = getattr(state, "ai_grant_remaining", None)
+    if grant is not None:
+        if grant <= 0:
+            return "grant_used"
+    elif state.auto_reply_count >= policy.max_auto_replies:
+        return "max_auto_replies"
+    elif state.clarification_count >= policy.max_clarifications:
+        return "max_clarifications"
+    return await auto_reply_queue_cap_reason(session, queue_id=queue_id, policy=policy)
+
+
+@dataclass(frozen=True, slots=True)
+class AutoRunInputs:
+    """What ``run_ticket_agent`` needs besides the ticket: the LLM chain and the KB wiring.
+
+    The KB callables are bound to the session they were prepared on, so the caller has to
+    run the agent on that same session.
+    """
+
+    llm: LlmClient
+    llm_models: list[ChainModel]
+    kb_bundle: str | None
+    kb_search_fn: Any
+    kb_get_article_fn: Any
+
+    def as_kwargs(self) -> dict[str, Any]:
+        return {
+            "llm": self.llm,
+            "llm_models": self.llm_models,
+            "kb_bundle": self.kb_bundle,
+            "kb_search_fn": self.kb_search_fn,
+            "kb_get_article_fn": self.kb_get_article_fn,
+        }
+
+
+async def prepare_auto_run(
+    session: AsyncSession, settings: Settings, policy: TiqoraAiQueuePolicy
+) -> AutoRunInputs:
+    """Resolve the agent chain (also the provider-budget pre-check) and the KB wiring.
+
+    Raises :class:`tiqora.ai.llm_routing.NoUsableModel` when every chain entry is skipped and
+    :class:`NoAgentProfile` when the policy has no agent profile.
+    """
+    task_llm = await build_task_llm(session, settings, policy, TASK_AGENT)
+    if task_llm is None:
+        raise NoAgentProfile(TASK_AGENT)
+    service_user_id = policy.service_user_id
+    assert service_user_id is not None  # the caller gates on a service user
+    return AutoRunInputs(
+        llm=task_llm.client,
+        llm_models=task_llm.models,
+        kb_bundle=await kb_bundle(session, settings, service_user_id, policy),
+        kb_search_fn=kb_search_fn(session, settings, service_user_id),
+        kb_get_article_fn=kb_get_article_fn(session, settings, service_user_id),
+    )
+
+
 __all__ = [
+    "QUEUE_CAP_REASONS",
+    "TICKET_CAP_REASONS",
+    "AutoRunInputs",
+    "NoAgentProfile",
     "auto_replies_last_hour",
+    "auto_reply_cap_reason",
     "auto_reply_queue_cap_reason",
     "global_replies_per_hour_cap",
+    "prepare_auto_run",
     "tokens_used_today",
 ]

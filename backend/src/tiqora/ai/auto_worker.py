@@ -38,7 +38,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
 
 import structlog
 from sqlalchemy import select, text
@@ -46,8 +45,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.ai import summary as summary_service
 from tiqora.ai.auto_run import (
+    TICKET_CAP_REASONS,
+    NoAgentProfile,
     auto_replies_last_hour,
+    auto_reply_cap_reason,
     global_replies_per_hour_cap,
+    prepare_auto_run,
     tokens_used_today,
 )
 from tiqora.ai.context import (
@@ -56,7 +59,6 @@ from tiqora.ai.context import (
     get_or_create_state,
     ticket_snapshot,
 )
-from tiqora.ai.customer_pause import SKIP_REASON as CUSTOMER_PAUSE_SKIP_REASON
 from tiqora.ai.customer_pause import active_pause_for_ticket
 from tiqora.ai.gate import (
     AUTO_REPLY_SKIP_CHANNELS,
@@ -65,7 +67,6 @@ from tiqora.ai.gate import (
     is_tiqora_primary,
 )
 from tiqora.ai.handoff import consume_ai_grant, mark_ai_escalated
-from tiqora.ai.kb_wiring import kb_bundle, kb_get_article_fn, kb_search_fn
 from tiqora.ai.listfields import parse_str_list
 from tiqora.ai.llm_routing import (
     TASK_AGENT,
@@ -123,9 +124,10 @@ _article_sender_type = article_sender_type
 # triggers when switching the autopilot back on (start_ai_autopilot).
 _CUSTOMER_ARTICLE_EVENTS = frozenset({"ArticleCreate", AI_REPLY_REQUEST_EVENT})
 
-# Caps that end automation for one ticket for good (unlike rate limits and
-# budgets, which lift again on their own) — hitting one is a handoff.
-_TICKET_CAP_REASONS = frozenset({"max_clarifications", "max_auto_replies", "grant_used"})
+# The cap check moved to tiqora.ai.auto_run (the web-chat bot shares it); the private names stay
+# for this module's call sites and for tests that import them.
+_TICKET_CAP_REASONS = TICKET_CAP_REASONS
+_cap_reason = auto_reply_cap_reason
 
 
 # The queue counters moved to tiqora.ai.auto_run (the web-chat bot shares them); the private
@@ -193,55 +195,6 @@ async def _consume_grant(session: AsyncSession, ticket_id: int, result: AgentRun
         return
     await consume_ai_grant(session, ticket_id)
     await session.commit()
-
-
-async def _cap_reason(
-    session: AsyncSession, *, ticket_id: int, queue_id: int, policy: TiqoraAiQueuePolicy, state: Any
-) -> str | None:
-    """Return a short reason string if anything blocks this run, else None."""
-    # A handoff has to actually hand off. `escalate_to_human` sets
-    # `ai_escalated_at` and writes an internal note, but until this check
-    # existed nothing consumed the flag: the next customer message started a
-    # fresh run, and under `full` autonomy that answer went straight back to
-    # the customer -- right after the AI had said a human would take over.
-    # The flag stays until someone switches the autopilot back on (or the
-    # ticket is closed/merged/removed, see domain.ticket_write_service); an
-    # agent's reply does not lift it.
-    # Manual Assist is unaffected: it never runs through this worker.
-    if getattr(state, "ai_escalated_at", None) is not None:
-        return "escalated_to_human"
-    # An agent paused all automatic AI actions for this ticket. Unlike the
-    # handoff flag above, nothing clears this on its own.
-    if getattr(state, "ai_paused_at", None) is not None:
-        return "ai_paused"
-    # The same for the customer: an agent switched the automation off for
-    # this customer user / company (indefinitely or until a date).
-    if await active_pause_for_ticket(session, ticket_id) is not None:
-        return CUSTOMER_PAUSE_SKIP_REASON
-    # A release an agent granted by hand replaces the per-ticket caps until
-    # it is used up; rate limits and budgets below still apply.
-    grant = getattr(state, "ai_grant_remaining", None)
-    if grant is not None:
-        if grant <= 0:
-            return "grant_used"
-    elif state.auto_reply_count >= policy.max_auto_replies:
-        return "max_auto_replies"
-    elif state.clarification_count >= policy.max_clarifications:
-        return "max_clarifications"
-    if policy.max_replies_per_hour is not None:
-        recent = await _auto_replies_last_hour(session, queue_id=queue_id)
-        if recent >= policy.max_replies_per_hour:
-            return "queue_rate_limit"
-    global_cap = await _global_replies_per_hour_cap(session)
-    if global_cap is not None:
-        recent_global = await _auto_replies_last_hour(session, queue_id=None)
-        if recent_global >= global_cap:
-            return "global_rate_limit"
-    if policy.budget_tokens_day is not None:
-        tokens_today = await _tokens_used_today(session, queue_id)
-        if tokens_today >= policy.budget_tokens_day:
-            return "budget_tokens_day"
-    return None
 
 
 async def _defer_for_open_triage(session: AsyncSession, ticket_id: int, article_id: int) -> bool:
@@ -388,7 +341,7 @@ async def _process_customer_article_event(
     # entry whose provider is over budget is skipped, and when nothing is
     # left the run is skipped like any other cap.
     try:
-        task_llm = await build_task_llm(session, settings, policy, TASK_AGENT)
+        prepared = await prepare_auto_run(session, settings, policy)
     except NoUsableModel as exc:
         # Warning, not info: after a deploy a disabled provider or model
         # silently stops all auto-replies of the queue otherwise.
@@ -402,25 +355,20 @@ async def _process_customer_article_event(
         )
         await _record_skip(session, state, "llm_unavailable")
         return None
-    if task_llm is None:
+    except NoAgentProfile as exc:
         # No agent profile at all: an error, as before (no provider).
-        raise no_profile_error(TASK_AGENT)
+        raise no_profile_error(TASK_AGENT) from exc
     await _record_skip(session, state, None)
-    bundle = await kb_bundle(session, settings, policy.service_user_id, policy)
 
     result = await run_ticket_agent(
         session,
         settings=settings,
-        llm=task_llm.client,
-        llm_models=task_llm.models,
+        **prepared.as_kwargs(),
         ticket_id=ticket_id,
         trigger=TRIGGER_AUTO,
         acting_user_id=None,
         run_id=uuid.uuid4().hex,
         worker_instance="ai-worker",
-        kb_bundle=bundle,
-        kb_search_fn=kb_search_fn(session, settings, policy.service_user_id),
-        kb_get_article_fn=kb_get_article_fn(session, settings, policy.service_user_id),
         source_channel=source_channel,
     )
     await _consume_grant(session, ticket_id, result)
