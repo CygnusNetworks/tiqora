@@ -2891,6 +2891,50 @@
           "customerHidden": "Kunden sehen dieses Feld nicht.",
           "hiddenNeedsDefault": "Ein ausgeblendetes Feld braucht einen Vorgabewert."
         }
+      },
+      "condition": {
+        "title": "Übergang",
+        "name": "Name",
+        "note": "Keine Bedingung bedeutet: Der Übergang gilt immer.",
+        "none": "Keine Bedingung: Der Übergang gilt immer.",
+        "group": "Bedingungsgruppe",
+        "addGroup": "Gruppe hinzufügen",
+        "removeGroup": "Gruppe entfernen",
+        "addField": "Feld hinzufügen",
+        "removeField": "Feld entfernen",
+        "field": "Feld",
+        "typeLabel": "Vergleich",
+        "value": "Wert",
+        "rawValue": "Gespeicherter Wert (hier nicht bearbeitbar); eine Eingabe ersetzt ihn",
+        "module": "Prüfmodul",
+        "pickModule": "Modul wählen",
+        "modulePath": "Modulpfad",
+        "moduleUnknown": "Dieses Modul ist in Tiqora nicht installiert. Die Bedingung trifft nie zu, bis es verfügbar ist.",
+        "groupsMatch": "Von den Gruppen müssen zutreffen",
+        "rowsMatch": "Von den Zeilen dieser Gruppe müssen zutreffen",
+        "duplicate": "Jedes Feld darf pro Gruppe nur einmal vorkommen: {{fields}}",
+        "linking": {
+          "and": "alle",
+          "or": "mindestens eine",
+          "xor": "genau eine"
+        },
+        "regexp": {
+          "empty": "Geben Sie einen regulären Ausdruck ein.",
+          "invalid": "Das ist kein gültiger regulärer Ausdruck."
+        },
+        "type": {
+          "Module": "Prüfmodul",
+          "Regexp": "Regulärer Ausdruck",
+          "String": "Text gleich",
+          "Equal": "gleich",
+          "NotEqual": "ungleich",
+          "Contains": "enthält",
+          "NotContains": "enthält nicht",
+          "GreaterThan": "größer als",
+          "GreaterThanOrEqual": "größer oder gleich",
+          "LessThan": "kleiner als",
+          "LessThanOrEqual": "kleiner oder gleich"
+        }
       }
     },
     "mailOutbound": {

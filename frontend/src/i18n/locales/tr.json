@@ -2883,6 +2883,50 @@
           "customerHidden": "Customers do not see this field.",
           "hiddenNeedsDefault": "A hidden field needs a default value."
         }
+      },
+      "condition": {
+        "title": "Transition",
+        "name": "Name",
+        "note": "No condition means the transition always applies.",
+        "none": "No condition: the transition always applies.",
+        "group": "Condition group",
+        "addGroup": "Add group",
+        "removeGroup": "Remove group",
+        "addField": "Add field",
+        "removeField": "Remove field",
+        "field": "Field",
+        "typeLabel": "Comparison",
+        "value": "Value",
+        "rawValue": "Stored value (not editable here); typing replaces it",
+        "module": "Check module",
+        "pickModule": "Pick a module",
+        "modulePath": "Module path",
+        "moduleUnknown": "This module is not installed in Tiqora. The condition never matches until it is available.",
+        "groupsMatch": "The groups must match",
+        "rowsMatch": "Of the rows in this group",
+        "duplicate": "Each field may appear only once per group: {{fields}}",
+        "linking": {
+          "and": "all",
+          "or": "at least one",
+          "xor": "exactly one"
+        },
+        "regexp": {
+          "empty": "Enter a regular expression.",
+          "invalid": "This is not a valid regular expression."
+        },
+        "type": {
+          "Module": "Check module",
+          "Regexp": "Regular expression",
+          "String": "Text equals",
+          "Equal": "equals",
+          "NotEqual": "does not equal",
+          "Contains": "contains",
+          "NotContains": "does not contain",
+          "GreaterThan": "greater than",
+          "GreaterThanOrEqual": "greater than or equal",
+          "LessThan": "less than",
+          "LessThanOrEqual": "less than or equal"
+        }
       }
     },
     "mailOutbound": {
