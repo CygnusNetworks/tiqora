@@ -2842,6 +2842,55 @@
         "moveUp": "Move \"{{name}}\" up",
         "moveDown": "Move \"{{name}}\" down",
         "remove": "Remove \"{{name}}\" from the step"
+      },
+      "dialog": {
+        "title": "Form",
+        "name": "Name",
+        "short": "Short description",
+        "long": "Long description",
+        "submitButton": "Button text",
+        "submitAdvice": "Advice before submitting",
+        "interfaces": "Interfaces",
+        "interfaceRequired": "Select at least one interface.",
+        "iface": {
+          "AgentInterface": "Agents",
+          "CustomerInterface": "Customers"
+        },
+        "permission": "Permission",
+        "noPermission": "None",
+        "requiredLock": "Ticket must be locked",
+        "fields": "Fields (in order)",
+        "noFields": "No fields yet.",
+        "addField": "Add field",
+        "display": "Display",
+        "displayMode": {
+          "0": "Hidden",
+          "1": "Visible",
+          "2": "Required"
+        },
+        "defaultValue": "Default value",
+        "noDefault": "No default",
+        "channel": "Channel",
+        "channelName": {
+          "Internal": "Internal",
+          "Email": "Email",
+          "Phone": "Phone"
+        },
+        "visibleForCustomer": "Visible to customers",
+        "timeUnits": "Time spent",
+        "timeUnitsMode": {
+          "0": "Off",
+          "1": "Optional",
+          "2": "Required"
+        },
+        "moveUp": "Move \"{{name}}\" up",
+        "moveDown": "Move \"{{name}}\" down",
+        "remove": "Remove \"{{name}}\" from the form",
+        "hint": {
+          "queueRequired": "Queue, state, lock and priority must be hidden or required; \"Visible\" is a configuration error in Znuny.",
+          "customerHidden": "Customers do not see this field.",
+          "hiddenNeedsDefault": "A hidden field needs a default value."
+        }
       }
     },
     "mailOutbound": {

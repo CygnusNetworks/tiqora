@@ -2842,6 +2842,55 @@
         "moveUp": "„{{name}}“ nach oben",
         "moveDown": "„{{name}}“ nach unten",
         "remove": "„{{name}}“ aus dem Schritt entfernen"
+      },
+      "dialog": {
+        "title": "Formular",
+        "name": "Name",
+        "short": "Kurzbeschreibung",
+        "long": "Langbeschreibung",
+        "submitButton": "Text der Schaltfläche",
+        "submitAdvice": "Hinweis vor dem Absenden",
+        "interfaces": "Oberflächen",
+        "interfaceRequired": "Wählen Sie mindestens eine Oberfläche.",
+        "iface": {
+          "AgentInterface": "Agenten",
+          "CustomerInterface": "Kunden"
+        },
+        "permission": "Berechtigung",
+        "noPermission": "Keine",
+        "requiredLock": "Ticket muss gesperrt sein",
+        "fields": "Felder (in Reihenfolge)",
+        "noFields": "Noch keine Felder.",
+        "addField": "Feld hinzufügen",
+        "display": "Anzeige",
+        "displayMode": {
+          "0": "Ausgeblendet",
+          "1": "Sichtbar",
+          "2": "Pflichtfeld"
+        },
+        "defaultValue": "Vorgabewert",
+        "noDefault": "Keine Vorgabe",
+        "channel": "Kanal",
+        "channelName": {
+          "Internal": "Intern",
+          "Email": "E-Mail",
+          "Phone": "Telefon"
+        },
+        "visibleForCustomer": "Für Kunden sichtbar",
+        "timeUnits": "Zeitaufwand",
+        "timeUnitsMode": {
+          "0": "Aus",
+          "1": "Optional",
+          "2": "Pflicht"
+        },
+        "moveUp": "„{{name}}“ nach oben",
+        "moveDown": "„{{name}}“ nach unten",
+        "remove": "„{{name}}“ aus dem Formular entfernen",
+        "hint": {
+          "queueRequired": "Queue, Status, Sperre und Priorität müssen ausgeblendet oder Pflichtfeld sein; „Sichtbar“ ist in Znuny ein Konfigurationsfehler.",
+          "customerHidden": "Kunden sehen dieses Feld nicht.",
+          "hiddenNeedsDefault": "Ein ausgeblendetes Feld braucht einen Vorgabewert."
+        }
       }
     },
     "mailOutbound": {
