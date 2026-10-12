@@ -9,7 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
-from tiqora.api.deps import DbSession
+from tiqora.api.deps import AppSettings, DbSession
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.itsm_schemas import (
     ItsmAdminOut,
@@ -21,6 +21,9 @@ from tiqora.api.v1.admin.itsm_schemas import (
     LinkTypeOut,
     LinkTypePatchIn,
     LinkTypeSyncOut,
+    SetupApplyIn,
+    SetupItemOut,
+    SetupOut,
 )
 from tiqora.itsm.link_types import (
     LinkTypeError,
@@ -42,6 +45,8 @@ from tiqora.itsm.mode import (
 )
 from tiqora.itsm.models import TiqoraItsmLinkType
 from tiqora.itsm.providers import tiqora_cmdb_empty
+from tiqora.itsm.settings import load_itsm_settings
+from tiqora.itsm.setup import SetupItem, apply_setup, plan_setup
 from tiqora.znuny.sysconfig import SysConfig
 
 router = APIRouter(prefix="/itsm", tags=["admin:itsm"])
@@ -220,3 +225,35 @@ async def delete_link_type_route(link_type_id: int, admin: AdminUser, session: D
         await session.rollback()
         raise _link_type_http(exc) from exc
     await session.commit()
+
+
+# --- setup (types, workaround state, dynamic fields) ---------------------------------------
+
+
+def _setup_out(items: list[SetupItem]) -> SetupOut:
+    return SetupOut(
+        items=[
+            SetupItemOut(group=i.group, kind=i.kind, name=i.name, status=i.status, detail=i.detail)
+            for i in items
+        ],
+        complete=all(i.status == "present" for i in items if i.group == "incident_problem"),
+    )
+
+
+@router.get("/setup", response_model=SetupOut)
+async def get_setup(admin: AdminUser, session: DbSession, settings: AppSettings) -> SetupOut:
+    """Preview: what exists and what "Einrichten" would create. Writes nothing."""
+    _ = admin
+    return _setup_out(await plan_setup(session, await load_itsm_settings(session, settings)))
+
+
+@router.post("/setup", response_model=SetupOut)
+async def post_setup(
+    body: SetupApplyIn, admin: AdminUser, session: DbSession, settings: AppSettings
+) -> SetupOut:
+    """Create the missing rows of the selected groups; existing rows are never changed."""
+    cfg = await load_itsm_settings(session, settings)
+    items = await apply_setup(session, cfg, groups=set(body.groups), user_id=admin.id)
+    out = _setup_out(items)
+    await session.commit()
+    return out

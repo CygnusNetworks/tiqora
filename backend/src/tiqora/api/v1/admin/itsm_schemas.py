@@ -115,3 +115,25 @@ class LinkTypePatchIn(BaseModel):
 
 class LinkTypeSyncOut(BaseModel):
     changed: int
+
+
+class SetupItemOut(BaseModel):
+    group: Literal["incident_problem", "change"]
+    kind: Literal["ticket_type", "ticket_state", "dynamic_field"]
+    name: str
+    status: Literal["present", "missing", "conflict", "invalid"]
+    detail: str | None = None
+
+
+class SetupOut(BaseModel):
+    items: list[SetupItemOut]
+    #: everything of the group ``incident_problem`` is present (the ITSM dialogs are usable)
+    complete: bool
+
+
+class SetupApplyIn(BaseModel):
+    #: ``change`` (types Change / Change::Task) is opt-in; the default is the core group only
+    groups: list[Literal["incident_problem", "change"]] = Field(
+        default_factory=lambda: ["incident_problem"],  # type: ignore[arg-type]
+        min_length=1,
+    )

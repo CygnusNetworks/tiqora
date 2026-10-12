@@ -33053,6 +33053,99 @@
         "title": "SettingsSectionUpdate",
         "type": "object"
       },
+      "SetupApplyIn": {
+        "properties": {
+          "groups": {
+            "items": {
+              "enum": [
+                "incident_problem",
+                "change"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Groups",
+            "type": "array"
+          }
+        },
+        "title": "SetupApplyIn",
+        "type": "object"
+      },
+      "SetupItemOut": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "group": {
+            "enum": [
+              "incident_problem",
+              "change"
+            ],
+            "title": "Group",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "ticket_type",
+              "ticket_state",
+              "dynamic_field"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "present",
+              "missing",
+              "conflict",
+              "invalid"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group",
+          "kind",
+          "name",
+          "status"
+        ],
+        "title": "SetupItemOut",
+        "type": "object"
+      },
+      "SetupOut": {
+        "properties": {
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SetupItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "complete"
+        ],
+        "title": "SetupOut",
+        "type": "object"
+      },
       "ShareGroupOut": {
         "properties": {
           "id": {
@@ -60845,6 +60938,146 @@
           }
         },
         "summary": "Put Itsm Mode",
+        "tags": [
+          "admin:itsm"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/setup": {
+      "get": {
+        "description": "Preview: what exists and what \"Einrichten\" would create. Writes nothing.",
+        "operationId": "get_setup_api_v1_admin_itsm_setup_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Setup",
+        "tags": [
+          "admin:itsm"
+        ]
+      },
+      "post": {
+        "description": "Create the missing rows of the selected groups; existing rows are never changed.",
+        "operationId": "post_setup_api_v1_admin_itsm_setup_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetupApplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Setup",
         "tags": [
           "admin:itsm"
         ]

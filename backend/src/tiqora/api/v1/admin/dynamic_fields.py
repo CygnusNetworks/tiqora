@@ -11,9 +11,6 @@ tree (``BaseText.pm``, ``TextArea.pm``, ``Checkbox.pm``, ``BaseSelect.pm``/
 
 from __future__ import annotations
 
-from typing import Any
-
-import yaml
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
@@ -26,70 +23,19 @@ from tiqora.api.v1.admin.common import (
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filter, window
 from tiqora.api.v1.admin.schemas import (
-    DYNAMIC_FIELD_TYPES,
     DynamicFieldCreate,
     DynamicFieldOut,
     DynamicFieldUpdate,
 )
 from tiqora.db.legacy.dynamic_field import DynamicField
-from tiqora.domain.dynamic_field_config import config_from_yaml
+from tiqora.domain.dynamic_field_config import (
+    config_from_yaml,
+    config_to_yaml,
+    validate_dynamic_field_config,
+)
+from tiqora.domain.znuny_admin_writes import create_dynamic_field_row
 
 router = APIRouter(prefix="/dynamic-fields", tags=["admin:dynamic-fields"])
-
-
-# Keys recognised (validated/allowed) per field_type. Extra unknown keys are
-# rejected to avoid silently persisting typos that Znuny would ignore.
-_COMMON_TEXT_KEYS = {"DefaultValue", "Link", "RegExList"}
-_SELECT_KEYS = {"DefaultValue", "PossibleValues", "PossibleNone", "TranslatableValues", "Link"}
-_DATETIME_KEYS = {"DefaultValue", "YearsPeriod", "YearsInPast", "YearsInFuture"}
-
-_ALLOWED_KEYS: dict[str, set[str]] = {
-    "Text": _COMMON_TEXT_KEYS,
-    "TextArea": _COMMON_TEXT_KEYS | {"Rows", "Cols"},
-    "Checkbox": {"DefaultValue"},
-    "Dropdown": _SELECT_KEYS,
-    "Multiselect": _SELECT_KEYS,
-    "Date": _DATETIME_KEYS,
-    "DateTime": _DATETIME_KEYS,
-}
-
-_REQUIRED_KEYS: dict[str, set[str]] = {
-    "Dropdown": {"PossibleValues"},
-    "Multiselect": {"PossibleValues"},
-}
-
-
-def validate_dynamic_field_config(field_type: str, config: dict[str, Any]) -> None:
-    """Validate *config* keys/shape against Znuny's expectations for *field_type*.
-
-    Raises :class:`ValueError` on an invalid field_type or config shape.
-    """
-    if field_type not in DYNAMIC_FIELD_TYPES:
-        raise ValueError(
-            f"Unsupported field_type {field_type!r}; expected one of {sorted(DYNAMIC_FIELD_TYPES)}"
-        )
-    allowed = _ALLOWED_KEYS[field_type]
-    unknown = set(config) - allowed
-    if unknown:
-        raise ValueError(f"Unknown config keys for {field_type}: {sorted(unknown)}")
-    required = _REQUIRED_KEYS.get(field_type, set())
-    missing = required - set(config)
-    if missing:
-        raise ValueError(f"Missing required config keys for {field_type}: {sorted(missing)}")
-    if field_type in {"Dropdown", "Multiselect"} and "PossibleValues" in config:
-        pv = config["PossibleValues"]
-        if not isinstance(pv, dict) or not pv:
-            raise ValueError("PossibleValues must be a non-empty mapping of value -> label")
-
-
-def config_to_yaml(config: dict[str, Any]) -> str:
-    """Serialize *config* the way Znuny's ``YAML::Dump`` round-trips it.
-
-    ``dynamic_field.config`` is a TEXT column on both dialects (see the
-    :class:`~tiqora.db.legacy.dynamic_field.DynamicField` docstring), so this
-    returns ``str``, not ``bytes``.
-    """
-    return yaml.safe_dump(config, default_flow_style=False, allow_unicode=True)
 
 
 def _to_out(row: DynamicField) -> DynamicFieldOut:
@@ -139,29 +85,21 @@ async def create_dynamic_field(
     body: DynamicFieldCreate, admin: AdminUser, session: DbSession
 ) -> DynamicFieldOut:
     try:
-        validate_dynamic_field_config(body.field_type, body.config)
+        row = await create_dynamic_field_row(
+            session,
+            name=body.name,
+            label=body.label,
+            field_type=body.field_type,
+            object_type=body.object_type,
+            config=body.config,
+            field_order=body.field_order,
+            valid_id=body.valid_id,
+            user_id=admin.id,
+        )
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
-
-    ts = now()
-    row = DynamicField(
-        internal_field=0,
-        name=body.name,
-        label=body.label,
-        field_order=body.field_order,
-        field_type=body.field_type,
-        object_type=body.object_type,
-        config=config_to_yaml(body.config),
-        valid_id=body.valid_id,
-        create_time=ts,
-        create_by=admin.id,
-        change_time=ts,
-        change_by=admin.id,
-    )
-    session.add(row)
-    await invalidate_znuny_cache_types(session, DYNAMIC_FIELD_CACHE_TYPES)
     await session.commit()
     await session.refresh(row)
     return _to_out(row)
