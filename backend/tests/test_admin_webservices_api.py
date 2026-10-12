@@ -7,6 +7,7 @@ entries, jobs) are removed with ``snapshot_marks`` / ``delete_above_marks``.
 
 from __future__ import annotations
 
+import base64
 import json
 import types
 from collections.abc import AsyncIterator
@@ -65,6 +66,7 @@ HOSTS = {"crm.example.org": ["198.51.100.10"]}
 ADMIN = AuthenticatedUser(
     id=1, login="root@localhost", first_name="Admin", last_name="Znuny", auth_method="session"
 )
+BASIC_TOKEN = base64.b64encode(f"u:{PASSWORD}".encode()).decode()
 KNOWN_SECRETS = (PASSWORD, PROXY_PASSWORD, HEADER_SECRET)
 
 
@@ -412,7 +414,11 @@ async def test_debugger_detail_both_sources(
             "gi51-tq",
             debug_level="error",
             summary=f"failed with {PASSWORD}",
-            content="Authorization: Basic Zm9vOmJhcg==\nplain line",
+            content=(
+                "Authorization: Basic Zm9vOmJhcg==\nplain line\n"
+                f'Response content: \'{{"auth":"Basic {BASIC_TOKEN}"}}\'\n'
+                "AuthType BasicAuth used"
+            ),
         )
         env.znuny_entry(
             WS,
@@ -442,8 +448,11 @@ async def test_debugger_detail_both_sources(
         for detail in (tq, zn):
             blob = detail.model_dump_json()
             assert PASSWORD not in blob and "Zm9vOmJhcg" not in blob
+            assert BASIC_TOKEN not in blob
             assert all(c.masked for c in detail.contents)
         assert "plain line" in tq.contents[0].content
+        assert "AuthType BasicAuth used" in tq.contents[0].content
+        assert 'Response content: \'{"auth":"Basic ***' in tq.contents[0].content
         assert "Basic Zm9v" not in zn.contents[0].content and "'Note'" in zn.contents[0].content
 
 

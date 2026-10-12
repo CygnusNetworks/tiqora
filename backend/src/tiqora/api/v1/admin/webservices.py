@@ -80,6 +80,7 @@ DEFAULT_LIMIT: Final = 50
 MAX_LIMIT: Final = 200
 
 PROBLEM_INVALID_YAML: Final = "Die Konfiguration ist kein gültiges YAML."
+PROBLEM_UNREADABLE: Final = "Die Konfiguration kann nicht gelesen werden."
 PROBLEM_UNSUPPORTED_TYPE: Final = "Der Typ {type} wird von Tiqora nicht unterstützt."
 WARNING_CERT_DIRS: Final = (
     "Die Konfiguration verwendet ein Clientzertifikat, aber TIQORA_GI_CERT_DIRS ist nicht "
@@ -154,7 +155,7 @@ async def _parse_row(row: Any, sysconfig: SysConfig, huge_xml: bool) -> _Parsed:
         if isinstance(config.get("Requester"), dict) and config["Requester"]:
             parsed.requester = await asyncio.to_thread(parse_requester, config, huge_xml=huge_xml)
     except _PARSE_ERRORS:
-        parsed.problem = PROBLEM_INVALID_YAML
+        parsed.problem = PROBLEM_UNREADABLE
         parsed.config = None
         return parsed
     if parsed.requester is not None:
@@ -196,6 +197,8 @@ def _collect_secrets(value: Any, out: set[str], *, secret_context: bool = False)
     if isinstance(value, Mapping):
         for key, item in value.items():
             name = str(key)
+            if name == "AuthType":
+                continue  # names the scheme (BasicAuth, OAuth2Token), not a secret
             secret = (
                 secret_context or bool(SECRET_KEY_RE.search(name)) or name == "AdditionalHeaders"
             )
@@ -219,10 +222,29 @@ def _secrets_of(config: dict[str, Any] | None) -> set[str]:
     p_transport = provider.get("Transport") if isinstance(provider, dict) else None
     _collect_secrets(transport, found)
     _collect_secrets(p_transport, found)
-    # The basic-auth token Znuny logs is "user:password" in base64.
     for secret in list(found):
         found.add(base64.b64encode(secret.encode()).decode("ascii"))
+    # Znuny logs "Basic " + base64("user:password") (REST.pm:705 proxy, :787 basic auth).
+    _collect_credential_tokens(transport, found)
+    _collect_credential_tokens(p_transport, found)
     return found
+
+
+_CREDENTIAL_PAIRS: Final = (("BasicAuthUser", "BasicAuthPassword"), ("ProxyUser", "ProxyPassword"))
+
+
+def _collect_credential_tokens(value: Any, out: set[str]) -> None:
+    """Add base64("user:password") for every user/password pair Znuny turns into a token."""
+    if isinstance(value, Mapping):
+        for user_key, password_key in _CREDENTIAL_PAIRS:
+            if user_key in value and password_key in value:
+                pair = f"{perl_str(value[user_key])}:{perl_str(value[password_key])}"
+                out.add(base64.b64encode(pair.encode()).decode("ascii"))
+        for item in value.values():
+            _collect_credential_tokens(item, out)
+    elif isinstance(value, list | tuple):
+        for item in value:
+            _collect_credential_tokens(item, out)
 
 
 def _mask_line(text: str, secrets: set[str]) -> tuple[str, bool]:
@@ -439,7 +461,9 @@ def _decode_cursor(raw: str) -> tuple[datetime, str, int]:
             raise ValueError(source)
         return datetime.fromisoformat(when), str(source), int(entry_id)
     except (ValueError, TypeError, binascii.Error, json.JSONDecodeError) as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Ungültiger Cursor") from exc
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "Ungültige Seitenangabe"
+        ) from exc
 
 
 def _naive_utc(moment: datetime | None) -> datetime | None:
