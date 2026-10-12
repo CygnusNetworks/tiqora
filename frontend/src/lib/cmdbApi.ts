@@ -140,6 +140,9 @@ export const cmdbApi = {
     if (ciId != null) form.append("ci_id", String(ciId));
     return api.request<CmdbAttachment>("POST", `${BASE}/attachments`, { body: form });
   },
+  ciAttachments(ciId: number) {
+    return api.request<CmdbAttachment[]>("GET", `${BASE}/cis/${ciId}/attachments`);
+  },
   attachmentUrl(id: number): string {
     return `${BASE}/attachments/${id}`;
   },

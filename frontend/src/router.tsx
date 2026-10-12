@@ -2,6 +2,7 @@ import { CmdbComingSoon } from "@/components/cmdb/CmdbComingSoon";
 import { validateCmdbListSearch } from "@/components/cmdb/ciFilterModel";
 import { validateCiDetailSearch } from "@/components/cmdb/ciDetailModel";
 import { CiDetailPage } from "@/routes/agent/cmdb/CiDetailPage";
+import { CiEditRoute, CiNewRoute } from "@/routes/agent/cmdb/CiEditPage";
 import { CmdbListPage } from "@/routes/agent/cmdb/CmdbListPage";
 import { PluginRoutePage } from "@/routes/agent/PluginRoutePage";
 import {
@@ -1311,7 +1312,7 @@ const agentCmdbNewRoute = createRoute({
     const n = Number(s.class);
     return Number.isInteger(n) && n > 0 ? { class: n } : {};
   },
-  component: CmdbComingSoon,
+  component: CiNewRoute,
 });
 
 const agentCmdbImportRoute = createRoute({
@@ -1330,7 +1331,7 @@ const agentCmdbCiRoute = createRoute({
 const agentCmdbCiEditRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/cmdb/$ciId/edit",
-  component: CmdbComingSoon,
+  component: CiEditRoute,
 });
 
 const adminCmdbClassesRoute = createRoute({

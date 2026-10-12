@@ -16,6 +16,7 @@ import type {
   CiTicket,
   CiVersion,
   CiVersionSummary,
+  CmdbAttachment,
   CmdbClass,
   CmdbDefinition,
   CmdbSavedSearch,
@@ -173,6 +174,7 @@ export type DemoCmdb = {
   links: DemoLink[];
   nextCiId: number;
   nextLinkId: number;
+  nextAttachmentId: number;
   saved: CmdbSavedSearch[];
   nextSavedId: number;
   jobs: Record<number, DemoJob>;
@@ -217,6 +219,7 @@ export function createDemoCmdb(): DemoCmdb {
     ],
     nextCiId: 7,
     nextLinkId: 5,
+    nextAttachmentId: 1,
     saved: [],
     nextSavedId: 1,
     jobs: {},
@@ -606,6 +609,19 @@ export function resolveCmdb(
     ]);
     return ok({ job_id: jobId, status: "queued" }, 202);
   }
+  if (sub === "/attachments" && method === "POST") {
+    const file = body instanceof FormData ? body.get("file") : null;
+    const ciField = body instanceof FormData ? body.get("ci_id") : null;
+    const att: CmdbAttachment = {
+      id: store.nextAttachmentId++,
+      ci_id: ciField ? Number(ciField) : null,
+      filename: file instanceof File ? file.name : "datei.txt",
+      content_type: file instanceof File && file.type ? file.type : "application/octet-stream",
+      size_bytes: file instanceof File ? file.size : 0,
+      created_at: AT,
+    };
+    return ok(att, 201);
+  }
   if (sub === "/cis/search" && method === "POST") return ok(search(store, (body ?? {}) as SearchBody));
   if (sub === "/cis/lookup") {
     const rows = store.cis.filter((c) => matches(c, query.get("q") ?? ""));
@@ -650,11 +666,14 @@ export function resolveCmdb(
         return none();
       }
       if (method === "PUT") {
-        const b = (body ?? {}) as { name?: string; deployment_state_id?: number; incident_state_id?: number; attributes?: Record<string, AttrEntry[]> };
-        ci.name = b.name ?? ci.name;
-        ci.deployment = b.deployment_state_id ?? ci.deployment;
-        ci.incidentOwn = b.incident_state_id ?? ci.incidentOwn;
-        ci.attrs = b.attributes ?? ci.attrs;
+        const b = (body ?? {}) as { name?: string; deployment_state_id?: number; incident_state_id?: number; attributes?: Record<string, AttrEntry[]>; expected_lock_version?: number };
+        if (b.expected_lock_version !== undefined && b.expected_lock_version !== ci.lockVersion) {
+          return { status: 409, body: { detail: { code: "conflict", message: "Inzwischen geändert. Bitte neu laden." } } };
+        }
+        const next = { name: b.name ?? ci.name, deployment: b.deployment_state_id ?? ci.deployment, incidentOwn: b.incident_state_id ?? ci.incidentOwn, attrs: b.attributes ?? ci.attrs };
+        const same = next.name === ci.name && next.deployment === ci.deployment && next.incidentOwn === ci.incidentOwn && JSON.stringify(next.attrs) === JSON.stringify(ci.attrs);
+        if (same) return ok({ ci: ciOut(store, ci), changed: false });
+        Object.assign(ci, next);
         ci.lockVersion += 1;
         return ok({ ci: ciOut(store, ci), changed: true });
       }

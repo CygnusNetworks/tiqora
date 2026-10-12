@@ -7745,6 +7745,39 @@
         "AttachmentAddPost": "Attachment added",
         "AttachmentDeletePost": "Attachment removed"
       }
+    },
+    "edit": {
+      "titleNew": "New CI: {{class}}",
+      "titleEdit": "Edit CI {{number}}",
+      "backToCi": "Back to the CI",
+      "pickClass": "Choose a class",
+      "pickClassHint": "Choose the class of the new CI.",
+      "noWritableClasses": "You may not create CIs in any class.",
+      "name": "Name",
+      "attributes": "Attributes",
+      "changeNote": "Change note",
+      "summary_one": "Please check the marked fields ({{count}} error).",
+      "summary_other": "Please check the marked fields ({{count}} errors).",
+      "unknownKeys": "Affected attributes: {{keys}}",
+      "dropUnknown": "Remove values",
+      "unknownConfirm": "Please confirm that the unknown values are removed.",
+      "unchanged": "No changes",
+      "saveFailed": "The CI could not be saved.",
+      "uploadFailed": "The file could not be uploaded.",
+      "loadFailed": "The CI could not be loaded.",
+      "forbidden": "You may not edit this CI.",
+      "forbiddenClass": "You may not create CIs in this class.",
+      "conflict": {
+        "title": "Changed in the meantime",
+        "message": "This CI was changed while you were editing it. Reloading discards your input.",
+        "reload": "Reload"
+      },
+      "leave": {
+        "title": "Discard changes?",
+        "message": "You have unsaved changes. Leave the page anyway?",
+        "confirm": "Leave",
+        "stay": "Stay"
+      }
     }
   }
 }

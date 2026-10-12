@@ -7753,6 +7753,39 @@
         "AttachmentAddPost": "Anhang hinzugefügt",
         "AttachmentDeletePost": "Anhang entfernt"
       }
+    },
+    "edit": {
+      "titleNew": "Neues CI: {{class}}",
+      "titleEdit": "CI {{number}} bearbeiten",
+      "backToCi": "Zum CI",
+      "pickClass": "Klasse wählen",
+      "pickClassHint": "Wählen Sie die Klasse des neuen CIs.",
+      "noWritableClasses": "Sie dürfen in keiner Klasse CIs anlegen.",
+      "name": "Name",
+      "attributes": "Attribute",
+      "changeNote": "Änderungsnotiz",
+      "summary_one": "Bitte prüfen Sie die markierten Felder ({{count}} Fehler).",
+      "summary_other": "Bitte prüfen Sie die markierten Felder ({{count}} Fehler).",
+      "unknownKeys": "Betroffene Attribute: {{keys}}",
+      "dropUnknown": "Werte entfernen",
+      "unknownConfirm": "Bitte bestätigen Sie, dass die unbekannten Werte entfernt werden.",
+      "unchanged": "Keine Änderungen",
+      "saveFailed": "Das CI konnte nicht gespeichert werden.",
+      "uploadFailed": "Die Datei konnte nicht hochgeladen werden.",
+      "loadFailed": "Das CI konnte nicht geladen werden.",
+      "forbidden": "Sie dürfen dieses CI nicht bearbeiten.",
+      "forbiddenClass": "Sie dürfen in dieser Klasse keine CIs anlegen.",
+      "conflict": {
+        "title": "Inzwischen geändert",
+        "message": "Dieses CI wurde geändert, während Sie es bearbeitet haben. Beim Neuladen gehen Ihre Eingaben verloren.",
+        "reload": "Neu laden"
+      },
+      "leave": {
+        "title": "Änderungen verwerfen?",
+        "message": "Sie haben ungespeicherte Änderungen. Möchten Sie die Seite trotzdem verlassen?",
+        "confirm": "Verlassen",
+        "stay": "Bleiben"
+      }
     }
   }
 }
