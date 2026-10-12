@@ -24,6 +24,17 @@ from tiqora.plugins.context import PluginContext
 from tiqora.plugins.events import EVENT_SUBSCRIBERS, EventHandler, EventSubscriber
 from tiqora.plugins.manifest import PluginManifest
 from tiqora.plugins.mcp import CORE_MCP_TOOL_NAMES, MCP_TOOLS, McpTool
+from tiqora.plugins.naming import CAMEL_NAME_RE, qualified
+from tiqora.plugins.process_points import (
+    MAX_ACTION_TIMEOUT,
+    MIN_ACTION_TIMEOUT,
+    ConditionRun,
+    TransitionActionRun,
+    make_action_adapter,
+    make_condition_adapter,
+    stage_action,
+    stage_condition,
+)
 from tiqora.plugins.routes import PLUGIN_ROUTES, PluginRoute
 from tiqora.plugins.sync_hooks import (
     SYNC_HOOKS,
@@ -33,6 +44,8 @@ from tiqora.plugins.sync_hooks import (
     SyncOperation,
 )
 from tiqora.plugins.tasks import SCHEDULED_TASKS, Schedule, ScheduledTask, TaskRun
+from tiqora.process.actions.registry import TRANSITION_ACTIONS, ActionParam
+from tiqora.process.condition_modules import CONDITION_MODULES, ZNUNY_VALIDATION_PREFIX
 from tiqora.settings_sections.section import (
     SETTINGS_SECTIONS,
     SettingsSection,
@@ -368,3 +381,77 @@ class PluginRegistrar:
             context=self._context,
         )
         self._stage(SYNC_HOOKS, item, check=check)
+
+    def transition_action(
+        self,
+        name: str,
+        run: TransitionActionRun,
+        *,
+        params: Iterable[ActionParam] = (),
+        timeout_seconds: int = 5,
+    ) -> None:
+        """Stage ``Plugin_<short_id>_<name>`` as a process transition action (D5)."""
+        qname = qualified(self._manifest.short_id, name)
+        params_t = tuple(params)
+
+        def check() -> None:
+            if not isinstance(name, str) or not CAMEL_NAME_RE.fullmatch(name):
+                raise RegistrationRejected(
+                    f"Ungültiger Name „{name}“ für die Prozessaktion: "
+                    "2 bis 41 Zeichen, A-Z, a-z und 0-9, beginnt mit einem Großbuchstaben"
+                )
+            _require_async(run, f"Die Prozessaktion „{name}“")
+            if (
+                isinstance(timeout_seconds, bool)
+                or not MIN_ACTION_TIMEOUT <= timeout_seconds <= MAX_ACTION_TIMEOUT
+            ):
+                raise RegistrationRejected(
+                    f"Zeitlimit einer Prozessaktion muss zwischen {MIN_ACTION_TIMEOUT} "
+                    f"und {MAX_ACTION_TIMEOUT} Sekunden liegen"
+                )
+            for param in params_t:
+                if not isinstance(param, ActionParam):
+                    raise RegistrationRejected(
+                        f"Parameter der Prozessaktion „{name}“ müssen ActionParam sein"
+                    )
+
+        adapter = make_action_adapter(
+            plugin_id=self.plugin_id,
+            plugin_name=self._manifest.name,
+            qualified_name=qname,
+            run=run,
+            context=self._context,
+            timeout_seconds=timeout_seconds,
+        )
+        self._stage(
+            TRANSITION_ACTIONS,
+            stage_action(qualified_name=qname, adapter=adapter, params=params_t),
+            check=check,
+        )
+
+    def condition_module(self, name: str, run: ConditionRun) -> None:
+        """Stage ``Plugin_<short_id>_<name>`` as a ``Type: Module`` transition condition (D5)."""
+        match = ZNUNY_VALIDATION_PREFIX + qualified(self._manifest.short_id, name)
+
+        def check() -> None:
+            if not isinstance(name, str) or not CAMEL_NAME_RE.fullmatch(name):
+                raise RegistrationRejected(
+                    f"Ungültiger Name „{name}“ für die Bedingung: "
+                    "2 bis 41 Zeichen, A-Z, a-z und 0-9, beginnt mit einem Großbuchstaben"
+                )
+            if not callable(run) or is_async_callable(run):
+                raise RegistrationRejected(
+                    f"Die Bedingung „{name}“ muss eine gewöhnliche Funktion sein "
+                    "(def, nicht async def): sie läuft synchron und muss schnell sein"
+                )
+
+        self._stage(
+            CONDITION_MODULES,
+            stage_condition(
+                match=match,
+                adapter=make_condition_adapter(
+                    plugin_id=self.plugin_id, qualified_match=match, run=run
+                ),
+            ),
+            check=check,
+        )

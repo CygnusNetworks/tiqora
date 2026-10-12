@@ -10,6 +10,8 @@ from tiqora.plugins.mcp import MCP_TOOLS
 from tiqora.plugins.routes import PLUGIN_ROUTES
 from tiqora.plugins.sync_hooks import SYNC_HOOKS
 from tiqora.plugins.tasks import SCHEDULED_TASKS
+from tiqora.process.actions.registry import TRANSITION_ACTIONS
+from tiqora.process.condition_modules import CONDITION_MODULES
 from tiqora.settings_sections.section import SETTINGS_SECTIONS
 
 EXPECTED = {
@@ -66,6 +68,7 @@ SUBMODULES: dict[str, set[str]] = {
         "OperationVetoed",
         "SyncHandler",
     },
+    "tiqora_sdk.process": {"ActionContext", "ActionParam", "ConditionRun", "TransitionActionRun"},
 }
 
 
@@ -99,6 +102,8 @@ def test_registry_protocol_matches_registrar() -> None:
             "job_handler",
             "mcp_tool",
             "before",
+            "transition_action",
+            "condition_module",
         }
     )
 
@@ -120,6 +125,8 @@ def test_phase1_points_are_sdk_stable() -> None:
             SCHEDULED_TASKS,
             MCP_TOOLS,
             SYNC_HOOKS,
+            TRANSITION_ACTIONS,
+            CONDITION_MODULES,
         )
     )
     assert CHANNELS.sdk_stable is False

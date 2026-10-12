@@ -14,4 +14,8 @@ entry = "tq_fixture_points:plugin"
 sdk = ">=0.2,<0.3"
 
 [capabilities]
-extension_points = ["core.events.sync_hooks"]
+extension_points = [
+  "core.events.sync_hooks",
+  "core.process.transition_actions",
+  "core.process.condition_modules",
+]

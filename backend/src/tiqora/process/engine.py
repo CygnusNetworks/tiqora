@@ -2079,20 +2079,24 @@ async def run_transitions(
         values=[transition.target_activity_entity_id],
         user_id=user_id,
     )
+    # lazy: plugins.process_points imports tiqora.process (package init imports this module)
+    from tiqora.plugins.process_points import action_budget_scope
+
     unsupported: list[str] = []
-    for action_node in transition.actions:
-        skipped = await execute_transition_action(
-            session,
-            action=action_node.config,
-            ticket_id=ticket_id,
-            process_entity_id=graph.entity_id,
-            activity_entity_id=activity.entity_id,
-            transition_entity_id=transition.entity_id,
-            user_id=user_id,
-            sysconfig=sysconfig,
-        )
-        if skipped is not None:
-            unsupported.append(skipped)
+    with action_budget_scope():  # one shared time budget for all plugin actions of this run
+        for action_node in transition.actions:
+            skipped = await execute_transition_action(
+                session,
+                action=action_node.config,
+                ticket_id=ticket_id,
+                process_entity_id=graph.entity_id,
+                activity_entity_id=activity.entity_id,
+                transition_entity_id=transition.entity_id,
+                user_id=user_id,
+                sysconfig=sysconfig,
+            )
+            if skipped is not None:
+                unsupported.append(skipped)
     return TransitionOutcome(
         activity_changed=True,
         new_activity_entity_id=transition.target_activity_entity_id,

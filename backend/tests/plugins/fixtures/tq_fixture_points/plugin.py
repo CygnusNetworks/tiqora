@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 from typing import Any
+
+from sqlalchemy import text
 
 from tiqora_sdk import PluginRegistry
 from tiqora_sdk.hooks import (
@@ -13,6 +16,7 @@ from tiqora_sdk.hooks import (
     SyncOperation,
     TicketCreatePatch,
 )
+from tiqora_sdk.process import ActionContext
 
 from . import behaviour
 
@@ -60,10 +64,42 @@ def _register_sync_hooks(registry: PluginRegistry) -> None:
         )
 
 
+async def _set_contract(ac: ActionContext) -> None:
+    behaviour.CALLS.append(("action.SetContract", dict(ac.config)))
+    await ac.plugin.tickets.set_dynamic_field(
+        ac.ticket_id, "PP55Contract", [str(ac.config["Contract"])], session=ac.session
+    )
+    mode = behaviour.MODE.get("action", "ok")
+    if mode == "raise":
+        raise RuntimeError("kaputt")
+    if mode == "hang":
+        await asyncio.sleep(30)
+    if mode == "db_hang":  # a long statement on the engine session (cancelled by the timeout)
+        dialect = ac.session.get_bind().dialect.name
+        sql = "SELECT SLEEP(5)" if dialect == "mysql" else "SELECT pg_sleep(5)"
+        await ac.session.execute(text(sql))
+
+
+def _is_vip(data: Mapping[str, str | list[str] | None], field: str) -> bool:
+    mode = behaviour.MODE.get("cond", "ok")
+    if mode == "raise":
+        raise RuntimeError("kaputt")
+    if mode == "nonbool":
+        return "yes"  # type: ignore[return-value]
+    return data.get("CustomerID") == "pp55-vip"
+
+
+def _register_process(registry: PluginRegistry) -> None:
+    """Action ``SetContract`` and condition ``IsVip``; behaviour by ``MODE["action"|"cond"]``."""
+    registry.transition_action("SetContract", _set_contract, timeout_seconds=2)
+    registry.condition_module("IsVip", _is_vip)
+
+
 class PointsPlugin:
     def register(self, registry: PluginRegistry) -> None:
         # Each task of the plugin-points plan adds its ``_register_<point>(registry)`` call here.
         _register_sync_hooks(registry)
+        _register_process(registry)
 
 
 plugin = PointsPlugin()

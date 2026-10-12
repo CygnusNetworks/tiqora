@@ -33,7 +33,9 @@ if _t.TYPE_CHECKING:
     from fastapi import APIRouter
     from pydantic import BaseModel
 
+    from tiqora.plugins.process_points import ConditionRun, TransitionActionRun
     from tiqora.plugins.sync_hooks import SyncHandler, SyncOperation
+    from tiqora.process.actions.registry import ActionParam
     from tiqora.settings_sections.section import SettingsSection
 
 __all__ = [
@@ -119,6 +121,17 @@ class PluginRegistry(_t.Protocol):
         on_error: _t.Literal["allow", "deny"] = "allow",
         order: int = 100,
     ) -> None: ...
+
+    def transition_action(
+        self,
+        name: str,
+        run: TransitionActionRun,
+        *,
+        params: _abc.Iterable[ActionParam] = (),
+        timeout_seconds: int = 5,
+    ) -> None: ...
+
+    def condition_module(self, name: str, run: ConditionRun) -> None: ...
 
 
 class Plugin(_t.Protocol):

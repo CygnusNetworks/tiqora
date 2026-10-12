@@ -46,6 +46,7 @@ CONDITION_MODULES: ExtensionPoint[ConditionModule] = ExtensionPoint(
     key="core.process.condition_modules",
     item_key=lambda m: m.match,
     description="Transition condition validation modules (Type: Module)",
+    sdk_stable=True,
 )
 
 
