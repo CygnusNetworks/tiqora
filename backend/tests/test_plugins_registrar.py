@@ -56,6 +56,7 @@ ALL_POINTS = [
     "core.mcp.tools",
     "core.http.public_routes",
     "core.auth.password_providers",
+    "core.customers.sources",
 ]
 
 
@@ -452,3 +453,58 @@ def test_password_provider_staged(registrar: PluginRegistrar) -> None:
     registrar.password_provider("pp", _auth, audience="agent")
     ((_, item),) = registrar.staged
     assert item.key == "org.example.hello:pp" and item.audience == "agent"
+
+
+async def _cs_search(ctx: Any, q: str, limit: int) -> list[Any]:
+    return []
+
+
+async def _cs_lookup(ctx: Any, key: str) -> None:
+    return None
+
+
+def _cs_sync(ctx: Any, key: str) -> None:
+    return None
+
+
+@pytest.mark.parametrize(
+    ("name", "kwargs", "match"),
+    [
+        ("Bad Name", {}, "Name"),
+        ("cs", {"label": " "}, "Bezeichnung"),
+        ("cs", {"search": _cs_sync}, "async"),
+        ("cs", {"by_login": _cs_sync}, "async"),
+        ("cs", {"by_email": _cs_sync}, "async"),
+        ("cs", {"materialize_on_inbound": True}, "by_email"),
+        ("cs", {"timeout_seconds": 0}, "Zeitlimit"),
+        ("cs", {"timeout_seconds": 11}, "Zeitlimit"),
+        ("cs", {"timeout_seconds": True}, "Zeitlimit"),
+    ],
+)
+def test_customer_source_rejects(
+    registrar: PluginRegistrar, name: str, kwargs: dict[str, Any], match: str
+) -> None:
+    args: dict[str, Any] = {
+        "label": "Verzeichnis",
+        "search": _cs_search,
+        "by_login": _cs_lookup,
+        **kwargs,
+    }
+    with pytest.raises(RegistrationRejected, match=match):
+        registrar.customer_source(name, **args)
+    assert registrar.staged == ()
+
+
+def test_customer_source_staged(registrar: PluginRegistrar) -> None:
+    registrar.customer_source(
+        "cs",
+        label="Verzeichnis",
+        search=_cs_search,
+        by_login=_cs_lookup,
+        by_email=_cs_lookup,
+        materialize_on_inbound=True,
+    )
+    ((point, item),) = registrar.staged
+    assert point.key == "core.customers.sources"
+    assert item.key == "org.example.hello:cs" and item.timeout_seconds == 3
+    assert item.materialize_on_inbound is True and item.by_email is _cs_lookup

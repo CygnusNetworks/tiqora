@@ -7,6 +7,7 @@ from tiqora.channels.registry import CHANNELS
 from tiqora.jobs.registry import JOB_HANDLERS
 from tiqora.plugins.auth_providers import AUTH_PROVIDERS
 from tiqora.plugins.channels import CHANNEL_DRIVERS
+from tiqora.plugins.customer_sources import CUSTOMER_SOURCES
 from tiqora.plugins.df_types import DYNAMIC_FIELD_TYPES
 from tiqora.plugins.events import EVENT_SUBSCRIBERS
 from tiqora.plugins.mail_filters import INBOUND_MAIL_FILTERS, OUTBOUND_MAIL_FILTERS
@@ -107,6 +108,13 @@ SUBMODULES: dict[str, set[str]] = {
         "verify_shared_secret",
     },
     "tiqora_sdk.auth": {"AuthContext", "PasswordCheck", "PasswordAuthenticate"},
+    "tiqora_sdk.customers": {
+        "CustomerLookup",
+        "CustomerSearch",
+        "CustomerSourceContext",
+        "ExternalCompany",
+        "ExternalCustomer",
+    },
 }
 
 
@@ -149,6 +157,7 @@ def test_registry_protocol_matches_registrar() -> None:
             "notification_transport",
             "channel",
             "password_provider",
+            "customer_source",
         }
     )
 
@@ -179,6 +188,7 @@ def test_phase1_points_are_sdk_stable() -> None:
             OUTBOUND_MAIL_FILTERS,
             CHANNEL_DRIVERS,
             AUTH_PROVIDERS,
+            CUSTOMER_SOURCES,
         )
     )
     assert CHANNELS.sdk_stable is False

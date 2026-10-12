@@ -35,6 +35,12 @@ from tiqora.plugins.channels import (
     ChannelSend,
 )
 from tiqora.plugins.context import PluginContext
+from tiqora.plugins.customer_sources import (
+    CUSTOMER_SOURCES,
+    CustomerLookup,
+    CustomerSearch,
+    CustomerSource,
+)
 from tiqora.plugins.df_types import (
     BASE_TYPES,
     DYNAMIC_FIELD_TYPES,
@@ -878,6 +884,64 @@ class PluginRegistrar:
             context=self._context,
         )
         self._stage(AUTH_PROVIDERS, item, check=check)
+
+    def customer_source(
+        self,
+        name: str,
+        *,
+        label: str,
+        search: CustomerSearch,
+        by_login: CustomerLookup,
+        by_email: CustomerLookup | None = None,
+        materialize_on_inbound: bool = False,
+        timeout_seconds: int = 3,
+    ) -> None:
+        """Stage a customer directory (D13): searched by agents, imported on request.
+
+        ``search(ctx, query, limit)`` lists matches, ``by_login(ctx, login)`` returns one
+        person or ``None``. With ``by_email`` and ``materialize_on_inbound=True`` an unknown
+        mail sender is looked up too and taken over into the customer table.
+        """
+
+        def check() -> None:
+            self._check_name(name, "das Kundenverzeichnis")
+            if not isinstance(label, str) or not label.strip() or len(label) > 100:
+                raise RegistrationRejected(
+                    f"Das Kundenverzeichnis „{name}“ braucht eine Bezeichnung "
+                    "(höchstens 100 Zeichen)"
+                )
+            _require_async(search, f"Die Suche des Kundenverzeichnisses „{name}“")
+            _require_async(by_login, f"Die Abfrage per Login des Kundenverzeichnisses „{name}“")
+            if by_email is not None:
+                _require_async(
+                    by_email, f"Die Abfrage per E-Mail des Kundenverzeichnisses „{name}“"
+                )
+            if materialize_on_inbound and by_email is None:
+                raise RegistrationRejected(
+                    f"Das Kundenverzeichnis „{name}“ braucht by_email, "
+                    "um unbekannte Absender zu übernehmen"
+                )
+            if (
+                isinstance(timeout_seconds, bool)
+                or not isinstance(timeout_seconds, int)
+                or not 1 <= timeout_seconds <= 10
+            ):
+                raise RegistrationRejected(
+                    "Zeitlimit eines Kundenverzeichnisses muss zwischen 1 und 10 Sekunden liegen"
+                )
+
+        item = CustomerSource(
+            key=f"{self.plugin_id}:{name}",
+            plugin_id=self.plugin_id,
+            label=label,
+            search=search,
+            by_login=by_login,
+            by_email=by_email,
+            materialize_on_inbound=bool(materialize_on_inbound),
+            timeout_seconds=timeout_seconds,
+            context=self._context,
+        )
+        self._stage(CUSTOMER_SOURCES, item, check=check)
 
     def channel(
         self,

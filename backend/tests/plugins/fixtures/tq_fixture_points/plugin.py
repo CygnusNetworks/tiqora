@@ -21,6 +21,7 @@ from tiqora_sdk.channels import (
     InboundChannelMessage,
     OutboundChannelMessage,
 )
+from tiqora_sdk.customers import CustomerSourceContext, ExternalCompany, ExternalCustomer
 from tiqora_sdk.fields import DfBaseType
 from tiqora_sdk.hooks import (
     HookContext,
@@ -464,6 +465,56 @@ def _register_auth(registry: PluginRegistry) -> None:
     )
 
 
+_DIRECTORY = (
+    ExternalCustomer("pp55-ext1", "pp55-ext1@example.org", "Erika", "Extern"),
+    ExternalCustomer(
+        "pp55-ext2",
+        "pp55-ext2@example.org",
+        "Emil",
+        "Extern",
+        company=ExternalCompany("PP55-FIRMA", "Beispiel GmbH", city="Musterstadt"),
+    ),
+    ExternalCustomer("pp55-ext3", "pp55-ext3@example.org", "Elsa", "Extern"),
+)
+
+
+async def _cs_gate(what: str) -> None:
+    behaviour.CALLS.append((f"customers.{what}", None))
+    mode = behaviour.MODE.get("cs")
+    if mode == "raise":
+        raise RuntimeError("Verzeichnis kaputt")
+    if mode == "hang":
+        await asyncio.sleep(30)
+
+
+async def _cs_search(ctx: CustomerSourceContext, q: str, limit: int) -> list[ExternalCustomer]:
+    await _cs_gate("search")
+    needle = q.lower()
+    return [c for c in _DIRECTORY if needle in c.login.lower() or needle in c.email.lower()][:limit]
+
+
+async def _cs_by_login(ctx: CustomerSourceContext, login: str) -> ExternalCustomer | None:
+    await _cs_gate("by_login")
+    return next((c for c in _DIRECTORY if c.login == login), None)
+
+
+async def _cs_by_email(ctx: CustomerSourceContext, email: str) -> ExternalCustomer | None:
+    await _cs_gate("by_email")
+    return next((c for c in _DIRECTORY if c.email.lower() == email.lower()), None)
+
+
+def _register_customer_source(registry: PluginRegistry) -> None:
+    registry.customer_source(
+        "directory",
+        label="Beispielverzeichnis",
+        search=_cs_search,
+        by_login=_cs_by_login,
+        by_email=_cs_by_email,
+        materialize_on_inbound=True,
+        timeout_seconds=1,
+    )
+
+
 class PointsPlugin:
     def register(self, registry: PluginRegistry) -> None:
         # Each task of the plugin-points plan adds its ``_register_<point>(registry)`` call here.
@@ -477,6 +528,7 @@ class PointsPlugin:
         _register_transports(registry)
         _register_channels(registry)
         _register_auth(registry)
+        _register_customer_source(registry)
 
 
 plugin = PointsPlugin()

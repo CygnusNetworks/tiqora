@@ -241,6 +241,34 @@ def _build_get_param(parsed: ParsedEmail, *, trusted: bool) -> dict[str, str]:
     return get_param
 
 
+async def _take_over_external_sender(session: AsyncSession, sender: str) -> tuple[str, str] | None:
+    """``(login, customer_id)`` of an unknown sender a plugin customer source knows.
+
+    Only sources that opted in (``materialize_on_inbound``) are asked. The customer is written
+    inside a savepoint of the pipeline transaction; any failure leaves the mail to be handled
+    as for any unknown sender.
+    """
+    from tiqora.identity.types import SYSTEM_USER_ID
+    from tiqora.plugins.customer_sources import lookup_by_email, materialize
+
+    try:
+        found = await lookup_by_email(sender, inbound_only=True)
+        if found is None:
+            return None
+        _source, ext = found
+        async with session.begin_nested():
+            login = await materialize(session, ext, actor_id=SYSTEM_USER_ID)
+            customer_id = (
+                await session.execute(
+                    text("SELECT customer_id FROM customer_user WHERE login = :l"), {"l": login}
+                )
+            ).scalar_one_or_none()
+    except Exception as exc:
+        logger.warning("postmaster_customer_source_failed", error=f"{type(exc).__name__}: {exc}")
+        return None
+    return login, str(customer_id) if customer_id else ""
+
+
 async def _resolve_customer(
     session: AsyncSession, get_param: dict[str, str]
 ) -> tuple[str | None, str | None]:
@@ -267,6 +295,11 @@ async def _resolve_customer(
         if row is not None:
             customer_user = customer_user or str(row[0])
             customer_no = customer_no or (str(row[1]) if row[1] else None)
+        else:
+            taken = await _take_over_external_sender(session, sender)
+            if taken is not None:
+                customer_user = customer_user or taken[0]
+                customer_no = customer_no or taken[1]
 
     if not customer_no and sender:
         customer_no = sender

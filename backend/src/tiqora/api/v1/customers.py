@@ -44,6 +44,12 @@ from tiqora.domain.new_ticket_queue import (
 )
 from tiqora.domain.schemas import CustomerUserOut, UtcDateTime
 from tiqora.domain.vcard import build_vcard, vcard_filename
+from tiqora.plugins.customer_sources import (
+    CustomerSourceConflict,
+    active_sources,
+    lookup_by_login,
+    materialize,
+)
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
@@ -167,6 +173,42 @@ async def create_customer(
         first_name=cu.first_name,
         last_name=cu.last_name,
     )
+
+
+class ExternalImportRequest(BaseModel):
+    source: str = Field(..., min_length=1, max_length=200, description="Customer source key")
+    login: str = Field(..., min_length=1, max_length=200)
+
+
+@router.post("/external-import", response_model=CustomerUserOut)
+async def import_external_customer(
+    body: ExternalImportRequest,
+    user: CurrentUser,
+    session: DbSession,
+) -> CustomerUserOut:
+    """Take over one customer from a plugin directory (once; never updated afterwards).
+
+    An already known login is returned unchanged. 404 when the source or the login is
+    unknown, 409 when the e-mail address belongs to another customer or the data is unusable.
+    """
+    source = next((s for s in active_sources() if s.key == body.source), None)
+    if source is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown customer source")
+    ext = await lookup_by_login(source, body.login.strip())
+    if ext is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found in the directory"
+        )
+    try:
+        login = await materialize(session, ext, actor_id=user.id)
+    except CustomerSourceConflict as exc:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    await session.commit()
+    out = await CustomerService(session).get_by_login(login)
+    if out is None:  # pragma: no cover - committed a moment ago
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    return out
 
 
 class CompanyCreateRequest(BaseModel):

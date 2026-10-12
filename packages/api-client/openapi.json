@@ -11467,6 +11467,14 @@
             },
             "title": "Contacts",
             "type": "array"
+          },
+          "external": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExternalContactOut"
+            },
+            "title": "External",
+            "type": "array"
           }
         },
         "required": [
@@ -15486,6 +15494,79 @@
           "items"
         ],
         "title": "ExtensionPointOut",
+        "type": "object"
+      },
+      "ExternalContactOut": {
+        "description": "A hit from a plugin customer directory; not stored until an agent imports it.",
+        "properties": {
+          "company_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Name"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_label": {
+            "title": "Source Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "source_label",
+          "login",
+          "email",
+          "first_name",
+          "last_name"
+        ],
+        "title": "ExternalContactOut",
+        "type": "object"
+      },
+      "ExternalImportRequest": {
+        "properties": {
+          "login": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Login",
+            "type": "string"
+          },
+          "source": {
+            "description": "Customer source key",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "login"
+        ],
+        "title": "ExternalImportRequest",
         "type": "object"
       },
       "FactsStatusOut": {
@@ -79962,6 +80043,82 @@
         ]
       }
     },
+    "/api/v1/customers/external-import": {
+      "post": {
+        "description": "Take over one customer from a plugin directory (once; never updated afterwards).\n\nAn already known login is returned unchanged. 404 when the source or the login is\nunknown, 409 when the e-mail address belongs to another customer or the data is unusable.",
+        "operationId": "import_external_customer_api_v1_customers_external_import_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerUserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import External Customer",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
     "/api/v1/customers/vcard-import/apply": {
       "post": {
         "description": "Fill blank fields, replace chosen conflicts and/or store photos per selected card.",
@@ -86721,6 +86878,18 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "description": "Also ask plugin customer directories (only when fewer than limit local contacts match; the client sets this after a debounce and from 3 characters)",
+            "in": "query",
+            "name": "external",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Also ask plugin customer directories (only when fewer than limit local contacts match; the client sets this after a debounce and from 3 characters)",
+              "title": "External",
+              "type": "boolean"
             }
           },
           {

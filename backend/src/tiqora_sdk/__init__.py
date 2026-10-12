@@ -35,6 +35,7 @@ if _t.TYPE_CHECKING:
 
     from tiqora.plugins.auth_providers import PasswordAuthenticate
     from tiqora.plugins.channels import ChannelCapabilities, ChannelSend
+    from tiqora.plugins.customer_sources import CustomerLookup, CustomerSearch
     from tiqora.plugins.df_types import DfBaseType, DfDisplay, DfValidate
     from tiqora.plugins.mail_filters import MailFilterStage
     from tiqora.plugins.notification_transports import TransportSend
@@ -198,6 +199,18 @@ class PluginRegistry(_t.Protocol):
         audience: _t.Literal["agent", "customer", "both"],
         order: int = 100,
         timeout_seconds: int = 5,
+    ) -> None: ...
+
+    def customer_source(
+        self,
+        name: str,
+        *,
+        label: str,
+        search: CustomerSearch,
+        by_login: CustomerLookup,
+        by_email: CustomerLookup | None = None,
+        materialize_on_inbound: bool = False,
+        timeout_seconds: int = 3,
     ) -> None: ...
 
 

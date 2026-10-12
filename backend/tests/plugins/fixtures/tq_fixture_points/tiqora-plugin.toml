@@ -26,6 +26,7 @@ extension_points = [
   "core.notifications.transports",
   "core.channels.drivers",
   "core.auth.password_providers",
+  "core.customers.sources",
   "core.http.routes",
   "core.http.public_routes",
 ]

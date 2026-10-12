@@ -7171,6 +7171,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customers/external-import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import External Customer
+         * @description Take over one customer from a plugin directory (once; never updated afterwards).
+         *
+         *     An already known login is returned unchanged. 404 when the source or the login is
+         *     unknown, 409 when the e-mail address belongs to another customer or the data is unusable.
+         */
+        post: operations["import_external_customer_api_v1_customers_external_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers/vcard-import/apply": {
         parameters: {
             query?: never;
@@ -15130,6 +15153,11 @@ export interface components {
             companies: components["schemas"]["CustomerCompanyRefOut"][];
             /** Contacts */
             contacts: components["schemas"]["CustomerContactRefOut"][];
+            /**
+             * External
+             * @default []
+             */
+            external: components["schemas"]["ExternalContactOut"][];
         };
         /** CustomerShortlist */
         CustomerShortlist: {
@@ -16435,6 +16463,36 @@ export interface components {
             key: string;
             /** Sdk Stable */
             sdk_stable: boolean;
+        };
+        /**
+         * ExternalContactOut
+         * @description A hit from a plugin customer directory; not stored until an agent imports it.
+         */
+        ExternalContactOut: {
+            /** Company Name */
+            company_name?: string | null;
+            /** Email */
+            email: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Login */
+            login: string;
+            /** Source */
+            source: string;
+            /** Source Label */
+            source_label: string;
+        };
+        /** ExternalImportRequest */
+        ExternalImportRequest: {
+            /** Login */
+            login: string;
+            /**
+             * Source
+             * @description Customer source key
+             */
+            source: string;
         };
         /**
          * FactsStatusOut
@@ -43856,6 +43914,43 @@ export interface operations {
             };
         };
     };
+    import_external_customer_api_v1_customers_external_import_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExternalImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerUserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     apply_vcard_import_api_v1_customers_vcard_import_apply_post: {
         parameters: {
             query?: never;
@@ -46911,6 +47006,8 @@ export interface operations {
                 /** @description Substring matched against company name/id or contact login/email/name */
                 q?: string;
                 limit?: number;
+                /** @description Also ask plugin customer directories (only when fewer than limit local contacts match; the client sets this after a debounce and from 3 characters) */
+                external?: boolean;
             };
             header?: {
                 authorization?: string | null;
