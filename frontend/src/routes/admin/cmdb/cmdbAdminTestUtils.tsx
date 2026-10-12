@@ -49,4 +49,27 @@ export async function renderAdminPage(Page: () => JSX.Element, path: string) {
   return router;
 }
 
+/** Renders `Page` on `routePath` (with `$params`) while the memory history sits on the concrete `url`. */
+export async function renderAdminRoute(Page: () => JSX.Element, routePath: string, url: string) {
+  window.scrollTo = vi.fn();
+  const root = createRootRoute();
+  const page = createRoute({ getParentRoute: () => root, path: routePath, component: Page });
+  const list = createRoute({ getParentRoute: () => root, path: "/admin/cmdb/classes", component: () => <div data-testid="class-list-stub" /> });
+  const router = createRouter({
+    routeTree: root.addChildren([page, list]),
+    history: createMemoryHistory({ initialEntries: [url] }),
+  });
+  await router.load();
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <I18nextProvider i18n={i18n}>
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        <RouterProvider router={router as any} />
+      </I18nextProvider>
+    </QueryClientProvider>,
+  );
+  return router;
+}
+
 export { createDemoCmdb };

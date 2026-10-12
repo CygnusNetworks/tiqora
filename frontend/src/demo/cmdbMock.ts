@@ -28,7 +28,7 @@ import type {
   LinkType,
   RenderedAttr,
 } from "@/lib/cmdbApi";
-import type { CatalogItemIn, ClassTemplate, CmdbAdminStatus, CmdbClassIn } from "@/lib/cmdbAdminApi";
+import type { CatalogItemIn, ClassTemplate, CmdbAdminStatus, CmdbClassIn, CmdbClassUpdateIn } from "@/lib/cmdbAdminApi";
 import type { PortalCiDetail, PortalCiPage } from "@/lib/portalCmdbApi";
 import { demoItsmMode } from "./itsmMode";
 
@@ -481,6 +481,83 @@ const adminStatus = (store: DemoCmdb): CmdbAdminStatus => ({
   archived_version_count: 0,
 });
 
+
+/** Definition history of the demo classes (version 1 is the seeded definition); new versions append. */
+const DEFINITION_HISTORY: Record<number, CmdbDefinition[]> = {};
+function definitionsOf(classId: number): CmdbDefinition[] {
+  const cls = classOf(classId);
+  const hist = (DEFINITION_HISTORY[classId] ??= cls.definition ? [cls.definition] : []);
+  return hist;
+}
+
+type DemoIssue = { path: string; code: string; message: string };
+type DemoChange = { path: string; kind: "added" | "removed" | "type_changed" | "count_changed" | "renamed_label" | "flags_changed"; detail: string };
+
+function flattenAttrs(defs: readonly AttributeDef[], prefix = ""): Array<[string, AttributeDef]> {
+  return defs.flatMap((a) => [[`${prefix}${a.key}`, a] as [string, AttributeDef], ...flattenAttrs(a.sub ?? [], `${prefix}${a.key}.`)]);
+}
+
+/** Small stand-in of the server validation: key pattern, duplicates, group without sub, unknown catalog class. */
+function demoValidate(defs: readonly AttributeDef[]): DemoIssue[] {
+  const issues: DemoIssue[] = [];
+  const walk = (list: readonly AttributeDef[], prefix: string) => {
+    const seen = new Set<string>();
+    for (const a of list) {
+      const path = `${prefix}${a.key}`;
+      if (!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(a.key)) issues.push({ path, code: "bad_key", message: "Ungültiger Schlüssel." });
+      else if (seen.has(a.key.toLowerCase())) issues.push({ path, code: "duplicate_key", message: "Der Schlüssel kommt mehrfach vor." });
+      seen.add(a.key.toLowerCase());
+      if (a.type === "catalog" && !a.options?.catalog_class) issues.push({ path, code: "catalog_class_missing", message: "Eine Katalogklasse ist erforderlich." });
+      if (a.type === "group" && (a.sub ?? []).length === 0) issues.push({ path, code: "group_empty", message: "Eine Gruppe braucht Unterattribute." });
+      walk(a.sub ?? [], `${path}.`);
+    }
+  };
+  walk(defs, "");
+  return issues;
+}
+
+function demoDiff(oldDefs: readonly AttributeDef[], newDefs: readonly AttributeDef[]): DemoChange[] {
+  const before = new Map(flattenAttrs(oldDefs));
+  const after = new Map(flattenAttrs(newDefs));
+  const out: DemoChange[] = [];
+  for (const [path, a] of after) {
+    const b = before.get(path);
+    if (!b) out.push({ path, kind: "added", detail: a.type });
+    else {
+      if (b.type !== a.type) out.push({ path, kind: "type_changed", detail: `${b.type} -> ${a.type}` });
+      if (b.name !== a.name) out.push({ path, kind: "renamed_label", detail: `${b.name} -> ${a.name}` });
+      if (b.count_min !== a.count_min || b.count_max !== a.count_max) out.push({ path, kind: "count_changed", detail: `${b.count_min}..${b.count_max} -> ${a.count_min}..${a.count_max}` });
+      if (b.required !== a.required || b.searchable !== a.searchable || b.portal !== a.portal) out.push({ path, kind: "flags_changed", detail: "" });
+    }
+  }
+  for (const [path, b] of before) if (!after.has(path)) out.push({ path, kind: "removed", detail: b.type });
+  return out;
+}
+
+/** Import preview: Tiqora JSON is parsed for real, the Znuny formats answer a fixed two-attribute sample with a warning. */
+function demoImport(format: string, text: string): DemoCmdbResponse {
+  if (format === "tiqora_json") {
+    try {
+      const parsed = JSON.parse(text) as { attributes?: AttributeDef[] } | AttributeDef[];
+      const list = Array.isArray(parsed) ? parsed : (parsed.attributes ?? []);
+      return { status: 200, body: { attributes: list.map((a) => attr(a as AttrInit)), warnings: [], missing_catalog_classes: [] } };
+    } catch {
+      return { status: 422, body: { detail: "Kein gültiges JSON." } };
+    }
+  }
+  return {
+    status: 200,
+    body: {
+      attributes: [
+        attr({ key: "Name", name: "Name", type: "text", required: true, searchable: true }),
+        attr({ key: "Type", name: "Typ", type: "catalog", options: { catalog_class: "ITSM::Demo::Type" } }),
+      ],
+      warnings: ["Die Eingabe wurde als Beispiel gelesen (Demo)."],
+      missing_catalog_classes: ["ITSM::Demo::Type"],
+    },
+  };
+}
+
 export function resolveCmdb(
   store: DemoCmdb,
   method: string,
@@ -553,6 +630,44 @@ export function resolveCmdb(
       };
       CLASSES.push(cls);
       return ok(cls, 201);
+    }
+    const classRoute = /^\/classes\/(\d+)(\/.*)?$/.exec(sub);
+    if (classRoute) {
+      const cid = Number(classRoute[1]);
+      const cls = CLASSES.find((c) => c.id === cid);
+      if (!cls) return notFound();
+      const rest = classRoute[2] ?? "";
+      if (rest === "" && method === "GET") return ok(cls);
+      if (rest === "" && method === "PUT") {
+        const b = body as CmdbClassUpdateIn;
+        if (b.expected_lock_version !== cls.lock_version) return ok({ detail: { code: "conflict", message: "Die Klasse wurde zwischenzeitlich geändert." } }, 409);
+        Object.assign(cls, { name: b.name, icon: b.icon ?? null, number_prefix: b.number_prefix ?? cls.number_prefix, group_id: b.group_id, portal_visible: b.portal_visible ?? cls.portal_visible, valid: b.valid ?? cls.valid, lock_version: cls.lock_version + 1 });
+        return ok(cls);
+      }
+      if (rest === "/definitions" && method === "GET") return ok(definitionsOf(cid));
+      if (rest === "/definitions" && method === "POST") {
+        const b = body as { attributes: AttributeDef[]; comment?: string | null };
+        const issues = demoValidate(b.attributes);
+        if (issues.length > 0) return ok({ detail: issues[0].message }, 422);
+        const hist = definitionsOf(cid);
+        const def: CmdbDefinition = { id: 100 + hist.length + cid * 10, class_id: cid, version: (hist[hist.length - 1]?.version ?? 0) + 1, comment: b.comment ?? null, created_at: AT, created_by: 1, attributes: b.attributes.map((a) => attr(a as AttrInit)) };
+        hist.push(def);
+        cls.definition = def;
+        cls.current_definition_version = def.version;
+        cls.lock_version += 1;
+        return ok(def, 201);
+      }
+      if (rest === "/definitions/diff") {
+        const hist = definitionsOf(cid);
+        const from = hist.find((d) => d.version === Number(query.get("from_version")));
+        const to = hist.find((d) => d.version === Number(query.get("to_version")));
+        return from && to ? ok(demoDiff(from.attributes, to.attributes)) : notFound();
+      }
+    }
+    if (sub === "/definitions/validate" && method === "POST") return ok(demoValidate((body as { attributes: AttributeDef[] }).attributes));
+    if (sub === "/definition-import" && method === "POST") {
+      const b = body as { format: string; text: string };
+      return demoImport(b.format, b.text);
     }
     if (sub === "/class-templates" && method === "GET") return ok(CLASS_TEMPLATES);
     const apply = /^\/class-templates\/([^/]+)\/apply$/.exec(sub);

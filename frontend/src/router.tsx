@@ -5,6 +5,7 @@ import { CiDetailPage } from "@/routes/agent/cmdb/CiDetailPage";
 import { CiEditRoute, CiNewRoute } from "@/routes/agent/cmdb/CiEditPage";
 import { CmdbListPage } from "@/routes/agent/cmdb/CmdbListPage";
 import { CmdbCatalogPage } from "@/routes/admin/cmdb/CmdbCatalogPage";
+import { CmdbClassEditorPage } from "@/routes/admin/cmdb/CmdbClassEditorPage";
 import { CmdbClassesPage } from "@/routes/admin/cmdb/CmdbClassesPage";
 import { PluginRoutePage } from "@/routes/agent/PluginRoutePage";
 import {
@@ -1345,7 +1346,7 @@ const adminCmdbClassesRoute = createRoute({
 const adminCmdbClassRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/cmdb/classes/$classId",
-  component: CmdbComingSoon,
+  component: CmdbClassEditorPage,
 });
 
 const adminCmdbCatalogRoute = createRoute({
