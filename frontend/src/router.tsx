@@ -4,6 +4,8 @@ import { validateCiDetailSearch } from "@/components/cmdb/ciDetailModel";
 import { CiDetailPage } from "@/routes/agent/cmdb/CiDetailPage";
 import { CiEditRoute, CiNewRoute } from "@/routes/agent/cmdb/CiEditPage";
 import { CmdbListPage } from "@/routes/agent/cmdb/CmdbListPage";
+import { CmdbCatalogPage } from "@/routes/admin/cmdb/CmdbCatalogPage";
+import { CmdbClassesPage } from "@/routes/admin/cmdb/CmdbClassesPage";
 import { PluginRoutePage } from "@/routes/agent/PluginRoutePage";
 import {
   Outlet,
@@ -1337,7 +1339,7 @@ const agentCmdbCiEditRoute = createRoute({
 const adminCmdbClassesRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/cmdb/classes",
-  component: CmdbComingSoon,
+  component: CmdbClassesPage,
 });
 
 const adminCmdbClassRoute = createRoute({
@@ -1349,7 +1351,7 @@ const adminCmdbClassRoute = createRoute({
 const adminCmdbCatalogRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/cmdb/catalog",
-  component: CmdbComingSoon,
+  component: CmdbCatalogPage,
 });
 
 const portalCmdbListRoute = createRoute({

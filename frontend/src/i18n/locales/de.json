@@ -5048,6 +5048,65 @@
       "deleteTitle": "Link „{{name}}“ löschen?",
       "deleteMessage": "Der widerrufene Link wird aus der Liste entfernt.",
       "actionFailed": "Das hat nicht geklappt. Bitte versuchen Sie es erneut."
+    },
+    "cmdb": {
+      "classes": {
+        "title": "CMDB-Klassen",
+        "subtitle": "Klassen fassen Configuration Items einer Art zusammen, etwa Server oder Standorte.",
+        "new": "Neue Klasse",
+        "create": "Klasse anlegen",
+        "fromTemplate": "Aus Vorlage",
+        "settings": "Einstellungen",
+        "name": "Name",
+        "key": "Schlüssel",
+        "keyHelp": "Kleinbuchstaben, Ziffern und Unterstriche; später nicht mehr änderbar.",
+        "group": "Gruppe",
+        "groupPlaceholder": "Gruppe wählen…",
+        "groupHelp": "Wer CIs dieser Klasse sehen oder bearbeiten soll, braucht diese Gruppe.",
+        "prefix": "Nummernpräfix",
+        "prefixExample": "Beispiel: {{example}}",
+        "portal": "Im Kundenportal sichtbar",
+        "portalHelp": "Kunden sehen die CIs dieser Klasse, die ihnen zugeordnet sind.",
+        "template": "Vorlage",
+        "templateHelp": "Legt eine Klasse mit fertigen Attributen an, die Sie danach anpassen können.",
+        "applyTemplate": "Aus Vorlage anlegen",
+        "attributeCount_one": "{{count}} Attribut",
+        "attributeCount_other": "{{count}} Attribute",
+        "saveError": "Die Klasse konnte nicht gespeichert werden.",
+        "linkTypesHint": "Verknüpfungstypen zwischen CIs, Services und Tickets pflegen Sie zusammen mit den übrigen ITSM-Einstellungen.",
+        "linkTypesLink": "ITSM-Verknüpfungstypen öffnen"
+      },
+      "seed": {
+        "catalogMissing": "Die Standardeinträge des Katalogs (Zustände) fehlen.",
+        "viewsMissing": "Die Datenbank-Sichten für das Znuny-Add-on fehlen (möglicherweise fehlt das CREATE-VIEW-Recht).",
+        "button": "Standardwerte anlegen",
+        "error": "Die Standardwerte konnten nicht angelegt werden."
+      },
+      "catalog": {
+        "title": "CMDB-Katalog",
+        "subtitle": "Auswahllisten, aus denen CI-Attribute und Zustände schöpfen.",
+        "classes": "Katalogklassen",
+        "new": "Neuer Eintrag",
+        "edit": "Eintrag bearbeiten",
+        "name": "Name",
+        "key": "Schlüssel",
+        "keyHelp": "Buchstaben, Ziffern und Unterstriche; später nicht mehr änderbar.",
+        "keyLocked": "Der Schlüssel lässt sich nicht ändern.",
+        "functionality": "Funktion",
+        "functionalityPlaceholder": "Funktion wählen…",
+        "functionalityHelp": "Bestimmt, wie der Zustand zählt, zum Beispiel wenn Störungen an abhängige CIs weitergegeben werden.",
+        "functionalities": {
+          "preproductive": "Vor Produktivbetrieb",
+          "productive": "Produktiv",
+          "postproductive": "Nach Produktivbetrieb",
+          "operational": "Betriebsbereit",
+          "warning": "Warnung",
+          "incident": "Störung"
+        },
+        "position": "Position",
+        "valid": "Gültig",
+        "saveError": "Der Eintrag konnte nicht gespeichert werden."
+      }
     }
   },
   "kb": {

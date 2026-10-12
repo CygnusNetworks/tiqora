@@ -28,7 +28,7 @@ import type {
   LinkType,
   RenderedAttr,
 } from "@/lib/cmdbApi";
-import type { CmdbAdminStatus } from "@/lib/cmdbAdminApi";
+import type { CatalogItemIn, ClassTemplate, CmdbAdminStatus, CmdbClassIn } from "@/lib/cmdbAdminApi";
 import type { PortalCiDetail, PortalCiPage } from "@/lib/portalCmdbApi";
 import { demoItsmMode } from "./itsmMode";
 
@@ -464,6 +464,14 @@ const TICKETS: CiTicket[] = [
 
 const CLOSED_TICKET: CiTicket = { ticket_id: 2, number: "2026092201", title: "Festplatte getauscht", state_name: "closed successful", state_type: "closed", queue_id: 1, queue_name: "Raw", link_type: "RelevantTo", open: false };
 
+const CLASS_TEMPLATES: ClassTemplate[] = [
+  { key: "computer", name: "Computer", icon: "computer", attribute_count: 15 },
+  { key: "hardware", name: "Hardware", icon: "hardware", attribute_count: 10 },
+  { key: "location", name: "Standort", icon: "location", attribute_count: 4 },
+  { key: "network", name: "Netzwerk", icon: "network", attribute_count: 5 },
+  { key: "software", name: "Software", icon: "software", attribute_count: 6 },
+];
+
 const adminStatus = (store: DemoCmdb): CmdbAdminStatus => ({
   mode: demoItsmMode(),
   views_present: true,
@@ -525,12 +533,70 @@ export function resolveCmdb(
     const sub = admin[1] ?? "";
     if (sub === "/status" || sub === "/seed-defaults") return ok(adminStatus(store));
     if (sub === "/classes" && method === "GET") return ok(CLASSES);
+    if (sub === "/classes" && method === "POST") {
+      const b = body as CmdbClassIn;
+      const cls: CmdbClass = {
+        id: Math.max(0, ...CLASSES.map((c) => c.id)) + 1,
+        class_key: b.class_key,
+        name: b.name,
+        icon: b.icon ?? null,
+        number_prefix: b.number_prefix || `${b.class_key.toUpperCase().slice(0, 15)}-`,
+        group_id: b.group_id,
+        group_name: "users",
+        portal_visible: b.portal_visible ?? false,
+        valid: true,
+        position: CLASSES.length + 1,
+        lock_version: 1,
+        can_write: true,
+        current_definition_version: null,
+        definition: null,
+      };
+      CLASSES.push(cls);
+      return ok(cls, 201);
+    }
+    if (sub === "/class-templates" && method === "GET") return ok(CLASS_TEMPLATES);
+    const apply = /^\/class-templates\/([^/]+)\/apply$/.exec(sub);
+    if (apply && method === "POST") {
+      const tpl = CLASS_TEMPLATES.find((c) => c.key === decodeURIComponent(apply[1]));
+      if (!tpl) return notFound();
+      const cls: CmdbClass = {
+        id: Math.max(0, ...CLASSES.map((c) => c.id)) + 1,
+        class_key: tpl.key,
+        name: tpl.name,
+        icon: tpl.icon,
+        number_prefix: `${tpl.key.toUpperCase().slice(0, 15)}-`,
+        group_id: (body as { group_id: number }).group_id,
+        group_name: "users",
+        portal_visible: false,
+        valid: true,
+        position: CLASSES.length + 1,
+        lock_version: 1,
+        can_write: true,
+        current_definition_version: null,
+        definition: null,
+      };
+      CLASSES.push(cls);
+      return ok(cls, 201);
+    }
+    if (sub === "/catalog" && method === "POST") {
+      const b = body as CatalogItemIn;
+      const item: CatalogItem = { id: Math.max(0, ...CATALOG.map((c) => c.id)) + 1, catalog_class: b.catalog_class, item_key: b.item_key, name: b.name, functionality: b.functionality ?? null, position: b.position ?? 0, valid: b.valid ?? true };
+      CATALOG.push(item);
+      return ok(item, 201);
+    }
+    const catalogPut = /^\/catalog\/(\d+)$/.exec(sub);
+    if (catalogPut && method === "PUT") {
+      const item = CATALOG.find((c) => c.id === Number(catalogPut[1]));
+      if (!item) return notFound();
+      const b = body as CatalogItemIn;
+      Object.assign(item, { name: b.name, functionality: b.functionality ?? null, position: b.position ?? item.position, valid: b.valid ?? item.valid });
+      return ok(item);
+    }
     if (sub === "/catalog-classes") return ok([DEMO_CATALOG_DEPLOYMENT, DEMO_CATALOG_INCIDENT, CATALOG_OS]);
     if (sub === "/catalog" && method === "GET") {
       const cls = query.get("catalog_class");
       return ok(cls ? CATALOG.filter((c) => c.catalog_class === cls) : CATALOG);
     }
-    if (sub === "/class-templates") return ok([]);
     if (sub === "/propagation/recompute") return ok({ job_id: 9301, status: "queued" }, 202);
     return undefined;
   }
