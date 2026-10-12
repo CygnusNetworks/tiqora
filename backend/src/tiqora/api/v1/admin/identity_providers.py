@@ -442,7 +442,12 @@ async def update_identity_provider(
     try:
         before = await get_provider(session, provider_id, secret_key=settings.secret_key)
         record = await update_provider(
-            session, provider_id, body, secret_key=settings.secret_key, actor_id=admin.id
+            session,
+            provider_id,
+            body,
+            secret_key=settings.secret_key,
+            actor_id=admin.id,
+            settings=settings,
         )
         if body.config is not None and before is not None and _metadata_stale(before, record):
             record = await _check_metadata(session, settings, record)
@@ -514,7 +519,7 @@ def _login_url(slug: str, audience: str, test_id: str) -> str:
 
 
 async def _check_draft(
-    session: AsyncSession, record: ProviderRecord, draft: ProviderChanges | None
+    session: AsyncSession, settings: Settings, record: ProviderRecord, draft: ProviderChanges | None
 ) -> ProviderRecord:
     """The record with the (validated) unsaved draft applied; env rows take no draft."""
     if draft is None:
@@ -522,7 +527,7 @@ async def _check_draft(
     if record.read_only:
         raise _read_only()
     try:
-        await validate_changes(session, draft)
+        await validate_changes(session, draft, settings=settings, record=record)
         return record_with_changes(record, draft)
     except ProviderValidationError as exc:
         raise _validation_error(exc) from exc
@@ -545,7 +550,7 @@ async def start_identity_test(
         )
     if not audience_includes(record.audience, body.audience):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"message": MSG_AUDIENCE})
-    await _check_draft(session, record, body.draft)
+    await _check_draft(session, settings, record, body.draft)
     test_id = secrets.token_urlsafe(24)
     await flow_state.put_test(
         redis_client,
@@ -595,7 +600,7 @@ async def preview_identity_mapping(
     record = await _require(session, settings, provider_id)
     if not audience_includes(record.audience, body.audience):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"message": MSG_AUDIENCE})
-    record = await _check_draft(session, record, body.draft)
+    record = await _check_draft(session, settings, record, body.draft)
     identity = ExternalIdentity(
         provider_id=record.id,
         subject=body.subject,

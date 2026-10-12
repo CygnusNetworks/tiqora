@@ -15,6 +15,7 @@ import pytest_asyncio
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from tiqora.config import Settings
 from tiqora.crypto.secret import decrypt_secret, encrypt_secret
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import (
@@ -27,10 +28,12 @@ from tiqora.db.tiqora.models import (
 )
 from tiqora.identity.config_models import (
     JitDefaults,
+    MfaPolicy,
     OidcProviderConfig,
     RoleRule,
     SamlProviderConfig,
 )
+from tiqora.identity.scim.role_sync import enqueue_role_sync
 from tiqora.identity.store import (
     ProviderChanges,
     ProviderReadOnly,
@@ -43,6 +46,7 @@ from tiqora.identity.store import (
     list_enabled,
     list_providers,
     update_provider,
+    validate_changes,
 )
 from tiqora.settings_sections.section import SECRET_MASK
 
@@ -539,3 +543,251 @@ def test_ids_bounded_to_int32() -> None:
         RoleRule(attribute="a", value="b", groups=[{"group_id": 0}])  # type: ignore[list-item]
     with pytest.raises(ValidationError):
         JitDefaults(initial_role_ids=[2**40])
+
+
+# --------------------------------------------------------------------------- phase 3 fields
+# User ids 63020-63039 (soft references in tiqora_scim_*; no users rows needed).
+
+_SETTINGS = Settings(environment="test", secret_key=KEY, session_cookie_secure=True)
+assert _SETTINGS.session_ttl_seconds == 3600 and _SETTINGS.session_absolute_ttl_seconds == 43200
+
+
+def _scim_user(pid: int, uid: int, *, deleted: bool = False, kind: str = "agent") -> TiqoraScimUser:
+    name = f"scim{uid}@example.test"
+    return TiqoraScimUser(
+        provider_id=pid,
+        user_kind=kind,
+        scim_id=f"00000000-0000-4000-8000-0000000{uid}",
+        user_id=uid,
+        user_name=name,
+        user_name_fold=name,
+        user_name_fold_hash="d" * 64,
+        deleted=deleted,
+        created=NOW,
+        changed=NOW,
+    )
+
+
+async def _update(session: AsyncSession, pid: int, changes: ProviderChanges) -> Any:
+    return await update_provider(
+        session, pid, changes, secret_key=KEY, actor_id=1, settings=_SETTINGS
+    )
+
+
+@pytest.mark.asyncio
+async def test_update_roundtrip_new_fields(session: AsyncSession) -> None:
+    rec = await _create(session, "generic_oidc", "idptest-p3rt")
+    assert rec.require_mfa_claim is False and rec.mfa_policy == MfaPolicy()
+    assert rec.session_idle_seconds is None and rec.scim_enabled is False
+    out = await _update(
+        session,
+        rec.id,
+        ProviderChanges(
+            require_mfa_claim=True,
+            mfa_policy=MfaPolicy(fallback="reject"),
+            session_idle_seconds=900,
+            session_absolute_seconds=3600,
+            scim_enabled=True,
+            scim_adopt_existing=True,
+        ),
+    )
+    await session.commit()
+    got = await get_provider(session, rec.id, secret_key=KEY)
+    assert got == out
+    assert got is not None
+    assert got.require_mfa_claim and got.scim_enabled and got.scim_adopt_existing
+    assert got.mfa_policy.fallback == "reject"
+    assert (got.session_idle_seconds, got.session_absolute_seconds) == (900, 3600)
+    cleared = await _update(session, rec.id, ProviderChanges(session_idle_seconds=None))
+    await session.commit()
+    assert cleared.session_idle_seconds is None
+    assert cleared.session_absolute_seconds == 3600  # untouched field survives
+    assert cleared.mfa_policy.fallback == "reject"
+
+
+@pytest.mark.asyncio
+async def test_lifetime_bounds(session: AsyncSession) -> None:
+    rec = await _create(session, "generic_oidc", "idptest-p3life")
+    for bad, key in (
+        (ProviderChanges(session_idle_seconds=299), "session_idle_seconds"),
+        (ProviderChanges(session_idle_seconds=3601), "session_idle_seconds"),
+        (ProviderChanges(session_absolute_seconds=899), "session_absolute_seconds"),
+        (ProviderChanges(session_absolute_seconds=43201), "session_absolute_seconds"),
+        (
+            ProviderChanges(session_idle_seconds=3600, session_absolute_seconds=1800),
+            "session_idle_seconds",
+        ),
+    ):
+        with pytest.raises(ProviderValidationError) as exc:
+            await _update(session, rec.id, bad)
+        assert key in exc.value.errors, bad
+    edge = await _update(
+        session, rec.id, ProviderChanges(session_idle_seconds=300, session_absolute_seconds=900)
+    )
+    assert (edge.session_idle_seconds, edge.session_absolute_seconds) == (300, 900)
+    # the cross-check also uses the stored value of the field that is not sent
+    with pytest.raises(ProviderValidationError) as exc2:
+        await _update(session, rec.id, ProviderChanges(session_idle_seconds=1800))
+    assert "session_idle_seconds" in exc2.value.errors
+
+
+@pytest.mark.asyncio
+async def test_env_provider_refuses_new_fields(session: AsyncSession) -> None:
+    row = await _insert_env_row(
+        session,
+        secret_key=KEY,
+        slug="idptest-p3env",
+        kind="oidc",
+        name="Env",
+        audience="agent",
+        config=OidcProviderConfig(),
+    )
+    await session.commit()
+    with pytest.raises(ProviderReadOnly):
+        await _update(session, row.id, ProviderChanges(scim_enabled=True))
+    with pytest.raises(ProviderReadOnly):
+        await validate_changes(
+            session, ProviderChanges(require_mfa_claim=True), settings=_SETTINGS, record=row
+        )
+    got = await get_provider(session, row.id, secret_key=KEY)
+    assert got is not None and got.scim_enabled is False and got.require_mfa_claim is False
+
+
+@pytest.mark.asyncio
+async def test_ldap_provider_refuses_new_fields(session: AsyncSession) -> None:
+    rec = await _create(session, "ldap", "idptest-p3ldap")
+    assert rec.kind == "ldap"
+    for changes, key in (
+        (ProviderChanges(scim_enabled=True), "scim_enabled"),
+        (ProviderChanges(require_mfa_claim=True), "require_mfa_claim"),
+        (ProviderChanges(mfa_policy=MfaPolicy()), "mfa_policy"),
+        (ProviderChanges(session_idle_seconds=900), "session_idle_seconds"),
+    ):
+        with pytest.raises(ProviderValidationError) as exc:
+            await _update(session, rec.id, changes)
+        assert exc.value.errors == {key: "Nur für OpenID Connect und SAML verfügbar."}
+    unchanged = await _update(session, rec.id, ProviderChanges(name="Renamed"))
+    assert unchanged.name == "Renamed" and unchanged.scim_enabled is False
+
+
+@pytest.mark.asyncio
+async def test_validate_changes_checks_draft_against_record(session: AsyncSession) -> None:
+    rec = await _create(session, "ldap", "idptest-p3draft")
+    with pytest.raises(ProviderValidationError) as exc:
+        await validate_changes(
+            session, ProviderChanges(scim_enabled=True), settings=_SETTINGS, record=rec
+        )
+    assert "scim_enabled" in exc.value.errors
+    oidc = await _create(session, "generic_oidc", "idptest-p3draft2")
+    with pytest.raises(ProviderValidationError) as exc2:
+        await validate_changes(
+            session, ProviderChanges(session_idle_seconds=60), settings=_SETTINGS, record=oidc
+        )
+    assert "session_idle_seconds" in exc2.value.errors
+    await validate_changes(
+        session, ProviderChanges(session_idle_seconds=900), settings=_SETTINGS, record=oidc
+    )
+
+
+@pytest.mark.asyncio
+async def test_mixed_scim_rules_refused(session: AsyncSession) -> None:
+    rec = await _create(session, "generic_oidc", "idptest-p3mixed")
+    with pytest.raises(ProviderValidationError) as exc:
+        await _update(
+            session,
+            rec.id,
+            ProviderChanges(
+                role_rules=[
+                    RoleRule(attribute="scim:groups", value="Support", role_ids=[ROLE_ID]),
+                    RoleRule(attribute="groups", value="x", role_ids=[ROLE_ID]),
+                ]
+            ),
+        )
+    assert list(exc.value.errors) == ["role_rules"]
+    ok = await _update(
+        session,
+        rec.id,
+        ProviderChanges(
+            role_rules=[
+                RoleRule(attribute="scim:groups", value="Support", role_ids=[ROLE_ID]),
+                RoleRule(attribute="scim:group_ids", value="g-1", role_ids=[ROLE_ID]),
+            ]
+        ),
+    )
+    assert len(ok.role_rules) == 2
+
+
+@pytest.mark.asyncio
+async def test_invalid_mfa_policy_json_reads_defaults(session: AsyncSession) -> None:
+    rec = await _create(session, "generic_oidc", "idptest-p3bad")
+    for bad in ("{oops", '{"fallback": "allow"}'):
+        await session.execute(
+            text("UPDATE tiqora_identity_provider SET mfa_policy = :p WHERE id = :i"),
+            {"p": bad, "i": rec.id},
+        )
+        await session.commit()
+        got = await get_provider(session, rec.id, secret_key=KEY)
+        assert got is not None and got.mfa_policy == MfaPolicy()
+
+
+async def _pending(session: AsyncSession, pid: int) -> dict[int, tuple[datetime, int]]:
+    rows = await session.execute(
+        text(
+            "SELECT user_id, queued_at, generation FROM tiqora_scim_pending_sync"
+            " WHERE provider_id = :p"
+        ),
+        {"p": pid},
+    )
+    return {r[0]: (r[1], r[2]) for r in rows.all()}
+
+
+@pytest.mark.asyncio
+async def test_enqueue_role_sync_upserts(session: AsyncSession) -> None:
+    rec = await _create(session, "generic_oidc", "idptest-p3enq")
+    assert await enqueue_role_sync(session, rec.id, []) == 0
+    assert await enqueue_role_sync(session, rec.id, [63021, 63022, 63022]) == 2
+    await session.commit()
+    first = await _pending(session, rec.id)
+    assert set(first) == {63021, 63022}
+    assert first[63021][1] == 1 and first[63022][1] == 1
+    assert await enqueue_role_sync(session, rec.id, [63022]) == 1
+    await session.commit()
+    second = await _pending(session, rec.id)
+    assert set(second) == {63021, 63022}
+    assert second[63022][1] == 2 and second[63021][1] == 1
+    assert second[63022][0] >= first[63022][0]  # DATETIME may be second-granular (MariaDB)
+    assert second[63021] == first[63021]
+
+
+@pytest.mark.asyncio
+async def test_rule_change_enqueues_managed_agents(session: AsyncSession) -> None:
+    rec = await _create(session, "generic_oidc", "idptest-p3rule")
+    session.add_all(
+        [
+            _scim_user(rec.id, 63025),
+            _scim_user(rec.id, 63026, deleted=True),
+            _scim_user(rec.id, 63027, kind="customer"),
+        ]
+    )
+    await session.commit()
+    # non-SCIM rules: nothing is queued
+    await _update(
+        session,
+        rec.id,
+        ProviderChanges(role_rules=[RoleRule(attribute="groups", value="x", role_ids=[ROLE_ID])]),
+    )
+    await session.commit()
+    assert await _pending(session, rec.id) == {}
+    await _update(
+        session,
+        rec.id,
+        ProviderChanges(
+            role_rules=[RoleRule(attribute="scim:groups", value="Support", role_ids=[ROLE_ID])]
+        ),
+    )
+    await session.commit()
+    assert set(await _pending(session, rec.id)) == {63025}
+    # a sync-mode change re-queues again with a higher generation
+    await _update(session, rec.id, ProviderChanges(sync_mode="authoritative"))
+    await session.commit()
+    assert (await _pending(session, rec.id))[63025][1] == 2

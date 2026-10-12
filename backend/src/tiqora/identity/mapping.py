@@ -23,6 +23,9 @@ Attributes = Mapping[str, tuple[str, ...]]
 
 MAX_VALUE_LEN: Final = 2000
 LDAP_GROUP_DN_ATTR: Final = "ldap:group_dn"
+SCIM_GROUPS_ATTR: Final = "scim:groups"  # SCIM group display names
+SCIM_GROUP_IDS_ATTR: Final = "scim:group_ids"  # SCIM group external ids (Entra objectId)
+SCIM_ATTRS: Final = frozenset({SCIM_GROUPS_ATTR, SCIM_GROUP_IDS_ATTR})
 
 
 def _scalar(v: Any) -> str | None:
@@ -331,3 +334,8 @@ def diff_assignments(
         )
         return AssignmentDiff(final_group_keys=final, **kw)
     return AssignmentDiff(**kw)
+
+
+def rules_use_scim(rules: Sequence[RoleRule]) -> bool:
+    """True when any rule reads a ``scim:*`` attribute (provisioned groups)."""
+    return any(r.attribute.strip().lower() in SCIM_ATTRS for r in rules)

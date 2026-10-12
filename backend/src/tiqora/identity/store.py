@@ -11,7 +11,7 @@ import asyncio
 import dataclasses
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -21,6 +21,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.config import Settings, get_settings
 from tiqora.crypto.secret import decrypt_secret, encrypt_secret
 from tiqora.db.legacy.user import PermissionGroups, Roles
 from tiqora.db.tiqora.models import (
@@ -38,16 +39,20 @@ from tiqora.identity.config_models import (
     AttributeMap,
     GroupGrant,
     JitDefaults,
+    MfaPolicy,
     RoleRule,
     SamlProviderConfig,
     merge_config,
     secret_fields,
 )
-from tiqora.identity.mapping import LDAP_GROUP_DN_ATTR
+from tiqora.identity.mapping import LDAP_GROUP_DN_ATTR, rules_use_scim
 from tiqora.identity.presets import get_preset
 from tiqora.identity.saml_keys import generate_sp_keypair
 from tiqora.identity.types import (
     RESERVED_SLUGS,
+    SCIM_KINDS,
+    SESSION_ABSOLUTE_MIN,
+    SESSION_IDLE_MIN,
     SLUG_RE,
     SYSTEM_USER_ID,
     Audience,
@@ -81,7 +86,9 @@ __all__ = [
     "validate_changes",
 ]
 
-_NULLABLE_FIELDS = frozenset({"button_label", "button_icon"})
+_NULLABLE_FIELDS = frozenset(
+    {"button_label", "button_icon", "session_idle_seconds", "session_absolute_seconds"}
+)
 # Scalar ProviderChanges fields copied 1:1 onto the row / record (None = unchanged unless nullable).
 _SIMPLE_FIELDS = (
     "name",
@@ -94,7 +101,14 @@ _SIMPLE_FIELDS = (
     "require_sso_opt_in",
     "jit_enabled",
     "sync_mode",
+    "require_mfa_claim",
+    "session_idle_seconds",
+    "session_absolute_seconds",
+    "scim_enabled",
+    "scim_adopt_existing",
 )
+# Phase-3 fields: OIDC/SAML database providers only (LDAP and env rows refuse them).
+_PHASE3_FIELDS = (*_SIMPLE_FIELDS[-5:], "mfa_policy")
 _RULES_ADAPTER: TypeAdapter[list[RoleRule]] = TypeAdapter(list[RoleRule])
 
 MSG_SLUG_INVALID = "Dieser Kurzname ist ungültig (nur a–z, 0–9 und Bindestrich, 2–63 Zeichen)."
@@ -142,6 +156,12 @@ class ProviderRecord:
     metadata_xml: str | None
     metadata_fetched_at: datetime | None
     metadata_error: str | None
+    require_mfa_claim: bool = False
+    mfa_policy: MfaPolicy = field(default_factory=MfaPolicy)
+    session_idle_seconds: int | None = None
+    session_absolute_seconds: int | None = None
+    scim_enabled: bool = False
+    scim_adopt_existing: bool = False
 
     @property
     def read_only(self) -> bool:
@@ -170,6 +190,12 @@ class ProviderChanges(BaseModel):
     jit_defaults: JitDefaults | None = None
     role_rules: list[RoleRule] | None = None
     sync_mode: SyncMode | None = None
+    require_mfa_claim: bool | None = None
+    mfa_policy: MfaPolicy | None = None
+    session_idle_seconds: int | None = None
+    session_absolute_seconds: int | None = None
+    scim_enabled: bool | None = None
+    scim_adopt_existing: bool | None = None
 
 
 # --------------------------------------------------------------------------- encoding
@@ -212,6 +238,16 @@ def _decode_secrets(row: TiqoraIdentityProvider, secret_key: str) -> dict[str, s
     return {k: v for k, v in data.items() if k in allowed and isinstance(v, str) and v}
 
 
+def _mfa_policy_from_row(row: TiqoraIdentityProvider) -> MfaPolicy:
+    if not row.mfa_policy:
+        return MfaPolicy()
+    try:
+        return MfaPolicy.model_validate_json(row.mfa_policy)
+    except ValidationError:
+        logger.warning("identity_mfa_policy_invalid", provider_id=row.id, slug=row.slug)
+        return MfaPolicy()
+
+
 def provider_from_row(row: TiqoraIdentityProvider, *, secret_key: str) -> ProviderRecord:
     kind: ProviderKind = row.kind  # type: ignore[assignment]
     secrets = _decode_secrets(row, secret_key)
@@ -242,6 +278,12 @@ def provider_from_row(row: TiqoraIdentityProvider, *, secret_key: str) -> Provid
         metadata_xml=row.metadata_xml,
         metadata_fetched_at=row.metadata_fetched_at,
         metadata_error=row.metadata_error,
+        require_mfa_claim=bool(row.require_mfa_claim),
+        mfa_policy=_mfa_policy_from_row(row),
+        session_idle_seconds=row.session_idle_seconds,
+        session_absolute_seconds=row.session_absolute_seconds,
+        scim_enabled=bool(row.scim_enabled),
+        scim_adopt_existing=bool(row.scim_adopt_existing),
     )
 
 
@@ -394,6 +436,82 @@ def _validate_rule_dns(role_rules: list[RoleRule] | None) -> None:
                     )
                 }
             ) from None
+
+
+def _lifetime_message(low: int, high: int) -> str:
+    return f"Zwischen {low // 60} Minuten und {high // 60} Minuten."
+
+
+def _validate_phase3_fields(
+    row_kind: ProviderKind,
+    source: ProviderSource,
+    changes: ProviderChanges,
+    settings: Settings,
+    current: ProviderRecord | None = None,
+) -> None:
+    """Step-up, session lifetime and SCIM switches (the only write path is PATCH).
+
+    ``ProviderReadOnly`` for env rows, German field errors otherwise. *current* supplies the
+    stored lifetimes for the idle <= absolute cross-check.
+    """
+    sent = changes.model_fields_set
+    touched = [
+        name
+        for name in _PHASE3_FIELDS
+        if name in sent and (value := getattr(changes, name)) is not None and value is not False
+    ]
+    if source == "env":
+        if touched:
+            raise ProviderReadOnly(row_kind)
+        return
+    errors: dict[str, str] = {}
+    if row_kind not in SCIM_KINDS:
+        for name in touched:
+            errors[name] = "Nur für OpenID Connect und SAML verfügbar."
+    else:
+        idle = changes.session_idle_seconds
+        absolute = changes.session_absolute_seconds
+        if idle is not None and not SESSION_IDLE_MIN <= idle <= settings.session_ttl_seconds:
+            errors["session_idle_seconds"] = (
+                f"Zwischen {SESSION_IDLE_MIN // 60} Minuten und der allgemeinen "
+                f"Sitzungsdauer ({settings.session_ttl_seconds // 60} Minuten)."
+            )
+        if (
+            absolute is not None
+            and not SESSION_ABSOLUTE_MIN <= absolute <= settings.session_absolute_ttl_seconds
+        ):
+            errors["session_absolute_seconds"] = (
+                f"Zwischen {SESSION_ABSOLUTE_MIN // 60} Minuten und der allgemeinen "
+                f"Höchstdauer ({settings.session_absolute_ttl_seconds // 60} Minuten)."
+            )
+        eff_idle = (
+            idle
+            if "session_idle_seconds" in sent
+            else getattr(current, "session_idle_seconds", None)
+        )
+        eff_abs = (
+            absolute
+            if "session_absolute_seconds" in sent
+            else getattr(current, "session_absolute_seconds", None)
+        )
+        if (
+            "session_idle_seconds" not in errors
+            and eff_idle is not None
+            and eff_abs is not None
+            and eff_idle > eff_abs
+        ):
+            errors["session_idle_seconds"] = (
+                "Darf nicht länger sein als „Spätestens abmelden nach“."
+            )
+    if changes.role_rules:
+        scim_rules = [r for r in changes.role_rules if rules_use_scim([r])]
+        if scim_rules and len(scim_rules) != len(changes.role_rules):
+            errors["role_rules"] = (
+                "Regeln mit Gruppen aus der Bereitstellung (scim:…) können nicht mit "
+                "anderen Attributen gemischt werden."
+            )
+    if errors:
+        raise ProviderValidationError(errors)
 
 
 def _config_errors(exc: ValidationError) -> ProviderValidationError:
@@ -552,6 +670,7 @@ async def update_provider(
     *,
     secret_key: str,
     actor_id: int,
+    settings: Settings | None = None,
 ) -> ProviderRecord:
     row = await session.get(TiqoraIdentityProvider, provider_id)
     if row is None:
@@ -560,6 +679,7 @@ async def update_provider(
         raise ProviderReadOnly(row.slug)
     current = provider_from_row(row, secret_key=secret_key)
     kind = current.kind
+    _validate_phase3_fields(kind, current.source, changes, settings or get_settings(), current)
 
     # Validate everything first, mutate afterwards (an autoflush must not persist a
     # half-applied change).
@@ -607,15 +727,48 @@ async def update_provider(
         row.jit_defaults = changes.jit_defaults.model_dump_json()
     if changes.role_rules is not None:
         row.role_rules = _RULES_ADAPTER.dump_json(changes.role_rules).decode()
+    if changes.mfa_policy is not None:
+        row.mfa_policy = changes.mfa_policy.model_dump_json()
     row.change_by = actor_id
     row.change_time = utc_now()
     await _flush_unique_slug(session)
-    return provider_from_row(row, secret_key=secret_key)
+    updated = provider_from_row(row, secret_key=secret_key)
+    if (changes.role_rules is not None or changes.sync_mode is not None) and rules_use_scim(
+        updated.role_rules
+    ):
+        await _enqueue_scim_agents(session, updated.id)
+    return updated
 
 
-async def validate_changes(session: AsyncSession, changes: ProviderChanges) -> None:
-    """Role/group ids of *changes* must exist and ``ldap:group_dn`` values be valid DNs
+async def _enqueue_scim_agents(session: AsyncSession, provider_id: int) -> None:
+    """Rules or sync mode changed: re-evaluate every provisioned agent of the provider."""
+    # Imported here: role_sync pulls in provisioning -> ... -> login -> store (import cycle).
+    from tiqora.identity.scim.role_sync import enqueue_role_sync
+
+    user_ids = (
+        await session.scalars(
+            select(TiqoraScimUser.user_id).where(
+                TiqoraScimUser.provider_id == provider_id,
+                TiqoraScimUser.user_kind == "agent",
+                TiqoraScimUser.deleted.is_(False),
+            )
+        )
+    ).all()
+    await enqueue_role_sync(session, provider_id, user_ids)
+
+
+async def validate_changes(
+    session: AsyncSession,
+    changes: ProviderChanges,
+    *,
+    settings: Settings,
+    record: ProviderRecord | None = None,
+) -> None:
+    """Role/group ids of *changes* must exist, ``ldap:group_dn`` values be valid DNs and the
+    step-up / lifetime / SCIM fields fit the provider (*record*, when known)
     (``ProviderValidationError``). Reads only."""
+    if record is not None:
+        _validate_phase3_fields(record.kind, record.source, changes, settings, record)
     _validate_rule_dns(changes.role_rules)
     await _validate_assignments(
         session, role_rules=changes.role_rules, jit_defaults=changes.jit_defaults
@@ -647,6 +800,8 @@ def record_with_changes(record: ProviderRecord, changes: ProviderChanges) -> Pro
             simple[name] = value
     if changes.role_rules is not None:
         simple["role_rules"] = tuple(changes.role_rules)
+    if changes.mfa_policy is not None:
+        simple["mfa_policy"] = changes.mfa_policy
     return dataclasses.replace(record, config=config, secrets_set=secrets, **simple)
 
 
