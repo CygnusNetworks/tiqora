@@ -2,7 +2,7 @@
 
 The value is the ticket list's total for the preset (``TicketService.count_filtered`` with the
 preset's filter arguments), so it equals ``count_dashboard_summary`` and the list it stands for.
-Previews read the history but never write it (R-DASH-SAMPLES-PREVIEW).
+Previews and wallboards read the history but never write it (R-DASH-SAMPLES-PREVIEW).
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ async def run_counter(ctx: ProviderContext, settings: CounterSettings) -> dict[s
         counter_key=counter_key,
         value=value,
         today=ctx.now.date(),
-        persist=not ctx.preview,
+        persist=not (ctx.preview or ctx.kiosk),
     )
     return {"value": value, "delta": delta, "spark": spark}
 

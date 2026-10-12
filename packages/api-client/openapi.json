@@ -17100,6 +17100,77 @@
         "title": "KbSearchResponse",
         "type": "object"
       },
+      "KioskBoardOut": {
+        "properties": {
+          "dashboards": {
+            "items": {
+              "$ref": "#/components/schemas/KioskDashboardOut"
+            },
+            "title": "Dashboards",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "refresh_seconds": {
+            "title": "Refresh Seconds",
+            "type": "integer"
+          },
+          "rotate_seconds": {
+            "title": "Rotate Seconds",
+            "type": "integer"
+          },
+          "server_time": {
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          },
+          "show_details": {
+            "title": "Show Details",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "rotate_seconds",
+          "refresh_seconds",
+          "show_details",
+          "dashboards",
+          "server_time"
+        ],
+        "title": "KioskBoardOut",
+        "type": "object"
+      },
+      "KioskDashboardOut": {
+        "properties": {
+          "filters": {
+            "$ref": "#/components/schemas/DashboardFilters"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "widgets": {
+            "items": {
+              "$ref": "#/components/schemas/KioskWidgetOut"
+            },
+            "title": "Widgets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "widgets"
+        ],
+        "title": "KioskDashboardOut",
+        "type": "object"
+      },
       "KioskDashboardRef": {
         "properties": {
           "id": {
@@ -17376,6 +17447,50 @@
           "active"
         ],
         "title": "KioskLinkOut",
+        "type": "object"
+      },
+      "KioskWidgetOut": {
+        "description": "A widget as the wallboard gets it: only what it needs to render (E9 ruling).\n\n``settings`` is a per-type whitelist subset; ``title_override`` only with details. Never the\nticket source, report key, parameters, notes or links (unless the link shows details).",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "layout": {
+            "$ref": "#/components/schemas/WidgetLayouts"
+          },
+          "settings": {
+            "additionalProperties": true,
+            "title": "Settings",
+            "type": "object"
+          },
+          "title_override": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Override"
+          },
+          "type_key": {
+            "title": "Type Key",
+            "type": "string"
+          },
+          "type_version": {
+            "title": "Type Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "type_key",
+          "type_version",
+          "layout"
+        ],
+        "title": "KioskWidgetOut",
         "type": "object"
       },
       "KnowledgeArticle": {
@@ -77996,6 +78111,119 @@
         "summary": "List Tags",
         "tags": [
           "kb"
+        ]
+      }
+    },
+    "/api/v1/kiosk/board": {
+      "get": {
+        "description": "The link's dashboards in rotation order, widgets reduced to what rendering needs.",
+        "operationId": "kiosk_board_api_v1_kiosk_board_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tiqora-Kiosk",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tiqora-Kiosk"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KioskBoardOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Kiosk Board",
+        "tags": [
+          "kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk/dashboards/{dashboard_id}/data": {
+      "get": {
+        "description": "Redacted widget data, computed as the link's creator (cached for 20 s).",
+        "operationId": "kiosk_dashboard_data_api_v1_kiosk_dashboards__dashboard_id__data_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Dashboard Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tiqora-Kiosk",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tiqora-Kiosk"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardDataOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Kiosk Dashboard Data",
+        "tags": [
+          "kiosk"
         ]
       }
     },

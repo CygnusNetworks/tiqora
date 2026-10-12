@@ -252,3 +252,36 @@ class KioskLinkOut(BaseModel):
 class KioskLinkCreatedOut(KioskLinkOut):
     #: the secret; the only response that ever carries it
     token: str
+
+
+class KioskWidgetOut(BaseModel):
+    """A widget as the wallboard gets it: only what it needs to render (E9 ruling).
+
+    ``settings`` is a per-type whitelist subset; ``title_override`` only with details. Never the
+    ticket source, report key, parameters, notes or links (unless the link shows details).
+    """
+
+    id: str
+    type_key: str
+    type_version: int
+    layout: WidgetLayouts
+    settings: dict[str, Any] = Field(default_factory=dict)
+    title_override: str | None = None
+
+
+class KioskDashboardOut(BaseModel):
+    id: int
+    name: str
+    filters: DashboardFilters = Field(default_factory=DashboardFilters)
+    widgets: list[KioskWidgetOut]
+
+
+class KioskBoardOut(BaseModel):
+    name: str
+    rotate_seconds: int
+    #: how often the wallboard polls a dashboard's data
+    refresh_seconds: int
+    show_details: bool
+    #: the link's dashboards in rotation order (those the creator can still see)
+    dashboards: list[KioskDashboardOut]
+    server_time: UtcDateTime

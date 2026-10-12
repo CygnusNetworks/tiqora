@@ -172,6 +172,8 @@ _UNSCOPED_EXEMPT: frozenset[str] = frozenset(
 _UNSCOPED_EXEMPT_PREFIXES: tuple[str, ...] = (
     "/api/v1/dashboards",
     "/api/v1/dashboard-widget-types",
+    # the wallboard API authenticates by its own link header, never by API keys (Task 11)
+    "/api/v1/kiosk",
 )
 
 
@@ -280,6 +282,12 @@ def test_dashboards_stay_unknown_so_only_sessions_and_unrestricted_keys_get_in()
     for method in ("GET", "PUT", "DELETE"):
         assert scopes_allow(None, method=method, path="/api/v1/dashboards/1")
         assert_scope_allows(None, method=method, path="/api/v1/dashboards/1")
+
+
+def test_kiosk_routes_stay_unknown_so_an_api_key_cannot_reach_them() -> None:
+    for path in ("/api/v1/kiosk/board", "/api/v1/kiosk/dashboards/1/data"):
+        assert path_to_area(path) == "_unknown", path
+        assert not scopes_allow(frozenset({"tickets:rw", "admin:rw"}), method="GET", path=path)
 
 
 def test_plugins_area_scopes() -> None:

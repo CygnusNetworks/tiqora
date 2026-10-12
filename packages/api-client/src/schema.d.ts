@@ -7437,6 +7437,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/kiosk/board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Kiosk Board
+         * @description The link's dashboards in rotation order, widgets reduced to what rendering needs.
+         */
+        get: operations["kiosk_board_api_v1_kiosk_board_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/kiosk/dashboards/{dashboard_id}/data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Kiosk Dashboard Data
+         * @description Redacted widget data, computed as the link's creator (cached for 20 s).
+         */
+        get: operations["kiosk_dashboard_data_api_v1_kiosk_dashboards__dashboard_id__data_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/oauth2/callback": {
         parameters: {
             query?: never;
@@ -16115,6 +16155,34 @@ export interface components {
             /** Query */
             query: string;
         };
+        /** KioskBoardOut */
+        KioskBoardOut: {
+            /** Dashboards */
+            dashboards: components["schemas"]["KioskDashboardOut"][];
+            /** Name */
+            name: string;
+            /** Refresh Seconds */
+            refresh_seconds: number;
+            /** Rotate Seconds */
+            rotate_seconds: number;
+            /**
+             * Server Time
+             * Format: date-time
+             */
+            server_time: string;
+            /** Show Details */
+            show_details: boolean;
+        };
+        /** KioskDashboardOut */
+        KioskDashboardOut: {
+            filters?: components["schemas"]["DashboardFilters"];
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Widgets */
+            widgets: components["schemas"]["KioskWidgetOut"][];
+        };
         /** KioskDashboardRef */
         KioskDashboardRef: {
             /** Id */
@@ -16220,6 +16288,28 @@ export interface components {
             show_details: boolean;
             /** Token Hint */
             token_hint: string;
+        };
+        /**
+         * KioskWidgetOut
+         * @description A widget as the wallboard gets it: only what it needs to render (E9 ruling).
+         *
+         *     ``settings`` is a per-type whitelist subset; ``title_override`` only with details. Never the
+         *     ticket source, report key, parameters, notes or links (unless the link shows details).
+         */
+        KioskWidgetOut: {
+            /** Id */
+            id: string;
+            layout: components["schemas"]["WidgetLayouts"];
+            /** Settings */
+            settings?: {
+                [key: string]: unknown;
+            };
+            /** Title Override */
+            title_override?: string | null;
+            /** Type Key */
+            type_key: string;
+            /** Type Version */
+            type_version: number;
         };
         /**
          * KnowledgeArticle
@@ -42333,6 +42423,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TagOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    kiosk_board_api_v1_kiosk_board_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Tiqora-Kiosk"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KioskBoardOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    kiosk_dashboard_data_api_v1_kiosk_dashboards__dashboard_id__data_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Tiqora-Kiosk"?: string | null;
+            };
+            path: {
+                dashboard_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardDataOut"];
                 };
             };
             /** @description Validation Error */

@@ -11,22 +11,32 @@ The redaction half is pure (no I/O); the store half is called by
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import json
 import secrets
 from collections.abc import Callable, Mapping
-from datetime import timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Any, Final
 
 import structlog
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai.limits import KIND_PROVIDER_COST
+from tiqora.config import Settings
 from tiqora.dashboard import store
+from tiqora.dashboard.runner import BATCH_DEADLINE_SECONDS, SessionFactory, run_batch
 from tiqora.dashboard.schemas import (
+    DashboardDataOut,
+    DashboardOut,
+    KioskBoardOut,
+    KioskDashboardOut,
     KioskDashboardRef,
     KioskLinkIn,
     KioskLinkOut,
+    KioskWidgetOut,
     WidgetDataOut,
 )
 from tiqora.db.legacy.user import Users
@@ -36,18 +46,23 @@ from tiqora.db.tiqora.models import (
     TiqoraDashboardKioskToken,
 )
 from tiqora.domain.schemas import TicketListItem
+from tiqora.extensions.registry import Registry
 from tiqora.jobs.service import utc_now
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.reporting.person_dimensions import NON_PERSON_DIMENSIONS, PERSON_DIMENSIONS
 
 __all__ = [
+    "KIOSK_REFRESH_SECONDS",
     "KIOSK_RULES",
     "KIOSK_SAFE_TICKET_FIELDS",
     "KIOSK_SETTINGS_WHITELIST",
     "MSG_HIDDEN",
+    "MSG_INVALID_LINK",
     "MSG_NOT_FOUND",
     "NON_PERSON_DIMENSIONS",
     "PERSON_DIMENSIONS",
+    "ResolvedLink",
+    "board_out",
     "create_link",
     "delete_link",
     "hash_token",
@@ -57,7 +72,10 @@ __all__ = [
     "redact",
     "redact_result",
     "redact_settings",
+    "kiosk_data",
+    "resolve_link",
     "revoke_link",
+    "touch_link",
 ]
 
 logger = structlog.get_logger(__name__)
@@ -490,3 +508,285 @@ async def delete_link(session: AsyncSession, link_id: int) -> None:
     )
     await session.flush()
     logger.info("dashboard_kiosk_link_deleted", link_id=link_id)
+
+
+# --------------------------------------------------------------------------- public side
+
+#: the one answer for every invalid state of a link (unknown, expired, revoked, creator gone)
+MSG_INVALID_LINK: Final = "Dieser Wallboard-Link ist ungültig oder abgelaufen."
+#: how often the wallboard polls a dashboard (a little above the data cache TTL)
+KIOSK_REFRESH_SECONDS: Final = 30
+LAST_USED_INTERVAL: Final = timedelta(minutes=10)
+CACHE_TTL_SECONDS: Final = 20
+#: a result that still holds a ``pending`` widget is not kept longer than this
+PENDING_CACHE_TTL_SECONDS: Final = 5
+LOCK_TTL_SECONDS: Final = 30
+#: how long a waiter polls for the computing request's value (a batch ends after its deadline)
+WAIT_SECONDS: Final = BATCH_DEADLINE_SECONDS + 2
+WAIT_POLL_SECONDS: Final = 0.2
+#: last good value per widget, served in place of a ``pending`` one
+LAST_GOOD_TTL_SECONDS: Final = 6 * 3600
+_CACHE_PREFIX: Final = "tiqora:dash:kiosk"
+
+#: widget types the wallboard renders from their settings alone (no provider); their content
+#: leaves only for a link that shows details
+_STATIC_SETTINGS: Final[dict[str, frozenset[str]]] = {
+    "core.notes": frozenset({"markdown"}),
+    "core.links": frozenset({"items"}),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedLink:
+    """A valid link: the row's facts and the dashboards its creator can still see."""
+
+    id: int
+    name: str
+    created_by: int
+    rotate_seconds: int
+    show_details: bool
+    #: visible dashboards in rotation order (never empty)
+    dashboard_ids: tuple[int, ...]
+
+
+async def resolve_link(session: AsyncSession, token: str, now: datetime) -> ResolvedLink | None:
+    """The link behind ``token``, or ``None`` for every invalid state alike.
+
+    Invalid: unknown, revoked, expired, creator not valid or no longer an admin, or none of the
+    link's dashboards visible to the creator any more.
+    """
+    row = (
+        await session.execute(
+            select(TiqoraDashboardKioskToken)
+            .where(TiqoraDashboardKioskToken.token_hash == hash_token(token))
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one_or_none()
+    if row is None or not _is_active(row, now):
+        return None
+    creator = int(row.created_by)
+    valid_id = (await session.execute(select(Users.valid_id).where(Users.id == creator))).scalar()
+    if valid_id != 1 or not await PermissionEngine(session).is_admin(creator):
+        return None
+    ids = (
+        (
+            await session.execute(
+                select(TiqoraDashboardKioskItem.dashboard_id)
+                .where(TiqoraDashboardKioskItem.token_id == row.id)
+                .order_by(TiqoraDashboardKioskItem.position)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    visible = [int(d) for d in ids if await store.is_visible(session, int(d), creator, admin=True)]
+    if not visible:
+        return None
+    return ResolvedLink(
+        id=int(row.id),
+        name=row.name,
+        created_by=creator,
+        rotate_seconds=int(row.rotate_seconds),
+        show_details=bool(row.show_details),
+        dashboard_ids=tuple(visible),
+    )
+
+
+async def touch_link(session: AsyncSession, link_id: int, now: datetime) -> None:
+    """Set ``last_used_at`` at most every ten minutes (conditional UPDATE; the caller commits)."""
+    cutoff = now - LAST_USED_INTERVAL
+    await session.execute(
+        update(TiqoraDashboardKioskToken)
+        .where(
+            TiqoraDashboardKioskToken.id == link_id,
+            or_(
+                TiqoraDashboardKioskToken.last_used_at.is_(None),
+                TiqoraDashboardKioskToken.last_used_at < cutoff,
+            ),
+        )
+        .values(last_used_at=now)
+    )
+
+
+def _widget_view(w: Any, show_details: bool) -> KioskWidgetOut:
+    if w.type_key in _STATIC_SETTINGS:
+        keep = _STATIC_SETTINGS[w.type_key] if show_details else frozenset()
+        settings = {k: v for k, v in w.settings.items() if k in keep}
+    else:
+        settings = redact_settings(w.type_key, w.settings, show_details)
+    return KioskWidgetOut(
+        id=w.id,
+        type_key=w.type_key,
+        type_version=w.type_version,
+        layout=w.layout,
+        settings=settings,
+        title_override=kiosk_title(w.title_override, show_details),
+    )
+
+
+def board_out(link: ResolvedLink, boards: list[DashboardOut], now: datetime) -> KioskBoardOut:
+    """The wallboard's configuration: widgets reduced to what rendering needs."""
+    return KioskBoardOut(
+        name=link.name,
+        rotate_seconds=link.rotate_seconds,
+        refresh_seconds=KIOSK_REFRESH_SECONDS,
+        show_details=link.show_details,
+        dashboards=[
+            KioskDashboardOut(
+                id=b.id,
+                name=b.name,
+                filters=b.filters,
+                widgets=[_widget_view(w, link.show_details) for w in b.widgets],
+            )
+            for b in boards
+        ],
+        server_time=now,
+    )
+
+
+def _key(kind: str, link_id: int, board: DashboardOut) -> str:
+    return f"{_CACHE_PREFIX}:{kind}:{link_id}:{board.id}:{board.version}"
+
+
+async def _cache_get(redis: Any, key: str) -> DashboardDataOut | None:
+    try:
+        raw = await redis.get(key)
+        return DashboardDataOut.model_validate_json(raw) if raw else None
+    except Exception:  # noqa: BLE001 - a broken cache never breaks the wallboard
+        return None
+
+
+async def _last_good(redis: Any, key: str) -> dict[str, WidgetDataOut]:
+    try:
+        raw = await redis.get(key)
+        if not raw:
+            return {}
+        return {k: WidgetDataOut.model_validate(v) for k, v in json.loads(raw).items()}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+async def _compute(
+    factory: SessionFactory,
+    registry: Registry,
+    redis: Any,
+    link: ResolvedLink,
+    board: DashboardOut,
+    app_settings: Settings | None,
+) -> tuple[DashboardDataOut, bool]:
+    """Run the widgets as the link's creator and redact; stale values replace ``pending``.
+
+    The flag says whether a widget was ``pending`` (the result is then cached only briefly).
+    """
+    rows = [w for w in board.widgets if w.type_key in KIOSK_RULES]
+    results = (
+        await run_batch(
+            factory,
+            registry,
+            link.created_by,
+            rows,
+            redis=redis,
+            filters=board.filters,
+            app_settings=app_settings,
+            report_cache_backend=redis,
+            kiosk=True,
+        )
+        if rows
+        else {}
+    )
+    out: dict[str, WidgetDataOut] = {}
+    for w in board.widgets:
+        if w.type_key in _STATIC_SETTINGS:
+            continue  # rendered from settings
+        if w.type_key not in KIOSK_RULES:
+            out[w.id] = _hidden()  # third-party and unknown widgets never run here
+        elif w.id in results:
+            out[w.id] = redact_result(w.type_key, results[w.id], link.show_details)
+    any_pending = any(r.status == "pending" for r in out.values())
+    if redis is not None:
+        good_key = _key("last", link.id, board)
+        stored = await _last_good(redis, good_key)
+        fresh = {wid: r for wid, r in out.items() if r.status == "ok"}
+        out = {
+            wid: (stored[wid] if r.status == "pending" and wid in stored else r)
+            for wid, r in out.items()
+        }
+        if fresh:
+            stored.update(fresh)
+            try:
+                await redis.set(
+                    good_key,
+                    json.dumps({k: v.model_dump(mode="json") for k, v in stored.items()}),
+                    ex=LAST_GOOD_TTL_SECONDS,
+                )
+            except Exception:  # noqa: BLE001
+                logger.warning("dashboard_kiosk_last_good_failed", link_id=link.id)
+    return DashboardDataOut(widgets=out, generated_at=utc_now()), any_pending
+
+
+async def _compute_and_cache(
+    factory: SessionFactory,
+    registry: Registry,
+    redis: Any,
+    link: ResolvedLink,
+    board: DashboardOut,
+    app_settings: Settings | None,
+) -> DashboardDataOut:
+    data, pending = await _compute(factory, registry, redis, link, board, app_settings)
+    if redis is not None:
+        try:
+            await redis.set(
+                _key("data", link.id, board),
+                data.model_dump_json(),
+                ex=PENDING_CACHE_TTL_SECONDS if pending else CACHE_TTL_SECONDS,
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("dashboard_kiosk_cache_failed", link_id=link.id)
+    return data
+
+
+async def kiosk_data(
+    factory: SessionFactory,
+    registry: Registry,
+    redis: Any,
+    link: ResolvedLink,
+    board: DashboardOut,
+    app_settings: Settings | None = None,
+) -> DashboardDataOut:
+    """The redacted data of one of a link's dashboards, cached for 20 s.
+
+    The caller resolved the link first, so a revocation applies before the cache is read. One
+    request computes under a ``SET NX`` lock; the others poll for its value instead of running
+    the widgets again (a screen farm must not multiply the load).
+    """
+    if redis is None:
+        return await _compute_and_cache(factory, registry, None, link, board, app_settings)
+    data_key, lock_key = _key("data", link.id, board), _key("lock", link.id, board)
+    cached = await _cache_get(redis, data_key)
+    if cached is not None:
+        return cached
+    try:
+        got_lock = bool(await redis.set(lock_key, "1", ex=LOCK_TTL_SECONDS, nx=True))
+    except Exception:  # noqa: BLE001 - without a lock compute (bounded by the batch deadline)
+        got_lock = True
+    if got_lock:
+        try:
+            return await _compute_and_cache(factory, registry, redis, link, board, app_settings)
+        finally:
+            try:
+                await redis.delete(lock_key)
+            except Exception:  # noqa: BLE001 - the lock expires on its own
+                logger.warning("dashboard_kiosk_unlock_failed", link_id=link.id)
+    loop = asyncio.get_running_loop()
+    until = loop.time() + WAIT_SECONDS
+    while loop.time() < until:
+        await asyncio.sleep(WAIT_POLL_SECONDS)
+        cached = await _cache_get(redis, data_key)
+        if cached is not None:
+            return cached
+        try:
+            if not await redis.exists(lock_key):
+                break  # the computing request ended without a value
+        except Exception:  # noqa: BLE001
+            break
+    return await _compute_and_cache(factory, registry, redis, link, board, app_settings)
