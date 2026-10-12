@@ -9,6 +9,7 @@ export type ChatPublicConfig = Schemas["ChatPublicConfigOut"];
 export type ChatMessage = Schemas["ChatMessageOut"];
 export type ChatSession = Schemas["ChatSessionOut"];
 export type ChatSessionCreated = Schemas["ChatSessionCreatedOut"];
+export type ChatPortalIdentity = Schemas["ChatPortalIdentityOut"];
 
 /**
  * `code` is the server's `detail` string (`rate_limited`, `not_found`, `disabled`,
@@ -74,13 +75,14 @@ export function createChatApi(opts: { base?: string; fetchImpl?: typeof fetch } 
   const base = (opts.base ?? "/api/chat/v1").replace(/\/+$/, "");
   const doFetch = opts.fetchImpl ?? ((...a: Parameters<typeof fetch>) => fetch(...a));
 
-  async function call(path: string, init: RequestInit = {}, token?: string): Promise<Response> {
+  // `creds` is "omit" for every call except the portal identity (own origin, reads the portal cookie).
+  async function call(path: string, init: RequestInit = {}, token?: string, creds: RequestCredentials = "omit"): Promise<Response> {
     const headers: Record<string, string> = {};
     if (token) headers["X-Chat-Token"] = token;
     if (typeof init.body === "string") headers["Content-Type"] = "application/json";
     let res: Response;
     try {
-      res = await doFetch(base + path, { ...init, headers, cache: "no-store", credentials: "omit" });
+      res = await doFetch(base + path, { ...init, headers, cache: "no-store", credentials: creds });
     } catch {
       throw new ChatApiError(0, "network");
     }
@@ -118,5 +120,9 @@ export function createChatApi(opts: { base?: string; fetchImpl?: typeof fetch } 
       none(`${sid(id)}/contact`, post({ email, name }), token),
     end: (id: string, token: string) => none(`${sid(id)}/end`, { method: "POST" }, token),
     offline: (body: Schemas["ChatOfflineIn"]) => none("/offline", post(body)),
+    identify: (id: string, token: string, identity: string) => none(`${sid(id)}/identify`, post({ identity }), token),
+    handoff: (id: string, token: string) => none(`${sid(id)}/handoff`, { method: "POST" }, token),
+    portalIdentity: async (body: Schemas["ChatPortalIdentityIn"]) =>
+      (await (await call("/identity/portal", post(body), undefined, "same-origin")).json()) as ChatPortalIdentity,
   };
 }

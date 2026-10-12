@@ -29,6 +29,27 @@ describe("frame bridge", () => {
     expect(f.onHostMessage).toHaveBeenCalledTimes(1);
   });
 
+  it("accepts identify and logout from the host, drops a malformed token", () => {
+    const f = fixture();
+    const from = (data: unknown) => f.dispatch({ origin: "https://host.example", source: f.parent, data });
+    from({ p: "tiqora-chat/1", type: "identify", token: "a.b.c" });
+    from({ p: "tiqora-chat/1", type: "logout" });
+    from({ p: "tiqora-chat/1", type: "identify", token: "not a token" });
+    from({ p: "tiqora-chat/1", type: "identify" });
+    expect(f.onHostMessage.mock.calls.map((c) => c[0])).toEqual([
+      { p: "tiqora-chat/1", type: "identify", token: "a.b.c" },
+      { p: "tiqora-chat/1", type: "logout" },
+    ]);
+  });
+
+  it("posts identity and bot message notices to the host origin", () => {
+    const f = fixture();
+    f.bridge.post({ p: "tiqora-chat/1", type: "identity", verified: true });
+    f.bridge.post({ p: "tiqora-chat/1", type: "message", sender: "bot" });
+    expect(f.parent.postMessage).toHaveBeenCalledWith({ p: "tiqora-chat/1", type: "identity", verified: true }, "https://host.example");
+    expect(f.parent.postMessage).toHaveBeenCalledWith({ p: "tiqora-chat/1", type: "message", sender: "bot" }, "https://host.example");
+  });
+
   it("posts only to the host origin, never *", () => {
     const f = fixture();
     f.bridge.post({ p: "tiqora-chat/1", type: "close-request" });

@@ -5927,7 +5927,16 @@
       "visitor_left": "Sie haben den Chat beendet.",
       "no_agent": "Gerade ist niemand frei. Wir antworten Ihnen per E-Mail.",
       "no_agentNoEmail": "Gerade ist niemand frei. Wohin dürfen wir Ihnen antworten?",
-      "idle_closed": "Der Chat wurde wegen Inaktivität beendet."
+      "idle_closed": "Der Chat wurde wegen Inaktivität beendet.",
+      "bot_intro": "{{name}} ist ein KI-Assistent und beantwortet Ihre Fragen.",
+      "handoff": {
+        "visitor": "Wir verbinden Sie mit einem Mitarbeiter.",
+        "ai": "Der KI-Assistent hat den Chat an einen Mitarbeiter übergeben.",
+        "limit": "Der Chat wurde an einen Mitarbeiter übergeben.",
+        "error": "Die KI ist gerade nicht erreichbar. Der Chat wurde an einen Mitarbeiter übergeben.",
+        "unavailable": "Die KI ist gerade nicht verfügbar. Der Chat wurde an einen Mitarbeiter übergeben.",
+        "takeover": "Ein Mitarbeiter hat den Chat übernommen."
+      }
     },
     "contact": {
       "title": "Ihre E-Mail-Adresse",
@@ -5949,6 +5958,18 @@
     },
     "preview": {
       "reply": "Hallo! Wie kann ich Ihnen helfen?"
+    },
+    "bot": {
+      "badge": "KI",
+      "typing": "{{name}} schreibt …",
+      "status": "{{name}} antwortet",
+      "handoff": "Mit einem Menschen sprechen",
+      "handoffPending": "Wird übergeben …"
+    },
+    "identity": {
+      "signedIn": "Angemeldet als {{name}}",
+      "signedInAnon": "Angemeldet",
+      "invalid": "Die Anmeldung konnte nicht bestätigt werden. Bitte geben Sie Ihre Angaben ein."
     }
   },
   "plugins": {

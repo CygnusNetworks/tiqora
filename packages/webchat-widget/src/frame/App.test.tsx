@@ -86,7 +86,7 @@ describe("App", () => {
     expect(body.visitor_id).toHaveLength(22);
     expect(typeof body.client_id).toBe("string");
     expect(container.querySelector(".tq-status")?.textContent).toBe("Einen Moment – gleich ist jemand für Sie da.");
-    expect(loadSession("wc_key", store)).toEqual({ sessionId: "sid1", token: "tok1", lastSeq: 1 });
+    expect(loadSession("wc_key", store)).toEqual({ sessionId: "sid1", token: "tok1", lastSeq: 1, identified: false });
     expect(stream.made[0].start).toHaveBeenCalled();
     expect(stream.made[0].o.token).toBe("tok1");
 
@@ -97,11 +97,12 @@ describe("App", () => {
     expect(post).toHaveBeenCalledWith({ p: "tiqora-chat/1", type: "message", sender: "agent" });
     expect(JSON.stringify(post.mock.calls)).not.toContain("Hallo!");
 
-    // a bot (AI) message is shown like an agent message, and the host is told "agent"
+    // a bot (AI) message is shown like an agent message, and the host is told "bot" (no text)
     expect(post.mock.calls.filter((c) => c[0].type === "message")).toHaveLength(1);
     stream.emit("message", msg({ seq: 3, sender: "bot", body: "Ich bin die KI", agent_name: null }), "3");
     expect(container.textContent).toContain("Ich bin die KI");
     expect(post.mock.calls.filter((c) => c[0].type === "message")).toHaveLength(2);
+    expect(post.mock.calls.filter((c) => c[0].type === "message").map((c) => c[0].sender)).toEqual(["agent", "bot"]);
 
     click(byText(container, "button", "Chat beenden"));
     await flush();
@@ -391,5 +392,267 @@ describe("App", () => {
     await flush();
     fromHost("https://host.example");
     expect(live.container.textContent).not.toContain("Firma");
+  });
+
+  // ---- chat assistant and recognised visitors (C9) -------------------------------------
+
+  const TOKEN = "aaa.bbb.ccc";
+  const session = (over: Record<string, unknown> = {}) => ({
+    agent_name: null, bot_name: null, can_handoff: false, can_send: true, identified_as: null,
+    last_seq: 1, needs_contact: false, session_id: "sid1", status: "active", topic_label: null, ...over,
+  });
+  const botCreate = () =>
+    vi.fn(async (_b: Record<string, unknown>) => ({
+      session_id: "sid1", token: "tok1", status: "bot",
+      message: msg({ seq: 1, sender: "visitor", body: "Hilfe", client_id: "c0" }),
+    }));
+  const toHost = (data: unknown, origin = "https://host.example") =>
+    act(() => {
+      window.dispatchEvent(new MessageEvent("message", { origin, source: window, data }));
+    });
+  /** Mounts with the real bridge (so the host can speak) and records what the frame posts. */
+  async function mountHost(opts: { api?: ReturnType<typeof fakeApi>; store?: Store; p?: Partial<FrameParams> } = {}) {
+    const api = opts.api ?? fakeApi();
+    const store = opts.store ?? memStore();
+    const stream = fakeStream();
+    const posted: Array<Record<string, unknown>> = [];
+    const spy = vi.spyOn(window, "postMessage").mockImplementation(((m: Record<string, unknown>) => void posted.push(m)) as never);
+    const t = await loadMessages("de");
+    const { container } = renderPreact(
+      <App params={{ ...params, ...opts.p }} api={api as unknown as ChatApi} t={t} store={store} createStream={stream.create} />,
+    );
+    await flush();
+    return { container, api, store, stream, posted, spy };
+  }
+  const fillAndStart = async (container: HTMLElement, name = true) => {
+    if (name) {
+      input(byLabel(container, "Name"), "Erika");
+      input(byLabel(container, "E-Mail"), "e@example.org");
+    }
+    input(byLabel(container, "Ihre Nachricht"), "Hilfe");
+    click(byText(container, "button", "Chat starten"));
+    await flush();
+  };
+
+  it("a bot chat: header, named bot lines with a KI badge, intro from params, typing, handover button", async () => {
+    const api = fakeApi({ createSession: botCreate() });
+    const { container, post, stream } = await mount({ api });
+    await fillAndStart(container);
+    expect(container.querySelector(".tq-status")?.textContent).toBe("KI-Assistent antwortet");
+    stream.emit("session", { status: "bot", agent_name: null, bot_name: "Robo" });
+    expect(container.querySelector(".tq-status")?.textContent).toBe("Robo antwortet");
+    stream.emit("message", msg({ seq: 2, sender: "system", body: "bot_intro", code: "bot_intro", params: { name: "Robo", notice: "Antworten können Fehler enthalten." } }), "2");
+    expect(container.textContent).toContain("Robo ist ein KI-Assistent");
+    expect(container.textContent).toContain("Antworten können Fehler enthalten.");
+    stream.emit("typing", { who: "bot" });
+    expect(container.querySelector(".tq-typing")?.textContent).toBe("Robo schreibt …");
+    stream.emit("message", msg({ seq: 3, sender: "bot", body: "Starten Sie neu." }), "3");
+    expect(container.querySelector(".tq-typing")).toBeNull();
+    expect(container.querySelector(".tq-name")?.textContent).toBe("Robo KI");
+    expect(container.querySelector(".tq-ai")?.textContent).toBe("KI");
+    expect(post).toHaveBeenCalledWith({ p: "tiqora-chat/1", type: "message", sender: "bot" });
+    stream.emit("typing", { who: "agent" });
+    expect(container.querySelector(".tq-typing")?.textContent).toBe("schreibt …");
+    expect(container.querySelector(".tq-composer, .tq-input")).toBeTruthy(); // the visitor can type to the bot
+  });
+
+  it("the handover button posts handoff once, stays disabled while running, and goes with the waiting event", async () => {
+    let release: () => void = () => undefined;
+    const handoff = vi.fn(() => new Promise<void>((r) => (release = r)));
+    const api = fakeApi({ createSession: botCreate(), handoff });
+    const { container, stream } = await mount({ api });
+    expect(container.querySelector(".tq-handoff")).toBeNull();
+    await fillAndStart(container);
+    const btn = byText(container, "button", "Mit einem Menschen sprechen") as HTMLButtonElement;
+    click(btn);
+    await flush();
+    click(container.querySelector(".tq-handoff") as Element);
+    expect(handoff).toHaveBeenCalledTimes(1);
+    expect(handoff).toHaveBeenCalledWith("sid1", "tok1");
+    expect((container.querySelector(".tq-handoff") as HTMLButtonElement).disabled).toBe(true);
+    release();
+    await flush();
+    expect(container.querySelector(".tq-handoff")).not.toBeNull(); // only the session event removes it
+    stream.emit("session", { status: "waiting", agent_name: null });
+    expect(container.querySelector(".tq-handoff")).toBeNull();
+    expect(container.querySelector(".tq-status")?.textContent).toBe("Einen Moment – gleich ist jemand für Sie da.");
+    stream.emit("message", msg({ seq: 2, sender: "system", body: "handoff", code: "handoff", params: { reason: "visitor" } }), "2");
+    expect(container.textContent).toContain("Wir verbinden Sie mit einem Mitarbeiter.");
+  });
+
+  it("a refused handover (an agent was faster) refreshes the status instead of failing", async () => {
+    const api = fakeApi({
+      createSession: botCreate(),
+      handoff: vi.fn(async () => {
+        throw new ChatApiError(409, "not_bot");
+      }),
+      session: vi.fn(async () => session({ status: "active", agent_name: "Max", last_seq: 2 })),
+    });
+    const { container } = await mount({ api });
+    await fillAndStart(container);
+    click(byText(container, "button", "Mit einem Menschen sprechen"));
+    await flush();
+    expect(container.querySelector(".tq-handoff")).toBeNull();
+    expect(container.querySelector(".tq-banner")).toBeNull();
+  });
+
+  it("identify before the start hides name/e-mail, sends the token and shows who is signed in", async () => {
+    const api = fakeApi({
+      createSession: botCreate(),
+      session: vi.fn(async () => session({ status: "bot", can_handoff: true, identified_as: "Erika Muster" })),
+    });
+    const { container, store, posted } = await mountHost({ api });
+    toHost({ p: "tiqora-chat/1", type: "identify", token: TOKEN });
+    toHost({ p: "tiqora-chat/1", type: "open" });
+    expect(() => byLabel(container, "Name")).toThrow();
+    expect(() => byLabel(container, "E-Mail")).toThrow();
+    await fillAndStart(container, false);
+    const body = api.createSession.mock.calls[0][0] as { identity?: string; prechat: unknown };
+    expect(body.identity).toBe(TOKEN);
+    expect(body.prechat).toEqual({});
+    expect(container.textContent).toContain("Angemeldet als Erika Muster");
+    expect(posted).toContainEqual({ p: "tiqora-chat/1", type: "identity", verified: true });
+    expect(loadSession("wc_key", store)?.identified).toBe(true);
+    expect(store.get("tiqora-chat:session:wc_key")).not.toContain(TOKEN); // the token is never stored
+  });
+
+  it("a refused sign-in on create shows the full form again with the message", async () => {
+    const api = fakeApi({
+      createSession: vi.fn(async () => {
+        throw new ChatApiError(422, "invalid_identity");
+      }),
+    });
+    const { container, posted } = await mountHost({ api });
+    toHost({ p: "tiqora-chat/1", type: "identify", token: TOKEN });
+    await fillAndStart(container, false);
+    expect(container.querySelector("[role=alert]")?.textContent).toBe("Die Anmeldung konnte nicht bestätigt werden. Bitte geben Sie Ihre Angaben ein.");
+    expect(byLabel(container, "Name")).toBeTruthy();
+    expect(byLabel(container, "E-Mail")).toBeTruthy();
+    expect(posted).toContainEqual({ p: "tiqora-chat/1", type: "identity", verified: false });
+    // and the token is gone: the retry goes out anonymously
+    api.createSession.mockImplementationOnce(botCreate());
+    await fillAndStart(container);
+    expect((api.createSession.mock.calls[1][0] as { identity?: string }).identity).toBeUndefined();
+  });
+
+  it("identify on a running chat posts /identify and learns identified_as", async () => {
+    const store = memStore();
+    saveSession("wc_key", { sessionId: "sid1", token: "tok1", lastSeq: 1 }, store);
+    const identify = vi.fn(async () => undefined);
+    const api = fakeApi({ identify, session: vi.fn(async () => session({ identified_as: "Erika Muster" })) });
+    const { container, posted } = await mountHost({ api, store });
+    toHost({ p: "tiqora-chat/1", type: "identify", token: TOKEN });
+    await flush();
+    expect(identify).toHaveBeenCalledWith("sid1", "tok1", TOKEN);
+    expect(container.textContent).toContain("Angemeldet als Erika Muster");
+    expect(posted).toContainEqual({ p: "tiqora-chat/1", type: "identity", verified: true });
+  });
+
+  it("identity_conflict on /identify clears the stored chat and starts fresh; invalid_identity drops the token", async () => {
+    const store = memStore();
+    saveSession("wc_key", { sessionId: "sid1", token: "tok1", lastSeq: 1 }, store);
+    const identify = vi.fn(async () => {
+      throw new ChatApiError(409, "identity_conflict");
+    });
+    const { container, api } = await mountHost({ api: fakeApi({ identify }), store });
+    toHost({ p: "tiqora-chat/1", type: "identify", token: TOKEN });
+    await flush();
+    expect(loadSession("wc_key", store)).toBeNull();
+    expect(container.querySelector(".tq-log")).toBeNull();
+    expect(container.textContent).toContain("Angemeldet"); // the new token still signs the new chat in
+    api.createSession.mockImplementationOnce(botCreate());
+    input(byLabel(container, "Ihre Nachricht"), "Neu");
+    click(byText(container, "button", "Chat starten"));
+    await flush();
+    expect((api.createSession.mock.calls[0][0] as { identity?: string }).identity).toBe(TOKEN);
+
+    const store2 = memStore();
+    saveSession("wc_key", { sessionId: "sid1", token: "tok1", lastSeq: 1 }, store2);
+    const bad = await mountHost({ api: fakeApi({ identify: vi.fn(async () => { throw new ChatApiError(422, "invalid_identity"); }) }), store: store2 });
+    toHost({ p: "tiqora-chat/1", type: "identify", token: TOKEN });
+    await flush();
+    expect(bad.posted).toContainEqual({ p: "tiqora-chat/1", type: "identity", verified: false });
+    expect(loadSession("wc_key", store2)).not.toBeNull(); // the anonymous chat goes on
+  });
+
+  it("logout clears the stored chat and the sign-in and shows a fresh start", async () => {
+    const store = memStore();
+    saveSession("wc_key", { sessionId: "sid1", token: "tok1", lastSeq: 1 }, store);
+    const { container, api } = await mountHost({ store });
+    toHost({ p: "tiqora-chat/1", type: "identify", token: TOKEN });
+    await flush();
+    expect(container.querySelector(".tq-log")).toBeTruthy();
+    toHost({ p: "tiqora-chat/1", type: "logout" });
+    await flush();
+    expect(loadSession("wc_key", store)).toBeNull();
+    expect(container.querySelector(".tq-log")).toBeNull();
+    expect(byLabel(container, "Name")).toBeTruthy(); // anonymous form again
+    expect(api.end).not.toHaveBeenCalled(); // nothing is ended server-side
+  });
+
+  it("a stored identified chat is restored only if the host signs in before the visitor opens the chat", async () => {
+    const mk = () => {
+      const store = memStore();
+      saveSession("wc_key", { sessionId: "sid1", token: "tok1", lastSeq: 1, identified: true }, store);
+      return store;
+    };
+    // host never identifies: dropped on open, nothing fetched
+    const store = mk();
+    const a = await mountHost({ store });
+    expect(a.api.session).not.toHaveBeenCalled();
+    toHost({ p: "tiqora-chat/1", type: "open" });
+    await flush();
+    expect(a.api.session).not.toHaveBeenCalled();
+    expect(loadSession("wc_key", store)).toBeNull();
+    expect(byLabel(a.container, "Name")).toBeTruthy();
+
+    // host identifies after ready, before open: restored (and identified again)
+    const store2 = mk();
+    const identify = vi.fn(async () => undefined);
+    const b = await mountHost({ store: store2, api: fakeApi({ identify, session: vi.fn(async () => session({ identified_as: "Erika Muster" })) }) });
+    expect(b.container.querySelector(".tq-log")).toBeNull();
+    toHost({ p: "tiqora-chat/1", type: "identify", token: TOKEN });
+    toHost({ p: "tiqora-chat/1", type: "open" });
+    await flush();
+    expect(b.container.querySelector(".tq-log")).toBeTruthy();
+    expect(identify).toHaveBeenCalledWith("sid1", "tok1", TOKEN);
+    expect(loadSession("wc_key", store2)).not.toBeNull();
+
+    // an anonymous stored chat is restored as before
+    const store3 = memStore();
+    saveSession("wc_key", { sessionId: "sid1", token: "tok1", lastSeq: 1 }, store3);
+    const c = await mountHost({ store: store3 });
+    expect(c.container.querySelector(".tq-log")).toBeTruthy();
+  });
+
+  it("portal config fetches the portal identity once and uses it (also for the restore rule)", async () => {
+    const portalIdentity = vi.fn(async (_b: Record<string, unknown>) => ({ identity: TOKEN, name: "Erika Muster" }));
+    const store = memStore();
+    saveSession("wc_key", { sessionId: "sid1", token: "tok1", lastSeq: 1, identified: true }, store);
+    const identify = vi.fn(async () => undefined);
+    const api = fakeApi({ config: vi.fn(async () => cfg({ portal_identity: true })), portalIdentity, identify, session: vi.fn(async () => session({ identified_as: "Erika Muster" })) });
+    const { container } = await mountHost({ api, store, p: { origin: "http://localhost" } });
+    expect(portalIdentity).toHaveBeenCalledTimes(1);
+    expect(portalIdentity.mock.calls[0][0]).toMatchObject({ key: "wc_key", origin: "http://localhost" });
+    expect(container.querySelector(".tq-log")).toBeTruthy(); // restored without a host identify
+    expect(identify).toHaveBeenCalledWith("sid1", "tok1", TOKEN);
+
+    // no chat yet: the form is the signed-in one
+    const api2 = fakeApi({ config: vi.fn(async () => cfg({ portal_identity: true })), portalIdentity: vi.fn(async () => ({ identity: TOKEN, name: "Erika Muster" })) });
+    const m = await mountHost({ api: api2, p: { origin: "http://localhost" } });
+    expect(m.container.querySelector(".tq-signed")?.textContent).toBe("Angemeldet als Erika Muster");
+    // a portal that is not logged in (404) stays anonymous
+    const api3 = fakeApi({ config: vi.fn(async () => cfg({ portal_identity: true })), portalIdentity: vi.fn(async () => { throw new ChatApiError(404, "not_found"); }) });
+    const n = await mountHost({ api: api3 });
+    expect(byLabel(n.container, "Name")).toBeTruthy();
+  });
+
+  it("preview frames never ask for the portal identity and ignore the host's sign-in", async () => {
+    const portalIdentity = vi.fn(async () => ({ identity: TOKEN, name: "X" }));
+    const api = fakeApi({ config: vi.fn(async () => cfg({ portal_identity: true })), portalIdentity });
+    const { container } = await mountHost({ api, p: { preview: true } });
+    toHost({ p: "tiqora-chat/1", type: "identify", token: TOKEN });
+    expect(portalIdentity).not.toHaveBeenCalled();
+    expect(byLabel(container, "Name")).toBeTruthy();
   });
 });

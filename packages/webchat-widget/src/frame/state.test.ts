@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contiguousSeq, initial, maxSeq, reducer } from "./state";
+import { canStartNew, contiguousSeq, initial, isLive, maxSeq, reducer } from "./state";
 import { cfg, msg } from "./testkit";
 
 describe("reducer", () => {
@@ -78,5 +78,54 @@ describe("reducer", () => {
     expect(reducer(s, { type: "set-topic", topic: "nope" }).topic).toBeNull();
     s = reducer(s, { type: "set-topic", topic: "sales" });
     expect(s.topic).toBe("sales");
+  });
+
+  const botSession = { agent_name: null, bot_name: "Robo", can_handoff: true, can_send: true, last_seq: 1, needs_contact: false, session_id: "s", status: "bot", topic_label: null };
+
+  it("bot is a live status; the handoff button state follows the status events", () => {
+    expect(isLive("bot")).toBe(true);
+    let s = reducer(initial, { type: "session-restored", session: botSession, messages: [] });
+    expect(s.view).toBe("chat");
+    s = reducer(s, { type: "handoff-started" });
+    expect(s.handoffBusy).toBe(true);
+    s = reducer(s, { type: "session-event", status: "waiting", agentName: null });
+    expect(s.handoffBusy).toBe(false);
+    expect(s.session).toMatchObject({ status: "waiting", can_handoff: false, bot_name: null, can_send: true });
+    s = reducer(s, { type: "session-event", status: "bot", agentName: null, botName: "Robo" });
+    expect(s.session).toMatchObject({ can_handoff: true, bot_name: "Robo" });
+    s = reducer(s, { type: "handoff-started" });
+    expect(reducer(s, { type: "handoff-failed" }).handoffBusy).toBe(false);
+  });
+
+  it("a created chat in status bot can hand off; typing tells who; a bot line ends the typing", () => {
+    let s = reducer(initial, { type: "session-created", created: { session_id: "s", token: "t", status: "bot", message: msg({ seq: 1, sender: "visitor" }) } });
+    expect(s.session?.can_handoff).toBe(true);
+    s = reducer(s, { type: "typing", who: "bot" });
+    expect([s.agentTyping, s.typingBot]).toEqual([true, true]);
+    s = reducer(s, { type: "typing", who: "agent" });
+    expect(s.typingBot).toBe(false);
+    s = reducer(s, { type: "typing", who: "bot" });
+    s = reducer(s, { type: "message", message: msg({ seq: 2, sender: "bot" }) });
+    expect(s.agentTyping).toBe(false);
+  });
+
+  it("identity actions keep the sign-in across a restart and flag a refused one", () => {
+    let s = reducer(initial, { type: "config-loaded", config: cfg() });
+    s = reducer(s, { type: "identity-set", name: "Erika" });
+    expect(s.identity).toEqual({ name: "Erika" });
+    expect(reducer(s, { type: "reset" }).identity).toEqual({ name: "Erika" });
+    s = reducer(s, { type: "identity-invalid" });
+    expect([s.identity, s.identityError]).toEqual([null, true]);
+    s = reducer(s, { type: "identity-set", name: null });
+    expect(s.identityError).toBe(false);
+    expect(reducer(s, { type: "identity-cleared" }).identity).toBeNull();
+  });
+
+  it("offline_mode ai starts a chat only when a topic is answered by the AI", () => {
+    const topics = [{ key: "a", label: "A", online: false, ai_first: true }];
+    expect(reducer(initial, { type: "config-loaded", config: cfg({ online: false, offline_mode: "ai", topics }) }).view).toBe("prechat");
+    expect(reducer(initial, { type: "config-loaded", config: cfg({ online: false, offline_mode: "ai", topics: [{ ...topics[0], ai_first: false }] }) }).view).toBe("hidden");
+    expect(canStartNew(cfg({ online: false, offline_mode: "ai", topics }))).toBe(true);
+    expect(canStartNew(cfg({ online: false, offline_mode: "ai" }))).toBe(false);
   });
 });

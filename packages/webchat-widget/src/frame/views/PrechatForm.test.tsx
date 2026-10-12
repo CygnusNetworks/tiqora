@@ -4,7 +4,7 @@ import { loadMessages } from "../i18n";
 import { byLabel, byText, cfg, click, input } from "../testkit";
 import { PrechatForm } from "./PrechatForm";
 
-async function setup(over = {}, serverErrors: Record<string, string> = {}) {
+async function setup(over = {}, serverErrors: Record<string, string> = {}, identity?: { name: string | null } | null) {
   const t = await loadMessages("de");
   const onSubmit = vi.fn();
   const { container } = renderPreact(
@@ -19,6 +19,7 @@ async function setup(over = {}, serverErrors: Record<string, string> = {}) {
       serverErrors={serverErrors}
       formError={null}
       onSubmit={onSubmit}
+      identity={identity}
     />,
   );
   return { container, onSubmit };
@@ -66,5 +67,20 @@ describe("PrechatForm", () => {
     const a = container.querySelector(".tq-privacy a");
     expect(a?.getAttribute("rel")).toBe("noopener noreferrer");
     expect(a?.getAttribute("href")).toBe("https://example.org/privacy");
+  });
+
+  it("a signed-in visitor sees no name/e-mail fields, is told who they are and submits without them", async () => {
+    const { container, onSubmit } = await setup({}, {}, { name: "Erika Muster" });
+    expect(() => byLabel(container, "Name")).toThrow();
+    expect(() => byLabel(container, "E-Mail")).toThrow();
+    expect(container.querySelector(".tq-signed")?.textContent).toBe("Angemeldet als Erika Muster");
+    input(byLabel(container, "Ihre Nachricht"), "Hilfe");
+    click(byText(container, "button", "Chat starten"));
+    expect(onSubmit).toHaveBeenCalledWith({ prechat: {}, message: "Hilfe", topic: null });
+  });
+
+  it("a sign-in without a known name still says so", async () => {
+    const { container } = await setup({}, {}, { name: null });
+    expect(container.querySelector(".tq-signed")?.textContent).toBe("Angemeldet");
   });
 });

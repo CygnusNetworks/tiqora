@@ -31,7 +31,7 @@ describe("storage", () => {
     });
     const s = { sessionId: "abc", token: "tok", lastSeq: 3 };
     saveSession("k", s);
-    expect(loadSession("k")).toEqual(s);
+    expect(loadSession("k")).toEqual({ ...s, identified: false });
     const id = visitorId();
     expect(visitorId()).toBe(id);
     clearSession("k");
@@ -58,7 +58,16 @@ describe("storage", () => {
     st.set("tiqora-chat:session:k", JSON.stringify({ sessionId: "a", token: "t", lastSeq: -1 }));
     expect(loadSession("k")).toBeNull();
     saveSession("k", { sessionId: "a", token: "t", lastSeq: 0 });
-    expect(loadSession("k")).toEqual({ sessionId: "a", token: "t", lastSeq: 0 });
+    expect(loadSession("k")).toEqual({ sessionId: "a", token: "t", lastSeq: 0, identified: false });
+  });
+
+  it("keeps the identified flag; anything but true reads as false", () => {
+    saveSession("k", { sessionId: "a", token: "t", lastSeq: 1, identified: true });
+    expect(loadSession("k")?.identified).toBe(true);
+    safeStorage().set("tiqora-chat:session:k", JSON.stringify({ sessionId: "a", token: "t", lastSeq: 1, identified: "yes" }));
+    expect(loadSession("k")?.identified).toBe(false);
+    clearSession("k");
+    expect(loadSession("k")).toBeNull();
   });
 
   it("creates a 22 char base64url visitor id once", () => {

@@ -81,4 +81,28 @@ describe("chat api", () => {
     await e.a.typing("s", "t");
     await e.a.contact("s", "t", "a@b.de", null);
   });
+
+  it("every call omits credentials except the portal identity; handoff and identify use the token header", async () => {
+    const { a, calls } = api(() => new Response(JSON.stringify({ identity: "a.b.c", name: "Erika" }), { status: 200 }));
+    await a.config("k", "o");
+    await a.session("s", "t");
+    await a.handoff("sid 1", "tok");
+    await a.identify("s", "tok", "a.b.c");
+    await a.createSession({ key: "k", origin: "o", visitor_id: "v".repeat(22), message: "x", identity: "a.b.c" });
+    await a.offline({ key: "k", origin: "o", visitor_id: "v".repeat(22), message: "x", email: "e@example.org" } as never);
+    expect(calls.every((c) => c.init.credentials === "omit")).toBe(true);
+    const h = calls[2];
+    expect(h.url).toBe("/api/chat/v1/sessions/sid%201/handoff");
+    expect(h.init.method).toBe("POST");
+    expect((h.init.headers as Record<string, string>)["X-Chat-Token"]).toBe("tok");
+    expect(JSON.parse(calls[3].init.body as string)).toEqual({ identity: "a.b.c" });
+    expect(calls[3].url).toBe("/api/chat/v1/sessions/s/identify");
+    expect(JSON.parse(calls[4].init.body as string).identity).toBe("a.b.c");
+    const out = await a.portalIdentity({ key: "k", origin: "o", visitor_id: "v".repeat(22) });
+    expect(out).toEqual({ identity: "a.b.c", name: "Erika" });
+    const last = calls[calls.length - 1];
+    expect(last.url).toBe("/api/chat/v1/identity/portal");
+    expect(last.init.credentials).toBe("same-origin");
+    expect(last.init.method).toBe("POST");
+  });
 });

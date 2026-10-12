@@ -5919,7 +5919,16 @@
       "visitor_left": "You have ended the chat.",
       "no_agent": "Nobody is free right now. We will reply to you by email.",
       "no_agentNoEmail": "Nobody is free right now. Where may we send our reply?",
-      "idle_closed": "The chat was closed due to inactivity."
+      "idle_closed": "The chat was closed due to inactivity.",
+      "bot_intro": "{{name}} is an AI assistant and answers your questions.",
+      "handoff": {
+        "visitor": "We are connecting you with a team member.",
+        "ai": "The AI assistant handed the chat over to a team member.",
+        "limit": "The chat was handed over to a team member.",
+        "error": "The AI is not reachable right now. The chat was handed over to a team member.",
+        "unavailable": "The AI is not available right now. The chat was handed over to a team member.",
+        "takeover": "A team member took over the chat."
+      }
     },
     "contact": {
       "title": "Your email address",
@@ -5941,6 +5950,18 @@
     },
     "preview": {
       "reply": "Hello! How can I help you?"
+    },
+    "bot": {
+      "badge": "AI",
+      "typing": "{{name}} is typing …",
+      "status": "{{name}} is answering",
+      "handoff": "Talk to a person",
+      "handoffPending": "Handing over …"
+    },
+    "identity": {
+      "signedIn": "Signed in as {{name}}",
+      "signedInAnon": "Signed in",
+      "invalid": "We could not confirm your sign-in. Please enter your details."
     }
   },
   "plugins": {

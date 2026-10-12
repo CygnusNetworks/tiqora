@@ -6,8 +6,9 @@ import { createFrameBridge, type FrameBridge } from "./bridge";
 import { isRtl, loadMessages, type Translate } from "./i18n";
 import { SharedChatStream, type SharedStreamOptions } from "./shared-stream";
 import { endReason, type SseEvent } from "./sse";
+import { claimName, mayRestore } from "./identity";
 import { canStartNew, contiguousSeq, initial, isLive, maxSeq, reducer } from "./state";
-import { clearSession, loadSession, saveSession, visitorId, type Store } from "./storage";
+import { clearSession, loadSession, saveSession, visitorId, type StoredSession, type Store } from "./storage";
 import { applyTheme } from "./theme";
 import { errorText, newClientId } from "./util";
 import { ChatView, type ChatHandlers } from "./views/ChatView";
@@ -98,6 +99,14 @@ export function App(props: {
   const mainRef = useRef<HTMLElement>(null);
   const readyPosted = useRef(false);
   const lastUnread = useRef(0);
+  const aliveRef = useRef(true);
+  // The signed token: memory only, never stored (C9). `deferred` is a stored signed-in chat
+  // waiting for the host to vouch for the visitor before it is restored.
+  const identRef = useRef<string | null>(null);
+  const deferred = useRef<StoredSession | null>(null);
+  const restoreRef = useRef<(s: StoredSession) => Promise<void>>(async () => undefined);
+  const identifyRef = useRef<(token: string) => Promise<void>>(async () => undefined);
+  const logoutRef = useRef<() => void>(() => undefined);
 
   const config = useMemo(
     () => (state.config ? (params.preview ? applyPreview(state.config, previewCfg) : state.config) : null),
@@ -123,6 +132,8 @@ export function App(props: {
       else if (m.type === "close") dispatch({ type: "closed" });
       else if (m.type === "set-topic") dispatch({ type: "set-topic", topic: m.topic });
       else if (m.type === "preview-config" && params.preview) setPreviewCfg(m.config);
+      else if (m.type === "identify" && !params.preview) void identifyRef.current(m.token);
+      else if (m.type === "logout" && !params.preview) logoutRef.current();
     };
     const b = props.bridge ?? createFrameBridge({ hostOrigin: params.origin, onHostMessage: onHost });
     bridgeRef.current = b;
@@ -140,6 +151,94 @@ export function App(props: {
   useEffect(() => {
     if (config) applyTheme(document.documentElement, { primaryColor: config.theme.primary_color, mode: config.theme.mode }, dir);
   }, [config, dir]);
+
+  // --- identity ---------------------------------------------------------------------
+  const setIdentity = useCallback((token: string, name?: string | null) => {
+    identRef.current = token;
+    dispatch({ type: "identity-set", name: name ?? claimName(token) });
+  }, []);
+  const dropIdentity = useCallback(() => {
+    identRef.current = null;
+    dispatch({ type: "identity-cleared" });
+  }, []);
+  const toStart = useCallback(() => {
+    const a = auth.current;
+    if (a || stateRef.current.session) clearSession(params.k, props.store);
+    auth.current = null;
+    seq.current = 0;
+    seqFloor.current = 0;
+    deferred.current = null;
+    dispatch({ type: "reset" });
+  }, [params.k, props.store]);
+
+  /** Attach the pending identity to the running chat (204 also for the same one again). */
+  const attachIdentity = useCallback(
+    async (token: string) => {
+      const a = auth.current;
+      if (!a) return;
+      try {
+        await api.identify(a.id, a.token, token);
+        const session = await api.session(a.id, a.token);
+        if (session) dispatch({ type: "session-refreshed", session });
+        bridgeRef.current?.post({ p: "tiqora-chat/1", type: "identity", verified: !!session?.identified_as });
+      } catch (e) {
+        if (!(e instanceof ChatApiError)) return;
+        if (e.code === "identity_conflict") toStart(); // the chat belongs to somebody else
+        else if (e.code === "invalid_identity") {
+          dropIdentity();
+          bridgeRef.current?.post({ p: "tiqora-chat/1", type: "identity", verified: false });
+        }
+      }
+    },
+    [api, toStart, dropIdentity],
+  );
+
+  const restoreStored = async (stored: StoredSession, isDead: () => boolean) => {
+    try {
+      const session = await api.session(stored.sessionId, stored.token);
+      const all: ChatMessage[] = [];
+      // The frame is reloaded on every host page: the transcript comes from the server.
+      for (let after = 0, n = 0; n < 5; n++) {
+        const page = await api.messages(stored.sessionId, stored.token, after);
+        all.push(...page);
+        if (page.length < 200) break;
+        after = maxSeq(page);
+      }
+      if (isDead()) return;
+      auth.current = { id: stored.sessionId, token: stored.token };
+      // the pages are a full read up to their top: resume from there; replays are deduped
+      seqFloor.current = maxSeq(all);
+      seq.current = seqFloor.current;
+      dispatch({ type: "session-restored", session, messages: all });
+      if (identRef.current && isLive(session.status)) void attachIdentity(identRef.current);
+    } catch (e) {
+      if (e instanceof ChatApiError && e.status === 404) clearSession(params.k, props.store);
+      // other failures: show the pre-chat form, the stored session survives for the next load
+    }
+  };
+  restoreRef.current = (s) => restoreStored(s, () => !aliveRef.current);
+  identifyRef.current = async (token) => {
+    setIdentity(token);
+    if (auth.current && stateRef.current.session && isLive(stateRef.current.session.status)) await attachIdentity(token);
+  };
+  logoutRef.current = () => {
+    dropIdentity();
+    toStart();
+  };
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => void (aliveRef.current = false);
+  }, []);
+
+  // A signed-in chat from an earlier page view is restored once the visitor opens the chat
+  // and the host has signed the visitor in by then; otherwise it is dropped.
+  useEffect(() => {
+    const d = deferred.current;
+    if (!d || !state.open) return;
+    deferred.current = null;
+    if (identRef.current) void restoreRef.current(d);
+    else clearSession(params.k, props.store);
+  }, [state.open, params.k, props.store]);
 
   // --- start: config, then a stored session ---------------------------------------
   useEffect(() => {
@@ -162,27 +261,24 @@ export function App(props: {
         dispatch({ type: "opened" });
         return;
       }
+      // Own-origin portal: the logged-in customer counts as a fresh identify for the restore rule.
+      // Preview frames never ask (the admin browser's portal identity must not attach).
+      if (cfg.portal_identity) {
+        try {
+          const p = await api.portalIdentity({ key: params.k, origin: params.origin, visitor_id: visitorId(props.store) });
+          if (dead) return;
+          setIdentity(p.identity, p.name);
+        } catch {
+          // 404 and every failure: anonymous
+        }
+      }
       const stored = loadSession(params.k, props.store);
       if (stored) {
-        try {
-          const session = await api.session(stored.sessionId, stored.token);
-          const all: ChatMessage[] = [];
-          // The frame is reloaded on every host page: the transcript comes from the server.
-          for (let after = 0, n = 0; n < 5; n++) {
-            const page = await api.messages(stored.sessionId, stored.token, after);
-            all.push(...page);
-            if (page.length < 200) break;
-            after = maxSeq(page);
-          }
-          if (dead) return;
-          auth.current = { id: stored.sessionId, token: stored.token };
-          // the pages are a full read up to their top: resume from there; replays are deduped
-          seqFloor.current = maxSeq(all);
-          seq.current = seqFloor.current;
-          dispatch({ type: "session-restored", session, messages: all });
-        } catch (e) {
-          if (e instanceof ChatApiError && e.status === 404) clearSession(params.k, props.store);
-          // other failures: show the pre-chat form, the stored session survives for the next load
+        if (!mayRestore(stored, !!identRef.current)) {
+          // The host calls identify() only after `ready`; the decision waits for the visitor to open the chat.
+          deferred.current = stored;
+        } else {
+          await restoreStored(stored, () => dead);
         }
       }
       if (!dead) dispatch({ type: "config-loaded", config: cfg });
@@ -232,8 +328,17 @@ export function App(props: {
     if (!live || !a || !top) return;
     const stored = loadSession(params.k, props.store);
     if (stored && stored.sessionId !== a.id) return; // another chat took over the slot
-    saveSession(params.k, { sessionId: a.id, token: a.token, lastSeq: Math.max(stored?.lastSeq ?? 0, top) }, props.store);
+    saveSession(params.k, { sessionId: a.id, token: a.token, lastSeq: Math.max(stored?.lastSeq ?? 0, top), identified: stored?.identified ?? false }, props.store);
   }, [state.messages, live, params.k, props.store]);
+
+  // The server says who the chat belongs to: remember it, so a reload needs a fresh sign-in.
+  const identifiedAs = state.session?.identified_as ?? null;
+  useEffect(() => {
+    const a = auth.current;
+    if (!live || !a || !identifiedAs) return;
+    const stored = loadSession(params.k, props.store);
+    if (stored && stored.sessionId === a.id && !stored.identified) saveSession(params.k, { ...stored, identified: true }, props.store);
+  }, [identifiedAs, live, params.k, props.store]);
 
   // --- live stream ------------------------------------------------------------------
   const sessionId = state.session?.session_id ?? null;
@@ -245,18 +350,32 @@ export function App(props: {
         if (!m) return;
         const known = stateRef.current.messages.some((x) => x.seq === m.seq);
         dispatch({ type: "message", message: m });
-        if (!known && m.sender !== "visitor") bridgeRef.current?.post({ p: "tiqora-chat/1", type: "message", sender: m.sender === "system" ? "system" : "agent" });
+        if (!known && m.sender !== "visitor") {
+          const sender = m.sender === "system" ? "system" : m.sender === "bot" ? "bot" : "agent";
+          bridgeRef.current?.post({ p: "tiqora-chat/1", type: "message", sender });
+        }
       } else if (e.event === "session") {
         try {
-          const o = JSON.parse(e.data) as { status?: unknown; agent_name?: unknown };
+          const o = JSON.parse(e.data) as { status?: unknown; agent_name?: unknown; bot_name?: unknown };
           if (typeof o.status === "string") {
-            dispatch({ type: "session-event", status: o.status, agentName: typeof o.agent_name === "string" ? o.agent_name : null });
+            dispatch({
+              type: "session-event",
+              status: o.status,
+              agentName: typeof o.agent_name === "string" ? o.agent_name : null,
+              botName: typeof o.bot_name === "string" ? o.bot_name : null,
+            });
           }
         } catch {
           // malformed event: ignore
         }
       } else if (e.event === "typing") {
-        dispatch({ type: "typing" });
+        let who: "agent" | "bot" = "agent";
+        try {
+          if ((JSON.parse(e.data) as { who?: unknown } | null)?.who === "bot") who = "bot";
+        } catch {
+          // a plain typing ping
+        }
+        dispatch({ type: "typing", who });
         if (typingTimer.current) clearTimeout(typingTimer.current);
         typingTimer.current = setTimeout(() => dispatch({ type: "typing-expired" }), TYPING_VISIBLE_MS);
       } else if (e.event === "end") {
@@ -362,6 +481,25 @@ export function App(props: {
       dispatch({ type: "end" });
       if (live && a) api.end(a.id, a.token).catch((e) => fail(e));
     },
+    onHandoff: () => {
+      const a = auth.current;
+      if (!live || !a || stateRef.current.handoffBusy) return;
+      dispatch({ type: "handoff-started" });
+      api.handoff(a.id, a.token).then(
+        () => undefined, // the session event (waiting / ended) removes the button
+        async (e: unknown) => {
+          dispatch({ type: "handoff-failed" });
+          if (e instanceof ChatApiError && e.code === "not_bot") {
+            // an agent was faster: learn the new status
+            try {
+              dispatch({ type: "session-refreshed", session: await api.session(a.id, a.token) });
+            } catch {
+              // the stream tells us
+            }
+          } else fail(e);
+        },
+      );
+    },
     onRestart: () => {
       if (!canStartNew(stateRef.current.config)) return;
       if (live) clearSession(params.k, props.store);
@@ -402,12 +540,27 @@ export function App(props: {
         topic: v.topic ?? stateRef.current.topic,
         language: params.lang,
         client_id: clientId,
+        ...(identRef.current ? { identity: identRef.current } : {}),
       });
       auth.current = { id: created.session_id, token: created.token };
-      saveSession(params.k, { sessionId: created.session_id, token: created.token, lastSeq: created.message.seq }, props.store);
+      saveSession(params.k, { sessionId: created.session_id, token: created.token, lastSeq: created.message.seq, identified: false }, props.store);
       dispatch({ type: "session-created", created });
+      if (identRef.current) {
+        // who the server recognised (identified_as) is only on the session
+        try {
+          const session = await api.session(created.session_id, created.token);
+          if (session) dispatch({ type: "session-refreshed", session });
+          bridgeRef.current?.post({ p: "tiqora-chat/1", type: "identity", verified: !!session?.identified_as });
+        } catch {
+          // best effort: the next restore / refresh learns it
+        }
+      }
     } catch (e) {
-      if (e instanceof ChatApiError && e.status === 422 && Object.keys(e.errors).length) setServerErrors(e.errors);
+      if (e instanceof ChatApiError && e.status === 422 && e.code === "invalid_identity") {
+        dropIdentity();
+        dispatch({ type: "identity-invalid" });
+        bridgeRef.current?.post({ p: "tiqora-chat/1", type: "identity", verified: false });
+      } else if (e instanceof ChatApiError && e.status === 422 && Object.keys(e.errors).length) setServerErrors(e.errors);
       else if (t) setFormError(errorText(t, e));
     } finally {
       setBusy(false);
@@ -454,7 +607,7 @@ export function App(props: {
     onTopic: (topic: string) => dispatch({ type: "set-topic", topic }),
     busy,
     serverErrors,
-    formError,
+    formError: formError ?? (state.identityError ? t("identity.invalid") : null),
   };
   let body: JSX.Element;
   switch (state.view) {
@@ -482,6 +635,7 @@ export function App(props: {
           config={config}
           title={t("prechat.title")}
           intro={config.greeting}
+          identity={state.identity}
           submitLabel={t("prechat.start")}
           onSubmit={(v) => void start(v)}
         />
