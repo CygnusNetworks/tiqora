@@ -28,8 +28,9 @@ Requester:
     - GoldenRetry
   Invoker:
     SendTicket:
-      Description: Ticket::Generic with Ticket/Title renamed to Subject
+      Description: Ticket::Generic, identity copy with Ticket/Title renamed to Subject, all attachments
       Type: Ticket::Generic
+      GetAllArticleAttachments: '1'
       MappingOutbound:
         Type: XSLT
         Config:
@@ -38,14 +39,11 @@ Requester:
             <xsl:stylesheet version="1.0"
               xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
             <xsl:output method="xml" encoding="utf-8" indent="yes"/>
-            <xsl:template match="/RootElement">
-              <RootElement>
-                <TicketID><xsl:value-of select="Ticket/TicketID"/></TicketID>
-                <Subject><xsl:value-of select="Ticket/Title"/></Subject>
-                <Event><xsl:value-of select="Event/Event"/></Event>
-                <Queue><xsl:value-of select="Ticket/Queue"/></Queue>
-                <xsl:copy-of select="Ticket/Articles"/>
-              </RootElement>
+            <xsl:template match="@*|node()">
+              <xsl:copy><xsl:apply-templates select="@*|node()"/></xsl:copy>
+            </xsl:template>
+            <xsl:template match="/RootElement/Ticket/Title">
+              <Subject><xsl:apply-templates select="node()"/></Subject>
             </xsl:template>
             </xsl:stylesheet>
       MappingInbound:

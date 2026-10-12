@@ -466,6 +466,31 @@ async def test_ticket_without_related_objects_has_empty_parts(sync_url: str) -> 
     assert d["QueueData"] and d["OwnerData"]
 
 
+async def test_queue_calendar_zero_is_empty_like_perl(sync_url: str) -> None:
+    """Znuny QueueGet does `Calendar => $Data[20] || ''`: a stored "0" is falsy and becomes ''
+    (found by the requester golden test, QueueData->Calendar '' vs '0')."""
+
+    async def run(session: AsyncSession, sc: SysConfig) -> dict[str, Any] | None:
+        return await ticket_deep_get(
+            session, TICKET, article_id=None, all_attachments=False, sysconfig=sc
+        )
+
+    engine = create_engine(sync_url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE queue SET calendar_name = '0' WHERE id = 51080"))
+        d = await _with_session(sync_url, run)
+        assert d is not None and d["QueueData"]["Calendar"] == ""
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE queue SET calendar_name = '2' WHERE id = 51080"))
+        d = await _with_session(sync_url, run)
+        assert d is not None and d["QueueData"]["Calendar"] == "2"
+    finally:
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE queue SET calendar_name = NULL WHERE id = 51080"))
+        engine.dispose()
+
+
 async def test_unknown_ticket_is_none(sync_url: str) -> None:
     async def run(session: AsyncSession, sc: SysConfig) -> Any:
         return await ticket_deep_get(

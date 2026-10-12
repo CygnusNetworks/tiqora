@@ -371,7 +371,7 @@ async def _queue_data(session: AsyncSession, queue_id: int) -> dict[str, Any]:
         "Email": row["email"],
         "RealName": row["real_name"],
         "DefaultSignKey": row["default_sign_key"],
-        "Calendar": row["calendar_name"] or "",
+        "Calendar": row["calendar_name"] if perl_truthy(row["calendar_name"]) else "",
         "CreateTime": _ts(row["create_time"]),
         "ChangeTime": _ts(row["change_time"]),
     }
@@ -471,7 +471,7 @@ async def _sla_data(session: AsyncSession, sla_id: int) -> dict[str, Any]:
     data: dict[str, Any] = {
         "SLAID": row["id"],
         "Name": row["name"],
-        "Calendar": row["calendar_name"] or "",
+        "Calendar": row["calendar_name"] if perl_truthy(row["calendar_name"]) else "",
         "FirstResponseTime": row["first_response_time"],
         "FirstResponseNotify": row["first_response_notify"],
         "UpdateTime": row["update_time"],

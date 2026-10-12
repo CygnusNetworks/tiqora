@@ -55,7 +55,6 @@ pytestmark = pytest.mark.golden
 
 REST_WS = "GoldenRequesterREST"
 SOAP_WS = "GoldenRequesterSOAP"
-SINK_URL = "http://127.0.0.1:8199"
 BASIC_PASSWORD = "example-golden-password"
 HEADER_SECRET = "example-golden-header-value"
 BASIC_TOKEN = base64.b64encode(f"golden-user:{BASIC_PASSWORD}".encode()).decode()
@@ -97,6 +96,25 @@ _VOLATILE_KEYS = frozenset(
 # (Deviation 6: Tiqora opens a fresh pinned connection per request, KeepAlive is ignored).
 _DROPPED_HEADERS = frozenset(
     {"host", "content-length", "user-agent", "accept", "accept-encoding", "connection", "te"}
+)
+
+
+# Known deviation (Deviation 14, for T20 compatibility.md): Znuny TicketGet adds the computed
+# escalation detail keys (working-time seconds and destination dates per escalation kind);
+# Tiqora's TicketDeepGet serialises only the stored ticket.escalation_* columns. The keys are
+# asserted present on the Znuny side and absent on the Tiqora side, then dropped for the compare.
+_ESCALATION_DETAIL_KEYS = frozenset(
+    {
+        "EscalationDestinationDate",
+        "EscalationDestinationIn",
+        "EscalationDestinationTime",
+        "EscalationTimeWorkingTime",
+    }
+    | {
+        f"{kind}{suffix}"
+        for kind in ("FirstResponseTime", "SolutionTime", "UpdateTime")
+        for suffix in ("", "WorkingTime", "DestinationDate", "DestinationTime")
+    }
 )
 
 
@@ -276,6 +294,9 @@ class _ForwardToSink(httpx.AsyncBaseTransport):
     def __init__(self) -> None:
         self._inner = httpx.AsyncHTTPTransport()
 
+    async def aclose(self) -> None:
+        await self._inner.aclose()
+
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         request.url = request.url.copy_with(scheme="http", host="127.0.0.1", port=8199)
         return await self._inner.handle_async_request(request)
@@ -315,6 +336,23 @@ async def _tiqora_run(
             session, SysConfig(session), ws_name
         )
     assert ws is not None, f"{ws_name} not loadable by Tiqora"
+    transport = _ForwardToSink()
+    try:
+        return await _run(transport, factory, ws, invoker, data, past, now, sink)
+    finally:
+        await transport.aclose()
+
+
+async def _run(
+    transport: _ForwardToSink,
+    factory: Any,
+    ws: GiWebservice,
+    invoker: str,
+    data: dict[str, Any],
+    past: PastExecutionData | None,
+    now: datetime | None,
+    sink: Any,
+) -> RequesterOutcome:
     return await run_requester(
         session_factory=factory,
         ws=ws,
@@ -325,7 +363,7 @@ async def _tiqora_run(
         sysconfig_factory=SysConfig,
         sink=sink if sink is not None else _MemorySink(),
         settings=Settings(environment="test"),
-        http_transport=_ForwardToSink(),
+        http_transport=transport,
         resolver=_resolver,
         policy=TEST_POLICY,
         now=now,
@@ -376,9 +414,31 @@ async def test_rest_payload_parity(golden_session_factory, golden_conn, ticket_i
     assert z_view["method"] == "POST" and z_view["path"].startswith("/Ticket/")
     assert z_view["headers"]["authorization"] == f"Basic {BASIC_TOKEN}"
     assert z_view["headers"]["x-golden-token"] == HEADER_SECRET
-    # The XSLT renamed Ticket/Title -> Subject on both sides, with both articles forwarded.
-    assert z_view["body"]["Subject"] == "Golden requester ticket"
-    assert len(z_view["body"]["Articles"]) == 2
+    # The XSLT is an identity copy that only renames Ticket/Title -> Subject, so the whole
+    # TicketDeepGet serialisation (ticket fields, customer/owner data with the secret cleanup,
+    # dynamic fields, articles with attachments) is compared. The body is compared as a dict:
+    # Znuny's JSON encoder emits random key order, so key order is not part of the contract.
+    body = z_view["body"]
+    assert body["Ticket"]["Subject"] == "Golden requester ticket"
+    assert "Title" not in body["Ticket"]
+    assert len(body["Ticket"]["Articles"]) == 2
+    # Positive guard: the attachment really is in the Znuny body (GetAllArticleAttachments=1),
+    # so a comparison that is empty on both sides cannot pass.
+    znuny_raw = z_requests[0]["body"]
+    assert "golden.txt" in znuny_raw
+    assert base64.b64encode(b"golden attachment content").decode() in znuny_raw
+    tiqora_raw = t_requests[0]["body"]
+    assert "golden.txt" in tiqora_raw
+    assert base64.b64encode(b"golden attachment content").decode() in tiqora_raw
+    # TicketDeepGet cleanup: no credential-like keys leak into either body.
+    for raw in (znuny_raw, tiqora_raw):
+        assert not re.search(r'"(?:UserPw|[A-Za-z_]*[Pp]assw[a-z]*)"\s*:', raw), raw[:500]
+    z_ticket, t_ticket = z_view["body"]["Ticket"], t_view["body"]["Ticket"]
+    assert set(z_ticket) >= _ESCALATION_DETAIL_KEYS, "Znuny no longer adds escalation details"
+    assert not _ESCALATION_DETAIL_KEYS & set(t_ticket)
+    for key in _ESCALATION_DETAIL_KEYS:
+        del z_ticket[key]
+    # UnlockTimeout/IncomingTime are epoch values taken from the identical stored ticket row.
     assert z_view == t_view, f"REST request differs:\nznuny:  {z_view}\ntiqora: {t_view}"
 
     # Deviation 4: Znuny logs the raw request params (incl. the Authorization header and the
@@ -530,7 +590,7 @@ async def test_retry_schedule_parity(
         clock = decision.execution_time
 
     assert z_steps == t_steps, f"retry schedule differs:\nznuny:  {z_steps}\ntiqora: {t_steps}"
-    assert [step[0] for step in z_steps][:1] == [60]
+    assert z_steps[:3] == [(60, 60, 1, 60), (180, 180, 2, 120), (420, 420, 3, 240)]
 
     # fourth failure: RetryCountMax 3 reached -> no reschedule on both sides
     z_last = znuny_requester_run(REST_WS + "Status", "SendTicket", event, past=z_past)
