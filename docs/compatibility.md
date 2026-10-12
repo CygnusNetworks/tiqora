@@ -395,9 +395,42 @@ Differences (deliberate):
   a startup warning).
 - **OIDC** id_tokens are always verified (discovery issuer, JWKS, audience, nonce); Entra's
   `{tenantid}` multi-tenant issuer is supported with an optional tenant allow-list.
-- SSO logins skip TOTP/passkey 2FA (the IdP is the strong factor); customers can enroll TOTP
-  and passkeys for password logins.
+- SSO logins skip TOTP/passkey 2FA unless the provider requires proof of a second factor from the IdP
+  (`require_mfa_claim`, Tiqora-only, Znuny has no equivalent); then a missing proof falls back to
+  Tiqora's TOTP/passkey or refuses the login. Customers can enroll TOTP and passkeys for password logins.
 - Customer 2FA tables are removed only by the GDPR erasure, not when a customer user is deleted.
+
+## SCIM 2.0 provisioning
+
+Znuny has no SCIM endpoint; this is a Tiqora addition (`/scim/v2`, RFC 7643/7644) so an IdP can create,
+update and deactivate agents and customers and push agent groups. Setup:
+[guide/identity-providers.md](guide/identity-providers.md#bereitstellung-mit-scim). Accounts end up as
+normal Znuny `users` / `customer_user` rows, so Znuny reads them like any other (golden test
+`tests/golden/test_identity_scim.py`).
+
+Supported subset:
+
+| Area | Support |
+|---|---|
+| Auth | per-provider bearer token (`tqscim_…`), sha256-hashed, up to 5 active per provider, scoped to agents or customers |
+| Resources | `Users`, `Groups` (agents only); GET/POST/PUT/PATCH/DELETE; discovery: `ServiceProviderConfig`, `ResourceTypes`, `Schemas` |
+| User attributes | `userName`, `externalId`, `name.givenName`/`familyName`, `displayName`, `emails`, `phoneNumbers` (type `mobile`), `active`; the enterprise extension, `password` and `groups` are accepted and ignored |
+| Filter | `eq` on `id`, `userName`, `externalId`, `emails.value`, `displayName` (Groups: `id`, `displayName`, `externalId`), one condition, at most 1000 characters |
+| Paging | `startIndex` / `count`, `count` capped at 200 (default 100) |
+| PATCH | `add` / `replace` / `remove` with and without path; group member add/remove |
+
+Deviations from the RFC (deliberate):
+
+- **No Bulk, no ETag, no changePassword, no sorting**; `ServiceProviderConfig` says so.
+- **`and` / `or` / `co` / `sw` / value-path filters** answer `400 invalidFilter`.
+- **DELETE deactivates**: `DELETE /Users/{id}` sets `valid_id = 2` and hides the SCIM resource (404 afterwards);
+  Znuny rows are never deleted. `active=false` is the same without hiding. GDPR erasure is a separate,
+  explicit action; delete in the IdP first or it re-creates the account.
+- **Groups do not grant anything themselves**; they feed role rules (`scim:groups`, `scim:group_ids`).
+  No nested groups; customers have no groups.
+- **No companies, no API-key area `scim`**: SCIM never creates customer companies.
+- **Adoption is opt-in** (`scim_adopt_existing`); otherwise a clash with an existing login is `409 uniqueness`.
+- **Uniqueness** is case-insensitive on `userName`; request bodies are capped (2 MB), group requests at 5000 members.
 
 ## Requester and invokers (Tiqora calls external systems)
 
