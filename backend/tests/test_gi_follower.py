@@ -362,7 +362,7 @@ async def test_reenable_after_gap_does_not_replay(url_fixture: str, follower_: F
     result = await follower_.tick()
     assert result["enqueued"] == 0 and _jobs(url_fixture) == []
 
-    # same without the API: the marker is older than 3 x interval
+    # same without the API: the marker is older than the stale threshold
     _set_setting(
         url_fixture,
         KEY_GI_REQUESTER_LAST_ENABLED_TICK,
@@ -376,6 +376,44 @@ async def test_reenable_after_gap_does_not_replay(url_fixture: str, follower_: F
     tid, _ = _new_ticket(url_fixture, 3)
     result = await follower_.tick()
     assert [j["payload"]["data"]["TicketID"] for j in _jobs(url_fixture)] == [tid]
+
+
+async def test_long_tick_marker_still_delivers(url_fixture: str, follower_: Follower) -> None:
+    _install(url_fixture, {"Send": CREATE})
+    await follower_.start()
+    # the previous tick ran long (budget stop) or the worker restarted briefly
+    _set_setting(
+        url_fixture,
+        KEY_GI_REQUESTER_LAST_ENABLED_TICK,
+        (utc_now() - timedelta(seconds=60)).isoformat(),
+    )
+    tid, _ = _new_ticket(url_fixture, 0)
+    result = await follower_.tick()
+    assert result["enqueued"] == 1
+    assert [j["payload"]["data"]["TicketID"] for j in _jobs(url_fixture)] == [tid]
+
+
+def test_stale_threshold_covers_budget_and_floor() -> None:
+    assert follower.stale_marker_seconds(5) >= 120
+    assert follower.stale_marker_seconds(5) > follower.TICK_BUDGET_SECONDS + 15
+    assert follower.stale_marker_seconds(600) >= follower.TICK_BUDGET_SECONDS + 3 * 600
+
+
+async def test_stale_reset_logs_warning_with_skipped(url_fixture: str, follower_: Follower) -> None:
+    import structlog.testing
+
+    _install(url_fixture, {"Send": CREATE})
+    await follower_.start()
+    _set_setting(
+        url_fixture,
+        KEY_GI_REQUESTER_LAST_ENABLED_TICK,
+        (utc_now() - timedelta(hours=1)).isoformat(),
+    )
+    _new_ticket(url_fixture, 0)
+    with structlog.testing.capture_logs() as logs:
+        await follower_.tick()
+    (entry,) = [e for e in logs if e["event"] == "gi_requester_cursor_reset"]
+    assert entry["log_level"] == "warning" and entry["skipped"] >= 1
 
 
 async def test_event_fires_matching_invokers_once(url_fixture: str, follower_: Follower) -> None:
@@ -599,7 +637,7 @@ async def test_condition_with_catastrophic_regex_is_a_non_match(
                     "Condition": {
                         "Cond1": {
                             "Type": "and",
-                            "Fields": {"Title": {"Type": "Regexp", "Match": "^(a+)+$"}},
+                            "Fields": {"Title": {"Type": "Regexp", "Match": "^(a|aa)+$"}},
                         }
                     }
                 },
@@ -612,9 +650,13 @@ async def test_condition_with_catastrophic_regex_is_a_non_match(
     engine = create_engine(url_fixture)
     with engine.begin() as conn:
         conn.execute(
-            text("UPDATE ticket SET title = :t WHERE id = :i"), {"t": "a" * 40 + "!", "i": tid}
+            text("UPDATE ticket SET title = :t WHERE id = :i"), {"t": "a" * 60 + "!", "i": tid}
         )
     engine.dispose()
     _history(url_fixture, tid)
-    result = await follower_.tick()
+    import structlog.testing
+
+    with structlog.testing.capture_logs() as logs:
+        result = await follower_.tick()
     assert result["events"] == 1 and result["enqueued"] == 0
+    assert any(e["event"] == "gi_requester_condition_warning" for e in logs)

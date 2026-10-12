@@ -5,9 +5,9 @@ flag itself):
 
 1. Flag off: the cursor follows ``MAX(ticket_history.id)`` and the ``last_enabled_tick`` marker
    is deleted. Nothing is ever replayed after the flag goes on. A NULL cursor, a missing or
-   stale marker (older than 3 x the interval) on an enabled tick resets the cursor to the head
-   too; the Daemons API does the same when it enables the service. So a worker that was down,
-   or a flag flipped between two ticks, can never replay old history.
+   stale marker (see :func:`stale_marker_seconds`, at least 180 s) on an enabled tick resets the
+   cursor to the head too; the Daemons API does the same when it enables the service. So a
+   worker that was down, or a flag flipped between two ticks, can never replay old history.
 2. Enabled: read up to :data:`EVENT_BATCH` rows above the cursor, cut them at the gap-safe
    horizon (:class:`~tiqora.plugins.events.GapTracker`), map them to events, and match the
    invokers (:func:`tiqora.gi.events.match_invokers`).
@@ -62,8 +62,21 @@ __all__ = ["EVENT_BATCH", "TICK_BUDGET_SECONDS", "make_gap_tracker", "run_gi_req
 EVENT_BATCH: Final = 500
 #: wall time after which a tick starts no further event
 TICK_BUDGET_SECONDS: Final = 30.0
-#: a marker older than this many intervals means the follower did not run in between
+#: a marker older than max(floor, budget + tick timeout + this many intervals) means the
+#: follower did not run in between (a long tick or a normal worker restart must not count)
 STALE_MARKER_INTERVALS: Final = 3
+STALE_MARKER_FLOOR_SECONDS: Final = 180.0
+#: upper bound for what one event may add to a tick beyond the budget (conditions, deep_get)
+TICK_OVERRUN_SECONDS: Final = 30.0
+
+
+def stale_marker_seconds(interval: int) -> float:
+    """Age after which an enabled tick no longer trusts the cursor."""
+    return max(
+        STALE_MARKER_FLOOR_SECONDS,
+        TICK_BUDGET_SECONDS + TICK_OVERRUN_SECONDS + STALE_MARKER_INTERVALS * interval,
+    )
+
 
 # Copy of tiqora.plugins.event_dispatch._HISTORY_SQL (a private name there).
 _HISTORY_SQL = text(
@@ -140,14 +153,21 @@ async def _prepare(session: AsyncSession, settings: Settings) -> tuple[dict[str,
     cursor = _parse_int(await get_setting(session, KEY_GI_REQUESTER_CURSOR))
     fresh = _marker_is_fresh(
         await get_setting(session, KEY_GI_REQUESTER_LAST_ENABLED_TICK),
-        max_age_seconds=STALE_MARKER_INTERVALS * interval,
+        max_age_seconds=stale_marker_seconds(interval),
     )
     await _write_setting(session, KEY_GI_REQUESTER_LAST_ENABLED_TICK, utc_now().isoformat())
     if cursor is None or not fresh:
         head = await _max_history_id(session)
         await _write_cursor(session, head)
         await session.commit()
-        logger.info("gi_requester_cursor_reset", cursor=head, had_cursor=cursor is not None)
+        skipped = max(0, head - cursor) if cursor is not None else 0
+        log = logger.warning if skipped else logger.info
+        log(
+            "gi_requester_cursor_reset",
+            cursor=head,
+            had_cursor=cursor is not None,
+            skipped=skipped,
+        )
         return {"enabled": 1, "events": 0, "enqueued": 0, "cursor": head}, head
     await session.commit()
     return None, cursor
@@ -229,7 +249,7 @@ async def _match_rows(
                             "gi_requester_condition_warning",
                             webservice_id=ws.id,
                             invoker=w.invoker,
-                            event=w.event,
+                            gi_event=w.event,
                             message=w.message,
                         )
         done = row.id
@@ -286,6 +306,8 @@ async def run_gi_requester_tick(
         for payload in matched.payloads:
             await enqueue_invocation(write, payload=payload, created_by=None)
         await _write_cursor(write, matched.cursor)
+        # refreshed at the end too, so a long tick does not age the marker
+        await _write_setting(write, KEY_GI_REQUESTER_LAST_ENABLED_TICK, utc_now().isoformat())
         await write.commit()
     return {
         "enabled": 1,

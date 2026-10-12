@@ -103,8 +103,10 @@ async def match_invokers(
     """Payloads for every invoker event entry that listens to *event* (``Handler.pm`` ``Run``).
 
     Webservices in the given order, invokers sorted by name, entries in config order (an
-    invoker listing the same event twice fires twice, as in Znuny). ``deep_get_loader`` is only
-    called for entries with a condition. Condition problems are appended to *warnings*.
+    invoker listing the same event twice yields two payloads, but both share one dedupe key
+    so the second is dropped by ``enqueue_job``; Znuny would fire twice).
+    ``deep_get_loader`` is only called for entries with a condition. Condition problems are
+    appended to *warnings*.
     """
     payloads: list[GiInvokePayload] = []
     data = event_data(event)
