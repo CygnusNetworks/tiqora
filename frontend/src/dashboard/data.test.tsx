@@ -17,6 +17,7 @@ function wire(id: string, type_key: string): EditWidget {
     type_version: 1,
     title_override: null,
     settings: {},
+    pinned: false,
     layout: { lg: { x: 0, y: 0, w: 3, h: 2 } },
   };
 }

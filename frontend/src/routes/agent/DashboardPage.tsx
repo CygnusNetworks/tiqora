@@ -11,6 +11,8 @@ import { displayTimeZone } from "@/lib/timeZone";
 import { DashboardGrid } from "@/dashboard/DashboardGrid";
 import { useDashboardData } from "@/dashboard/data";
 import { DashboardEditMode } from "@/dashboard/edit/DashboardEditMode";
+import { FilterBar } from "@/dashboard/filters/FilterBar";
+import { DashboardFiltersProvider } from "@/dashboard/filters/filtersContext";
 import { greetingKey } from "@/dashboard/legacy";
 import { toEditWidget } from "@/dashboard/model";
 import { ShareDialog } from "@/dashboard/tabs/ShareDialog";
@@ -239,6 +241,7 @@ export function DashboardPage() {
   }
 
   return (
+    <DashboardFiltersProvider filters={dashboard?.filters}>
     <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-8" data-testid="dashboard">
       {!isEditing && (
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -275,6 +278,8 @@ export function DashboardPage() {
       </header>
       )}
 
+      {dashboard && <FilterBar dashboard={dashboard} disabled={isEditing} />}
+
       {!isEditing && dashboard?.kind === "template" && dashboard.can_edit && (
         <p className="rounded-[14px] border border-accent/30 bg-accent/10 px-4 py-2.5 text-sm text-ink">
           {t("dashboards.view.templateBanner", { name: dashboard.name })}
@@ -300,5 +305,6 @@ export function DashboardPage() {
       </div>
       {sharing && dashboard && <ShareDialog dashboard={dashboard} onClose={() => setSharing(false)} />}
     </div>
+    </DashboardFiltersProvider>
   );
 }

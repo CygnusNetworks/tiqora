@@ -6296,7 +6296,9 @@
       },
       "counter": {
         "tone": "Farbe"
-      }
+      },
+      "useFilters": "Dashboard-Filter auf dieses Widget anwenden",
+      "useFiltersHint": "Aus: Das Widget ignoriert die Queue- und Zeitfilter des Dashboards."
     },
     "manage": {
       "newTitle": "Neues Dashboard",
@@ -6338,6 +6340,33 @@
       "cancel": "Abbrechen",
       "failed": "Das Teilen hat nicht geklappt. Bitte versuchen Sie es noch einmal.",
       "pickOne": "Wählen Sie mindestens eine Gruppe aus."
+    },
+    "filters": {
+      "label": "Dashboard-Filter",
+      "queues": "Queues",
+      "allQueues": "Alle Queues",
+      "allShort": "Alle",
+      "timeRange": "Zeitraum",
+      "asReport": "Wie im Bericht",
+      "chip": "{{label}}: {{value}}",
+      "queueCount": "{{count}} Queues",
+      "queuesLoading": "Queues werden geladen",
+      "queuesFailed": "Die Queues konnten nicht geladen werden.",
+      "apply": "Übernehmen",
+      "reset": "Zurücksetzen",
+      "ranges": {
+        "today": "Heute",
+        "7d": "Letzte 7 Tage",
+        "30d": "Letzte 30 Tage",
+        "90d": "Letzte 90 Tage",
+        "this_month": "Dieser Monat",
+        "last_month": "Letzter Monat"
+      },
+      "readOnly": "Nur wer das Dashboard bearbeiten darf, ändert die Filter.",
+      "editHint": "Filter im Ansichtsmodus ändern",
+      "conflict": "Das Dashboard wurde inzwischen geändert. Es wird neu geladen.",
+      "saveFailed": "Der Filter konnte nicht gespeichert werden.",
+      "pinned": "Dashboard-Filter gelten hier nicht"
     }
   },
   "filters": {

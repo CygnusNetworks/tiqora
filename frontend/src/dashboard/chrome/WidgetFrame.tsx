@@ -1,7 +1,10 @@
 import { createContext, useContext, useId, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import type { WidgetMode } from "@/plugins/dashboardWidgets";
+import { PinIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import { useTranslation } from "react-i18next";
+import { useDashboardFilters } from "../filters/filtersContext";
 import { isInteractive, linkTabIndex, rendersLinks } from "./mode";
 
 /**
@@ -20,6 +23,8 @@ export interface WidgetChrome {
   handle?: ReactNode;
   /** Opens this widget's settings (empty-state actions such as "Filter ändern"). */
   onConfigure?: () => void;
+  /** The widget ignores the dashboard-wide filters (shows the pin glyph while filters are active). */
+  pinned?: boolean;
 }
 
 const ChromeContext = createContext<WidgetChrome>({});
@@ -95,7 +100,9 @@ export function WidgetFrame({
   testId: string;
   variant?: "default" | "kpi";
 }) {
+  const { t } = useTranslation();
   const chrome = useWidgetChrome();
+  const { active: filtersActive } = useDashboardFilters();
   const headingId = useId();
   const interactive = isInteractive(mode);
   const editing = mode === "edit";
@@ -121,6 +128,17 @@ export function WidgetFrame({
         >
           {shownTitle}
         </h2>
+        {chrome.pinned && filtersActive && (
+          <span
+            role="img"
+            aria-label={t("dashboards.filters.pinned")}
+            title={t("dashboards.filters.pinned")}
+            data-testid="widget-pinned"
+            className="shrink-0 text-muted"
+          >
+            <PinIcon className="h-3.5 w-3.5" />
+          </span>
+        )}
         {hostActions ?? (
           <>
             {actions}

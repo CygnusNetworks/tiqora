@@ -324,8 +324,8 @@ export function DashboardEditMode({
           def={settingsDef}
           errors={settingsErrors}
           focusSource={focusSource}
-          onApply={(settings, titleOverride) => {
-            dispatch({ type: "settings", id: settingsWidget.id, settings, titleOverride });
+          onApply={(settings, titleOverride, pinned) => {
+            dispatch({ type: "settings", id: settingsWidget.id, settings, titleOverride, pinned });
             session.clearInvalid(settingsWidget.id);
             closeSettings(settingsWidget.id);
           }}

@@ -9,6 +9,7 @@ const w = (id: string, lg: Rect): EditWidget => ({
   type_version: 1,
   title_override: null,
   settings: {},
+  pinned: false,
   layout: { lg },
 });
 

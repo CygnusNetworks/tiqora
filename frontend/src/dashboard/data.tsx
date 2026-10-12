@@ -20,10 +20,13 @@ import {
   dashboardsApi,
   settingsHash,
   type DashboardData,
+  type DashboardFilters,
   type WidgetResult,
 } from "@/lib/dashboardsApi";
 import { subscribeSSE } from "@/lib/useSSE";
 import { useDashboardWidgetDefinitions, type WidgetDefinition } from "@/plugins/dashboardWidgets";
+import { FILTER_AWARE_KEYS } from "./definitions";
+import { useDashboardFilters } from "./filters/filtersContext";
 import type { EditWidget } from "./model";
 
 export type WidgetDataStatus = "loading" | "ok" | "pending" | "error" | "forbidden" | "none";
@@ -346,24 +349,32 @@ export function useDashboardData(
 export function usePreviewData(
   typeKey: string,
   settings: Record<string, unknown>,
-  opts: { enabled?: boolean; debounceMs?: number } = {},
+  opts: { enabled?: boolean; debounceMs?: number; pinned?: boolean } = {},
 ): WidgetDataState & { refetch: () => void } {
-  const { enabled = true, debounceMs = 300 } = opts;
+  const { enabled = true, debounceMs = 300, pinned = false } = opts;
+  // The open dashboard's filters narrow the preview like the saved widget (filter-aware, unpinned types).
+  const dashboardFilters = useDashboardFilters();
+  const sentFilters = dashboardFilters.active && !pinned && FILTER_AWARE_KEYS.includes(typeKey) ? dashboardFilters.filters : undefined;
+  const filtersHash = sentFilters ? JSON.stringify(sentFilters) : "";
   const def = useDashboardWidgetDefinitions().find((d) => d.key === typeKey);
   const active = enabled && hasData(def);
-  const hash = settingsHash(settings);
+  const hash = settingsHash(settings) + filtersHash;
   const latest = useRef(settings);
+  const latestFilters = useRef(sentFilters);
+  latestFilters.current = sentFilters;
   latest.current = settings;
-  const [settled, setSettled] = useState<{ hash: string; settings: Record<string, unknown> } | null>(null);
+  const [settled, setSettled] = useState<{ hash: string; settings: Record<string, unknown>; filters: DashboardFilters | undefined } | null>(null);
   useEffect(() => {
     if (!active) return;
-    const timer = setTimeout(() => setSettled({ hash, settings: latest.current }), debounceMs);
+    const timer = setTimeout(() => setSettled({ hash, settings: latest.current, filters: latestFilters.current }), debounceMs);
     return () => clearTimeout(timer);
   }, [active, hash, debounceMs]);
 
   const query = useQuery({
     queryKey: dashboardKeys.preview(typeKey, settled?.hash ?? ""),
-    queryFn: ({ signal }) => dashboardsApi.previewData(typeKey, settled!.settings, signal),
+    queryFn: ({ signal }) => settled!.filters
+        ? dashboardsApi.previewData(typeKey, settled!.settings, signal, settled!.filters)
+        : dashboardsApi.previewData(typeKey, settled!.settings, signal),
     enabled: active && settled !== null,
     staleTime: 30_000,
     placeholderData: (previous) => previous,

@@ -5,8 +5,9 @@ import { SchemaForm } from "@/components/fields/SchemaForm";
 import type { FieldValues } from "@/components/fields/types";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { Switch } from "@/components/ui/Switch";
 import type { WidgetDefinition } from "@/plugins/dashboardWidgets";
-import { settingsWithDefaults } from "../definitions";
+import { FILTER_AWARE_KEYS, settingsWithDefaults } from "../definitions";
 import { widgetTexts } from "../gallery/galleryModel";
 import { presetOf } from "../widgets/presets";
 import type { EditWidget } from "../model";
@@ -73,7 +74,8 @@ export function SettingsDrawer({
   errors?: Record<string, string>;
   /** Put the focus in the source section on open (the widget was opened from its "Suche wählen" action). */
   focusSource?: boolean;
-  onApply: (settings: Record<string, unknown>, titleOverride: string | null) => void;
+  /** `pinned`: the widget ignores the dashboard-wide filters (the switch is off). */
+  onApply: (settings: Record<string, unknown>, titleOverride: string | null, pinned: boolean) => void;
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
@@ -86,6 +88,8 @@ export function SettingsDrawer({
   // Older stored settings are migrated and completed once, on open.
   const [draft, setDraft] = useState(() => settingsWithDefaults(def, widget.settings, widget.type_version));
   const [title, setTitle] = useState(widget.title_override ?? "");
+  const [pinned, setPinned] = useState(widget.pinned === true);
+  const filterAware = FILTER_AWARE_KEYS.includes(def.key);
   const [server, setServer] = useState(() => splitServerErrors(errors));
 
   const change = (next: Record<string, unknown>) => {
@@ -123,7 +127,7 @@ export function SettingsDrawer({
   const apply = () => {
     if (invalid) return;
     const trimmed = title.trim();
-    onApply(finalizeSettings(def.key, draft), trimmed === "" ? null : trimmed);
+    onApply(finalizeSettings(def.key, draft), trimmed === "" ? null : trimmed, pinned);
   };
 
   if (!host) return null;
@@ -186,11 +190,31 @@ export function SettingsDrawer({
           />
         ) : null}
 
+        {filterAware && (
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-hairline px-3 py-2.5">
+            <div className="min-w-0 flex-1">
+              <span id={`${uid}-filters-label`} className="block text-sm text-ink">
+                {t("dashboards.settings.useFilters")}
+              </span>
+              <span id={`${uid}-filters-hint`} className="mt-0.5 block text-xs text-muted">
+                {t("dashboards.settings.useFiltersHint")}
+              </span>
+            </div>
+            <Switch
+              checked={!pinned}
+              onChange={(on) => setPinned(!on)}
+              aria-labelledby={`${uid}-filters-label`}
+              aria-describedby={`${uid}-filters-hint`}
+            />
+          </div>
+        )}
+
         <SettingsPreview
           def={def}
           settings={draft}
           valid={!invalid}
           titleOverride={title}
+          pinned={pinned}
           size={{ w: widget.layout.lg.w, h: widget.layout.lg.h }}
         />
       </form>

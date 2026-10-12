@@ -33,7 +33,7 @@ export interface EditWidget {
   settings: Record<string, unknown>;
   layout: { lg: Rect; md?: Rect };
   /** True: the widget ignores the dashboard-wide filters. */
-  pinned?: boolean;
+  pinned: boolean;
 }
 
 /** A stored widget row (API shape) as the edit model; `md` only when stored. */

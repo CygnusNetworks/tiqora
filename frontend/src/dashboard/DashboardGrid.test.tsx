@@ -22,7 +22,7 @@ vi.mock("@/plugins/PluginProvider", async () => {
 });
 
 function wire(id: string, type_key: string, x = 0, y = 0, w = 3, h = 2): EditWidget {
-  return { id, type_key, type_version: 1, title_override: null, settings: {}, layout: { lg: { x, y, w, h } } };
+  return { id, type_key, type_version: 1, title_override: null, settings: {}, pinned: false, layout: { lg: { x, y, w, h } } };
 }
 
 function grid(

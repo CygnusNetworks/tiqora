@@ -8,6 +8,7 @@ const widget: EditWidget = {
   type_version: 1,
   title_override: null,
   settings: { tone: "danger" },
+  pinned: false,
   layout: { lg: { x: 0, y: 0, w: 3, h: 2 } },
 };
 const draft: Draft = { baseVersion: 3, savedAt: Date.UTC(2026, 9, 10, 8, 42), name: "Mein Start", widgets: [widget] };

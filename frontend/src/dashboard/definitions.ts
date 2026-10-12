@@ -29,6 +29,23 @@ export const CORE_WIDGET_KEYS: readonly string[] = [
   "core.links",
 ];
 
+/**
+ * Widget types that honour the dashboard-wide filters (the backend providers read
+ * `ProviderContext.filters`); only these get the "Dashboard-Filter anwenden" switch.
+ */
+export const FILTER_AWARE_KEYS: readonly string[] = [
+  "core.ticket-list",
+  "core.counter",
+  "core.escalations",
+  "core.reminders",
+  "core.queue-overview",
+  "core.ai-status",
+  "core.report",
+  "core.sla-gauge",
+  "core.backlog-aging",
+  "core.heatmap",
+];
+
 /** Ticket-list columns — the same literal list as the backend's `TicketColumn`. */
 export const COLUMN_KEYS = [
   "tn",

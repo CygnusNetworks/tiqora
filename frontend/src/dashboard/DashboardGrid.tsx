@@ -155,8 +155,8 @@ function GridCell({
   const handle = cellEdit?.chrome.handle;
   const actions = cellEdit?.chrome.actions;
   const chrome = useMemo(
-    () => ({ titleOverride: widget.title_override, canEdit, handle, actions, onConfigure: edit?.onOpenSettings ? () => edit.onOpenSettings?.(id) : onConfigure && (() => onConfigure(id)) }),
-    [widget.title_override, canEdit, handle, actions, edit, onConfigure, id],
+    () => ({ titleOverride: widget.title_override, canEdit, handle, actions, pinned: widget.pinned === true, onConfigure: edit?.onOpenSettings ? () => edit.onOpenSettings?.(id) : onConfigure && (() => onConfigure(id)) }),
+    [widget.title_override, widget.pinned, canEdit, handle, actions, edit, onConfigure, id],
   );
   const waiting = state.status === "loading" || state.status === "pending";
   const size = { w: rect.w, h: rect.h };
@@ -247,7 +247,7 @@ function GridCell({
 
 /** A changed or new data widget while editing: its data comes from the preview route. */
 function PreviewGridCell(props: Omit<Parameters<typeof GridCell>[0], "state" | "retry">) {
-  const { refetch, ...state } = usePreviewData(props.widget.type_key, props.widget.settings);
+  const { refetch, ...state } = usePreviewData(props.widget.type_key, props.widget.settings, { pinned: props.widget.pinned === true });
   return <GridCell {...props} state={state} retry={refetch} />;
 }
 

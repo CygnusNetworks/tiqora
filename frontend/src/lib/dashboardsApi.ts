@@ -171,11 +171,11 @@ export const dashboardsApi = {
     );
   },
   /** Data for unsaved settings (settings drawer, edit mode); writes no history. */
-  previewData(key: string, settings: Record<string, unknown>, signal?: AbortSignal) {
+  previewData(key: string, settings: Record<string, unknown>, signal?: AbortSignal, filters?: DashboardFilters) {
     return api.request<WidgetResult>(
       "POST",
       `/api/v1/dashboard-widget-types/${encodeURIComponent(key)}/data`,
-      { body: { settings }, signal },
+      { body: filters ? { settings, filters } : { settings }, signal },
     );
   },
   widgetTypes(signal?: AbortSignal) {

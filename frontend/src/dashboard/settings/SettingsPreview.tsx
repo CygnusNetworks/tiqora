@@ -34,18 +34,21 @@ export function SettingsPreview({
   valid,
   titleOverride,
   size,
+  pinned = false,
 }: {
   def: WidgetDefinition;
   settings: Record<string, unknown>;
   valid: boolean;
   titleOverride: string | null;
   size: { w: number; h: number };
+  /** The widget ignores the dashboard filters: the preview then shows it unfiltered. */
+  pinned?: boolean;
 }) {
   const { t } = useTranslation();
   const lastValid = useRef(settings);
   if (valid) lastValid.current = settings;
   const shown = lastValid.current;
-  const { refetch, ...state } = usePreviewData(def.key, shown, { debounceMs: PREVIEW_DEBOUNCE_MS });
+  const { refetch, ...state } = usePreviewData(def.key, shown, { debounceMs: PREVIEW_DEBOUNCE_MS, pinned });
   const dataValue = useMemo(() => ({ ...state, refetch }), [state.status, state.data, state.error, refetch]); // eslint-disable-line react-hooks/exhaustive-deps
   const boxRef = useRef<HTMLDivElement>(null);
   // `inert` as an attribute: nothing in the preview can take focus or be clicked.

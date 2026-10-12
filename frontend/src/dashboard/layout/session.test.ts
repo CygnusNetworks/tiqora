@@ -14,6 +14,7 @@ const w = (id: string, lg: Rect = { x: 0, y: 0, w: 3, h: 2 }): EditWidget => ({
   type_version: 1,
   title_override: null,
   settings: {},
+  pinned: false,
   layout: { lg },
 });
 const w1 = w("w1");
@@ -218,4 +219,26 @@ test("after the history cap dropped steps, undoing all the way stays dirty (the 
   let t = editReducer(state([w1]), { type: "rename", name: "x" });
   t = editReducer(t, { type: "undo" });
   expect(t.dirty).toBe(false);
+});
+
+test("pin toggles the widget's filter opt-out as one undoable step and ignores a no-op", () => {
+  const s0 = state([w1]);
+  expect(editReducer(s0, { type: "pin", id: "w1", pinned: false })).toBe(s0);
+  expect(editReducer(s0, { type: "pin", id: "nope", pinned: true })).toBe(s0);
+  const s1 = editReducer(s0, { type: "pin", id: "w1", pinned: true });
+  expect(s1.widgets[0].pinned).toBe(true);
+  expect(s1.dirty).toBe(true);
+  const s2 = editReducer(s1, { type: "undo" });
+  expect(s2.widgets[0].pinned).toBe(false);
+  expect(s2.dirty).toBe(false);
+  expect(editReducer(s2, { type: "redo" }).widgets[0].pinned).toBe(true);
+});
+
+test("a new widget starts unpinned and a duplicate keeps the pin", () => {
+  const def = { key: "core.counter", version: 1, size: { default: [3, 2], min: [2, 2], max: [6, 4] }, settingsDefaults: {} } as WidgetLike;
+  let s = editReducer(state([]), { type: "add", def, id: "n1", bp: "lg" });
+  expect(s.widgets[0].pinned).toBe(false);
+  s = editReducer(s, { type: "pin", id: "n1", pinned: true });
+  s = editReducer(s, { type: "duplicate", id: "n1", newId: "n2" });
+  expect(s.widgets.map((w) => w.pinned)).toEqual([true, true]);
 });

@@ -6288,7 +6288,9 @@
       },
       "counter": {
         "tone": "Colour"
-      }
+      },
+      "useFilters": "Apply dashboard filters to this widget",
+      "useFiltersHint": "Off: the widget ignores the queue and time filters of the dashboard."
     },
     "manage": {
       "newTitle": "New dashboard",
@@ -6330,6 +6332,33 @@
       "cancel": "Cancel",
       "failed": "Sharing failed. Please try again.",
       "pickOne": "Select at least one group."
+    },
+    "filters": {
+      "label": "Dashboard filters",
+      "queues": "Queues",
+      "allQueues": "All queues",
+      "allShort": "All",
+      "timeRange": "Time range",
+      "asReport": "As in the report",
+      "chip": "{{label}}: {{value}}",
+      "queueCount": "{{count}} queues",
+      "queuesLoading": "Loading queues",
+      "queuesFailed": "The queues could not be loaded.",
+      "apply": "Apply",
+      "reset": "Reset",
+      "ranges": {
+        "today": "Today",
+        "7d": "Last 7 days",
+        "30d": "Last 30 days",
+        "90d": "Last 90 days",
+        "this_month": "This month",
+        "last_month": "Last month"
+      },
+      "readOnly": "Only people who may edit the dashboard change the filters.",
+      "editHint": "Change filters in view mode",
+      "conflict": "The dashboard was changed in the meantime. It is being reloaded.",
+      "saveFailed": "The filter could not be saved.",
+      "pinned": "Dashboard filters do not apply here"
     }
   },
   "filters": {
