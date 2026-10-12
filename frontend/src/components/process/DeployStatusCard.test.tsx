@@ -217,6 +217,27 @@ describe("DeployStatusCard", () => {
       expect(status.mock.calls.length).toBe(calls);
     });
 
+    it("starts polling again when a redeploy begins a new pending period after giving up", async () => {
+      status.mockResolvedValue(body({ process: kind({ deploy_mode: "signal", znuny_sync: sync({}) }) }));
+      const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      render(
+        <QueryClientProvider client={qc}>
+          <I18nextProvider i18n={i18n}>
+            <DeployStatusCard kind="process" pollMs={20} giveUpMs={120} />
+          </I18nextProvider>
+        </QueryClientProvider>,
+      );
+      await screen.findByTestId("deploy-sync-overdue", {}, { timeout: 3000 });
+      // The admin deploys again: still "pending", but for a new request (new `since`).
+      status
+        .mockResolvedValueOnce(
+          body({ process: kind({ deploy_mode: "signal", znuny_sync: sync({ since: "2026-10-12T10:30:00Z" }) }) }),
+        )
+        .mockResolvedValue(body({ process: kind({ deploy_mode: "signal", znuny_sync: sync({ state: "ok" }) }) }));
+      await qc.invalidateQueries({ queryKey: ["admin", "deploy-status"] });
+      expect(await screen.findByTestId("deploy-sync-ok", {}, { timeout: 3000 })).toBeInTheDocument();
+    });
+
     it("hides the card's own deploy button when a parent owns it", async () => {
       status.mockResolvedValue(body({ process: kind({ deploy_mode: "local", pending_changes: 2 }) }));
       const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

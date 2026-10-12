@@ -247,6 +247,7 @@ function summaryOf(p: DesignerProcess) {
     name: p.process.name,
     used_by: [],
     sync_state: p.process.sync_state,
+    has_draft_changes: p.process.sync_state !== "synced",
     state_entity_id: p.state_entity_id,
     state_name: STATE_NAMES[p.state_entity_id] ?? "",
   };
@@ -315,6 +316,10 @@ async function handleProcessDesigner(route: Route, path: string, method: string)
 
   if (seg[0] === "catalog") return send(200, designerCatalog);
   if (seg[0] === "revisions") return send(200, []);
+  if (seg[0] === "entities" && method === "GET" && seg[2]) {
+    const found = (designer.entities[seg[1]] ?? []).find((x) => x.entity_id === seg[2]);
+    return found ? send(200, found) : send(404, { detail: "Nicht gefunden." });
+  }
   if (seg[0] === "entities" && method === "GET") {
     return send(200, (designer.entities[seg[1]] ?? []).map((x) => ({ ...x, used_by: [] })));
   }

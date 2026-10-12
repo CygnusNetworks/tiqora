@@ -2936,7 +2936,7 @@
         },
         "regexp": {
           "empty": "Geben Sie einen regulären Ausdruck ein.",
-          "invalid": "Das ist kein gültiger regulärer Ausdruck."
+          "invalid": "Der Browser erkennt diesen Ausdruck nicht. Ob Znuny ihn versteht, zeigt „Prüfen“."
         },
         "type": {
           "Module": "Prüfmodul",
@@ -2987,7 +2987,7 @@
       },
       "check": "Prüfen",
       "checking": "Prüfe …",
-      "versions": "Versionen",
+      "versions": "Fassungen",
       "validation": {
         "title": "Prüfergebnis",
         "errors": "Fehler",
@@ -3016,24 +3016,29 @@
           "action_module_unsupported": "Das Modul {{module}} wird von Tiqora nicht unterstützt.",
           "tiqora_only_module_parallel": "Das Modul {{module}} gibt es nur in Tiqora; Znuny überspringt es.",
           "action_required_param_missing": "Der Parameter {{param}} fehlt."
+        },
+        "reason": {
+          "regexp": "ungültiger regulärer Ausdruck",
+          "name": "diesen Namen gibt es nicht",
+          "possible_values": "kein möglicher Wert des Feldes"
         }
       },
       "revisions": {
-        "title": "Versionen",
-        "empty": "Noch keine bereitgestellte Version.",
-        "loadError": "Die Versionen konnten nicht geladen werden.",
+        "title": "Fassungen",
+        "empty": "Noch keine bereitgestellte Fassung.",
+        "loadError": "Die Fassungen konnten nicht geladen werden.",
         "by": "von Benutzer {{id}}",
         "entities": "{{count}} Einträge",
         "compare": "Vergleichen",
         "compareWith": "Vergleichen mit",
-        "previous": "Vorherige Version",
-        "version": "Version {{id}}",
+        "previous": "Vorige Fassung",
+        "version": "Fassung {{id}}",
         "empty_base": "Leer",
         "restore": "Wiederherstellen",
-        "restoreTitle": "Version wiederherstellen",
-        "restoreConfirm": "Der Prozess wird auf den Stand von Version {{id}} zurückgesetzt. Ungespeicherte Änderungen gehen verloren; bereitgestellt wird erst danach.",
-        "restoreError": "Die Version konnte nicht wiederhergestellt werden.",
-        "diffTitle": "Version {{from}} → {{to}}",
+        "restoreTitle": "Fassung wiederherstellen",
+        "restoreConfirm": "Der Prozess wird auf den Stand von Fassung {{id}} zurückgesetzt. Ungespeicherte Änderungen gehen verloren; bereitgestellt wird erst danach.",
+        "restoreError": "Die Fassung konnte nicht wiederhergestellt werden.",
+        "diffTitle": "Fassung {{from}} → {{to}}",
         "diffError": "Der Vergleich konnte nicht geladen werden.",
         "noChanges": "Keine Unterschiede.",
         "added": "Neu",
@@ -3050,16 +3055,23 @@
         "checkFailed": "Die Prüfung konnte nicht ausgeführt werden."
       },
       "import": {
-        "title": "Prozess importieren",
-        "description": "Laden Sie eine aus Znuny oder Tiqora exportierte Prozessdatei. Sie wird als Entwurf importiert.",
-        "file": "Prozessdatei (.yml, .yaml)",
+        "title": "Znuny-Prozessdatei importieren",
+        "description": "Laden Sie eine aus Znuny oder Tiqora exportierte Znuny-Prozessdatei. Sie wird als Entwurf importiert.",
+        "file": "Znuny-Prozessdatei (.yml)",
         "overwrite": "Vorhandene Einträge mit gleicher ID überschreiben",
         "submit": "Importieren",
         "success": "„{{name}}“ wurde als Entwurf importiert.",
         "refused": "Die Datei wurde nicht importiert: {{message}}",
-        "unknown": "Die Datei ist keine gültige Prozessdatei.",
+        "unknown": "Die Datei ist keine gültige Znuny-Prozessdatei.",
         "readError": "Die Datei konnte nicht gelesen werden."
-      }
+      },
+      "transitionLabel": "Übergang",
+      "unused": "Nicht mehr verwendet",
+      "deleteEntity": "„{{name}}“ löschen",
+      "deleteEntityConfirm": "„{{name}}“ endgültig löschen? Kein Prozess verwendet den Eintrag mehr.",
+      "deleteEntityError": "Der Eintrag konnte nicht gelöscht werden.",
+      "inUse": "Wird noch verwendet von: {{names}}",
+      "sharedWith": "Wird auch verwendet von: {{names}}. Änderungen gelten dort ebenfalls."
     },
     "mailOutbound": {
       "title": "Ausgehende E-Mail (SMTP)",
@@ -4670,7 +4682,7 @@
       "pendingHere_one": "{{count}} Änderung ist noch nicht bereitgestellt. Sie gilt erst nach „Bereitstellen“.",
       "pendingHere_other": "{{count}} Änderungen sind noch nicht bereitgestellt. Sie gelten erst nach „Bereitstellen“.",
       "runningLive": "Noch keine bereitgestellte Fassung – Tiqora nutzt den Entwurfsstand.",
-      "ownership": "Tiqora stellt Änderungen selbst bereit (Znuny ist abgeschaltet).",
+      "ownership": "Änderungen gelten nach „Bereitstellen“ in Tiqora (Znuny ist abgeschaltet).",
       "deployNow": "Bereitstellen",
       "deployFailed": "Bereitstellen fehlgeschlagen.",
       "sync": {

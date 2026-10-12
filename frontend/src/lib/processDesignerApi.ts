@@ -56,6 +56,9 @@ export const processDesignerApi = {
   deleteProcess(processEntityId: string) {
     return api.request<void>("DELETE", `${BASE}/processes/${enc(processEntityId)}`);
   },
+  getEntity(entityType: SubEntityType, entityId: string, signal?: AbortSignal) {
+    return api.request<DesignerEntity>("GET", `${BASE}/entities/${entityType}/${enc(entityId)}`, { signal });
+  },
   createEntity(entityType: SubEntityType, body: EntityCreateIn) {
     return api.request<DesignerEntity>("POST", `${BASE}/entities/${entityType}`, { body });
   },

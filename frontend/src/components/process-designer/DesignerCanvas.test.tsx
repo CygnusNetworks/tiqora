@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, type Mock } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
@@ -60,7 +60,7 @@ const draft = {
   pending_changes: 0,
 } as unknown as ProcessDraft;
 
-function renderCanvas(selection: Selection) {
+function renderCanvas(selection: Selection, overrides: { createActivity?: Mock<() => Promise<string>> } = {}) {
   const props = {
     draft,
     shape: shapeOf(draft),
@@ -69,14 +69,27 @@ function renderCanvas(selection: Selection) {
     onShapeChange: vi.fn(),
     createActivity: vi.fn().mockResolvedValue("Activity-new"),
     createTransition: vi.fn().mockResolvedValue("Transition-new"),
+    adoptEntity: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
   };
-  render(
+  const view = render(
     <I18nextProvider i18n={i18n}>
       <DesignerCanvas {...props} />
     </I18nextProvider>,
   );
-  return props;
+  const rerender = (next: { shape: ReturnType<typeof shapeOf> }) =>
+    view.rerender(
+      <I18nextProvider i18n={i18n}>
+        <DesignerCanvas {...props} {...next} />
+      </I18nextProvider>,
+    );
+  return { ...props, rerender };
 }
+
+const dropData = (payload: string) => {
+  const data: Record<string, string> = { "application/x-tiqora-activity": payload };
+  return { dataTransfer: { types: Object.keys(data), getData: (k: string) => data[k] }, clientX: 10, clientY: 10 };
+};
 
 describe("DesignerCanvas", () => {
   beforeEach(async () => {
@@ -154,14 +167,69 @@ describe("DesignerCanvas", () => {
     expect(props.createActivity).not.toHaveBeenCalled();
     expect("Activity-c" in props.onShapeChange.mock.calls[0][0].path).toBe(true);
   });
+
+  it("an existing step of another process is loaded into the draft before it is placed", async () => {
+    const props = renderCanvas(null);
+    fireEvent.drop(screen.getByTestId("process-designer-canvas"), dropData("Activity-other"));
+    await waitFor(() => expect(props.onShapeChange).toHaveBeenCalled());
+    expect(props.adoptEntity).toHaveBeenCalledWith("Activity", "Activity-other");
+    expect(props.adoptEntity.mock.invocationCallOrder[0]).toBeLessThan(props.onShapeChange.mock.invocationCallOrder[0]);
+  });
+
+  it("a failed create shows an error and leaves the shape alone", async () => {
+    const props = renderCanvas(null, { createActivity: vi.fn().mockRejectedValue(new Error("boom")) });
+    fireEvent.drop(screen.getByTestId("process-designer-canvas"), dropData(""));
+    expect(await screen.findByTestId("process-designer-create-error")).toHaveTextContent(
+      "Der Eintrag konnte nicht angelegt werden.",
+    );
+    expect(props.onShapeChange).not.toHaveBeenCalled();
+  });
+
+  it("an edit made while the new step is created is kept", async () => {
+    let resolve: (id: string) => void = () => {};
+    const props = renderCanvas(null, {
+      createActivity: vi.fn(() => new Promise<string>((r) => (resolve = r))),
+    });
+    fireEvent.drop(screen.getByTestId("process-designer-canvas"), dropData(""));
+    const moved = shapeOf(draft);
+    moved.layout["Activity-b"] = { left: "999", top: "1" };
+    props.rerender({ shape: moved });
+    resolve("Activity-new");
+    await waitFor(() => expect(props.onShapeChange).toHaveBeenCalled());
+    const next = props.onShapeChange.mock.calls[0][0];
+    expect(next.layout["Activity-b"]).toEqual({ left: "999", top: "1" });
+    expect("Activity-new" in next.path).toBe(true);
+  });
 });
 
+const summaries = draft.activities.map((a) => ({
+  entity_type: a.entity_type,
+  entity_id: a.entity_id,
+  name: a.name,
+  used_by: ["Process-1"],
+  sync_state: a.sync_state,
+}));
+
 describe("EntityPalette", () => {
+  it("lists entries nothing uses with a delete button", async () => {
+    await i18n.changeLanguage("de");
+    const onDelete = vi.fn();
+    const orphan = { entity_type: "TransitionAction" as const, entity_id: "TA-9", name: "Alt", used_by: [], sync_state: "synced" as const };
+    render(
+      <I18nextProvider i18n={i18n}>
+        <EntityPalette activities={summaries} usedIds={new Set()} unused={[orphan]} onDelete={onDelete} />
+      </I18nextProvider>,
+    );
+    expect(screen.getByTestId("process-designer-palette-unused")).toHaveTextContent("Aktion: Alt");
+    fireEvent.click(screen.getByTestId("process-designer-delete-TA-9"));
+    expect(onDelete).toHaveBeenCalledWith(orphan);
+  });
+
   it("offers a new step and only the activities that are not in the process yet", async () => {
     await i18n.changeLanguage("de");
     render(
       <I18nextProvider i18n={i18n}>
-        <EntityPalette activities={draft.activities} usedIds={new Set(["Activity-a", "Activity-b"])} />
+        <EntityPalette activities={summaries} usedIds={new Set(["Activity-a", "Activity-b"])} />
       </I18nextProvider>,
     );
     expect(screen.getByTestId("process-designer-palette-new")).toHaveTextContent("Neuer Schritt");

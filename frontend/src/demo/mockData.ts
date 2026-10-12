@@ -10,6 +10,7 @@
  */
 
 import type { FrontendPlugin, PluginAdminList } from "@/lib/pluginsApi";
+import type { DeployStatus } from "@/lib/deployStatusApi";
 import { resolve as resolveDashboardsDemo } from "./dashboardsMock";
 import { resolveSavedRequest } from "./savedMock";
 import { resolveWebchatData } from "./webchatMock";
@@ -1607,40 +1608,31 @@ const demoDeployRevision = {
   deployed_at: "2026-10-07T14:30:00Z",
   deployed_by: null,
 };
+// Typed so a new required field of DeployStatusOut fails tsc here instead of crashing the demo.
 const demoDeployStatus = {
-  process: { revision: demoDeployRevision, pending_changes: 2, running_live: false },
-  acl: { revision: { ...demoDeployRevision, id: 5, source: "initial" }, pending_changes: 0, running_live: false },
+  process: {
+    revision: demoDeployRevision,
+    pending_changes: 2,
+    running_live: false,
+    deploy_mode: "signal",
+    znuny_sync: { state: "ok", revision_id: 3, since: "2026-10-07T14:31:00Z", message: "", overdue: false },
+  },
+  acl: {
+    revision: { ...demoDeployRevision, id: 5, source: "initial" },
+    pending_changes: 0,
+    running_live: false,
+    deploy_mode: "signal",
+    znuny_sync: { state: "not_needed", message: "", overdue: false },
+  },
   ownership_active: false,
   can_deploy_from_tiqora: true,
-};
+} satisfies DeployStatus;
 const demoAdminProcesses = [
   { entity_id: "Process-demo", name: "Bestellung", state_entity_id: "S1", state_name: "Active", activity_count: 4, start_interfaces: ["AgentInterface", "CustomerInterface"] },
   { entity_id: "Process-onb", name: "Onboarding", state_entity_id: "S2", state_name: "Inactive", activity_count: 6, start_interfaces: ["AgentInterface"] },
   { entity_id: "Process-old", name: "Altprozess Beschaffung", state_entity_id: "S3", state_name: "FadeAway", activity_count: 3, start_interfaces: [] },
 ];
 
-// Single process of the admin detail page (ProcessDetailOut): the list rows plus two activities.
-function demoProcessDetail(entityId: string) {
-  const row = demoAdminProcesses.find((r) => r.entity_id === entityId) ?? demoAdminProcesses[0];
-  return {
-    id: demoAdminProcesses.indexOf(row) + 1,
-    entity_id: row.entity_id,
-    name: row.name,
-    state_entity_id: row.state_entity_id,
-    start_activity_entity_id: "Activity-1",
-    activities: [
-      { entity_id: "Activity-1", name: "Antrag erfassen", activity_dialogs: [{ entity_id: "AD-1", name: "Antrag" }] },
-      {
-        entity_id: "Activity-2",
-        name: "Genehmigung",
-        activity_dialogs: [
-          { entity_id: "AD-2", name: "Genehmigen" },
-          { entity_id: "AD-3", name: "Rückfrage" },
-        ],
-      },
-    ],
-  };
-}
 // Process designer (admin): draft of the sample "Bestellung" process with three steps, the catalogue,
 // validation findings and deployed versions. Mirrors ProcessDraftOut / DesignerCatalogOut.
 const designerEntity = (entity_type: string, entity_id: string, id: number, name: string, config: Record<string, unknown>, sync_state = "synced") => ({
@@ -1702,18 +1694,59 @@ const designerRevisions = [
   { id: 4, source: "tiqora", entity_count: 11, deployed_at: "2026-10-07T14:30:00Z", deployed_by: 1 },
   { id: 3, source: "znuny", entity_count: 10, deployed_at: "2026-10-01T08:00:00Z", deployed_by: null },
 ];
+// A step no process uses yet, so "Vorhandene verwenden" has something to offer in the demo.
+const designerSpareActivity = designerEntity("Activity", "Activity-spare", 9, "Rückruf", { ActivityDialog: {} });
+type DemoEntity = ReturnType<typeof designerEntity>;
+const designerEntitiesOf = (type: string): DemoEntity[] =>
+  type === "Activity"
+    ? [...designerDraft.activities, designerSpareActivity]
+    : type === "ActivityDialog"
+      ? designerDraft.activity_dialogs
+      : type === "Transition"
+        ? designerDraft.transitions
+        : type === "TransitionAction"
+          ? designerDraft.transition_actions
+          : [];
+let designerNewId = 0;
+function designerDraftOf(id: string) {
+  const row = demoAdminProcesses.find((r) => r.entity_id === id);
+  return row ? { ...designerDraft, process: { ...designerDraft.process, entity_id: row.entity_id, name: row.name } } : designerDraft;
+}
+/**
+ * Writes never see the request body here (resolveData has none), so the demo designer answers them
+ * with plausible objects of the right shape: the stored draft for a process save, a fresh entity for
+ * a create and the stored entity for an update. The page must never receive `{}` for these.
+ */
 function demoProcessDesigner(p: string, method: string): unknown {
   if (p.endsWith("/process-designer/catalog")) return designerCatalog;
   if (p.endsWith("/process-designer/processes") && method === "GET")
-    return demoAdminProcesses.map((r) => ({ entity_type: "Process", entity_id: r.entity_id, name: r.name, used_by: [], sync_state: r.entity_id === "Process-demo" ? "not_sync" : "synced", state_entity_id: r.state_entity_id, state_name: r.state_name }));
+    return demoAdminProcesses.map((r) => ({ entity_type: "Process", entity_id: r.entity_id, name: r.name, used_by: [], sync_state: r.entity_id === "Process-demo" ? "not_sync" : "synced", has_draft_changes: r.entity_id === "Process-demo", state_entity_id: r.state_entity_id, state_name: r.state_name }));
   if (p.endsWith("/validation")) return designerValidation;
   if (p.endsWith("/process-designer/revisions")) return designerRevisions;
-  if (p.match(/\/process-designer\/entities\/[^/]+$/) && method === "GET") return [];
-  if (p.match(/\/process-designer\/processes\/[^/]+$/) && method === "GET") {
-    const id = decodeURIComponent(p.split("/").pop() ?? "");
-    const row = demoAdminProcesses.find((r) => r.entity_id === id);
-    return row ? { ...designerDraft, process: { ...designerDraft.process, entity_id: row.entity_id, name: row.name } } : designerDraft;
+  const list = p.match(/\/process-designer\/entities\/([^/]+)$/);
+  if (list && method === "GET")
+    return designerEntitiesOf(list[1]).map((e) => ({
+      entity_type: e.entity_type,
+      entity_id: e.entity_id,
+      name: e.name,
+      used_by: e === designerSpareActivity ? [] : e.entity_type === "ActivityDialog" ? ["Activity-1"] : ["Process-demo"],
+      sync_state: e.sync_state,
+    }));
+  if (list && method === "POST") {
+    designerNewId += 1;
+    return designerEntity(list[1], `${list[1]}-demo-new-${designerNewId}`, 100 + designerNewId, "Neu", list[1] === "Activity" ? { ActivityDialog: {} } : {}, "not_sync");
   }
+  const one = p.match(/\/process-designer\/entities\/([^/]+)\/([^/]+)$/);
+  if (one && (method === "GET" || method === "PUT")) {
+    const id = decodeURIComponent(one[2]);
+    return designerEntitiesOf(one[1]).find((e) => e.entity_id === id) ?? designerEntity(one[1], id, 99, id, {}, "not_sync");
+  }
+  if (one && method === "DELETE") return null;
+  const process = p.match(/\/process-designer\/processes\/([^/]+)(\/copy)?$/);
+  if (process && (method === "GET" || method === "PUT" || (method === "POST" && process[2])))
+    return designerDraftOf(decodeURIComponent(process[1]));
+  if (p.match(/\/process-designer\/revisions\/\d+\/restore$/) && method === "POST") return designerDraft;
+  if (p.endsWith("/process-designer/processes") && method === "POST") return designerDraft;
   return method === "GET" ? [] : {};
 }
 // Daemons page: the deploy watcher runs in live mode (the banner under its name).
@@ -2266,9 +2299,6 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/process/tickets") && method === "POST") return { ticket_id: 1, ticket_number: "2026100001", activity_changed: true, unsupported_actions: [], state: processTicketState };
   if (p.match(/\/api\/v1\/process\/ticket\/\d+\/start$/) && method === "POST") return processTicketState;
   if (p.match(/\/api\/v1\/process\/?$/) && method === "GET") return [{ id: 1, entity_id: "Process-demo", name: "Bestellung", state_entity_id: "S1", state_name: "Active" }];
-  // One process of the admin detail page; ids that are not a process (ticket/, tickets) fall through.
-  const processDetail = p.match(/\/api\/v1\/process\/([^/?]+)$/);
-  if (processDetail && method === "GET") return demoProcessDetail(decodeURIComponent(processDetail[1]));
   if (p.includes("/api/v1/process")) return method === "GET" ? [] : {};
   // Admin — assignment editors (before the generic list handler)
   if (p.match(/\/admin\/groups\/\d+\/customer-users$/)) { const id = Number(p.split("/").slice(-2)[0]); return groupCustomerUsers[id] ?? []; }

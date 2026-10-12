@@ -87,11 +87,15 @@ describe("TransitionPanel", () => {
     expect(input.value).toBe("2026-10-01");
   });
 
-  it("shows a German error for an invalid Regexp and blocks saving", () => {
+  it("only warns about a Regexp the browser rejects (Perl syntax) and still saves it", async () => {
+    updateEntity.mockResolvedValue(base({}));
     renderPanel({ Condition: { "1": { Type: "and", Fields: { Title: { Type: "Regexp", Match: "^ok$" } } } } });
-    fireEvent.change(screen.getByTestId("condition-row-0-0-value"), { target: { value: "(" } });
-    expect(screen.getByTestId("condition-row-0-0-regexp-error")).toHaveTextContent("kein gültiger regulärer Ausdruck");
-    expect(screen.getByTestId("transition-panel-save")).toBeDisabled();
+    fireEvent.change(screen.getByTestId("condition-row-0-0-value"), { target: { value: "(?i)foo" } });
+    expect(screen.getByTestId("condition-row-0-0-regexp-error")).toHaveTextContent("Prüfen");
+    expect(screen.getByTestId("transition-panel-save")).toBeEnabled();
+    fireEvent.click(screen.getByTestId("transition-panel-save"));
+    await waitFor(() => expect(updateEntity).toHaveBeenCalled());
+    expect(updateEntity.mock.calls[0][2].config.Condition["1"].Fields.Title).toEqual({ Type: "Regexp", Match: "(?i)foo" });
   });
 
   it("keeps an unknown Module path and warns", async () => {

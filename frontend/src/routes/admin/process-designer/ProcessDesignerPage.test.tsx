@@ -16,6 +16,10 @@ const updateProcess = vi.fn();
 const validation = vi.fn();
 const revisions = vi.fn();
 const deployStatus = vi.fn();
+const listEntities = vi.fn();
+const listProcesses = vi.fn();
+const getEntity = vi.fn();
+const deleteEntity = vi.fn();
 
 vi.mock("@tanstack/react-router", () => ({
   useParams: () => ({ processEntityId: "Process-1" }),
@@ -34,6 +38,11 @@ vi.mock("@/lib/processDesignerApi", () => ({
     createEntity: vi.fn(),
     validation: (...args: unknown[]) => validation(...args),
     revisions: (...args: unknown[]) => revisions(...args),
+    listEntities: (...args: unknown[]) => listEntities(...args),
+    listProcesses: (...args: unknown[]) => listProcesses(...args),
+    getEntity: (...args: unknown[]) => getEntity(...args),
+    deleteEntity: (...args: unknown[]) => deleteEntity(...args),
+    exportUrl: (id: string) => `/api/v1/admin/process-designer/processes/${id}/export`,
   },
 }));
 vi.mock("@/lib/deployStatusApi", () => ({
@@ -116,6 +125,10 @@ describe("ProcessDesignerPage", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("de");
     getProcess.mockResolvedValue(draft);
+    listEntities.mockReset();
+    listEntities.mockResolvedValue([]);
+    listProcesses.mockResolvedValue([{ entity_id: "Process-1", name: "Bestellung" }, { entity_id: "Process-2", name: "Reklamation" }]);
+    deleteEntity.mockReset();
     validation.mockResolvedValue([]);
     revisions.mockResolvedValue([]);
     deployStatus.mockResolvedValue({
@@ -170,6 +183,80 @@ describe("ProcessDesignerPage", () => {
     fireEvent.click(screen.getByTestId("activity-panel-open-AD-1"));
     expect(await screen.findByTestId("dialog-panel")).toBeInTheDocument();
     expect(screen.getByTestId("dialog-panel-name")).toHaveValue("Antrag");
+  });
+
+  describe("shared entities", () => {
+    const summary = (entity_type: string, entity_id: string, name: string, used_by: string[]) => ({
+      entity_type,
+      entity_id,
+      name,
+      used_by,
+      sync_state: "synced",
+    });
+    const library: Record<string, unknown[]> = {
+      Activity: [
+        summary("Activity", "Activity-a", "Antrag erfassen", ["Process-1", "Process-2"]),
+        summary("Activity", "Activity-x", "Fremder Schritt", ["Process-2"]),
+        summary("Activity", "Activity-orphan", "Verwaist", []),
+      ],
+      TransitionAction: [summary("TransitionAction", "TA-old", "Alte Aktion", [])],
+    };
+    beforeEach(() => {
+      listEntities.mockImplementation((type: string) => Promise.resolve(library[type] ?? []));
+    });
+
+    it("the palette offers steps of other processes and the entries nothing uses", async () => {
+      setViewport(false);
+      renderPage();
+      expect(await screen.findByTestId("process-designer-palette-Activity-x")).toHaveTextContent("Fremder Schritt");
+      const unused = await screen.findByTestId("process-designer-palette-unused");
+      expect(unused).toHaveTextContent("Verwaist");
+      expect(unused).toHaveTextContent("Alte Aktion");
+      expect(unused).not.toHaveTextContent("Fremder Schritt");
+    });
+
+    it("deletes an unused entry after confirmation and reloads the library", async () => {
+      setViewport(false);
+      deleteEntity.mockResolvedValue(undefined);
+      renderPage();
+      fireEvent.click(await screen.findByTestId("process-designer-delete-TA-old"));
+      fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+      await waitFor(() => expect(deleteEntity).toHaveBeenCalledWith("TransitionAction", "TA-old"));
+      await waitFor(() => expect(listEntities.mock.calls.length).toBeGreaterThan(4));
+    });
+
+    it("names the users when the entry is in use by now (409)", async () => {
+      setViewport(false);
+      deleteEntity.mockRejectedValue(new ApiError(409, "Wird noch verwendet von: x", "/x"));
+      renderPage();
+      await screen.findByTestId("process-designer-delete-TA-old");
+      library.TransitionAction = [summary("TransitionAction", "TA-old", "Alte Aktion", ["Process-2"])];
+      fireEvent.click(screen.getByTestId("process-designer-delete-TA-old"));
+      fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+      expect(await screen.findByTestId("process-designer-library-error")).toHaveTextContent(
+        "Wird noch verwendet von: Reklamation",
+      );
+      library.TransitionAction = [summary("TransitionAction", "TA-old", "Alte Aktion", [])];
+    });
+
+    it("says which other processes share the selected step", async () => {
+      setViewport(false);
+      renderPage();
+      await screen.findByTestId("process-designer-palette-Activity-x");
+      fireEvent.click(screen.getByText("mock-select"));
+      expect(await screen.findByTestId("shared-activity")).toHaveTextContent("Reklamation");
+      expect(screen.getByTestId("shared-activity")).not.toHaveTextContent("Bestellung");
+    });
+  });
+
+  it("shows the process state and an export link in the top bar", async () => {
+    setViewport(false);
+    renderPage();
+    expect(await screen.findByTestId("process-designer-state")).toHaveTextContent(i18n.t("admin.processes.states.Active"));
+    expect(screen.getByTestId("process-designer-export")).toHaveAttribute(
+      "href",
+      "/api/v1/admin/process-designer/processes/Process-1/export",
+    );
   });
 
   it("phone width renders the read-only list", async () => {

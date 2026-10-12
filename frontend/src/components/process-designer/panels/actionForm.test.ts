@@ -55,6 +55,13 @@ describe("actionForm", () => {
     expect(buildActionConfig(stateSet, base, state)).toEqual(base);
   });
 
+  it("never writes a locked (non-scalar) row under another key", () => {
+    const base = entity({ Nested: { a: [1, 2] } });
+    const state = readActionConfig(stateSet, base);
+    state.raw[0].key = "Renamed";
+    expect(Object.keys(buildActionConfig(stateSet, base, state).Config as object)).toEqual([]);
+  });
+
   it("round-trips raw keys including DynamicField_* and non-scalar values", () => {
     const base = entity({ State: "open", DynamicField_Foo: "bar", Extra: 7, Nested: { a: [1, 2] } });
     const state = readActionConfig(stateSet, base);

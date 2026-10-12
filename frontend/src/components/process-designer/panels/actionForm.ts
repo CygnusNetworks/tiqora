@@ -108,7 +108,12 @@ export function buildActionConfig(
   for (const r of state.raw) {
     const k = r.key.trim();
     if (!k || k in next || k === USER_ID_KEY) continue;
-    next[k] = r.locked ? old[k] : typed(old[k], r.value);
+    if (r.locked) {
+      // Locked rows carry a stored non-scalar value; it only exists under its stored key.
+      if (k in old) next[k] = old[k];
+      continue;
+    }
+    next[k] = typed(old[k], r.value);
   }
   const uid = state.userId.trim();
   if (uid !== "") {

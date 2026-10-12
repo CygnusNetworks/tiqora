@@ -51,6 +51,22 @@ describe("ValidationPanel", () => {
     expect(onSelect).toHaveBeenCalledWith(first);
   });
 
+  it("translates the reason of an impossible condition value instead of showing the code", async () => {
+    await i18n.changeLanguage("de");
+    renderPanel([
+      issue({
+        code: "condition_value_impossible",
+        severity: "error",
+        entity_type: "Transition",
+        params: { field: "DynamicField_Farbe", value: "lila", reason: "possible_values" },
+      }),
+    ]);
+    const text = screen.getByTestId("validation-issue").textContent ?? "";
+    expect(text).toContain("lila");
+    expect(text).not.toContain("possible_values");
+    expect(text).toContain(i18n.t("admin.processDesigner.validation.reason.possible_values"));
+  });
+
   it("falls back to the code for an unknown code", () => {
     renderPanel([issue({ code: "brand_new_code" })]);
     expect(screen.getByText("brand_new_code")).toBeInTheDocument();

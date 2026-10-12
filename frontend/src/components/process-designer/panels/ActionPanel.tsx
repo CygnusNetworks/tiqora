@@ -253,6 +253,8 @@ export function ActionPanel({
             <input
               className={inputCls}
               value={r.key}
+              // A non-scalar value cannot be edited here; renaming its key would drop it.
+              readOnly={r.locked}
               aria-label={t("admin.processDesigner.action.rawKey")}
               data-testid={`action-raw-${i}-key`}
               onChange={(e) => setRaw(i, { key: e.target.value })}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/SelectField";
-import type { DesignerEntity } from "@/lib/processDesignerApi";
+import type { DesignerEntity, EntitySummary } from "@/lib/processDesignerApi";
 import { moveItem } from "./activityModel";
 
 /**
@@ -13,6 +13,8 @@ import { moveItem } from "./activityModel";
 export function TransitionActions({
   actionIds,
   actions,
+  library,
+  adoptAction,
   selectedId,
   createAction,
   onChange,
@@ -20,6 +22,10 @@ export function TransitionActions({
 }: {
   actionIds: string[];
   actions: DesignerEntity[];
+  /** Every action of all processes (shared entities); without it only `actions` can be added. */
+  library?: EntitySummary[];
+  /** Loads a picked action of another process into the draft before it is added. */
+  adoptAction?: (id: string) => Promise<void>;
   selectedId?: string | null;
   /** Creates a new empty action and returns its entity id. */
   createAction: () => Promise<string>;
@@ -29,8 +35,18 @@ export function TransitionActions({
   const { t } = useTranslation();
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState(false);
-  const nameOf = new Map(actions.map((a) => [a.entity_id, a.name]));
-  const addable = actions.filter((a) => !actionIds.includes(a.entity_id));
+  const nameOf = new Map([...(library ?? []), ...actions].map((a) => [a.entity_id, a.name]));
+  const addable = (library ?? actions).filter((a) => !actionIds.includes(a.entity_id));
+
+  const addExisting = async (id: string) => {
+    setError(false);
+    try {
+      await adoptAction?.(id);
+      onChange([...actionIds, id]);
+    } catch {
+      setError(true);
+    }
+  };
 
   const addNew = async () => {
     setCreating(true);
@@ -118,7 +134,7 @@ export function TransitionActions({
             value={null}
             placeholder={t("admin.processDesigner.reuse")}
             items={addable.map((a) => ({ value: a.entity_id, label: a.name }))}
-            onChange={(id) => onChange([...actionIds, id])}
+            onChange={(id) => void addExisting(id)}
           />
         ) : null}
         <Button size="sm" disabled={creating} onClick={() => void addNew()} data-testid="transition-actions-new">

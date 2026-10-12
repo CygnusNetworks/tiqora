@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   Controls,
@@ -13,7 +13,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useTranslation } from "react-i18next";
-import type { ProcessDraft, ValidationIssue } from "@/lib/processDesignerApi";
+import type { EntitySummary, ProcessDraft, SubEntityType, ValidationIssue } from "@/lib/processDesignerApi";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Button } from "@/components/ui/Button";
 import { ActivityNode, type ActivityFlowNode } from "./ActivityNode";
@@ -62,6 +62,10 @@ export type DesignerCanvasProps = {
   createActivity: () => Promise<string>;
   /** Creates a new transition entity with that name and resolves to its entity id. */
   createTransition: (name: string) => Promise<string>;
+  /** Every transition of all processes (shared entities) for "Vorhandene verwenden" on connect. */
+  transitions?: EntitySummary[];
+  /** Loads an existing entity of another process into the draft before it is placed. */
+  adoptEntity?: (type: SubEntityType, id: string) => Promise<void>;
   /** Latest check result; the issue counts show as badges on steps and transitions. */
   issues?: ValidationIssue[];
 };
@@ -91,6 +95,8 @@ function Inner({
   onShapeChange,
   createActivity,
   createTransition,
+  transitions,
+  adoptEntity,
   issues,
 }: DesignerCanvasProps) {
   const { t } = useTranslation();
@@ -99,6 +105,13 @@ function Inner({
   const [pending, setPending] = useState<{ source: string; target: string } | null>(null);
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [createError, setCreateError] = useState(false);
+  // The handlers below await the server; they must apply their edit to the shape as it is then,
+  // not to the one captured when they started (an edit made meanwhile would be lost).
+  const shapeRef = useRef(shape);
+  useLayoutEffect(() => {
+    shapeRef.current = shape;
+  }, [shape]);
 
   const model = useMemo(() => toCanvas(withShape(draft, shape), issues ?? []), [draft, shape, issues]);
 
@@ -150,7 +163,7 @@ function Inner({
 
   const finishConnect = (transitionId: string) => {
     if (!pending) return;
-    onShapeChange(connect(shape, pending.source, transitionId, pending.target));
+    onShapeChange(connect(shapeRef.current, pending.source, transitionId, pending.target));
     onSelect({ kind: "transition", from: pending.source, transitionId });
     setPending(null);
   };
@@ -158,8 +171,24 @@ function Inner({
   const connectNew = async () => {
     const name = newName.trim() || t("admin.processDesigner.newTransition");
     setBusy(true);
+    setCreateError(false);
     try {
       finishConnect(await createTransition(name));
+    } catch {
+      setCreateError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const connectExisting = async (transitionId: string) => {
+    setBusy(true);
+    setCreateError(false);
+    try {
+      await adoptEntity?.("Transition", transitionId);
+      finishConnect(transitionId);
+    } catch {
+      setCreateError(true);
     } finally {
       setBusy(false);
     }
@@ -176,8 +205,16 @@ function Inner({
     e.preventDefault();
     const payload = e.dataTransfer.getData(PALETTE_DRAG_TYPE);
     const at = screenToFlowPosition({ x: e.clientX, y: e.clientY });
-    const id = payload || (await createActivity());
-    onShapeChange(addActivity(shape, id, at));
+    setCreateError(false);
+    let id = payload;
+    try {
+      if (id) await adoptEntity?.("Activity", id);
+      else id = await createActivity();
+    } catch {
+      setCreateError(true);
+      return;
+    }
+    onShapeChange(addActivity(shapeRef.current, id, at));
     onSelect({ kind: "activity", id });
   };
 
@@ -215,7 +252,9 @@ function Inner({
     }
   };
 
-  const reusable = pending ? draft.transitions.filter((tr) => !(tr.entity_id in (shape.path[pending.source] ?? {}))) : [];
+  const reusable = pending
+    ? (transitions ?? draft.transitions).filter((tr) => !(tr.entity_id in (shape.path[pending.source] ?? {})))
+    : [];
 
   return (
     <div
@@ -254,6 +293,15 @@ function Inner({
         <MiniMap pannable zoomable maskColor="color-mix(in srgb, var(--color-ink) 12%, transparent)" />
       </ReactFlow>
 
+      {createError ? (
+        <p
+          role="alert"
+          data-testid="process-designer-create-error"
+          className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-md border border-danger bg-surface px-3 py-1.5 text-sm text-danger"
+        >
+          {t("admin.processDesigner.createError")}
+        </p>
+      ) : null}
       {pending ? (
         <div
           role="dialog"
@@ -280,7 +328,8 @@ function Inner({
                   <li key={tr.entity_id}>
                     <button
                       type="button"
-                      onClick={() => finishConnect(tr.entity_id)}
+                      disabled={busy}
+                      onClick={() => void connectExisting(tr.entity_id)}
                       data-testid={`process-designer-connect-existing-${tr.entity_id}`}
                       className="w-full rounded px-2 py-1 text-left text-sm text-ink hover:bg-surface-subtle"
                     >

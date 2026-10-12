@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 /**
  * Shared frame of the designer side panels: header, optional save/discard row (for panels that save
  * on their own) and the "changed in the meantime" message when the stored version moved on.
+ * `Escape` inside the panel discards its unsaved edits.
  */
 export function PanelFrame({
   title,
@@ -32,7 +33,18 @@ export function PanelFrame({
 }) {
   const { t } = useTranslation();
   return (
-    <section className="space-y-3" data-testid={testId}>
+    <section
+      className="space-y-3"
+      data-testid={testId}
+      // Escape discards the panel's unsaved edits (Znuny's popups close without saving).
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && dirty && onDiscard && !saving) {
+          e.preventDefault();
+          e.stopPropagation();
+          onDiscard();
+        }
+      }}
+    >
       <h2 className="text-sm font-semibold text-ink">{title}</h2>
       {conflict ? (
         <div

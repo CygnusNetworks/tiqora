@@ -212,7 +212,11 @@ export function ConditionBuilder({
                     }}
                   />
                   {rx ? (
-                    <p role="alert" className="text-xs text-danger" data-testid={`${rid}-regexp-error`}>
+                    <p
+                      role={rx === "empty" ? "alert" : undefined}
+                      className={`text-xs ${rx === "empty" ? "text-danger" : "text-warning"}`}
+                      data-testid={`${rid}-regexp-error`}
+                    >
                       {t(`admin.processDesigner.condition.regexp.${rx}`)}
                     </p>
                   ) : null}

@@ -118,13 +118,11 @@ export function isUnknownModule(row: ConditionRow, modules: readonly string[]): 
   return row.type === "Module" && row.match !== "" && !modules.includes(row.match);
 }
 
-/** True when saving would write something the designer knows to be broken. */
+/**
+ * True when saving would write something the designer knows to be broken. A regular expression the
+ * browser rejects is only a warning: Znuny uses Perl syntax (e.g. `(?i)foo`, which JavaScript does
+ * not accept), and the server check ("Prüfen", `compile_perl_regex`) is the authority.
+ */
 export function hasBlockingProblem(model: ConditionModel): boolean {
-  return model.groups.some(
-    (g) =>
-      duplicateFields(g).length > 0 ||
-      g.rows.some(
-        (r) => !r.field || (r.type === "Regexp" && r.matchRaw === undefined && regexpProblem(r.match) === "invalid"),
-      ),
-  );
+  return model.groups.some((g) => duplicateFields(g).length > 0 || g.rows.some((r) => !r.field));
 }

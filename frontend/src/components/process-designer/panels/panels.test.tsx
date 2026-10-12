@@ -114,6 +114,29 @@ describe("ActivityPanel", () => {
     expect(screen.getByTestId("activity-panel-save")).toBeEnabled();
   });
 
+  it("Escape discards the unsaved edits of the panel", () => {
+    renderActivity();
+    const input = screen.getByTestId("activity-panel-name");
+    fireEvent.change(input, { target: { value: "Anders" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(screen.getByTestId("activity-panel-name")).toHaveValue("Antrag");
+    expect(screen.getByTestId("activity-panel-save")).toBeDisabled();
+  });
+
+  it("offers forms of other processes and loads a picked one before adding it", async () => {
+    const adoptDialog = vi.fn().mockResolvedValue(undefined);
+    const library = [
+      { entity_type: "ActivityDialog" as const, entity_id: "AD-1", name: "Erfassen", used_by: ["Activity-a"], sync_state: "synced" as const },
+      { entity_type: "ActivityDialog" as const, entity_id: "AD-77", name: "Fremdes Formular", used_by: ["Activity-z"], sync_state: "synced" as const },
+    ];
+    renderActivity({ library, adoptDialog });
+    fireEvent.click(screen.getByTestId("activity-panel-add"));
+    expect(screen.queryByTestId("activity-panel-add-menu-option-AD-1")).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByTestId("activity-panel-add-menu-option-AD-77"));
+    await waitFor(() => expect(adoptDialog).toHaveBeenCalledWith("AD-77"));
+    expect(await screen.findByTestId("activity-panel-form-AD-77")).toHaveTextContent("Fremdes Formular");
+  });
+
   it("discard restores stored order and name", () => {
     renderActivity();
     fireEvent.change(screen.getByTestId("activity-panel-name"), { target: { value: "Anders" } });

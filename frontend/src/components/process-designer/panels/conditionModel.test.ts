@@ -84,7 +84,9 @@ describe("conditionModel", () => {
     ] };
     expect(duplicateFields(dup)).toEqual(["Queue"]);
     expect(hasBlockingProblem({ linking: "and", groups: [dup] })).toBe(true);
-    expect(hasBlockingProblem({ linking: "and", groups: [{ linking: "and", rows: [{ field: "Q", type: "Regexp", match: "(" }] }] })).toBe(true);
+    // Perl syntax JavaScript rejects (Znuny imports): a warning, never a reason to refuse saving.
+    expect(regexpProblem("(?i)foo")).toBe("invalid");
+    expect(hasBlockingProblem({ linking: "and", groups: [{ linking: "and", rows: [{ field: "Q", type: "Regexp", match: "(?i)foo" }] }] })).toBe(false);
     expect(hasBlockingProblem({ linking: "and", groups: [{ linking: "and", rows: [{ field: "", type: "String", match: "" }] }] })).toBe(true);
   });
 });

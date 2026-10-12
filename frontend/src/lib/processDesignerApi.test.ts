@@ -12,6 +12,7 @@ describe("processDesignerApi", () => {
     await processDesignerApi.catalog();
     await processDesignerApi.listProcesses();
     await processDesignerApi.listEntities("Activity");
+    await processDesignerApi.getEntity("Transition", "Transition-a/b");
     await processDesignerApi.getProcess("Process-a/b");
     await processDesignerApi.createProcess({ name: "x", description: "" });
     await processDesignerApi.copyProcess("Process-1");
@@ -28,6 +29,7 @@ describe("processDesignerApi", () => {
       ["GET", `${BASE}/catalog`],
       ["GET", `${BASE}/processes`],
       ["GET", `${BASE}/entities/Activity`],
+      ["GET", `${BASE}/entities/Transition/Transition-a%2Fb`],
       ["GET", `${BASE}/processes/Process-a%2Fb`],
       ["POST", `${BASE}/processes`],
       ["POST", `${BASE}/processes/Process-1/copy`],
@@ -41,9 +43,9 @@ describe("processDesignerApi", () => {
       ["GET", `${BASE}/revisions/7/diff`],
       ["POST", `${BASE}/revisions/7/restore`],
     ]);
-    expect(spy.mock.calls[11][2]).toMatchObject({ body: { content: "a: 1", overwrite_existing: true } });
-    expect(spy.mock.calls[13][2]).toMatchObject({ query: { against: 0, process: "Process-1" } });
-    expect(spy.mock.calls[14][2]).toMatchObject({ body: { process_entity_id: "Process-1" } });
+    expect(spy.mock.calls[12][2]).toMatchObject({ body: { content: "a: 1", overwrite_existing: true } });
+    expect(spy.mock.calls[14][2]).toMatchObject({ query: { against: 0, process: "Process-1" } });
+    expect(spy.mock.calls[15][2]).toMatchObject({ body: { process_entity_id: "Process-1" } });
   });
 
   it("builds a plain download url for the export", () => {

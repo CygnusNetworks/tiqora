@@ -38,18 +38,19 @@ vi.mock("@/lib/deployStatusApi", () => ({
   deployStatusApi: { status, deploy: vi.fn() },
 }));
 
-const row = (entity_id: string, name: string, state_name: string, sync_state = "synced") => ({
+const row = (entity_id: string, name: string, state_name: string, sync_state = "synced", has_draft_changes = false) => ({
   entity_id,
   entity_type: "Process",
   name,
   state_entity_id: "S",
   state_name,
   sync_state,
+  has_draft_changes: has_draft_changes || sync_state !== "synced",
   used_by: [],
 });
 const rows = [
   row("Process-a", "Bestellung", "Active"),
-  row("Process-b", "Altprozess", "Inactive"),
+  row("Process-b", "Altprozess", "Inactive", "synced", true), // only a step of it was edited
   row("Process-c", "Auslauf", "FadeAway", "not_sync"),
 ];
 
@@ -104,6 +105,7 @@ describe("ProcessesPage", () => {
     renderPage();
     await screen.findByTestId("process-link-Process-a");
     expect(screen.getByTestId("process-draft-Process-c")).toHaveTextContent(i18n.t("admin.processDesigner.draft"));
+    expect(screen.getByTestId("process-draft-Process-b")).toBeInTheDocument();
     expect(screen.queryByTestId("process-draft-Process-a")).not.toBeInTheDocument();
   });
 

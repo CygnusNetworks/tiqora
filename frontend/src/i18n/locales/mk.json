@@ -2928,7 +2928,7 @@
         },
         "regexp": {
           "empty": "Enter a regular expression.",
-          "invalid": "This is not a valid regular expression."
+          "invalid": "The browser does not recognise this expression. “Check” shows whether Znuny accepts it."
         },
         "type": {
           "Module": "Check module",
@@ -3008,6 +3008,11 @@
           "action_module_unsupported": "The module {{module}} is not supported by Tiqora.",
           "tiqora_only_module_parallel": "The module {{module}} exists only in Tiqora; Znuny skips it.",
           "action_required_param_missing": "The parameter {{param}} is missing."
+        },
+        "reason": {
+          "regexp": "invalid regular expression",
+          "name": "no such name",
+          "possible_values": "not a possible value of the field"
         }
       },
       "revisions": {
@@ -3042,16 +3047,23 @@
         "checkFailed": "Could not run the check."
       },
       "import": {
-        "title": "Import process",
+        "title": "Import Znuny process file",
         "description": "Load a process file exported from Znuny or Tiqora. It is imported as a draft.",
-        "file": "Process file (.yml, .yaml)",
+        "file": "Znuny process file (.yml)",
         "overwrite": "Overwrite existing entries with the same ID",
         "submit": "Import",
         "success": "“{{name}}” was imported as a draft.",
         "refused": "The file was not imported: {{message}}",
         "unknown": "The file is not a valid process file.",
         "readError": "The file could not be read."
-      }
+      },
+      "transitionLabel": "Transition",
+      "unused": "No longer used",
+      "deleteEntity": "Delete “{{name}}”",
+      "deleteEntityConfirm": "Delete “{{name}}” for good? No process uses it any more.",
+      "deleteEntityError": "The entry could not be deleted.",
+      "inUse": "Still used by: {{names}}",
+      "sharedWith": "Also used by: {{names}}. Changes apply there as well."
     },
     "mailOutbound": {
       "title": "Појдовна е-пошта (SMTP)",
@@ -4662,7 +4674,7 @@
       "pendingHere_one": "{{count}} change has not been deployed yet. It only applies after “Deploy”.",
       "pendingHere_other": "{{count}} changes have not been deployed yet. They only apply after “Deploy”.",
       "runningLive": "No deployed revision yet – Tiqora runs the draft state.",
-      "ownership": "Tiqora deploys changes itself (Znuny is switched off).",
+      "ownership": "Changes take effect after “Deploy” in Tiqora (Znuny is switched off).",
       "deployNow": "Deploy",
       "deployFailed": "Deployment failed.",
       "sync": {

@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/SelectField";
-import { processDesignerApi, type DesignerEntity } from "@/lib/processDesignerApi";
+import { processDesignerApi, type DesignerEntity, type EntitySummary } from "@/lib/processDesignerApi";
 import { dialogIdsOf, moveItem, renumberDialogs } from "./activityModel";
 import { PanelFrame } from "./PanelFrame";
 
@@ -17,6 +17,8 @@ const inputCls = "w-full rounded-md border border-hairline bg-surface px-2 py-1 
 export function ActivityPanel({
   activity,
   dialogs,
+  library,
+  adoptDialog,
   createDialog,
   onSaved,
   onReload,
@@ -25,6 +27,10 @@ export function ActivityPanel({
 }: {
   activity: DesignerEntity;
   dialogs: DesignerEntity[];
+  /** Every form of all processes (shared entities); without it only `dialogs` can be added. */
+  library?: EntitySummary[];
+  /** Loads a picked form of another process into the draft before it is added. */
+  adoptDialog?: (id: string) => Promise<void>;
   /** Creates a new empty form and returns its entity id. */
   createDialog: () => Promise<string>;
   onSaved: (saved: DesignerEntity) => void;
@@ -42,9 +48,19 @@ export function ActivityPanel({
   const [error, setError] = useState(false);
   const [creating, setCreating] = useState(false);
 
-  const dialogName = new Map(dialogs.map((d) => [d.entity_id, d.name]));
+  const dialogName = new Map([...(library ?? []), ...dialogs].map((d) => [d.entity_id, d.name]));
   const dirty = name !== activity.name || ids.join("|") !== storedIds.join("|");
-  const addable = dialogs.filter((d) => !ids.includes(d.entity_id));
+  const addable = (library ?? dialogs).filter((d) => !ids.includes(d.entity_id));
+
+  const addExisting = async (id: string) => {
+    setError(false);
+    try {
+      await adoptDialog?.(id);
+      setIds((cur) => (cur.includes(id) ? cur : [...cur, id]));
+    } catch {
+      setError(true);
+    }
+  };
 
   const save = async () => {
     setSaving(true);
@@ -171,7 +187,7 @@ export function ActivityPanel({
               value={null}
               placeholder={t("admin.processDesigner.panelActivity.addExisting")}
               items={addable.map((d) => ({ value: d.entity_id, label: d.name }))}
-              onChange={(id) => setIds((cur) => [...cur, id])}
+              onChange={(id) => void addExisting(id)}
             />
           ) : null}
           <Button size="sm" disabled={creating} onClick={() => void addNew()} data-testid="activity-panel-new">

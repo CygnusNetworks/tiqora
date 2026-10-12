@@ -44,18 +44,20 @@ export function DeployStatusCard({
       query.state.data?.[kind].znuny_sync.state === "pending" && !gaveUp ? pollMs : false,
   });
   const syncState = statusQ.data?.[kind].znuny_sync.state;
+  // A redeploy while the old one is still pending keeps the state "pending" but starts a new
+  // request (new `since`); that must start the clock and the polling again.
+  const syncSince = statusQ.data?.[kind].znuny_sync.since ?? null;
   // Polling stops after `giveUpMs`; a new pending period starts the clock again.
   useEffect(() => {
-    if (syncState !== "pending") {
-      setGaveUp(false);
-      return;
-    }
+    setGaveUp(false);
+    if (syncState !== "pending") return;
     const timer = setTimeout(() => setGaveUp(true), giveUpMs);
     return () => clearTimeout(timer);
-  }, [syncState, giveUpMs]);
+  }, [syncState, syncSince, giveUpMs]);
   const deployM = useMutation({
     mutationFn: () => deployStatusApi.deploy(kind),
     onSuccess: async () => {
+      setGaveUp(false);
       await Promise.all([
         qc.invalidateQueries({ queryKey: DEPLOY_STATUS_QUERY_KEY }),
         qc.invalidateQueries({ queryKey: ["admin", kind === "acl" ? "acl" : "processes"] }),

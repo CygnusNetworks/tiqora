@@ -119,7 +119,7 @@ export function ProcessesPage() {
               ? t(`admin.processes.states.${r.state_name}`, { defaultValue: r.state_name })
               : "—"}
           </Badge>
-          {r.sync_state !== "synced" ? (
+          {r.has_draft_changes || r.sync_state !== "synced" ? (
             <Badge tone="warn" data-testid={`process-draft-${r.entity_id}`}>
               {t("admin.processDesigner.draft")}
             </Badge>

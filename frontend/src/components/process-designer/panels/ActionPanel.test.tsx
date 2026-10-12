@@ -95,6 +95,38 @@ describe("ActionPanel", () => {
     expect(screen.getByTestId("action-raw-0-value")).toHaveValue("bar");
   });
 
+  it("locks the key of a raw row whose value is not a scalar", () => {
+    renderPanel(entity("TA-4", "Eigene", { Module: MOD + "Custom", Config: { Foo: "bar", Nested: { a: [1] } } }));
+    expect(screen.getByTestId("action-raw-0-key")).not.toHaveAttribute("readonly");
+    expect(screen.getByTestId("action-raw-1-key")).toHaveAttribute("readonly");
+    expect(screen.getByTestId("action-raw-1-value")).toHaveAttribute("readonly");
+  });
+
+  it("adds an action of another process after loading it", async () => {
+    const onChange = vi.fn();
+    const adoptAction = vi.fn().mockResolvedValue(undefined);
+    const library = [
+      { entity_type: "TransitionAction" as const, entity_id: "X-1", name: "Fremd", used_by: ["Process-z"], sync_state: "synced" as const },
+    ];
+    render(
+      <I18nextProvider i18n={i18n}>
+        <TransitionActions
+          actionIds={[]}
+          actions={[]}
+          library={library}
+          adoptAction={adoptAction}
+          createAction={vi.fn()}
+          onChange={onChange}
+          onSelect={vi.fn()}
+        />
+      </I18nextProvider>,
+    );
+    fireEvent.click(screen.getByTestId("transition-actions-add"));
+    fireEvent.click(await screen.findByTestId("transition-actions-add-menu-option-X-1"));
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(["X-1"]));
+    expect(adoptAction).toHaveBeenCalledWith("X-1");
+  });
+
   it("badges modules Znuny-only", () => {
     renderPanel(entity("TA-3", "Invoker", { Module: MOD + "ExecuteInvoker", Config: {} }));
     expect(screen.getByTestId("action-panel-badge")).toHaveTextContent("nur in Znuny wirksam");

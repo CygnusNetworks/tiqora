@@ -3,7 +3,16 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "@tanstack/react-router";
 import { ApiError } from "@/lib/api";
-import { processDesignerApi, type DesignerEntity, type ProcessDraft, type ValidationIssue } from "@/lib/processDesignerApi";
+import {
+  processDesignerApi,
+  type DesignerEntity,
+  type EntitySummary,
+  type ProcessDraft,
+  type SubEntityType,
+  type ValidationIssue,
+} from "@/lib/processDesignerApi";
+import { apiErrorMessage } from "@/lib/avatarApi";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
@@ -24,6 +33,31 @@ import { RevisionsPanel } from "@/components/process-designer/RevisionsPanel";
 import { DeployBar } from "@/components/process-designer/DeployBar";
 import { targetOfIssue } from "@/components/process-designer/validationSelect";
 import { usePhoneWidth } from "@/components/process-designer/usePhoneWidth";
+import {
+  ENTITY_LIBRARY_KEY,
+  PROCESS_LIST_KEY,
+  draftHas,
+  mergeEntity,
+  otherUsers,
+  useEntityLibrary,
+} from "@/components/process-designer/entityLibrary";
+
+const STATE_TONE: Record<string, "success" | "muted" | "warn"> = {
+  Active: "success",
+  Inactive: "muted",
+  FadeAway: "warn",
+};
+
+/** "Also used by …": an edit of a shared step, form, transition or action changes them as well. */
+function SharedNote({ names, testId }: { names: string[]; testId: string }) {
+  const { t } = useTranslation();
+  if (names.length === 0) return null;
+  return (
+    <p className="rounded-md border border-amber bg-surface px-2 py-1 text-xs text-amber" data-testid={testId}>
+      {t("admin.processDesigner.sharedWith", { names: names.join(", ") })}
+    </p>
+  );
+}
 
 /**
  * Process designer (lazy route `/admin/processes/$processEntityId`). Skeleton: loads the draft and
@@ -55,6 +89,15 @@ export function ProcessDesignerPage() {
   const refreshValidation = useCallback(() => void qc.invalidateQueries({ queryKey: validationKey }), [qc, validationKey]);
   const draftKey = useMemo(() => ["admin", "process-designer", "draft", processEntityId], [processEntityId]);
   const draft = draftQ.data;
+  // Shared entities of all processes ("Vorhandene verwenden", "used by", deleting unused ones).
+  const library = useEntityLibrary();
+  const refreshLibrary = useCallback(() => {
+    void qc.invalidateQueries({ queryKey: ENTITY_LIBRARY_KEY });
+    void qc.invalidateQueries({ queryKey: PROCESS_LIST_KEY });
+  }, [qc]);
+  const activityNames = useMemo(() => new Map(library.Activity.map((a) => [a.entity_id, a.name])), [library.Activity]);
+  const { confirm, dialog: confirmDialog } = useConfirm();
+  const [libraryNotice, setLibraryNotice] = useState<string | null>(null);
 
   // Canvas edits (layout, path, start) stay local until "Speichern", like Znuny's canvas.
   const [edited, setEdited] = useState<ProcessShape | null>(null);
@@ -112,6 +155,7 @@ export function ProcessDesignerPage() {
       });
       qc.setQueryData(draftKey, next);
       refreshValidation();
+      refreshLibrary();
       setEdited(null);
       setEditedFields(null);
       setConflict(false);
@@ -121,7 +165,7 @@ export function ProcessDesignerPage() {
     } finally {
       setSaving(false);
     }
-  }, [draft, shape, fields, dirty, saving, processEntityId, qc, draftKey, refreshValidation]);
+  }, [draft, shape, fields, dirty, saving, processEntityId, qc, draftKey, refreshValidation, refreshLibrary]);
 
   const reload = useCallback(async () => {
     discard();
@@ -153,20 +197,52 @@ export function ProcessDesignerPage() {
   const createEntity = useCallback(
     async (type: "Activity" | "ActivityDialog" | "Transition" | "TransitionAction", name: string, config: Record<string, unknown>) => {
       const created: DesignerEntity = await processDesignerApi.createEntity(type, { name, config });
-      qc.setQueryData<ProcessDraft>(draftKey, (cur) =>
-        cur
-          ? type === "Activity"
-            ? { ...cur, activities: [...cur.activities, created] }
-            : type === "ActivityDialog"
-              ? { ...cur, activity_dialogs: [...cur.activity_dialogs, created] }
-              : type === "TransitionAction"
-                ? { ...cur, transition_actions: [...cur.transition_actions, created] }
-                : { ...cur, transitions: [...cur.transitions, created] }
-          : cur,
-      );
+      qc.setQueryData<ProcessDraft>(draftKey, (cur) => (cur ? mergeEntity(cur, created) : cur));
+      refreshLibrary();
       return created.entity_id;
     },
+    [qc, draftKey, refreshLibrary],
+  );
+  // An existing entity of another process: load it into the cached draft before it is used, so the
+  // canvas and the panels know its name and configuration.
+  const adoptEntity = useCallback(
+    async (type: SubEntityType, entityId: string) => {
+      const cur = qc.getQueryData<ProcessDraft>(draftKey);
+      if (cur && draftHas(cur, type, entityId)) return;
+      const entity = await processDesignerApi.getEntity(type, entityId);
+      qc.setQueryData<ProcessDraft>(draftKey, (c) => (c ? mergeEntity(c, entity) : c));
+    },
     [qc, draftKey],
+  );
+  const deleteEntity = useCallback(
+    async (entity: EntitySummary) => {
+      const ok = await confirm({
+        title: t("admin.processDesigner.delete"),
+        message: t("admin.processDesigner.deleteEntityConfirm", { name: entity.name }),
+        confirmLabel: t("admin.processDesigner.delete"),
+        variant: "danger",
+      });
+      if (!ok) return;
+      setLibraryNotice(null);
+      const type = entity.entity_type as SubEntityType;
+      try {
+        await processDesignerApi.deleteEntity(type, entity.entity_id);
+      } catch (err) {
+        let text = apiErrorMessage(err, t("admin.processDesigner.deleteEntityError"));
+        if (err instanceof ApiError && err.status === 409) {
+          // Meanwhile somebody started using it: name the users from a fresh list.
+          const fresh = await processDesignerApi.listEntities(type).catch(() => []);
+          const users = fresh.find((e) => e.entity_id === entity.entity_id)?.used_by ?? [];
+          const names = type === "ActivityDialog" ? activityNames : library.processNames;
+          if (users.length > 0)
+            text = t("admin.processDesigner.inUse", { names: users.map((id) => names.get(id) ?? id).join(", ") });
+        }
+        setLibraryNotice(text);
+      } finally {
+        refreshLibrary();
+      }
+    },
+    [confirm, t, refreshLibrary, activityNames, library.processNames],
   );
   const createActivity = useCallback(
     () => createEntity("Activity", t("admin.processDesigner.newStep"), { ActivityDialog: {} }),
@@ -265,10 +341,49 @@ export function ProcessDesignerPage() {
       qc.setQueryData(draftKey, restored);
       discard();
       refreshValidation();
+      refreshLibrary();
       void qc.invalidateQueries({ queryKey: ["admin", "deploy-status"] });
     },
-    [qc, draftKey, discard, refreshValidation],
+    [qc, draftKey, discard, refreshValidation, refreshLibrary],
   );
+
+  // Everything the local (possibly unsaved) shape references: such entities are not offered for
+  // deletion, and a form shared only with steps of this process is not "shared".
+  const referenced = useMemo(() => {
+    const ids = new Set<string>();
+    if (!shape || !draft) return ids;
+    ids.add(shape.startActivity);
+    ids.add(shape.startActivityDialog);
+    for (const [aid, transitions] of Object.entries(shape.path)) {
+      ids.add(aid);
+      for (const [tid, entry] of Object.entries(transitions as Record<string, Record<string, unknown>>)) {
+        ids.add(tid);
+        ids.add(String(entry.ActivityEntityID ?? ""));
+        const actions = entry.TransitionAction;
+        for (const a of Array.isArray(actions) ? actions : []) ids.add(String(a));
+      }
+    }
+    for (const a of draft.activities) {
+      if (!ids.has(a.entity_id)) continue;
+      const dialogs = (a.config as { ActivityDialog?: Record<string, unknown> }).ActivityDialog ?? {};
+      for (const d of Object.values(dialogs)) ids.add(String(d));
+    }
+    return ids;
+  }, [shape, draft]);
+  const unusedEntities = useMemo(
+    () =>
+      [...library.Activity, ...library.ActivityDialog, ...library.Transition, ...library.TransitionAction].filter(
+        (e) => e.used_by.length === 0 && !referenced.has(e.entity_id),
+      ),
+    [library, referenced],
+  );
+  const ownProcess = useMemo(() => new Set([processEntityId]), [processEntityId]);
+  const sharedNames = (type: SubEntityType, entityId: string | undefined) =>
+    entityId
+      ? type === "ActivityDialog"
+        ? otherUsers(library.ActivityDialog.find((e) => e.entity_id === entityId), referenced, activityNames)
+        : otherUsers(library[type].find((e) => e.entity_id === entityId), ownProcess, library.processNames)
+      : [];
 
   const selectedName = useMemo(() => {
     if (!draft || !selection) return null;
@@ -291,7 +406,12 @@ export function ProcessDesignerPage() {
         <>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h1 className="font-display text-xl font-semibold text-ink">{draft.process.name}</h1>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={STATE_TONE[draft.state_name] ?? "muted"} data-testid="process-designer-state">
+                {draft.state_name
+                  ? t(`admin.processes.states.${draft.state_name}`, { defaultValue: draft.state_name })
+                  : "—"}
+              </Badge>
               {draft.process.sync_state !== "synced" ? (
                 <Badge tone="muted">{t("admin.processDesigner.draft")}</Badge>
               ) : null}
@@ -314,6 +434,14 @@ export function ProcessDesignerPage() {
                     {validationQ.isFetching ? t("admin.processDesigner.checking") : t("admin.processDesigner.check")}
                     {issues && issues.length > 0 ? ` (${issues.length})` : ""}
                   </Button>
+                  <a
+                    href={processDesignerApi.exportUrl(processEntityId)}
+                    download
+                    data-testid="process-designer-export"
+                    className="rounded-md border border-hairline bg-surface px-2 py-1 text-xs text-ink hover:bg-surface-subtle"
+                  >
+                    {t("admin.processes.export")}
+                  </a>
                   <Button
                     size="sm"
                     onClick={() => setDrawer(drawer === "revisions" ? null : "revisions")}
@@ -363,6 +491,11 @@ export function ProcessDesignerPage() {
               {t("admin.processDesigner.saveError")}
             </p>
           ) : null}
+          {libraryNotice ? (
+            <p role="alert" className="text-sm text-danger" data-testid="process-designer-library-error">
+              {libraryNotice}
+            </p>
+          ) : null}
 
           {phone ? (
             <div data-testid="process-designer-phone-list" className="space-y-2">
@@ -385,8 +518,10 @@ export function ProcessDesignerPage() {
                   {t("admin.processDesigner.palette")}
                 </h2>
                 <EntityPalette
-                  activities={draft.activities}
+                  activities={library.Activity}
                   usedIds={new Set(Object.keys(shape?.path ?? {}))}
+                  unused={unusedEntities}
+                  onDelete={(e) => void deleteEntity(e)}
                 />
               </aside>
               <section className="min-h-0 rounded-lg border border-hairline bg-surface">
@@ -403,6 +538,8 @@ export function ProcessDesignerPage() {
                     onShapeChange={setEdited}
                     createActivity={createActivity}
                     createTransition={createTransition}
+                    transitions={library.Transition}
+                    adoptEntity={adoptEntity}
                     issues={issues}
                   />
                 ) : null}
@@ -414,16 +551,22 @@ export function ProcessDesignerPage() {
                 <div className="mt-2">
                   {selectedActivity ? (
                     <div className="space-y-4">
+                      <SharedNote names={sharedNames("Activity", selectedActivity.entity_id)} testId="shared-activity" />
                       <ActivityPanel
                         key={`${selectedActivity.entity_id}:${selectedActivity.version}`}
                         activity={selectedActivity}
                         dialogs={draft.activity_dialogs}
+                        library={library.ActivityDialog}
+                        adoptDialog={(id) => adoptEntity("ActivityDialog", id)}
                         createDialog={createDialog}
                         onSaved={onActivitySaved}
                         onReload={() => void draftQ.refetch()}
                         onOpenForm={setDialogId}
                         openFormId={dialogId}
                       />
+                      {selectedDialog ? (
+                        <SharedNote names={sharedNames("ActivityDialog", selectedDialog.entity_id)} testId="shared-dialog" />
+                      ) : null}
                       {selectedDialog && catalogQ.data ? (
                         <DialogPanel
                           key={`${selectedDialog.entity_id}:${selectedDialog.version}`}
@@ -436,6 +579,7 @@ export function ProcessDesignerPage() {
                     </div>
                   ) : selectedTransition && shape && catalogQ.data && selection?.kind === "transition" ? (
                     <div className="space-y-4">
+                      <SharedNote names={sharedNames("Transition", selectedTransition.entity_id)} testId="shared-transition" />
                       <TransitionPanel
                         key={`${selectedTransition.entity_id}:${selectedTransition.version}`}
                         transition={selectedTransition}
@@ -446,11 +590,16 @@ export function ProcessDesignerPage() {
                       <TransitionActions
                         actionIds={transitionActionIds}
                         actions={draft.transition_actions}
+                        library={library.TransitionAction}
+                        adoptAction={(id) => adoptEntity("TransitionAction", id)}
                         selectedId={actionId}
                         createAction={createAction}
                         onChange={(ids) => setEdited(setActions(shape, selection.from, selection.transitionId, ids))}
                         onSelect={setActionId}
                       />
+                      {selectedAction && transitionActionIds.includes(selectedAction.entity_id) ? (
+                        <SharedNote names={sharedNames("TransitionAction", selectedAction.entity_id)} testId="shared-action" />
+                      ) : null}
                       {selectedAction && transitionActionIds.includes(selectedAction.entity_id) ? (
                         <ActionPanel
                           key={`${selectedAction.entity_id}:${selectedAction.version}`}
@@ -499,6 +648,7 @@ export function ProcessDesignerPage() {
           ) : null}
         </>
       )}
+      {confirmDialog}
     </div>
   );
 }
