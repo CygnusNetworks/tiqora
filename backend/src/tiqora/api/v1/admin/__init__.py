@@ -61,6 +61,7 @@ from tiqora.api.v1.admin import (
     types,
     users,
     webhooks,
+    webservices,
 )
 
 admin_router = APIRouter(prefix="/admin")
@@ -116,5 +117,6 @@ admin_router.include_router(settings_sections.router)
 admin_router.include_router(identity_providers.router)
 admin_router.include_router(reporting.router)
 admin_router.include_router(dashboard_templates.router)
+admin_router.include_router(webservices.router)
 
 __all__ = ["admin_router"]

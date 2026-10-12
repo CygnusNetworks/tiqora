@@ -5085,6 +5085,134 @@ export interface paths {
         patch: operations["update_webhook_api_v1_admin_webhooks__webhook_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/webservices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Webservices
+         * @description All webservices, including invalid ones (``valid`` false) and broken configurations.
+         */
+        get: operations["list_webservices_api_v1_admin_webservices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/webservices/{ws_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Webservice */
+        get: operations["get_webservice_api_v1_admin_webservices__ws_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/webservices/{ws_id}/debugger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Debugger */
+        get: operations["list_debugger_api_v1_admin_webservices__ws_id__debugger_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/webservices/{ws_id}/debugger/tiqora/{entry_id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend
+         * @description Run the recorded call again with the stored event data and the CURRENT ticket data.
+         */
+        post: operations["resend_api_v1_admin_webservices__ws_id__debugger_tiqora__entry_id__resend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/webservices/{ws_id}/debugger/{source}/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Debugger Entry */
+        get: operations["get_debugger_entry_api_v1_admin_webservices__ws_id__debugger__source___entry_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/webservices/{ws_id}/egress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Egress */
+        put: operations["put_egress_api_v1_admin_webservices__ws_id__egress_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/webservices/{ws_id}/invokers/{invoker}/dry-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dry Run
+         * @description Build the request exactly as a real call would and show it masked; nothing is sent.
+         */
+        post: operations["dry_run_api_v1_admin_webservices__ws_id__invokers__invoker__dry_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agents/online": {
         parameters: {
             query?: never;
@@ -14586,6 +14714,66 @@ export interface components {
             /** Version */
             version?: string | null;
         };
+        /** DebugContentOut */
+        DebugContentOut: {
+            /** Content */
+            content: string;
+            /**
+             * Created
+             * Format: date-time
+             */
+            created: string;
+            /** Debug Level */
+            debug_level: string;
+            /** Id */
+            id: number;
+            /** Masked */
+            masked: boolean;
+            /** Subject */
+            subject: string;
+        };
+        /** DebugEntryDetailOut */
+        DebugEntryDetailOut: {
+            /** Contents */
+            contents: components["schemas"]["DebugContentOut"][];
+            entry: components["schemas"]["DebugEntryOut"];
+        };
+        /** DebugEntryListOut */
+        DebugEntryListOut: {
+            /** Entries */
+            entries: components["schemas"]["DebugEntryOut"][];
+            /** Next Before */
+            next_before: string | null;
+        };
+        /** DebugEntryOut */
+        DebugEntryOut: {
+            /** Can Resend */
+            can_resend: boolean;
+            /** Communication Id */
+            communication_id: string;
+            /** Communication Type */
+            communication_type: string;
+            /**
+             * Created
+             * Format: date-time
+             */
+            created: string;
+            /** Id */
+            id: number;
+            /** Max Level */
+            max_level: string;
+            /** Name */
+            name: string | null;
+            /** Remote Ip */
+            remote_ip: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "tiqora" | "znuny";
+            /** Ticket Id */
+            ticket_id: number | null;
+        };
         /** DeployIn */
         DeployIn: {
             /**
@@ -14711,6 +14899,18 @@ export interface components {
             title?: string | null;
             /** User Id */
             user_id: number;
+        };
+        /** DryRunIn */
+        DryRunIn: {
+            /** Article Id */
+            article_id?: number | null;
+            /**
+             * Event
+             * @default TicketCreate
+             */
+            event: string;
+            /** Ticket Id */
+            ticket_id: number;
         };
         /** DynamicFieldCreate */
         DynamicFieldCreate: {
@@ -14924,6 +15124,23 @@ export interface components {
             logins?: string[];
             /** Valid Id */
             valid_id?: number | null;
+        };
+        /** ErrorHandlingOut */
+        ErrorHandlingOut: {
+            /** Error Message Content Filter */
+            error_message_content_filter: string | null;
+            /** Error Stage Filter */
+            error_stage_filter: string[];
+            /** Invoker Filter */
+            invoker_filter: string[];
+            /** Key */
+            key: string;
+            /** Retry Summary */
+            retry_summary: string | null;
+            /** Stop After Match */
+            stop_after_match: string | null;
+            /** Type */
+            type: string;
         };
         /** EscalationHitOut */
         EscalationHitOut: {
@@ -15815,6 +16032,34 @@ export interface components {
             /** Test Id */
             test_id: string;
         };
+        /** InvokerEventOut */
+        InvokerEventOut: {
+            /** Asynchronous */
+            asynchronous: boolean;
+            /** Event */
+            event: string;
+            /** Fired By Tiqora */
+            fired_by_tiqora: boolean;
+            /** Has Condition */
+            has_condition: boolean;
+        };
+        /** InvokerOut */
+        InvokerOut: {
+            /** Events */
+            events: components["schemas"]["InvokerEventOut"][];
+            /** Mapping Inbound */
+            mapping_inbound: string | null;
+            /** Mapping Outbound */
+            mapping_outbound: string | null;
+            /** Name */
+            name: string;
+            /** Problem */
+            problem: string | null;
+            /** Supported */
+            supported: boolean;
+            /** Type */
+            type: string;
+        };
         /** JitDefaults */
         JitDefaults: {
             /** Allowed Email Domains */
@@ -15898,6 +16143,19 @@ export interface components {
             status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
             /** Title Key */
             title_key: string | null;
+        };
+        /**
+         * JobRefOut
+         * @description 202 body of resend and dry run: poll ``GET /api/v1/jobs/{job_id}``.
+         */
+        JobRefOut: {
+            /** Job Id */
+            job_id: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running";
         };
         /** KbSearchHit */
         KbSearchHit: {
@@ -19136,6 +19394,21 @@ export interface components {
             /** Snapshot Time Zone */
             snapshot_time_zone: string | null;
         };
+        /** RequesterTransportOut */
+        RequesterTransportOut: {
+            /** Auth Type */
+            auth_type: string | null;
+            /** Endpoint */
+            endpoint: string | null;
+            /** Has Proxy */
+            has_proxy: boolean;
+            /** Insecure Tls Requested */
+            insecure_tls_requested: boolean;
+            /** Type */
+            type: string;
+            /** Uses Client Certificate */
+            uses_client_certificate: boolean;
+        };
         /** ResolvedCustomerLink */
         ResolvedCustomerLink: {
             /** Label */
@@ -21908,6 +22181,68 @@ export interface components {
             url?: string | null;
             /** Valid */
             valid?: boolean | null;
+        };
+        /** WebserviceDetailOut */
+        WebserviceDetailOut: {
+            /** Debug Threshold */
+            debug_threshold: string;
+            egress: components["schemas"]["WebserviceEgressOut"];
+            /** Error Handling */
+            error_handling: components["schemas"]["ErrorHandlingOut"][];
+            /** Id */
+            id: number;
+            /** Invokers */
+            invokers: components["schemas"]["InvokerOut"][];
+            /** Name */
+            name: string;
+            /** Problem */
+            problem: string | null;
+            requester_transport: components["schemas"]["RequesterTransportOut"] | null;
+            /** Valid */
+            valid: boolean;
+            /** Warnings */
+            warnings: string[];
+        };
+        /** WebserviceEgressIn */
+        WebserviceEgressIn: {
+            /**
+             * Allow Insecure Tls
+             * @default false
+             */
+            allow_insecure_tls: boolean;
+            /** Allowed Targets */
+            allowed_targets?: string[];
+        };
+        /** WebserviceEgressOut */
+        WebserviceEgressOut: {
+            /** Allow Insecure Tls */
+            allow_insecure_tls: boolean;
+            /** Allowed Targets */
+            allowed_targets: string[];
+        };
+        /** WebserviceListItemOut */
+        WebserviceListItemOut: {
+            /** Event Invoker Count */
+            event_invoker_count: number;
+            /** Has Provider */
+            has_provider: boolean;
+            /** Id */
+            id: number;
+            /** Invoker Count */
+            invoker_count: number;
+            /** Name */
+            name: string;
+            /** Problem */
+            problem: string | null;
+            /** Transport */
+            transport: string | null;
+            /** Valid */
+            valid: boolean;
+        };
+        /** WebserviceListOut */
+        WebserviceListOut: {
+            /** Webservices */
+            webservices: components["schemas"]["WebserviceListItemOut"][];
         };
         /** WhatsAppSendResponse */
         WhatsAppSendResponse: {
@@ -36748,6 +37083,269 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WebhookOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_webservices_api_v1_admin_webservices_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebserviceListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_webservice_api_v1_admin_webservices__ws_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ws_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebserviceDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_debugger_api_v1_admin_webservices__ws_id__debugger_get: {
+        parameters: {
+            query?: {
+                type?: ("Provider" | "Requester") | null;
+                source?: ("tiqora" | "znuny") | null;
+                from?: string | null;
+                to?: string | null;
+                remote_ip?: string | null;
+                before?: string | null;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ws_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DebugEntryListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resend_api_v1_admin_webservices__ws_id__debugger_tiqora__entry_id__resend_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ws_id: number;
+                entry_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRefOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_debugger_entry_api_v1_admin_webservices__ws_id__debugger__source___entry_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ws_id: number;
+                source: "tiqora" | "znuny";
+                entry_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DebugEntryDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_egress_api_v1_admin_webservices__ws_id__egress_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ws_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebserviceEgressIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebserviceEgressOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dry_run_api_v1_admin_webservices__ws_id__invokers__invoker__dry_run_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ws_id: number;
+                invoker: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DryRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRefOut"];
                 };
             };
             /** @description Validation Error */
