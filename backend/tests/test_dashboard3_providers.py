@@ -269,6 +269,12 @@ async def test_team_presence_marks_agents_in_chat(env: Env3) -> None:
     status = {a["id"]: a["status"] for a in out["online"]}
     assert status == {A: "available", B: "in_chat"}
     assert out["total_online"] == 2
+    assert out["by_status"] == {"available": 1, "in_chat": 1}
+    # the limit cuts the people shown, never the counts: B (in a chat) is not shown but counted
+    capped = await data_of(env, A, W("p", "core.team-presence", {"limit": 1}), redis=redis)
+    assert [a["id"] for a in capped["online"]] == [A]
+    assert capped["total_online"] == 2
+    assert capped["by_status"] == {"available": 1, "in_chat": 1}
 
 
 # --- chat queue ----------------------------------------------------------------------------

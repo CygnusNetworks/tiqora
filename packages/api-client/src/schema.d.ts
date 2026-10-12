@@ -42474,7 +42474,7 @@ export interface operations {
                 "X-Tiqora-Kiosk"?: string | null;
             };
             path: {
-                dashboard_id: number;
+                dashboard_id: string;
             };
             cookie?: never;
         };

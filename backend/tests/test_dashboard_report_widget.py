@@ -368,6 +368,7 @@ async def test_report_widget_deferred_never_enqueues(
     data = await run_ok(env, A, {"report_key": "builtin.channel_mix"})
     assert data["deferred"] is True and data["reason"] == "estimate"
     assert "result" not in data and "kiosk" not in data
+    assert data["definition"]["source"] == "tickets" and data["row_cap"] == 10
     jobs = env.sql("SELECT COUNT(*) FROM tiqora_job WHERE kind = 'core.report_run'")
     assert jobs[0][0] == 0
 
@@ -381,6 +382,7 @@ async def test_report_widget_kiosk_flag_never_defers_to_job(
     monkeypatch.setattr(run_service, "estimate_rows", huge)
     data = await run_ok(env, A, {"report_key": "builtin.channel_mix"}, kiosk=True)
     assert data["deferred"] is True and data["kiosk"] is True
+    assert "definition" not in data and "row_cap" not in data, "a wallboard renders no job"
     assert env.sql("SELECT COUNT(*) FROM tiqora_job WHERE kind = 'core.report_run'")[0][0] == 0
 
 
@@ -773,6 +775,8 @@ async def test_report_job_result_is_served_from_cache(
         env, A, type_key, settings, filters=board_filters, report_cache_backend=cache
     )
     assert deferred["deferred"] is True and "result" not in deferred
+    # the browser renders the job's own result with this definition (cache off: never served)
+    assert deferred["definition"]["source"] and deferred["row_cap"] >= 1
 
     resp = await env.as_user(A).post(_job_url(d))
     assert resp.status_code == 202, resp.text
@@ -787,6 +791,7 @@ async def test_report_job_result_is_served_from_cache(
         env, A, type_key, settings, filters=board_filters, report_cache_backend=cache
     )
     assert served["deferred"] is False and served["result"]["cached"] is True
+    assert served["definition"] == deferred["definition"]
     fresh = await run_type(env, A, type_key, settings, filters=board_filters)
     assert fresh["result"]["cached"] is False
     assert served["result"]["rows"] == fresh["result"]["rows"]

@@ -137,7 +137,9 @@ async def test_board_widgets_carry_only_whitelisted_configuration(env: Env3) -> 
     by_id = {w["id"]: w for w in detailed["dashboards"][0]["widgets"]}
     assert by_id[_wid(d, 1)]["title_override"] == "Kunde Beispiel GmbH"
     assert by_id[_wid(d, 1)]["settings"] == {"tone": "danger", "preset": "mine_open"}
-    assert by_id[_wid(d, 2)]["settings"] == {"markdown": "Notiz fuer anna@example.org"}
+    # notes and links never render on a wallboard (recorded deviation): their text never leaves
+    assert by_id[_wid(d, 2)]["settings"] == {}
+    assert "example.org" not in json.dumps(detailed)
 
 
 async def test_invalid_states_are_indistinguishable(env: Env3) -> None:
@@ -407,3 +409,46 @@ async def test_trusted_proxies_give_separate_buckets_per_forwarded_client(env: E
 async def _get_xff(env: Env3, xff: str, token: str = "nope" * 10) -> Any:
     async with _anon(env) as c:
         return await c.get(BOARD, headers={HDR: token, "X-Forwarded-For": xff})
+
+
+async def test_malformed_requests_get_the_same_404(env: Env3) -> None:
+    """No FastAPI 422 (other body, no no-store): an id below 1 and an oversized header."""
+    d = await _board(env)
+    link = await _link(env, [d])
+    for url, token in (
+        (_data(0), link["token"]),
+        (_data(-3), link["token"]),
+        ("/api/v1/kiosk/dashboards/abc/data", link["token"]),
+        ("/api/v1/kiosk/dashboards/99999999999999999999999/data", link["token"]),
+        (BOARD, "x" * 1500),
+        (_data(d), "x" * 1500),
+    ):
+        r = await _get(env, url, token)
+        assert r.status_code == 404 and r.json() == INVALID, (url, r.text)
+        assert r.headers["Cache-Control"] == "no-store"
+        assert r.headers["Referrer-Policy"] == "no-referrer"
+    assert (await _get(env, _data(d), link["token"])).status_code == 200
+
+
+async def test_lock_release_never_deletes_another_requests_lock(
+    env: Env3, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    d = await _board(env)
+    link = await _link(env, [d])
+    redis: FakeRedis = env.app.state.redis
+
+    async def slow_batch(factory: Any, registry: Any, user_id: int, rows: Any, **kw: Any) -> Any:
+        # the lock expired meanwhile and another request took it
+        lock_key = next(k for k in await redis.keys("*") if ":lock:" in k)
+        await redis.set(lock_key, "someone-else", ex=kiosk.LOCK_TTL_SECONDS)
+        return {w.id: WidgetDataOut(status="ok", data={"value": 1}) for w in rows}
+
+    monkeypatch.setattr(kiosk, "run_batch", slow_batch)
+    assert (await _get(env, _data(d), link["token"])).status_code == 200
+    locks = [k for k in await redis.keys("*") if ":lock:" in k]
+    assert len(locks) == 1 and await redis.get(locks[0]) == "someone-else"
+
+
+def test_last_good_values_are_short_lived() -> None:
+    """A last good value stands in for ``pending`` without a stale marker: at most 30 min."""
+    assert kiosk.LAST_GOOD_TTL_SECONDS <= 30 * 60

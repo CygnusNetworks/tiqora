@@ -336,3 +336,23 @@ async def test_count_by_queue_matches_per_queue_counts(env: Env3) -> None:
         assert await svc.count_by_queue(B, state_type="open") == {Q2: 1}
         assert await svc.count_by_queue(A, state_type="open", queue_ids=[Q2]) == {}
         assert await svc.count_by_queue(A, state_type="open", queue_ids=[Q1]) == {Q1: 4}
+
+
+async def test_preview_applies_the_dashboard_filters(env: Env3) -> None:
+    """The settings drawer's preview counts like the saved tile on a filtered dashboard."""
+    url = "/api/v1/dashboard-widget-types/core.counter/data"
+    settings = {"source": {"kind": "preset", "preset": "mine_open"}}
+    client = env.as_user(A)
+    plain = await client.post(url, json={"settings": settings})
+    assert plain.status_code == 200 and plain.json()["data"]["value"] == 6
+    narrowed = await client.post(
+        url, json={"settings": settings, "filters": {"queue_ids": [Q1], "time_range": None}}
+    )
+    assert narrowed.status_code == 200, narrowed.text
+    assert narrowed.json()["status"] == "ok" and narrowed.json()["data"]["value"] == 4
+    lst = await client.post(
+        "/api/v1/dashboard-widget-types/core.ticket-list/data",
+        json={"settings": settings | {"limit": 50}, "filters": {"queue_ids": [Q1B]}},
+    )
+    assert lst.status_code == 200, lst.text
+    assert {i["queue_id"] for i in lst.json()["data"]["items"]} == {Q1B}

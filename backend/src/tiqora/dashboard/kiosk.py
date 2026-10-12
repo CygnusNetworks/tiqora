@@ -27,7 +27,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.ai.limits import KIND_PROVIDER_COST
 from tiqora.config import Settings
 from tiqora.dashboard import store
-from tiqora.dashboard.runner import BATCH_DEADLINE_SECONDS, SessionFactory, run_batch
+from tiqora.dashboard.runner import (
+    BATCH_DEADLINE_SECONDS,
+    ERROR_MESSAGE,
+    SessionFactory,
+    run_batch,
+)
 from tiqora.dashboard.schemas import (
     DashboardDataOut,
     DashboardOut,
@@ -220,15 +225,21 @@ def _team_presence(data: dict[str, Any], show_details: bool) -> dict[str, Any]:
     if show_details:
         return data
     online = data.get("online", [])
-    counts: dict[str, int] = {}
-    for person in online:
-        status = str(person.get("status", "available"))
-        counts[status] = counts.get(status, 0) + 1
-    return {"total_online": data.get("total_online", len(online)), "by_status": counts}
+    counts = data.get("by_status")  # counted by the provider over everyone online
+    if not isinstance(counts, Mapping):
+        counts = {}
+        for person in online:
+            status = str(person.get("status", "available"))
+            counts[status] = counts.get(status, 0) + 1
+    return {
+        "total_online": data.get("total_online", len(online)),
+        "by_status": {str(k): int(v) for k, v in counts.items()},
+    }
 
 
 def _chat_queue(data: dict[str, Any], show_details: bool) -> dict[str, Any]:
-    out = {k: v for k, v in data.items() if k != "visitor_name"}
+    # ``mine`` would be the link creator's own chats: meaningless on a wall, so it never leaves
+    out = {k: v for k, v in data.items() if k not in {"visitor_name", "mine"}}
     if not show_details:
         out.pop("items", None)
     else:
@@ -239,14 +250,15 @@ def _chat_queue(data: dict[str, Any], show_details: bool) -> dict[str, Any]:
 
 
 def _ai_status(data: dict[str, Any], show_details: bool) -> dict[str, Any]:
+    """E9: provider cost budgets (money) and the currency never leave; queue token budgets do,
+    with or without details (they name a queue, like the queue overview)."""
+    _ = show_details
     out = {k: v for k, v in data.items() if k != "budgets"}
-    if show_details:
-        # provider cost budgets (money) never leave, queue token budgets may
-        out["budgets"] = [
-            {k: v for k, v in b.items() if k != "currency"}
-            for b in data.get("budgets", [])
-            if b.get("kind") != KIND_PROVIDER_COST
-        ]
+    out["budgets"] = [
+        {k: v for k, v in b.items() if k != "currency"}
+        for b in data.get("budgets", [])
+        if b.get("kind") != KIND_PROVIDER_COST
+    ]
     return out
 
 
@@ -324,11 +336,18 @@ def redact(type_key: str, data: dict[str, Any], show_details: bool) -> WidgetDat
 
 
 def redact_result(type_key: str, result: WidgetDataOut, show_details: bool) -> WidgetDataOut:
-    """Like :func:`redact` for a runner result: only ``ok`` carries data to redact."""
+    """Like :func:`redact` for a runner result: only ``ok`` carries data to redact.
+
+    An error text may quote a saved report's name or a literal of the stored settings, so
+    without details it becomes the runner's generic text (other statuses carry constants).
+    """
     if type_key not in KIOSK_RULES:
         return _hidden()
     if result.status != "ok" or result.data is None:
-        return WidgetDataOut(status=result.status, error=result.error)
+        error = result.error
+        if result.status == "error" and not show_details:
+            error = ERROR_MESSAGE
+        return WidgetDataOut(status=result.status, error=error)
     return redact(type_key, result.data, show_details)
 
 
@@ -543,16 +562,14 @@ LOCK_TTL_SECONDS: Final = 30
 #: how long a waiter polls for the computing request's value (a batch ends after its deadline)
 WAIT_SECONDS: Final = BATCH_DEADLINE_SECONDS + 2
 WAIT_POLL_SECONDS: Final = 0.2
-#: last good value per widget, served in place of a ``pending`` one
-LAST_GOOD_TTL_SECONDS: Final = 6 * 3600
+#: last good value per widget, served in place of a ``pending`` one. It carries no stale marker
+#: (the wallboard shows it as current), so it is kept for half an hour only
+LAST_GOOD_TTL_SECONDS: Final = 30 * 60
 _CACHE_PREFIX: Final = "tiqora:dash:kiosk"
 
-#: widget types the wallboard renders from their settings alone (no provider); their content
-#: leaves only for a link that shows details
-_STATIC_SETTINGS: Final[dict[str, frozenset[str]]] = {
-    "core.notes": frozenset({"markdown"}),
-    "core.links": frozenset({"items"}),
-}
+#: widget types without a provider: the wallboard shows "not available" for them, so none of
+#: their settings (free text, URLs) ever leaves, with or without details (recorded deviation)
+_STATIC_TYPES: Final = frozenset({"core.notes", "core.links"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -628,11 +645,7 @@ async def touch_link(session: AsyncSession, link_id: int, now: datetime) -> None
 
 
 def _widget_view(w: Any, show_details: bool) -> KioskWidgetOut:
-    if w.type_key in _STATIC_SETTINGS:
-        keep = _STATIC_SETTINGS[w.type_key] if show_details else frozenset()
-        settings = {k: v for k, v in w.settings.items() if k in keep}
-    else:
-        settings = redact_settings(w.type_key, w.settings, show_details)
+    settings = redact_settings(w.type_key, w.settings, show_details)
     return KioskWidgetOut(
         id=w.id,
         type_key=w.type_key,
@@ -715,8 +728,8 @@ async def _compute(
     )
     out: dict[str, WidgetDataOut] = {}
     for w in board.widgets:
-        if w.type_key in _STATIC_SETTINGS:
-            continue  # rendered from settings
+        if w.type_key in _STATIC_TYPES:
+            continue  # no data: the wallboard shows "not available" from the type alone
         if w.type_key not in KIOSK_RULES:
             out[w.id] = _hidden()  # third-party and unknown widgets never run here
         elif w.id in results:
@@ -764,6 +777,22 @@ async def _compute_and_cache(
     return data
 
 
+async def _unlock(redis: Any, lock_key: str, token: str, link_id: int) -> None:
+    """Release the lock only while it is still ours (it may have expired and been taken).
+
+    GET and DEL are two commands, so a lock taken in the microseconds between them could still
+    be dropped; the batch deadline (20 s) keeps the computation well inside ``LOCK_TTL_SECONDS``.
+    """
+    try:
+        held = await redis.get(lock_key)
+        if isinstance(held, bytes):
+            held = held.decode()
+        if held == token:
+            await redis.delete(lock_key)
+    except Exception:  # noqa: BLE001 - the lock expires on its own
+        logger.warning("dashboard_kiosk_unlock_failed", link_id=link_id)
+
+
 async def kiosk_data(
     factory: SessionFactory,
     registry: Registry,
@@ -784,18 +813,16 @@ async def kiosk_data(
     cached = await _cache_get(redis, data_key)
     if cached is not None:
         return cached
+    lock_token = secrets.token_hex(8)
     try:
-        got_lock = bool(await redis.set(lock_key, "1", ex=LOCK_TTL_SECONDS, nx=True))
+        got_lock = bool(await redis.set(lock_key, lock_token, ex=LOCK_TTL_SECONDS, nx=True))
     except Exception:  # noqa: BLE001 - without a lock compute (bounded by the batch deadline)
         got_lock = True
     if got_lock:
         try:
             return await _compute_and_cache(factory, registry, redis, link, board, app_settings)
         finally:
-            try:
-                await redis.delete(lock_key)
-            except Exception:  # noqa: BLE001 - the lock expires on its own
-                logger.warning("dashboard_kiosk_unlock_failed", link_id=link.id)
+            await _unlock(redis, lock_key, lock_token, link.id)
     loop = asyncio.get_running_loop()
     until = loop.time() + WAIT_SECONDS
     while loop.time() < until:

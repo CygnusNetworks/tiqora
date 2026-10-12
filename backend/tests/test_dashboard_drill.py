@@ -781,3 +781,10 @@ async def test_drill_is_read_only(env: Env3) -> None:
     await drill_ok(env, A, d, "dash3wid00001")
     after = await env.get(A, d.id)
     assert after.version == before.version and after.filters == DashboardFilters(queue_ids=[Q1])
+
+
+def test_drill_sort_keys_are_the_ticket_services_sort_columns() -> None:
+    """The drill route checks ``sort`` against a public list; it must stay the service's."""
+    from tiqora.api.v1.dashboards import DRILL_SORT_KEYS
+
+    assert set(TicketService._SORT_COLUMNS) == DRILL_SORT_KEYS

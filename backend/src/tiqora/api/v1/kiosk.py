@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Annotated, Final, NoReturn
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Path, Request, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -44,8 +44,9 @@ MSG_UNAVAILABLE: Final = "Der Dienst ist vorübergehend nicht verfügbar."
 HEADERS: Final = {"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"}
 
 SessionFactory = Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory_dep)]
-DashboardId = Annotated[int, Path(ge=1, le=2**63 - 1)]
-KioskToken = Annotated[str | None, Header(alias=KIOSK_HEADER, max_length=1000)]
+#: no FastAPI validation of the path id or the header: a 422 would differ from the one 404 (body
+#: and headers); ``_gate`` checks the token length, and an id that is not on the link is that 404
+KioskToken = Annotated[str | None, Header(alias=KIOSK_HEADER)]
 
 
 def _fail(code: int, message: str, **extra: str) -> NoReturn:
@@ -95,6 +96,14 @@ async def _gate(
     return link
 
 
+def _dashboard_id(raw: str) -> int | None:
+    """A positive decimal id, or ``None`` (which answers the same 404 as an id not on the link)."""
+    if not raw.isdecimal() or len(raw) > 19:
+        return None
+    value = int(raw)
+    return value if value >= 1 else None
+
+
 @router.get("/board", response_model=KioskBoardOut)
 async def kiosk_board(
     request: Request,
@@ -124,7 +133,7 @@ async def kiosk_board(
 
 @router.get("/dashboards/{dashboard_id}/data", response_model=DashboardDataOut)
 async def kiosk_dashboard_data(
-    dashboard_id: DashboardId,
+    dashboard_id: str,
     request: Request,
     response: Response,
     session: DbSession,
@@ -136,11 +145,12 @@ async def kiosk_dashboard_data(
 ) -> DashboardDataOut:
     """Redacted widget data, computed as the link's creator (cached for 20 s)."""
     link = await _gate(request, response, session, redis, settings, token)
-    if dashboard_id not in link.dashboard_ids:
+    wanted = _dashboard_id(dashboard_id)
+    if wanted is None or wanted not in link.dashboard_ids:
         await session.rollback()
         _fail(status.HTTP_404_NOT_FOUND, kiosk.MSG_INVALID_LINK)
     try:
-        board = await store.get_dashboard(session, dashboard_id, link.created_by, admin=True)
+        board = await store.get_dashboard(session, wanted, link.created_by, admin=True)
     except store.DashboardNotFound:
         _fail(status.HTTP_404_NOT_FOUND, kiosk.MSG_INVALID_LINK)
     finally:

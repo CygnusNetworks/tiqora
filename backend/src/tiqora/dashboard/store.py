@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
 import random
 import uuid
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any, Final
 
+import structlog
 from pydantic import ValidationError
 from sqlalchemy import delete, func, insert, select, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
@@ -84,7 +84,11 @@ __all__ = [
     "user_role_ids",
 ]
 
-_log = logging.getLogger(__name__)
+_log = structlog.get_logger(__name__)
+#: (dashboard id, stored value) already reported as unreadable: ``/data`` reads the row on every
+#: poll, so one broken value is logged once per process (bounded)
+_UNREADABLE_LOGGED: set[tuple[int, int]] = set()
+_UNREADABLE_LOGGED_MAX: Final = 1000
 
 _OWNED_KINDS: Final = ("personal", "shared")
 MSG_NOT_EDITABLE: Final = "Dieses Dashboard können Sie nicht bearbeiten."
@@ -292,7 +296,12 @@ def dashboard_filters(row: TiqoraDashboard) -> DashboardFilters:
     try:
         return DashboardFilters.model_validate_json(row.filters or "{}")
     except ValidationError:
-        _log.warning("dashboard %s: unreadable filters, treated as empty", row.id)
+        seen = (int(row.id), hash(row.filters))
+        if seen not in _UNREADABLE_LOGGED:
+            if len(_UNREADABLE_LOGGED) >= _UNREADABLE_LOGGED_MAX:
+                _UNREADABLE_LOGGED.clear()
+            _UNREADABLE_LOGGED.add(seen)
+            _log.warning("dashboard_filters_unreadable", dashboard_id=int(row.id))
         return DashboardFilters()
 
 

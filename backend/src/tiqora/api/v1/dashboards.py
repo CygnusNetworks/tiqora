@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Annotated, Any, Final, Literal, NoReturn
+from typing import Annotated, Any, Final, Literal, NoReturn, get_args
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
 from pydantic import ValidationError
@@ -60,7 +60,7 @@ from tiqora.dashboard.settings_models import (
     SettingsError,
     validate_widget_settings,
 )
-from tiqora.domain.ticket_service import TicketService
+from tiqora.domain.schemas import TicketSortKey
 from tiqora.extensions import Registry, get_registry
 from tiqora.filters import FilterError
 from tiqora.jobs.schemas import JobAccepted
@@ -92,6 +92,8 @@ JOBS_FULL_MESSAGE: Final = (
 )
 DRILL_TIMEOUT_MESSAGE: Final = "Die Liste braucht zu lange. Bitte grenzen Sie den Filter ein."
 CORE_WIDGET_VERSION: Final = 1
+#: sort keys of the drill-down list: the public ticket sort keys plus the reminders' ``until``
+DRILL_SORT_KEYS: Final = frozenset(get_args(TicketSortKey)) | {"until"}
 
 
 def get_dashboard_registry() -> Registry:
@@ -486,7 +488,7 @@ async def widget_tickets(
     dashboard filters. Statements are bounded to the single-widget budget.
     """
     chosen = _parse_point(point)
-    if sort is not None and sort not in TicketService._SORT_COLUMNS:
+    if sort is not None and sort not in DRILL_SORT_KEYS:
         raise HTTPException(422, {"message": "Diese Sortierung gibt es nicht.", "path": "sort"})
     board = await _visible_dashboard(session, user, dashboard_id)
     widget = next((w for w in board.widgets if w.id == widget_id), None)
@@ -640,6 +642,7 @@ async def preview_widget_data(
         widget,
         redis=redis,
         preview=True,
+        filters=body.filters,
         app_settings=app_settings,
         report_cache_backend=redis,
     )

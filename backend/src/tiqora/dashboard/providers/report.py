@@ -188,12 +188,17 @@ def _report_meta(report_key: str | None, saved_name: str | None) -> dict[str, An
     return {"key": report_key, "kind": "saved", "name": saved_name}
 
 
+def row_cap(definition: ReportDefinition, max_rows: int) -> int:
+    """Rows a tile shows: every cell for pivot/heatmap (up to 200), else ``max_rows``."""
+    return MAX_WIDE_ROWS if definition.visualization.type in WIDE_VISUALIZATIONS else max_rows
+
+
 def _result_data(
     outcome: RunRefOutcome, definition: ReportDefinition, max_rows: int
 ) -> dict[str, Any]:
     assert outcome.result is not None
     result = outcome.result.model_dump(mode="json")
-    cap = MAX_WIDE_ROWS if definition.visualization.type in WIDE_VISUALIZATIONS else max_rows
+    cap = row_cap(definition, max_rows)
     rows = result["rows"]
     if len(rows) > cap:
         result["rows"] = rows[:cap]
@@ -264,6 +269,11 @@ async def run_report_widget(
         data["reason"] = outcome.deferred
         if ctx.kiosk:
             data["kiosk"] = True  # a wallboard never starts a job
+        else:
+            # the browser draws the background job's own result with these (with
+            # ``cache_seconds = 0`` that result is never served from the cache)
+            data["definition"] = effective.model_dump(mode="json", exclude_none=True)
+            data["row_cap"] = row_cap(effective, max_rows)
         return data
     data.update(
         deferred=False,

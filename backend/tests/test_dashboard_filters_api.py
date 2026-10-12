@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 from pydantic import ValidationError
+from structlog.testing import capture_logs
 
 from tests._dashboard3_helpers import (
     ADMIN,
@@ -216,6 +217,20 @@ async def test_preview_accepts_filters(env: Env3) -> None:
     assert r.status_code == 200 and r.json()["status"] == "ok"
     bad = await client.post(url, json={"settings": settings, "filters": {"queue_ids": [0]}})
     assert bad.status_code == 422
+
+
+def test_broken_filters_are_logged_once_per_value() -> None:
+    from tiqora.db.tiqora.models import TiqoraDashboard
+
+    row = TiqoraDashboard(id=987654321, filters="not json")
+    with capture_logs() as logs:
+        for _ in range(3):
+            assert store.dashboard_filters(row) == DashboardFilters()
+        row.filters = '{"queue_ids": "x"}'
+        assert store.dashboard_filters(row) == DashboardFilters()
+    events = [e for e in logs if e["event"] == "dashboard_filters_unreadable"]
+    assert [e["dashboard_id"] for e in events] == [987654321, 987654321]
+    assert all(e["log_level"] == "warning" for e in events)
 
 
 def test_widget_in_pinned_defaults_false_and_save_in_filters_optional() -> None:

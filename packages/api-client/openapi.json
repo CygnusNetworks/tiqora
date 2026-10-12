@@ -78126,7 +78126,6 @@
             "schema": {
               "anyOf": [
                 {
-                  "maxLength": 1000,
                   "type": "string"
                 },
                 {
@@ -78175,10 +78174,8 @@
             "name": "dashboard_id",
             "required": true,
             "schema": {
-              "maximum": 9223372036854775807,
-              "minimum": 1,
               "title": "Dashboard Id",
-              "type": "integer"
+              "type": "string"
             }
           },
           {
@@ -78188,7 +78185,6 @@
             "schema": {
               "anyOf": [
                 {
-                  "maxLength": 1000,
                   "type": "string"
                 },
                 {

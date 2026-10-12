@@ -49,12 +49,7 @@ from tiqora.filters.ticket_params import TicketListParams, filter_from_list_para
 from tiqora.filters.tickets import compile_ticket_filter, ticket_query_scope
 from tiqora.jobs.service import utc_now
 from tiqora.reporting.access import require_report_access
-from tiqora.reporting.compiler import (
-    DEFAULT_TIME_RANGE,
-    RunParams,
-    _apply_choices_and_grain,
-    _apply_parameters,
-)
+from tiqora.reporting.compiler import DEFAULT_TIME_RANGE, RunParams, effective_definition
 from tiqora.reporting.definition import (
     AbsoluteTimeRange,
     ReportDefinition,
@@ -212,8 +207,7 @@ def point_filter(
     src = get_registry().get(REPORT_SOURCES, definition.source)
     if src is None:
         raise DrillNotPossible
-    effective = _apply_choices_and_grain(definition, src, params)
-    effective, param_conds = _apply_parameters(effective, src, params)
+    effective, param_conds = effective_definition(definition, src, params)
     keys = [d.key for d in effective.dimensions]
     check_drillable(effective, keys)
     nodes: list[FilterNode] = []

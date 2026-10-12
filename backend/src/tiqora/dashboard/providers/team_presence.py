@@ -14,27 +14,32 @@ from tiqora.db.tiqora.models import TiqoraChatSession
 
 async def run_team_presence(ctx: ProviderContext, settings: TeamPresenceSettings) -> dict[str, Any]:
     if ctx.redis is None:
-        return {"online": [], "total_online": 0}
+        return {"online": [], "total_online": 0, "by_status": {}}
     agents = await list_online_agents_for(ctx.redis, ctx.session)
     agents.sort(key=lambda a: (a.id != ctx.user_id, a.full_name.lower()))
-    shown = agents[: settings.limit]
     in_chat: set[int] = set()
-    if shown:  # integer IN-list over the shown agents only (never joined with Znuny tables)
+    if agents:  # integer IN-list over everyone online (never joined with Znuny tables)
         rows = await ctx.session.execute(
             select(TiqoraChatSession.assigned_user_id)
             .where(
                 TiqoraChatSession.status == "active",
-                TiqoraChatSession.assigned_user_id.in_([a.id for a in shown]),
+                TiqoraChatSession.assigned_user_id.in_([a.id for a in agents]),
             )
             .distinct()
         )
         in_chat = {int(uid) for (uid,) in rows.all() if uid is not None}
+    by_status: dict[str, int] = {}
+    for a in agents:
+        status = "in_chat" if a.id in in_chat else "available"
+        by_status[status] = by_status.get(status, 0) + 1
     return {
         "online": [
             {**a.model_dump(mode="json"), "status": "in_chat" if a.id in in_chat else "available"}
-            for a in shown
+            for a in agents[: settings.limit]
         ],
         "total_online": len(agents),
+        # counts over everyone online, not only the people shown (the wallboard shows these)
+        "by_status": by_status,
     }
 
 

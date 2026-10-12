@@ -310,7 +310,16 @@ async def test_team_presence_without_redis_is_empty_not_an_error(env: Env) -> No
     out = await run_widget(
         env.factory, registry(), USER_A, W("p", "core.team-presence"), redis=None
     )
-    assert out is not None and out.status == "ok" and out.data == {"online": [], "total_online": 0}
+    assert (
+        out is not None
+        and out.status == "ok"
+        and out.data
+        == {
+            "online": [],
+            "total_online": 0,
+            "by_status": {},
+        }
+    )
 
 
 async def test_online_route_and_helper_return_the_same_list(env: Env) -> None:

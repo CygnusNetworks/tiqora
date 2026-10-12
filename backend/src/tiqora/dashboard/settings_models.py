@@ -18,12 +18,15 @@ from pydantic import (
 )
 
 from tiqora.dashboard.filters import TimeRangePreset
+from tiqora.reporting.definition import MAX_KEY_LENGTH
 from tiqora.reporting.schemas import (
     MAX_DIMENSION_CHOICES,
     MAX_RUN_PARAMETERS,
     ParameterValue,
-    _ColumnKey,
 )
+
+#: a report column key (same bound as ``reporting.schemas``' run input)
+ColumnKey = Annotated[str, Field(max_length=MAX_KEY_LENGTH)]
 
 WIDGET_KEY_RE: Final = re.compile(r"^[a-z0-9][a-z0-9._-]{1,118}$")
 MAX_WIDGET_SETTINGS_BYTES: Final = 20_000
@@ -199,7 +202,7 @@ class ReportWidgetSettings(_Strict):
         default_factory=dict, max_length=MAX_RUN_PARAMETERS
     )
     #: dimension index ("0".."9") -> dimension key, as in ``ReportRunIn``
-    dimension_choices: dict[Annotated[str, Field(pattern=r"^[0-9]$")], _ColumnKey] = Field(
+    dimension_choices: dict[Annotated[str, Field(pattern=r"^[0-9]$")], ColumnKey] = Field(
         default_factory=dict, max_length=MAX_DIMENSION_CHOICES
     )
     display: Literal["auto", "table"] = "auto"

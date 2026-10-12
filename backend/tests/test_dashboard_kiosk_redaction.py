@@ -23,6 +23,8 @@ from tiqora.dashboard.kiosk import (
     redact_result,
     redact_settings,
 )
+from tiqora.dashboard.providers.report import MSG_NO_ACCESS
+from tiqora.dashboard.runner import ERROR_MESSAGE
 from tiqora.dashboard.schemas import WidgetDataOut
 from tiqora.dashboard.settings_models import CORE_WIDGET_SETTINGS
 from tiqora.domain.schemas import TicketListItem
@@ -125,6 +127,7 @@ def test_calendar_hidden_without_details_and_team_reduced_to_counts() -> None:
     shown = redact("core.calendar-agenda", agenda, show_details=True)
     assert shown.status == "ok" and shown.data == agenda
 
+    # the provider cut ``online`` to the widget limit; ``by_status`` counts everyone online
     team = {
         "online": [
             {"id": 1, "full_name": "Anna Beispiel", "status": "available"},
@@ -132,11 +135,19 @@ def test_calendar_hidden_without_details_and_team_reduced_to_counts() -> None:
             {"id": 3, "full_name": "Cora Beispiel", "status": "available"},
         ],
         "total_online": 5,
+        "by_status": {"available": 3, "in_chat": 2},
     }
     out = redact("core.team-presence", team, show_details=False)
-    assert out.data == {"total_online": 5, "by_status": {"available": 2, "in_chat": 1}}
+    assert out.data == {"total_online": 5, "by_status": {"available": 3, "in_chat": 2}}
+    assert out.data is not None and sum(out.data["by_status"].values()) == out.data["total_online"]
     assert "Beispiel" not in json.dumps(out.data)
     assert redact("core.team-presence", team, show_details=True).data == team
+    # an answer without ``by_status`` (older provider) is still counted from the shown people
+    legacy = {k: v for k, v in team.items() if k != "by_status"}
+    assert redact("core.team-presence", legacy, show_details=False).data == {
+        "total_online": 5,
+        "by_status": {"available": 2, "in_chat": 1},
+    }
 
 
 def test_chat_queue_drops_items_and_never_carries_a_visitor_name() -> None:
@@ -175,13 +186,16 @@ def test_ai_provider_costs_always_dropped() -> None:
             },
         ],
     }
-    plain = redact("core.ai-status", ai, show_details=False)
-    assert plain.data == {"ai_escalated": 2, "runs_today": {"draft": 4}}
-    detailed = redact("core.ai-status", ai, show_details=True)
-    assert detailed.data is not None
-    assert [b["kind"] for b in detailed.data["budgets"]] == ["queue_tokens_day"]
-    assert "currency" not in detailed.data["budgets"][0]
-    assert "Hetzner" not in json.dumps(detailed.data)
+    # E9: only provider cost budgets (money) and the currency are dropped; queue token budgets
+    # stay with and without details (queue names leave through the queue overview as well)
+    for details in (False, True):
+        out = redact("core.ai-status", ai, show_details=details)
+        assert out.data is not None
+        assert out.data["ai_escalated"] == 2 and out.data["runs_today"] == {"draft": 4}
+        assert [b["kind"] for b in out.data["budgets"]] == ["queue_tokens_day"]
+        assert out.data["budgets"][0]["subject_name"] == "Support"
+        assert "currency" not in json.dumps(out.data)
+        assert "Hetzner" not in json.dumps(out.data)
 
 
 def _report(dimensions: list[dict[str, Any]], **extra: Any) -> dict[str, Any]:
@@ -268,7 +282,7 @@ def test_redact_result_passes_non_ok_statuses_without_data() -> None:
     pending = WidgetDataOut(status="pending")
     assert redact_result("core.counter", pending, False).status == "pending"
     assert (
-        redact_result("core.counter", WidgetDataOut(status="error", error="x"), False).error == "x"
+        redact_result("core.counter", WidgetDataOut(status="error", error="x"), True).error == "x"
     )
     assert (
         redact_result("acme.x", WidgetDataOut(status="ok", data={"a": 1}), True).status
@@ -355,3 +369,25 @@ def test_preset_name_survives_for_preset_sources_only() -> None:
     assert "preset" not in redact_settings(
         "core.queue-overview", {"source": {"kind": "preset"}}, True
     )
+
+
+def test_error_texts_are_generic_without_details() -> None:
+    """A provider error may quote a saved report's name or a stored filter literal."""
+    gone = WidgetDataOut(status="error", error="Der Bericht „Kunde Beispiel GmbH“ wurde gelöscht.")
+    for key in ("core.report", "core.sla-gauge", "core.counter"):
+        out = redact_result(key, gone, False)
+        assert out.status == "error" and out.data is None
+        assert out.error == ERROR_MESSAGE
+        assert "Beispiel" not in json.dumps(out.model_dump())
+    shown = redact_result("core.report", gone, True)
+    assert shown.status == "error" and shown.error == gone.error
+    # constant texts of the other statuses stay
+    forbidden = WidgetDataOut(status="forbidden", error=MSG_NO_ACCESS)
+    assert redact_result("core.report", forbidden, False).error == forbidden.error
+
+
+def test_chat_queue_never_sends_the_link_creators_own_count() -> None:
+    chat = {"enabled": True, "waiting": 3, "oldest_waiting_since": None, "mine": 2, "items": []}
+    for details in (False, True):
+        out = redact("core.chat-queue", chat, show_details=details)
+        assert out.data is not None and "mine" not in out.data and out.data["waiting"] == 3
