@@ -24,6 +24,7 @@ from tiqora.dashboard.kiosk import (
 )
 from tiqora.dashboard.schemas import WidgetDataOut
 from tiqora.dashboard.settings_models import CORE_WIDGET_SETTINGS
+from tiqora.domain.schemas import TicketListItem
 from tiqora.extensions.core import get_registry
 from tiqora.reporting.semantic import REPORT_SOURCES
 
@@ -33,6 +34,9 @@ TICKET: dict[str, Any] = {
     "title": "VPN gesperrt",
     "queue_id": 3,
     "queue_name": "Support",
+    "state_id": 2,
+    "lock_id": 1,
+    "age_seconds": 99,
     "state": "open",
     "state_type": "open",
     "priority_id": 3,
@@ -50,14 +54,44 @@ TICKET: dict[str, Any] = {
 SECRETS = ("VPN gesperrt", "Beispiel GmbH", "anna@example.org", "Anna Beispiel", "future_field")
 
 
-def test_redaction_whitelist_drops_unknown_fields() -> None:
+def _assert_neutral(item: dict[str, Any]) -> None:
+    TicketListItem.model_validate(item)  # the wallboard gets a complete TicketListItem
+    assert item["tn"] == TICKET["tn"] and item["queue_name"] == "Support"
+    assert item["state_id"] == 2 and item["lock_id"] == 1 and item["age_seconds"] == 99
+    assert item["title"] is None and item["owner_id"] == 0 and item["owner_name"] is None
+    assert item["customer_id"] is None and item["customer_user_id"] is None
+    assert item["customer_email"] is None and item["first_from"] is None
+    assert item["channel"] == "email" and item["links"] == []
+    assert item["chat_display_name"] is None and item["chat_username"] is None
+    assert "future_field" not in item
+    assert not any(s in json.dumps(item) for s in SECRETS)
+
+
+def test_kiosk_safe_fields_are_ticket_list_item_fields() -> None:
+    assert set(TicketListItem.model_fields) >= KIOSK_SAFE_TICKET_FIELDS
+    assert {"state_id", "lock_id", "age_seconds"} <= KIOSK_SAFE_TICKET_FIELDS
+
+
+def test_redaction_whitelist_builds_neutral_ticket_list_item() -> None:
     out = redact("core.ticket-list", {"items": [TICKET], "total": 1}, show_details=False)
     assert out.status == "ok" and out.data is not None
-    item = out.data["items"][0]
-    assert item.keys() <= KIOSK_SAFE_TICKET_FIELDS
-    assert item["tn"] == TICKET["tn"] and item["queue_name"] == "Support"
-    assert "future_field" not in item and "title" not in item
+    _assert_neutral(out.data["items"][0])
     assert out.data["total"] == 1
+
+
+def test_redaction_neutral_item_for_escalations_and_reminders() -> None:
+    for key in ("core.escalations", "core.reminders"):
+        data = {"items": [{"ticket": TICKET, "epoch": 5, "kind": "solution"}], "total": 1}
+        out = redact(key, data, show_details=False)
+        assert out.data is not None
+        _assert_neutral(out.data["items"][0]["ticket"])
+
+
+def test_redaction_survives_a_source_missing_required_fields() -> None:
+    out = redact("core.ticket-list", {"items": [{"tn": "1", "title": "x"}]}, show_details=False)
+    assert out.data is not None
+    item = TicketListItem.model_validate(out.data["items"][0])
+    assert item.title is None and item.tn == "1"
 
 
 def test_details_keep_ticket_fields_but_still_run_through_the_rule() -> None:
@@ -177,7 +211,8 @@ def test_report_without_details_drops_filter_and_parameters_and_keeps_render_dat
     assert "a@example.org" not in json.dumps(out.data) and "Beispiel GmbH" not in json.dumps(
         out.data
     )
-    assert out.data["report"]["key"] is None and "report_key" not in out.data["result"]
+    assert out.data["report"]["key"] is None and out.data["report"]["name"] is None
+    assert "report_key" not in out.data["result"]
 
 
 @pytest.mark.parametrize("key", sorted(PERSON_DIMENSIONS))
@@ -194,6 +229,12 @@ def test_report_with_person_dimension_is_forbidden_without_details(key: str) -> 
 def test_report_with_unclassified_dimension_fails_closed() -> None:
     out = redact("core.report", _report([{"key": "brand_new_dimension"}]), show_details=False)
     assert out.status == "forbidden"
+
+
+def test_report_result_without_definition_fails_closed() -> None:
+    data = _report([{"key": "queue"}])
+    del data["definition"]
+    assert redact("core.report", data, show_details=False).status == "forbidden"
 
 
 def test_deferred_report_passes_without_a_definition() -> None:

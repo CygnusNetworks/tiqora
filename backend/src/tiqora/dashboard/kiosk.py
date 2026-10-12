@@ -35,6 +35,7 @@ from tiqora.db.tiqora.models import (
     TiqoraDashboardKioskItem,
     TiqoraDashboardKioskToken,
 )
+from tiqora.domain.schemas import TicketListItem
 from tiqora.jobs.service import utc_now
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.reporting.person_dimensions import NON_PERSON_DIMENSIONS, PERSON_DIMENSIONS
@@ -91,12 +92,15 @@ KIOSK_SAFE_TICKET_FIELDS: Final[frozenset[str]] = frozenset(
         "tn",
         "queue_id",
         "queue_name",
+        "state_id",
         "state",
         "state_type",
         "priority_id",
         "priority",
+        "lock_id",
         "create_time",
         "change_time",
+        "age_seconds",
         "until_time",
         "escalation_time",
         "escalation_response_time",
@@ -126,10 +130,40 @@ KIOSK_SETTINGS_WHITELIST: Final[dict[str, frozenset[str]]] = {
 Rule = Callable[[dict[str, Any], bool], dict[str, Any] | None]
 
 
+#: neutral values for every sensitive ``TicketListItem`` field (and the required ones, should a
+#: source lack them), so a redacted item still satisfies the type the wallboard is written against
+_NEUTRAL_TICKET: Final[dict[str, Any]] = {
+    "id": 0,
+    "tn": "",
+    "title": None,
+    "queue_id": 0,
+    "state_id": 0,
+    "priority_id": 0,
+    "lock_id": 0,
+    "owner_id": 0,
+    "owner_login": None,
+    "owner_name": None,
+    "customer_id": None,
+    "customer_user_id": None,
+    "customer_email": None,
+    "first_from": None,
+    "channel": "email",
+    "chat_display_name": None,
+    "chat_username": None,
+    "links": [],
+    "create_time": "1970-01-01T00:00:00Z",
+    "change_time": "1970-01-01T00:00:00Z",
+}
+
+
 def _ticket(ticket: Mapping[str, Any], show_details: bool) -> dict[str, Any]:
+    """Without details: a full ``TicketListItem`` of whitelisted source fields over neutral
+    defaults (not a key-deleted dict), so unknown or future fields cannot leave."""
     if show_details:
         return dict(ticket)
-    return {k: v for k, v in ticket.items() if k in KIOSK_SAFE_TICKET_FIELDS}
+    picked = {k: v for k, v in ticket.items() if k in KIOSK_SAFE_TICKET_FIELDS}
+    item = TicketListItem.model_validate({**_NEUTRAL_TICKET, **picked})
+    return item.model_dump(mode="json")
 
 
 def _keep(data: dict[str, Any], _show_details: bool) -> dict[str, Any]:
@@ -191,10 +225,11 @@ def _calendar(data: dict[str, Any], show_details: bool) -> dict[str, Any] | None
 
 
 def _report_meta(meta: Mapping[str, Any]) -> dict[str, Any]:
-    """A saved report's key is an internal reference: keep it for built-ins only."""
+    """A saved report's key is an internal reference and its name may name a customer: keep both
+    for built-ins only."""
     if meta.get("kind") == "builtin":
         return dict(meta)
-    return {**meta, "key": None}
+    return {**meta, "key": None, "name": None}
 
 
 def _report(data: dict[str, Any], show_details: bool) -> dict[str, Any] | None:
@@ -204,6 +239,8 @@ def _report(data: dict[str, Any], show_details: bool) -> dict[str, Any] | None:
     if isinstance(data.get("report"), Mapping):
         out["report"] = _report_meta(data["report"])
     definition = data.get("definition")
+    if definition is None and data.get("result") is not None:
+        return None  # a result without its definition cannot be checked: fail closed
     if definition is not None:
         dims = definition.get("dimensions", [])
         keys = {str(d.get("key")) for d in dims} | {
