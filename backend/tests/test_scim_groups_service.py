@@ -265,7 +265,8 @@ async def test_deleted_users_are_not_members(db: AsyncSession) -> None:
 async def test_customer_tenant_has_no_groups(db: AsyncSession) -> None:
     rec = await seed_scim_provider(db, audience="customer", slug="sc63g-c")
     tenant = make_tenant(rec, "customer")
-    await _expect(create_group(db, tenant, _doc("X"), base=BASE, max_members=MAXM), 404, None)
+    err = await _expect(create_group(db, tenant, _doc("X"), base=BASE, max_members=MAXM), 404, None)
+    assert err.detail == "Groups are not available for customer provisioning"
     await _expect(list_groups(db, tenant, None, PAGE, base=BASE), 404, None)
 
 
@@ -523,3 +524,103 @@ async def test_put_group_5000_members_is_fast(db: AsyncSession) -> None:
     # and back down to nothing
     gone = await replace_group(db, tenant, g["id"], _doc("Bulk"), base=BASE, max_members=MAXM)
     assert len(gone.affected_user_ids) == MAXM and gone.resource["members"] == []
+
+
+# ---------------------------------------------------------------------------- fix round 1
+
+
+@pytest.mark.asyncio
+async def test_patch_validates_names_before_writing_members(db: AsyncSession) -> None:
+    tenant = await _tenant(db)
+    a, _ = await _agent(db, tenant, "a")
+    g = await _group(db, tenant, "Support")
+    ops = _ops(
+        {"op": "Add", "path": "members", "value": _members(a)},
+        {"op": "Replace", "path": "displayName", "value": "y" * 256},
+    )
+    await _expect(
+        patch_group(db, tenant, g["id"], ops, base=BASE, max_members=MAXM), 400, "invalidValue"
+    )
+    assert await _member_scim_ids(db, g["id"]) == set()
+
+
+@pytest.mark.asyncio
+async def test_patch_replace_remove_members_and_external_id(db: AsyncSession) -> None:
+    tenant = await _tenant(db)
+    a, a_uid = await _agent(db, tenant, "a")
+    b, b_uid = await _agent(db, tenant, "b")
+    c, c_uid = await _agent(db, tenant, "c")
+    g = await _group(db, tenant, "Support", a, b, externalId="e1")
+    await _clear_pending(db)
+    ops = _ops({"op": "Replace", "path": "members", "value": _members(b, c)})
+    r = await patch_group(db, tenant, g["id"], ops, base=BASE, max_members=MAXM)
+    assert await _member_scim_ids(db, g["id"]) == {b, c}
+    assert r.affected_user_ids == {a_uid, c_uid}
+    await _clear_pending(db)
+    r = await patch_group(
+        db, tenant, g["id"], _ops({"op": "Remove", "path": "members"}), base=BASE, max_members=MAXM
+    )
+    assert await _member_scim_ids(db, g["id"]) == set()
+    assert r.affected_user_ids == {b_uid, c_uid} and r.resource["members"] == []
+    r = await patch_group(
+        db,
+        tenant,
+        g["id"],
+        _ops({"op": "Remove", "path": "externalId"}),
+        base=BASE,
+        max_members=MAXM,
+    )
+    assert "externalId" not in r.resource
+    total, _ = await list_groups(db, tenant, ScimFilter("externalId", "e1"), PAGE, base=BASE)
+    assert total == 0
+
+
+async def _commit_state(db: AsyncSession) -> tuple[ScimTenant, dict[str, tuple[str, int]], str]:
+    tenant = await _tenant(db)
+    users = {n: await _agent(db, tenant, n) for n in ("x", "y")}
+    g = await _group(db, tenant, "Race")
+    await db.commit()
+    return tenant, users, g["id"]
+
+
+async def _fresh_members(db: AsyncSession, group_scim_id: str) -> set[str]:
+    assert db.bind is not None
+    async with async_sessionmaker(db.bind, expire_on_commit=False)() as fresh:
+        return await _member_scim_ids(fresh, group_scim_id)
+
+
+@pytest.mark.asyncio
+async def test_parallel_patch_adding_same_member_does_not_collide(db: AsyncSession) -> None:
+    """B holds a stale snapshot (plain read first, like authenticate_token), A commits, B writes."""
+    tenant, users, gid = await _commit_state(db)
+    x = users["x"][0]
+    assert db.bind is not None
+    maker = async_sessionmaker(db.bind, expire_on_commit=False)
+    async with maker() as a, maker() as b:
+        await b.execute(text("SELECT COUNT(*) FROM tiqora_scim_token"))
+        ops = _ops({"op": "Add", "path": "members", "value": _members(x)})
+        await patch_group(a, tenant, gid, ops, base=BASE, max_members=MAXM)
+        await a.commit()
+        r = await patch_group(b, tenant, gid, ops, base=BASE, max_members=MAXM)
+        await b.commit()
+    assert r.affected_user_ids == frozenset()
+    assert await _fresh_members(db, gid) == {x}
+
+
+@pytest.mark.asyncio
+async def test_put_after_concurrent_add_removes_the_added_member(db: AsyncSession) -> None:
+    tenant, users, gid = await _commit_state(db)
+    x, _ = users["x"]
+    y, y_uid = users["y"]
+    assert db.bind is not None
+    maker = async_sessionmaker(db.bind, expire_on_commit=False)
+    async with maker() as a, maker() as b:
+        await b.execute(text("SELECT COUNT(*) FROM tiqora_scim_token"))
+        add_y = _ops({"op": "Add", "path": "members", "value": _members(y)})
+        await patch_group(a, tenant, gid, add_y, base=BASE, max_members=MAXM)
+        await a.commit()
+        r = await replace_group(b, tenant, gid, _doc("Race", x), base=BASE, max_members=MAXM)
+        await b.commit()
+    assert y_uid in r.affected_user_ids
+    assert {m["value"] for m in r.resource["members"]} == {x}
+    assert await _fresh_members(db, gid) == {x}
