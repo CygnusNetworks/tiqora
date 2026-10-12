@@ -8,6 +8,7 @@ from tiqora.jobs.registry import JOB_HANDLERS
 from tiqora.plugins.events import EVENT_SUBSCRIBERS
 from tiqora.plugins.mcp import MCP_TOOLS
 from tiqora.plugins.routes import PLUGIN_ROUTES
+from tiqora.plugins.sync_hooks import SYNC_HOOKS
 from tiqora.plugins.tasks import SCHEDULED_TASKS
 from tiqora.settings_sections.section import SETTINGS_SECTIONS
 
@@ -53,6 +54,18 @@ SUBMODULES: dict[str, set[str]] = {
         "PluginPermissionDenied",
         "CustomerSummary",
     },
+    "tiqora_sdk.hooks": {
+        "SyncOperation",
+        "HookContext",
+        "TicketCreateOp",
+        "ArticleOp",
+        "QueueMoveOp",
+        "StateChangeOp",
+        "DynamicFieldsOp",
+        "TicketCreatePatch",
+        "OperationVetoed",
+        "SyncHandler",
+    },
 }
 
 
@@ -85,6 +98,7 @@ def test_registry_protocol_matches_registrar() -> None:
             "scheduled_task",
             "job_handler",
             "mcp_tool",
+            "before",
         }
     )
 
@@ -105,6 +119,7 @@ def test_phase1_points_are_sdk_stable() -> None:
             EVENT_SUBSCRIBERS,
             SCHEDULED_TASKS,
             MCP_TOOLS,
+            SYNC_HOOKS,
         )
     )
     assert CHANNELS.sdk_stable is False

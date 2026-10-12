@@ -12,7 +12,7 @@ import functools
 import inspect
 import re
 from collections.abc import Awaitable, Callable, Iterable
-from typing import Any, Final
+from typing import Any, Final, Literal
 
 from fastapi import APIRouter
 from fastapi.routing import APIRoute
@@ -25,6 +25,13 @@ from tiqora.plugins.events import EVENT_SUBSCRIBERS, EventHandler, EventSubscrib
 from tiqora.plugins.manifest import PluginManifest
 from tiqora.plugins.mcp import CORE_MCP_TOOL_NAMES, MCP_TOOLS, McpTool
 from tiqora.plugins.routes import PLUGIN_ROUTES, PluginRoute
+from tiqora.plugins.sync_hooks import (
+    SYNC_HOOKS,
+    SYNC_OPERATIONS,
+    SyncHandler,
+    SyncHook,
+    SyncOperation,
+)
 from tiqora.plugins.tasks import SCHEDULED_TASKS, Schedule, ScheduledTask, TaskRun
 from tiqora.settings_sections.section import (
     SETTINGS_SECTIONS,
@@ -318,3 +325,46 @@ class PluginRegistrar:
             context=self._context,
         )
         self._stage(MCP_TOOLS, item, check=check)
+
+    def before(
+        self,
+        operation: SyncOperation,
+        name: str,
+        handler: SyncHandler,
+        *,
+        timeout_ms: int = 1000,
+        on_error: Literal["allow", "deny"] = "allow",
+        order: int = 100,
+    ) -> None:
+        def check() -> None:
+            if operation not in SYNC_OPERATIONS:
+                raise RegistrationRejected(
+                    f"Unbekannter Vorgang „{operation}“ für eine Prüfung vor dem Speichern; "
+                    f"erlaubt: {', '.join(SYNC_OPERATIONS)}"
+                )
+            self._check_name(name, "die Prüfung vor dem Speichern")
+            _require_async(handler, f"Die Prüfung „{name}“")
+            if isinstance(timeout_ms, bool) or not 50 <= timeout_ms <= 3000:
+                raise RegistrationRejected(
+                    "Zeitlimit einer Prüfung muss zwischen 50 und 3000 Millisekunden liegen"
+                )
+            if on_error not in ("allow", "deny"):
+                raise RegistrationRejected(
+                    f"on_error „{on_error}“ ist ungültig; erlaubt: allow, deny"
+                )
+            if isinstance(order, bool) or not 0 <= order <= 1000:
+                raise RegistrationRejected(
+                    "Reihenfolge einer Prüfung muss zwischen 0 und 1000 liegen"
+                )
+
+        item = SyncHook(
+            key=f"{self.plugin_id}:{name}",
+            plugin_id=self.plugin_id,
+            operation=operation,
+            handler=handler,
+            timeout_ms=timeout_ms,
+            on_error=on_error,
+            order=order,
+            context=self._context,
+        )
+        self._stage(SYNC_HOOKS, item, check=check)

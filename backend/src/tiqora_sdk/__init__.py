@@ -33,6 +33,7 @@ if _t.TYPE_CHECKING:
     from fastapi import APIRouter
     from pydantic import BaseModel
 
+    from tiqora.plugins.sync_hooks import SyncHandler, SyncOperation
     from tiqora.settings_sections.section import SettingsSection
 
 __all__ = [
@@ -106,6 +107,17 @@ class PluginRegistry(_t.Protocol):
         description: str,
         write: bool = False,
         timeout_seconds: int = 60,
+    ) -> None: ...
+
+    def before(
+        self,
+        operation: SyncOperation,
+        name: str,
+        handler: SyncHandler,
+        *,
+        timeout_ms: int = 1000,
+        on_error: _t.Literal["allow", "deny"] = "allow",
+        order: int = 100,
     ) -> None: ...
 
 
