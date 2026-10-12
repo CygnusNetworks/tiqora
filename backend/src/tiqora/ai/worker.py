@@ -41,7 +41,7 @@ from tiqora.domain.settings_store import (
     get_setting_int,
 )
 from tiqora.logging_setup import configure_logging
-from tiqora.plugins.bootstrap import init_registry
+from tiqora.plugins.bootstrap import init_registry, retry_plugin_boot
 from tiqora.worker.status import record_tick_status
 
 logger = structlog.get_logger(__name__)
@@ -136,14 +136,22 @@ async def _run_all(stop: asyncio.Event) -> None:
     # Build + freeze the registry (core + enabled plugins) before any loop starts: number
     # generators, placeholders, outbound filters and DF types apply here too. A broken plugin
     # never blocks the boot (R-BOOT-ANYERR).
-    await init_registry(
-        role="ai-worker", settings=get_settings(), session_factory=get_session_factory()
+    settings = get_settings()
+    factory = get_session_factory()
+    await init_registry(role="ai-worker", settings=settings, session_factory=factory)
+    # Booted before the api migrated: wait for the plugin tables, then load plugins late.
+    plugin_retry = asyncio.create_task(
+        retry_plugin_boot(role="ai-worker", settings=settings, session_factory=factory)
     )
-    await asyncio.gather(_heartbeat_loop(stop), _run_loop(stop), run_chat_bot_loop(stop))
+    try:
+        await asyncio.gather(_heartbeat_loop(stop), _run_loop(stop), run_chat_bot_loop(stop))
+    finally:
+        plugin_retry.cancel()
+        await asyncio.gather(plugin_retry, return_exceptions=True)
 
 
 def run_ai_worker() -> None:
-    """Start the AI worker process (Readiness-Gate tick + heartbeat only, Phase A)."""
+    """Start the AI worker process (plugins, AI tick, heartbeat, chat bot)."""
     settings = get_settings()
     configure_logging(settings)
     stop = asyncio.Event()

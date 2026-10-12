@@ -176,7 +176,7 @@ async def retry_plugin_boot(
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     clock: Callable[[], float] = time.monotonic,
 ) -> bool:
-    """Worker/mcp that booted before the api migrated: retry until the tables exist.
+    """Worker/mcp/ai-worker that booted before the api migrated: retry until the tables exist.
 
     Every ``interval`` seconds (60) for up to ``max_seconds`` (30 min). The api never
     retries (it runs the migration). Returns True once plugins were loaded.
