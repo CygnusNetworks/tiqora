@@ -130,3 +130,22 @@ async def load_gi_webservice(
     parsed_rows = await asyncio.to_thread(_load_yaml_rows, row)
     ws_id_, name, parsed = parsed_rows[0]
     return await _build(ws_id_, name, parsed, sysconfig, await _huge_xml(sysconfig))
+
+
+async def load_gi_webservice_by_name(
+    session: AsyncSession, sysconfig: SysConfig, name: str
+) -> GiWebservice | None:
+    """One valid webservice with a requester section by its (unique) name; None when missing
+    or invalid. ``ExecuteInvoker`` addresses webservices by name, like Znuny."""
+    row = (
+        await session.execute(
+            select(GiWebserviceConfig.id, GiWebserviceConfig.name, GiWebserviceConfig.config).where(
+                GiWebserviceConfig.name == name, GiWebserviceConfig.valid_id == 1
+            )
+        )
+    ).all()
+    if not row:
+        return None
+    parsed_rows = await asyncio.to_thread(_load_yaml_rows, row[:1])
+    ws_id_, name_, parsed = parsed_rows[0]
+    return await _build(ws_id_, name_, parsed, sysconfig, await _huge_xml(sysconfig))
