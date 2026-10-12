@@ -21,6 +21,7 @@ from tests.test_identity_store import _to_async_url
 from tiqora.api.v1.admin.common import USER_CACHE_TYPES
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraScimGroup, TiqoraScimGroupMember, TiqoraScimUser
+from tiqora.domain.password_setup import unusable_password_hash
 from tiqora.identity.config_models import JitDefaults, RoleRule
 from tiqora.identity.scim.errors import ScimError
 from tiqora.identity.scim.patch import PatchOp, parse_patch
@@ -188,7 +189,8 @@ async def test_create_agent_writes_through_provisioning(db: AsyncSession) -> Non
         db, "SELECT id, pw, valid_id, first_name, last_name FROM users WHERE login = :l", l=login
     )
     assert user is not None and user.id == r.user_id and user.valid_id == 1
-    assert user.pw not in ("", "x") and (user.first_name, user.last_name) == ("Neu", "Agent")
+    assert user.pw and user.pw != "x" and user.pw[:4] == unusable_password_hash()[:4]
+    assert (user.first_name, user.last_name) == ("Neu", "Agent")
     assert _text(await _pref(db, login, "UserEmail")) == login
     assert await _scalar(
         db, "SELECT sso_eligible FROM tiqora_user_auth_config WHERE user_id = :u", u=r.user_id
@@ -357,6 +359,45 @@ async def test_owned_by_other_provider_conflicts(db: AsyncSession) -> None:
     assert rows == 1
 
 
+async def _deleted_row_of_a(db: AsyncSession, login: str) -> tuple[int, int]:
+    a = await _agent_tenant(db, "sc63u-a")
+    c = await create_user(db, a, _doc(login), base=BASE)
+    await delete_user(db, a, c.resource["id"])
+    return c.user_id, a.provider.id
+
+
+@pytest.mark.asyncio
+async def test_deleted_row_of_other_provider_is_released_to_adopting_provider(
+    db: AsyncSession,
+) -> None:
+    uid, pid_a = await _deleted_row_of_a(db, "sc63.rel@example.test")
+    b = await _agent_tenant(db, "sc63u-b", scim_adopt_existing=True)
+    r = await create_user(db, b, _doc("sc63.rel@example.test"), base=BASE)
+    assert r.operation == "adopt" and r.user_id == uid
+    rows = (
+        await db.execute(
+            text("SELECT provider_id, deleted FROM tiqora_scim_user WHERE user_id = :u"), {"u": uid}
+        )
+    ).all()
+    assert [(x.provider_id, bool(x.deleted)) for x in rows] == [(b.provider.id, False)]
+    assert pid_a != b.provider.id
+
+
+@pytest.mark.asyncio
+async def test_deleted_row_of_other_provider_kept_when_not_adopting(db: AsyncSession) -> None:
+    uid, pid_a = await _deleted_row_of_a(db, "sc63.keep@example.test")
+    b = await _agent_tenant(db, "sc63u-b", scim_adopt_existing=False)
+    with pytest.raises(ScimConflictError) as exc:
+        await create_user(db, b, _doc("sc63.keep@example.test"), base=BASE)
+    assert exc.value.reason == "not_adopted"
+    rows = (
+        await db.execute(
+            text("SELECT provider_id, deleted FROM tiqora_scim_user WHERE user_id = :u"), {"u": uid}
+        )
+    ).all()
+    assert [(x.provider_id, bool(x.deleted)) for x in rows] == [(pid_a, True)]
+
+
 @pytest.mark.asyncio
 async def test_duplicate_username_in_tenant_conflicts(db: AsyncSession) -> None:
     tenant = await _agent_tenant(db)
@@ -451,7 +492,10 @@ async def test_patch_active_true_reactivates_and_enqueues(db: AsyncSession) -> N
     rule = RoleRule(attribute="scim:groups", value="Support", role_ids=[ROLE_RULE])
     tenant = await _agent_tenant(db, role_rules=(rule,))
     c = await create_user(db, tenant, _doc("sc63.re@example.test", active=False), base=BASE)
-    await db.execute(text("DELETE FROM tiqora_scim_pending_sync"))
+    await db.execute(
+        text("DELETE FROM tiqora_scim_pending_sync WHERE provider_id = :p"),
+        {"p": tenant.provider.id},
+    )
     r = await patch_user(db, tenant, c.resource["id"], _replace("active", True), base=BASE)
     assert r.reactivated and r.operation == "reactivate" and not r.deactivated
     assert await _scalar(db, "SELECT valid_id FROM users WHERE id = :u", u=r.user_id) == 1

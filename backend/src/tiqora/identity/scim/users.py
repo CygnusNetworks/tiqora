@@ -7,8 +7,8 @@ through ``user_provisioning`` / ``identity.provisioning``; this module writes on
 are loaded with IN-lists of ids. Znuny rows are never deleted ("delete" deactivates and hides).
 
 ``ScimConflictError`` carries a ``reason`` (``system_user``, ``other_provider``, ``not_adopted``,
-``already_managed``, ``duplicate_user_name``, ``race``) for the router's ``conflict`` audit row; the
-response text stays generic.
+``already_managed``, ``duplicate_user_name``, ``ambiguous_login``, ``race``) for the router's
+``conflict`` audit row; the response text stays generic.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ from tiqora.identity.scim.patch import PatchOp, apply_user_patch
 from tiqora.identity.scim.protocol import ListParams, ScimFilter
 from tiqora.identity.scim.role_sync import enqueue_role_sync
 from tiqora.identity.scim.tokens import ScimTenant
-from tiqora.identity.scim.users_map import parse_user, to_profile, user_resource
+from tiqora.identity.scim.users_map import ScimUserInput, parse_user, to_profile, user_resource
 from tiqora.identity.types import SYSTEM_USER_ID, UserKind, utc_now
 
 logger = structlog.get_logger(__name__)
@@ -68,9 +68,6 @@ _CHUNK = 1000
 _NOT_MANAGED = "An account with this userName exists and is not managed by this provider"
 _NOT_FOUND = "Resource not found"
 _IGNORED_NOISE = frozenset({"schemas", "id", "meta"})
-_BAD_REQUEST_CODES = frozenset(
-    {"email_invalid", "email_required", "name_required", "jit_missing_fields"}
-)
 _CONFLICT_CODES = frozenset({"email_in_use", "login_exists"})
 
 
@@ -115,8 +112,7 @@ def _provisioning_to_scim(exc: ProvisioningError) -> ScimError:
     """One mapping for every write path (create, adopt, revive, replace, patch)."""
     if exc.code in _CONFLICT_CODES:
         return ScimError(409, "uniqueness", exc.code)
-    if exc.code in _BAD_REQUEST_CODES:
-        return ScimError(400, "invalidValue", exc.code)
+    # email_invalid/email_required/name_required/jit_missing_fields and unknown codes: 400
     return ScimError(400, "invalidValue", exc.code)
 
 
@@ -312,10 +308,10 @@ async def _account_by_login(
     if len(exact) == 1:
         return exact[0]
     if exact:
-        raise ScimConflictError("duplicate_user_name", "userName is ambiguous")
+        raise ScimConflictError("ambiguous_login", "userName is ambiguous")
     folded = [r for r in rows if r[1].strip().casefold() == wanted.casefold()]
     if len(folded) > 1:
-        raise ScimConflictError("duplicate_user_name", "userName is ambiguous")
+        raise ScimConflictError("ambiguous_login", "userName is ambiguous")
     return folded[0] if folded else None
 
 
@@ -361,7 +357,7 @@ async def _apply_active(
 
 
 async def _apply_profile(
-    session: AsyncSession, tenant: ScimTenant, account: _Account, inp: Any
+    session: AsyncSession, tenant: ScimTenant, account: _Account, inp: ScimUserInput
 ) -> list[str]:
     """Sync name/e-mail/mobile that the IdP sent and that differ; returns the field names."""
     kind = tenant.user_kind
@@ -381,7 +377,7 @@ async def _enqueue(session: AsyncSession, tenant: ScimTenant, user_id: int) -> N
         await enqueue_role_sync(session, tenant.provider.id, [user_id])
 
 
-def _new_row(tenant: ScimTenant, user_id: int, inp: Any) -> TiqoraScimUser:
+def _new_row(tenant: ScimTenant, user_id: int, inp: ScimUserInput) -> TiqoraScimUser:
     now = utc_now()
     fold = inp.user_name.casefold()
     return TiqoraScimUser(
@@ -449,6 +445,9 @@ async def create_user(
                 user_id = (await provision_customer(session, provider, to_profile(inp))).id
         except ProvisioningError as exc:
             raise _provisioning_to_scim(exc) from exc
+        except IntegrityError:  # a parallel POST won Znuny's unique login/e-mail slot
+            await session.rollback()
+            raise ScimConflictError("race") from None
         if inp.active is False:
             await _set_validity(session, kind, user_id, 2)
         row = _new_row(tenant, user_id, inp)
@@ -462,7 +461,11 @@ async def create_user(
         if existing is not None and existing.provider_id != provider.id:
             if not existing.deleted:
                 raise ScimConflictError("other_provider")
-            await _drop_row(session, existing)  # a dead mapping of another provider
+            # S6 amendment: a deleted mapping of another provider is released, and only to a
+            # provider that adopts; the gate runs before anything is written.
+            if not provider.scim_adopt_existing:
+                raise ScimConflictError("not_adopted")
+            await _drop_row(session, existing)
             existing = None
         if existing is not None and not existing.deleted:
             raise ScimConflictError("already_managed", "userName already exists")
@@ -587,7 +590,7 @@ async def _update(
     session: AsyncSession,
     tenant: ScimTenant,
     row: TiqoraScimUser,
-    inp: Any,
+    inp: ScimUserInput,
     *,
     sent: frozenset[str],
     operation: ScimOperation,
