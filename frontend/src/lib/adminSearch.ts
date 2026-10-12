@@ -281,7 +281,7 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     group: "tickets",
     nameKey: "admin.nav.processes",
     descriptionKey: "admin.pageDescriptions.processes",
-    keywords: ["workflow", "prozess", "process management", "bpmn"],
+    keywords: ["workflow", "prozess", "process management", "bpmn", "designer", "prozess bearbeiten", "import"],
   },
 
   // ── Kommunikation & Vorlagen ───────────────────────────────────────

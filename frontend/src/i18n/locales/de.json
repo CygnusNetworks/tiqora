@@ -2792,7 +2792,23 @@
         "Active": "Aktiv",
         "Inactive": "Abgeschaltet",
         "FadeAway": "Läuft aus"
-      }
+      },
+      "new": "Neuer Prozess",
+      "import": "Importieren",
+      "edit": "Bearbeiten",
+      "export": "Exportieren",
+      "copy": "Kopieren",
+      "delete": "Löschen",
+      "actions": "Aktionen",
+      "create": "Anlegen",
+      "newTitle": "Neuer Prozess",
+      "newMessage": "Name des neuen Prozesses. Er wird als Entwurf angelegt.",
+      "deleteTitle": "Prozess löschen?",
+      "deleteMessage": "Soll der Prozess „{{name}}“ gelöscht werden? Das lässt sich nicht rückgängig machen.",
+      "copied": "„{{name}}“ wurde als Entwurf angelegt.",
+      "createError": "Der Prozess konnte nicht angelegt werden.",
+      "copyError": "Der Prozess konnte nicht kopiert werden.",
+      "deleteError": "Der Prozess konnte nicht gelöscht werden."
     },
     "processDesigner": {
       "title": "Prozess-Designer",
@@ -3032,6 +3048,17 @@
         "confirm_one": "Die Prüfung meldet {{count}} Fehler. Trotzdem bereitstellen?",
         "confirm_other": "Die Prüfung meldet {{count}} Fehler. Trotzdem bereitstellen?",
         "checkFailed": "Die Prüfung konnte nicht ausgeführt werden."
+      },
+      "import": {
+        "title": "Prozess importieren",
+        "description": "Laden Sie eine aus Znuny oder Tiqora exportierte Prozessdatei. Sie wird als Entwurf importiert.",
+        "file": "Prozessdatei (.yml, .yaml)",
+        "overwrite": "Vorhandene Einträge mit gleicher ID überschreiben",
+        "submit": "Importieren",
+        "success": "„{{name}}“ wurde als Entwurf importiert.",
+        "refused": "Die Datei wurde nicht importiert: {{message}}",
+        "unknown": "Die Datei ist keine gültige Prozessdatei.",
+        "readError": "Die Datei konnte nicht gelesen werden."
       }
     },
     "mailOutbound": {

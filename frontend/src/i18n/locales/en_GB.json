@@ -2792,7 +2792,23 @@
         "Active": "Active",
         "Inactive": "Switched off",
         "FadeAway": "Phasing out"
-      }
+      },
+      "new": "New process",
+      "import": "Import",
+      "edit": "Edit",
+      "export": "Export",
+      "copy": "Copy",
+      "delete": "Delete",
+      "actions": "Actions",
+      "create": "Create",
+      "newTitle": "New process",
+      "newMessage": "Name of the new process. It is created as a draft.",
+      "deleteTitle": "Delete process?",
+      "deleteMessage": "Delete the process “{{name}}”? This cannot be undone.",
+      "copied": "“{{name}}” was created as a draft.",
+      "createError": "Could not create the process.",
+      "copyError": "Could not copy the process.",
+      "deleteError": "Could not delete the process."
     },
     "processDesigner": {
       "title": "Process designer",
@@ -3032,6 +3048,17 @@
         "confirm_one": "The check reports {{count}} error. Deploy anyway?",
         "confirm_other": "The check reports {{count}} errors. Deploy anyway?",
         "checkFailed": "Could not run the check."
+      },
+      "import": {
+        "title": "Import process",
+        "description": "Load a process file exported from Znuny or Tiqora. It is imported as a draft.",
+        "file": "Process file (.yml, .yaml)",
+        "overwrite": "Overwrite existing entries with the same ID",
+        "submit": "Import",
+        "success": "“{{name}}” was imported as a draft.",
+        "refused": "The file was not imported: {{message}}",
+        "unknown": "The file is not a valid process file.",
+        "readError": "The file could not be read."
       }
     },
     "mailOutbound": {
