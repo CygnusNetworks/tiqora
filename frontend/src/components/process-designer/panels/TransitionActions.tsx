@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/SelectField";
@@ -38,11 +38,18 @@ export function TransitionActions({
   const nameOf = new Map([...(library ?? []), ...actions].map((a) => [a.entity_id, a.name]));
   const addable = (library ?? actions).filter((a) => !actionIds.includes(a.entity_id));
 
+  // The latest list and handler: an edit made while the picked action is being loaded must survive.
+  const latest = useRef({ actionIds, onChange });
+  useEffect(() => {
+    latest.current = { actionIds, onChange };
+  });
+
   const addExisting = async (id: string) => {
     setError(false);
     try {
       await adoptAction?.(id);
-      onChange([...actionIds, id]);
+      const cur = latest.current;
+      if (!cur.actionIds.includes(id)) cur.onChange([...cur.actionIds, id]);
     } catch {
       setError(true);
     }

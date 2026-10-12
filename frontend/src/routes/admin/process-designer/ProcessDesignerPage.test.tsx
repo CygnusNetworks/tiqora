@@ -55,11 +55,13 @@ vi.mock("@/components/process-designer/DesignerCanvas", () => ({
     shape,
     onShapeChange,
     onSelect,
+    adoptEntity,
     issues,
   }: {
     shape: ProcessShape;
     onShapeChange: (s: ProcessShape) => void;
     onSelect: (s: { kind: "activity"; id: string }) => void;
+    adoptEntity?: (type: "Activity", id: string) => Promise<void>;
     issues?: unknown[];
   }) => (
     <div data-testid="process-designer-canvas" data-issues={issues?.length ?? 0}>
@@ -71,6 +73,12 @@ vi.mock("@/components/process-designer/DesignerCanvas", () => ({
       </button>
       <button type="button" onClick={() => onSelect({ kind: "activity", id: "Activity-a" })}>
         mock-select
+      </button>
+      <button
+        type="button"
+        onClick={() => void adoptEntity?.("Activity", "Activity-x").then(() => onSelect({ kind: "activity", id: "Activity-x" }))}
+      >
+        mock-adopt
       </button>
     </div>
   ),
@@ -183,6 +191,23 @@ describe("ProcessDesignerPage", () => {
     fireEvent.click(screen.getByTestId("activity-panel-open-AD-1"));
     expect(await screen.findByTestId("dialog-panel")).toBeInTheDocument();
     expect(screen.getByTestId("dialog-panel-name")).toHaveValue("Antrag");
+  });
+
+  it("a step adopted from another process brings its forms along, so they open unsaved", async () => {
+    setViewport(false);
+    getEntity.mockImplementation((type: string, id: string) =>
+      Promise.resolve(
+        type === "Activity"
+          ? entity(id, "Fremder Schritt", { ActivityDialog: { "1": "AD-77" } })
+          : { ...entity(id, "Fremdes Formular", { Interface: ["AgentInterface"], Fields: {}, FieldOrder: [] }), entity_type: "ActivityDialog" as const },
+      ),
+    );
+    renderPage();
+    fireEvent.click(await screen.findByText("mock-adopt"));
+    fireEvent.click(await screen.findByTestId("activity-panel-open-AD-77"));
+    expect(await screen.findByTestId("dialog-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("dialog-panel-name")).toHaveValue("Fremdes Formular");
+    expect(getEntity).toHaveBeenCalledWith("ActivityDialog", "AD-77");
   });
 
   describe("shared entities", () => {

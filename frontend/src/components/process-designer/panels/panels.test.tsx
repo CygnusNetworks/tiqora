@@ -123,6 +123,22 @@ describe("ActivityPanel", () => {
     expect(screen.getByTestId("activity-panel-save")).toBeDisabled();
   });
 
+  it("Escape on an open add-menu closes only the menu and keeps the edits", async () => {
+    const library = [
+      { entity_type: "ActivityDialog" as const, entity_id: "AD-77", name: "Fremdes Formular", used_by: ["Activity-z"], sync_state: "synced" as const },
+    ];
+    renderActivity({ library, adoptDialog: vi.fn().mockResolvedValue(undefined) });
+    fireEvent.change(screen.getByTestId("activity-panel-name"), { target: { value: "Anders" } });
+    fireEvent.click(screen.getByTestId("activity-panel-add"));
+    await screen.findByTestId("activity-panel-add-menu-option-AD-77");
+    fireEvent.keyDown(screen.getByTestId("activity-panel-add"), { key: "Escape" });
+    expect(screen.getByTestId("activity-panel-name")).toHaveValue("Anders");
+    expect(screen.queryByTestId("activity-panel-add-menu-option-AD-77")).not.toBeInTheDocument();
+    // A second Escape (nothing open any more) discards as before.
+    fireEvent.keyDown(screen.getByTestId("activity-panel-name"), { key: "Escape" });
+    expect(screen.getByTestId("activity-panel-name")).toHaveValue("Antrag");
+  });
+
   it("offers forms of other processes and loads a picked one before adding it", async () => {
     const adoptDialog = vi.fn().mockResolvedValue(undefined);
     const library = [

@@ -211,6 +211,19 @@ export function ProcessDesignerPage() {
       if (cur && draftHas(cur, type, entityId)) return;
       const entity = await processDesignerApi.getEntity(type, entityId);
       qc.setQueryData<ProcessDraft>(draftKey, (c) => (c ? mergeEntity(c, entity) : c));
+      if (type !== "Activity") return;
+      // A step brings its forms along, so they open before the process is saved.
+      const forms = Object.values((entity.config?.ActivityDialog ?? {}) as Record<string, unknown>).filter(
+        (x): x is string => typeof x === "string",
+      );
+      await Promise.all(
+        forms.map(async (formId) => {
+          const now = qc.getQueryData<ProcessDraft>(draftKey);
+          if (!now || draftHas(now, "ActivityDialog", formId)) return;
+          const form = await processDesignerApi.getEntity("ActivityDialog", formId);
+          qc.setQueryData<ProcessDraft>(draftKey, (c) => (c ? mergeEntity(c, form) : c));
+        }),
+      );
     },
     [qc, draftKey],
   );

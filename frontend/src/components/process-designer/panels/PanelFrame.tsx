@@ -2,6 +2,9 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 
+/** Anything that closes itself on Escape: portal menus, expanded triggers, dialogs. */
+const POPUP_SELECTOR = '[data-portal-menu], [aria-expanded="true"], [role="dialog"], [aria-modal="true"]';
+
 /**
  * Shared frame of the designer side panels: header, optional save/discard row (for panels that save
  * on their own) and the "changed in the meantime" message when the stored version moved on.
@@ -38,11 +41,13 @@ export function PanelFrame({
       data-testid={testId}
       // Escape discards the panel's unsaved edits (Znuny's popups close without saving).
       onKeyDown={(e) => {
-        if (e.key === "Escape" && dirty && onDiscard && !saving) {
-          e.preventDefault();
-          e.stopPropagation();
-          onDiscard();
-        }
+        if (e.key !== "Escape" || !dirty || !onDiscard || saving) return;
+        // An open dropdown, popover or dialog owns this Escape (its own document listener closes
+        // it): leave the event alone and keep the edits. No stopPropagation, that would starve it.
+        const from = e.target instanceof Element ? e.target : null;
+        if (from?.closest(POPUP_SELECTOR) || document.querySelector(POPUP_SELECTOR)) return;
+        e.preventDefault();
+        onDiscard();
       }}
     >
       <h2 className="text-sm font-semibold text-ink">{title}</h2>
