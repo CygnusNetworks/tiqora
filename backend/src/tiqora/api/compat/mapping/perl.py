@@ -57,7 +57,7 @@ def check_perl_fullmatch_x(pattern: str) -> None:
 
 
 def perl_fullmatch_x(pattern: str, value: str) -> bool:
-    """``$value =~ m{ \A $pattern \z }xms``; MappingError if the match exceeds the time budget."""
+    r"""``$value =~ m{ \A $pattern \z }xms``; MappingError if the match exceeds the time budget."""
     try:
         return _fullmatch_x_regex(pattern).search(value, timeout=REGEX_TIMEOUT_SECONDS) is not None
     except TimeoutError as exc:
