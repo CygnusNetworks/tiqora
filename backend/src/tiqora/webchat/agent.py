@@ -86,6 +86,7 @@ from tiqora.webchat.availability import (
     lock_agent_state,
     topic_ref,
 )
+from tiqora.webchat.bot import close_bot_resolved_ticket
 from tiqora.webchat.hub import publish_chat_typing
 from tiqora.webchat.models import ChatConfigValues
 from tiqora.webchat.notify import queue_agent_event, queue_wakeup
@@ -485,12 +486,16 @@ async def end_session_by_agent(
     if not may_write and (not own_chat or close_ticket):
         raise ChatError("forbidden", 403)
 
+    was_bot = locked.status == "bot"
     locked.status = "ended"
     locked.end_reason = "agent"
     locked.ended_at = now
     await db.flush([locked])
 
     ticket_id = int(locked.ticket_id)
+    if was_bot and not close_ticket:
+        # A chat the bot answered alone parks its ticket like a visitor's goodbye would.
+        await close_bot_resolved_ticket(db, sysconfig, chat=locked)
     if close_ticket:
         state_id = await closed_state_id(db)
         if state_id is None:

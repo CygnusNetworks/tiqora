@@ -1148,7 +1148,7 @@ async def post_chat_end(
         )
         # Own small bucket: a visitor at the message limit can still close the chat.
         await limiter.hit("end", chat.id, limit=END_PER_SESSION_MINUTE, window_seconds=60)
-        await end_by_visitor(db, chat=chat, now=utc_now())
+        await end_by_visitor(db, chat=chat, now=utc_now(), sysconfig=SysConfig(db))
         await _commit_and_flush(db, redis_client)
     except (ChatError, RateLimited, ChatBackendUnavailable) as exc:
         return await _refused(db, exc)

@@ -66,7 +66,7 @@ from tiqora.domain.ticket_write_service import (
 )
 from tiqora.jobs.service import utc_now
 from tiqora.webchat.availability import eligible_agent_ids, topic_ref, within_business_hours
-from tiqora.webchat.bot import bot_availability
+from tiqora.webchat.bot import bot_availability, close_bot_resolved_ticket
 from tiqora.webchat.models import ChatConfigValues, ChatTopic, PrechatField
 from tiqora.webchat.notify import queue_agent_event, queue_bot_turn, queue_wakeup
 from tiqora.webchat.origins import effective_allowed_origins, origin_allowed
@@ -460,7 +460,6 @@ async def _store_visitor_line(
                 client_id=client_id,
                 now=now,
             )
-            return message, True
     except IntegrityError:
         set_committed_value(chat, "last_seq", seq_before)
         if client_id is None:
@@ -468,7 +467,15 @@ async def _store_visitor_line(
         existing = await find_by_client_id(db, chat.id, client_id, locking=True)
         if existing is None:
             raise
+        # A retried line must not move the marker (it could lower it below a newer line).
         return existing, False
+    # The bot's pending marker: only a stored new line moves it, and only upward.
+    if int(message.seq) > int(chat.last_visitor_seq):
+        chat.last_visitor_seq = int(message.seq)
+        await db.flush([chat])
+    if chat.status == "bot":
+        queue_bot_turn(db, chat.id)
+    return message, True
 
 
 # -- service functions ---------------------------------------------------------------------
@@ -920,14 +927,22 @@ async def post_bot_intro(
     )
 
 
-async def end_by_visitor(db: AsyncSession, *, chat: TiqoraChatSession, now: datetime) -> None:
+async def end_by_visitor(
+    db: AsyncSession,
+    *,
+    chat: TiqoraChatSession,
+    now: datetime,
+    sysconfig: SysConfig | None = None,
+) -> None:
     """The visitor closes the chat: ``ended`` / ``visitor`` / ``ended_at``, system line
-    ``visitor_left``, wake + ``chat_ended``. Idempotent: an already closed chat is left
+    ``visitor_left``, wake + ``chat_ended``. A chat the bot answered alone also parks its
+    ticket (``close_bot_resolved_ticket``). Idempotent: an already closed chat is left
     alone. Refusal: ``not_found``."""
     locked = await lock_session(db, chat.id)
     if locked.status not in LIVE_STATUSES:
         return
     queue_id = await current_queue_id(db, locked)
+    was_bot = locked.status == "bot"
     locked.status = "ended"
     locked.end_reason = "visitor"
     locked.ended_at = now
@@ -935,6 +950,8 @@ async def end_by_visitor(db: AsyncSession, *, chat: TiqoraChatSession, now: date
     await db.flush([locked])
     await add_system_message(db, chat=locked, code="visitor_left", params={}, now=now)
     queue_agent_event(db, _agent_event(locked, "chat_ended", queue_id))
+    if was_bot:
+        await close_bot_resolved_ticket(db, sysconfig or SysConfig(db), chat=locked)
 
 
 async def set_contact(
