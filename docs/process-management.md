@@ -22,6 +22,9 @@ Code lives under `backend/src/tiqora/process/`:
 | `process/process_ticket.py` | New process ticket (agent and customer) and enroll |
 | `deployed/` | Deployed revisions, deploy detection (`watcher.py`), `acl_sync` writes |
 | `process/ticket_state.py` | Resolves a ticket's current process/activity from its two Dynamic Fields |
+| `process/designer/` | The process designer backend: ids, YAML codec, draft writer, validation, import/export, revisions (see "Process designer") |
+| `process/actions/registry.py` | `TRANSITION_ACTIONS`: handler plus designer parameter specs per TransitionAction module |
+| `process/condition_modules.py` | `CONDITION_MODULES`: Python re-implementations of `Type: Module` conditions |
 | `process/engine.py` | The execution engine: start a process, evaluate transitions, dispatch actions, submit dialogs |
 | `process/exceptions.py` | Typed exceptions the engine raises (mapped to HTTP codes in the API layer) |
 | `api/v1/process.py` | REST endpoints |
@@ -70,17 +73,21 @@ admin presses **"Bereitstellen"** (Znuny writes the deployed file and empties
   | Sync table empty, dump differs from the newest revision, first tick | `confirming` | notes the new checksum only (a designer edit may have started meanwhile) |
   | Same changed dump on the next tick | `snapshot` | records revision `znuny` ("aus Znuny") |
   | Sync table empty, dump equal | `unchanged` | nothing |
-  | Tiqora owns the schema (after cutover) | `snapshot` | records revision `tiqora` ("von Tiqora") whenever the dump differs and clears the sync tables: Tiqora deploys on its own, without the two-tick confirmation |
+  | Tiqora owns the schema (after cutover), drafts pending | `waiting_for_deploy` | drafts never run; only "Bereitstellen" in Tiqora clears the sync rows |
+| Tiqora owns the schema (after cutover), sync table empty, dump differs | `snapshot` | records revision `tiqora` ("von Tiqora") without the two-tick confirmation (an import or a direct DB edit) |
 
 - **"Bereitstellen" in Tiqora.** `POST /api/v1/admin/deploy` (`{"kind":
   "process" | "acl"}`, admins only) does Znuny's deploy DB effect: it records
   the current `pm_*` / `acl` rows (drafts included) as revision `tiqora` and
   clears `pm_entity_sync` / `acl_sync`. When nothing changed it records no
   revision and only clears the sync rows (`"action": "unchanged"`). It is
-  allowed only when Tiqora owns the schema **or** the setting
-  `process.deploy_from_tiqora` is on ("Einstellungen", section "Prozesse und
+  allowed in one of three modes (`deployed/gate.py`, checked in this order):
+  Tiqora owns the schema (`local`); a fresh TiqoraSync heartbeat with the
+  deploy capability (`signal`, see "Deploy in parallel operation"); or the
+  setting `process.deploy_from_tiqora` is on (`local`) ("Einstellungen", section "Prozesse und
   ACLs": "Prozesse und ACLs in Tiqora bereitstellen (Znuny läuft nicht mehr)");
-  otherwise it answers 409. It answers 503 when another deploy holds the
+  otherwise it answers 409. In `local` mode it records the revision and clears
+  the sync rows itself. It answers 503 when another deploy holds the
   revision lock. The "Bereitstellung" card shows the button "Bereitstellen"
   when that gate is open and changes are pending. Only switch the setting on
   when Znuny no longer runs: Znuny keeps its own deployed file
@@ -97,6 +104,36 @@ admin presses **"Bereitstellen"** (Znuny writes the deployed file and empties
   when Tiqora still runs the draft state. `GET /api/v1/admin/deploy-status`
   (including `can_deploy_from_tiqora`) and `GET /api/v1/admin/processes` back
   them.
+
+## Deploy in parallel operation (signal mode)
+
+While Znuny still runs, "Bereitstellen" in Tiqora must make **Znuny** run the
+new state too, otherwise the two systems would execute different process
+definitions. That needs the Znuny add-on **TiqoraSync 1.2.0** or newer:
+
+1. TiqoraSync writes a heartbeat (`tiqorasync.heartbeat`, once a minute) with
+   its version and the capabilities `process_deploy` / `acl_deploy`. Tiqora
+   offers a signal deploy only when the heartbeat is younger than 10 minutes
+   (it proves that the Znuny daemon is alive). A heartbeat beats the setting
+   `process.deploy_from_tiqora`.
+2. Tiqora records the revision (source `tiqora`) and queues a signal row in
+   `tiqora_cache_invalidation`, remembering its id per kind.
+3. On its next run TiqoraSync does what Znuny's own Deploy button does: it
+   writes `ZZZProcessManagement.pm` / `ZZZACL.pm` and resets the sync state
+   (`pm_entity_sync` / `acl_sync`).
+4. TiqoraSync reports `ok` or `error` (with the message) under the signal
+   row id. The card "Bereitstellung" shows "Wartet auf Znuny ..." until a
+   status with a signal id at least as new as the request arrives, then
+   "In Znuny übernommen" or the error. An `error` banner stays until the
+   problem is fixed and the deploy is requested again: **Znuny keeps running
+   the previous version until then**, while Tiqora already runs the new one.
+   If Znuny does not react within a few minutes the card warns that the
+   daemon may be down.
+
+Without a fresh heartbeat (add-on missing or older than 1.2.0, daemon down)
+and without ownership or the setting, "Bereitstellen" answers 409 with the
+reason. Install notes for the add-on:
+[`packages/znuny-addon/TiqoraSync/install/README.md`](../packages/znuny-addon/TiqoraSync/install/README.md).
 
 ## Ticket <-> process linkage
 
@@ -327,6 +364,72 @@ steps (pick a process, fill the start dialog) and goes through the start
 dialog like Znuny (`POST /process/ticket/{id}/start` takes `field_values` and
 validates mandatory fields).
 
+## Process designer
+
+`/admin/processes` lists the **draft** state (processes that are not yet
+deployed carry the badge "Entwurf"); a process opens in the designer at
+`/admin/processes/<id>`. Concepts use Znuny's words: a process has *Schritte*
+(activities), *Formulare* (activity dialogs), *Übergänge* (transitions)
+and *Aktionen* (transition actions). Desktop only: on a phone the designer is
+read-only.
+
+- **Canvas and panels.** Steps and transitions are drawn on a canvas
+  (positions are stored in `pm_process.layout` in Znuny's format, so Znuny's
+  own canvas shows them too). Panels edit the process, a step (its forms in
+  order), a form (typed fields, `Display` hidden / shown / required, default
+  values, interface, permission), a transition (condition blocks with
+  and/or/xor and typed values) and an action (a typed parameter form per
+  module, raw key/value for unknown modules). Delete asks for confirmation.
+- **Drafts.** Every save writes `pm_*` rows exactly like Znuny's
+  `ProcessManagement::DB::*` modules (entity ids `<Type>-<32 hex>`, YAML
+  `config`, `create_by` / `change_by`) and a `pm_entity_sync` row. The
+  change is a *draft*: the engine keeps running the last deployed revision, a
+  draft started in Tiqora shows as a draft in Znuny's designer and vice
+  versa. Concurrent edits are detected by comparing the stored version
+  (`config` and name) in the same statement; the loser gets a conflict, not a
+  silent overwrite.
+- **Bereitstellen.** Records the draft state as a revision and, depending on
+  the mode, clears the sync rows itself (after cutover, or with
+  `process.deploy_from_tiqora`) or hands the deploy to Znuny through
+  TiqoraSync 1.2.0 (see "Deploy in parallel operation"). Validation never
+  blocks a deploy (Znuny does not validate either); with errors the button
+  asks for confirmation.
+- **Prüfung (validation).** `GET .../validation` returns issues with a code,
+  severity and the entity they belong to. Errors: `start_activity_missing`,
+  `start_dialog_missing`, `start_dialog_not_in_start_activity`,
+  `reference_missing`, `transition_target_missing`, `dialog_no_interface`,
+  `action_reference_missing`, `action_required_param_missing`,
+  `condition_value_impossible` (value cannot match: bad regexp, unknown
+  queue/state name, value outside the possible values of a dynamic field).
+  Warnings: `activity_unreachable`, `activity_dead_end`, `dialog_no_fields`,
+  `dialog_field_unknown`, `queue_required_display`,
+  `transition_without_condition`, `condition_type_unknown`,
+  `condition_module_unknown`, `action_module_unsupported` (known to Znuny but
+  not run by Tiqora: "nur in Znuny wirksam") and `tiqora_only_module_parallel`.
+- **Import / export.** Export downloads a process as Znuny's YAML (the format
+  of `AdminProcessManagement` export, selected entities included). Import
+  accepts that file from Znuny (6.0 to 7.3) as a *draft*, optionally
+  overwriting existing entities; unlike Znuny's `ProcessImport` it writes
+  `pm_entity_sync` rows, so an imported process never runs undeployed and
+  Znuny shows its usual "please deploy" banner. Limits: 1 MB, 1 000
+  entities, no YAML aliases or anchors; entity ids are at most 50 characters.
+- **Versions (Fassungen).** Every deployed revision is listed with its source
+  (`initial`, `znuny`, `tiqora`). Two versions can be compared per entity
+  (and as a text view). *Wiederherstellen* writes the old entities back as a
+  **draft** (it does not redeploy), keeps the canvas positions of activities
+  that still exist, and the normal deploy follows. The restored state
+  reproduces the deployed checksum.
+- **Extension points.** `TRANSITION_ACTIONS` (module name to handler plus
+  parameter specs) and `CONDITION_MODULES` (Perl module path to a Python
+  predicate; `ValidateDemo` ships) are core-only registries
+  (`sdk_stable=False`, no plugin exposure yet). The designer's action forms are
+  generated from the parameter specs, so an action module added to the
+  registry shows up in the designer without frontend work.
+- **API.** `/api/v1/admin/process-designer/*` (admin only, see the OpenAPI
+  document): `catalog`, `processes`, `entities/{type}`, per-process
+  `validation`, `export`, `import`, `revisions`, `revisions/{id}/diff` and
+  `revisions/{id}/restore`.
+
 ## REST API
 
 All endpoints live under `/api/v1/process` (`backend/src/tiqora/api/v1/process.py`):
@@ -344,7 +447,11 @@ All endpoints live under `/api/v1/process` (`backend/src/tiqora/api/v1/process.p
 | POST | `/api/v1/process/ticket/{ticket_id}/submit` | Submit an activity dialog (advance the ticket) |
 
 The portal has the same endpoints except the process detail under
-`/api/portal/process/*` (customer interface dialogs only). Admin: `GET
+`/api/portal/process/*` (customer interface dialogs only). The server also
+offers `POST /api/v1/process/{id}/start-form/options` (and the ticket
+variant, agent and portal) to refresh dialog field options after another
+field changed, and `GET /api/v1/process/ticket/{id}/path` for the path so far.
+Admin: `GET
 /api/v1/admin/processes` (all processes of the deployed revision), `GET
 /api/v1/admin/deploy-status` and `POST /api/v1/admin/deploy` (see "Deployed
 revisions").
@@ -362,17 +469,15 @@ docstring in `api/v1/process.py`).
   (`GET .../ticket/{id}/dialog/{eid}/form`) and submits it.
 - **New process ticket**: pages `NewProcessTicketPage` (agent and portal);
   zoom dialogs render the shared `ProcessDialogForm`.
-- **Admin**: read-only `/admin/processes` list (`routes/admin/ProcessesPage.tsx`)
-  with the "Bereitstellung" card, and detail view
-  (`routes/admin/ProcessDetailPage.tsx`) — browse processes, activities and
-  dialogs.
+- **Admin**: `/admin/processes` list (`routes/admin/ProcessesPage.tsx`) with
+  the "Bereitstellung" card and create / import / export / copy / delete, and
+  the designer (`routes/admin/process-designer/`, see "Process designer").
+- **Ticket zoom path**: the process widget shows "Bisheriger Weg" (the path
+  so far) next to the current step.
 - **Customer portal**: `PortalProcessWidget` + `/api/portal/process/*`
   expose start/submit for dialogs whose YAML ``Interface`` includes
   ``CustomerInterface`` (Znuny parity). Writes use system user id 1 (same
   as other portal ticket writes), ACLs run as the customer.
-- **Out of scope**: there is no visual process *designer*. Processes must
-  still be authored via Znuny's admin UI (`AdminProcessManagement`) or by
-  writing directly to the `pm_*` tables / their YAML `config` columns.
 
 ## Supported vs deferred
 
@@ -380,7 +485,8 @@ docstring in `api/v1/process.py`).
 
 | Supported | Deferred |
 |---|---|
-| `String` (case-sensitive `eq`; also a plain scalar entry) | `Module` (custom Perl module): logged, never matches |
+| `String` (case-sensitive `eq`; also a plain scalar entry) | |
+| `Module` (`Match` = Perl module path; registered Python re-implementations, today `ValidateDemo`) | Unknown modules: logged, never match (designer warning `condition_module_unknown`) |
 | `Regexp` | |
 | `Array` (list entry: every value present) | |
 | `Hash` (`Match` is a hash: every key equal) | |
@@ -406,9 +512,9 @@ with its Znuny source lines.
 
 | Supported | Deferred (logged, no-op — collected into `unsupported_actions`) |
 |---|---|
-| `TicketStateSet` | `ExecuteInvoker` |
-| `TicketQueueSet` | `Appointment*` (Create/Update/Remove) |
-| `TicketOwnerSet` | `ConfigItemUpdate` |
+| `TicketStateSet` | `ExecuteInvoker` (the handler belongs to the GenericInterface work; registered without a handler until that is merged) |
+| `TicketQueueSet` | `ConfigItemUpdate` (needs the CMDB) |
+| `TicketOwnerSet` | |
 | `TicketPrioritySet` | |
 | `TicketTitleSet` | |
 | `TicketCustomerSet` | |
@@ -425,6 +531,7 @@ with its Znuny source lines.
 | `TicketSLASet` | |
 | `TicketWatchSet` | |
 | `LinkAdd` | |
+| `AppointmentCreate` / `AppointmentUpdate` / `AppointmentRemove` | |
 | `TicketCreate` | (Title/Queue/State/Priority/…; optional `LinkAs` to parent) |
 
 An unsupported action does not abort the submission: the transition still
@@ -437,8 +544,9 @@ unsupported_actions` so callers/tests can assert on skip behaviour.
 - `pm_process.state_entity_id` is exposed raw plus a `state_name`
   (Active / Inactive / FadeAway, see "State gate").
 - A ticket can only be in one process at a time (`TicketAlreadyInProcess`).
-- Dialog field options do not refresh when another field changes (Znuny's AJAX
-  update). `Attachments` in dialog articles are not supported.
+- Dialog field options are re-asked from the server when another field
+  changes; this does not reproduce Znuny's per-dialog `AJAXUpdatableFields`
+  list field by field.
 - No global toast/notification system — the process widgets show inline
   success/error state.
 
@@ -452,9 +560,23 @@ Deployment:
 - An edit made within one watch interval (default 30 s) after a Znuny deploy
   hides that deploy (the sync table is never seen empty); Tiqora catches up
   with the next deploy.
-- There is no process designer in Tiqora. "Bereitstellen" in Tiqora exists but
-  is gated (see "Deployed revisions"); after cutover Tiqora deploys
-  automatically.
+- "Bereitstellen" in Tiqora is gated (see "Deployed revisions" and "Deploy in
+  parallel operation"); after cutover Tiqora deploys automatically.
+- Edits between a Tiqora deploy and TiqoraSync's dump (about one minute) are
+  deployed in Znuny as well; Tiqora picks them up within two watch intervals
+  as a `znuny` revision.
+- TiqoraSync writes `ZZZProcessManagement.pm` / `ZZZACL.pm` only on the host
+  that runs the Znuny daemon. Multi-node Znuny setups with separate web nodes
+  need a shared `Kernel/Config/Files` directory, as Znuny's own button does.
+- Znuny itself has a short window in which an edit made during its own
+  deploy looks deployed but is not; the same window exists in Tiqora.
+- The designer does not show the ACLs that restrict a process; the ACL editor
+  stays separate.
+- `Appointment*` actions ignore `Custom*` recurrence, `RecurrenceFrequency`,
+  `RecurrenceExclude`, all notification keys and `TicketAppointmentRuleID`;
+  there are no appointment notifications.
+- A *Probelauf* (test run), visual diff on the canvas and process analytics
+  are not built; the version diff is a per-entity list plus a text view.
 
 Engine:
 

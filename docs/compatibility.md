@@ -841,14 +841,18 @@ narrower than Znuny), **by design** (deliberate platform choice).
 
 | Znuny feature | Status | Note |
 |---|---|---|
-| Process designer | by design | Processes are imported and executed; admin UI is list/detail ([process-management.md](process-management.md)) |
-| Process deploy ("Bereitstellen") | yes | Engine and ACLs run from the deployed state only; Tiqora detects a Znuny deploy within two watch intervals. "Bereitstellen" in Tiqora (`POST /api/v1/admin/deploy`) only after cutover or with the setting "Prozesse und ACLs in Tiqora bereitstellen (Znuny läuft nicht mehr)"; after cutover Tiqora deploys by itself |
+| Process designer | yes | Canvas with panels for steps, forms, transitions and actions, drafts in `pm_*` like Znuny, validation, versions with diff and restore ([process-management.md](process-management.md#process-designer)). Desktop only (read-only on phones); no test run (Probelauf) |
+| Process import/export (Znuny YAML) | yes | Znuny 6.0 to 7.3 process files in and out; an import is a draft and writes `pm_entity_sync` rows (unlike Znuny's `ProcessImport`). Limits: 1 MB, 1 000 entities, no YAML aliases |
+| Process deploy ("Bereitstellen") | yes | Engine and ACLs run from the deployed state only; Tiqora detects a Znuny deploy within two watch intervals. "Bereitstellen" in Tiqora (`POST /api/v1/admin/deploy`) while Znuny still runs needs TiqoraSync 1.2.0 (Znuny writes its own deploy files, status `ok`/`error` is shown in Tiqora); otherwise only after cutover or with the setting "Prozesse und ACLs in Tiqora bereitstellen (Znuny läuft nicht mehr)"; after cutover Tiqora deploys by itself |
 | Process state gate (Active / FadeAway / Inactive) | yes | Same rules as Znuny: only Active starts, FadeAway keeps running tickets, Inactive refuses dialogs and runs no transitions |
 | ACLs on process list, dialogs, action menu and bulk | yes | Agents as the agent, portal customers as the customer (never as root); Properties on `Process` entity ids work |
 | New process ticket (agent and portal), enroll via start dialog | yes | "Neues Prozessticket" / "Prozess starten"; Znuny's create order, `Process::Default*` for hidden fields, immediate first transition |
 | Compat (GenericInterface) API and ACLs | by design | No ACL filtering, exactly as Znuny's GenericInterface (it never calls `TicketAcl`) |
 | Smart tags in actions and conditions | yes | `<OTRS_TICKET_*>`, dynamic fields, first/last article, template placeholders; conditions of the Base types only, like Znuny |
-| `Module` conditions, `ExecuteInvoker`/`Appointment*`/`ConfigItemUpdate` actions | missing | Logged as unsupported |
+| `Module` conditions | partial | Python re-implementations registered by Perl module path (`ValidateDemo`); unknown modules never match and the designer warns |
+| Appointment actions (`AppointmentCreate/Update/Remove`) | yes | `Custom*` recurrence, `RecurrenceFrequency`, `RecurrenceExclude`, notification keys and `TicketAppointmentRuleID` are ignored |
+| `ExecuteInvoker` / `ConfigItemUpdate` actions | missing | Logged as unsupported (`ExecuteInvoker` follows with the GenericInterface requester, `ConfigItemUpdate` needs the CMDB) |
+| Dialog attachments and time units | yes | Article uploads, `TimeUnits`, Znuny's existing-attachment selection (`Attachments` field, `AttachmentsReuse`), option refresh when a field changes |
 | Transitions after every ticket change | missing | Evaluated after process dialogs and new process tickets only |
 | Znuny 7.x process YAML | verified | Same format as 6.5 (no renamed keys); `pm_process_preferences` (7.2+) is snapshotted. Golden tests passed on Znuny 6.5 and on 7.3.5 |
 | GenericAgent execution | partial | Pragmatic subset: no absolute `TimeSlot`, `Next`/`After`, dynamic-field criteria; off by default |
@@ -872,7 +876,7 @@ narrower than Znuny), **by design** (deliberate platform choice).
 - **Process and ACL revisions.** New tables `tiqora_process_revision` and
   `tiqora_acl_revision` come with the regular Tiqora migration. Processes and
   ACLs now run from the deployed state. Process admins must press "Bereitstellen" in Znuny for edits to
-  take effect ([process-management.md](process-management.md)).
+  take effect ([process-management.md](process-management.md)). Since the process designer, edits can also be made and deployed in Tiqora; while Znuny runs that needs the add-on TiqoraSync 1.2.0 (see [parallel-operation.md](parallel-operation.md#processes-and-acls-deploy-in-znuny)).
 - Dialog fields with `Display: 1` are now optional and `2` mandatory (Znuny
   semantics; it was the other way round).
 
