@@ -194,3 +194,10 @@ export function useCmdbStatus() {
     staleTime: 60_000,
   });
 }
+
+export const cmdbSavedSearchesKey = ["cmdb", "saved-searches"] as const;
+
+/** The caller's own and the shared saved CI searches. */
+export function useCmdbSavedSearches() {
+  return useQuery({ queryKey: cmdbSavedSearchesKey, queryFn: () => cmdbApi.savedSearches(), staleTime: 30_000 });
+}

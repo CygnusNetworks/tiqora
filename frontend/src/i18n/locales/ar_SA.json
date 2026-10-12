@@ -7559,6 +7559,110 @@
       "unknown_key": "Unknown attribute.",
       "unknown_reference": "The referenced entry does not exist.",
       "wrong_class": "The referenced entry is not allowed here."
+    },
+    "list": {
+      "class": "Class",
+      "allClasses": "All classes",
+      "searchPlaceholder": "Search number, name or attribute…",
+      "search": "Search CIs",
+      "deploymentState": "Deployment state",
+      "incidentState": "Incident state",
+      "attrFilter": "Attribute filter",
+      "attrAdd": "Add condition",
+      "attrNeedsClass": "Select a class to filter by attributes.",
+      "attrNone": "This class has no searchable attributes.",
+      "attrField": "Attribute",
+      "attrOp": "Condition",
+      "attrValue": "Value",
+      "attrRemove": "Remove condition",
+      "ops": {
+        "eq": "is",
+        "neq": "is not",
+        "contains": "contains",
+        "starts_with": "starts with",
+        "lt": "less than",
+        "lte": "at most",
+        "gt": "greater than",
+        "gte": "at least",
+        "before": "before",
+        "after": "after",
+        "is_empty": "is empty",
+        "is_not_empty": "is not empty"
+      },
+      "new": "New CI",
+      "import": "Import",
+      "selectAll": "Select all CIs on this page",
+      "select": "Select {{name}}",
+      "number": "Number",
+      "name": "Name",
+      "changed": "Changed",
+      "total_one": "{{count}} CI",
+      "total_other": "{{count}} CIs",
+      "totalCapped": "more than 10,000 CIs",
+      "empty": "No CIs found.",
+      "loadFailed": "The CIs could not be loaded.",
+      "paging": "Pages",
+      "pageOf": "Page {{page}} of {{pages}}",
+      "pageNo": "Page {{page}}",
+      "saved": {
+        "label": "Saved searches",
+        "none": "Saved searches",
+        "sharedTag": "shared",
+        "save": "Save search",
+        "delete": "Delete",
+        "name": "Name",
+        "shared": "Share with all agents",
+        "failed": "The search could not be saved."
+      },
+      "export": {
+        "button": "Export",
+        "needsClass": "Select one class to export.",
+        "title": "Export CIs",
+        "description": "Exports the CIs of the current filter, one row per CI.",
+        "start": "Start export",
+        "format": "File format",
+        "failed": "The export could not be started."
+      },
+      "bulk": {
+        "open": "Edit several",
+        "title": "Edit several CIs",
+        "description": "The changes apply to {{count}} selected CIs. Fields left on \"unchanged\" are not touched.",
+        "keep": "— unchanged —",
+        "start": "Start",
+        "failed": "The bulk edit could not be started.",
+        "addLink": "Add a link",
+        "targetKind": "Link target",
+        "kinds": {
+          "ci": "CI",
+          "service": "Service",
+          "ticket": "Ticket"
+        },
+        "linkType": "Link type",
+        "ciSide": "The CI is",
+        "side": {
+          "source": "Source",
+          "target": "Target"
+        },
+        "target": "Target",
+        "keyHint": {
+          "service": "Service ID",
+          "ticket": "Ticket ID"
+        },
+        "result": "{{updated}} changed, {{skipped}} skipped (no permission)"
+      }
+    },
+    "filter": {
+      "fields": {
+        "number": "Number",
+        "name": "Name",
+        "class": "Class",
+        "deployment_state": "Deployment state",
+        "deployment_functionality": "Deployment functionality",
+        "incident_state": "Incident state",
+        "incident_functionality": "Incident functionality",
+        "created_at": "Created",
+        "changed_at": "Changed"
+      }
     }
   }
 }

@@ -18,6 +18,7 @@ import type {
   CiVersionSummary,
   CmdbClass,
   CmdbDefinition,
+  CmdbSavedSearch,
   CmdbStatus,
   FilterField,
   FormOptions,
@@ -149,7 +150,61 @@ function seedCis(): DemoCi[] {
   ];
 }
 
-export type DemoCmdb = { cis: DemoCi[]; links: DemoLink[]; nextCiId: number; nextLinkId: number };
+type DemoJob = {
+  id: number;
+  kind: string;
+  status: "succeeded";
+  title_key: string;
+  progress_done: number;
+  progress_total: number;
+  progress_message: null;
+  cancel_requested: boolean;
+  error: null;
+  result: Record<string, unknown> | null;
+  files: Array<{ id: number; name: string; content_type: string; size_bytes: number }>;
+  created_by: number;
+  created_at: string;
+  started_at: string;
+  finished_at: string;
+};
+
+export type DemoCmdb = {
+  cis: DemoCi[];
+  links: DemoLink[];
+  nextCiId: number;
+  nextLinkId: number;
+  saved: CmdbSavedSearch[];
+  nextSavedId: number;
+  jobs: Record<number, DemoJob>;
+  nextJobId: number;
+};
+
+/** Finished background job of the demo (bulk edit / export): answers `GET /api/v1/jobs/:id`. */
+export function demoCmdbJob(store: DemoCmdb, id: number): DemoJob | undefined {
+  return store.jobs[id];
+}
+
+function finishedJob(store: DemoCmdb, kind: "cmdb_bulk" | "cmdb_export", result: Record<string, unknown> | null, files: DemoJob["files"]): number {
+  const id = store.nextJobId++;
+  store.jobs[id] = {
+    id,
+    kind: `core.${kind}`,
+    status: "succeeded",
+    title_key: `jobs.kinds.core.${kind}`,
+    progress_done: 1,
+    progress_total: 1,
+    progress_message: null,
+    cancel_requested: false,
+    error: null,
+    result,
+    files,
+    created_by: 1,
+    created_at: AT,
+    started_at: AT,
+    finished_at: AT,
+  };
+  return id;
+}
 
 export function createDemoCmdb(): DemoCmdb {
   return {
@@ -162,6 +217,10 @@ export function createDemoCmdb(): DemoCmdb {
     ],
     nextCiId: 7,
     nextLinkId: 5,
+    saved: [],
+    nextSavedId: 1,
+    jobs: {},
+    nextJobId: 9311,
   };
 }
 
@@ -317,10 +376,51 @@ const SORTS: Record<string, (c: DemoCi) => string> = {
   incident_state: (c) => catalogItem(c.incidentCurrent).name,
 };
 
-type SearchBody = { class_ids?: number[]; q?: string | null; sort?: string; order?: string; offset?: number; limit?: number };
+type Cond = { field: string; op: string; value?: unknown };
+type SearchBody = {
+  class_ids?: number[];
+  q?: string | null;
+  sort?: string;
+  order?: string;
+  offset?: number;
+  limit?: number;
+  filter?: { where?: { all?: Cond[] } | null } | null;
+};
+
+/** The conditions the demo list can build: states and `attr.<key>` text conditions. */
+function matchesCond(ci: DemoCi, c: Cond): boolean {
+  const list = Array.isArray(c.value) ? c.value.map(String) : [];
+  if (c.field === "deployment_state") return list.includes(String(ci.deployment));
+  if (c.field === "incident_functionality") return list.includes(String(catalogItem(ci.incidentCurrent).functionality));
+  if (c.field.startsWith("attr.")) {
+    const vals = (ci.attrs[c.field.slice(5)] ?? []).map((e) => String(e.v ?? "").toLowerCase());
+    const needle = String(c.value ?? "").toLowerCase();
+    switch (c.op) {
+      case "eq":
+        return vals.includes(needle);
+      case "neq":
+        return !vals.includes(needle);
+      case "contains":
+        return vals.some((v) => v.includes(needle));
+      case "starts_with":
+        return vals.some((v) => v.startsWith(needle));
+      case "is_empty":
+        return vals.every((v) => v === "");
+      case "is_not_empty":
+        return vals.some((v) => v !== "");
+      default:
+        return true;
+    }
+  }
+  return true;
+}
 
 function search(store: DemoCmdb, body: SearchBody): CiPage {
-  let rows = store.cis.filter((c) => (body.class_ids?.length ? body.class_ids.includes(c.classId) : true) && matches(c, body.q ?? ""));
+  const conds = body.filter?.where?.all ?? [];
+  let rows = store.cis.filter(
+    (c) =>
+      (body.class_ids?.length ? body.class_ids.includes(c.classId) : true) && matches(c, body.q ?? "") && conds.every((cond) => matchesCond(c, cond)),
+  );
   const key = SORTS[body.sort ?? "number"] ?? SORTS.number;
   rows = [...rows].sort((a, b) => key(a).localeCompare(key(b)) * (body.order === "desc" ? -1 : 1));
   const offset = body.offset ?? 0;
@@ -328,9 +428,28 @@ function search(store: DemoCmdb, body: SearchBody): CiPage {
 }
 
 const FILTER_FIELDS: FilterField[] = [
+  { key: "number", label: "Nummer", label_key: null, type: "string", ops: ["eq", "starts_with"], enum_values: [], options_source: null },
   { key: "name", label: "Name", label_key: null, type: "string", ops: ["contains", "eq"], enum_values: [], options_source: null },
   { key: "incident_state", label: "Vorfallsstatus", label_key: null, type: "enum", ops: ["eq", "in"], enum_values: ["operational", "warning", "incident"], options_source: null },
 ];
+
+/** Base fields plus the searchable attributes of one class (text attributes only in the demo). */
+function filterFields(classId: number | undefined): FilterField[] {
+  if (classId === undefined) return FILTER_FIELDS;
+  const attrs = (classOf(classId).definition?.attributes ?? []).filter((a) => a.searchable || a.type === "ip");
+  return [
+    ...FILTER_FIELDS,
+    ...attrs.map<FilterField>((a) => ({
+      key: `attr.${a.key}`,
+      label: a.name,
+      label_key: null,
+      type: "string",
+      ops: ["eq", "neq", "contains", "starts_with", "is_empty", "is_not_empty"],
+      enum_values: [],
+      options_source: null,
+    })),
+  ];
+}
 
 const FORM_OPTIONS: FormOptions = {
   catalog: { [CATALOG_OS]: CATALOG.filter((c) => c.catalog_class === CATALOG_OS).map((c) => ({ value: String(c.id), label: c.name })) },
@@ -430,10 +549,61 @@ export function resolveCmdb(
     return ok(cls ? CATALOG.filter((c) => c.catalog_class === cls) : CATALOG);
   }
   if (sub === "/form-options") return ok(FORM_OPTIONS);
-  if (sub === "/filter-fields") return ok(FILTER_FIELDS);
+  if (sub === "/filter-fields") {
+    const cid = Number(query.get("class_id"));
+    return ok(filterFields(Number.isInteger(cid) && cid > 0 ? cid : undefined));
+  }
   if (sub === "/companies/lookup") return ok([{ id: "beispiel", label: "Beispiel GmbH" }]);
   if (sub === "/link-types") return ok(LINK_TYPES);
-  if (sub === "/saved-searches" || sub === "/import-templates") return ok([]);
+  if (sub === "/import-templates") return ok([]);
+  if (sub === "/saved-searches" && method === "GET") return ok(store.saved);
+  if (sub === "/saved-searches" && method === "POST") {
+    const b = (body ?? {}) as { name: string; shared?: boolean; criteria: CmdbSavedSearch["criteria"] };
+    const row: CmdbSavedSearch = {
+      id: store.nextSavedId++,
+      name: b.name,
+      shared: b.shared ?? false,
+      criteria: b.criteria,
+      owned: true,
+      owner_user_id: 1,
+      created_at: AT,
+      changed_at: AT,
+    };
+    store.saved.push(row);
+    return ok(row, 201);
+  }
+  if (seg[0] === "saved-searches" && seg[1] && method === "DELETE") {
+    store.saved = store.saved.filter((x) => x.id !== Number(seg[1]));
+    return none();
+  }
+  if (sub === "/bulk-jobs" && method === "POST") {
+    const b = (body ?? {}) as { ci_ids: number[]; deployment_state_id?: number | null; incident_state_id?: number | null; link?: { link_type_key: string; target_kind: string; target_key: string; ci_side?: string } | null };
+    let updated = 0;
+    for (const id of b.ci_ids) {
+      const ci = store.cis.find((c) => c.id === id);
+      if (!ci) continue;
+      if (b.deployment_state_id) ci.deployment = b.deployment_state_id;
+      if (b.incident_state_id) {
+        ci.incidentOwn = b.incident_state_id;
+        ci.incidentCurrent = b.incident_state_id;
+      }
+      if (b.link && b.link.target_kind === "ci") {
+        const other = Number(b.link.target_key);
+        const link: DemoLink = b.link.ci_side === "target" ? { id: store.nextLinkId++, type: b.link.link_type_key, source: other, target: id } : { id: store.nextLinkId++, type: b.link.link_type_key, source: id, target: other };
+        store.links.push(link);
+      }
+      updated += 1;
+    }
+    const jobId = finishedJob(store, "cmdb_bulk", { updated, skipped: b.ci_ids.length - updated }, []);
+    return ok({ job_id: jobId, status: "queued" }, 202);
+  }
+  if (sub === "/export-jobs" && method === "POST") {
+    const fmt = (body as { file_format?: string } | undefined)?.file_format === "xlsx" ? "xlsx" : "csv";
+    const jobId = finishedJob(store, "cmdb_export", null, [
+      { id: 1, name: `cmdb.${fmt}`, content_type: fmt === "xlsx" ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "text/csv; charset=utf-8", size_bytes: 512 },
+    ]);
+    return ok({ job_id: jobId, status: "queued" }, 202);
+  }
   if (sub === "/cis/search" && method === "POST") return ok(search(store, (body ?? {}) as SearchBody));
   if (sub === "/cis/lookup") {
     const rows = store.cis.filter((c) => matches(c, query.get("q") ?? ""));

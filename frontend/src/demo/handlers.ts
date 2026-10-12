@@ -8,7 +8,7 @@ import {
   demoRefine,
 } from "./mockData";
 import { demoDashboards, resolve as resolveDashboards } from "./dashboardsMock";
-import { demoCmdb, resolveCmdb } from "./cmdbMock";
+import { demoCmdb, demoCmdbJob, resolveCmdb } from "./cmdbMock";
 import { resolveKiosk } from "./kioskMock";
 import { resolve as resolveSchedules } from "./schedulesMock";
 import { setDemoFactsBuilding } from "./reportsMock";
@@ -126,6 +126,11 @@ function kioskResponse(request: Request): Response | undefined {
 }
 
 export const handlers = [
+  // jobs of the CMDB mock (bulk edit, export); any other job id falls through to the generic resolver
+  http.get("*/api/v1/jobs/:id", ({ params }) => {
+    const job = demoCmdbJob(demoCmdb, Number(params.id));
+    return job ? HttpResponse.json(job as never) : undefined;
+  }),
   http.all("*/api/portal/config-items*", async ({ request }) => (await cmdbResponse(request)) ?? HttpResponse.json({}, { status: 404 })),
   http.all("*/api/v1/admin/cmdb/*", async ({ request }) => (await cmdbResponse(request)) ?? HttpResponse.json([])),
   http.all("*/api/v1/cmdb/*", async ({ request }) => (await cmdbResponse(request)) ?? HttpResponse.json([])),

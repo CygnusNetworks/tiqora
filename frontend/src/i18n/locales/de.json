@@ -7567,6 +7567,110 @@
       "unknown_key": "Unbekanntes Attribut.",
       "unknown_reference": "Der verknüpfte Eintrag existiert nicht.",
       "wrong_class": "Der verknüpfte Eintrag ist hier nicht erlaubt."
+    },
+    "list": {
+      "class": "Klasse",
+      "allClasses": "Alle Klassen",
+      "searchPlaceholder": "Nummer, Name oder Attribut suchen…",
+      "search": "CIs suchen",
+      "deploymentState": "Einsatzstatus",
+      "incidentState": "Vorfallsstatus",
+      "attrFilter": "Attributfilter",
+      "attrAdd": "Bedingung hinzufügen",
+      "attrNeedsClass": "Wählen Sie eine Klasse, um nach Attributen zu filtern.",
+      "attrNone": "Diese Klasse hat keine durchsuchbaren Attribute.",
+      "attrField": "Attribut",
+      "attrOp": "Bedingung",
+      "attrValue": "Wert",
+      "attrRemove": "Bedingung entfernen",
+      "ops": {
+        "eq": "ist",
+        "neq": "ist nicht",
+        "contains": "enthält",
+        "starts_with": "beginnt mit",
+        "lt": "kleiner als",
+        "lte": "höchstens",
+        "gt": "größer als",
+        "gte": "mindestens",
+        "before": "vor",
+        "after": "nach",
+        "is_empty": "ist leer",
+        "is_not_empty": "ist nicht leer"
+      },
+      "new": "Neues CI",
+      "import": "Import",
+      "selectAll": "Alle CIs dieser Seite auswählen",
+      "select": "{{name}} auswählen",
+      "number": "Nummer",
+      "name": "Name",
+      "changed": "Geändert",
+      "total_one": "{{count}} CI",
+      "total_other": "{{count}} CIs",
+      "totalCapped": "mehr als 10 000 CIs",
+      "empty": "Keine CIs gefunden.",
+      "loadFailed": "Die CIs konnten nicht geladen werden.",
+      "paging": "Seiten",
+      "pageOf": "Seite {{page}} von {{pages}}",
+      "pageNo": "Seite {{page}}",
+      "saved": {
+        "label": "Gespeicherte Suchen",
+        "none": "Gespeicherte Suchen",
+        "sharedTag": "geteilt",
+        "save": "Suche speichern",
+        "delete": "Löschen",
+        "name": "Name",
+        "shared": "Mit allen Agenten teilen",
+        "failed": "Die Suche konnte nicht gespeichert werden."
+      },
+      "export": {
+        "button": "Export",
+        "needsClass": "Wählen Sie für den Export genau eine Klasse.",
+        "title": "CIs exportieren",
+        "description": "Exportiert die CIs des aktuellen Filters, eine Zeile je CI.",
+        "start": "Export starten",
+        "format": "Dateiformat",
+        "failed": "Der Export konnte nicht gestartet werden."
+      },
+      "bulk": {
+        "open": "Mehrere bearbeiten",
+        "title": "Mehrere CIs bearbeiten",
+        "description": "Die Änderungen gelten für {{count}} ausgewählte CIs. Felder auf „unverändert“ bleiben unberührt.",
+        "keep": "– unverändert –",
+        "start": "Starten",
+        "failed": "Die Sammelbearbeitung konnte nicht gestartet werden.",
+        "addLink": "Verknüpfung hinzufügen",
+        "targetKind": "Verknüpfungsziel",
+        "kinds": {
+          "ci": "CI",
+          "service": "Service",
+          "ticket": "Ticket"
+        },
+        "linkType": "Verknüpfungstyp",
+        "ciSide": "Das CI ist",
+        "side": {
+          "source": "Quelle",
+          "target": "Ziel"
+        },
+        "target": "Ziel",
+        "keyHint": {
+          "service": "Service-ID",
+          "ticket": "Ticket-ID"
+        },
+        "result": "{{updated}} geändert, {{skipped}} übersprungen (keine Berechtigung)"
+      }
+    },
+    "filter": {
+      "fields": {
+        "number": "Nummer",
+        "name": "Name",
+        "class": "Klasse",
+        "deployment_state": "Einsatzstatus",
+        "deployment_functionality": "Einsatzfunktion",
+        "incident_state": "Vorfallsstatus",
+        "incident_functionality": "Vorfallsfunktion",
+        "created_at": "Erstellt",
+        "changed_at": "Geändert"
+      }
     }
   }
 }

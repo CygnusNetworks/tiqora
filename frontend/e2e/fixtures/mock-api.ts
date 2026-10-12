@@ -1,6 +1,6 @@
 import { test, type Page, type Route, type TestInfo } from "@playwright/test";
 import { GONE_SAVED_SEARCH_ID, createDemoDashboards, demoDefaultWidgets, demoTemplateUpdateHint, resolveDashboards, type DemoDashboards } from "../../src/demo/dashboardsMock";
-import { createDemoCmdb, resolveCmdb, type DemoCmdb } from "../../src/demo/cmdbMock";
+import { createDemoCmdb, demoCmdbJob, resolveCmdb, type DemoCmdb } from "../../src/demo/cmdbMock";
 import { resolveKiosk } from "../../src/demo/kioskMock";
 import type { ReportRunIn } from "../../src/lib/reportsApi";
 // Reports reuse the demo's pure report data (catalogue definitions + deterministic results).
@@ -740,6 +740,16 @@ export async function mockApi(page: Page) {
     if (!authenticated) {
       await json(route, 401, { detail: "Not authenticated" });
       return;
+    }
+
+    // CMDB bulk / export jobs finish at once (ids from the mock store).
+    const cmdbJob = /\/api\/v1\/jobs\/(\d+)$/.exec(path);
+    if (cmdbJob && method === "GET") {
+      const job = demoCmdbJob(cmdbStore, Number(cmdbJob[1]));
+      if (job) {
+        await json(route, 200, job);
+        return;
+      }
     }
 
     // CMDB (Mode B): in-memory store of the demo mock.
