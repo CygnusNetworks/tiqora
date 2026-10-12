@@ -6,14 +6,17 @@ Tiqora itself does not know. Inbound messages arrive through :meth:`PluginChanne
 plugin's channel, with the same ticket matching as the other chat channels. The channel is
 registered in Znuny's ``communication_channel`` table like the WebChat row (module
 ``Kernel::System::CommunicationChannel::Internal``, package ``Tiqora``, no article data tables),
-so Znuny can read the articles. Outbound agent replies are added in the next task.
+so Znuny can read the articles. Outbound agent replies are send-then-store
+(:func:`deliver_plugin_channel_reply`): the plugin's ``send`` runs first, inside the request and
+under a hard timeout; only when it succeeds is the article stored, so a failed delivery leaves
+nothing behind and the agent can retry.
 """
 
 from __future__ import annotations
 
 import re
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Final
 
 from sqlalchemy import text
@@ -31,7 +34,8 @@ from tiqora.domain import ticket_write_service as tws
 from tiqora.extensions.core import get_registry
 from tiqora.extensions.registry import ExtensionPoint
 from tiqora.identity.types import SYSTEM_USER_ID
-from tiqora.plugins.context import PluginContext, TicketSummary
+from tiqora.plugins.calls import call_plugin
+from tiqora.plugins.context import PluginContext, PluginTickets, TicketSummary, minimal_context
 from tiqora.plugins.state import is_active
 from tiqora.plugins.writes import PluginWriteError, _lookup_id, run_in_session
 from tiqora.znuny.search_flag import message_id_md5
@@ -44,6 +48,7 @@ __all__ = [
     "TIQORA_CHANNEL_MODULE",
     "ChannelCapabilities",
     "ChannelContext",
+    "ChannelDeliveryError",
     "ChannelDriver",
     "ChannelSend",
     "DeliveryResult",
@@ -51,6 +56,7 @@ __all__ = [
     "InboundChannelMessage",
     "OutboundChannelMessage",
     "PluginChannels",
+    "deliver_plugin_channel_reply",
     "driver_for",
     "ensure_tiqora_channel_row",
 ]
@@ -140,6 +146,10 @@ CHANNEL_DRIVERS: Final[ExtensionPoint[ChannelDriver]] = ExtensionPoint(
     description="Customer channels (chats, messengers) a plugin adds next to e-mail and phone.",
     sdk_stable=True,
 )
+
+
+class ChannelDeliveryError(Exception):
+    """The plugin could not deliver an agent reply (API: 502, nothing was stored)."""
 
 
 def driver_for(channel: str) -> ChannelDriver | None:
@@ -312,4 +322,75 @@ async def _ingest(
     )
     return IngestResult(
         ticket_id=ticket_id, article_id=article_id, created=created, duplicate=False
+    )
+
+
+def _delivery_failed(driver: ChannelDriver, reason: str) -> ChannelDeliveryError:
+    return ChannelDeliveryError(f"Zustellung über „{driver.label}“ fehlgeschlagen: {reason}")
+
+
+async def deliver_plugin_channel_reply(
+    session: AsyncSession,
+    sysconfig: SysConfig,
+    driver: ChannelDriver,
+    *,
+    ticket_id: int,
+    user_id: int,
+    article: tws.ArticleIn,
+) -> int:
+    """Send an agent reply over a plugin channel, then store it. Returns the article id.
+
+    Send-then-store like e-mail and Telegram: the plugin's ``send`` runs first (hard timeout
+    ``min(driver.timeout_seconds, 30)`` s, inside the request); a refusal, an exception or a
+    timeout raises :class:`ChannelDeliveryError` and nothing is stored. The plugin's error text
+    is logged by :func:`call_plugin` but never shown to the agent (it may carry secrets).
+    """
+    if driver.send is None:
+        raise tws.InvalidInput("Über diesen Kanal kann nicht geantwortet werden")
+    limit = driver.capabilities.max_length
+    if limit is not None and len(article.body) > limit:
+        raise tws.InvalidInput(
+            f"Die Nachricht ist zu lang für {driver.label} (höchstens {limit} Zeichen)"
+        )
+    if article.attachments and not driver.capabilities.attachments:
+        raise tws.InvalidInput(f"{driver.label} kann keine Anhänge übertragen")
+    summary = await PluginTickets().get(ticket_id, session=session)
+    if summary is None:
+        raise tws.TicketNotFound(ticket_id)
+    message = OutboundChannelMessage(
+        ticket=summary,
+        agent_id=user_id,
+        to=article.to_address,
+        subject=article.subject if driver.capabilities.subject else "",
+        body=article.body,
+        content_type=article.content_type,
+        attachments=tuple(article.attachments),
+    )
+    send = driver.send
+    ctx = ChannelContext(plugin=driver.context or minimal_context(driver.plugin_id))
+    outcome = await call_plugin(
+        driver.plugin_id,
+        f"channel {driver.name} send",
+        lambda: send(ctx, message),
+        timeout=float(min(driver.timeout_seconds, MAX_CHANNEL_TIMEOUT)),
+    )
+    if not outcome.ok:
+        raise _delivery_failed(
+            driver,
+            "Zeitüberschreitung" if outcome.timed_out else "die Erweiterung meldet einen Fehler",
+        )
+    result = outcome.value
+    if not isinstance(result, DeliveryResult):
+        raise _delivery_failed(driver, "ungültige Antwort der Erweiterung")
+    external_id = result.external_id
+    message_id = article.message_id
+    if external_id is not None and _EXTERNAL_ID_RE.fullmatch(external_id):
+        message_id = f"<{driver.key}.{external_id}@tiqora.invalid>"
+    stored = replace(
+        article,
+        message_id=message_id,
+        to_address=(result.to if isinstance(result.to, str) and result.to else article.to_address),
+    )
+    return await tws.add_article(
+        session, ticket_id=ticket_id, article=stored, user_id=user_id, sysconfig=sysconfig
     )

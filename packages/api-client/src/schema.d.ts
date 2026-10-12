@@ -6646,6 +6646,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/channels/plugin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Plugin Channels
+         * @description The channels of loaded, enabled plugins an agent can answer on or at least see.
+         */
+        get: operations["list_plugin_channels_api_v1_channels_plugin_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/channels/sms/inbound": {
         parameters: {
             query?: never;
@@ -19520,6 +19540,31 @@ export interface components {
             kind: "extension_point" | "outbound_host" | "frontend_slot";
             /** Value */
             value: string;
+        };
+        /** PluginChannelCapabilitiesOut */
+        PluginChannelCapabilitiesOut: {
+            /** Attachments */
+            attachments: boolean;
+            /** Html */
+            html: boolean;
+            /** Max Length */
+            max_length: number | null;
+            /** Subject */
+            subject: boolean;
+        };
+        /** PluginChannelOut */
+        PluginChannelOut: {
+            /** Can Reply */
+            can_reply: boolean;
+            capabilities: components["schemas"]["PluginChannelCapabilitiesOut"];
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Name */
+            name: string;
+            /** Plugin Id */
+            plugin_id: string;
         };
         /** PluginContributionOut */
         PluginContributionOut: {
@@ -42640,6 +42685,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PhoneNoteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_plugin_channels_api_v1_channels_plugin_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginChannelOut"][];
                 };
             };
             /** @description Validation Error */

@@ -26,6 +26,7 @@ from tiqora.api.v1 import (
     oauth2_callback,
     phone_calls,
     phone_cti,
+    plugin_channels,
     plugins,
     process,
     queues,
@@ -91,6 +92,7 @@ api_v1_router.include_router(kiosk.router)
 api_v1_router.include_router(integrations.router)
 api_v1_router.include_router(jobs.router)
 api_v1_router.include_router(plugins.router)
+api_v1_router.include_router(plugin_channels.router)
 api_v1_router.include_router(admin_router)
 
 __all__ = ["api_v1_router"]

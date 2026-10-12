@@ -2785,6 +2785,20 @@ class TicketWriteService:
                 agent_id=user_id,
                 session=self._session,
             )
+        # Outgoing agent reply on a plugin channel (D11): the plugin sends, then we store.
+        if article.sender_type == "agent" and article.is_visible_for_customer:
+            from tiqora.plugins.channels import deliver_plugin_channel_reply, driver_for
+
+            plugin_driver = driver_for(article.channel)
+            if plugin_driver is not None:
+                return await deliver_plugin_channel_reply(
+                    self._session,
+                    self._sysconfig,
+                    plugin_driver,
+                    ticket_id=ticket_id,
+                    user_id=user_id,
+                    article=article,
+                )
         # Outgoing agent email: SMTP deliver then store (see outbound_reply).
         if article.channel.lower() == "email" and article.sender_type == "agent":
             from tiqora.channels.email.outbound_reply import deliver_agent_email_reply

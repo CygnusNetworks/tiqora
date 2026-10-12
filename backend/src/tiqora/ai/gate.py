@@ -71,6 +71,19 @@ TIQORA_ONLY_CHANNELS: frozenset[str] = frozenset({"telegram", "webchat"})
 AUTO_REPLY_SKIP_CHANNELS: frozenset[str] = frozenset({"webchat"})
 
 
+def is_tiqora_only_channel(name: str | None) -> bool:
+    """True for a channel Znuny cannot answer on: the core set or a loaded plugin channel (D11)."""
+    channel = (name or "").strip().lower()
+    if not channel:
+        return False
+    if channel in TIQORA_ONLY_CHANNELS:
+        return True
+    # Lazy: tiqora.plugins.channels pulls in the write service (import cycle with this module).
+    from tiqora.plugins.channels import driver_for
+
+    return driver_for(channel) is not None
+
+
 class AiGateError(RuntimeError):
     """Raised when an AI feature is enabled/run while the gate is not open."""
 
@@ -213,10 +226,7 @@ async def require_feature_allowed(
     (``ai.auto_reply.paused``) is never skipped, regardless of channel.
     """
     if feature == FEATURE_AUTO_REPLY:
-        is_tiqora_only_channel = (
-            source_channel is not None and source_channel.strip().lower() in TIQORA_ONLY_CHANNELS
-        )
-        if not is_tiqora_only_channel:
+        if not is_tiqora_only_channel(source_channel):
             await require_tiqora_primary(session)
         await require_auto_reply_not_paused(session)
 
@@ -230,6 +240,7 @@ __all__ = [
     "AiAutoReplyPausedError",
     "AiGateError",
     "get_operation_mode",
+    "is_tiqora_only_channel",
     "is_auto_reply_paused",
     "is_tiqora_primary",
     "queue_serves_tiqora_only_channel",

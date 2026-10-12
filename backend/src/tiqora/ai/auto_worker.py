@@ -62,8 +62,8 @@ from tiqora.ai.context import (
 from tiqora.ai.customer_pause import active_pause_for_ticket
 from tiqora.ai.gate import (
     AUTO_REPLY_SKIP_CHANNELS,
-    TIQORA_ONLY_CHANNELS,
     is_auto_reply_paused,
+    is_tiqora_only_channel,
     is_tiqora_primary,
 )
 from tiqora.ai.handoff import consume_ai_grant, mark_ai_escalated
@@ -518,18 +518,18 @@ async def run_auto_tick(
         if (source_channel or "").lower() in AUTO_REPLY_SKIP_CHANNELS:
             totals["skipped_channel"] += 1
             continue
-        is_tiqora_only_channel = (source_channel or "").lower() in TIQORA_ONLY_CHANNELS
+        only_tiqora = is_tiqora_only_channel(source_channel)
         # Per-event gate (plan §3.0 v1.1 relaxation, Phase E): outside
         # tiqora_primary, only events on a channel with no Znuny counterpart
         # (see TIQORA_ONLY_CHANNELS) are still processed. The kill-switch
         # always wins over both.
-        should_process = not paused and (primary or is_tiqora_only_channel)
+        should_process = not paused and (primary or only_tiqora)
         if not should_process:
             # Skipped (gated or paused); still counted as "seen" so the
             # watermark advances and the ticket is still eligible for
             # auto-summary below (summaries are never gated).
             continue
-        if not primary and is_tiqora_only_channel:
+        if not primary and only_tiqora:
             totals["tiqora_only_replies"] += 1
         try:
             async with factory() as session:

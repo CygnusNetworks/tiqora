@@ -102,6 +102,7 @@ from tiqora.jobs.service import (
     utc_now,
 )
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.plugins.channels import ChannelDeliveryError
 from tiqora.reporting.settings import load_reporting_settings
 from tiqora.reporting.sql import ReportQueryTimeout, invalidate_quietly, statement_timeout
 from tiqora.webchat.agent import accept_waiting_chat_for_reply, agent_chat_body
@@ -301,6 +302,9 @@ def _map_exc(exc: Exception) -> HTTPException:
         )
     if isinstance(exc, TelegramDeliveryError):
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    if isinstance(exc, ChannelDeliveryError):
+        # the message is German and written by us (never the plugin's own error text)
+        return HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
     return HTTPException(status_code=500, detail="Internal error")
 
 
@@ -1838,6 +1842,7 @@ async def create_article(
         InvalidInput,
         OutboundMailError,
         TelegramDeliveryError,
+        ChannelDeliveryError,
     ) as exc:
         refusal = _chat_reply_refusal(exc) if chat_reply and isinstance(exc, InvalidInput) else None
         raise (refusal or _map_exc(exc)) from exc

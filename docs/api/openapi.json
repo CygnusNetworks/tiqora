@@ -24418,6 +24418,78 @@
         "title": "PluginCapabilityOut",
         "type": "object"
       },
+      "PluginChannelCapabilitiesOut": {
+        "properties": {
+          "attachments": {
+            "title": "Attachments",
+            "type": "boolean"
+          },
+          "html": {
+            "title": "Html",
+            "type": "boolean"
+          },
+          "max_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Length"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "subject",
+          "html",
+          "attachments",
+          "max_length"
+        ],
+        "title": "PluginChannelCapabilitiesOut",
+        "type": "object"
+      },
+      "PluginChannelOut": {
+        "properties": {
+          "can_reply": {
+            "title": "Can Reply",
+            "type": "boolean"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/PluginChannelCapabilitiesOut"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "label",
+          "plugin_id",
+          "capabilities",
+          "can_reply"
+        ],
+        "title": "PluginChannelOut",
+        "type": "object"
+      },
       "PluginContributionOut": {
         "properties": {
           "key": {
@@ -77446,6 +77518,76 @@
         "summary": "Log Note",
         "tags": [
           "channels:phone"
+        ]
+      }
+    },
+    "/api/v1/channels/plugin": {
+      "get": {
+        "description": "The channels of loaded, enabled plugins an agent can answer on or at least see.",
+        "operationId": "list_plugin_channels_api_v1_channels_plugin_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PluginChannelOut"
+                  },
+                  "title": "Response List Plugin Channels Api V1 Channels Plugin Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Plugin Channels",
+        "tags": [
+          "channels:plugin"
         ]
       }
     },

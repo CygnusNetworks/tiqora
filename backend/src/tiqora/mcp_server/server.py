@@ -98,6 +98,7 @@ from tiqora.kb.schemas import ArticleIn as KbArticleIn
 from tiqora.kb.schemas import ArticleUpdateIn as KbArticleUpdateIn
 from tiqora.kb.service import KbForbidden, KbNotFound, KbService
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.plugins.channels import ChannelDeliveryError
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -938,6 +939,8 @@ async def ticket_reply(
         except TicketAccessDenied:
             return {"error": "Access denied — insufficient queue permissions"}
         except InvalidInput as e:
+            return {"error": str(e)}
+        except ChannelDeliveryError as e:  # plugin channel: nothing was stored
             return {"error": str(e)}
 
 
