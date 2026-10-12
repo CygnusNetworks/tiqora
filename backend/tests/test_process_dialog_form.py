@@ -608,7 +608,7 @@ async def test_unsupported_df_type_is_marked(client: AsyncClient, sync_url: str)
             {
                 "DynamicField_Registry889": "Display: '1'",  # a "Database" DF
                 "DynamicField_NoSuchField": "Display: '1'",
-                "Attachments": "Display: '1'",  # phase 2 (rulings F34)
+                "Attachments": "Display: '1'",  # start form: not rendered (needs a ticket)
                 "Title": "Display: '1'",
             },
         )
@@ -619,7 +619,6 @@ async def test_unsupported_df_type_is_marked(client: AsyncClient, sync_url: str)
     assert [(f["name"], f["kind"], f["options"]) for f in form["fields"]] == [
         ("DynamicField_Registry889", "unsupported", []),
         ("DynamicField_NoSuchField", "unsupported", []),
-        ("Attachments", "unsupported", []),
         ("Title", "text", []),
     ]
     assert _by_name(form)["DynamicField_Registry889"]["label"] == "Registry"

@@ -33,6 +33,7 @@ from tiqora.deployed.store import (
     record_revision,
 )
 from tiqora.deployed.sync_tables import clear_sync_table, pending_sync_count
+from tiqora.deployed.znuny_sync import DeployMode, queue_deploy_signal
 from tiqora.domain.ownership import get_ownership_state
 from tiqora.process.dump import build_process_dump, dump_checksum
 
@@ -146,18 +147,17 @@ async def _check_deploy_state(
     pending = await pending_sync_count(session, kind)
     latest = await latest_revision_info(session, kind)
 
-    if not ownership_active and pending > 0:
+    if pending > 0:
         _candidate.pop(kind, None)
-        # Drafts exist: keep the current revision; without one the engine runs live.
+        # Drafts exist (also in ownership mode: drafts must not run, only
+        # ``deploy_from_tiqora(mode="local")`` clears them): keep the current revision;
+        # without one the engine runs live.
         action: WatchAction = "running_live" if latest is None else "waiting_for_deploy"
         return WatchOutcome(kind, action, latest.id if latest else None, pending)
 
     dump = await _build_dump(session, kind)
     if latest is not None and dump_checksum(dump) == latest.checksum:
         _candidate.pop(kind, None)
-        if ownership_active and pending > 0:
-            await clear_sync_table(session, kind)
-            pending = 0
         return WatchOutcome(kind, "unchanged", latest.id, pending)
 
     async with revision_write_lock(session, kind):
@@ -166,7 +166,7 @@ async def _check_deploy_state(
         await session.commit()
         pending = await pending_sync_count(session, kind)
         latest = await latest_revision_info(session, kind)
-        if not ownership_active and pending > 0:
+        if pending > 0:
             _candidate.pop(kind, None)
             action = "running_live" if latest is None else "waiting_for_deploy"
             return WatchOutcome(kind, action, latest.id if latest else None, pending)
@@ -174,10 +174,8 @@ async def _check_deploy_state(
         checksum = dump_checksum(dump)
         if latest is not None and checksum == latest.checksum:
             _candidate.pop(kind, None)
-            if ownership_active and pending > 0:
-                await clear_sync_table(session, kind)
             await session.commit()
-            return WatchOutcome(kind, "unchanged", latest.id, 0 if ownership_active else pending)
+            return WatchOutcome(kind, "unchanged", latest.id, pending)
         if latest is not None and not ownership_active and _candidate.get(kind) != checksum:
             # First sighting of a changed dump after a deploy: confirm on the next tick.
             _candidate[kind] = checksum
@@ -191,28 +189,29 @@ async def _check_deploy_state(
         else:
             source = "znuny"
         info = await record_revision(session, kind, dump=dump, source=source, deployed_by=None)
-        if ownership_active and pending > 0:
-            await clear_sync_table(session, kind)
         await session.commit()
         logger.info("deploy_watch_snapshot", extra={"kind": kind, "source": source, "id": info.id})
-        return WatchOutcome(kind, "snapshot", info.id, 0 if ownership_active else pending)
+        return WatchOutcome(kind, "snapshot", info.id, pending)
 
 
 async def deploy_from_tiqora(
-    session: AsyncSession, kind: RevisionKind, *, user_id: int
+    session: AsyncSession, kind: RevisionKind, *, user_id: int, mode: DeployMode
 ) -> DeployResult:
     """Admin deploy: make the current ``pm_*``/``acl`` rows (drafts) the live revision.
 
     Znuny's deploy DB effect is "dump goes live, sync table is purged"
     (AdminProcessManagement.pm ProcessSync -> EntitySyncStatePurge, Entity.pm:324-345;
     AdminACL.pm ACLDeploy -> ACLsNeedSyncReset, ACL.pm:795-815). Single tick, no
-    two-tick confirmation: the admin asked for exactly this state. Like
+    two-tick confirmation: the admin asked for exactly this state. ``mode="local"`` purges
+    the sync table itself (Tiqora is the only system); ``mode="signal"`` records the
+    revision and queues the TiqoraSync signal, and never clears the sync tables (the
+    add-on runs Znuny's own dump + purge). Like
     :func:`check_deploy_state` this OWNS its transaction (commit, or rollback when it
     raises) and the caller must not have pending writes. Raises ``TimeoutError``
     when another writer holds the revision lock.
     """
     try:
-        result = await _deploy_from_tiqora(session, kind, user_id=user_id)
+        result = await _deploy_from_tiqora(session, kind, user_id=user_id, mode=mode)
     except BaseException:
         await session.rollback()
         raise
@@ -221,7 +220,7 @@ async def deploy_from_tiqora(
 
 
 async def _deploy_from_tiqora(
-    session: AsyncSession, kind: RevisionKind, *, user_id: int
+    session: AsyncSession, kind: RevisionKind, *, user_id: int, mode: DeployMode
 ) -> DeployResult:
     async with revision_write_lock(session, kind):
         # Fresh snapshot (MariaDB REPEATABLE READ) so the checksum re-check sees
@@ -232,8 +231,12 @@ async def _deploy_from_tiqora(
         checksum = dump_checksum(dump)
         _candidate.pop(kind, None)
         if latest is not None and latest.checksum == checksum:
-            # Drafts that net out to the live state still count as deployed.
-            await clear_sync_table(session, kind)
+            if mode == "signal":
+                # Znuny may still hold drafts although Tiqora's content is equal: signal anyway.
+                await queue_deploy_signal(session, kind, latest.id)
+            else:
+                # Drafts that net out to the live state still count as deployed.
+                await clear_sync_table(session, kind)
             await session.commit()
             logger.info(
                 "deploy_from_tiqora",
@@ -243,11 +246,16 @@ async def _deploy_from_tiqora(
                     "revision_id": latest.id,
                     "checksum": checksum,
                     "action": "unchanged",
+                    "mode": mode,
                 },
             )
             return DeployResult(kind, latest.id, checksum, "unchanged")
         info = await record_revision(session, kind, dump=dump, source="tiqora", deployed_by=user_id)
-        await clear_sync_table(session, kind)
+        if mode == "signal":
+            # TiqoraSync runs Znuny's own dump + purge; Tiqora never clears the sync tables here.
+            await queue_deploy_signal(session, kind, info.id)
+        else:
+            await clear_sync_table(session, kind)
         await session.commit()
         logger.info(
             "deploy_from_tiqora",
@@ -256,6 +264,7 @@ async def _deploy_from_tiqora(
                 "user_id": user_id,
                 "revision_id": info.id,
                 "checksum": info.checksum,
+                "mode": mode,
             },
         )
         return DeployResult(kind, info.id, info.checksum, "recorded")

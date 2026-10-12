@@ -142,6 +142,7 @@ export function PortalProcessWidget({ ticketId }: { ticketId: number }) {
                 key={picked}
                 api={portalProcessApi}
                 queryKeyPrefix={["portal", "process"]}
+                scope="portal"
                 processEntityId={picked}
                 ticketId={ticketId}
                 pending={enrollM.isPending}
@@ -222,6 +223,8 @@ function PortalActivityDialog({
             onSubmit={(fv) => submitM.mutate(fv)}
             onCancel={onClose}
             testIdPrefix="portal-process-dialog"
+            scope="portal"
+            optionsTarget={{ scope: "portal", kind: "dialog", ticketId, dialogEntityId }}
           />
         </div>
       )}

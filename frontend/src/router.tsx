@@ -4,6 +4,7 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  lazyRouteComponent,
   redirect,
 } from "@tanstack/react-router";
 import { SetPasswordPage } from "@/routes/SetPasswordPage";
@@ -140,7 +141,6 @@ import { AclDetailPage } from "@/routes/admin/AclDetailPage";
 import { GenericAgentJobsPage } from "@/routes/admin/GenericAgentJobsPage";
 import { GenericAgentJobDetailPage } from "@/routes/admin/GenericAgentJobDetailPage";
 import { ProcessesPage } from "@/routes/admin/ProcessesPage";
-import { ProcessDetailPage } from "@/routes/admin/ProcessDetailPage";
 import { QueueVariablesPage } from "@/routes/admin/QueueVariablesPage";
 import { QueueCustomerLinksPage } from "@/routes/admin/QueueCustomerLinksPage";
 import { CustomerFieldsPage } from "@/routes/admin/CustomerFieldsPage";
@@ -1210,7 +1210,11 @@ const adminSystemRoute = createRoute({
 const adminProcessDetailRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/processes/$processEntityId",
-  component: ProcessDetailPage,
+  // Lazy: keeps @xyflow/react out of the main chunk.
+  component: lazyRouteComponent(
+    () => import("@/routes/admin/process-designer/ProcessDesignerPage"),
+    "ProcessDesignerPage",
+  ),
 });
 
 const adminAiRoute = createRoute({

@@ -2544,6 +2544,76 @@ async def _link_state_id(session: AsyncSession, name: str) -> int:
     return int(row[0])
 
 
+async def link_objects(
+    session: AsyncSession,
+    *,
+    source_object: str,
+    source_key: str,
+    target_object: str,
+    target_key: str,
+    link_type: str,
+    user_id: int,
+    state: str = "Valid",
+) -> bool:
+    """Insert a ``link_relation`` row between any two linkable objects (idempotent).
+
+    Ports the ``link_relation`` write of Kernel/System/LinkObject.pm::LinkAdd: object, type
+    and state ids are resolved by name (an unseen object name gets its ``link_object`` row,
+    like Znuny's ObjectLookup), the stored direction is source -> target as given. Returns
+    ``False`` when nothing was written (self link, or the relation already exists).
+    """
+    if source_object == target_object and str(source_key) == str(target_key):
+        return False  # LinkObject.pm::LinkAdd: "Can't link an object with itself"
+    src_obj_id = await _link_object_id(session, source_object)
+    tgt_obj_id = await _link_object_id(session, target_object)
+    type_id = await _link_type_id(session, link_type)
+    state_id = await _link_state_id(session, state)
+    params = {
+        "so": src_obj_id,
+        "to": tgt_obj_id,
+        "sk": str(source_key),
+        "tk": str(target_key),
+        "t": type_id,
+    }
+    existing = (
+        await session.execute(
+            text(
+                "SELECT 1 FROM link_relation WHERE source_object_id = :so AND source_key = :sk"
+                " AND target_object_id = :to AND target_key = :tk AND type_id = :t LIMIT 1"
+            ),
+            params,
+        )
+    ).first()
+    if existing is not None:
+        return False
+    await session.execute(
+        text(
+            "INSERT INTO link_relation (source_object_id, source_key, target_object_id,"
+            " target_key, type_id, state_id, create_time, create_by)"
+            " VALUES (:so, :sk, :to, :tk, :t, :s, current_timestamp, :uid)"
+        ),
+        {**params, "s": state_id, "uid": user_id},
+    )
+    # Both linked tickets must refresh in Znuny (link list on each side).
+    if source_object == "Ticket" and str(source_key).isdigit():
+        if target_object == "Ticket":
+            data: dict[str, Any] = {"target_ticket_id": int(target_key)}
+        else:
+            data = {"target_object": target_object, "target_key": str(target_key)}
+        await _emit_event(session, "LinkAdd", int(source_key), data)
+        await invalidate_ticket_cache(session, int(source_key))
+    if target_object == "Ticket" and str(target_key).isdigit():
+        if source_object != "Ticket":
+            await _emit_event(
+                session,
+                "LinkAdd",
+                int(target_key),
+                {"source_object": source_object, "source_key": str(source_key)},
+            )
+        await invalidate_ticket_cache(session, int(target_key))
+    return True
+
+
 async def link_tickets(
     session: AsyncSession,
     *,
@@ -2552,44 +2622,16 @@ async def link_tickets(
     link_type: str,
     user_id: int,
 ) -> None:
-    """Insert a ticket↔ticket link_relation row (idempotent).
-
-    Ports the ``link_relation`` write of Kernel/System/LinkObject.pm::LinkAdd
-    (Ticket↔Ticket, state 'Valid'); resolves object/type/state ids by name.
-    """
-    obj_id = await _link_object_id(session, "Ticket")
-    type_id = await _link_type_id(session, link_type)
-    state_id = await _link_state_id(session, "Valid")
-    existing = (
-        await session.execute(
-            text(
-                "SELECT 1 FROM link_relation WHERE source_object_id = :o AND source_key = :sk"
-                " AND target_object_id = :o AND target_key = :tk AND type_id = :t LIMIT 1"
-            ),
-            {"o": obj_id, "sk": str(source_ticket_id), "tk": str(target_ticket_id), "t": type_id},
-        )
-    ).first()
-    if existing is not None:
-        return
-    await session.execute(
-        text(
-            "INSERT INTO link_relation (source_object_id, source_key, target_object_id,"
-            " target_key, type_id, state_id, create_time, create_by)"
-            " VALUES (:o, :sk, :o, :tk, :t, :s, current_timestamp, :uid)"
-        ),
-        {
-            "o": obj_id,
-            "sk": str(source_ticket_id),
-            "tk": str(target_ticket_id),
-            "t": type_id,
-            "s": state_id,
-            "uid": user_id,
-        },
+    """Insert a ticket↔ticket link_relation row (idempotent, state 'Valid')."""
+    await link_objects(
+        session,
+        source_object="Ticket",
+        source_key=str(source_ticket_id),
+        target_object="Ticket",
+        target_key=str(target_ticket_id),
+        link_type=link_type,
+        user_id=user_id,
     )
-    await _emit_event(session, "LinkAdd", source_ticket_id, {"target_ticket_id": target_ticket_id})
-    # Both linked tickets must refresh in Znuny (link list on each side).
-    await invalidate_ticket_cache(session, source_ticket_id)
-    await invalidate_ticket_cache(session, target_ticket_id)
 
 
 # ---------------------------------------------------------------------------

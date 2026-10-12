@@ -4,7 +4,9 @@ import { Switch } from "@/components/ui/Switch";
 import { TagInput } from "@/components/ui/TagInput";
 import { createExtensionPoint } from "@/extensions/registry";
 import { cn } from "@/lib/cn";
+import { CustomerKind } from "./CustomerKind";
 import { MultiSelectInput } from "./MultiSelectInput";
+import { TicketAttachmentsKind } from "./TicketAttachmentsKind";
 import type { FieldKindProps, FieldKindRegistration, FieldValue } from "./types";
 
 export const FIELD_KINDS = createExtensionPoint<FieldKindRegistration>("core.fields.kinds", (r) => r.kind);
@@ -245,6 +247,8 @@ export function registerCoreFieldKinds(): void {
     { kind: "datetime", component: DateTimeKind },
     { kind: "secret", component: SecretKind },
     { kind: "tags", component: TagsKind },
+    { kind: "customer", component: CustomerKind },
+    { kind: "ticket_attachments", component: TicketAttachmentsKind },
   ];
   for (const k of core) if (!FIELD_KINDS.get(k.kind)) FIELD_KINDS.register(k);
 }

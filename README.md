@@ -206,7 +206,7 @@ Grouped by topic; click a section to expand it, click a picture for full size. T
 | AI assistance subsystem | Draft replies, summaries, triage, refine (diff review, call notes), auto-reply worker, human handoff, per-ticket pause, 🤖 origin traces, attachment/vision, PII masking, model catalog/profiles/task routing, per-subject ACL, cost budgets & audit — `/admin/ai/*`, [docs/ai-integration.md](./docs/ai-integration.md) |
 | Daemon takeover (mail, escalation, notify, GA) | Per-function flags, off by default |
 | Calendar / appointments | Month/week/agenda UI; reuses Znuny `calendar*` tables |
-| Process management (BPM) | Reuses Znuny `pm_*` tables — [docs/process-management.md](./docs/process-management.md) |
+| Process management (BPM) and process designer | Reuses Znuny `pm_*` tables; visual designer (canvas, validation, Znuny YAML import/export, versions), deploy through TiqoraSync while Znuny runs — [docs/process-management.md](./docs/process-management.md) |
 | PGP / S-MIME | Off by default (Znuny's `PGP` / `SMIME` switches). Shared Znuny key stores, admin pages with overview/keys/settings, inbound verify/decrypt, outbound sign/encrypt with per-queue defaults and per-sender sign keys, signed/encrypted notifications, customer keys, public S/MIME roots trusted out of the box — [docs/crypto.md](./docs/crypto.md) |
 | Telegram, SMS, WhatsApp, phone/CTI | Telegram chat composer; phone tickets, call logging and CTI incoming-call popup — [docs/channels.md](./docs/channels.md) |
 | New-ticket helpers | Queue suggested from the customer's history, property bar, compact phone ticket with call strip |
@@ -448,7 +448,7 @@ missing or narrower than Znuny (last reviewed 2026-10-01):
 - **Partial:** statistics (fixed reports instead of the Znuny stats framework),
   GenericAgent execution, bulk actions, user preferences, GenericInterface
   edge cases, process conditions/actions.
-- **By design:** Package Manager (OPM), process designer, SysConfig edit UI,
+- **By design:** Package Manager (OPM), SysConfig edit UI,
   GenericInterface webservice editor/requester.
 
 The maintained, detailed list lives in

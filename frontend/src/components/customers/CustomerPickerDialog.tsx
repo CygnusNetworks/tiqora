@@ -61,13 +61,17 @@ export function CustomerPickerDialog({
   currentCustomerUserId,
   senderFrom,
   onClose,
+  onPick,
 }: {
+  /** Ticket to assign the customer to; ignored when `onPick` takes over (forms without a ticket). */
   ticketId: number;
   currentCustomerId?: string | null;
   currentCustomerUserId?: string | null;
   /** Raw From of the ticket's first article — suggestion and create prefill. */
   senderFrom?: string | null;
   onClose: () => void;
+  /** Hand the pick to the caller instead of patching a ticket (process forms). */
+  onPick?: (customer: { login: string; customer_id: string }) => void;
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -132,8 +136,14 @@ export function CustomerPickerDialog({
     senderQ.isSuccess &&
     !(senderQ.data ?? []).some((c) => c.email.toLowerCase() === sender.email.toLowerCase());
 
-  const assign = (c: { login: string; customer_id: string }) =>
+  const assign = (c: { login: string; customer_id: string }) => {
+    if (onPick) {
+      onPick({ login: c.login, customer_id: c.customer_id });
+      onClose();
+      return;
+    }
     patch.mutate({ customer_user_id: c.login, customer_id: c.customer_id });
+  };
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown") {
@@ -186,7 +196,7 @@ export function CustomerPickerDialog({
             {currentCustomerId && currentCustomerId !== currentCustomerUserId && (
               <span className="font-mono text-[11px]">{currentCustomerId}</span>
             )}
-            {hasCurrent && (
+            {hasCurrent && !onPick && (
               <button
                 type="button"
                 className="font-medium text-danger hover:underline disabled:opacity-50"

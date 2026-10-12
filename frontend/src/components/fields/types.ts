@@ -10,7 +10,10 @@ export type FieldKind =
   | "date"
   | "datetime"
   | "secret"
-  | "tags";
+  | "tags"
+  | "customer"
+  | "ticket_attachments";
+// "customer" values are the customer user login (string); "ticket_attachments" values are the chosen option keys (string[]).
 export type FieldValue = string | number | boolean | string[] | null;
 // date: "YYYY-MM-DD"; datetime: "YYYY-MM-DDTHH:MM" (wall time in the agent's display zone)
 export type FieldValues = Record<string, FieldValue>;

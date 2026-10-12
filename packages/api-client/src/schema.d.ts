@@ -795,6 +795,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portal/process/ticket/{ticket_id}/dialog/{activity_dialog_entity_id}/form/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Ticket Dialog Form Options
+         * @description The option lists of a ticket dialog for the values entered so far (customer principal).
+         */
+        post: operations["refresh_ticket_dialog_form_options_api_portal_process_ticket__ticket_id__dialog__activity_dialog_entity_id__form_options_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portal/process/ticket/{ticket_id}/start": {
         parameters: {
             query?: never;
@@ -887,6 +907,27 @@ export interface paths {
         get: operations["get_start_form_api_portal_process__process_entity_id__start_form_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/process/{process_entity_id}/start-form/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Start Form Options
+         * @description The option lists of the start dialog for the values entered so far, with the customer
+         *     principal. Same gates as ``GET .../start-form``.
+         */
+        post: operations["refresh_start_form_options_api_portal_process__process_entity_id__start_form_options_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3886,6 +3927,234 @@ export interface paths {
         head?: never;
         /** Update Priority */
         patch: operations["update_priority_api_v1_admin_priorities__priority_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/process-designer/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Catalog */
+        get: operations["get_catalog_api_v1_admin_process_designer_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/process-designer/entities/{entity_type}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Entity Summaries */
+        get: operations["list_entity_summaries_api_v1_admin_process_designer_entities__entity_type__get"];
+        put?: never;
+        /** Create Entity */
+        post: operations["create_entity_api_v1_admin_process_designer_entities__entity_type__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/process-designer/entities/{entity_type}/{entity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Entity
+         * @description One step, form, transition or action (the designer adds an existing one to a process).
+         */
+        get: operations["get_entity_api_v1_admin_process_designer_entities__entity_type___entity_id__get"];
+        /** Update Entity */
+        put: operations["update_entity_api_v1_admin_process_designer_entities__entity_type___entity_id__put"];
+        post?: never;
+        /** Delete Entity */
+        delete: operations["delete_entity_api_v1_admin_process_designer_entities__entity_type___entity_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/process-designer/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Process
+         * @description Import a Znuny process file as a draft; all or nothing.
+         */
+        post: operations["import_process_api_v1_admin_process_designer_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/process-designer/processes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Processes */
+        get: operations["list_processes_api_v1_admin_process_designer_processes_get"];
+        put?: never;
+        /** Create Process */
+        post: operations["create_process_api_v1_admin_process_designer_processes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/process-designer/processes/{process_entity_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Process */
+        get: operations["get_process_api_v1_admin_process_designer_processes__process_entity_id__get"];
+        /** Update Process */
+        put: operations["update_process_api_v1_admin_process_designer_processes__process_entity_id__put"];
+        post?: never;
+        /** Delete Process */
+        delete: operations["delete_process_api_v1_admin_process_designer_processes__process_entity_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/process-designer/processes/{process_entity_id}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copy Process */
+        post: operations["copy_process_api_v1_admin_process_designer_processes__process_entity_id__copy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/process-designer/processes/{process_entity_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Process
+         * @description Znuny-format process file (``Export_ProcessEntityID_<id>.yml``), a plain download.
+         */
+        get: operations["export_process_api_v1_admin_process_designer_processes__process_entity_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/process-designer/processes/{process_entity_id}/validation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Validation */
+        get: operations["get_validation_api_v1_admin_process_designer_processes__process_entity_id__validation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/process-designer/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Revisions
+         * @description Deployed process revisions, newest first.
+         */
+        get: operations["get_revisions_api_v1_admin_process_designer_revisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/process-designer/revisions/{revision_id}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Revision Diff
+         * @description Compare a revision with ``against`` (default: the one before it; 0 = empty).
+         */
+        get: operations["get_revision_diff_api_v1_admin_process_designer_revisions__revision_id__diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/process-designer/revisions/{revision_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Revision
+         * @description Write one process of a deployed revision back as a draft (nothing is deleted).
+         */
+        post: operations["restore_revision_api_v1_admin_process_designer_revisions__revision_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/processes": {
@@ -7778,6 +8047,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/process/ticket/{ticket_id}/dialog/{activity_dialog_entity_id}/form/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Ticket Dialog Form Options
+         * @description The option lists of a ticket dialog for the values entered so far; 403 when the dialog is
+         *     hidden for this agent, like ``GET .../form``.
+         */
+        post: operations["refresh_ticket_dialog_form_options_api_v1_process_ticket__ticket_id__dialog__activity_dialog_entity_id__form_options_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/process/ticket/{ticket_id}/path": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ticket Path
+         * @description The activities the ticket has been through so far, oldest first (empty outside a process).
+         */
+        get: operations["get_ticket_path_api_v1_process_ticket__ticket_id__path_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/process/ticket/{ticket_id}/start": {
         parameters: {
             query?: never;
@@ -7897,6 +8207,27 @@ export interface paths {
         get: operations["get_start_form_api_v1_process__process_entity_id__start_form_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/process/{process_entity_id}/start-form/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Start Form Options
+         * @description The option lists of the start dialog for the values entered so far (Owner follows Queue,
+         *     SLA follows Service, ACLs see the entered values). Same gates as ``GET .../start-form``.
+         */
+        post: operations["refresh_start_form_options_api_v1_process__process_entity_id__start_form_options_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -13302,6 +13633,47 @@ export interface components {
             /** Tn */
             tn: string;
         };
+        /** CatalogActionOut */
+        CatalogActionOut: {
+            /** Module */
+            module: string;
+            /** Name */
+            name: string;
+            /** Params */
+            params: components["schemas"]["CatalogParamOut"][];
+            /** Supported */
+            supported: boolean;
+            /** Tiqora Only */
+            tiqora_only: boolean;
+        };
+        /** CatalogFieldOut */
+        CatalogFieldOut: {
+            /** Condition */
+            condition: boolean;
+            /** Dialog */
+            dialog: boolean;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+            /** Name */
+            name: string;
+            /** Options */
+            options?: components["schemas"]["ProcessDialogOptionOut"][];
+        };
+        /** CatalogParamOut */
+        CatalogParamOut: {
+            /** Kind */
+            kind: string;
+            /** List Value */
+            list_value: boolean;
+            /** Name */
+            name: string;
+            /** One Of */
+            one_of: string[];
+            /** Required */
+            required: boolean;
+        };
         /** CategoryIn */
         CategoryIn: {
             /**
@@ -15168,11 +15540,14 @@ export interface components {
         };
         /** DeployKindStatusOut */
         DeployKindStatusOut: {
+            /** Deploy Mode */
+            deploy_mode: ("local" | "signal") | null;
             /** Pending Changes */
             pending_changes: number;
             revision: components["schemas"]["RevisionOut"] | null;
             /** Running Live */
             running_live: boolean;
+            znuny_sync: components["schemas"]["ZnunySyncOut"];
         };
         /** DeployOut */
         DeployOut: {
@@ -15188,6 +15563,11 @@ export interface components {
              * @enum {string}
              */
             kind: "process" | "acl";
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "local" | "signal";
             /** Revision Id */
             revision_id: number;
         };
@@ -15199,6 +15579,56 @@ export interface components {
             /** Ownership Active */
             ownership_active: boolean;
             process: components["schemas"]["DeployKindStatusOut"];
+        };
+        /** DesignerCatalogOut */
+        DesignerCatalogOut: {
+            /** Account Time */
+            account_time: boolean;
+            /** Actions */
+            actions: components["schemas"]["CatalogActionOut"][];
+            /** Condition Modules */
+            condition_modules: string[];
+            /** Condition Types */
+            condition_types: string[];
+            /** Fields */
+            fields: components["schemas"]["CatalogFieldOut"][];
+            /** Interfaces */
+            interfaces: string[];
+            /** Permissions */
+            permissions: string[];
+        };
+        /** DesignerEntityOut */
+        DesignerEntityOut: {
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /** Changed By */
+            changed_by: number;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /** Entity Id */
+            entity_id: string;
+            /**
+             * Entity Type
+             * @enum {string}
+             */
+            entity_type: "Process" | "Activity" | "ActivityDialog" | "Transition" | "TransitionAction";
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /**
+             * Sync State
+             * @default synced
+             * @enum {string}
+             */
+            sync_state: "synced" | "not_sync" | "deleted";
+            /** Version */
+            version: string;
         };
         /** DialOut */
         DialOut: {
@@ -15487,6 +15917,61 @@ export interface components {
             method: "detached" | "inline";
             /** Sign Key */
             sign_key?: string | null;
+        };
+        /** EntityChangeOut */
+        EntityChangeOut: {
+            /**
+             * Change
+             * @enum {string}
+             */
+            change: "added" | "removed" | "changed";
+            /** Changed Keys */
+            changed_keys: string[];
+            /** Entity Id */
+            entity_id: string;
+            /** Entity Type */
+            entity_type: string;
+            /** Name */
+            name: string;
+        };
+        /** EntityCreateIn */
+        EntityCreateIn: {
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /** Name */
+            name: string;
+        };
+        /** EntitySummaryOut */
+        EntitySummaryOut: {
+            /** Entity Id */
+            entity_id: string;
+            /**
+             * Entity Type
+             * @enum {string}
+             */
+            entity_type: "Process" | "Activity" | "ActivityDialog" | "Transition" | "TransitionAction";
+            /** Name */
+            name: string;
+            /**
+             * Sync State
+             * @enum {string}
+             */
+            sync_state: "synced" | "not_sync" | "deleted";
+            /** Used By */
+            used_by: string[];
+        };
+        /** EntityUpdateIn */
+        EntityUpdateIn: {
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /** Expected Version */
+            expected_version: string;
+            /** Name */
+            name: string;
         };
         /**
          * ErasureSelectorIn
@@ -19019,6 +19504,16 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** ProcessCreateIn */
+        ProcessCreateIn: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Name */
+            name: string;
+        };
         /**
          * ProcessDetailOut
          * @description A single process's full graph: activities and their dialogs.
@@ -19059,15 +19554,28 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "text" | "textarea" | "select" | "multiselect" | "boolean" | "date" | "datetime" | "article" | "pending_time" | "customer" | "unsupported";
+            kind: "text" | "textarea" | "select" | "multiselect" | "boolean" | "date" | "datetime" | "article" | "pending_time" | "customer" | "ticket_attachments" | "unsupported";
             /** Label */
             label: string;
             /** Name */
             name: string;
             /** Options */
             options?: components["schemas"]["ProcessDialogOptionOut"][];
+            /** Refresh On */
+            refresh_on?: string[];
             /** Required */
             required: boolean;
+            /**
+             * Time Units
+             * @default 0
+             * @enum {string}
+             */
+            time_units: "0" | "1" | "2";
+            /**
+             * Uploads
+             * @default false
+             */
+            uploads: boolean;
         };
         /**
          * ProcessDialogFormOut
@@ -19098,6 +19606,126 @@ export interface components {
             label: string;
             /** Value */
             value: string;
+        };
+        /** ProcessDraftOut */
+        ProcessDraftOut: {
+            /** Activities */
+            activities: components["schemas"]["DesignerEntityOut"][];
+            /** Activity Dialogs */
+            activity_dialogs: components["schemas"]["DesignerEntityOut"][];
+            /** Layout */
+            layout: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+            /** Missing References */
+            missing_references: string[];
+            /** Pending Changes */
+            pending_changes: number;
+            process: components["schemas"]["DesignerEntityOut"];
+            /** State Entity Id */
+            state_entity_id: string;
+            /** State Name */
+            state_name: string;
+            /** Transition Actions */
+            transition_actions: components["schemas"]["DesignerEntityOut"][];
+            /** Transitions */
+            transitions: components["schemas"]["DesignerEntityOut"][];
+        };
+        /**
+         * ProcessDraftSummaryOut
+         * @description ``GET /processes`` row: a summary plus the process state (ruling: list shows drafts).
+         */
+        ProcessDraftSummaryOut: {
+            /** Entity Id */
+            entity_id: string;
+            /**
+             * Entity Type
+             * @enum {string}
+             */
+            entity_type: "Process" | "Activity" | "ActivityDialog" | "Transition" | "TransitionAction";
+            /** Has Draft Changes */
+            has_draft_changes: boolean;
+            /** Name */
+            name: string;
+            /** State Entity Id */
+            state_entity_id: string;
+            /** State Name */
+            state_name: string;
+            /**
+             * Sync State
+             * @enum {string}
+             */
+            sync_state: "synced" | "not_sync" | "deleted";
+            /** Used By */
+            used_by: string[];
+        };
+        /** ProcessFormOptionsIn */
+        ProcessFormOptionsIn: {
+            /** Fields */
+            fields?: string[];
+            /** Values */
+            values?: {
+                [key: string]: unknown;
+            };
+        };
+        /** ProcessFormOptionsOut */
+        ProcessFormOptionsOut: {
+            /** Options */
+            options: {
+                [key: string]: components["schemas"]["ProcessDialogOptionOut"][];
+            };
+        };
+        /** ProcessImportIn */
+        ProcessImportIn: {
+            /** Content */
+            content: string;
+            /**
+             * Overwrite Existing
+             * @default false
+             */
+            overwrite_existing: boolean;
+        };
+        /** ProcessImportOut */
+        ProcessImportOut: {
+            /** Created */
+            created: {
+                [key: string]: number;
+            };
+            /** Name */
+            name: string;
+            /** Process Entity Id */
+            process_entity_id: string;
+            /** Updated */
+            updated: {
+                [key: string]: number;
+            };
+        };
+        /** ProcessPathOut */
+        ProcessPathOut: {
+            /** Process Entity Id */
+            process_entity_id: string | null;
+            /** Steps */
+            steps: components["schemas"]["ProcessPathStepOut"][];
+        };
+        /** ProcessPathStepOut */
+        ProcessPathStepOut: {
+            /** Activity Entity Id */
+            activity_entity_id: string;
+            /** Activity Name */
+            activity_name: string;
+            /** Current */
+            current: boolean;
+            /**
+             * Entered At
+             * Format: date-time
+             */
+            entered_at: string;
+            /** Entered By */
+            entered_by: number;
+            /** Entered By Name */
+            entered_by_name: string;
         };
         /**
          * ProcessStartIn
@@ -19130,6 +19758,47 @@ export interface components {
              * @default
              */
             state_name: string;
+        };
+        /** ProcessUpdateIn */
+        ProcessUpdateIn: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Expected Version */
+            expected_version: string;
+            /** Layout */
+            layout: {
+                [key: string]: {
+                    [key: string]: string | number;
+                };
+            };
+            /** Name */
+            name: string;
+            /** Path */
+            path: {
+                [key: string]: {
+                    [key: string]: {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /**
+             * Start Activity
+             * @default
+             */
+            start_activity: string;
+            /**
+             * Start Activity Dialog
+             * @default
+             */
+            start_activity_dialog: string;
+            /**
+             * State Entity Id
+             * @enum {string}
+             */
+            state_entity_id: "S1" | "S2" | "S3";
         };
         /**
          * ProviderChanges
@@ -20235,6 +20904,11 @@ export interface components {
             /** Url */
             url: string | null;
         };
+        /** RestoreIn */
+        RestoreIn: {
+            /** Process Entity Id */
+            process_entity_id: string;
+        };
         /** ResultColumnOut */
         ResultColumnOut: {
             /** Grain */
@@ -20255,6 +20929,21 @@ export interface components {
              * @enum {string}
              */
             type: "id" | "string" | "enum" | "date" | "hour" | "weekday" | "count" | "number" | "minutes" | "hours" | "days" | "units" | "percent";
+        };
+        /** RevisionDiffOut */
+        RevisionDiffOut: {
+            /** Changes */
+            changes: components["schemas"]["EntityChangeOut"][];
+            /** From Revision */
+            from_revision: number;
+            /** Process Entity Id */
+            process_entity_id: string | null;
+            /** To Revision */
+            to_revision: number;
+            /** Yaml After */
+            yaml_after: string;
+            /** Yaml Before */
+            yaml_before: string;
         };
         /** RevisionOut */
         RevisionOut: {
@@ -23149,6 +23838,29 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** ValidationIssueOut */
+        ValidationIssueOut: {
+            /** Code */
+            code: string;
+            /** Entity Id */
+            entity_id: string;
+            /**
+             * Entity Type
+             * @enum {string}
+             */
+            entity_type: "Process" | "Activity" | "ActivityDialog" | "Transition" | "TransitionAction";
+            /** Field */
+            field: string;
+            /** Params */
+            params: {
+                [key: string]: string;
+            };
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "error" | "warning";
+        };
         /** Visualization */
         Visualization: {
             /** Chart Measures */
@@ -23519,6 +24231,28 @@ export interface components {
             stats: components["schemas"]["StatPreviewOut"][];
             /** Truncated */
             truncated: boolean;
+        };
+        /** ZnunySyncOut */
+        ZnunySyncOut: {
+            /**
+             * Message
+             * @default
+             */
+            message: string;
+            /**
+             * Overdue
+             * @default false
+             */
+            overdue: boolean;
+            /** Revision Id */
+            revision_id?: number | null;
+            /** Since */
+            since?: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "not_needed" | "pending" | "ok" | "error" | "addon_missing";
         };
     };
     responses: never;
@@ -25232,6 +25966,44 @@ export interface operations {
             };
         };
     };
+    refresh_ticket_dialog_form_options_api_portal_process_ticket__ticket_id__dialog__activity_dialog_entity_id__form_options_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticket_id: number;
+                activity_dialog_entity_id: string;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessFormOptionsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessFormOptionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     start_ticket_process_api_portal_process_ticket__ticket_id__start_post: {
         parameters: {
             query?: never;
@@ -25396,6 +26168,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProcessDialogFormOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_start_form_options_api_portal_process__process_entity_id__start_form_options_post: {
+        parameters: {
+            query?: {
+                ticket_id?: number | null;
+            };
+            header?: never;
+            path: {
+                process_entity_id: string;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessFormOptionsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessFormOptionsOut"];
                 };
             };
             /** @description Validation Error */
@@ -34079,6 +34890,655 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PriorityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_catalog_api_v1_admin_process_designer_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignerCatalogOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_entity_summaries_api_v1_admin_process_designer_entities__entity_type__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                entity_type: "Activity" | "ActivityDialog" | "Transition" | "TransitionAction";
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntitySummaryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_entity_api_v1_admin_process_designer_entities__entity_type__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                entity_type: "Activity" | "ActivityDialog" | "Transition" | "TransitionAction";
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntityCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignerEntityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_entity_api_v1_admin_process_designer_entities__entity_type___entity_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                entity_type: "Activity" | "ActivityDialog" | "Transition" | "TransitionAction";
+                entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignerEntityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_entity_api_v1_admin_process_designer_entities__entity_type___entity_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                entity_type: "Activity" | "ActivityDialog" | "Transition" | "TransitionAction";
+                entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntityUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignerEntityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_entity_api_v1_admin_process_designer_entities__entity_type___entity_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                entity_type: "Activity" | "ActivityDialog" | "Transition" | "TransitionAction";
+                entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_process_api_v1_admin_process_designer_import_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessImportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessImportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_processes_api_v1_admin_process_designer_processes_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessDraftSummaryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_process_api_v1_admin_process_designer_processes_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_process_api_v1_admin_process_designer_processes__process_entity_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                process_entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_process_api_v1_admin_process_designer_processes__process_entity_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                process_entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_process_api_v1_admin_process_designer_processes__process_entity_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                process_entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    copy_process_api_v1_admin_process_designer_processes__process_entity_id__copy_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                process_entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_process_api_v1_admin_process_designer_processes__process_entity_id__export_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                process_entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_validation_api_v1_admin_process_designer_processes__process_entity_id__validation_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                process_entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationIssueOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_revisions_api_v1_admin_process_designer_revisions_get: {
+        parameters: {
+            query?: {
+                kind?: "process";
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_revision_diff_api_v1_admin_process_designer_revisions__revision_id__diff_get: {
+        parameters: {
+            query?: {
+                against?: number | null;
+                process?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                revision_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionDiffOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_revision_api_v1_admin_process_designer_revisions__revision_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                revision_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestoreIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessDraftOut"];
                 };
             };
             /** @description Validation Error */
@@ -44054,6 +45514,81 @@ export interface operations {
             };
         };
     };
+    refresh_ticket_dialog_form_options_api_v1_process_ticket__ticket_id__dialog__activity_dialog_entity_id__form_options_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                activity_dialog_entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessFormOptionsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessFormOptionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ticket_path_api_v1_process_ticket__ticket_id__path_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessPathOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     start_ticket_process_api_v1_process_ticket__ticket_id__start_post: {
         parameters: {
             query?: never;
@@ -44263,6 +45798,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProcessDialogFormOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_start_form_options_api_v1_process__process_entity_id__start_form_options_post: {
+        parameters: {
+            query?: {
+                ticket_id?: number | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                process_entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProcessFormOptionsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessFormOptionsOut"];
                 };
             };
             /** @description Validation Error */

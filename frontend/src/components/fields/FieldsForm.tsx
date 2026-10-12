@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import { FieldInput } from "./FieldInput";
@@ -13,6 +14,7 @@ export function FieldsForm({
   disabled,
   columns = 1,
   testId = "fields",
+  extras,
 }: {
   fields: FieldDef[];
   values: FieldValues;
@@ -22,6 +24,8 @@ export function FieldsForm({
   disabled?: boolean;
   columns?: 1 | 2;
   testId?: string;
+  /** Extra content rendered right under the field with that key (for example an upload area under a body). */
+  extras?: Record<string, ReactNode>;
 }) {
   const { t } = useTranslation();
   if (fields.length === 0) return null;
@@ -69,6 +73,7 @@ export function FieldsForm({
                 {error}
               </p>
             )}
+            {extras?.[def.key]}
           </div>
         );
       })}

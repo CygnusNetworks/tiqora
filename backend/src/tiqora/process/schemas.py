@@ -12,6 +12,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from tiqora.process.path import ProcessPathOut, ProcessPathStepOut
+
+__all__ = ["ProcessPathOut", "ProcessPathStepOut"]
+
 
 class ProcessSummaryOut(BaseModel):
     """One row from :meth:`tiqora.process.graph.ProcessRepository.list_processes`."""
@@ -206,6 +210,7 @@ FieldKind = Literal[
     "article",
     "pending_time",
     "customer",
+    "ticket_attachments",
     "unsupported",
 ]
 
@@ -224,6 +229,16 @@ class ProcessDialogFieldOut(BaseModel):
     description_long: str = ""
     default: Any = None
     options: list[ProcessDialogOptionOut] = Field(default_factory=list)
+    #: kind "article" only: booked time. "0" = no time field (also whenever
+    #: ``Ticket::Frontend::AccountTime`` is off or on the customer interface), "1" = optional,
+    #: "2" = required (``AgentTicketProcess.pm:3067-3082``).
+    time_units: Literal["0", "1", "2"] = "0"
+    #: kind "article": the submit may carry files in ``field_values.ArticleAttachments``
+    #: (a list of ``{filename, content_type, content_base64}``, at most 10).
+    uploads: bool = False
+    #: Canonical names of the fields whose change must re-ask this field's options
+    #: (``POST .../options``, plan D7). Empty: the options never depend on another field.
+    refresh_on: list[str] = Field(default_factory=list)
 
 
 class ProcessDialogFormOut(BaseModel):

@@ -14,6 +14,9 @@ export type NewProcessTicketOut = Schemas["NewProcessTicketOut"];
 export type ActivityDialogSubmitOut = Schemas["ActivityDialogSubmitOut"];
 export type TicketAclActions = Schemas["TicketAclActionsOut"];
 export type ProcessDetail = Schemas["ProcessDetailOut"];
+export type ProcessFormOptionsIn = Schemas["ProcessFormOptionsIn"];
+export type ProcessFormOptionsOut = Schemas["ProcessFormOptionsOut"];
+export type ProcessPath = Schemas["ProcessPathOut"];
 
 const enc = encodeURIComponent;
 const ticketQuery = (opts?: { ticketId?: number }) =>
@@ -36,6 +39,21 @@ export const processApi = {
       { signal },
     );
   },
+  /** Options of the listed fields asked again with the current form values (dependent selects). */
+  startFormOptions(processEntityId: string, body: ProcessFormOptionsIn, opts?: { ticketId?: number }, signal?: AbortSignal) {
+    return api.request<ProcessFormOptionsOut>("POST", `/api/v1/process/${enc(processEntityId)}/start-form/options`, {
+      query: ticketQuery(opts),
+      body,
+      signal,
+    });
+  },
+  dialogFormOptions(ticketId: number, dialogEntityId: string, body: ProcessFormOptionsIn, signal?: AbortSignal) {
+    return api.request<ProcessFormOptionsOut>(
+      "POST",
+      `/api/v1/process/ticket/${ticketId}/dialog/${enc(dialogEntityId)}/form/options`,
+      { body, signal },
+    );
+  },
   createTicket(body: NewProcessTicketIn) {
     return api.request<NewProcessTicketOut>("POST", "/api/v1/process/tickets", { body });
   },
@@ -51,6 +69,10 @@ export const processApi = {
   /** One process with its activities and their dialogs (read-only admin view). */
   detail(processEntityId: string, signal?: AbortSignal) {
     return api.request<ProcessDetail>("GET", `/api/v1/process/${enc(processEntityId)}`, { signal });
+  },
+  /** The activities a ticket has been through ("Bisheriger Weg"). */
+  path(ticketId: number, signal?: AbortSignal) {
+    return api.request<ProcessPath>("GET", `/api/v1/process/ticket/${ticketId}/path`, { signal });
   },
   aclActions(ticketId: number, signal?: AbortSignal) {
     return api.request<TicketAclActions>("GET", `/api/v1/tickets/${ticketId}/acl-actions`, { signal });

@@ -77,6 +77,10 @@ ZNUNY_SETTING_DEFAULTS: Final[dict[str, Any]] = {
     "SendNoAutoResponseRegExp": r"(MAILER-DAEMON|postmaster|abuse)@.+?\..+?",
     # Time accounting (Ticket.xml): booking is on, but not mandatory.
     "Ticket::Frontend::AccountTime": 1,
+    # ProcessManagement.xml: the dynamic field that carries the dialog's `Attachments` selection.
+    "Process::DynamicFieldProcessManagementAttachment": "ProcessManagementAttachment",
+    "Process::DynamicFieldProcessManagementAttachment::Keep": 0,
+    "Process::DynamicFieldProcessManagementAttachment::FormatString": "%3$s#%1$d: %2$s",
     "Ticket::Frontend::NeedAccountedTime": 0,
     # GenericInterface TicketCreate / TicketUpdate article defaults
     # (Kernel/Config/Files/XML/GenericInterface.xml).

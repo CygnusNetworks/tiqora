@@ -990,15 +990,34 @@ While Znuny is still in use:
 - Until the first deploy has been seen, Tiqora runs the live (draft) rows and
   the "Dienste" page warns; one "Bereitstellen" in Znuny ends that state.
 - Znuny's process import writes no sync rows and is picked up by Tiqora
-  without a deploy.
+  without a deploy. Tiqora's own import writes sync rows (draft until deployed).
+- **TiqoraSync 1.2.0 or newer** lets the Tiqora process designer (and the
+  ACL admin) deploy while Znuny runs. The add-on writes a heartbeat once a
+  minute; with a heartbeat younger than 10 minutes "Bereitstellen" in Tiqora
+  records the revision and queues a signal, and the add-on does what Znuny's
+  own Deploy button does (`ZZZProcessManagement.pm` / `ZZZACL.pm`, purge of
+  the sync state) and reports `ok` or `error` back. Tiqora shows "Wartet auf
+  Znuny ...", then the result. On `error` Znuny keeps the previous version
+  until the problem is fixed and the deploy is requested again. Requirements:
+  the daemon user can write `Kernel/Config/Files/`, and on multi-node Znuny
+  that directory is shared with the web nodes. Details:
+  [TiqoraSync install notes](../packages/znuny-addon/TiqoraSync/install/README.md).
+- Deploy modes, in this order: schema ownership (`local`), a fresh TiqoraSync
+  heartbeat with the deploy capability (`signal`), the setting below
+  (`local`); otherwise "Bereitstellen" in Tiqora answers 409 and says why
+  (add-on missing or older than 1.2.0, or the Znuny daemon silent).
 - Leave the setting "Prozesse und ACLs in Tiqora bereitstellen (Znuny läuft
-  nicht mehr)" off. It enables "Bereitstellen" in Tiqora
-  (`POST /api/v1/admin/deploy`); while Znuny runs, Znuny's own deployed
+  nicht mehr)" off while Znuny runs and the add-on is current. It enables a
+  local deploy in Tiqora; with Znuny still running, Znuny's own deployed
   configuration would then stay on the old state.
 
-After the schema cutover (see below) Tiqora is the only system and deploys
-automatically: each tick records a revision when something changed and clears
-`pm_entity_sync` / `acl_sync`.
+After the schema cutover (see below) Tiqora is the only system, but it does
+not deploy on its own: edits in the designer or the ACL editor stay drafts
+(`pm_entity_sync` / `acl_sync` rows) until an admin presses "Bereitstellen" in
+Tiqora, which records the revision and clears the sync rows (`local` mode).
+While drafts are pending, the watcher keeps the current revision running
+(`waiting_for_deploy`). Without drafts it records a `tiqora` revision when the
+rows changed anyway (an import or a direct DB edit).
 
 ## Schema ownership
 

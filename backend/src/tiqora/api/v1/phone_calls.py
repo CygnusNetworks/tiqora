@@ -15,12 +15,13 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from tiqora.api.deps import CurrentUser, DbSession
-from tiqora.api.v1.tickets import ArticleAttachmentIn, decode_attachments
+from tiqora.api.v1.tickets import decode_attachments
 from tiqora.channels.phone.service import (
     PhoneCallIn,
     PhoneCallLockedByOther,
     log_phone_call_on_ticket,
 )
+from tiqora.domain.attachments_in import ArticleAttachmentIn
 from tiqora.domain.ticket_write_service import InvalidInput, TicketAccessDenied, TicketNotFound
 from tiqora.znuny.sysconfig import SysConfig
 

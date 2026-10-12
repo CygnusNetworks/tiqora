@@ -10,6 +10,7 @@
  */
 
 import type { FrontendPlugin, PluginAdminList } from "@/lib/pluginsApi";
+import type { DeployStatus } from "@/lib/deployStatusApi";
 import { resolve as resolveDashboardsDemo } from "./dashboardsMock";
 import { resolveSavedRequest } from "./savedMock";
 import { resolveWebchatData } from "./webchatMock";
@@ -1609,39 +1610,146 @@ const demoDeployRevision = {
   deployed_at: "2026-10-07T14:30:00Z",
   deployed_by: null,
 };
+// Typed so a new required field of DeployStatusOut fails tsc here instead of crashing the demo.
 const demoDeployStatus = {
-  process: { revision: demoDeployRevision, pending_changes: 2, running_live: false },
-  acl: { revision: { ...demoDeployRevision, id: 5, source: "initial" }, pending_changes: 0, running_live: false },
+  process: {
+    revision: demoDeployRevision,
+    pending_changes: 2,
+    running_live: false,
+    deploy_mode: "signal",
+    znuny_sync: { state: "ok", revision_id: 3, since: "2026-10-07T14:31:00Z", message: "", overdue: false },
+  },
+  acl: {
+    revision: { ...demoDeployRevision, id: 5, source: "initial" },
+    pending_changes: 0,
+    running_live: false,
+    deploy_mode: "signal",
+    znuny_sync: { state: "not_needed", message: "", overdue: false },
+  },
   ownership_active: false,
   can_deploy_from_tiqora: true,
-};
+} satisfies DeployStatus;
 const demoAdminProcesses = [
   { entity_id: "Process-demo", name: "Bestellung", state_entity_id: "S1", state_name: "Active", activity_count: 4, start_interfaces: ["AgentInterface", "CustomerInterface"] },
   { entity_id: "Process-onb", name: "Onboarding", state_entity_id: "S2", state_name: "Inactive", activity_count: 6, start_interfaces: ["AgentInterface"] },
   { entity_id: "Process-old", name: "Altprozess Beschaffung", state_entity_id: "S3", state_name: "FadeAway", activity_count: 3, start_interfaces: [] },
 ];
 
-// Single process of the admin detail page (ProcessDetailOut): the list rows plus two activities.
-function demoProcessDetail(entityId: string) {
-  const row = demoAdminProcesses.find((r) => r.entity_id === entityId) ?? demoAdminProcesses[0];
-  return {
-    id: demoAdminProcesses.indexOf(row) + 1,
-    entity_id: row.entity_id,
-    name: row.name,
-    state_entity_id: row.state_entity_id,
-    start_activity_entity_id: "Activity-1",
-    activities: [
-      { entity_id: "Activity-1", name: "Antrag erfassen", activity_dialogs: [{ entity_id: "AD-1", name: "Antrag" }] },
-      {
-        entity_id: "Activity-2",
-        name: "Genehmigung",
-        activity_dialogs: [
-          { entity_id: "AD-2", name: "Genehmigen" },
-          { entity_id: "AD-3", name: "Rückfrage" },
-        ],
-      },
-    ],
-  };
+// Process designer (admin): draft of the sample "Bestellung" process with three steps, the catalogue,
+// validation findings and deployed versions. Mirrors ProcessDraftOut / DesignerCatalogOut.
+const designerEntity = (entity_type: string, entity_id: string, id: number, name: string, config: Record<string, unknown>, sync_state = "synced") => ({
+  entity_type, entity_id, id, name, config, version: `v-${entity_id}`, sync_state,
+  changed_at: "2026-10-09T09:00:00Z", changed_by: 1,
+});
+const designerDraft = {
+  process: designerEntity("Process", "Process-demo", 1, "Bestellung", {
+    Description: "Bestellung von Arbeitsmitteln",
+    StartActivity: "Activity-1",
+    StartActivityDialog: "AD-1",
+    Path: {
+      "Activity-1": { "Transition-1": { ActivityEntityID: "Activity-2", TransitionAction: ["TA-1"] } },
+      "Activity-2": { "Transition-2": { ActivityEntityID: "Activity-3" } },
+      "Activity-3": {},
+    },
+  }, "not_sync"),
+  state_entity_id: "S1",
+  state_name: "Active",
+  layout: { "Activity-1": { left: "40", top: "60" }, "Activity-2": { left: "300", top: "60" }, "Activity-3": { left: "560", top: "60" } },
+  activities: [
+    designerEntity("Activity", "Activity-1", 1, "Antrag erfassen", { ActivityDialog: { "1": "AD-1" } }),
+    designerEntity("Activity", "Activity-2", 2, "Genehmigung", { ActivityDialog: { "1": "AD-2", "2": "AD-3" } }),
+    designerEntity("Activity", "Activity-3", 3, "Abgeschlossen", { ActivityDialog: {} }),
+  ],
+  activity_dialogs: [
+    designerEntity("ActivityDialog", "AD-1", 1, "Antrag", { DescriptionShort: "Antrag", Interface: ["AgentInterface"], Fields: {}, FieldOrder: [] }),
+    designerEntity("ActivityDialog", "AD-2", 2, "Genehmigen", { DescriptionShort: "Genehmigen", Interface: ["AgentInterface"], Fields: {}, FieldOrder: [] }),
+    designerEntity("ActivityDialog", "AD-3", 3, "Rückfrage", { DescriptionShort: "Rückfrage", Interface: ["AgentInterface"], Fields: {}, FieldOrder: [] }),
+  ],
+  transitions: [
+    designerEntity("Transition", "Transition-1", 1, "Antrag vollständig", { ConditionLinking: "and", Condition: {} }),
+    designerEntity("Transition", "Transition-2", 2, "Genehmigt", { ConditionLinking: "and", Condition: {} }),
+  ],
+  transition_actions: [
+    designerEntity("TransitionAction", "TA-1", 1, "Status auf offen", { Module: "Kernel::System::ProcessManagement::TransitionAction::TicketStateSet", Config: { State: "open" } }),
+  ],
+  missing_references: [] as string[],
+  pending_changes: 2,
+};
+const designerCatalog = {
+  actions: [
+    { name: "TicketStateSet", module: "Kernel::System::ProcessManagement::TransitionAction::TicketStateSet", supported: true, tiqora_only: false, params: [{ name: "State", kind: "state", required: false, one_of: ["State", "StateID"], list_value: false }] },
+  ],
+  condition_types: ["Module", "Regexp", "String", "Equal", "NotEqual", "Contains", "NotContains", "GreaterThan", "GreaterThanOrEqual", "LessThan", "LessThanOrEqual"],
+  condition_modules: ["Kernel::System::ProcessManagement::TransitionValidation::ValidateDemo"],
+  fields: [
+    { name: "Queue", label: "Queue", kind: "queue", dialog: true, condition: true, options: [] },
+    { name: "Title", label: "Titel", kind: "text", dialog: true, condition: true, options: [] },
+  ],
+  interfaces: ["AgentInterface", "CustomerInterface"],
+  permissions: ["", "ro", "rw"],
+  account_time: false,
+};
+const designerValidation = [
+  { code: "transition_without_condition", severity: "warning", entity_type: "Transition", entity_id: "Transition-1", field: "Condition", params: { name: "Antrag vollständig" } },
+];
+const designerRevisions = [
+  { id: 4, source: "tiqora", entity_count: 11, deployed_at: "2026-10-07T14:30:00Z", deployed_by: 1 },
+  { id: 3, source: "znuny", entity_count: 10, deployed_at: "2026-10-01T08:00:00Z", deployed_by: null },
+];
+// A step no process uses yet, so "Vorhandene verwenden" has something to offer in the demo.
+const designerSpareActivity = designerEntity("Activity", "Activity-spare", 9, "Rückruf", { ActivityDialog: {} });
+type DemoEntity = ReturnType<typeof designerEntity>;
+const designerEntitiesOf = (type: string): DemoEntity[] =>
+  type === "Activity"
+    ? [...designerDraft.activities, designerSpareActivity]
+    : type === "ActivityDialog"
+      ? designerDraft.activity_dialogs
+      : type === "Transition"
+        ? designerDraft.transitions
+        : type === "TransitionAction"
+          ? designerDraft.transition_actions
+          : [];
+let designerNewId = 0;
+function designerDraftOf(id: string) {
+  const row = demoAdminProcesses.find((r) => r.entity_id === id);
+  return row ? { ...designerDraft, process: { ...designerDraft.process, entity_id: row.entity_id, name: row.name } } : designerDraft;
+}
+/**
+ * Writes never see the request body here (resolveData has none), so the demo designer answers them
+ * with plausible objects of the right shape: the stored draft for a process save, a fresh entity for
+ * a create and the stored entity for an update. The page must never receive `{}` for these.
+ */
+function demoProcessDesigner(p: string, method: string): unknown {
+  if (p.endsWith("/process-designer/catalog")) return designerCatalog;
+  if (p.endsWith("/process-designer/processes") && method === "GET")
+    return demoAdminProcesses.map((r) => ({ entity_type: "Process", entity_id: r.entity_id, name: r.name, used_by: [], sync_state: r.entity_id === "Process-demo" ? "not_sync" : "synced", has_draft_changes: r.entity_id === "Process-demo", state_entity_id: r.state_entity_id, state_name: r.state_name }));
+  if (p.endsWith("/validation")) return designerValidation;
+  if (p.endsWith("/process-designer/revisions")) return designerRevisions;
+  const list = p.match(/\/process-designer\/entities\/([^/]+)$/);
+  if (list && method === "GET")
+    return designerEntitiesOf(list[1]).map((e) => ({
+      entity_type: e.entity_type,
+      entity_id: e.entity_id,
+      name: e.name,
+      used_by: e === designerSpareActivity ? [] : e.entity_type === "ActivityDialog" ? ["Activity-1"] : ["Process-demo"],
+      sync_state: e.sync_state,
+    }));
+  if (list && method === "POST") {
+    designerNewId += 1;
+    return designerEntity(list[1], `${list[1]}-demo-new-${designerNewId}`, 100 + designerNewId, "Neu", list[1] === "Activity" ? { ActivityDialog: {} } : {}, "not_sync");
+  }
+  const one = p.match(/\/process-designer\/entities\/([^/]+)\/([^/]+)$/);
+  if (one && (method === "GET" || method === "PUT")) {
+    const id = decodeURIComponent(one[2]);
+    return designerEntitiesOf(one[1]).find((e) => e.entity_id === id) ?? designerEntity(one[1], id, 99, id, {}, "not_sync");
+  }
+  if (one && method === "DELETE") return null;
+  const process = p.match(/\/process-designer\/processes\/([^/]+)(\/copy)?$/);
+  if (process && (method === "GET" || method === "PUT" || (method === "POST" && process[2])))
+    return designerDraftOf(decodeURIComponent(process[1]));
+  if (p.match(/\/process-designer\/revisions\/\d+\/restore$/) && method === "POST") return designerDraft;
+  if (p.endsWith("/process-designer/processes") && method === "POST") return designerDraft;
+  return method === "GET" ? [] : {};
 }
 // Daemons page: the deploy watcher runs in live mode (the banner under its name).
 const demoDaemons = {
@@ -2068,6 +2176,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/admin/deploy") && method === "POST")
     return { action: "recorded", checksum: "demo", kind: "process", revision_id: 4 };
   if (p.endsWith("/api/v1/admin/processes")) return demoAdminProcesses;
+  if (p.includes("/api/v1/admin/process-designer/")) return demoProcessDesigner(p, method);
   if (p.endsWith("/api/v1/admin/daemons") && method === "GET") return demoDaemons;
   if (p.endsWith("/api/v1/phone/calls/active")) return [];
   if (p.endsWith("/api/v1/reference/caller")) return demoCallerLookup;
@@ -2177,15 +2286,23 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/kb/assignable-groups")) return [{ id: 2, name: "users" }, { id: 3, name: "support" }];
   if (p.endsWith("/api/v1/calendar/calendars")) return calendars;
   if (p.endsWith("/api/v1/calendar/appointments")) return occurrences;
+  // Option refresh (dependent selects) and the ticket's process path.
+  if (p.match(/\/api\/v1\/process\/.*\/options$/) && method === "POST") return demoProcessOptions(p);
+  if (p.match(/\/api\/v1\/process\/ticket\/\d+\/path$/)) return {
+    process_entity_id: "Process-demo",
+    steps: [
+      { activity_entity_id: "Activity-demo-1", activity_name: "Bestellung erfassen", entered_at: "2026-10-05T07:12:00Z", entered_by: 1, entered_by_name: "Anna Beispiel", current: false },
+      { activity_entity_id: "Activity-demo-2", activity_name: "Freigabe prüfen", entered_at: "2026-10-06T09:40:00Z", entered_by: 1, entered_by_name: "Anna Beispiel", current: false },
+      { activity_entity_id: "Activity-demo-3", activity_name: "", entered_at: "2026-10-07T13:05:00Z", entered_by: 2, entered_by_name: "Ben Muster", current: false },
+      { activity_entity_id: "Activity-demo-4", activity_name: "Versand vorbereiten", entered_at: "2026-10-08T10:20:00Z", entered_by: 2, entered_by_name: "Ben Muster", current: true },
+    ],
+  };
   if (p.match(/\/api\/v1\/process\/ticket\/\d+\/state$/)) return processTicketState;
   if (p.match(/\/api\/v1\/process\/ticket\/\d+\/dialog\/[^/]+\/form$/) || p.match(/\/api\/v1\/process\/[^/]+\/start-form$/)) return processDialogForm;
   if (p.match(/\/api\/v1\/process\/ticket\/\d+\/submit$/) && method === "POST") return { activity_changed: true, new_activity_entity_id: null, transition_entity_id: null, unsupported_actions: [], state: processTicketState };
   if (p.endsWith("/api/v1/process/tickets") && method === "POST") return { ticket_id: 1, ticket_number: "2026100001", activity_changed: true, unsupported_actions: [], state: processTicketState };
   if (p.match(/\/api\/v1\/process\/ticket\/\d+\/start$/) && method === "POST") return processTicketState;
   if (p.match(/\/api\/v1\/process\/?$/) && method === "GET") return [{ id: 1, entity_id: "Process-demo", name: "Bestellung", state_entity_id: "S1", state_name: "Active" }];
-  // One process of the admin detail page; ids that are not a process (ticket/, tickets) fall through.
-  const processDetail = p.match(/\/api\/v1\/process\/([^/?]+)$/);
-  if (processDetail && method === "GET") return demoProcessDetail(decodeURIComponent(processDetail[1]));
   if (p.includes("/api/v1/process")) return method === "GET" ? [] : {};
   // Admin — assignment editors (before the generic list handler)
   if (p.match(/\/admin\/groups\/\d+\/customer-users$/)) { const id = Number(p.split("/").slice(-2)[0]); return groupCustomerUsers[id] ?? []; }
@@ -2398,6 +2515,11 @@ const processTicketState = {
   can_start: false,
 };
 
+// Demo answer of the option refresh: the Priority list shifts with the picked value so the refresh is visible.
+function demoProcessOptions(_path: string): unknown {
+  return { options: { Priority: [{ value: "3", label: "3 normal" }, { value: "4", label: "4 hoch" }, { value: "5", label: "5 sehr hoch" }] } };
+}
+
 const processDialogForm = {
   process_entity_id: "Process-demo",
   activity_dialog_entity_id: "ActivityDialog-demo",
@@ -2407,10 +2529,12 @@ const processDialogForm = {
   submit_button_text: "Freigeben",
   submit_advice_text: "",
   fields: [
-    { name: "Priority", kind: "select", label: "Priority", required: true, description_short: "", description_long: "", default: "3", options: [{ value: "3", label: "3 normal" }, { value: "4", label: "4 hoch" }] },
-    { name: "Article", kind: "article", label: "Article", required: true, description_short: "", description_long: "", default: null, options: [] },
-    { name: "PendingTime", kind: "pending_time", label: "PendingTime", required: false, description_short: "", description_long: "", default: null, options: [] },
-    { name: "Attachments", kind: "unsupported", label: "Attachments", required: false, description_short: "", description_long: "", default: null, options: [] },
+    { name: "Queue", kind: "select", label: "Queue", required: false, description_short: "", description_long: "", default: "2", options: [{ value: "2", label: "Support" }, { value: "3", label: "Sales" }], time_units: "0", uploads: false, refresh_on: [] },
+    { name: "Priority", kind: "select", label: "Priority", required: true, description_short: "", description_long: "", default: "3", options: [{ value: "3", label: "3 normal" }, { value: "4", label: "4 hoch" }], time_units: "0", uploads: false, refresh_on: ["Queue"] },
+    { name: "CustomerUserID", kind: "customer", label: "Customer", required: false, description_short: "", description_long: "", default: null, options: [], time_units: "0", uploads: false, refresh_on: [] },
+    { name: "Article", kind: "article", label: "Article", required: true, description_short: "", description_long: "", default: null, options: [], time_units: "2", uploads: true, refresh_on: [] },
+    { name: "PendingTime", kind: "pending_time", label: "PendingTime", required: false, description_short: "", description_long: "", default: null, options: [], time_units: "0", uploads: false, refresh_on: [] },
+    { name: "Attachments", kind: "ticket_attachments", label: "Attachments", required: false, description_short: "", description_long: "", default: null, options: [{ value: "Article::1::1", label: "#2026100001: Rechnung.pdf (Artikel 1, Anhang 1)" }, { value: "Article::1::2", label: "#2026100001: Lieferschein.pdf (Artikel 1, Anhang 2)" }], time_units: "0", uploads: false, refresh_on: [] },
   ],
 };
 
@@ -2418,7 +2542,7 @@ const processDialogForm = {
 // Customer-shaped: the server drops Owner/Responsible/Lock/PendingTime/CustomerID/CustomerUserID
 // for customers (CustomerTicketProcess), so these forms carry only title, article and a queue pick.
 const portalField = (name: string, kind: string, extra: Record<string, unknown> = {}) => ({
-  name, kind, label: name, required: false, description_short: "", description_long: "", default: null, options: [], ...extra,
+  name, kind, label: name, required: false, description_short: "", description_long: "", default: null, options: [], time_units: "0", uploads: false, ...extra,
 });
 
 const portalStartForm = {
@@ -2454,6 +2578,7 @@ const portalProcessState = {
 /** Mocks for `/api/portal/process*`; undefined when the path is not a process route. */
 export function demoPortalProcess(pathname: string, method: string): unknown {
   const p = pathname.replace(/\/+$/, "");
+  if (p.endsWith("/options") && method === "POST") return { options: {} };
   if (p.match(/\/api\/portal\/process\/ticket\/\d+\/state$/)) return portalProcessState;
   if (p.match(/\/api\/portal\/process\/ticket\/\d+\/dialog\/[^/]+\/form$/)) return portalDialogForm;
   if (p.match(/\/api\/portal\/process\/[^/]+\/start-form$/)) return portalStartForm;

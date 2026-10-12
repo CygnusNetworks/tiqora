@@ -776,8 +776,33 @@ Frontend: a `ProcessWidget` + `StartProcessDialog` + `ActivityDialogModal`
 on agent ticket zoom (`components/agent/process/`); customer portal
 `PortalProcessWidget` + `/api/portal/process/*` for dialogs whose YAML
 `Interface` includes `CustomerInterface`; and a read-only
-`/admin/processes` list/detail pair — there is no visual process designer;
-processes are still authored via Znuny's admin UI or direct DB/YAML.
+`/admin/processes` list plus the designer route (`routes/admin/process-designer/`,
+canvas on `@xyflow/react`, lazy-loaded).
+
+**Process designer** (`tiqora/process/designer/`, API
+`api/v1/admin/process_designer.py` under `/api/v1/admin/process-designer`):
+`ids.py` / `yaml_codec.py` / `versioning.py` (Znuny entity ids, YAML in Znuny's
+format, optimistic version check), `writer.py` (`ProcessWriter`: `pm_*` writes
+like Znuny's `ProcessManagement::DB::*`, `pm_entity_sync` rows, one cache signal
+per entity type), `catalog.py` (what the panels offer), `validation.py` (issue
+codes), `exchange.py` (YAML import/export), `revisions.py` (diff, restore as
+draft). Two core extension points sit beside it: `TRANSITION_ACTIONS`
+(`process/actions/registry.py`: handler plus parameter specs, the designer
+builds its action forms from them) and `CONDITION_MODULES`
+(`process/condition_modules.py`). Both are `sdk_stable=False`; plugins cannot
+register into them yet.
+
+**Deploy handshake** (parallel operation, TiqoraSync 1.2.0): designer saves write
+draft rows and `pm_entity_sync` rows; the admin presses "Bereitstellen";
+`deploy_from_tiqora(mode="signal")` records a revision (source `tiqora`) and
+queues `TiqoraDeploy_<kind>_<revision>` in `tiqora_cache_invalidation`, remembering
+the signal row id in `tiqora_settings`; TiqoraSync (Znuny daemon, once a minute)
+dumps `ProcessDump` / `ACLDump` into `ZZZProcessManagement.pm` / `ZZZACL.pm`, purges
+the Znuny sync state and writes `{"signal_id", "revision_id"}` plus `ok` or `error`
+to `tiqorasync.deploy.<kind>`; Tiqora shows `ok` only when the reported signal id
+is at least the requested one. The mode order is: schema ownership (`local`, no
+Znuny), fresh heartbeat with the capability (`signal`), the setting
+`process.deploy_from_tiqora` (`local`), else refused (`deployed/gate.py`).
 
 Condition types and TransitionAction modules are a documented subset of
 Znuny's (String/Regexp/Array/Hash/Contains/NotContains/Equal/NotEqual and

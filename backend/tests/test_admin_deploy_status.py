@@ -200,7 +200,19 @@ async def test_status_without_revision_is_running_live(make_client: Make) -> Non
     assert resp.status_code == 200, resp.text
     body = resp.json()
     for kind in ("process", "acl"):
-        assert body[kind] == {"revision": None, "pending_changes": 0, "running_live": True}
+        assert body[kind] == {
+            "revision": None,
+            "pending_changes": 0,
+            "running_live": True,
+            "znuny_sync": {
+                "state": "not_needed",
+                "revision_id": None,
+                "message": "",
+                "since": None,
+                "overdue": False,
+            },
+            "deploy_mode": None,
+        }
     assert body["ownership_active"] is False
     assert body["can_deploy_from_tiqora"] is False
 
@@ -240,6 +252,7 @@ async def test_can_deploy_follows_setting_and_ownership(
     async with make_client() as client:
         body = (await client.get(STATUS)).json()
     assert body["can_deploy_from_tiqora"] is True
+    assert body["process"]["deploy_mode"] == "local" and body["acl"]["deploy_mode"] == "local"
     assert body["ownership_active"] is False
 
 

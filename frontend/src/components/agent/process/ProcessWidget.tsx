@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { StartProcessDialog } from "./StartProcessDialog";
 import { ActivityDialogModal } from "./ActivityDialogModal";
+import { ProcessPathTimeline } from "./ProcessPathTimeline";
 
 /**
  * ProcessManagement (BPM) widget for the ticket zoom page.
@@ -43,10 +44,19 @@ export function ProcessWidget({
     if (startOpenProp === undefined) setStartOpenLocal(open);
   };
   const [openDialogEntityId, setOpenDialogEntityId] = useState<string | null>(null);
+  const [pathOpen, setPathOpen] = useState(false);
 
   const stateQ = useQuery({
     queryKey: ["process", "ticket", ticketId, "state"],
     queryFn: ({ signal }) => processApi.ticketState(ticketId, signal),
+  });
+
+  const inProcessNow = Boolean(stateQ.data?.process_entity_id);
+  // "Bisheriger Weg": only fetched once the section is expanded.
+  const pathQ = useQuery({
+    queryKey: ["process", "ticket", ticketId, "path"],
+    queryFn: ({ signal }) => processApi.path(ticketId, signal),
+    enabled: pathOpen && inProcessNow,
   });
 
   // Loading/error are transient for a secondary feature — stay out of the way.
@@ -144,6 +154,32 @@ export function ProcessWidget({
             </div>
           )}
         </div>
+      </div>
+
+      <div data-testid="process-path-section">
+        <button
+          type="button"
+          onClick={() => setPathOpen((o) => !o)}
+          aria-expanded={pathOpen}
+          className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-muted transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+          data-testid="process-path-toggle"
+        >
+          <span aria-hidden>{pathOpen ? "▾" : "▸"}</span>
+          {t("process.path.title")}
+        </button>
+        {pathOpen && (
+          <div className="mt-2">
+            {pathQ.isLoading ? (
+              <p className="text-sm text-muted">{t("process.path.loading")}</p>
+            ) : pathQ.isError || !pathQ.data ? (
+              <p className="text-sm text-muted" data-testid="process-path-error">
+                {t("process.path.loadError")}
+              </p>
+            ) : (
+              <ProcessPathTimeline path={pathQ.data} />
+            )}
+          </div>
+        )}
       </div>
 
       {openDialogEntityId && !switchedOff && (

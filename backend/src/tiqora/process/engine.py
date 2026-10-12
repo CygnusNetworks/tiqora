@@ -42,10 +42,12 @@ Deferred/unsupported scope (documented, not silently missing)
   (``GreaterThan`` / ``GreaterThanOrEqual`` / ``LessThan`` /
   ``LessThanOrEqual``) are implemented per Znuny
   ``TransitionValidation::Base``.
-- TransitionAction modules other than the implemented handlers (see
-  ``_ACTION_HANDLERS``) — remaining deferred: ``ExecuteInvoker``,
-  ``Appointment*`` (Create/Update/Remove), ``ConfigItemUpdate``.
-  Unsupported modules are logged and no-op'd, and collected into
+- TransitionAction modules are dispatched through the registry
+  ``tiqora.process.actions.TRANSITION_ACTIONS`` (:func:`resolve_action`); every
+  Znuny module is listed there, but these have no Tiqora handler yet (``run is
+  None``): ``ExecuteInvoker`` (handler owned by the GI requester plan),
+  ``Appointment*`` (Create/Update/Remove), ``ConfigItemUpdate``. Unsupported and
+  unknown modules are logged and no-op'd, and collected into
   ``ActivityDialogSubmitResult.unsupported_actions``.
 - Activity Dialog ``PendingTimeDiff`` is not a dialog field (a transition action's own
   ``PendingTimeDiff`` on ``TicketStateSet`` is honoured).
@@ -60,13 +62,16 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from pydantic import ValidationError
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.channels.email.placeholder import PlaceholderContext
+from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.legacy.queue import Queue, Service, Sla
 from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketType
 from tiqora.db.legacy.user import Users
+from tiqora.domain.attachments_in import ArticleAttachmentIn, AttachmentInvalid, decode_attachments
 from tiqora.domain.dynamic_field_values import load_ticket_dynamic_field
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
@@ -74,6 +79,7 @@ from tiqora.domain.ticket_write_service import (
     _state_type_name,  # noqa: PLC2701
     _ticket_must_exist,  # noqa: PLC2701
     add_article,
+    add_time_accounting,
     assign_owner,
     assign_responsible,
     change_priority,
@@ -83,21 +89,31 @@ from tiqora.domain.ticket_write_service import (
     change_title,
     change_type,
     create_ticket,
+    link_objects,
     link_tickets,
     lock_ticket,
     move_queue,
     set_customer,
     unlock_ticket,
+    unwatch_ticket,
     update_dynamic_field,
     watch_ticket,
 )
+from tiqora.process.actions.registry import module_short_name, resolve_action
 from tiqora.process.actor import ProcessActor
+from tiqora.process.attachments_field import (
+    ATTACHMENTS_FIELD,
+    collect_action_attachments,
+    encode_attachment_selection,
+    valid_attachment_keys,
+)
 from tiqora.process.availability import RUNNING_STATES, assert_can_submit
 from tiqora.process.conditions import (
     ConditionConfigError,
     ConditionData,
     as_integer,
     check_transition,
+    condition_module_warning_scope,
     evaluate_transition,
     get_condition_data,
     resolve_transition_tags,
@@ -119,6 +135,7 @@ from tiqora.process.fields import (
     effective_field_values,
     is_present,
     missing_required_fields,
+    time_units_mode,
 )
 from tiqora.process.graph import ProcessRepository
 from tiqora.process.smart_tags import (
@@ -133,7 +150,7 @@ from tiqora.process.ticket_state import (
     TicketProcessCandidates,
     get_ticket_process_state,
 )
-from tiqora.util.perl import perl_truthy
+from tiqora.util.perl import perl_comma_list, perl_truthy
 from tiqora.znuny.cache_invalidation import invalidate_ticket_cache
 from tiqora.znuny.history import (
     TYPE_ADD_NOTE,
@@ -641,23 +658,101 @@ async def _action_article_send(
     if not body and not config.get("Subject"):
         raise RequiredFieldMissing("ArticleSend: Config must set Body or Subject")
     t = await _ticket_must_exist(session, ticket_id)
+    queue_id = int(t["queue_id"])
     article = ArticleIn(
         sender_type="agent",
         is_visible_for_customer=perl_truthy(config.get("IsVisibleForCustomer", 1)),
         subject=subject,
         body=body,
         channel="email",
-        to_address=str(config.get("To") or config.get("Customer") or "") or None,
+        # ``To`` is Znuny's key; ``Customer`` is the older Tiqora spelling.
+        from_address=await _article_send_from(session, config, queue_id),
+        to_address=_address_list(config.get("To") or config.get("Customer")),
+        cc=_address_list(config.get("Cc")),
+        bcc=_address_list(config.get("Bcc")),
+        attachments=await collect_action_attachments(
+            session, config, ticket_id=ticket_id, sysconfig=sysconfig
+        ),
     )
     await deliver_agent_email_reply(
         session,
         sysconfig,
         None,
         ticket_id=ticket_id,
-        queue_id=int(t["queue_id"]),
+        queue_id=queue_id,
         user_id=user_id,
         article=article,
     )
+
+
+def _address_list(value: Any) -> str | None:
+    """``To``/``Cc``/``Bcc`` as one comma separated string (a list value is joined)."""
+    if isinstance(value, (list, tuple)):
+        value = ", ".join(str(v).strip() for v in value if str(v).strip())
+    text_value = str(value or "").strip()
+    return text_value or None
+
+
+async def _system_address(
+    session: AsyncSession, *, address: str | None = None, queue_id: int | None = None
+) -> tuple[str, str] | None:
+    """``(address, realname)`` of a valid system address, by address or a queue's own."""
+    if address is not None:
+        row = (
+            await session.execute(
+                text(
+                    "SELECT value0, value1 FROM system_address"
+                    " WHERE LOWER(value0) = :a AND valid_id = 1 LIMIT 1"
+                ),
+                {"a": address.lower()},
+            )
+        ).first()
+    else:
+        row = (
+            await session.execute(
+                text(
+                    "SELECT sa.value0, sa.value1 FROM queue q"
+                    " JOIN system_address sa ON sa.id = q.system_address_id"
+                    " WHERE q.id = :q LIMIT 1"
+                ),
+                {"q": queue_id},
+            )
+        ).first()
+    if row is None or not str(row[0] or "").strip():
+        return None
+    return str(row[0]).strip(), str(row[1] or "").strip()
+
+
+async def _article_send_from(
+    session: AsyncSession, config: dict[str, Any], ticket_queue_id: int
+) -> str | None:
+    """Port of ``ArticleSend::FromGet`` (``TransitionAction/ArticleSend.pm:378-432``).
+
+    ``From`` only counts when it is a local system address (``Realname <address>``);
+    anything else is logged and replaced by the default. The default is the system address
+    of ``Queue``/``QueueID`` when set, else of the ticket's queue. ``None`` lets the shared
+    outbound path pick the ticket queue's address, which is the same default.
+    """
+    from email.utils import parseaddr
+
+    wanted = str(config.get("From") or "").strip()
+    if wanted:
+        found = await _system_address(session, address=parseaddr(wanted)[1] or wanted)
+        if found is not None:
+            addr, name = found
+            return f"{name} <{addr}>" if name else addr
+        logger.warning(
+            "ArticleSend: configured From address %r is not a system address, "
+            "using the default queue address",
+            wanted,
+        )
+    queue_id = await _resolve_queue_id(session, config.get("Queue"), config.get("QueueID"))
+    if queue_id is not None and int(queue_id) != ticket_queue_id:
+        found = await _system_address(session, queue_id=int(queue_id))
+        if found is not None:
+            addr, name = found
+            return f"{name} <{addr}>" if name else addr
+    return None
 
 
 _ARTICLE_CHANNEL_MAP: dict[str, str] = {
@@ -688,6 +783,9 @@ async def _action_ticket_article_create(
         subject=str(config.get("Subject", "")),
         body=str(config.get("Body", "")),
         channel=channel,
+        attachments=await collect_action_attachments(
+            session, config, ticket_id=ticket_id, sysconfig=sysconfig
+        ),
     )
     await add_article(
         session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
@@ -753,6 +851,55 @@ async def _action_ticket_sla_set(
     )
 
 
+def _acting_user(config: dict[str, Any], user_id: int, module: str) -> int:
+    """``_OverrideUserID``: ``DynamicField_UserID`` or ``UserID`` replaces the acting user."""
+    raw = config.get("DynamicField_UserID") or config.get("UserID")
+    if raw in (None, ""):
+        return user_id
+    try:
+        return int(str(raw).strip())
+    except ValueError:
+        logger.warning("%s: UserID %r is not a number, using the acting user", module, raw)
+        return user_id
+
+
+async def _users_by_email(session: AsyncSession, pattern: str) -> list[int]:
+    """``UserSearch(PostMasterSearch)``: valid users whose ``UserEmail`` preference matches.
+
+    ``*`` is the wildcard, the match is case insensitive and the whole address has to match.
+    Matching happens here, not in SQL: the preference is a BLOB on MariaDB and a bytea on
+    PostgreSQL.
+    """
+    from fnmatch import fnmatchcase
+
+    wanted = pattern.lower().replace("[", "[[]")
+    rows = (
+        await session.execute(
+            text(
+                "SELECT p.user_id, p.preferences_value FROM user_preferences p"
+                " WHERE p.preferences_key = 'UserEmail'"
+            )
+        )
+    ).all()
+    ids = sorted(
+        {
+            int(uid)
+            for uid, value in rows
+            if value is not None
+            and fnmatchcase(
+                (bytes(value).decode("utf-8", "replace") if not isinstance(value, str) else value)
+                .strip()
+                .lower(),
+                wanted,
+            )
+        }
+    )
+    if not ids:
+        return []
+    valid = await session.execute(select(Users.id).where(Users.id.in_(ids), Users.valid_id == 1))
+    return sorted(int(r) for r in valid.scalars().all())
+
+
 async def _action_ticket_watch_set(
     session: AsyncSession,
     config: dict[str, Any],
@@ -760,13 +907,85 @@ async def _action_ticket_watch_set(
     user_id: int,
     sysconfig: SysConfig,
 ) -> None:
+    """Port of TicketWatchSet (``TicketWatchSet.pm:126-200``).
+
+    Znuny keys: ``Action`` (``Subscribe`` default; ``Unsubscribe``; ``UnsubscribeAll``), the
+    watchers as ``UserLogin`` / ``PostMasterSearch`` / ``UserIDs`` (comma lists, each present
+    list is applied) and ``UserID`` (``DynamicField_UserID``), which overrides the *acting*
+    user. Unknown logins / ids are skipped.
+
+    Fallback for configs written for Tiqora before: with none of the three lists, ``User``
+    (login) or ``UserID`` names the one watcher (default the acting user), and ``Action``
+    still picks subscribe or unsubscribe.
+    """
     del sysconfig
-    watcher_id = await _resolve_user_id(session, config.get("User"), config.get("UserID"))
-    if watcher_id is None:
-        watcher_id = user_id
-    await watch_ticket(
-        session, ticket_id=ticket_id, watcher_user_id=int(watcher_id), user_id=user_id
-    )
+    action = str(config.get("Action") or "Subscribe")
+
+    async def apply(watcher_id: int, actor: int) -> None:
+        if action == "Subscribe":
+            await watch_ticket(
+                session, ticket_id=ticket_id, watcher_user_id=watcher_id, user_id=actor
+            )
+        else:  # _TicketWatch: everything but Subscribe unsubscribes
+            await unwatch_ticket(
+                session, ticket_id=ticket_id, watcher_user_id=watcher_id, user_id=actor
+            )
+
+    if action == "UnsubscribeAll":
+        actor = _acting_user(config, user_id, "TicketWatchSet")
+        watchers = (
+            (
+                await session.execute(
+                    text("SELECT user_id FROM ticket_watcher WHERE ticket_id = :t"),
+                    {"t": ticket_id},
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for watcher_id in watchers:
+            await unwatch_ticket(
+                session, ticket_id=ticket_id, watcher_user_id=int(watcher_id), user_id=actor
+            )
+        return
+
+    logins = perl_comma_list(config.get("UserLogin"))
+    searches = perl_comma_list(config.get("PostMasterSearch"))
+    user_ids = perl_comma_list(config.get("UserIDs"))
+    if not (logins or searches or user_ids):
+        # Tiqora's own keys: one watcher, ``User`` (login) or ``UserID``.
+        watcher_id = await _resolve_user_id(
+            session,
+            config.get("User"),
+            int(config["UserID"]) if str(config.get("UserID") or "").isdigit() else None,
+        )
+        await apply(int(watcher_id) if watcher_id is not None else user_id, user_id)
+        return
+
+    actor = _acting_user(config, user_id, "TicketWatchSet")
+    for login in logins:
+        found = await _resolve_user_id(session, login, None)
+        if found is None:
+            logger.warning("TicketWatchSet: cannot find user login %r", login)
+            continue
+        await apply(int(found), actor)
+    for pattern in searches:
+        for found in await _users_by_email(session, pattern):
+            await apply(found, actor)
+    for raw in user_ids:
+        found_id = (
+            (
+                await session.execute(
+                    select(Users.id).where(Users.id == int(raw), Users.valid_id == 1)
+                )
+            ).scalar_one_or_none()
+            if raw.isdigit()
+            else None
+        )
+        if found_id is None:
+            logger.warning("TicketWatchSet: cannot find user with id %r", raw)
+            continue
+        await apply(int(found_id), actor)
 
 
 async def _action_link_add(
@@ -776,18 +995,45 @@ async def _action_link_add(
     user_id: int,
     sysconfig: SysConfig,
 ) -> None:
+    """Port of LinkAdd (``LinkAdd.pm``): ``LinkObject::LinkAdd`` with the config as is.
+
+    Znuny keys: ``SourceObject``, ``SourceKey``, ``TargetObject``, ``TargetKey``, ``Type``,
+    ``State`` (``Valid`` / ``Temporary``) and ``UserID`` (``DynamicField_UserID``), which
+    overrides the acting user. The link is stored from source to target as given.
+
+    Keys left out fall back to Tiqora's older form: source ``Ticket`` / the current ticket,
+    target ``Ticket`` with ``TargetTicketID`` (or ``TicketID``), ``Type`` or ``LinkType``
+    (default ``Normal``), ``State`` ``Valid``.
+    """
     del sysconfig
-    target = config.get("TargetTicketID") or config.get("TicketID")
-    if target is None:
-        raise RequiredFieldMissing("LinkAdd: Config must set 'TargetTicketID' or 'TicketID'")
-    link_type = str(config.get("Type") or config.get("LinkType") or "Normal")
-    await link_tickets(
+    actor = _acting_user(config, user_id, "LinkAdd")
+    source_object = str(config.get("SourceObject") or "Ticket").strip()
+    target_object = str(config.get("TargetObject") or "Ticket").strip()
+    source_key = str(config.get("SourceKey") or "").strip() or str(ticket_id)
+    target_key = str(
+        config.get("TargetKey") or config.get("TargetTicketID") or config.get("TicketID") or ""
+    ).strip()
+    if not target_key:
+        raise RequiredFieldMissing("LinkAdd: Config must set 'TargetKey' (or 'TargetTicketID')")
+    for object_name in (source_object, target_object):
+        if not _LINK_OBJECT_RE.match(object_name):
+            raise RequiredFieldMissing(f"LinkAdd: {object_name!r} is not a link object name")
+    for obj, key in ((source_object, source_key), (target_object, target_key)):
+        if obj == "Ticket" and not key.isdigit():
+            raise RequiredFieldMissing(f"LinkAdd: {key!r} is not a ticket id")
+    await link_objects(
         session,
-        source_ticket_id=ticket_id,
-        target_ticket_id=int(target),
-        link_type=link_type,
-        user_id=user_id,
+        source_object=source_object,
+        source_key=source_key,
+        target_object=target_object,
+        target_key=target_key,
+        link_type=str(config.get("Type") or config.get("LinkType") or "Normal"),
+        state=str(config.get("State") or "Valid"),
+        user_id=actor,
     )
+
+
+_LINK_OBJECT_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,99}$")
 
 
 def _offset_to_seconds(offset: Any) -> int:
@@ -1095,45 +1341,6 @@ async def _action_ticket_create(
             )
 
 
-_ActionHandler = Callable[[AsyncSession, dict[str, Any], int, int, SysConfig], Awaitable[None]]
-
-_ACTION_HANDLERS: dict[str, _ActionHandler] = {
-    "TicketStateSet": _action_ticket_state_set,
-    "TicketQueueSet": _action_ticket_queue_set,
-    "TicketOwnerSet": _action_ticket_owner_set,
-    "TicketPrioritySet": _action_ticket_priority_set,
-    "TicketTitleSet": _action_ticket_title_set,
-    "TicketCustomerSet": _action_ticket_customer_set,
-    "TicketResponsibleSet": _action_ticket_responsible_set,
-    "TicketLockSet": _action_ticket_lock_set,
-    "DynamicFieldSet": _action_dynamic_field_set,
-    "DynamicFieldRemove": _action_dynamic_field_remove,
-    "DynamicFieldIncrement": _action_dynamic_field_increment,
-    "DynamicFieldPendingTimeSet": _action_dynamic_field_pending_time_set,
-    "TicketArticleCreate": _action_ticket_article_create,
-    "ArticleSend": _action_article_send,
-    "TicketTypeSet": _action_ticket_type_set,
-    "TicketServiceSet": _action_ticket_service_set,
-    "TicketSLASet": _action_ticket_sla_set,
-    "TicketWatchSet": _action_ticket_watch_set,
-    "LinkAdd": _action_link_add,
-    "TicketCreate": _action_ticket_create,
-}
-"""Implemented TransitionAction modules, keyed by the last ``::``-segment of
-``TransitionActionConfig.module``. Remaining deferred modules include
-``ExecuteInvoker``, ``Appointment*``, ``ConfigItemUpdate`` — see
-:func:`execute_transition_action`."""
-
-
-def _module_short_name(module: str) -> str:
-    """Last segment of a Perl-style ``Kernel::System::...::Foo`` module path."""
-    if "::" in module:
-        return module.rsplit("::", 1)[-1]
-    if "." in module:
-        return module.rsplit(".", 1)[-1]
-    return module
-
-
 async def execute_transition_action(
     session: AsyncSession,
     *,
@@ -1163,15 +1370,14 @@ async def execute_transition_action(
     mutated.
     """
     del process_entity_id, activity_entity_id, transition_entity_id  # see docstring
-    module_name = _module_short_name(action.module)
-    handler = _ACTION_HANDLERS.get(module_name)
-    if handler is None:
+    entry = resolve_action(action.module)
+    if entry is None or entry.run is None:
         logger.warning("unsupported ProcessManagement TransitionAction module: %s", action.module)
-        return module_name
+        return module_short_name(action.module)
     config = await replace_action_config(
         action.config, session=session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig
     )
-    await handler(session, config, ticket_id, user_id, sysconfig)
+    await entry.run(session, config, ticket_id, user_id, sysconfig)
     return None
 
 
@@ -1381,6 +1587,12 @@ async def _apply_dialog_field_changes(
         t = await _ticket_must_exist(session, ticket_id)
         customer_id = field_values.get("CustomerID", t.get("customer_id"))
         customer_user_id = field_values.get("CustomerUserID", t.get("customer_user_id"))
+        if "CustomerID" in field_values and not is_present(customer_id):
+            # An agent picked a customer user and left the company empty: Znuny's agent screens
+            # fill it with the customer user's UserCustomerID through AJAX (D6).
+            picked = str(customer_user_id or "").strip()
+            if picked:
+                customer_id = await customer_id_of_user(session, picked)
         # AgentTicketProcess.pm:5770-5783: no TicketCustomerSet when CustomerID and
         # CustomerUser both equal the ticket's (Perl ``eq``: undef compares as "").
         unchanged = str(customer_id or "") == str(t.get("customer_id") or "") and str(
@@ -1402,7 +1614,7 @@ async def _apply_dialog_field_changes(
     order = dialog_field_order(dialog_config)
     dynamic = [k for k in field_values if k.startswith("DynamicField_")]
     dynamic.sort(key=lambda k: order.index(k) if k in order else len(order))
-    steps = [n for n in order if n in ("Article", "Owner") or n in dynamic]
+    steps = [n for n in order if n in ("Article", "Owner", ATTACHMENTS_FIELD) or n in dynamic]
     steps += [k for k in dynamic if k not in steps]
     if new_ticket:
         steps = dynamic + [n for n in steps if n not in dynamic]
@@ -1428,6 +1640,25 @@ async def _apply_dialog_field_changes(
                     sysconfig=sysconfig,
                 )
             continue
+        if step == ATTACHMENTS_FIELD:
+            # Agent and existing ticket only (AgentTicketProcess.pm:1878, 5513-5545). Znuny sets
+            # the dynamic field only for a non-empty selection; unknown keys are dropped.
+            if sender_type == "agent" and not new_ticket and ATTACHMENTS_FIELD in field_values:
+                keys = await valid_attachment_keys(
+                    session, ticket_id, sysconfig, field_values[ATTACHMENTS_FIELD]
+                )
+                if keys:
+                    await update_dynamic_field(
+                        session,
+                        ticket_id=ticket_id,
+                        field_name=await sysconfig.get_str(
+                            "Process::DynamicFieldProcessManagementAttachment",
+                            "ProcessManagementAttachment",
+                        ),
+                        values=[encode_attachment_selection(keys)],
+                        user_id=user_id,
+                    )
+            continue
         if step == "Article":
             await _store_dialog_article(
                 session,
@@ -1451,6 +1682,36 @@ async def _apply_dialog_field_changes(
         )
 
 
+async def customer_id_of_user(session: AsyncSession, login: str) -> str | None:
+    """``UserCustomerID`` of the customer user *login* (``None`` for an unknown login)."""
+    return (
+        await session.execute(select(CustomerUser.customer_id).where(CustomerUser.login == login))
+    ).scalar_one_or_none()
+
+
+#: Files per dialog submit; the reply dialog (``useChatAttachments.MAX_ATTACHMENTS``) allows the
+#: same number (rulings F33).
+MAX_DIALOG_ATTACHMENTS = 10
+
+
+def _decode_dialog_attachments(raw: Any) -> list[tuple[str, str, bytes]]:
+    """``ArticleAttachments`` (list of ``{filename, content_type, content_base64}``) -> files.
+
+    Raises :class:`AttachmentInvalid` (422) / ``AttachmentTooLarge`` (413) from the domain layer;
+    the routes map them."""
+    if raw is None or raw == []:
+        return []
+    if not isinstance(raw, list):
+        raise AttachmentInvalid("ArticleAttachments must be a list")
+    if len(raw) > MAX_DIALOG_ATTACHMENTS:
+        raise AttachmentInvalid(f"at most {MAX_DIALOG_ATTACHMENTS} attachments per submit")
+    try:
+        items = [ArticleAttachmentIn.model_validate(item) for item in raw]
+    except ValidationError as exc:
+        raise AttachmentInvalid(f"invalid attachment: {exc.errors()[0]['msg']}") from None
+    return decode_attachments(items)
+
+
 async def _store_dialog_article(
     session: AsyncSession,
     *,
@@ -1472,6 +1733,13 @@ async def _store_dialog_article(
         or not is_present(field_values.get("Subject"))
         or not is_present(field_values.get("Body"))
     ):
+        if is_present(field_values.get("ArticleAttachments")):
+            # Files belong to the article (AgentTicketProcess.pm:5701-5707): no article, no files.
+            logger.warning(
+                "process dialog uploads ignored: ticket %s gets no article (Subject and Body "
+                "are both required)",
+                ticket_id,
+            )
         return
     cfg = article_cfg.config
     channel_raw = str(cfg.get("CommunicationChannel") or cfg.get("ArticleType") or "note").lower()
@@ -1489,6 +1757,7 @@ async def _store_dialog_article(
         else:
             history_type = TYPE_WEB_REQUEST_CUSTOMER if new_ticket else TYPE_FOLLOW_UP
         history_comment = "%%"
+    attachments = _decode_dialog_attachments(field_values.get("ArticleAttachments"))
     article = ArticleIn(
         sender_type=sender_type,
         is_visible_for_customer=perl_truthy(cfg.get("IsVisibleForCustomer", 0)),
@@ -1497,10 +1766,28 @@ async def _store_dialog_article(
         channel=_ARTICLE_CHANNEL_MAP.get(channel_raw, "note"),
         history_type_override=history_type,
         history_comment_override=history_comment,
+        attachments=attachments,
     )
-    await add_article(
+    article_id = await add_article(
         session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
     )
+    # Time accounting after the article, with its id (AgentTicketProcess.pm:5716-5723). A
+    # Perl-false value (empty, "0") books nothing; the field exists for agents only and only
+    # while Ticket::Frontend::AccountTime is on.
+    mode = time_units_mode(
+        dialog_config,
+        "AgentInterface" if sender_type == "agent" else "CustomerInterface",
+        account_time=perl_truthy(await sysconfig.get("Ticket::Frontend::AccountTime")),
+    )
+    time_units = field_values.get("TimeUnits")
+    if mode != "0" and perl_truthy(time_units):
+        await add_time_accounting(
+            session,
+            ticket_id=ticket_id,
+            article_id=article_id,
+            time_unit=time_units if isinstance(time_units, int | float) else str(time_units),
+            user_id=user_id,
+        )
 
 
 async def _ensure_required_lock(
@@ -1616,7 +1903,11 @@ async def _resolve_dialog_pending_time(
 
 
 def dialog_values_and_missing(
-    dialog: ActivityDialogConfig, field_values: Mapping[str, Any], actor: ProcessActor
+    dialog: ActivityDialogConfig,
+    field_values: Mapping[str, Any],
+    actor: ProcessActor,
+    *,
+    account_time: bool = True,
 ) -> tuple[dict[str, Any], list[str]]:
     """Effective dialog values and the ``Display: 2`` fields still missing (PendingTime included).
 
@@ -1628,7 +1919,9 @@ def dialog_values_and_missing(
     if actor.interface == "CustomerInterface":
         values["CustomerUserID"] = actor.customer_user_login
         values["CustomerID"] = actor.customer_id
-    return values, missing_required_fields(dialog, values, actor.interface)
+    return values, missing_required_fields(
+        dialog, values, actor.interface, account_time=account_time
+    )
 
 
 async def apply_activity_dialog(
@@ -1651,7 +1944,10 @@ async def apply_activity_dialog(
     dynamic fields right after creating the ticket, and a customer's article is a web request
     instead of a follow-up).
     """
-    values, missing = dialog_values_and_missing(dialog, field_values, actor)
+    account_time = perl_truthy(await sysconfig.get("Ticket::Frontend::AccountTime"))
+    values, missing = dialog_values_and_missing(
+        dialog, field_values, actor, account_time=account_time
+    )
     customer_filled = actor.interface == "CustomerInterface"
     # PendingTime is only required (and only read) when the target state is a pending one.
     pending_required = "PendingTime" in missing
@@ -1759,44 +2055,49 @@ async def run_transitions(
         data,
         render=_render,
     )
-    for transition in sorted(activity.outgoing_transitions, key=lambda t: t.entity_id):
-        try:
-            if not check_transition(transition.config, data, tags=tags):
-                continue
-        except ConditionConfigError as exc:
-            # Znuny's bare ``return`` leaves TransitionCheck: nothing fires (Transition.pm:322).
-            logger.error("transition %s: %s; no transition runs", transition.entity_id, exc)
-            return _NO_TRANSITION
-        # The new activity is stored BEFORE the actions run (Process.pm:501, actions from :558),
-        # so the history shows the activity update first.
-        await update_dynamic_field(
+    chosen = None
+    with condition_module_warning_scope():
+        for candidate in sorted(activity.outgoing_transitions, key=lambda t: t.entity_id):
+            try:
+                if check_transition(candidate.config, data, tags=tags):
+                    chosen = candidate
+                    break
+            except ConditionConfigError as exc:
+                # Znuny's bare ``return`` leaves TransitionCheck: nothing fires (Transition.pm:322).
+                logger.error("transition %s: %s; no transition runs", candidate.entity_id, exc)
+                return _NO_TRANSITION
+    if chosen is None:
+        return _NO_TRANSITION
+    transition = chosen
+    # The new activity is stored BEFORE the actions run (Process.pm:501, actions from :558),
+    # so the history shows the activity update first.
+    await update_dynamic_field(
+        session,
+        ticket_id=ticket_id,
+        field_name=ACTIVITY_ID_DF_NAME,
+        values=[transition.target_activity_entity_id],
+        user_id=user_id,
+    )
+    unsupported: list[str] = []
+    for action_node in transition.actions:
+        skipped = await execute_transition_action(
             session,
+            action=action_node.config,
             ticket_id=ticket_id,
-            field_name=ACTIVITY_ID_DF_NAME,
-            values=[transition.target_activity_entity_id],
-            user_id=user_id,
-        )
-        unsupported: list[str] = []
-        for action_node in transition.actions:
-            skipped = await execute_transition_action(
-                session,
-                action=action_node.config,
-                ticket_id=ticket_id,
-                process_entity_id=graph.entity_id,
-                activity_entity_id=activity.entity_id,
-                transition_entity_id=transition.entity_id,
-                user_id=user_id,
-                sysconfig=sysconfig,
-            )
-            if skipped is not None:
-                unsupported.append(skipped)
-        return TransitionOutcome(
-            activity_changed=True,
-            new_activity_entity_id=transition.target_activity_entity_id,
+            process_entity_id=graph.entity_id,
+            activity_entity_id=activity.entity_id,
             transition_entity_id=transition.entity_id,
-            unsupported_actions=unsupported,
+            user_id=user_id,
+            sysconfig=sysconfig,
         )
-    return _NO_TRANSITION
+        if skipped is not None:
+            unsupported.append(skipped)
+    return TransitionOutcome(
+        activity_changed=True,
+        new_activity_entity_id=transition.target_activity_entity_id,
+        transition_entity_id=transition.entity_id,
+        unsupported_actions=unsupported,
+    )
 
 
 async def submit_activity_dialog(

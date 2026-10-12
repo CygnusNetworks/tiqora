@@ -298,6 +298,7 @@ async def collect_ticket_field_options(
     sla_id: int | None = None,
     process: Mapping[str, str] | None = None,
     state_types: Sequence[str] | None = None,
+    dynamic_fields: Mapping[str, Sequence[str]] | None = None,
 ) -> TicketFieldOptionsOut:
     """Load base maps, apply Ticket ACL, then Ticket Attribute Relations.
 
@@ -305,7 +306,9 @@ async def collect_ticket_field_options(
     process dialog the lists are built for (live ``Process`` ACL checks,
     ``TicketACL.pm:1118-1146``). *queue_ids* (bulk: the queues of the selected tickets) scope
     the owner/responsible pickers, as do *picker_queue_id* and *honor_everyone*, see
-    :func:`base_field_maps`, which also explains *state_types*.
+    :func:`base_field_maps`, which also explains *state_types*. *dynamic_fields* (name without
+    prefix -> values) are the form's current dynamic field values: ACL ``Properties`` may name
+    ``DynamicField_<name>`` (AJAX refresh of a process dialog).
     """
     from tiqora.domain.ticket_acl import filter_id_name_map
     from tiqora.domain.ticket_attribute_relations import apply_attribute_relations_to_field_maps
@@ -332,7 +335,11 @@ async def collect_ticket_field_options(
         priority_id=priority_id,
         sla_id=sla_id,
     )
-    checks: dict[str, Any] | None = {"Ticket": dict(ticket_ctx)} if ticket_ctx else None
+    checks: dict[str, Any] | None = None
+    if ticket_ctx or dynamic_fields:
+        checks = {"Ticket": dict(ticket_ctx)}
+        for df_name, df_values in (dynamic_fields or {}).items():
+            checks["Ticket"][f"{DF_OPTION_PREFIX}{df_name}"] = list(df_values)
 
     acl_maps: dict[str, dict[int, str]] = {}
     for field, mapping in base.items():
@@ -487,6 +494,7 @@ async def collect_field_options(
             picker_queue_id=picker_queue_id,
             honor_everyone=honor_everyone,
             state_types=state_types,
+            dynamic_fields=ctx.dynamic_fields,
             **ids,
         )
         attribute_maps = {f: getattr(collected, f) for f in attr_requested}

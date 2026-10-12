@@ -35,8 +35,9 @@ pytestmark = pytest.mark.db
 
 URL = "/api/v1/admin/deploy"
 GATE_DETAIL = (
-    "Bereitstellung erfolgt in Znuny. Wenn Znuny nicht mehr läuft, in den Einstellungen "
-    "„Prozesse und ACLs in Tiqora bereitstellen“ einschalten."
+    "Bereitstellen aus Tiqora braucht das Znuny-Add-on TiqoraSync ab Version 1.2.0 "
+    "(zuletzt gesehen: nie) oder die Einstellung „Prozesse und ACLs in Tiqora "
+    "bereitstellen (Znuny läuft nicht mehr)“."
 )
 BUSY_DETAIL = "Eine andere Bereitstellung läuft gerade. Bitte gleich noch einmal versuchen."
 T0 = datetime(2026, 3, 4, 5, 6, 7)
@@ -225,6 +226,7 @@ async def test_setting_deploys_acl_and_engine_reads_new_revision(
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["kind"] == "acl" and body["action"] == "recorded"
+    assert body["mode"] == "local"
     assert body["revision_id"] != first.revision_id
 
     async with factory() as s:

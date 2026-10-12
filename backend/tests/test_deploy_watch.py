@@ -23,6 +23,7 @@ from tiqora.deployed import watcher as watcher_module
 from tiqora.deployed.sync_tables import pending_sync_count
 from tiqora.deployed.watcher import (
     check_deploy_state,
+    deploy_from_tiqora,
     revision_write_lock,
     run_deploy_watch_tick,
 )
@@ -207,26 +208,34 @@ async def test_acl_changes_wait_for_acl_sync_to_empty(session: AsyncSession) -> 
     assert done.action == "snapshot" and done.revision_id != first.revision_id
 
 
-async def test_ownership_mode_snapshots_and_clears_sync_tables(session: AsyncSession) -> None:
+async def test_ownership_mode_waits_for_local_deploy(session: AsyncSession) -> None:
+    # Drafts must not run in ownership mode either: the watcher waits, only
+    # deploy_from_tiqora(mode="local") clears the sync table (Znuny's draft semantics).
+    first = await check_deploy_state(session, "process", ownership_active=True)
+    assert first.action == "snapshot"
     await _mark_process_draft(session)
     out = await check_deploy_state(session, "process", ownership_active=True)
-    assert out.action == "snapshot" and out.pending_changes == 0
+    assert out.action == "waiting_for_deploy" and out.pending_changes == 1
+    assert out.revision_id == first.revision_id
+    assert await pending_sync_count(session, "process") == 1
     info = await latest_revision_info(session, "process")
-    assert info is not None and info.source == "tiqora" and info.id == out.revision_id
-    assert await pending_sync_count(session, "process") == 0
+    assert info is not None and info.id == first.revision_id
 
-    # Same dump again, but with a leftover sync row: only the table is cleared.
-    await session.execute(
-        text(
-            "INSERT INTO pm_entity_sync (entity_type, entity_id, sync_state, create_time,"
-            " change_time) VALUES ('Process', 'Process-882001', 'not_sync', :t, :t)"
-        ),
-        {"t": T0},
-    )
-    await session.commit()
-    again = await check_deploy_state(session, "process", ownership_active=True)
-    assert again.action == "unchanged" and again.revision_id == out.revision_id
+    deployed = await deploy_from_tiqora(session, "process", user_id=1, mode="local")
+    assert deployed.action == "recorded" and deployed.revision_id != first.revision_id
     assert await pending_sync_count(session, "process") == 0
+    again = await check_deploy_state(session, "process", ownership_active=True)
+    assert again.action == "unchanged" and again.revision_id == deployed.revision_id
+
+
+async def test_ownership_without_revision_runs_live_while_drafts_exist(
+    session: AsyncSession,
+) -> None:
+    await _mark_process_draft(session)
+    out = await check_deploy_state(session, "process", ownership_active=True)
+    assert out.action == "running_live" and out.revision_id is None
+    assert await latest_revision_info(session, "process") is None
+    assert await pending_sync_count(session, "process") == 1
 
 
 async def test_tick_result_reports_live_mode(

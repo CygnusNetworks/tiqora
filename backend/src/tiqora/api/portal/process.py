@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.portal.deps import CurrentCustomer, DbSession
 from tiqora.db.engine import get_session_factory
+from tiqora.domain.attachments_in import AttachmentInvalid, AttachmentTooLarge
 from tiqora.domain.portal_ticket_service import (
     PORTAL_SYSTEM_USER_ID,
     PortalTicketAccessDenied,
@@ -49,6 +50,12 @@ from tiqora.process.exceptions import (
     TicketAlreadyInProcess,
     TicketNotInProcess,
     UnresolvedFieldValue,
+)
+from tiqora.process.form_options import (
+    ProcessFormOptionsIn,
+    ProcessFormOptionsOut,
+    refresh_start_options,
+    refresh_ticket_dialog_options,
 )
 from tiqora.process.graph import ProcessRepository
 from tiqora.process.process_ticket import create_process_ticket, enroll_ticket
@@ -89,12 +96,18 @@ def _map_exc(exc: Exception) -> HTTPException:
         ),
     ):
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    if isinstance(exc, AttachmentTooLarge):
+        return HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail=str(exc))
+    if isinstance(exc, AttachmentInvalid):
+        return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
     if isinstance(exc, (RequiredFieldMissing, UnresolvedFieldValue, InvalidInput)):
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return HTTPException(status_code=500, detail="Internal error")
 
 
 _MAPPED = (
+    AttachmentTooLarge,
+    AttachmentInvalid,
     WriteTicketNotFound,
     PortalTicketNotFound,
     PortalTicketAccessDenied,
@@ -217,6 +230,32 @@ async def get_start_form(
         raise _map_exc(exc) from exc
 
 
+@router.post("/{process_entity_id}/start-form/options", response_model=ProcessFormOptionsOut)
+async def refresh_start_form_options(
+    process_entity_id: str,
+    body: ProcessFormOptionsIn,
+    customer: CurrentCustomer,
+    session: DbSession,
+    ticket_id: int | None = None,
+) -> ProcessFormOptionsOut:
+    """The option lists of the start dialog for the values entered so far, with the customer
+    principal. Same gates as ``GET .../start-form``."""
+    try:
+        if ticket_id is not None:
+            await _assert_customer_ticket(session, customer, ticket_id)
+        return await refresh_start_options(
+            session,
+            actor=_actor(customer),
+            user=None,
+            process_entity_id=process_entity_id,
+            ticket_id=ticket_id,
+            body=body,
+            repository=ProcessRepository(session),
+        )
+    except _MAPPED as exc:
+        raise _map_exc(exc) from exc
+
+
 @router.get("/activity-dialog/{activity_dialog_entity_id}", response_model=ActivityDialogDetailOut)
 async def get_activity_dialog(
     activity_dialog_entity_id: str, customer: CurrentCustomer, session: DbSession
@@ -272,6 +311,33 @@ async def get_ticket_dialog_form(
             user=None,
             ticket_id=ticket_id,
             activity_dialog_entity_id=activity_dialog_entity_id,
+            repository=ProcessRepository(session),
+        )
+    except _MAPPED as exc:
+        raise _map_exc(exc) from exc
+
+
+@router.post(
+    "/ticket/{ticket_id}/dialog/{activity_dialog_entity_id}/form/options",
+    response_model=ProcessFormOptionsOut,
+)
+async def refresh_ticket_dialog_form_options(
+    ticket_id: int,
+    activity_dialog_entity_id: str,
+    body: ProcessFormOptionsIn,
+    customer: CurrentCustomer,
+    session: DbSession,
+) -> ProcessFormOptionsOut:
+    """The option lists of a ticket dialog for the values entered so far (customer principal)."""
+    try:
+        await _assert_customer_ticket(session, customer, ticket_id)
+        return await refresh_ticket_dialog_options(
+            session,
+            actor=_actor(customer),
+            user=None,
+            ticket_id=ticket_id,
+            activity_dialog_entity_id=activity_dialog_entity_id,
+            body=body,
             repository=ProcessRepository(session),
         )
     except _MAPPED as exc:

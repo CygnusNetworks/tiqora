@@ -4,6 +4,8 @@ import type {
   ActivityDialogSubmitOut,
   NewProcessTicketIn,
   NewProcessTicketOut,
+  ProcessFormOptionsIn,
+  ProcessFormOptionsOut,
   ProcessDialogFormData,
   ProcessSummary,
   TicketProcessState,
@@ -29,6 +31,20 @@ export const portalProcessApi = {
       "GET",
       `/api/portal/process/ticket/${ticketId}/dialog/${enc(dialogEntityId)}/form`,
       { signal },
+    );
+  },
+  startFormOptions(processEntityId: string, body: ProcessFormOptionsIn, opts?: { ticketId?: number }, signal?: AbortSignal) {
+    return portalApi.request<ProcessFormOptionsOut>(
+      "POST",
+      `/api/portal/process/${enc(processEntityId)}/start-form/options`,
+      { query: ticketQuery(opts), body, signal },
+    );
+  },
+  dialogFormOptions(ticketId: number, dialogEntityId: string, body: ProcessFormOptionsIn, signal?: AbortSignal) {
+    return portalApi.request<ProcessFormOptionsOut>(
+      "POST",
+      `/api/portal/process/ticket/${ticketId}/dialog/${enc(dialogEntityId)}/form/options`,
+      { body, signal },
     );
   },
   createTicket(body: NewProcessTicketIn) {

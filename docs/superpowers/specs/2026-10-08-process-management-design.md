@@ -62,38 +62,38 @@ processes must be authored in Znuny. Both docs change when phase 3 ships.
 ## Parity checklist
 
 Engine:
-- [ ] Respect process state: S1 startable, S3 FadeAway = running tickets
+- [x] Respect process state: S1 startable, S3 FadeAway = running tickets
       continue but no new starts, S2 Inactive = not offered
-- [ ] Run **deployed** configuration only (see "Deploy model")
-- [ ] ACLs applied to process list, activity dialogs, actions, bulk (not the
+- [x] Run **deployed** configuration only (see "Deploy model")
+- [x] ACLs applied to process list, activity dialogs, actions, bulk (not the
       compat API: Znuny's GenericInterface calls no `TicketAcl`, ruling F33)
-- [ ] Smart tags (`<OTRS_TICKET_*>`, `<OTRS_CUSTOMER_*>`, `<OTRS_CURRENT_*>`,
+- [x] Smart tags (`<OTRS_TICKET_*>`, `<OTRS_CUSTOMER_*>`, `<OTRS_CURRENT_*>`,
       `<OTRS_Agent_*>`, `<OTRS_CONFIG_*>`) in action config and condition
       values, using the existing notification placeholder engine
-- [ ] Dialog `PendingTime` fields, attachments on dialog articles
-- [ ] Missing actions: `AppointmentCreate/Update/Remove` (calendar module
+- [x] Dialog `PendingTime` fields, attachments on dialog articles
+- [~] Missing actions (Appointment* done in wave 3; ExecuteInvoker follows the GI requester, ConfigItemUpdate needs CMDB): `AppointmentCreate/Update/Remove` (calendar module
       exists), `ExecuteInvoker` (needs GI requester — see GI design),
       `ConfigItemUpdate` (needs CMDB — see ITSM design)
-- [ ] `Module` conditions → mapped to built-in Python condition modules by
+- [x] `Module` conditions → mapped to built-in Python condition modules by
       name where Znuny ships them (`ValidateDemo` is a demo); unknown modules
       stay non-matching with a visible warning in the designer
-- [ ] Znuny 7.x YAML verified on real 7.0–7.3 peers (golden), including any
+- [x] Znuny 7.x YAML verified on real 7.0–7.3 peers (golden), including any
       renamed keys
-- [ ] "New process ticket" from the start dialog, agent and customer
-- [ ] Process categories / grouping in the start menu (verify Znuny 7.3 key)
+- [x] "New process ticket" from the start dialog, agent and customer
+- [ ] Process categories / grouping in the start menu (verify Znuny 7.3 key) - not built in wave 3
 
 UI:
-- [ ] Typed dialog widgets for every field Znuny dialogs support (Title,
+- [x] Typed dialog widgets for every field Znuny dialogs support (Title,
       Article incl. communication channel + visibility + time units, CustomerID
       + CustomerUserID with search, Queue, State, Type, Service, SLA, Owner,
       Responsible, Lock, Priority, PendingTime, Attachments, every dynamic
       field type) with ACL-filtered options, `Display` 0/1/2 (hidden / shown /
       required), default values, short/long descriptions
-- [ ] Process widget in ticket zoom shows path so far + current activity
+- [x] Process widget in ticket zoom shows path so far + current activity
 
 Designer:
-- [ ] Create/edit processes, activities, dialogs, transitions, actions
-- [ ] Deploy step; import/export in Znuny's YAML format (round-trip)
+- [x] Create/edit processes, activities, dialogs, transitions, actions
+- [x] Deploy step; import/export in Znuny's YAML format (round-trip)
 
 ## Beyond parity ("besser als")
 
@@ -193,6 +193,19 @@ Designer:
 - Import/export: Znuny's process YAML (`ProcessImport` / export format)
   round-trip, golden-tested against a real peer (export in Znuny → import in
   Tiqora → export → identical modulo ordering).
+
+### Deviations decided in the wave-3 designer plan
+
+Plan: [`docs/superpowers/plans/2026-10-11-wave3-process-designer.md`](../plans/2026-10-11-wave3-process-designer.md), section "Deviations from spec". In short:
+
+- Deploy in parallel operation needs TiqoraSync 1.2.0 and a fresh heartbeat; without it the deploy is refused instead of queued. The status is keyed by the signal row id (`tiqorasync.deploy.<kind>`).
+- Draft state lives in `pm_*` with `pm_entity_sync` rows also after cutover: drafts never run, only "Bereitstellen" in Tiqora clears them.
+- Import writes `pm_entity_sync` rows (Znuny's `ProcessImport` does not).
+- Rollback = restore as draft, then the normal deploy (not a direct redeploy of an old revision). Diff is a per-entity list plus text view, not on the canvas.
+- Validation never blocks a deploy.
+- The condition module registry is keyed by the `Match` value (Perl module path); core-only, no plugin exposure in this wave.
+- The "Attachments" dialog field is Znuny's existing-attachment selection (`ProcessManagementAttachment`), not an upload field.
+- The designer is read-only on phones. Test run (Probelauf), approvals, deadlines, scheduled start, analytics, templates and AI drafting (phase 4) are not built.
 
 ### Dialog forms
 

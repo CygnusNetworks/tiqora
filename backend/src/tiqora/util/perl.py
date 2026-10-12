@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
+
+_COMMA_RE = re.compile(r"\s*,\s*")
 
 
 def perl_truthy(value: Any) -> bool:
@@ -18,3 +21,11 @@ def perl_truthy(value: Any) -> bool:
     if isinstance(value, (int, float)):
         return value != 0
     return True
+
+
+def perl_comma_list(value: Any) -> list[str]:
+    """``split /\\s*,\\s*/`` of a Znuny list key, empty items dropped (a list is taken as is)."""
+    if value is None:
+        return []
+    items = value if isinstance(value, list | tuple) else _COMMA_RE.split(str(value).strip())
+    return [str(i).strip() for i in items if str(i).strip()]

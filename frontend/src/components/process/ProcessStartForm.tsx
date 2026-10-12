@@ -4,6 +4,7 @@ import { processApi } from "@/lib/processApi";
 import { Spinner } from "@/components/ui/Spinner";
 import { processStartErrorMessage } from "./processStartError";
 import { ProcessFormBody } from "./ProcessFormBody";
+import type { ProcessScope } from "./processForm";
 
 /**
  * The start dialog of one process: loads the (permission/ACL filtered) start form, validates and hands
@@ -20,6 +21,7 @@ export function ProcessStartForm({
   testIdPrefix,
   api = processApi,
   queryKeyPrefix = ["process"],
+  scope = "agent",
 }: {
   processEntityId: string;
   ticketId?: number;
@@ -33,6 +35,8 @@ export function ProcessStartForm({
   api?: Pick<typeof processApi, "startForm">;
   /** Query key namespace of the start form: `["process"]` for agents, `["portal", "process"]` in the portal. */
   queryKeyPrefix?: readonly string[];
+  /** "portal" for the customer portal: no customer search, no ticket attachments, portal option endpoints. */
+  scope?: ProcessScope;
 }) {
   const { t } = useTranslation();
 
@@ -69,6 +73,8 @@ export function ProcessStartForm({
       error={error}
       onCancel={onCancel}
       testIdPrefix={testIdPrefix}
+      scope={scope}
+      optionsTarget={{ scope, kind: "start", processEntityId, ticketId }}
     />
   );
 }
