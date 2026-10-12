@@ -73,4 +73,21 @@ describe("ChatInboxPanel", () => {
     fireEvent.keyDown(dlg, { key: "Escape" });
     expect(onClose).toHaveBeenCalled();
   });
+  it("renders the assistant section with count and takeover; hidden when empty", async () => {
+    routeRequests(request, {
+      inbox: () => ({ ...inbox, bot: [item({ session_id: "b1", ticket_id: 130, status: "bot", visitor_name: "Bo Bot" })] }),
+      state: () => ({ ...agentState, available: true }),
+      accept,
+    });
+    const { unmount } = renderWithProviders(<ChatInboxPanel onClose={() => undefined} />);
+    expect(await screen.findByTestId("chat-bot-section")).toHaveTextContent("Mit KI im Gespräch (1)");
+    expect(screen.getByTestId("chat-accept-b1")).toHaveTextContent("Übernehmen");
+    fireEvent.click(screen.getByTestId("chat-accept-b1"));
+    await waitFor(() => expect(accept).toHaveBeenCalledWith("b1"));
+    unmount();
+    routeRequests(request, { inbox: () => ({ ...inbox, bot: [] }), accept });
+    renderWithProviders(<ChatInboxPanel onClose={() => undefined} />);
+    await screen.findByTestId("chat-waiting-s1");
+    expect(screen.queryByTestId("chat-bot-section")).toBeNull();
+  });
 });

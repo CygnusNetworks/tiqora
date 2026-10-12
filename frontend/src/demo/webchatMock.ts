@@ -6,6 +6,8 @@
 
 const WAITING_SESSION = "9f3c2a40-5b1e-4d7a-8c2e-0a1b2c3d4e51";
 const MINE_SESSION = "5d8e7b12-3a4c-4f60-9b1d-6e7f8a9b0c22";
+const BOT_SESSION = "c4a1f0d2-7e63-4b85-9a2c-1d3e5f708b93";
+const HANDED_SESSION = "e2b7a9c1-4d58-4a36-8f0e-9c1b2a3d4e64";
 
 const topics = [{ ref: "1:support", label: "Support", queue_id: 1, config_name: "Website" }];
 
@@ -18,6 +20,27 @@ const mineItem = {
   session_id: MINE_SESSION, ticket_id: 116, tn: "20260701016", title: "Chat: Router blinkt rot",
   status: "active" as const, visitor_name: "Max Beispiel", topic_label: "Support",
   waiting_since: null, accepted_at: "2026-07-21T11:03:00Z",
+};
+
+const botItem = {
+  session_id: BOT_SESSION, ticket_id: 118, tn: "20260701018", title: "Chat: Rechnung nicht erhalten",
+  status: "bot" as const, visitor_name: "Jana Beispiel", topic_label: "Support",
+  waiting_since: null, accepted_at: null,
+};
+const ticketChat118 = {
+  session_id: BOT_SESSION, status: "bot", visitor_name: "Jana Beispiel",
+  visitor_email: "jana@customer.example.org", visitor_email_verified: true, identity_source: "website",
+  bot_name: "Mia", handoff_at: null, handoff_reason: null,
+  topic_label: "Support", language: "de", page_url: "https://www.example.org/rechnungen",
+  assigned_user_id: null, assigned_name: null, waiting_since: null,
+  accepted_at: null, ended_at: null, end_reason: null,
+  visitor_online: true, visitor_typing: false,
+};
+const ticketChat119 = {
+  ...ticketChat118, session_id: HANDED_SESSION, status: "waiting", visitor_name: "Paul Muster",
+  visitor_email: "paul@example.org", visitor_email_verified: false, identity_source: null,
+  handoff_at: "2026-07-21T11:10:00Z", handoff_reason: "ai",
+  waiting_since: new Date(Date.now() - 30_000).toISOString(),
 };
 
 const ticketChat116 = {
@@ -70,12 +93,14 @@ export function resolveWebchatData(p: string, method: string): unknown | undefin
   const ticketChat = p.match(/\/api\/v1\/tickets\/(\d+)\/chat(\/typing)?$/);
   if (ticketChat) {
     if (ticketChat[2]) return {};
-    return method === "GET" ? (Number(ticketChat[1]) === 116 ? ticketChat116 : null) : {};
+    if (method !== "GET") return {};
+    const id = Number(ticketChat[1]);
+    return id === 116 ? ticketChat116 : id === 118 ? ticketChat118 : id === 119 ? ticketChat119 : null;
   }
   if (p.includes("/api/v1/chat/")) {
     if (p.endsWith("/agent-state")) return { available: true, max_concurrent: 3, active_count: 1, topics: [] };
     if (p.endsWith("/topics")) return topics;
-    if (p.endsWith("/inbox")) return { waiting: [waitingItem], mine: [mineItem] };
+    if (p.endsWith("/inbox")) return { waiting: [waitingItem], bot: [botItem], mine: [mineItem] };
     if (p.endsWith("/accept")) return { ticket_id: 117 };
     return {};
   }

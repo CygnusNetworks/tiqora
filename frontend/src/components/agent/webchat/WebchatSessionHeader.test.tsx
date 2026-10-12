@@ -152,4 +152,48 @@ describe("WebchatSessionHeader", () => {
     await waitFor(() => expect(ticketChat).toHaveBeenCalled());
     expect(screen.queryByTestId("webchat-session-header")).toBeNull();
   });
+  it("bot status: shows the AI chip and takes over via accept", async () => {
+    ticketChat.mockResolvedValue({ ...base, status: "bot", waiting_since: null, bot_name: "Mia" });
+    mount();
+    expect(await screen.findByTestId("webchat-status")).toHaveTextContent("Mit KI im Gespräch (Mia)");
+    expect(screen.queryByTestId("webchat-accept")).toBeNull();
+    fireEvent.click(screen.getByTestId("webchat-takeover"));
+    expect(screen.getByTestId("webchat-takeover")).toHaveTextContent("Übernehmen");
+    await waitFor(() => expect(accept).toHaveBeenCalledWith("s1"));
+  });
+
+  it.each([
+    ["visitor", "Besucher wollte einen Menschen"],
+    ["ai", "Die KI hat den Chat abgegeben"],
+    ["limit", "Limit der KI erreicht"],
+    ["error", "KI nicht erreichbar"],
+    ["unavailable", "KI nicht verfügbar"],
+    ["takeover", "Von einem Agenten übernommen"],
+  ])("handoff reason %s is spelled out", async (reason, text) => {
+    ticketChat.mockResolvedValue({ ...base, status: "waiting", handoff_reason: reason });
+    mount();
+    expect(await screen.findByTestId("webchat-handoff")).toHaveTextContent(text);
+  });
+
+  it("an unknown handoff reason renders no handoff line", async () => {
+    ticketChat.mockResolvedValue({ ...base, handoff_reason: "something_new" });
+    mount();
+    await screen.findByTestId("webchat-visitor-name");
+    expect(screen.queryByTestId("webchat-handoff")).toBeNull();
+  });
+
+  it("website identity: confirmed chip instead of the unverified one", async () => {
+    ticketChat.mockResolvedValue({ ...base, identity_source: "website", visitor_email_verified: true });
+    mount();
+    expect(await screen.findByTestId("webchat-identity-confirmed")).toHaveTextContent(
+      "Identität bestätigt · Website-Anmeldung",
+    );
+    expect(screen.queryByTestId("webchat-email-unverified")).toBeNull();
+  });
+
+  it("portal identity names the customer portal; phase 1 stays unverified", async () => {
+    ticketChat.mockResolvedValue({ ...base, identity_source: "portal", visitor_email_verified: true });
+    mount();
+    expect(await screen.findByTestId("webchat-identity-confirmed")).toHaveTextContent("Kundenportal");
+  });
 });

@@ -97,8 +97,23 @@ export function WebchatSessionHeader({ ticketId }: { ticketId: number }) {
         : age < 3600
           ? t("webchat.agent.ageMinutes", { count: Math.floor(age / 60) })
           : t("webchat.agent.ageHours", { count: Math.floor(age / 3600) });
-  const statusLabel =
-    chat.status === "waiting"
+  const isBot = chat.status === "bot";
+  const botName = chat.bot_name?.trim() || null;
+  const handoffReason = chat.handoff_reason
+    ? ["visitor", "ai", "limit", "error", "unavailable", "takeover"].includes(chat.handoff_reason)
+      ? chat.handoff_reason
+      : null
+    : null;
+  const identityConfirmed = chat.visitor_email_verified && !!chat.identity_source;
+  const identityLabel =
+    chat.identity_source === "portal"
+      ? t("webchat.agent.identity.portal")
+      : t("webchat.agent.identity.website");
+  const statusLabel = isBot
+    ? botName
+      ? t("webchat.agent.bot.statusNamed", { name: botName })
+      : t("webchat.agent.bot.status")
+    : chat.status === "waiting"
       ? ageLabel
         ? t("webchat.agent.statusWaiting", { age: ageLabel })
         : t("webchat.agent.statusWaitingNoAge")
@@ -107,7 +122,7 @@ export function WebchatSessionHeader({ ticketId }: { ticketId: number }) {
           ? t("webchat.agent.statusActive", { name: chat.assigned_name })
           : t("webchat.agent.statusActiveNoName")
         : t("webchat.agent.statusEnded");
-  const statusTone = chat.status === "waiting" ? "warn" : chat.status === "active" ? "success" : "muted";
+  const statusTone = isBot || chat.status === "waiting" ? "warn" : chat.status === "active" ? "success" : "muted";
 
   return (
     <div
@@ -139,12 +154,21 @@ export function WebchatSessionHeader({ ticketId }: { ticketId: number }) {
           {chat.visitor_email && (
             <span className="inline-flex items-center gap-1.5">
               <span data-testid="webchat-visitor-email">{chat.visitor_email}</span>
-              {!chat.visitor_email_verified && (
-                <Badge tone="warn" data-testid="webchat-email-unverified">
-                  {t("webchat.agent.emailUnverified")}
+              {identityConfirmed ? (
+                <Badge tone="success" data-testid="webchat-identity-confirmed">
+                  {identityLabel}
                 </Badge>
+              ) : (
+                !chat.visitor_email_verified && (
+                  <Badge tone="warn" data-testid="webchat-email-unverified">
+                    {t("webchat.agent.emailUnverified")}
+                  </Badge>
+                )
               )}
             </span>
+          )}
+          {handoffReason && (
+            <span data-testid="webchat-handoff">{t(`webchat.agent.handoff.${handoffReason}`)}</span>
           )}
           {chat.topic_label && <span data-testid="webchat-topic">{chat.topic_label}</span>}
           {link ? (
@@ -166,6 +190,17 @@ export function WebchatSessionHeader({ ticketId }: { ticketId: number }) {
         <Badge tone={statusTone} data-testid="webchat-status">
           {statusLabel}
         </Badge>
+        {isBot && (
+          <Button
+            size="sm"
+            variant="primary"
+            data-testid="webchat-takeover"
+            disabled={accept.isPending}
+            onClick={() => accept.mutate(chat.session_id)}
+          >
+            {t("webchat.agent.takeover")}
+          </Button>
+        )}
         {chat.status === "waiting" && (
           <Button
             size="sm"

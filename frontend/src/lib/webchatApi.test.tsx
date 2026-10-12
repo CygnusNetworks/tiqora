@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { api, ApiError } from "./api";
-import { chatInboxKey, ticketChatKey, useTicketChat, webchatApi } from "./webchatApi";
+import { chatInboxKey, isChatLive, ticketChatKey, useTicketChat, webchatApi } from "./webchatApi";
 import { resolveWebchatData } from "@/demo/webchatMock";
 import { resolveData } from "@/demo/mockData";
 
@@ -89,5 +89,19 @@ describe("webchat demo data", () => {
     expect(arts.every((a) => a.communication_channel_name === "WebChat")).toBe(true);
     expect(resolveData("/api/v1/tickets/116/chat", "GET")).toMatchObject({ visitor_online: true, status: "active" });
     expect(resolveData("/api/v1/tickets/100/chat", "GET")).toBeNull();
+  });
+});
+
+describe("isChatLive", () => {
+  it.each([
+    ["bot", true],
+    ["waiting", true],
+    ["active", true],
+    ["ended", false],
+  ])("status %s -> %s", (status, live) => {
+    expect(isChatLive({ status } as Parameters<typeof isChatLive>[0])).toBe(live);
+  });
+  it("is false without a chat", () => {
+    expect(isChatLive(null)).toBe(false);
   });
 });

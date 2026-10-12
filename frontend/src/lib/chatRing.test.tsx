@@ -119,4 +119,23 @@ describe("useChatRing", () => {
     expect(webchatApi.getAgentState).toHaveBeenCalled();
     expect(result.current.pending).toBe(0);
   });
+
+  it("the badge counts only waiting chats: an assistant-led chat does not ring", async () => {
+    const it = (sid: string, status: "bot" | "waiting") => ({
+      session_id: sid, ticket_id: 1, tn: "1", title: "t", status, visitor_name: null,
+      topic_label: null, waiting_since: null, accepted_at: null,
+    });
+    vi.spyOn(webchatApi, "topics").mockResolvedValue([
+      { ref: "1:support", label: "Support", queue_id: 1, config_name: "Website" },
+    ]);
+    vi.spyOn(webchatApi, "getAgentState").mockResolvedValue({
+      available: true, max_concurrent: 3, active_count: 0, topics: [],
+    });
+    vi.spyOn(webchatApi, "inbox").mockResolvedValue({
+      waiting: [it("w1", "waiting")], bot: [it("b1", "bot"), it("b2", "bot")], mine: [],
+    });
+    const { result } = renderHook(() => useChatRing(), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    expect(result.current.pending).toBe(1);
+  });
 });

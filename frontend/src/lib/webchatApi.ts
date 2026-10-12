@@ -101,9 +101,10 @@ export function useTicketChat(ticketId: number, enabled: boolean): UseQueryResul
   });
 }
 
-/** A chat the agent can still type into (a reply to a waiting one accepts it first). */
+/** A chat the agent can still type into (a reply to a waiting or assistant-led
+ * one accepts / takes it over first). */
 export function isChatLive(chat: TicketChat | null | undefined): boolean {
-  return chat?.status === "waiting" || chat?.status === "active";
+  return chat?.status === "bot" || chat?.status === "waiting" || chat?.status === "active";
 }
 
 /** Addresses in the reserved `.invalid` TLD (the placeholder a visitor

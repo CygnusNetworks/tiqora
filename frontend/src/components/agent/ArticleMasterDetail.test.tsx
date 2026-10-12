@@ -735,4 +735,11 @@ describe("ArticleMasterDetail — web chat", () => {
     // The per-bubble reply is the e-mail dialog again.
     expect(screen.getAllByTitle(/Reply|Antworten/).length).toBeGreaterThan(0);
   });
+
+  it("shows the messenger composer while the AI leads the chat (reply = takeover)", async () => {
+    mockChat("bot");
+    wrap(<ArticleMasterDetail ticketId={116} />);
+    expect(await screen.findByTestId("tg-composer")).toBeInTheDocument();
+    expect(await screen.findByTestId("webchat-takeover")).toBeInTheDocument();
+  });
 });

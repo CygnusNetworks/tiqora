@@ -5665,7 +5665,26 @@
         "noneMine": "You have no running chats.",
         "newWaiting": "New chat waiting. Waiting chats: {{count}}",
         "atCapacity": "You already have {{count}} chats.",
-        "maxInvalid": "Please enter a whole number from {{min}} to {{max}}."
+        "maxInvalid": "Please enter a whole number from {{min}} to {{max}}.",
+        "botSection": "Talking to the AI ({{count}})"
+      },
+      "takeover": "Take over",
+      "takeoverHint": "Your reply takes the chat over from the AI.",
+      "bot": {
+        "status": "Talking to the AI",
+        "statusNamed": "Talking to the AI ({{name}})"
+      },
+      "handoff": {
+        "visitor": "Handed over: visitor asked for a person",
+        "ai": "Handed over: the AI passed the chat on",
+        "limit": "Handed over: AI limit reached",
+        "error": "Handed over: AI unreachable",
+        "unavailable": "Handed over: AI unavailable",
+        "takeover": "Taken over by an agent"
+      },
+      "identity": {
+        "website": "Identity confirmed · website sign-in",
+        "portal": "Identity confirmed · customer portal"
       }
     },
     "admin": {
