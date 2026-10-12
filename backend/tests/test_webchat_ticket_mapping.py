@@ -382,6 +382,8 @@ def _row(**over: object) -> TiqoraChatConfig:
         wait_timeout_seconds=180,
         show_agent_names=True,
         retention_days=30,
+        show_on_portal=False,  # NOT NULL in the table; a transient row would hold None
+        identity_create_customers=False,
     )
     base.update(over)
     return TiqoraChatConfig(**base)
@@ -475,3 +477,37 @@ async def test_load_config_and_by_key(env) -> None:  # type: ignore[no-untyped-d
         assert await load_config_by_key(session, "wc_48427") is None  # invalid config
         assert await load_config_by_key(session, "wc_unknown") is None
         assert config_values(row).allowed_origins == ["https://a.test"]
+
+
+def test_config_values_null_bot_name_is_default_without_warning() -> None:
+    with capture_logs() as logs:
+        v = config_values(_row(bot_name=None, allowed_origins="[]", upload_policy="{}"))
+    assert v.bot_name == "KI-Assistent"
+    assert [e for e in logs if e["event"] == "webchat_config_column_invalid"] == []
+
+
+def test_config_values_empty_bot_name_warns_and_falls_back() -> None:
+    with capture_logs() as logs:
+        v = config_values(_row(bot_name="", allowed_origins="[]", upload_policy="{}"))
+    assert v.bot_name == "KI-Assistent"
+    columns = [e["column"] for e in logs if e["event"] == "webchat_config_column_invalid"]
+    assert columns == ["bot_name"]
+
+
+def test_config_values_new_scalar_columns_roundtrip() -> None:
+    v = config_values(
+        _row(
+            bot_name="Robo",
+            bot_tone_prompt="Kurz.",
+            show_on_portal=True,
+            identity_create_customers=True,
+            allowed_origins="[]",
+            upload_policy="{}",
+        )
+    )
+    assert (v.bot_name, v.bot_tone_prompt, v.show_on_portal, v.identity_create_customers) == (
+        "Robo",
+        "Kurz.",
+        True,
+        True,
+    )

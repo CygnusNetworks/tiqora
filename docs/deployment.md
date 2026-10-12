@@ -55,6 +55,7 @@ and never commit real credentials.
 | `TIQORA_FORWARDED_ALLOW_IPS` | `127.0.0.1` | Proxy IPs whose `X-Forwarded-For`/`X-Real-IP` uvicorn honours for `request.client.host`. **Required behind a proxy** that is not on `127.0.0.1` (e.g. the Docker gateway), otherwise every request keys on the proxy IP. |
 | `TIQORA_PUBLIC_BASE_URL` | `https://helpdesk.example.com` | Public browser URL (no trailing slash) for links in notifications, password-setup mails and the OAuth2 mail callback. Set on API **and** worker. |
 | `TIQORA_CSP_ENFORCE` | `false` (dev) / **`true` (production)** | Enforce the SPA Content-Security-Policy. Auto-enabled in production; set `0` to keep report-only. |
+| `TIQORA_CHAT_BOT_CONCURRENCY` | `4` | `ai-worker` only: how many web chat assistant turns run at the same time (1-32). |
 | `TIQORA_METRICS_ENABLED` | `true` (dev) / **`false` (production)** | Expose unauthenticated `GET /metrics` on the app port. Off by default in production; set `1` to scrape it (keep it off the public vhost). |
 | `TIQORA_PORTAL_ENABLED` | `false` | The customer portal is opt-in: unset/`false` hard-disables it (`/api/portal/*` → 404, `/` → agent login); `true` lets the admin switch decide. |
 | `TIQORA_CRYPTO_SMIME_CA_PATH` | *(empty)* | Extra CA bundle for S/MIME chain validation, e.g. a private CA. Signers whose chain validates against neither this, `SMIME::CertPath`, the bundled public roots nor openssl's store are reported `signed_untrusted` (valid signature, untrusted signer) rather than `verified`. |
@@ -498,6 +499,40 @@ The web chat (see the [admin and agent guide](guide/webchat.md)) is served by `t
 and the iframe document under `/chat/v1/`, the public visitor API under `/api/chat/v1/`. No nginx change is
 needed for routing, because `/chat/` and `/api/chat/` go to `tiqora-api` like the rest of the app. The
 `tiqora-worker` runs the chat sweep (waiting timeout, idle chats, retention).
+
+### Chat assistant and website sign-in
+
+The AI first line of the web chat ([setup](guide/webchat.md#5-ki-assistent-einrichten)) runs in the
+**`tiqora-ai-worker`**, not in `tiqora-api`. It needs no new service and no new proxy rule, but:
+
+- **The AI worker must run** and be switched on (`daemon.ai_worker.enabled`; while it is off the bot loop neither
+  consumes the queue nor refreshes the alive key). The worker consumes the queue `tiqora:chat:bot:queue` (Redis
+  list) and rescans the database every 15 s for chats whose last visitor line is unanswered, so a lost wake-up
+  costs at most 15 s. It refreshes `tiqora:chat:bot:alive` (TTL 30 s); if it stops, new chats skip the assistant and
+  go to humans (the admin editor shows `worker_down`); a chat already with the assistant whose visitor line has
+  waited more than 60 s is handed to the team by the chat sweep in `tiqora-worker` (reason `unavailable`, or ended
+  with `no_agent` when nobody is there). Redis must be reachable by both `tiqora-api` and `tiqora-ai-worker`.
+- **Run exactly one `tiqora-ai-worker`.** A chat turn is leased for 180 s; a second replica would take over a turn
+  that runs longer (slow model times several tool rounds) and both would answer the same chat.
+- **`TIQORA_CHAT_BOT_CONCURRENCY`** (default `4`, 1-32): assistant turns in parallel per `ai-worker` process. A turn
+  holds one LLM call (up to `TIQORA_LLM_TIMEOUT`); raise it only with the provider's rate limit in mind.
+- **The queue policy decides.** The topic's queue needs auto-reply, an AI service user and a usable model (see the
+  guide). A dedicated chat queue is recommended.
+- **Website sign-in secret.** The secret is stored encrypted in the database (keyed by `TIQORA_SECRET_KEY`, like the
+  other stored secrets) and cached, still encrypted, for 10 s per API process: a rotated or removed secret stops
+  working on every replica within 10 s. There is no environment variable for it. If you ever change
+  `TIQORA_SECRET_KEY`, the stored secret can no longer be decrypted and website sign-in stops (visitors fall back to
+  the pre-chat form); generate a new secret in the admin editor. Do not log the signed token.
+- **Portal chat.** `show_on_portal` additionally needs `TIQORA_PORTAL_ENABLED=true`. The portal page calls the chat
+  from Tiqora's own origin and sends its session cookie only to `/api/chat/v1/identity/portal`; set
+  `TIQORA_PUBLIC_BASE_URL` so the origin check recognises it.
+
+**Post-deploy check (assistant).** Use a test chat with a topic set to **KI antwortet zuerst** (Admin, **Web-Chat**,
+tab **KI**, status **Bereit**). Open the embedded chat and write a question: the assistant must answer within 15 s
+(the model's time plus at most one rescan). Then click **Mit einem Menschen sprechen**: the chat must appear under
+**Wartende Chats** and ring. Last, stop `tiqora-ai-worker`, wait 30 s and check that the status shows `worker_down`
+and a new chat goes straight to the waiting list. The image carries the widget: `docker run --rm --entrypoint ls
+<image> /app/webchat/dist` lists `loader.js`.
 
 ### Required behind a reverse proxy
 

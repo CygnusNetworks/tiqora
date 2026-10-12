@@ -11,6 +11,7 @@ from tiqora.api.portal import (
     process,
     security,
     tickets,
+    webchat,
 )
 
 portal_router = APIRouter()
@@ -22,5 +23,6 @@ portal_router.include_router(attachments.router)
 portal_router.include_router(kb.router)
 portal_router.include_router(process.router)
 portal_router.include_router(preferences.router)
+portal_router.include_router(webchat.router)
 
 __all__ = ["portal_router"]

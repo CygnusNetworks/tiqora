@@ -31,6 +31,14 @@ export type ChatState = {
   topic: string | null;
   unread: number;
   open: boolean;
+  /** Who is typing: the AI (`bot`) or a human (`agent`). */
+  typingBot: boolean;
+  /** A signed-in visitor (host token or portal) is pending; the token itself stays in memory in App. */
+  identity: { name: string | null } | null;
+  /** The last sign-in was refused (422 `invalid_identity`): the full form shows with a message. */
+  identityError: boolean;
+  /** The handover request is running (the button is disabled). */
+  handoffBusy: boolean;
 };
 
 export type Action =
@@ -39,8 +47,13 @@ export type Action =
   | { type: "session-restored"; session: ChatSession; messages: ChatMessage[] }
   | { type: "session-created"; created: ChatSessionCreated }
   | { type: "message"; message: ChatMessage }
-  | { type: "session-event"; status: string; agentName: string | null }
-  | { type: "typing" }
+  | { type: "session-event"; status: string; agentName: string | null; botName?: string | null }
+  | { type: "typing"; who?: "agent" | "bot" }
+  | { type: "identity-set"; name: string | null }
+  | { type: "identity-cleared" }
+  | { type: "identity-invalid" }
+  | { type: "handoff-started" }
+  | { type: "handoff-failed" }
   | { type: "typing-expired" }
   | { type: "pending"; pending: PendingMessage }
   | { type: "pending-failed"; clientId: string }
@@ -52,7 +65,7 @@ export type Action =
   | { type: "stream-state"; state: StreamState }
   | { type: "error"; error: string | null }
   | { type: "session-refreshed"; session: ChatSession }
-  | { type: "reset" };
+  | { type: "reset"; force?: boolean };
 
 export const initial: ChatState = {
   view: "loading",
@@ -66,13 +79,25 @@ export const initial: ChatState = {
   topic: null,
   unread: 0,
   open: false,
+  typingBot: false,
+  identity: null,
+  identityError: false,
+  handoffBusy: false,
 };
+
+/** A chat can start right now: a human is online, or (`offline_mode: ai`) the assistant
+ * answers a topic on its own. */
+const chatOpen = (c: ChatPublicConfig) => c.online || (c.offline_mode === "ai" && c.topics.some((t) => t.ai_first));
 
 /** Whether a new chat (pre-chat or offline form) can be offered; under `offline_mode: hide`
  * with nobody online there is nothing to show, so an ended chat keeps its transcript. */
-export const canStartNew = (c: ChatPublicConfig | null) => !!c && (c.online || c.offline_mode === "form");
+export const canStartNew = (c: ChatPublicConfig | null) => !!c && startView(c) !== "hidden";
 
-const LIVE = ["waiting", "active"];
+/** The view of a fresh start: chat form, offline form or nothing. */
+export const startView = (c: ChatPublicConfig): View =>
+  chatOpen(c) ? "prechat" : c.offline_mode === "form" ? "offline" : "hidden";
+
+const LIVE = ["bot", "waiting", "active"];
 export const isLive = (status: string) => LIVE.includes(status);
 
 /** Highest seq in a list (0 when empty). */
@@ -114,7 +139,7 @@ function withMessages(s: ChatState, add: ChatMessage[]): ChatState {
   const incoming = isNew
     ? add.filter((m) => m.sender !== "visitor" && !s.messages.some((x) => x.seq === m.seq)).length
     : 0;
-  const agentSpoke = add.some((m) => m.sender === "agent");
+  const agentSpoke = add.some((m) => m.sender === "agent" || m.sender === "bot");
   return {
     ...s,
     messages,
@@ -130,7 +155,7 @@ export function reducer(s: ChatState, a: Action): ChatState {
       const c = a.config;
       let view = s.view;
       if (!s.session) {
-        view = c.online ? "prechat" : c.offline_mode === "form" ? "offline" : "hidden";
+        view = startView(c);
       }
       const topic = s.topic && c.topics.some((t) => t.key === s.topic) ? s.topic : null;
       return { ...s, config: c, view, error: null, topic };
@@ -147,7 +172,11 @@ export function reducer(s: ChatState, a: Action): ChatState {
       const c = a.created;
       const session: ChatSession = {
         agent_name: null,
+        can_handoff: c.status === "bot",
         can_send: true,
+        identified: false,
+        identified_as: null,
+        bot_name: null,
         last_seq: c.message.seq,
         needs_contact: false,
         session_id: c.session_id,
@@ -166,16 +195,36 @@ export function reducer(s: ChatState, a: Action): ChatState {
       const live = isLive(a.status);
       return {
         ...s,
-        session: { ...s.session, status: a.status, agent_name: a.agentName, can_send: live },
+        session: {
+          ...s.session,
+          status: a.status,
+          agent_name: a.agentName,
+          bot_name: a.status === "bot" ? (a.botName ?? s.session.bot_name ?? null) : null,
+          can_handoff: a.status === "bot",
+          can_send: live,
+        },
         view: live ? s.view : "ended",
         agentTyping: live ? s.agentTyping : false,
+        handoffBusy: false,
         pending: live ? s.pending : [],
       };
     }
-    case "typing":
-      return s.agentTyping ? s : { ...s, agentTyping: true };
+    case "typing": {
+      const bot = a.who === "bot";
+      return s.agentTyping && s.typingBot === bot ? s : { ...s, agentTyping: true, typingBot: bot };
+    }
     case "typing-expired":
       return s.agentTyping ? { ...s, agentTyping: false } : s;
+    case "identity-set":
+      return { ...s, identity: { name: a.name }, identityError: false };
+    case "identity-cleared":
+      return { ...s, identity: null };
+    case "identity-invalid":
+      return { ...s, identity: null, identityError: true };
+    case "handoff-started":
+      return { ...s, handoffBusy: true };
+    case "handoff-failed":
+      return { ...s, handoffBusy: false };
     case "pending":
       return { ...s, pending: [...s.pending.filter((p) => p.clientId !== a.pending.clientId), a.pending] };
     case "pending-failed":
@@ -207,12 +256,16 @@ export function reducer(s: ChatState, a: Action): ChatState {
     case "session-refreshed":
       return s.session ? { ...s, session: a.session } : s;
     case "reset":
-      if (!canStartNew(s.config)) return s; // never an empty panel (T16 M11)
+      if (!canStartNew(s.config)) {
+        // never an empty panel (T16 M11) - except after logout/conflict: the old chat must go
+        return a.force && s.config ? { ...initial, config: s.config, view: "hidden", open: s.open, topic: s.topic } : s;
+      }
       return {
         ...initial,
         config: s.config,
-        view: s.config?.online ? "prechat" : s.config?.offline_mode === "form" ? "offline" : "hidden",
+        view: s.config ? startView(s.config) : "hidden",
         open: s.open,
+        identity: s.identity,
         topic: s.topic,
       };
   }

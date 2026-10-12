@@ -203,6 +203,19 @@ textarea {
   font-size: 0.8rem;
   color: var(--tq-muted);
 }
+.tq-ai {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid var(--tq-line);
+  border-radius: 8px;
+  font-size: 0.7rem;
+}
+.tq-signed {
+  margin: 0;
+  padding: 4px 16px;
+  color: var(--tq-muted);
+  font-size: 0.85rem;
+}
 .tq-bubble {
   padding: 8px 12px;
   border-radius: 12px;
@@ -264,6 +277,7 @@ textarea {
 .tq-send {
   min-height: 44px;
 }
+.tq-handoff,
 .tq-endbtn {
   display: block;
   margin-top: 4px;

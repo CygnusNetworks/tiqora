@@ -19,6 +19,8 @@ vi.mock("@/auth/CustomerAuthContext", () => ({
   }),
 }));
 
+vi.mock("@/components/portal/PortalWebchat", () => ({ PortalWebchat: () => <div data-testid="portal-webchat" /> }));
+
 const { portalSetLanguage } = vi.hoisted(() => ({ portalSetLanguage: vi.fn() }));
 vi.mock("@/lib/portalApi", () => ({ portalApi: { portalSetLanguage } }));
 
@@ -75,6 +77,11 @@ describe("PortalShell", () => {
     expect(screen.getByText("New ticket")).toBeInTheDocument();
     expect(screen.getByText("Help articles")).toBeInTheDocument();
     expect(screen.getByTestId("portal-shell-content")).toBeInTheDocument();
+  });
+
+  it("mounts the portal chat", async () => {
+    await renderShell();
+    expect(screen.getByTestId("portal-webchat")).toBeInTheDocument();
   });
 
   it("shows the current customer's name", async () => {

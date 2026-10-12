@@ -1,16 +1,24 @@
 """Housekeeping sweep of the web chat: waiting timeouts, idle chats, retention.
 
-One tick runs three bounded steps (``SWEEP_BATCH`` rows each). Every row is handled in its
+One tick runs four bounded steps (``SWEEP_BATCH`` rows each). Every row is handled in its
 own short transaction: lock the session row by primary key (R-LOCK-ORDER), re-check the
 state (a visitor or an agent may have changed it since the batch select), write, commit,
 then publish the queued wake / agent events. The sweep writes ``tiqora_*`` tables only —
-tickets and articles stay as they are — and loads keys first (no JOIN with Znuny tables).
+except the ticket state of a bot-solved chat, through the Znuny write service — and loads
+keys first (no JOIN with Znuny tables).
 
 * ``timed_out``: ``waiting`` longer than the config's ``wait_timeout_seconds`` ->
   ``ended`` / ``no_agent`` + system line ``no_agent`` ``{"has_email": bool}``.
 * ``abandoned``: the visitor is gone (no ``tiqora:chat:seen:<sid>`` marker AND a stale
   ``visitor_last_seen``; R-LASTSEEN: a brief marker gap with a fresh ``visitor_last_seen``
   keeps the chat) -> ``abandoned`` / ``idle`` + system line ``idle_closed``.
+  A chat the AI still answers (``bot``) goes with the ``active`` cutoff and, when the AI had
+  answered it alone, parks its ticket like a visitor's goodbye (``close_bot_resolved_ticket``).
+* ``handed_off``: the AI worker is gone (no ``BOT_ALIVE_KEY``: stopped, or
+  ``daemon.ai_worker.enabled`` switched off) and a ``bot`` chat has a visitor line older than
+  ``ORPHAN_BOT_SECONDS`` without an answer -> handed to the team (``unavailable``), or ended
+  ``no_agent`` when nobody is there. A chat is never left waiting for an assistant that
+  cannot answer (Review Focus 2).
 * ``purged``: ``ended_at`` older than the config's ``retention_days`` -> messages deleted,
   visitor data (name, email, page, user agent, IP hash, visitor id, token hash) cleared,
   ``purged_at`` set (the row stays as a tombstone for the ticket link).
@@ -26,19 +34,22 @@ from datetime import datetime, timedelta
 from typing import Any, Final
 
 import structlog
-from sqlalchemy import delete, distinct, select, update
+from sqlalchemy import delete, distinct, exists, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.db.tiqora.models import TiqoraChatMessage, TiqoraChatSession
 from tiqora.jobs.service import utc_now
 from tiqora.webchat.availability import VISITOR_SEEN_PREFIX
+from tiqora.webchat.bot import BOT_ALIVE_KEY, close_bot_resolved_ticket, hand_off_chat
 from tiqora.webchat.models import ChatConfigValues
 from tiqora.webchat.notify import flush_chat_notifications, queue_agent_event
 from tiqora.webchat.sessions import _agent_event, add_system_message, current_queue_id
 from tiqora.webchat.store import config_values, get_chat_session, load_config
+from tiqora.znuny.sysconfig import SysConfig
 
 __all__ = [
     "ACTIVE_IDLE_SECONDS",
+    "ORPHAN_BOT_SECONDS",
     "SWEEP_BATCH",
     "WAITING_IDLE_SECONDS",
     "run_webchat_sweep_tick",
@@ -50,6 +61,8 @@ logger = structlog.get_logger(__name__)
 WAITING_IDLE_SECONDS: Final = 120
 #: An active chat may be quiet this long without the visitor's stream.
 ACTIVE_IDLE_SECONDS: Final = 900
+#: A visitor line of a ``bot`` chat may wait this long for a stopped AI worker.
+ORPHAN_BOT_SECONDS: Final = 60
 #: Rows handled per step and tick.
 SWEEP_BATCH: Final = 200
 
@@ -209,7 +222,7 @@ async def _abandon_idle(
                         & (TiqoraChatSession.visitor_last_seen < _idle_cutoff("waiting", now))
                     )
                     | (
-                        (TiqoraChatSession.status == "active")
+                        TiqoraChatSession.status.in_(("active", "bot"))
                         & (TiqoraChatSession.visitor_last_seen < _idle_cutoff("active", now))
                     )
                 )
@@ -220,14 +233,18 @@ async def _abandon_idle(
         ids = [str(i) for i in candidates]
 
     async def work(db: AsyncSession, chat: TiqoraChatSession) -> bool:
-        if chat.status not in ("waiting", "active"):
+        if chat.status not in ("waiting", "active", "bot"):
             return False
         if chat.visitor_last_seen >= _idle_cutoff(str(chat.status), now):
             return False
+        was_bot = chat.status == "bot"
         chat.status = "abandoned"
         chat.end_reason = "idle"
         chat.ended_at = now
         await db.flush([chat])
+        if was_bot:
+            # A chat the AI answered alone and the visitor left: park the ticket like a goodbye.
+            await close_bot_resolved_ticket(db, SysConfig(db), chat=chat)
         await add_system_message(db, chat=chat, code="idle_closed", params={}, now=now)
         await _end_event(db, chat)
         return True
@@ -237,6 +254,58 @@ async def _abandon_idle(
         if await _marker_present(redis_client, session_id):
             continue
         if await _in_transaction(factory, redis_client, session_id, work):
+            done += 1
+    return done
+
+
+async def _hand_off_orphaned_bot_chats(
+    factory: async_sessionmaker[AsyncSession], redis_client: Any, now: datetime
+) -> int:
+    """Hand ``bot`` chats to the team while no AI worker answers (see the module doc)."""
+    try:
+        if await redis_client.exists(BOT_ALIVE_KEY):
+            return 0
+    except Exception:  # noqa: BLE001 - unknown worker state: leave the chats alone this tick
+        logger.warning("webchat_sweep_bot_alive_check_failed")
+        return 0
+    cutoff = now - timedelta(seconds=ORPHAN_BOT_SECONDS)
+    pending_old = exists(
+        select(TiqoraChatMessage.id).where(
+            TiqoraChatMessage.session_id == TiqoraChatSession.id,
+            TiqoraChatMessage.sender == "visitor",
+            TiqoraChatMessage.seq > TiqoraChatSession.bot_answered_seq,
+            TiqoraChatMessage.created <= cutoff,
+        )
+    )
+    async with factory() as db:
+        ids = await _ids(
+            db,
+            TiqoraChatSession.status == "bot",
+            TiqoraChatSession.last_visitor_seq > TiqoraChatSession.bot_answered_seq,
+            pending_old,
+            limit=SWEEP_BATCH,
+        )
+    done = 0
+    for session_id in ids:
+        async with factory() as db:
+            try:
+                # locks the row and re-checks ``bot`` itself (``noop`` when an agent was faster)
+                result = await hand_off_chat(
+                    db,
+                    SysConfig(db),
+                    redis_client,
+                    session_id=session_id,
+                    reason="unavailable",
+                    note=None,
+                    now=now,
+                )
+                await db.commit()
+            except Exception:
+                await db.rollback()
+                logger.exception("webchat_sweep_row_failed", session_id=session_id)
+                continue
+            await flush_chat_notifications(db, redis_client)
+        if result != "noop":
             done += 1
     return done
 
@@ -317,12 +386,24 @@ async def run_webchat_sweep_tick(
     redis_client: Any,
     now: datetime | None = None,
 ) -> dict[str, int]:
-    """One sweep tick; ``{"timed_out": n, "abandoned": n, "purged": n}``."""
+    """One sweep tick; ``{"timed_out": n, "abandoned": n, "handed_off": n, "purged": n}``."""
     moment = now if now is not None else utc_now()
     configs = _Configs(session_factory)
     timed_out = await _time_out_waiting(session_factory, redis_client, configs, moment)
     abandoned = await _abandon_idle(session_factory, redis_client, moment)
+    handed_off = await _hand_off_orphaned_bot_chats(session_factory, redis_client, moment)
     purged = await _purge_expired(session_factory, redis_client, configs, moment)
-    if timed_out or abandoned or purged:
-        logger.info("webchat_sweep", timed_out=timed_out, abandoned=abandoned, purged=purged)
-    return {"timed_out": timed_out, "abandoned": abandoned, "purged": purged}
+    if timed_out or abandoned or handed_off or purged:
+        logger.info(
+            "webchat_sweep",
+            timed_out=timed_out,
+            abandoned=abandoned,
+            handed_off=handed_off,
+            purged=purged,
+        )
+    return {
+        "timed_out": timed_out,
+        "abandoned": abandoned,
+        "handed_off": handed_off,
+        "purged": purged,
+    }

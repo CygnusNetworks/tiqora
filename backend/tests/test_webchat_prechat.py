@@ -90,6 +90,25 @@ def test_email_rule_is_the_strict_one_from_text() -> None:
     assert r.email == "erika@xn--strae-oqa.de"
 
 
+def test_identity_skips_mapped_fields_but_keeps_other_required_ones() -> None:
+    fields = [
+        PrechatField(key="email", kind="email", label="E-Mail", required=True, maps_to="email"),
+        PrechatField(key="name", kind="text", label="Name", required=True, maps_to="name"),
+        PrechatField(key="company", kind="text", label="Firma", required=True),
+    ]
+    with pytest.raises(PrechatInvalid) as e:
+        validate_prechat(fields, {}, require_email=True, identity_fields=True)
+    assert e.value.errors == {"company": "required"}
+    r = validate_prechat(
+        fields,
+        {"company": "Muster AG", "email": "typed@example.org"},
+        require_email=True,
+        identity_fields=True,
+    )
+    assert (r.name, r.email) == (None, None)
+    assert r.extra_lines == [("Firma", "Muster AG")]
+
+
 def test_strings_lose_controls_and_empty_optional_fields_are_absent() -> None:
     fields = [
         PrechatField(key="name", kind="text", label="Name", maps_to="name"),

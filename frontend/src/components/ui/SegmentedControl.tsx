@@ -1,12 +1,12 @@
 import { useRef, type KeyboardEvent } from "react";
 import { cn } from "@/lib/cn";
 
-export type SegmentedItem<T extends string | number> = { value: T; label: string };
+export type SegmentedItem<T extends string | number> = { value: T; label: string; disabled?: boolean };
 
 /**
  * Single-choice segmented control for two to four short options. Screen
  * readers see a radiogroup: one tab stop (the checked option, else the
- * first), arrow keys move and select, Home/End jump to the ends.
+ * first enabled one), arrow keys move and select, Home/End jump to the ends.
  *
  * `data-testid={testId}` sits on the group, `${testId}-${value}` on each
  * option.
@@ -41,12 +41,18 @@ export function SegmentedControl<T extends string | number>({
 }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const checkedIdx = items.findIndex((i) => String(i.value) === String(value ?? ""));
-  const tabStop = checkedIdx >= 0 ? checkedIdx : 0;
+  // The checked option, unless it cannot be chosen (then keyboard users could not reach the
+  // group at all): the first enabled option instead.
+  const firstEnabled = Math.max(0, items.findIndex((i) => !i.disabled));
+  const tabStop = checkedIdx >= 0 && !items[checkedIdx].disabled ? checkedIdx : firstEnabled;
 
-  const move = (to: number) => {
+  const move = (to: number, dir: 1 | -1 = 1) => {
     const n = items.length;
     if (n === 0) return;
-    const idx = ((to % n) + n) % n;
+    let idx = ((to % n) + n) % n;
+    // Skip options that cannot be chosen (arrow keys wrap around).
+    for (let guard = 0; items[idx].disabled && guard < n; guard++) idx = (((idx + dir) % n) + n) % n;
+    if (items[idx].disabled) return;
     onChange(items[idx].value);
     refs.current[idx]?.focus();
   };
@@ -55,13 +61,13 @@ export function SegmentedControl<T extends string | number>({
     const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
     if (step !== undefined) {
       e.preventDefault();
-      move(idx + step);
+      move(idx + step, step < 0 ? -1 : 1);
     } else if (e.key === "Home") {
       e.preventDefault();
       move(0);
     } else if (e.key === "End") {
       e.preventDefault();
-      move(items.length - 1);
+      move(items.length - 1, -1);
     }
   };
 
@@ -95,7 +101,7 @@ export function SegmentedControl<T extends string | number>({
             role="radio"
             aria-checked={on}
             tabIndex={idx === tabStop ? 0 : -1}
-            disabled={disabled}
+            disabled={disabled || item.disabled}
             data-testid={testId ? `${testId}-${item.value}` : undefined}
             onClick={() => onChange(item.value)}
             onKeyDown={(e) => onKeyDown(e, idx)}

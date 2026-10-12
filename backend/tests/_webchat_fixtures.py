@@ -95,9 +95,10 @@ def insert_config(
     origins: list[str],
     values_override: dict[str, Any] | None = None,
     valid: bool = True,
+    topics: list[ChatTopic] | None = None,
 ) -> None:
     values = ChatConfigValues(
-        topics=[ChatTopic(key="support", label="Support", queue_id=queue_id)],
+        topics=topics or [ChatTopic(key="support", label="Support", queue_id=queue_id)],
         allowed_origins=origins,
         **(values_override or {}),
     )
@@ -122,6 +123,10 @@ def insert_config(
             default_customer_user=dumped["default_customer_user"],
             show_agent_names=dumped["show_agent_names"],
             retention_days=dumped["retention_days"],
+            bot_name=dumped["bot_name"],
+            bot_tone_prompt=dumped["bot_tone_prompt"],
+            show_on_portal=dumped["show_on_portal"],
+            identity_create_customers=dumped["identity_create_customers"],
             created=NOW,
             created_by=1,
             changed=NOW,

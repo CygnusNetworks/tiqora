@@ -1702,6 +1702,17 @@ class TiqoraChatConfig(TiqoraBase):
     retention_days: Mapped[int] = mapped_column(
         Integer, nullable=False, default=30, server_default="30"
     )
+    # AI first line and identified visitors (20261010_0073). ``identity_secret`` is
+    # ``encrypt_secret(...)`` ciphertext and never part of the typed values.
+    bot_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    bot_tone_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    show_on_portal: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    identity_create_customers: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    identity_secret: Mapped[str | None] = mapped_column(Text, nullable=True)
     created: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     created_by: Mapped[int] = mapped_column(Integer, nullable=False)
     changed: Mapped[datetime] = mapped_column(DateTime, nullable=False)
@@ -1746,6 +1757,22 @@ class TiqoraChatSession(TiqoraBase):
     language: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     purged_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # AI first line and identified visitors (20261010_0073)
+    identity_source: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    last_visitor_seq: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    bot_answered_seq: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    bot_claimed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    bot_claim_owner: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    bot_attempts: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=0, server_default="0"
+    )
+    bot_outcome: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    handoff_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    handoff_reason: Mapped[str | None] = mapped_column(String(12), nullable=True)
 
     __table_args__ = (
         Index("ix_tiqora_chat_session_config", "config_id"),
@@ -1753,6 +1780,7 @@ class TiqoraChatSession(TiqoraBase):
         Index("ix_tiqora_chat_session_ticket", "ticket_id"),
         Index("ix_tiqora_chat_session_assigned", "assigned_user_id", "status"),
         Index("ix_tiqora_chat_session_visitor", "visitor_id"),
+        Index("ix_tiqora_chat_session_bot", "status", "bot_claimed_at"),
     )
 
 

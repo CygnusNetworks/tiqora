@@ -31,7 +31,7 @@ from tests._webchat_fixtures import (
 )
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_redis
-from tiqora.config import Settings
+from tiqora.config import Settings, get_settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraChatSession
 from tiqora.domain.auth import AuthenticatedUser
@@ -214,6 +214,7 @@ async def _start(env: Env, n: int, message: str = "Mein Router blinkt rot") -> T
             ),
             ctx=CTX,
             now=NOW,
+            settings=get_settings(),
         )
         await db.commit()
         return chat
@@ -377,6 +378,7 @@ async def test_inbox_lists_waiting_in_rw_queues_and_mine(env: Env) -> None:
         assert res.status_code == 200
         body = res.json()
         assert body["mine"] == []
+        assert body["bot"] == []
         assert [i["session_id"] for i in body["waiting"]] == [first.id]
         item = body["waiting"][0]
         assert item["ticket_id"] == first.ticket_id
@@ -399,7 +401,11 @@ async def test_inbox_lists_waiting_in_rw_queues_and_mine(env: Env) -> None:
         assert body["mine"][0]["accepted_at"] is not None
 
     async with _client(env, AGENT_B) as client:
-        assert (await client.get("/api/v1/chat/inbox")).json() == {"waiting": [], "mine": []}
+        assert (await client.get("/api/v1/chat/inbox")).json() == {
+            "waiting": [],
+            "mine": [],
+            "bot": [],
+        }
 
 
 # -- first accept wins ----------------------------------------------------------------------

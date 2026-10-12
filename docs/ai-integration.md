@@ -434,11 +434,13 @@ could receive both Znuny's own autoresponder and Tiqora's AI reply.
 **Exception — Tiqora-only channels.** `require_feature_allowed` skips the
 `operation_mode` check (the kill-switch still applies) when the triggering
 article's channel is in `tiqora.ai.gate.TIQORA_ONLY_CHANNELS` (currently
-just `"telegram"`, matched case-insensitively) — i.e. a channel with no
+`"telegram"` and `"webchat"`, matched case-insensitively) — i.e. a channel with no
 Znuny counterpart at all. There is nothing for a Tiqora auto-reply to
-double up with: Znuny never sees a Telegram message in the first place, so
+double up with: Znuny never sees a Telegram message or a web chat line in the first place, so
 the double-answer risk the `parallel`/`tiqora_primary` distinction exists to
-prevent doesn't apply. See [parallel-operation.md](parallel-operation.md)
+prevent doesn't apply. For `webchat` the exemption applies to the chat assistant only (see
+"Web chat assistant" below): the outbox auto-reply tick still never answers a chat article
+(`AUTO_REPLY_SKIP_CHANNELS`). See [parallel-operation.md](parallel-operation.md)
 §Feature-flag daemon takeover.
 
 **AI triage is gated too**, for a related reason: a Tiqora-side queue move is
@@ -956,6 +958,40 @@ budget per provider"). Any cap hit is a silent skip, retried on the next
 relevant event — there is no catch-up queueing. These are separate from the
 per-agent ACL limits the manual-assist/summary path uses
 (`tiqora_ai_acl`) — auto-path and manual-path never cross-charge each other.
+
+### Web chat assistant
+
+The web chat ([guide](guide/webchat.md#5-ki-assistent-einrichten)) can use the auto-reply runtime as its "first
+line": a topic with **KI antwortet zuerst** is answered by `run_ticket_agent` (trigger `auto`, source channel
+`webchat`) in the `tiqora-ai-worker`. It is not a second AI configuration; it reads the queue policy of the
+ticket's **current** queue.
+
+- **Gate.** The assistant runs only where the queue's policy has `enabled_auto_reply` and a service user
+  (`service_user_id`), the autonomy is not `off`, the kill switch allows `auto_reply` for the `webchat` channel and
+  the `tiqora-ai-worker` is alive (it refreshes the Redis key `tiqora:chat:bot:alive` every 10 s, TTL 30 s). In the
+  Admin editor (tab **KI**) the status list shows why a topic is not ready (`ai_mode_off`, `no_policy`,
+  `auto_reply_off`, `no_service_user`, `autonomy_off`, `gate`, `paused`, `worker_down`, `queue_rate_limit`,
+  `global_rate_limit`, `budget_tokens_day`, `llm_unavailable`). A bot that is not available is never shown to
+  the visitor; the chat falls back to humans or to the **Wenn niemand da ist** setting.
+- **Recommendation: a dedicated chat queue.** `enabled_auto_reply` is a per-queue switch, so every other channel
+  that queue serves (in `tiqora_primary` mode that includes e-mail) is auto-answered as well. Chat answers count
+  against the queue's hourly limit (`max_replies_per_hour`), the install-wide cap and the daily token budget
+  (`budget_tokens_day`) like any auto-reply. Point the chat topic at a queue of its own.
+- **Caps and budgets.** The per-ticket caps (`max_auto_replies` default 5, `max_clarifications` default 2), the
+  escalation stamp, the pause switches and the provider budgets apply exactly as for e-mail
+  ("Auto-reply caps and budget"). A cap hit is not a silent skip here: it hands the chat to a human
+  (`handoff_reason` `limit`), because a visitor is waiting. `unavailable` (assistant gone mid-chat) and `error`
+  (three failed attempts, e.g. the LLM is unreachable) end the same way, and so does the model's own
+  escalation (`ai`) or a visitor click (`visitor`).
+- **Tone and disclosure.** The chat has its own default tone (short plain-text answers, no greeting or signature,
+  no Markdown headings, one question at a time) unless the chat's **Tonfall** is set. The disclosure footer is not
+  added to chat lines; the chat's first system line (`bot_intro`) carries the notice, using the policy's
+  disclosure text when set. The notice cannot be switched off.
+- **Where the answer goes.** A chat answer is an agent article on the `WebChat` channel written by the policy's
+  service user, plus the transcript line; it never reaches SMTP. If an agent takes the chat over while the model is
+  still working, the answer is saved as a draft and the visitor sees nothing from the model.
+- **Prompt injection.** The visitor is untrusted text like any customer; the built-in agent defenses described in
+  section 4 apply. The model's tools are the policy's tools; the chat adds none.
 
 ### Disclosure
 

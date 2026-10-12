@@ -32,10 +32,13 @@ blocked) and pauses auto-reply only.
 
 from __future__ import annotations
 
-from sqlalchemy import text
+import json
+
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai.models import FEATURE_AUTO_REPLY
+from tiqora.db.tiqora.models import TiqoraChatConfig
 from tiqora.domain.settings_store import (
     KEY_AI_AUTO_REPLY_PAUSED,
     KEY_OPERATION_MODE,
@@ -52,13 +55,19 @@ VALID_OPERATION_MODES = frozenset({OPERATION_MODE_PARALLEL, OPERATION_MODE_TIQOR
 # Tiqora outbox for one of these channels can never be "missed" by Znuny's
 # own autoresponders, because Znuny never sees these messages in the first
 # place (unlike email, which Znuny still ingests while running in parallel).
-# Deliberately narrow (telegram only, for now); names match the channel
+# Deliberately narrow (telegram and the web chat); names match the channel
 # name used in the ArticleCreate outbox payload / channels/common.py
 # convention, always lowercase.
-TIQORA_ONLY_CHANNELS: frozenset[str] = frozenset({"telegram"})
+#
+# ``webchat`` is here for the chat's AI first line (``tiqora.webchat.bot``), which asks the gate
+# with ``source_channel="webchat"``. It does NOT make the outbox auto worker answer chat
+# articles: ``AUTO_REPLY_SKIP_CHANNELS`` is checked BEFORE ``TIQORA_ONLY_CHANNELS`` in
+# ``run_auto_tick``, so a chat article never reaches the gate there.
+TIQORA_ONLY_CHANNELS: frozenset[str] = frozenset({"telegram", "webchat"})
 
-#: Source channels whose customer articles are never auto-replied (live chat:
-#: a visitor waits for a human; a delayed mail-style answer would be wrong).
+#: Source channels whose customer articles are never auto-replied by the outbox worker (live
+#: chat: a visitor waits for a human or the bot's own loop; a delayed mail-style answer
+#: would be wrong). Checked first in ``run_auto_tick``.
 AUTO_REPLY_SKIP_CHANNELS: frozenset[str] = frozenset({"webchat"})
 
 
@@ -130,11 +139,43 @@ async def require_auto_reply_not_paused(session: AsyncSession) -> None:
         )
 
 
+async def _queue_has_ai_first_line_topic(session: AsyncSession, queue_id: int) -> bool:
+    """True when a valid web-chat config has a ``first_line`` topic on *queue_id*.
+
+    Only ``tiqora_chat_config`` is read, and the ``topics`` JSON is parsed in Python (never
+    queried in SQL: it is a text column in a dialect-neutral schema).
+    """
+    rows = (
+        await session.execute(
+            select(TiqoraChatConfig.topics).where(TiqoraChatConfig.valid.is_(True))
+        )
+    ).all()
+    for (raw,) in rows:
+        try:
+            topics = json.loads(raw or "[]")
+        except ValueError:
+            continue
+        if not isinstance(topics, list):
+            continue
+        for topic in topics:
+            if (
+                isinstance(topic, dict)
+                and topic.get("queue_id") == queue_id
+                and topic.get("ai_mode") == "first_line"
+            ):
+                return True
+    return False
+
+
 async def queue_serves_tiqora_only_channel(session: AsyncSession, queue_id: int) -> bool:
     """True when *queue_id*'s queue name matches the configured ``queue_name``
-    of any :data:`TIQORA_ONLY_CHANNELS` channel (e.g. Telegram) — such a queue
+    of any :data:`TIQORA_ONLY_CHANNELS` channel (e.g. Telegram), or when a valid web-chat
+    config answers a topic of this queue with the AI first line — such a queue
     has no Znuny counterpart to double-answer alongside, so it is exempt from
     :func:`require_tiqora_primary` (see :func:`require_feature_allowed`).
+
+    Emails of such a queue are still not auto-answered in ``parallel`` mode: the auto worker
+    gates every outbox event by its own channel.
     """
     # Lazy import: tiqora.channels.common pulls in domain/ticket_write_service
     # and permissions.engine, which would otherwise create an import cycle
@@ -144,14 +185,15 @@ async def queue_serves_tiqora_only_channel(session: AsyncSession, queue_id: int)
     row = (
         await session.execute(text("SELECT name FROM queue WHERE id = :qid"), {"qid": queue_id})
     ).first()
-    if row is None or not row[0]:
+    if row is None:
         return False
-    queue_name = str(row[0])
-    for channel in TIQORA_ONLY_CHANNELS:
-        configured_queue_name = await channel_setting(session, channel, "queue_name")
-        if configured_queue_name and configured_queue_name == queue_name:
-            return True
-    return False
+    queue_name = str(row[0]) if row[0] else ""
+    if queue_name:
+        for channel in TIQORA_ONLY_CHANNELS:
+            configured_queue_name = await channel_setting(session, channel, "queue_name")
+            if configured_queue_name and configured_queue_name == queue_name:
+                return True
+    return await _queue_has_ai_first_line_topic(session, queue_id)
 
 
 async def require_feature_allowed(

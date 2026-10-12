@@ -26,6 +26,8 @@ TOPIC_KEY_PATTERN: Final = r"^[a-z][a-z0-9_-]{0,39}$"
 FIELD_KEY_PATTERN: Final = r"^[a-z][a-z0-9_]{0,39}$"
 RESERVED_FIELD_KEYS: Final = frozenset({"message", "topic"})
 DF_KINDS_FOR_PRECHAT: Final = frozenset({"Text", "TextArea", "Dropdown", "Checkbox"})
+AiMode = Literal["off", "first_line"]
+DEFAULT_BOT_NAME: Final = "KI-Assistent"
 
 
 class ChatTopic(BaseModel):
@@ -35,6 +37,8 @@ class ChatTopic(BaseModel):
     label: str = Field(min_length=1, max_length=80)
     queue_id: int = Field(ge=1)
     priority_id: int | None = Field(default=None, ge=1)
+    # Old JSON rows lack the key and keep the human-only behaviour.
+    ai_mode: AiMode = "off"
 
 
 class PrechatOption(BaseModel):
@@ -125,7 +129,11 @@ class ChatConfigValues(BaseModel):
     topics: list[ChatTopic] = Field(min_length=1, max_length=20)
     greeting: str | None = Field(default=None, max_length=500)
     privacy_url: str | None = Field(default=None, max_length=500)
-    offline_mode: Literal["form", "hide"] = "form"
+    # "ai" needs at least one ``first_line`` topic. That cross-field rule is checked on save in
+    # the admin ``_check_values`` only: ``store.config_values`` validates every column on its
+    # own against a probe topic, so a model validator here would reset every stored "ai" to
+    # "form" on read.
+    offline_mode: Literal["form", "ai", "hide"] = "form"
     business_calendar: str | None = Field(default=None, pattern=r"^(|[1-9][0-9]?)$")
     wait_timeout_seconds: int = Field(default=180, ge=30, le=3600)
     prechat_fields: list[PrechatField] = Field(
@@ -137,6 +145,10 @@ class ChatConfigValues(BaseModel):
     default_customer_user: str | None = Field(default=None, max_length=200)
     show_agent_names: bool = True
     retention_days: int = Field(default=30, ge=1, le=3650)
+    bot_name: str = Field(default=DEFAULT_BOT_NAME, min_length=1, max_length=80)
+    bot_tone_prompt: str | None = Field(default=None, max_length=2000)
+    show_on_portal: bool = False
+    identity_create_customers: bool = False
 
     @field_validator("allowed_origins")
     @classmethod

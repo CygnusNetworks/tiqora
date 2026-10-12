@@ -170,6 +170,22 @@ ticketItems.push(
     age_seconds: 60, escalation_time: 0, attachment_count: 0, has_ai_summary: false,
     channel: "webchat", chat_display_name: "Erika Musterfrau", chat_username: null,
   },
+  {
+    ...ticketItems[0], id: 118, tn: "20260701018", title: "Chat: Rechnung nicht erhalten",
+    ...QROUTE[0], ...STATES[0], ...PRIOS[1], ...OWNERS[1],
+    customer_id: "EXAMPLE", customer_user_id: "jana@customer.example.org",
+    create_time: "2026-07-21T11:12:00Z", change_time: "2026-07-21T11:13:00Z",
+    age_seconds: 40, escalation_time: 0, attachment_count: 0, has_ai_summary: false,
+    channel: "webchat", chat_display_name: "Jana Beispiel", chat_username: null,
+  },
+  {
+    ...ticketItems[0], id: 119, tn: "20260701019", title: "Chat: Vertrag kündigen",
+    ...QROUTE[0], ...STATES[0], ...PRIOS[1], ...OWNERS[1],
+    customer_id: "EXAMPLE", customer_user_id: "paul@example.org",
+    create_time: "2026-07-21T11:09:00Z", change_time: "2026-07-21T11:10:00Z",
+    age_seconds: 30, escalation_time: 0, attachment_count: 0, has_ai_summary: false,
+    channel: "webchat", chat_display_name: "Paul Muster", chat_username: null,
+  },
 );
 /** Built on demand rather than eagerly: `ai_reply_source` is only known once
  * the article threads below have registered their AI-written articles. */
@@ -745,6 +761,23 @@ registerThread(117, [
   { day: 21, hm: "11:08", sender: "customer", channel: WEBCHAT_CHANNEL_ID, channelName: "WebChat", isHtml: false,
     subject: "WebChat", from: "Erika Musterfrau", to: "",
     body: "Guten Tag, ich möchte meinen Tarif wechseln. Wer kann mir dabei helfen?" },
+]);
+
+// Assistant chats: 118 is still with the AI (bot), 119 was handed to the team.
+const wcFrom = (from: string, spec: Omit<ArticleSpec, "subject" | "channel" | "channelName" | "isHtml" | "from" | "to">): ArticleSpec => ({
+  ...spec, subject: "WebChat", channel: WEBCHAT_CHANNEL_ID, channelName: "WebChat", isHtml: false, from, to: "",
+});
+registerThread(118, [
+  wcFrom("Jana Beispiel", { day: 21, hm: "11:12", sender: "customer",
+    body: "Hallo, ich habe meine Rechnung für Juli nicht erhalten." }),
+  wcFrom("Mia", { day: 21, hm: "11:13", sender: "agent",
+    body: "Guten Tag, das tut mir leid. Ich prüfe, an welche Adresse die Rechnung gegangen ist." }),
+]);
+registerThread(119, [
+  wcFrom("Paul Muster", { day: 21, hm: "11:09", sender: "customer",
+    body: "Ich möchte meinen Vertrag zum Monatsende kündigen." }),
+  wcFrom("Mia", { day: 21, hm: "11:10", sender: "agent",
+    body: "Dafür übergebe ich Sie an einen Kollegen, der Ihnen weiterhilft." }),
 ]);
 
 // AI subsystem (state-only summary + drafts) for the demo ticket. Static,

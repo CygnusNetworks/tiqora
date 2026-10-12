@@ -28,10 +28,13 @@ function WaitingRow({
   item,
   onAccept,
   busy,
+  takeover = false,
 }: {
   item: ChatInboxItem;
   onAccept: (item: ChatInboxItem) => void;
   busy: boolean;
+  /** A chat the assistant is still handling: "Übernehmen" instead of "Annehmen". */
+  takeover?: boolean;
 }) {
   const { t } = useTranslation();
   const age = useAgeSeconds(item.waiting_since);
@@ -55,7 +58,11 @@ function WaitingRow({
         <div className="truncate text-[11.5px] text-muted">
           {[
             item.topic_label,
-            ageLabel ? t("webchat.agent.statusWaiting", { age: ageLabel }) : t("webchat.agent.statusWaitingNoAge"),
+            takeover
+              ? t("webchat.agent.bot.status")
+              : ageLabel
+                ? t("webchat.agent.statusWaiting", { age: ageLabel })
+                : t("webchat.agent.statusWaitingNoAge"),
           ]
             .filter(Boolean)
             .join(" · ")}
@@ -65,10 +72,10 @@ function WaitingRow({
         size="sm"
         disabled={busy}
         data-testid={`chat-accept-${item.session_id}`}
-        aria-label={`${t("webchat.agent.accept")}: ${name}`}
+        aria-label={`${takeover ? t("webchat.agent.takeover") : t("webchat.agent.accept")}: ${name}`}
         onClick={() => onAccept(item)}
       >
-        {t("webchat.agent.accept")}
+        {takeover ? t("webchat.agent.takeover") : t("webchat.agent.accept")}
       </Button>
     </li>
   );
@@ -128,6 +135,7 @@ export function ChatInboxPanel({ onClose }: { onClose: () => void }) {
 
   const waiting = inboxQ.data?.waiting ?? [];
   const mine = inboxQ.data?.mine ?? [];
+  const bot = inboxQ.data?.bot ?? [];
 
   return (
     <div
@@ -174,6 +182,24 @@ export function ChatInboxPanel({ onClose }: { onClose: () => void }) {
           </ul>
         )}
       </section>
+      {bot.length > 0 && (
+        <section aria-labelledby="chat-bot-heading" className="border-t border-hairline" data-testid="chat-bot-section">
+          <h3 id="chat-bot-heading" className="px-3 pt-2 text-[12px] font-semibold text-muted">
+            {t("webchat.agent.inbox.botSection", { count: bot.length })}
+          </h3>
+          <ul className="max-h-48 list-none overflow-y-auto" data-testid="chat-bot-list">
+            {bot.map((item) => (
+              <WaitingRow
+                key={item.session_id}
+                item={item}
+                takeover
+                busy={accept.isPending}
+                onAccept={(it) => accept.mutate(it)}
+              />
+            ))}
+          </ul>
+        </section>
+      )}
       <section aria-labelledby="chat-mine-heading" className="border-t border-hairline">
         <h3 id="chat-mine-heading" className="px-3 pt-2 text-[12px] font-semibold text-muted">
           {t("webchat.agent.inbox.mine")}

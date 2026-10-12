@@ -4,7 +4,7 @@
  * with `hidden: false`, which the frame does only after a successful /config of an
  * enabled channel. No `ready` means no launcher, ever.
  */
-import { PROTOCOL, TOPIC_KEY, type FrameToHost } from "../shared/protocol";
+import { PROTOCOL, TOPIC_KEY, isIdentityToken, type FrameToHost } from "../shared/protocol";
 import { createHostBridge } from "./bridge";
 import { createEvents, installHostApi } from "./hostApi";
 import { LAUNCHER_Z, createLauncher, css, type Launcher } from "./launcher";
@@ -58,6 +58,10 @@ export function boot(win: Win, script: HTMLScriptElement | null): void {
   let open = false;
   let wantOpen = false; // host API call before `ready`
   let topic: string | null = null;
+  let pendingToken: string | null = null; // identify() before `ready`: only the latest counts
+  // logout() before `ready`: delivered before any later identify(), never cancelled by it
+  // (a stored chat of the previous visitor must be dropped before the next one signs in)
+  let pendingLogout = false;
   let launcher: Launcher | null = null;
   let panel: HTMLDivElement | null = null;
   let iframe: HTMLIFrameElement | null = null;
@@ -99,6 +103,13 @@ export function boot(win: Win, script: HTMLScriptElement | null): void {
     events.emit(o ? "open" : "close");
   };
 
+  const flushIdentity = () => {
+    if (pendingLogout) bridge?.post({ p: PROTOCOL, type: "logout" });
+    if (pendingToken) bridge?.post({ p: PROTOCOL, type: "identify", token: pendingToken });
+    pendingToken = null;
+    pendingLogout = false;
+  };
+
   const onFrame = (m: FrameToHost) => {
     switch (m.type) {
       case "ready": {
@@ -108,6 +119,7 @@ export function boot(win: Win, script: HTMLScriptElement | null): void {
         side = m.theme.position;
         events.emit("ready", { online: m.online });
         events.emit("availability", { online: m.online });
+        flushIdentity();
         if (hidden || !panel) return;
         launcher = createLauncher(doc, {
           label: m.launcherLabel || "Chat",
@@ -130,6 +142,9 @@ export function boot(win: Win, script: HTMLScriptElement | null): void {
         return;
       case "message":
         events.emit("message", { sender: m.sender });
+        return;
+      case "identity":
+        events.emit("identity", { verified: m.verified });
         return;
       case "close-request":
         setOpen(false);
@@ -154,6 +169,21 @@ export function boot(win: Win, script: HTMLScriptElement | null): void {
       if (!TOPIC_KEY.test(k)) return;
       topic = k;
       if (ready && !hidden) bridge?.post({ p: PROTOCOL, type: "set-topic", topic: k });
+    },
+    identify(token) {
+      if (!isIdentityToken(token)) {
+        console.warn("[tiqora-chat] identify() needs the signed token string, call ignored");
+        return;
+      }
+      if (ready) bridge?.post({ p: PROTOCOL, type: "identify", token });
+      else pendingToken = token;
+    },
+    logout() {
+      if (ready) bridge?.post({ p: PROTOCOL, type: "logout" });
+      else {
+        pendingToken = null;
+        pendingLogout = true;
+      }
     },
     on: events.on,
   });

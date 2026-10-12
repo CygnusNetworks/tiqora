@@ -14,7 +14,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from tiqora.domain.schemas import UtcDateTime
-from tiqora.webchat.models import ChatConfigValues, ChatTheme, PrechatOption
+from tiqora.webchat.models import DEFAULT_BOT_NAME, ChatConfigValues, ChatTheme, PrechatOption
 from tiqora.webchat.text import MAX_EMAIL_LENGTH, MAX_PAGE_URL_LENGTH
 from tiqora.webchat.tokens import VISITOR_ID_RE
 
@@ -31,6 +31,22 @@ class ChatSessionCreateIn(BaseModel):
     client_id: str | None = Field(default=None, max_length=64)
     page_url: str | None = Field(default=None, max_length=MAX_PAGE_URL_LENGTH)
     language: str | None = Field(default=None, max_length=16)
+    identity: str | None = Field(default=None, max_length=4096)
+
+
+class ChatIdentifyIn(BaseModel):
+    identity: str = Field(min_length=1, max_length=4096)
+
+
+class ChatPortalIdentityIn(BaseModel):
+    key: str = Field(max_length=40)
+    origin: str = Field(max_length=200)
+    visitor_id: str = Field(pattern=VISITOR_ID_PATTERN)
+
+
+class ChatPortalIdentityOut(BaseModel):
+    identity: str
+    name: str | None
 
 
 class ChatOfflineIn(BaseModel):
@@ -70,6 +86,8 @@ class ChatPublicTopicOut(BaseModel):
     key: str
     label: str
     online: bool
+    # The AI answers first on this topic right now (topic ``first_line`` and the bot is able to).
+    ai_first: bool = False
 
 
 class ChatPublicFieldOut(BaseModel):
@@ -78,6 +96,9 @@ class ChatPublicFieldOut(BaseModel):
     label: str
     required: bool
     options: list[PrechatOption]
+    # A verified identity supplies this field (``maps_to`` name/email): the widget hides it
+    # for a signed-in visitor, and the server neither requires nor reads it then.
+    identity_supplied: bool = False
 
 
 class ChatPublicUploadOut(BaseModel):
@@ -94,10 +115,12 @@ class ChatPublicConfigOut(BaseModel):
     theme: ChatTheme
     topics: list[ChatPublicTopicOut]
     online: bool
-    offline_mode: Literal["form", "hide"]
+    offline_mode: Literal["form", "ai", "hide"]
     prechat_fields: list[ChatPublicFieldOut]
     upload: ChatPublicUploadOut
     max_message_length: int
+    portal_identity: bool = False
+    bot_name: str = DEFAULT_BOT_NAME
 
 
 class ChatAttachmentOut(BaseModel):
@@ -109,7 +132,7 @@ class ChatAttachmentOut(BaseModel):
 
 class ChatMessageOut(BaseModel):
     seq: int
-    sender: Literal["visitor", "agent", "system"]
+    sender: Literal["visitor", "agent", "bot", "system"]
     body: str | None
     code: str | None
     params: dict[str, str | bool | None]
@@ -134,6 +157,13 @@ class ChatSessionOut(BaseModel):
     can_send: bool
     needs_contact: bool
     last_seq: int
+    identified_as: str | None = None
+    # A verified identity is attached (also when it carries no display name).
+    identified: bool = False
+    # The assistant's display name while the AI answers (``bot``), else ``None``.
+    bot_name: str | None = None
+    # The visitor may press "talk to a human": true exactly while the AI answers.
+    can_handoff: bool = False
 
 
 class ChatOfflineOut(BaseModel):
@@ -174,7 +204,7 @@ class ChatInboxItemOut(BaseModel):
     title: str
     topic_label: str | None
     visitor_name: str | None
-    status: Literal["waiting", "active"]
+    status: Literal["bot", "waiting", "active"]
     waiting_since: UtcDateTime | None
     accepted_at: UtcDateTime | None
 
@@ -182,6 +212,8 @@ class ChatInboxItemOut(BaseModel):
 class ChatInboxOut(BaseModel):
     waiting: list[ChatInboxItemOut]
     mine: list[ChatInboxItemOut]
+    # Chats the AI is answering on queues the agent holds ``rw`` on (newest first); no ring.
+    bot: list[ChatInboxItemOut] = Field(default_factory=list)
 
 
 class ChatAcceptOut(BaseModel):
@@ -195,8 +227,9 @@ class ChatEndIn(BaseModel):
 class TicketChatOut(BaseModel):
     """The newest chat of a ticket for the agent's conversation header (``ro`` on its queue).
 
-    ``visitor_email_verified`` is always False in phase 1 (R-NOTIFY b): the address is what
-    the visitor typed; nothing proved they own it.
+    ``visitor_email_verified`` is True only for a chat with a verified identity
+    (``identity_source`` set, signed token or portal login) that carries an address
+    (R-NOTIFY b); otherwise the address is what the visitor typed.
     """
 
     session_id: str
@@ -205,6 +238,13 @@ class TicketChatOut(BaseModel):
     visitor_name: str | None
     visitor_email: str | None
     visitor_email_verified: bool = False
+    identity_source: str | None = None
+    # ``visitor`` | ``ai`` | ``limit`` | ``error`` | ``unavailable`` | ``takeover``; the AI's own
+    # handoff summary is the internal note on the ticket, never part of this response.
+    handoff_reason: str | None = None
+    handoff_at: UtcDateTime | None = None
+    # The assistant's name when the AI took part in this chat, else ``None``.
+    bot_name: str | None = None
     topic_label: str | None
     page_url: str | None
     language: str | None
@@ -226,10 +266,31 @@ class ChatConfigOut(BaseModel):
     public_key: str
     valid: bool
     values: ChatConfigValues
+    # The website sign-in secret is shown once (``ChatIdentitySecretOut``) and never read back.
+    identity_secret_set: bool
     embed_snippet: str
     session_count: int
     created: UtcDateTime
     changed: UtcDateTime
+
+
+class ChatIdentitySecretOut(BaseModel):
+    """The plain website sign-in secret; only ever returned by the 201 that creates it."""
+
+    secret: str
+
+
+class ChatAiTopicStatusOut(BaseModel):
+    """Plan C8/C9: one entry per topic (``topic_key``, queue incl. name, verdict)."""
+
+    topic_key: str
+    label: str
+    queue_id: int
+    queue_name: str | None
+    ai_mode: Literal["off", "first_line"]
+    ok: bool
+    # ``BotAvailability.reason``: why the assistant would not answer on this topic right now.
+    reason: str | None
 
 
 class ChatConfigCreateIn(BaseModel):

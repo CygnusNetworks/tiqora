@@ -9,6 +9,7 @@ import { SelectMenu } from "@/components/ui/SelectMenu";
 import { localePickerItems, resolveLocaleCode, setAppLanguage } from "@/i18n";
 import { cn } from "@/lib/cn";
 import { portalApi } from "@/lib/portalApi";
+import { PortalWebchat } from "@/components/portal/PortalWebchat";
 
 /** Header language switch: apply locally, store as the customer's UserLanguage. */
 function switchPortalLanguage(code: string) {
@@ -141,6 +142,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
       <main className="mx-auto w-full max-w-3xl flex-1 animate-route-in px-4 py-6">
         {children}
       </main>
+      <PortalWebchat />
     </div>
   );
 }

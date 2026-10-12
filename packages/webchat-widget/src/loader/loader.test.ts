@@ -101,7 +101,7 @@ describe("launcher", () => {
 });
 
 describe("host API", () => {
-  const impl = (): HostApiImpl => ({ open: vi.fn(), close: vi.fn(), toggle: vi.fn(), setTopic: vi.fn(), on: vi.fn(() => () => undefined) });
+  const impl = (): HostApiImpl => ({ open: vi.fn(), close: vi.fn(), toggle: vi.fn(), setTopic: vi.fn(), identify: vi.fn(), logout: vi.fn(), on: vi.fn(() => () => undefined) });
 
   it("does not clobber window.Tiqora", () => {
     (window as unknown as { Tiqora: unknown }).Tiqora = { other: 1 };
@@ -109,7 +109,7 @@ describe("host API", () => {
     const t = (window as unknown as { Tiqora: { other: number; chat: Record<string, unknown> } }).Tiqora;
     expect(t.other).toBe(1);
     expect(typeof t.chat.open).toBe("function");
-    expect(Object.keys(t.chat).sort()).toEqual(["close", "on", "open", "setTopic", "toggle"]);
+    expect(Object.keys(t.chat).sort()).toEqual(["close", "identify", "logout", "on", "open", "setTopic", "toggle"]);
   });
 
   it("survives a frozen window.Tiqora", () => {
@@ -122,7 +122,7 @@ describe("host API", () => {
 });
 
 describe("boot", () => {
-  type Chat = { open(): void; close(): void; toggle(): void; setTopic(k: string): void; on(e: string, cb: (d: unknown) => void): () => void };
+  type Chat = { open(): void; close(): void; toggle(): void; setTopic(k: string): void; identify(t: unknown): void; logout(): void; on(e: string, cb: (d: unknown) => void): () => void };
   const chat = () => (window as unknown as { Tiqora: { chat: Chat } }).Tiqora.chat;
   let script: HTMLScriptElement;
 
@@ -215,6 +215,62 @@ describe("boot", () => {
     chat().on("ready", late);
     vi.advanceTimersByTime(10);
     expect(late).toHaveBeenCalledWith({ online: false });
+  });
+
+  it("queues identify until ready, validates the token, relays logout and identity", () => {
+    boot(window, script);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    chat().identify("a.b.c");
+    chat().identify(42);
+    chat().identify("bad token=");
+    expect(warn).toHaveBeenCalledTimes(2);
+    const ids: unknown[] = [];
+    chat().on("identity", (d) => ids.push(d));
+    vi.advanceTimersByTime(1600);
+    const iframe = document.querySelector("iframe") as HTMLIFrameElement;
+    const post = vi.spyOn(iframe.contentWindow!, "postMessage");
+    expect(post).not.toHaveBeenCalled();
+    send(ready(), ORIGIN, iframe.contentWindow);
+    const identifies = () => post.mock.calls.filter((c) => (c[0] as { type: string }).type === "identify");
+    expect(identifies()).toEqual([[{ p: PROTOCOL, type: "identify", token: "a.b.c" }, ORIGIN]]);
+    chat().identify("d.e.f");
+    expect(identifies()).toHaveLength(2);
+    expect(identifies()[1]).toEqual([{ p: PROTOCOL, type: "identify", token: "d.e.f" }, ORIGIN]);
+    chat().logout();
+    expect(post).toHaveBeenCalledWith({ p: PROTOCOL, type: "logout" }, ORIGIN);
+    send({ p: PROTOCOL, type: "identity", verified: true }, ORIGIN, iframe.contentWindow);
+    expect(ids).toEqual([{ verified: true }]);
+  });
+
+  it("logout then identify before ready delivers both, in that order (shared computer)", () => {
+    boot(window, script);
+    chat().logout();
+    chat().identify("b.b.b");
+    vi.advanceTimersByTime(1600);
+    const iframe = document.querySelector("iframe") as HTMLIFrameElement;
+    const post = vi.spyOn(iframe.contentWindow!, "postMessage");
+    send(ready(), ORIGIN, iframe.contentWindow);
+    const sent = post.mock.calls
+      .map((c) => c[0] as { type: string; token?: string })
+      .filter((m) => m.type === "logout" || m.type === "identify");
+    expect(sent).toEqual([
+      { p: PROTOCOL, type: "logout" },
+      { p: PROTOCOL, type: "identify", token: "b.b.b" },
+    ]);
+  });
+
+  it("identify then logout before ready delivers only the logout", () => {
+    boot(window, script);
+    chat().identify("a.a.a");
+    chat().logout();
+    vi.advanceTimersByTime(1600);
+    const iframe = document.querySelector("iframe") as HTMLIFrameElement;
+    const post = vi.spyOn(iframe.contentWindow!, "postMessage");
+    send(ready(), ORIGIN, iframe.contentWindow);
+    const sent = post.mock.calls
+      .map((c) => c[0] as { type: string })
+      .filter((m) => m.type === "logout" || m.type === "identify");
+    expect(sent).toEqual([{ p: PROTOCOL, type: "logout" }]);
   });
 
   it("a throwing host callback does not break the loader", () => {

@@ -13,8 +13,8 @@ let currentId = "new";
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
   useParams: () => ({ configId: currentId }),
-  Link: ({ children, ...rest }: { children: ReactNode; [k: string]: unknown }) => (
-    <a href="#" data-testid={rest["data-testid"] as string}>
+  Link: ({ children, to, ...rest }: { children: ReactNode; to?: string; [k: string]: unknown }) => (
+    <a href={to ?? "#"} data-testid={rest["data-testid"] as string}>
       {children}
     </a>
   ),
@@ -36,6 +36,8 @@ const getConfig = vi.fn();
 const createConfig = vi.fn();
 const updateConfig = vi.fn();
 const rotateKey = vi.fn();
+const aiStatus = vi.fn();
+const createIdentitySecret = vi.fn();
 vi.mock("@/lib/webchatApi", async (orig) => {
   const mod = await orig<typeof import("@/lib/webchatApi")>();
   return {
@@ -45,6 +47,8 @@ vi.mock("@/lib/webchatApi", async (orig) => {
       createConfig: (...a: unknown[]) => createConfig(...a),
       updateConfig: (...a: unknown[]) => updateConfig(...a),
       rotateKey: (...a: unknown[]) => rotateKey(...a),
+      aiStatus: (...a: unknown[]) => aiStatus(...a),
+      createIdentitySecret: (...a: unknown[]) => createIdentitySecret(...a),
     },
   };
 });
@@ -59,10 +63,11 @@ const saved: ChatConfig = {
   session_count: 0,
   created: "2026-07-01T08:00:00Z",
   changed: "2026-07-01T08:00:00Z",
+  identity_secret_set: false,
   values: {
     ...completeValues(defaultValues()),
     allowed_origins: ["https://www.example.org"],
-    topics: [{ key: "support", label: "Support", queue_id: 1, priority_id: null }],
+    topics: [{ key: "support", label: "Support", queue_id: 1, priority_id: null, ai_mode: "off" }],
   },
 };
 
@@ -89,6 +94,7 @@ describe("WebchatConfigEditorPage", () => {
     vi.clearAllMocks();
     currentId = "new";
     getConfig.mockResolvedValue(saved);
+    aiStatus.mockResolvedValue([]);
   });
 
   it("creates a config and shows server errors per field", async () => {
@@ -122,7 +128,7 @@ describe("WebchatConfigEditorPage", () => {
       valid: true,
       values: {
         allowed_origins: ["https://www.example.org"],
-        topics: [{ key: "support-hilfe", label: "Support & Hilfe", queue_id: 1, priority_id: null }],
+        topics: [{ key: "support-hilfe", label: "Support & Hilfe", queue_id: 1, priority_id: null, ai_mode: "off" }],
         greeting: null,
         privacy_url: null,
         business_calendar: null,
@@ -169,5 +175,63 @@ describe("WebchatConfigEditorPage", () => {
     fireEvent.click(screen.getByTestId("webchat-embed-rotate"));
     fireEvent.click(await screen.findByTestId("confirm-dialog-cancel"));
     expect(rotateKey).not.toHaveBeenCalled();
+  });
+
+  it("has a KI tab whose choices are saved with the config", async () => {
+    currentId = "7";
+    aiStatus.mockResolvedValue([
+      { topic_key: "support", label: "Support", queue_id: 1, queue_name: "Support", ai_mode: "off", ok: false, reason: "ai_mode_off" },
+    ]);
+    updateConfig.mockResolvedValue(saved);
+    renderPage();
+    fireEvent.click(await screen.findByRole("tab", { name: "KI" }));
+    fireEvent.click(await screen.findByTestId("webchat-ai-topic-0-mode-first_line"));
+    fireEvent.change(screen.getByTestId("webchat-bot-name"), { target: { value: " Frieda " } });
+    fireEvent.change(screen.getByTestId("webchat-bot-tone"), { target: { value: "  " } });
+    expect(await screen.findByTestId("webchat-ai-status-support-state")).toHaveTextContent("ausgeschaltet");
+    expect(aiStatus).toHaveBeenCalledWith(7, expect.anything());
+
+    fireEvent.click(screen.getByTestId("webchat-save"));
+    await waitFor(() => expect(updateConfig).toHaveBeenCalledTimes(1));
+    expect(updateConfig.mock.calls[0][1].values).toMatchObject({
+      topics: [{ key: "support", ai_mode: "first_line" }],
+      bot_name: "Frieda",
+      bot_tone_prompt: null,
+    });
+  });
+
+  it("jumps to the KI tab for a server error on the assistant name", async () => {
+    currentId = "7";
+    updateConfig.mockRejectedValueOnce(await apiError422({ bot_name: "Der Name ist ungültig." }));
+    renderPage();
+    fireEvent.click(await screen.findByRole("tab", { name: "Einbetten" }));
+    await screen.findByTestId("webchat-tab-embed");
+    fireEvent.click(screen.getByTestId("webchat-save"));
+    expect(await screen.findByTestId("webchat-bot-name-error")).toHaveTextContent("Der Name ist ungültig.");
+    expect(screen.getByTestId("webchat-tab-ai-error")).toBeInTheDocument();
+  });
+
+  it("embed tab: portal switch with its server error, website sign-in key and unknown customers", async () => {
+    currentId = "7";
+    updateConfig.mockRejectedValueOnce(
+      await apiError422({ show_on_portal: "Es kann nur ein Chat im Kundenportal angezeigt werden." }),
+    );
+    createIdentitySecret.mockResolvedValue({ secret: "geheim-123" });
+    renderPage();
+    fireEvent.click(await screen.findByRole("tab", { name: "Einbetten" }));
+    expect(await screen.findByText("Im Kundenportal anzeigen")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("webchat-show-on-portal"));
+    fireEvent.click(screen.getByTestId("webchat-create-customers"));
+    fireEvent.click(screen.getByTestId("webchat-save"));
+    expect(await screen.findByTestId("webchat-show-on-portal-error")).toHaveTextContent(
+      "Es kann nur ein Chat im Kundenportal angezeigt werden.",
+    );
+    expect(updateConfig.mock.calls[0][1].values).toMatchObject({ show_on_portal: true, identity_create_customers: true });
+
+    expect(screen.getByText("Unbekannte Kunden anlegen")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("webchat-identity-create"));
+    expect(await screen.findByTestId("webchat-identity-secret")).toHaveValue("geheim-123");
+    // the section now knows a key is set, without a reload
+    expect(screen.getByTestId("webchat-identity-regenerate")).toBeInTheDocument();
   });
 });

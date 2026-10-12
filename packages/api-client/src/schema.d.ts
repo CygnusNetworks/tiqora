@@ -41,6 +41,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chat/v1/identity/portal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Portal Identity
+         * @description A short-lived assertion for the customer who is logged in to the portal.
+         *
+         *     The ONLY public chat endpoint that reads the portal cookie, and only for Tiqora's own
+         *     origin and a chat with ``show_on_portal``. Every refusal (no or pending portal session,
+         *     portal off, chat not on the portal, foreign origin, unknown key) is the same 404.
+         */
+        post: operations["post_portal_identity_api_chat_v1_identity_portal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chat/v1/offline": {
         parameters: {
             query?: never;
@@ -155,6 +179,53 @@ export interface paths {
          * @description The visitor closes the chat (idempotent).
          */
         post: operations["post_chat_end_api_chat_v1_sessions__session_id__end_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions/{session_id}/handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Chat Handoff
+         * @description The visitor asks for a human while the AI answers.
+         *
+         *     204 and the chat is ``waiting`` (the agents ring) or, when nobody is available, ended as
+         *     ``no_agent`` (the e-mail prompt follows). 409 ``not_bot`` when the AI is not answering
+         *     (any other status, or an agent took over first). A running AI turn does not block it.
+         */
+        post: operations["post_chat_handoff_api_chat_v1_sessions__session_id__handoff_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/v1/sessions/{session_id}/identify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Chat Identify
+         * @description Attach a signed website identity (or portal assertion) to a running chat.
+         *
+         *     204 also for the same identity again; 422 ``invalid_identity``; 409 ``identity_conflict``
+         *     (the chat already belongs to another verified person) or ``session_closed``.
+         */
+        post: operations["post_chat_identify_api_chat_v1_sessions__session_id__identify_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1078,6 +1149,27 @@ export interface paths {
         put?: never;
         /** Reply */
         post: operations["reply_api_portal_tickets__ticket_id__reply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/webchat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Portal Webchat
+         * @description The public key of the valid chat shown on the portal (404 when there is none or the
+         *     web-chat channel is off).
+         */
+        get: operations["get_portal_webchat_api_portal_webchat_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2152,6 +2244,50 @@ export interface paths {
         head?: never;
         /** Update Chat Config */
         patch: operations["update_chat_config_api_v1_admin_chat_configs__config_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/chat-configs/{config_id}/ai-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Chat Ai Status
+         * @description Per topic: whether the chat assistant would answer there right now, else why not.
+         */
+        get: operations["chat_ai_status_api_v1_admin_chat_configs__config_id__ai_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/chat-configs/{config_id}/identity-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Identity Secret
+         * @description Create or rotate the website sign-in secret; the plain value is in this response only.
+         *
+         *     Tokens signed with the previous secret stop working at once on this replica and within the
+         *     config cache TTL (10 s) on the others.
+         */
+        post: operations["create_identity_secret_api_v1_admin_chat_configs__config_id__identity_secret_post"];
+        /** Delete Identity Secret */
+        delete: operations["delete_identity_secret_api_v1_admin_chat_configs__config_id__identity_secret_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/chat-configs/{config_id}/rotate-key": {
@@ -6639,7 +6775,8 @@ export interface paths {
         };
         /**
          * Get Chat Inbox
-         * @description Waiting chats the agent may accept and the agent's own active chats.
+         * @description Waiting chats the agent may accept, the agent's own active chats and the chats the AI
+         *     is answering (section ``bot``, no ring).
          */
         get: operations["get_chat_inbox_api_v1_chat_inbox_get"];
         put?: never;
@@ -6661,7 +6798,8 @@ export interface paths {
         put?: never;
         /**
          * Post Chat Accept
-         * @description Take a waiting chat (first accept wins; owner + lock like Znuny).
+         * @description Take a waiting chat or one the AI is answering (first accept wins; owner + lock like
+         *     Znuny).
          */
         post: operations["post_chat_accept_api_v1_chat_sessions__session_id__accept_post"];
         delete?: never;
@@ -13800,6 +13938,29 @@ export interface components {
             /** Topics */
             topics: string[];
         };
+        /**
+         * ChatAiTopicStatusOut
+         * @description Plan C8/C9: one entry per topic (``topic_key``, queue incl. name, verdict).
+         */
+        ChatAiTopicStatusOut: {
+            /**
+             * Ai Mode
+             * @enum {string}
+             */
+            ai_mode: "off" | "first_line";
+            /** Label */
+            label: string;
+            /** Ok */
+            ok: boolean;
+            /** Queue Id */
+            queue_id: number;
+            /** Queue Name */
+            queue_name: string | null;
+            /** Reason */
+            reason: string | null;
+            /** Topic Key */
+            topic_key: string;
+        };
         /** ChatAttachmentOut */
         ChatAttachmentOut: {
             /** Content Type */
@@ -13838,6 +13999,8 @@ export interface components {
             embed_snippet: string;
             /** Id */
             id: number;
+            /** Identity Secret Set */
+            identity_secret_set: boolean;
             /** Name */
             name: string;
             /** Public Key */
@@ -13863,6 +14026,13 @@ export interface components {
         ChatConfigValues: {
             /** Allowed Origins */
             allowed_origins?: string[];
+            /**
+             * Bot Name
+             * @default KI-Assistent
+             */
+            bot_name: string;
+            /** Bot Tone Prompt */
+            bot_tone_prompt?: string | null;
             /** Business Calendar */
             business_calendar?: string | null;
             /** Default Customer User */
@@ -13870,11 +14040,16 @@ export interface components {
             /** Greeting */
             greeting?: string | null;
             /**
+             * Identity Create Customers
+             * @default false
+             */
+            identity_create_customers: boolean;
+            /**
              * Offline Mode
              * @default form
              * @enum {string}
              */
-            offline_mode: "form" | "hide";
+            offline_mode: "form" | "ai" | "hide";
             /** Prechat Fields */
             prechat_fields?: components["schemas"]["PrechatField"][];
             /** Privacy Url */
@@ -13890,6 +14065,11 @@ export interface components {
              * @default true
              */
             show_agent_names: boolean;
+            /**
+             * Show On Portal
+             * @default false
+             */
+            show_on_portal: boolean;
             theme?: components["schemas"]["ChatTheme"];
             /** Topics */
             topics: components["schemas"]["ChatTopic"][];
@@ -13918,6 +14098,19 @@ export interface components {
              */
             close_ticket: boolean;
         };
+        /** ChatIdentifyIn */
+        ChatIdentifyIn: {
+            /** Identity */
+            identity: string;
+        };
+        /**
+         * ChatIdentitySecretOut
+         * @description The plain website sign-in secret; only ever returned by the 201 that creates it.
+         */
+        ChatIdentitySecretOut: {
+            /** Secret */
+            secret: string;
+        };
         /** ChatInboxItemOut */
         ChatInboxItemOut: {
             /** Accepted At */
@@ -13928,7 +14121,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "waiting" | "active";
+            status: "bot" | "waiting" | "active";
             /** Ticket Id */
             ticket_id: number;
             /** Title */
@@ -13944,6 +14137,8 @@ export interface components {
         };
         /** ChatInboxOut */
         ChatInboxOut: {
+            /** Bot */
+            bot?: components["schemas"]["ChatInboxItemOut"][];
             /** Mine */
             mine: components["schemas"]["ChatInboxItemOut"][];
             /** Waiting */
@@ -13981,7 +14176,7 @@ export interface components {
              * Sender
              * @enum {string}
              */
-            sender: "visitor" | "agent" | "system";
+            sender: "visitor" | "agent" | "bot" | "system";
             /** Seq */
             seq: number;
         };
@@ -14025,11 +14220,32 @@ export interface components {
          * @description Empty acknowledgement of the offline form (``{}``).
          */
         ChatOfflineOut: Record<string, never>;
+        /** ChatPortalIdentityIn */
+        ChatPortalIdentityIn: {
+            /** Key */
+            key: string;
+            /** Origin */
+            origin: string;
+            /** Visitor Id */
+            visitor_id: string;
+        };
+        /** ChatPortalIdentityOut */
+        ChatPortalIdentityOut: {
+            /** Identity */
+            identity: string;
+            /** Name */
+            name: string | null;
+        };
         /**
          * ChatPublicConfigOut
          * @description What the widget needs to render; no admin name, ids or queue data.
          */
         ChatPublicConfigOut: {
+            /**
+             * Bot Name
+             * @default KI-Assistent
+             */
+            bot_name: string;
             /** Greeting */
             greeting: string | null;
             /** Max Message Length */
@@ -14038,9 +14254,14 @@ export interface components {
              * Offline Mode
              * @enum {string}
              */
-            offline_mode: "form" | "hide";
+            offline_mode: "form" | "ai" | "hide";
             /** Online */
             online: boolean;
+            /**
+             * Portal Identity
+             * @default false
+             */
+            portal_identity: boolean;
             /** Prechat Fields */
             prechat_fields: components["schemas"]["ChatPublicFieldOut"][];
             /** Privacy Url */
@@ -14052,6 +14273,11 @@ export interface components {
         };
         /** ChatPublicFieldOut */
         ChatPublicFieldOut: {
+            /**
+             * Identity Supplied
+             * @default false
+             */
+            identity_supplied: boolean;
             /** Key */
             key: string;
             /**
@@ -14068,6 +14294,11 @@ export interface components {
         };
         /** ChatPublicTopicOut */
         ChatPublicTopicOut: {
+            /**
+             * Ai First
+             * @default false
+             */
+            ai_first: boolean;
             /** Key */
             key: string;
             /** Label */
@@ -14126,6 +14357,8 @@ export interface components {
         ChatSessionCreateIn: {
             /** Client Id */
             client_id?: string | null;
+            /** Identity */
+            identity?: string | null;
             /** Key */
             key: string;
             /** Language */
@@ -14159,8 +14392,22 @@ export interface components {
         ChatSessionOut: {
             /** Agent Name */
             agent_name: string | null;
+            /** Bot Name */
+            bot_name?: string | null;
+            /**
+             * Can Handoff
+             * @default false
+             */
+            can_handoff: boolean;
             /** Can Send */
             can_send: boolean;
+            /**
+             * Identified
+             * @default false
+             */
+            identified: boolean;
+            /** Identified As */
+            identified_as?: string | null;
             /** Last Seq */
             last_seq: number;
             /** Needs Contact */
@@ -14196,6 +14443,12 @@ export interface components {
         };
         /** ChatTopic */
         ChatTopic: {
+            /**
+             * Ai Mode
+             * @default off
+             * @enum {string}
+             */
+            ai_mode: "off" | "first_line";
             /** Key */
             key: string;
             /** Label */
@@ -19334,6 +19587,11 @@ export interface components {
             /** Ticket Id */
             ticket_id: number;
         };
+        /** PortalWebchatOut */
+        PortalWebchatOut: {
+            /** Public Key */
+            public_key: string;
+        };
         /**
          * PostmasterFilterOut
          * @description Grouped by ``f_name`` (Znuny's filter identity is the name, not a single row).
@@ -22628,8 +22886,9 @@ export interface components {
          * TicketChatOut
          * @description The newest chat of a ticket for the agent's conversation header (``ro`` on its queue).
          *
-         *     ``visitor_email_verified`` is always False in phase 1 (R-NOTIFY b): the address is what
-         *     the visitor typed; nothing proved they own it.
+         *     ``visitor_email_verified`` is True only for a chat with a verified identity
+         *     (``identity_source`` set, signed token or portal login) that carries an address
+         *     (R-NOTIFY b); otherwise the address is what the visitor typed.
          */
         TicketChatOut: {
             /** Accepted At */
@@ -22638,10 +22897,18 @@ export interface components {
             assigned_name: string | null;
             /** Assigned User Id */
             assigned_user_id: number | null;
+            /** Bot Name */
+            bot_name?: string | null;
             /** End Reason */
             end_reason: string | null;
             /** Ended At */
             ended_at: string | null;
+            /** Handoff At */
+            handoff_at?: string | null;
+            /** Handoff Reason */
+            handoff_reason?: string | null;
+            /** Identity Source */
+            identity_source?: string | null;
             /** Language */
             language: string | null;
             /** Page Url */
@@ -24345,6 +24612,67 @@ export interface operations {
             };
         };
     };
+    post_portal_identity_api_chat_v1_identity_portal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatPortalIdentityIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatPortalIdentityOut"];
+                };
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     post_offline_form_api_chat_v1_offline_post: {
         parameters: {
             query?: never;
@@ -24672,6 +25000,131 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_chat_handoff_api_chat_v1_sessions__session_id__handoff_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `not_bot`: the AI is not answering this chat */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_chat_identify_api_chat_v1_sessions__session_id__identify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatIdentifyIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             204: {
@@ -26520,6 +26973,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortalReplyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_portal_webchat_api_portal_webchat_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalWebchatOut"];
                 };
             };
             /** @description Validation Error */
@@ -29791,6 +30275,109 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ChatConfigOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    chat_ai_status_api_v1_admin_chat_configs__config_id__ai_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatAiTopicStatusOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_identity_secret_api_v1_admin_chat_configs__config_id__identity_secret_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatIdentitySecretOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_identity_secret_api_v1_admin_chat_configs__config_id__identity_secret_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

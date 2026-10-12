@@ -48,22 +48,28 @@ from tiqora.api.deps import AppSettings, DbSession, RedisDep
 from tiqora.api.uploads import MAX_ATTACHMENT_BYTES, read_upload_within_limit
 from tiqora.config import Settings
 from tiqora.db.engine import get_session_factory
-from tiqora.db.tiqora.models import TiqoraChatMessage, TiqoraChatSession
+from tiqora.db.tiqora.models import TiqoraChatConfig, TiqoraChatMessage, TiqoraChatSession
+from tiqora.domain.customer_auth import CustomerAuthService, CustomerSessionStore
+from tiqora.domain.portal_gate import portal_enabled
 from tiqora.jobs.service import utc_now
 from tiqora.security.ratelimit import client_ip
 from tiqora.storage.backend import DbMimeStorage
 from tiqora.webchat.availability import VISITOR_TYPING_PREFIX, config_availability
+from tiqora.webchat.bot import bot_availability, hand_off_chat
 from tiqora.webchat.config_cache import CachedConfig, public_config_cache
 from tiqora.webchat.hub import ChatHub, StreamLimitReached, get_chat_hub
+from tiqora.webchat.identity import IdentityError
 from tiqora.webchat.models import ChatConfigValues
 from tiqora.webchat.notify import flush_chat_notifications, queue_agent_event
 from tiqora.webchat.origins import (
     OriginError,
+    effective_allowed_origins,
     origin_allowed,
     own_origin,
     referer_origin,
     request_same_origin_ok,
 )
+from tiqora.webchat.prechat import IDENTITY_FIELD_TARGETS
 from tiqora.webchat.ratelimit import (
     AUTH_FAIL_LIMIT,
     AUTH_FAIL_SCOPE,
@@ -75,10 +81,13 @@ from tiqora.webchat.ratelimit import (
 )
 from tiqora.webchat.schemas import (
     ChatContactIn,
+    ChatIdentifyIn,
     ChatMessageIn,
     ChatMessageOut,
     ChatOfflineIn,
     ChatOfflineOut,
+    ChatPortalIdentityIn,
+    ChatPortalIdentityOut,
     ChatPublicConfigOut,
     ChatPublicFieldOut,
     ChatPublicTopicOut,
@@ -99,6 +108,7 @@ from tiqora.webchat.sessions import (
     LIVE_STATUSES,
     ChatError,
     VisitorContext,
+    check_origin,
     create_session,
     end_by_visitor,
     post_visitor_message,
@@ -127,6 +137,12 @@ from tiqora.webchat.uploads import (
     content_length_within,
     is_raster_image,
 )
+from tiqora.webchat.visitor_identity import (
+    ResolvedIdentity,
+    identify_session,
+    issue_portal_assertion,
+    verify_and_resolve,
+)
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -143,6 +159,17 @@ UPLOAD_BYTES_PER_CONFIG_DAY: Final = 500 * 1024 * 1024
 #: R-UPLOAD-BUDGET-IP: one address may use at most a quarter of the config budget, ≤ 100 MiB.
 UPLOAD_BYTES_PER_IP_DAY: Final = min(100 * 1024 * 1024, UPLOAD_BYTES_PER_CONFIG_DAY // 4)
 END_PER_SESSION_MINUTE: Final = 10
+#: "Mit einem Menschen sprechen" presses per session and minute (own bucket, C8).
+HANDOFF_PER_SESSION_MINUTE: Final = 3
+#: The internal note on the ticket after a visitor's handoff press.
+VISITOR_HANDOFF_NOTE: Final = "Der Besucher möchte mit einem Menschen sprechen."
+#: Failed identity verifications per IP hash (checked before verifying, spent on failure).
+IDENTITY_FAIL_SCOPE: Final = "identity_fail"
+IDENTITY_FAIL_LIMIT: Final = 30
+IDENTITY_FAIL_WINDOW: Final = 600
+#: Portal-identity requests per IP hash.
+PORTAL_IDENTITY_LIMIT: Final = 20
+PORTAL_IDENTITY_WINDOW: Final = 600
 TYPING_WINDOW_SECONDS: Final = 2
 VISITOR_TYPING_TTL: Final = 6
 _UPLOAD_BUDGET_KEY: Final = "tiqora:chat:rl:upload_bytes:cfg"
@@ -445,6 +472,7 @@ def _needs_contact(chat: TiqoraChatSession, now: datetime) -> bool:
         and ended_at is not None
         and (now - ended_at).total_seconds() < CONTACT_WINDOW_SECONDS
         and not chat.visitor_email
+        and chat.identity_source is None  # identified: the verified customer stays
     )
 
 
@@ -460,12 +488,54 @@ async def session_out(
         can_send=chat.status in LIVE_STATUSES,
         needs_contact=_needs_contact(chat, now),
         last_seq=int(chat.last_seq),
+        # the display name only: never the login or the e-mail address
+        identified_as=chat.visitor_name if chat.identity_source is not None else None,
+        identified=chat.identity_source is not None,
+        # Only while the AI answers: afterwards the transcript lines carry their own names.
+        bot_name=values.bot_name if chat.status == "bot" else None,
+        can_handoff=chat.status == "bot",
     )
 
 
-def _public_config(values: ChatConfigValues, availability: dict[str, bool]) -> ChatPublicConfigOut:
+async def _ai_first_topics(
+    db: AsyncSession,
+    redis_client: Any,
+    settings: Settings,
+    config: TiqoraChatConfig,
+    values: ChatConfigValues,
+) -> set[str]:
+    """Keys of the ``first_line`` topics whose bot can answer right now (cached 10 s)."""
+    keys: set[str] = set()
+    for topic in values.topics:
+        if topic.ai_mode != "first_line":
+            continue
+        bot = await bot_availability(
+            db,
+            redis_client,
+            settings,
+            config_id=int(config.id),
+            topic=topic,
+            queue_id=topic.queue_id,
+        )
+        if bot.ok:
+            keys.add(topic.key)
+    return keys
+
+
+def _public_config(
+    values: ChatConfigValues,
+    availability: dict[str, bool],
+    *,
+    portal_identity: bool = False,
+    ai_first: set[str] | frozenset[str] = frozenset(),
+) -> ChatPublicConfigOut:
     topics = [
-        ChatPublicTopicOut(key=t.key, label=t.label, online=bool(availability.get(t.key)))
+        ChatPublicTopicOut(
+            key=t.key,
+            label=t.label,
+            online=bool(availability.get(t.key)),
+            ai_first=t.key in ai_first,
+        )
         for t in values.topics
     ]
     policy = values.upload_policy
@@ -478,7 +548,12 @@ def _public_config(values: ChatConfigValues, availability: dict[str, bool]) -> C
         offline_mode=values.offline_mode,
         prechat_fields=[
             ChatPublicFieldOut(
-                key=f.key, kind=f.kind, label=f.label, required=f.required, options=f.options
+                key=f.key,
+                kind=f.kind,
+                label=f.label,
+                required=f.required,
+                options=f.options,
+                identity_supplied=f.maps_to in IDENTITY_FIELD_TARGETS,
             )
             for f in values.prechat_fields
         ],
@@ -486,6 +561,8 @@ def _public_config(values: ChatConfigValues, availability: dict[str, bool]) -> C
             enabled=policy.enabled, max_bytes=policy.max_bytes, types=list(policy.types)
         ),
         max_message_length=MAX_MESSAGE_LENGTH,
+        portal_identity=portal_identity,
+        bot_name=values.bot_name,
     )
 
 
@@ -495,6 +572,57 @@ def _is_own_origin(origin: str, request: Request, settings: Settings) -> bool:
     except OriginError:
         return False
     return referer_origin(origin) == own
+
+
+def _own_or_none(request: Request, settings: Settings) -> str | None:
+    """Tiqora's own origin, ``None`` when it cannot be determined (then only the admin's
+    website list applies)."""
+    try:
+        return own_origin(request, settings)
+    except OriginError:
+        return None
+
+
+async def _verified_identity(
+    db: AsyncSession,
+    limiter: ChatRateLimiter,
+    settings: Settings,
+    *,
+    ip_hash: str,
+    cached: CachedConfig,
+    token: str,
+    visitor_id: str,
+) -> ResolvedIdentity:
+    """Verify a website token / portal assertion for this chat (nothing is written on failure).
+
+    The per-IP ``identity_fail`` bucket is checked BEFORE the verification and spent on a
+    failure, so a leaked or guessed secret cannot be brute-forced and the 31st failure within
+    10 minutes is answered 429 without any signature work.
+    """
+    await limiter.check(
+        IDENTITY_FAIL_SCOPE,
+        ip_hash,
+        limit=IDENTITY_FAIL_LIMIT,
+        window_seconds=IDENTITY_FAIL_WINDOW,
+    )
+    try:
+        return await verify_and_resolve(
+            db,
+            settings,
+            config=cached.config,
+            values=cached.values,
+            token=token,
+            visitor_id=visitor_id,
+            now=utc_now(),
+        )
+    except IdentityError:
+        await limiter.hit(
+            IDENTITY_FAIL_SCOPE,
+            ip_hash,
+            limit=IDENTITY_FAIL_LIMIT,
+            window_seconds=IDENTITY_FAIL_WINDOW,
+        )
+        raise ChatError("invalid_identity", 422) from None
 
 
 async def _ticket_queue_id(db: AsyncSession, chat: TiqoraChatSession) -> int:
@@ -549,22 +677,42 @@ async def get_public_config(
         )
         # R-PREVIEW / R-PREVIEW-DRAFT: Tiqora's own origin (the admin preview frame) may read
         # the config of a disabled or invalid chat and while the channel switch is off.
+        own = _own_or_none(request, settings)
+        portal_identity = False
         if _is_own_origin(origin, request, settings):
             cached = await public_config_cache.by_key_any(db, k)
             if cached is None:
                 raise ChatError("not_found", 404)
+            # Offered only on a live, portal-embedded chat (never for a draft/preview read).
+            portal_identity = (
+                cached.values.show_on_portal
+                and cached.config.valid
+                and await public_config_cache.channel_enabled(db)
+            )
         else:
             cached = await _config_by_key(db, k)
-            if not origin_allowed(origin, cached.values.allowed_origins):
+            allowed = (
+                effective_allowed_origins(cached.values, own)
+                if own is not None
+                else cached.values.allowed_origins
+            )
+            if not origin_allowed(origin, allowed):
                 raise ChatError("origin", 403)
         values = cached.values
         availability = await config_availability(
-            db, redis_client, SysConfig(db), config=cached.config, values=values, now=utc_now()
+            db,
+            redis_client,
+            SysConfig(db),
+            config=cached.config,
+            values=values,
+            now=utc_now(),
+            settings=settings,
         )
+        ai_first = await _ai_first_topics(db, redis_client, settings, cached.config, values)
         await db.rollback()
     except (ChatError, RateLimited, ChatBackendUnavailable) as exc:
         return await _refused(db, exc)
-    return _public_config(values, availability)
+    return _public_config(values, availability, portal_identity=portal_identity, ai_first=ai_first)
 
 
 @router.post("/sessions", status_code=201, response_model=ChatSessionCreatedOut, responses=_ERRORS)
@@ -596,6 +744,20 @@ async def create_chat_session(
             limit=rl.sessions_per_config_minute,
             window_seconds=60,
         )
+        own = _own_or_none(request, settings)
+        resolved: ResolvedIdentity | None = None
+        if payload.identity:
+            # a foreign website is refused before any signature work
+            check_origin(payload.origin, cached.values, own)
+            resolved = await _verified_identity(
+                db,
+                limiter,
+                settings,
+                ip_hash=ip_hash,
+                cached=cached,
+                token=payload.identity,
+                visitor_id=payload.visitor_id,
+            )
         chat, token, first = await create_session(
             db,
             _session_factory(request),
@@ -606,6 +768,9 @@ async def create_chat_session(
             payload=payload,
             ctx=visitor_context(request, settings),
             now=utc_now(),
+            identity=resolved,
+            own_origin=own,
+            settings=settings,
         )
         out = ChatSessionCreatedOut(
             session_id=chat.id, token=token, status=chat.status, message=message_out(first)
@@ -997,11 +1162,151 @@ async def post_chat_end(
         )
         # Own small bucket: a visitor at the message limit can still close the chat.
         await limiter.hit("end", chat.id, limit=END_PER_SESSION_MINUTE, window_seconds=60)
-        await end_by_visitor(db, chat=chat, now=utc_now())
+        await end_by_visitor(db, chat=chat, now=utc_now(), sysconfig=SysConfig(db))
         await _commit_and_flush(db, redis_client)
     except (ChatError, RateLimited, ChatBackendUnavailable) as exc:
         return await _refused(db, exc)
     return Response(status_code=204)
+
+
+@router.post(
+    "/sessions/{session_id}/handoff",
+    status_code=204,
+    responses={**_ERRORS, 409: {"description": "`not_bot`: the AI is not answering this chat"}},
+)
+async def post_chat_handoff(
+    session_id: SessionId,
+    request: Request,
+    db: DbSession,
+    redis_client: RedisDep,
+    settings: AppSettings,
+) -> Response:
+    """The visitor asks for a human while the AI answers.
+
+    204 and the chat is ``waiting`` (the agents ring) or, when nobody is available, ended as
+    ``no_agent`` (the e-mail prompt follows). 409 ``not_bot`` when the AI is not answering
+    (any other status, or an agent took over first). A running AI turn does not block it.
+    """
+    limiter = ChatRateLimiter(redis_client)
+    try:
+        chat, cached = await authorised_session(
+            session_id, request, db, limiter, settings, write=True
+        )
+        await _message_limits(limiter, cached.values, chat.id, request_ip_hash(request, settings))
+        await limiter.hit("handoff", chat.id, limit=HANDOFF_PER_SESSION_MINUTE, window_seconds=60)
+        if chat.status != "bot":
+            raise ChatError("not_bot", 409)
+        await touch_visitor_last_seen(db, chat, utc_now())
+        # R-TX: the pre-checks end their transaction; the handoff runs in a fresh one so the
+        # session row lock comes before every ticket write (R-LOCK-ORDER).
+        await db.commit()
+        outcome = await hand_off_chat(
+            db,
+            SysConfig(db),
+            redis_client,
+            session_id=chat.id,
+            reason="visitor",
+            note=VISITOR_HANDOFF_NOTE,
+            now=utc_now(),
+        )
+        if outcome == "noop":  # an agent (or the bot's own handoff) was faster
+            raise ChatError("not_bot", 409)
+        await _commit_and_flush(db, redis_client)
+    except (ChatError, RateLimited, ChatBackendUnavailable) as exc:
+        return await _refused(db, exc)
+    return Response(status_code=204)
+
+
+@router.post("/sessions/{session_id}/identify", status_code=204, responses=_ERRORS)
+async def post_chat_identify(
+    session_id: SessionId,
+    payload: ChatIdentifyIn,
+    request: Request,
+    db: DbSession,
+    redis_client: RedisDep,
+    settings: AppSettings,
+) -> Response:
+    """Attach a signed website identity (or portal assertion) to a running chat.
+
+    204 also for the same identity again; 422 ``invalid_identity``; 409 ``identity_conflict``
+    (the chat already belongs to another verified person) or ``session_closed``.
+    """
+    limiter = ChatRateLimiter(redis_client)
+    ip_hash = request_ip_hash(request, settings)
+    try:
+        chat, cached = await authorised_session(
+            session_id, request, db, limiter, settings, write=True
+        )
+        await _message_limits(limiter, cached.values, chat.id, ip_hash)
+        resolved = await _verified_identity(
+            db,
+            limiter,
+            settings,
+            ip_hash=ip_hash,
+            cached=cached,
+            token=payload.identity,
+            visitor_id=chat.visitor_id,
+        )
+        now = utc_now()
+        changed = await identify_session(db, SysConfig(db), chat=chat, identity=resolved, now=now)
+        if changed:
+            await touch_visitor_last_seen(db, chat, now)
+        await _commit_and_flush(db, redis_client)
+    except (ChatError, RateLimited, ChatBackendUnavailable) as exc:
+        return await _refused(db, exc)
+    return Response(status_code=204)
+
+
+@router.post("/identity/portal", response_model=ChatPortalIdentityOut, responses=_ERRORS)
+async def post_portal_identity(
+    payload: ChatPortalIdentityIn,
+    request: Request,
+    db: DbSession,
+    redis_client: RedisDep,
+    settings: AppSettings,
+) -> ChatPortalIdentityOut | JSONResponse:
+    """A short-lived assertion for the customer who is logged in to the portal.
+
+    The ONLY public chat endpoint that reads the portal cookie, and only for Tiqora's own
+    origin and a chat with ``show_on_portal``. Every refusal (no or pending portal session,
+    portal off, chat not on the portal, foreign origin, unknown key) is the same 404.
+    """
+    limiter = ChatRateLimiter(redis_client)
+    refused = ChatError("not_found", 404)
+    try:
+        if not _is_own_origin(payload.origin, request, settings):
+            raise refused
+        try:
+            cached = await _config_by_key(db, payload.key)
+        except ChatError:
+            raise refused from None
+        await limiter.hit(
+            "identity",
+            request_ip_hash(request, settings),
+            limit=PORTAL_IDENTITY_LIMIT,
+            window_seconds=PORTAL_IDENTITY_WINDOW,
+        )
+        if not cached.values.show_on_portal or not await portal_enabled(db, settings):
+            raise refused
+        token = request.cookies.get(settings.customer_session_cookie_name)
+        if not token:
+            raise refused
+        auth = CustomerAuthService(db, CustomerSessionStore(redis_client, settings), settings)
+        customer = await auth.resolve_session(token)  # a pending (pre-2FA) token never resolves
+        if customer is None:
+            raise refused
+        identity = issue_portal_assertion(
+            customer,
+            public_key=cached.config.public_key,
+            visitor_id=payload.visitor_id,
+            settings=settings,
+            now=utc_now(),
+        )
+        name = " ".join(p for p in (customer.first_name, customer.last_name) if p) or None
+        await db.rollback()
+    except (ChatError, RateLimited, ChatBackendUnavailable) as exc:
+        return await _refused(db, exc)
+    return ChatPortalIdentityOut(identity=identity, name=name)
 
 
 @router.post("/offline", status_code=201, response_model=ChatOfflineOut, responses=_ERRORS)
@@ -1038,6 +1343,7 @@ async def post_offline_form(
             payload=payload,
             ctx=visitor_context(request, settings),
             now=utc_now(),
+            own_origin=_own_or_none(request, settings),
         )
         await _commit_and_flush(db, redis_client)
     except (ChatError, RateLimited, ChatBackendUnavailable) as exc:

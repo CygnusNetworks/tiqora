@@ -26,6 +26,7 @@ from tests._webchat_fixtures import (
     mark_cleanup_first,
     seed_queue_agent,
 )
+from tiqora.config import get_settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraChatConfig, TiqoraChatSession
 from tiqora.webchat import sessions as sessions_mod
@@ -216,6 +217,7 @@ async def _start(env: Env, config_id: int = CONFIG, **overrides: Any) -> TiqoraC
             payload=_payload(**overrides),
             ctx=CTX,
             now=NOW,
+            settings=get_settings(),
         )
         await db.commit()
         return chat
@@ -301,6 +303,7 @@ async def test_create_session_creates_ticket_article_and_first_message(env: Env)
             payload=_payload(),
             ctx=CTX,
             now=NOW,
+            settings=get_settings(),
         )
         events = list(db.info[AGENT_EVENTS_KEY])
         assert events[0]["type"] == "chat_waiting"
@@ -430,6 +433,7 @@ async def test_create_session_offline_refused(env: Env) -> None:
                 payload=_payload(),
                 ctx=CTX,
                 now=NOW,
+                settings=get_settings(),
             )
         assert e.value.code == "offline" and e.value.http_status == 409
         assert AGENT_EVENTS_KEY not in db.info
@@ -462,6 +466,7 @@ async def test_prechat_invalid_creates_nothing(env: Env) -> None:
                     payload=_payload(**overrides),
                     ctx=CTX,
                     now=NOW,
+                    settings=get_settings(),
                 )
             assert (e.value.code, e.value.http_status, e.value.errors) == (code, status, errors)
             await db.rollback()

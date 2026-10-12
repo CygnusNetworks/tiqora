@@ -4,8 +4,10 @@
 answers ``text/event-stream`` with these events:
 
 - ``id: <seq>`` + ``event: message`` + ``ChatMessageOut`` JSON — persisted lines only carry ids;
-- ``event: session`` ``{"status", "agent_name"}`` — on connect and whenever either changes;
-- ``event: typing`` ``{"who": "agent"}`` — forwarded from the hub without a DB read;
+- ``event: session`` ``{"status", "agent_name"}`` (plus ``"bot_name"`` while the AI answers) — on
+  connect and whenever one of them changes;
+- ``event: typing`` ``{"who": "agent" | "bot"}`` — forwarded from the hub without a DB read
+  (the hub item carries ``who``; anything else counts as ``agent``);
 - ``event: end`` ``{"reason"}`` — the session is ``ended``/``abandoned``/purged; the stream then
   closes and the client stops reconnecting (R-SSE-CAPS e: also right after the replay when
   the session was already over at connect);
@@ -75,6 +77,12 @@ def sse_event(*, event: str, data: dict[str, Any], event_id: int | None = None) 
 
 
 TYPING_CHUNK: Final = sse_event(event="typing", data={"who": "agent"})
+BOT_TYPING_CHUNK: Final = sse_event(event="typing", data={"who": "bot"})
+
+
+def typing_chunk(item: dict[str, Any]) -> bytes:
+    """The SSE frame of a hub typing item: ``bot`` only when the item says so."""
+    return BOT_TYPING_CHUNK if item.get("who") == "bot" else TYPING_CHUNK
 
 
 def parse_last_event_id(raw: str | None) -> int | None:
@@ -96,6 +104,7 @@ class _Snapshot:
     status: str | None
     agent_name: str | None
     end_reason: str | None
+    bot_name: str | None = None
 
 
 async def _read(
@@ -128,10 +137,11 @@ async def _read(
         cached = await public_config_cache.by_id(db, int(chat.config_id))
         values = (cached if cached is not None else fallback_config(chat)).values
         agent_name = await session_agent_name(db, chat, values)
+        bot_name = values.bot_name if status == "bot" else None
         if touch:
             await touch_visitor_last_seen(db, chat, utc_now())
         await db.commit()
-    return _Snapshot(chunks, cursor, status, agent_name, None)
+    return _Snapshot(chunks, cursor, status, agent_name, None, bot_name)
 
 
 async def _mark_seen(redis_client: Any, session_id: str) -> None:
@@ -169,7 +179,7 @@ async def visitor_event_stream(
         queue = await hub.subscribe(session_id, ip_hash=ip_hash)
     try:
         cursor = after_seq
-        sent: tuple[str | None, str | None] | None = None
+        sent: tuple[str | None, str | None, str | None] | None = None
         last_alive = float("-inf")
         last_sent = clock()
         while True:
@@ -192,11 +202,15 @@ async def visitor_event_stream(
             if snap.end_reason is not None:
                 yield sse_event(event="end", data={"reason": snap.end_reason})
                 return
-            if sent != (snap.status, snap.agent_name):
-                sent = (snap.status, snap.agent_name)
-                yield sse_event(
-                    event="session", data={"status": snap.status, "agent_name": snap.agent_name}
-                )
+            if sent != (snap.status, snap.agent_name, snap.bot_name):
+                sent = (snap.status, snap.agent_name, snap.bot_name)
+                session_data: dict[str, str | None] = {
+                    "status": snap.status,
+                    "agent_name": snap.agent_name,
+                }
+                if snap.bot_name is not None:  # only while the AI answers
+                    session_data["bot_name"] = snap.bot_name
+                yield sse_event(event="session", data=session_data)
                 last_sent = clock()
             # Wait for a wake (re-read), typing (forward) or close, bounded by both deadlines.
             while True:
@@ -218,20 +232,21 @@ async def visitor_event_stream(
                 if kind == CLOSE_ITEM["type"]:
                     return
                 if kind == "typing":
-                    yield TYPING_CHUNK
+                    yield typing_chunk(item)
                     last_sent = clock()
                     continue
                 if kind != "wake":
                     continue
                 # Collapse a burst of queued wakes into ONE re-read (typing/close still count).
-                typing = False
+                typing: dict[str, Any] | None = None
                 while not queue.empty():
-                    extra = queue.get_nowait().get("type")
-                    if extra == CLOSE_ITEM["type"]:
+                    extra = queue.get_nowait()
+                    if extra.get("type") == CLOSE_ITEM["type"]:
                         return
-                    typing = typing or extra == "typing"
-                if typing:
-                    yield TYPING_CHUNK
+                    if extra.get("type") == "typing":
+                        typing = extra
+                if typing is not None:
+                    yield typing_chunk(typing)
                     last_sent = clock()
                 break
     finally:

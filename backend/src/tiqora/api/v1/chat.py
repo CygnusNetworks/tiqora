@@ -135,7 +135,8 @@ async def get_chat_topics(user: CurrentUser, db: DbSession) -> list[ChatTopicRef
 
 @router.get("/inbox", response_model=ChatInboxOut)
 async def get_chat_inbox(user: CurrentUser, db: DbSession) -> ChatInboxOut:
-    """Waiting chats the agent may accept and the agent's own active chats."""
+    """Waiting chats the agent may accept, the agent's own active chats and the chats the AI
+    is answering (section ``bot``, no ring)."""
     return await list_inbox(db, user_id=user.id)
 
 
@@ -145,7 +146,8 @@ async def get_chat_inbox(user: CurrentUser, db: DbSession) -> ChatInboxOut:
 async def post_chat_accept(
     session_id: SessionId, user: CurrentUser, db: DbSession, redis_client: RedisDep
 ) -> ChatAcceptOut:
-    """Take a waiting chat (first accept wins; owner + lock like Znuny)."""
+    """Take a waiting chat or one the AI is answering (first accept wins; owner + lock like
+    Znuny)."""
     now = utc_now()
     # The agent's state row exists before the accept transaction starts: accept_session's
     # first statement is its locking read (MariaDB snapshot timing, see webchat.agent), and

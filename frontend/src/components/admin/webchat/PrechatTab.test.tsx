@@ -27,7 +27,7 @@ function pick(testId: string, value: string) {
 function validDraft(): Draft {
   const base = newDraft();
   base.name = "X";
-  base.values.topics = [{ key: "a", label: "A", queue_id: 1, priority_id: null }];
+  base.values.topics = [{ key: "a", label: "A", queue_id: 1, priority_id: null, ai_mode: "off" }];
   return base;
 }
 

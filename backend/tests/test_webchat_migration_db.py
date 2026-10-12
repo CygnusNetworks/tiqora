@@ -25,6 +25,8 @@ pytestmark = pytest.mark.db
 
 _PREVIOUS = "20261010_0071"
 _WEBCHAT = "20261010_0072"
+#: 20261010_0073 (web chat phase 2) sits on top of the GI debugger migration since the merge
+_WEBCHAT2_PARENT = "20261010_0076"
 _TABLES = (
     "tiqora_chat_config",
     "tiqora_chat_session",
@@ -199,7 +201,23 @@ def test_webchat_migration_up_down_up_matches_orm(alembic_env: str) -> None:
 
         _migrate("head")
         assert _present(sync_url) == set(_TABLES)
+        head_schema = _reflect(sync_url)
+        # 20261010_0073 adds columns and one index on top of the phase-1 schema ...
+        assert {"bot_name", "identity_secret", "show_on_portal"} <= set(
+            head_schema["tiqora_chat_config"]["columns"]
+        )
+        assert {"last_visitor_seq", "bot_claim_owner", "handoff_reason"} <= set(
+            head_schema["tiqora_chat_session"]["columns"]
+        )
+        assert ("ix_tiqora_chat_session_bot", ("status", "bot_claimed_at"), False) in head_schema[
+            "tiqora_chat_session"
+        ]["indexes"]
+        # ... and its downgrade restores the phase-1 schema exactly
+        _migrate(_WEBCHAT2_PARENT, down=True)
+        assert _version(sync_url) == _WEBCHAT2_PARENT
         assert _reflect(sync_url) == first
+        _migrate("head")
+        assert _reflect(sync_url) == head_schema
 
         # every foreign key (there are none by design) targets a tiqora_ table
         assert all(t.startswith("tiqora_") for t in _foreign_key_targets(sync_url))
@@ -207,7 +225,7 @@ def test_webchat_migration_up_down_up_matches_orm(alembic_env: str) -> None:
         # the ORM builds the very same schema
         _drop_tables(sync_url)
         _create_from_orm(sync_url)
-        assert _reflect(sync_url) == first
+        assert _reflect(sync_url) == head_schema
     finally:
         _migrate("head")
         delete_migration_seed_rows(sync_url)

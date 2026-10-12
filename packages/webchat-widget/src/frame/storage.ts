@@ -65,11 +65,12 @@ export function visitorId(store: Store = safeStorage()): string {
   return id;
 }
 
-export type StoredSession = { sessionId: string; token: string; lastSeq: number };
+/** `identified`: the chat belongs to a signed-in visitor; restored only after a fresh identify (C9). */
+export type StoredSession = { sessionId: string; token: string; lastSeq: number; identified?: boolean };
 
 const sessionKey = (key: string) => `tiqora-chat:session:${key}`;
 
-export function loadSession(key: string, store: Store = safeStorage()): StoredSession | null {
+export function loadSession(key: string, store: Store = safeStorage()): (StoredSession & { identified: boolean }) | null {
   const raw = store.get(sessionKey(key));
   if (!raw) return null;
   try {
@@ -84,7 +85,7 @@ export function loadSession(key: string, store: Store = safeStorage()): StoredSe
       Number.isInteger(o.lastSeq) &&
       o.lastSeq >= 0
     ) {
-      return { sessionId: o.sessionId, token: o.token, lastSeq: o.lastSeq };
+      return { sessionId: o.sessionId, token: o.token, lastSeq: o.lastSeq, identified: o.identified === true };
     }
   } catch {
     // corrupt value
@@ -93,7 +94,7 @@ export function loadSession(key: string, store: Store = safeStorage()): StoredSe
 }
 
 export function saveSession(key: string, s: StoredSession, store: Store = safeStorage()): void {
-  store.set(sessionKey(key), JSON.stringify({ sessionId: s.sessionId, token: s.token, lastSeq: s.lastSeq }));
+  store.set(sessionKey(key), JSON.stringify({ sessionId: s.sessionId, token: s.token, lastSeq: s.lastSeq, identified: s.identified === true }));
 }
 
 export function clearSession(key: string, store: Store = safeStorage()): void {

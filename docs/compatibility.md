@@ -868,6 +868,13 @@ bug. Znuny's own chat engine is not used.
   the `CustomerTicketMessage` defaults or `CustomerPanelUserID`, and they never trigger Znuny's web-ticket
   auto-response (`AutoResponseForWebTickets`, a Perl boolean that would have to be read with `get_bool` if it
   were ever honoured).
+- **Assistant replies are normal articles.** A reply of the chat assistant is an ordinary `WebChat` article
+  (sender type `agent`, visible for the customer, `create_by` = the queue's AI service user) and the handoff
+  summary is an ordinary internal note (an article on Znuny's internal channel, not visible for the customer, same
+  author). Znuny's ticket view, `TicketGet`/`ArticleList` and the article search show them like any
+  other article; they survive `Admin::CommunicationChannel::Sync`. Tiqora-only state (who is chatting, the bot
+  claim, the handoff reason, identity source) lives in `tiqora_chat_session` and is not visible in Znuny. The
+  golden test `test_bot_reply_and_handoff_note_are_normal_znuny_articles` pins this against the real peer.
 - The chat retention purge (see [gdpr.md](gdpr.md#web-chat)) clears the visitor's data in Tiqora's session table
   only. Name and e-mail also live on the chat articles and the ticket; those are the GDPR engine's scope.
 

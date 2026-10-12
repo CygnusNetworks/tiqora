@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Sequence
-from typing import Final
+from typing import TYPE_CHECKING, Final
 from urllib.parse import urlsplit
 
 import idna
@@ -18,6 +18,9 @@ import structlog
 from starlette.requests import Request
 
 from tiqora.config import Settings
+
+if TYPE_CHECKING:
+    from tiqora.webchat.models import ChatConfigValues
 
 logger = structlog.get_logger(__name__)
 
@@ -85,6 +88,12 @@ def normalize_origin(raw: str) -> str:
     return _canon(raw, allow_plain_http=False)
 
 
+def canonical_origin(raw: str) -> str:
+    """Like :func:`normalize_origin` but also accepts plain ``http`` (a request's claimed
+    origin, compared against an allow-list afterwards). Raises ``OriginError``."""
+    return _canon(raw, allow_plain_http=True)
+
+
 def validate_origins(values: Iterable[str]) -> list[str]:
     """Normalise, de-duplicate (order kept) and cap at ``MAX_ORIGINS``."""
     out: list[str] = []
@@ -102,16 +111,28 @@ def origin_allowed(origin: str | None, allowed: Sequence[str]) -> bool:
     if not origin:
         return False
     try:
-        norm = normalize_origin(origin)
+        norm = _canon(origin, allow_plain_http=True)
     except OriginError:
         return False
     for entry in allowed:
         try:
-            if normalize_origin(entry) == norm:
+            # Lenient on the scheme only so that Tiqora's own origin matches on a plain-http
+            # development deployment; admin entries are saved through ``normalize_origin``
+            # (https only), and the scheme is part of the comparison.
+            if _canon(entry, allow_plain_http=True) == norm:
                 return True
         except OriginError:
             continue
     return False
+
+
+def effective_allowed_origins(values: ChatConfigValues, own: str) -> list[str]:
+    """The websites that may embed / use this chat: the admin's list, plus Tiqora's own origin
+    (the customer portal) while ``show_on_portal`` is on. *own* is ``own_origin()``."""
+    allowed = list(values.allowed_origins)
+    if values.show_on_portal and own not in allowed:
+        allowed.append(own)
+    return allowed
 
 
 def _base_origin(public_base_url: str) -> str | None:
@@ -279,7 +300,7 @@ def frame_csp(
     own_norm = _canon(own, allow_plain_http=True)
     ancestors = "'self'"
     if origin is not None and not preview_only:
-        norm = normalize_origin(origin)
+        norm = _canon(origin, allow_plain_http=True)
         if not origin_allowed(norm, allowed):
             raise OriginError("Diese Website ist für den Chat nicht freigegeben.")
         ancestors += f" {norm}"

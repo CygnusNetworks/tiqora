@@ -28,7 +28,7 @@ describe("handleSSEMessage chat events", () => {
     }
   });
 
-  it("chat_typing invalidates only the ticket chat, chat_waiting only the inbox", () => {
+  it("chat_typing invalidates only the ticket chat, chat_waiting the inbox and the ticket chat", () => {
     const qc = new QueryClient();
     const spy = vi.spyOn(qc, "invalidateQueries");
     handleSSEMessage(qc, chatMsg("chat_typing"));
@@ -39,8 +39,9 @@ describe("handleSSEMessage chat events", () => {
     resetChatRing();
     setRingContext({ available: false, topics: [] });
     handleSSEMessage(qc, chatMsg("chat_waiting"));
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledTimes(2);
     expect(spy).toHaveBeenCalledWith({ queryKey: chatInboxKey });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ticketChatKey(116) });
   });
 });
 

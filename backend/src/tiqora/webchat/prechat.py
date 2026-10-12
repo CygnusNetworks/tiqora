@@ -33,10 +33,12 @@ __all__ = [
     "CHECKBOX_NO",
     "CHECKBOX_YES",
     "EMAIL_RE",
+    "IDENTITY_FIELD_TARGETS",
     "MAX_TEXT_LENGTH",
     "MAX_TEXTAREA_LENGTH",
     "PrechatInvalid",
     "PrechatResult",
+    "free_text_customer_id",
     "resolve_chat_customer",
     "validate_prechat",
 ]
@@ -47,8 +49,12 @@ CHECKBOX_YES: Final = "Ja"
 CHECKBOX_NO: Final = "Nein"
 #: Key of the address when ``require_email`` is set and no field maps to ``email``.
 EMAIL_KEY: Final = "email"
+#: ``maps_to`` targets a verified identity supplies (the widget hides them, C9).
+IDENTITY_FIELD_TARGETS: Final = ("name", "email")
 #: Values beyond this are rejected as too long before any cleaning work is done.
 _HARD_CAP: Final = 20_000
+#: ``ticket.customer_id`` is VARCHAR(150); a longer free-text id would raise a DataError.
+MAX_CUSTOMER_ID_LENGTH: Final = 150
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,6 +187,7 @@ def validate_prechat(
     values: Mapping[str, str | bool],
     *,
     require_email: bool = False,
+    identity_fields: bool = False,
 ) -> PrechatResult:
     """Validate the visitor's pre-chat answers; every error is collected, then raised.
 
@@ -190,14 +197,18 @@ def validate_prechat(
     lose control/bidi characters first; an empty optional field is simply absent.
     ``require_email`` (offline form): an address is required even when no field maps to
     ``email`` — then it is read from ``values["email"]``.
+    ``identity_fields`` (a verified identity supplies name and address): fields mapped to
+    ``name`` / ``email`` are neither required nor read, and ``require_email`` is satisfied.
     """
     out = _Collector()
     email_field = next((f for f in fields if f.maps_to == "email"), None)
     for f in fields:
+        if identity_fields and f.maps_to in IDENTITY_FIELD_TARGETS:
+            continue
         required = f.required or (require_email and f is email_field)
         _field_value(f, values.get(f.key), out, required=required)
 
-    if require_email and email_field is None:
+    if require_email and email_field is None and not identity_fields:
         raw = values.get(EMAIL_KEY)
         if raw is not None and not isinstance(raw, str):
             out.errors[EMAIL_KEY] = "type"
@@ -215,6 +226,14 @@ def validate_prechat(
     return PrechatResult(
         name=out.name, email=out.email, df_values=out.df_values, extra_lines=out.extra_lines
     )
+
+
+def free_text_customer_id(value: str | None) -> str | None:
+    """``value`` as a free-text ``ticket.customer_id``, or None when it does not fit the
+    column (the customer user id, VARCHAR(250), still carries it)."""
+    if value and len(value) <= MAX_CUSTOMER_ID_LENGTH:
+        return value
+    return None
 
 
 async def resolve_chat_customer(
@@ -240,8 +259,8 @@ async def resolve_chat_customer(
             )
         ).first()
         if row is not None:
-            return (str(row[1]) if row[1] else email), str(row[0])
-        return email, email
+            return (str(row[1]) if row[1] else free_text_customer_id(email)), str(row[0])
+        return free_text_customer_id(email), email
     if default_customer_user:
         row = (
             await db.execute(

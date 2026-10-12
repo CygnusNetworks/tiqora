@@ -6333,7 +6333,26 @@
         "noneMine": "You have no running chats.",
         "newWaiting": "New chat waiting. Waiting chats: {{count}}",
         "atCapacity": "You already have {{count}} chats.",
-        "maxInvalid": "Please enter a whole number from {{min}} to {{max}}."
+        "maxInvalid": "Please enter a whole number from {{min}} to {{max}}.",
+        "botSection": "Talking to the AI ({{count}})"
+      },
+      "takeover": "Take over",
+      "takeoverHint": "Your reply takes the chat over from the AI.",
+      "bot": {
+        "status": "Talking to the AI",
+        "statusNamed": "Talking to the AI ({{name}})"
+      },
+      "handoff": {
+        "visitor": "Handed over: visitor asked for a person",
+        "ai": "Handed over: the AI passed the chat on",
+        "limit": "Handed over: AI limit reached",
+        "error": "Handed over: AI unreachable",
+        "unavailable": "Handed over: AI unavailable",
+        "takeover": "Taken over by an agent"
+      },
+      "identity": {
+        "website": "Identity confirmed · website sign-in",
+        "portal": "Identity confirmed · customer portal"
       }
     },
     "admin": {
@@ -6352,7 +6371,8 @@
         "prechat": "Pre-chat form",
         "look": "Appearance",
         "protection": "Protection",
-        "embed": "Embed"
+        "embed": "Embed",
+        "ai": "AI"
       },
       "list": {
         "title": "Web chat",
@@ -6400,7 +6420,9 @@
         "offlineForm": "Message form",
         "offlineHide": "Hide chat",
         "defaultCustomer": "Default customer (optional)",
-        "defaultCustomerHint": "Customer user that chats without an email address are assigned to."
+        "defaultCustomerHint": "Customer user that chats without an email address are assigned to.",
+        "offlineAi": "AI answers alone",
+        "offlineAiNeedsTopic": "Available once at least one topic on the \"AI\" tab has \"AI answers first\" switched on."
       },
       "prechat": {
         "hint": "The chat asks for these fields before the conversation starts. “Map to” decides where the answer goes in the ticket.",
@@ -6524,7 +6546,77 @@
         "mapsNameTwice": "Only one field may be mapped to “Name”.",
         "mapsEmailKind": "A field for the email address must be of kind “Email”.",
         "mapsNameKind": "A field for the name must be of kind “Text”.",
-        "dynamicRequired": "Please choose a dynamic field."
+        "dynamicRequired": "Please choose a dynamic field.",
+        "botNameRequired": "Please enter a name for the assistant.",
+        "botNameLong": "The name is too long (at most 80 characters).",
+        "toneLong": "The text is too long (at most 2000 characters)."
+      },
+      "ai": {
+        "intro": "The AI assistant answers a visitor's first messages and hands over to your team when needed. It only answers if the topic's queue allows automatic replies.",
+        "topicsTitle": "AI answers first",
+        "topicMode": "AI answers first: {{topic}}",
+        "modeOff": "Off",
+        "modeOn": "Yes",
+        "noTopicLabel": "(no label)",
+        "nameTitle": "The assistant",
+        "botName": "Assistant name",
+        "botNameHint": "How the AI introduces itself to visitors.",
+        "botTone": "Tone (optional)",
+        "botToneHint": "For example: \"Friendly, short, formal.\" At most 2000 characters.",
+        "statusTitle": "Status per topic",
+        "statusUnsaved": "The status appears after the first save.",
+        "statusNote": "The status reflects the saved state.",
+        "statusLoading": "Loading status …",
+        "statusFailed": "The status could not be loaded.",
+        "ok": "Ready",
+        "queueLink": "Open the queue's AI settings",
+        "queue": "Queue: {{name}}",
+        "reasonUnknown": "The AI is currently not available here ({{code}}).",
+        "reasons": {
+          "ai_mode_off": "\"AI answers first\" is switched off for this topic.",
+          "no_policy": "The queue has no AI settings yet.",
+          "auto_reply_off": "Automatic replies are switched off in the queue's AI settings.",
+          "no_service_user": "The queue's AI settings have no service user.",
+          "autonomy_off": "The queue's autonomy is \"Off\", the AI would only write drafts.",
+          "gate": "AI replies are blocked for this channel.",
+          "paused": "Automatic AI replies are paused right now.",
+          "worker_down": "The AI service (tiqora-ai-worker) is not running right now. New chats go to your team.",
+          "queue_rate_limit": "The queue's hourly limit for AI replies is reached.",
+          "global_rate_limit": "The general hourly limit for AI replies is reached.",
+          "budget_tokens_day": "The queue's daily AI budget is used up.",
+          "llm_unavailable": "No AI model is reachable."
+        }
+      },
+      "identity": {
+        "title": "Website sign-in",
+        "intro": "If your website knows its visitors, it can introduce them to the chat with a signed sign-in. The chat then links them to the right customer and shows \"Identity confirmed\".",
+        "keyTitle": "Key for the website sign-in",
+        "keyNone": "There is no key yet.",
+        "keySet": "A key is set up. For security it is not shown again.",
+        "create": "Create key",
+        "regenerate": "Create a new one",
+        "regenerateConfirm": "Existing sign-ins on your website only work again once you enter the new key there.",
+        "remove": "Remove",
+        "removeConfirm": "Afterwards nobody can sign in through your website. The chat itself keeps working.",
+        "shownOnce": "Only visible now",
+        "shownOnceHint": "Copy the key now and enter it on your server. It will not be shown again.",
+        "secretLabel": "New key",
+        "copy": "Copy",
+        "copied": "Copied.",
+        "copyFailed": "Copying is not possible. Please select the key and copy it with Ctrl/Cmd+C.",
+        "failed": "That did not work. Please try again.",
+        "samplesTitle": "How to sign the sign-in",
+        "samplesHint": "On your server, create a short signed sign-in (HS256) per visitor with an e-mail address or ID, a name and an expiry time. Never print the key in the browser or in the page source.",
+        "samplesCall": "Hand the result to the chat in the browser:",
+        "sampleTabs": "Programming language",
+        "createCustomers": "Create unknown customers",
+        "createCustomersHint": "If the confirmed e-mail address is not a customer yet, Tiqora creates a customer user. Otherwise the address is only noted on the ticket.",
+        "warning": "Whoever knows the key can sign in on your website as any customer."
+      },
+      "portal": {
+        "title": "Customer portal",
+        "show": "Show in the customer portal",
+        "showHint": "Signed-in customers see the chat in the portal and are confirmed in it automatically. Only one chat can be shown in the customer portal."
       }
     }
   },
@@ -6587,7 +6679,16 @@
       "visitor_left": "You have ended the chat.",
       "no_agent": "Nobody is free right now. We will reply to you by email.",
       "no_agentNoEmail": "Nobody is free right now. Where may we send our reply?",
-      "idle_closed": "The chat was closed due to inactivity."
+      "idle_closed": "The chat was closed due to inactivity.",
+      "bot_intro": "{{name}} is an AI assistant and answers your questions.",
+      "handoff": {
+        "visitor": "We are connecting you with a team member.",
+        "ai": "The AI assistant handed the chat over to a team member.",
+        "limit": "The chat was handed over to a team member.",
+        "error": "The AI is not reachable right now. The chat was handed over to a team member.",
+        "unavailable": "The AI is not available right now. The chat was handed over to a team member.",
+        "takeover": "A team member took over the chat."
+      }
     },
     "contact": {
       "title": "Your email address",
@@ -6609,6 +6710,18 @@
     },
     "preview": {
       "reply": "Hello! How can I help you?"
+    },
+    "bot": {
+      "badge": "AI",
+      "typing": "{{name}} is typing …",
+      "status": "{{name}} is answering",
+      "handoff": "Talk to a person",
+      "handoffPending": "Handing over …"
+    },
+    "identity": {
+      "signedIn": "Signed in as {{name}}",
+      "signedInAnon": "Signed in",
+      "invalid": "We could not confirm your sign-in. Please enter your details."
     }
   },
   "plugins": {

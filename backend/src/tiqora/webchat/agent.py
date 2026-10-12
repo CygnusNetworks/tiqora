@@ -86,6 +86,7 @@ from tiqora.webchat.availability import (
     lock_agent_state,
     topic_ref,
 )
+from tiqora.webchat.bot import close_bot_resolved_ticket
 from tiqora.webchat.hub import publish_chat_typing
 from tiqora.webchat.models import ChatConfigValues
 from tiqora.webchat.notify import queue_agent_event, queue_wakeup
@@ -117,6 +118,7 @@ __all__ = [
     "AGENT_TYPING_WINDOW_SECONDS",
     "CHAT_REPLY_CONTENT_TYPE",
     "CLOSED_STATE_NAME",
+    "INBOX_BOT_LIMIT",
     "INBOX_WAITING_LIMIT",
     "ChatNotLive",
     "RwQueues",
@@ -140,6 +142,7 @@ CLOSED_STATE_NAME: Final = "closed successful"
 #: Waiting chats listed in the inbox (oldest first), counted after the ``rw`` filter. All
 #: waiting rows are loaded: the sweep ends them after ``wait_timeout_seconds`` (≤ 1 h).
 INBOX_WAITING_LIMIT: Final = 200
+INBOX_BOT_LIMIT: Final = 200
 #: An agent reply is stored as plain text (the transcript is plain text end-to-end).
 CHAT_REPLY_CONTENT_TYPE: Final = "text/plain; charset=utf-8"
 #: At most one agent typing signal per chat per window (``ChatRateLimiter.try_hit``).
@@ -296,8 +299,9 @@ async def list_agent_topics(
 
 
 async def list_inbox(db: AsyncSession, *, user_id: int) -> ChatInboxOut:
-    """Waiting chats in queues the agent holds ``rw`` on (the ticket's CURRENT queue) and
-    the agent's own active chats; ``tn``/``title`` from the ticket (IN-list read)."""
+    """Waiting chats in queues the agent holds ``rw`` on (the ticket's CURRENT queue), the
+    agent's own active chats and the chats the AI is answering (``bot``, same ``rw`` filter,
+    newest first); ``tn``/``title`` from the ticket (IN-list read)."""
     waiting_rows = list(
         (
             await db.execute(
@@ -326,7 +330,22 @@ async def list_inbox(db: AsyncSession, *, user_id: int) -> ChatInboxOut:
         .scalars()
         .all()
     )
-    all_rows = [*waiting_rows, *mine_rows]
+    bot_rows = list(
+        (
+            await db.execute(
+                select(TiqoraChatSession)
+                .where(
+                    TiqoraChatSession.status == "bot",
+                    TiqoraChatSession.purged_at.is_(None),
+                )
+                .order_by(TiqoraChatSession.created.desc(), TiqoraChatSession.id.desc())
+                .limit(INBOX_BOT_LIMIT * 5)  # bot chats are short; rw filtering is below
+            )
+        )
+        .scalars()
+        .all()
+    )
+    all_rows = [*waiting_rows, *mine_rows, *bot_rows]
     tickets = await _ticket_rows(db, (int(c.ticket_id) for c in all_rows))
     configs = await _configs(db, (int(c.config_id) for c in all_rows))
     values = {cid: config_values(cfg) for cid, cfg in configs.items()}
@@ -340,7 +359,9 @@ async def list_inbox(db: AsyncSession, *, user_id: int) -> ChatInboxOut:
             title=ticket["title"],
             topic_label=_topic_label(values.get(int(chat.config_id)), chat.topic_key),
             visitor_name=chat.visitor_name,
-            status="active" if chat.status == "active" else "waiting",
+            status="active"
+            if chat.status == "active"
+            else ("bot" if chat.status == "bot" else "waiting"),
             waiting_since=chat.waiting_since,
             accepted_at=chat.accepted_at,
         )
@@ -357,7 +378,14 @@ async def list_inbox(db: AsyncSession, *, user_id: int) -> ChatInboxOut:
         for chat in mine_rows
         if int(chat.ticket_id) in tickets
     ]
-    return ChatInboxOut(waiting=waiting, mine=mine)
+    bot: list[ChatInboxItemOut] = []
+    for chat in bot_rows:
+        ticket = tickets.get(int(chat.ticket_id))
+        if ticket is not None and await rw.allows(int(ticket["queue_id"])):
+            bot.append(item(chat, ticket))
+            if len(bot) >= INBOX_BOT_LIMIT:
+                break
+    return ChatInboxOut(waiting=waiting, mine=mine, bot=bot)
 
 
 # -- accept --------------------------------------------------------------------------------
@@ -367,6 +395,10 @@ async def accept_session(
     db: AsyncSession, sysconfig: SysConfig, *, session_id: str, user_id: int, now: datetime
 ) -> TiqoraChatSession:
     """First accept wins: the chat becomes ``active`` with *user_id* as its agent.
+
+    A chat the AI is still answering (``bot``) may be taken over the same way: it also records
+    ``handoff_at`` / ``handoff_reason = "takeover"`` (no AI escalation mark — the status change
+    alone stops the bot, and the ticket is not parked as bot-resolved afterwards).
 
     Run it at the START of a transaction — ``RuntimeError`` when the session is already in
     one (see the module docstring: the agent-state locking read must come before the
@@ -404,20 +436,30 @@ async def accept_session(
     locked = await get_chat_session(db, session_id, for_update=True)
     if locked is None or locked.purged_at is not None:
         raise ChatError("not_found", 404)
-    if locked.status != "waiting":
+    if locked.status not in ("waiting", "bot"):
         raise _refusal_for(locked.status)
+    takeover = locked.status == "bot"
     # (3) the ticket row, locked: its newest queue (MariaDB snapshot may predate a move)
     queue_id = await current_queue_id(db, locked, lock_ticket_row=True)
     if not await rw.allows(queue_id):
         raise ChatError("forbidden", 403)
+    values: dict[str, Any] = {"status": "active", "assigned_user_id": user_id, "accepted_at": now}
+    if takeover:
+        values.update(handoff_at=now, handoff_reason="takeover")
     result = await db.execute(
         update(TiqoraChatSession)
-        .where(TiqoraChatSession.id == locked.id, TiqoraChatSession.status == "waiting")
-        .values(status="active", assigned_user_id=user_id, accepted_at=now)
+        .where(
+            TiqoraChatSession.id == locked.id,
+            TiqoraChatSession.status.in_(("waiting", "bot")),
+        )
+        .values(**values)
         .execution_options(synchronize_session=False)
     )
     if getattr(result, "rowcount", 1) != 1:  # unreachable while the row lock is held
         raise ChatError("already_taken", 409)
+    if takeover:
+        set_committed_value(locked, "handoff_at", now)
+        set_committed_value(locked, "handoff_reason", "takeover")
     set_committed_value(locked, "status", "active")
     set_committed_value(locked, "assigned_user_id", user_id)
     set_committed_value(locked, "accepted_at", now)
@@ -485,12 +527,16 @@ async def end_session_by_agent(
     if not may_write and (not own_chat or close_ticket):
         raise ChatError("forbidden", 403)
 
+    was_bot = locked.status == "bot"
     locked.status = "ended"
     locked.end_reason = "agent"
     locked.ended_at = now
     await db.flush([locked])
 
     ticket_id = int(locked.ticket_id)
+    if was_bot and not close_ticket:
+        # A chat the bot answered alone parks its ticket like a visitor's goodbye would.
+        await close_bot_resolved_ticket(db, sysconfig, chat=locked)
     if close_ticket:
         state_id = await closed_state_id(db)
         if state_id is None:
@@ -542,8 +588,9 @@ def agent_chat_body(body: str, content_type: str, attachment_names: Sequence[str
 async def accept_waiting_chat_for_reply(
     db: AsyncSession, sysconfig: SysConfig, *, ticket_id: int, user_id: int, now: datetime
 ) -> None:
-    """R-REPLY-ACCEPT-FIRST: the ticket's chat is still ``waiting`` → *user_id* accepts it
-    in its own transaction, committed before the reply's write transaction starts.
+    """R-REPLY-ACCEPT-FIRST: the ticket's chat is still ``waiting`` (or the AI is still
+    answering it, ``bot`` — an agent reply is a takeover) → *user_id* accepts it in its own
+    transaction, committed before the reply's write transaction starts.
 
     Call it with NO transaction open on *db* (``RuntimeError`` otherwise); it ends every
     transaction it starts (commit or rollback). The caller publishes the queued accept
@@ -557,7 +604,7 @@ async def accept_waiting_chat_for_reply(
     if db.in_transaction():
         raise RuntimeError("accept_waiting_chat_for_reply needs a session without a transaction")
     chat = await live_session_for_ticket(db, ticket_id)
-    if chat is None or chat.status != "waiting":
+    if chat is None or chat.status not in ("waiting", "bot"):
         await db.rollback()
         return
     session_id = chat.id
@@ -699,13 +746,18 @@ async def ticket_chat_info(
         raise ChatError("not_found", 404)
     cfg = (await _configs(db, [int(chat.config_id)])).get(int(chat.config_id))
     assigned = chat.assigned_user_id
+    ai_took_part = chat.status == "bot" or chat.bot_outcome is not None
     return TicketChatOut(
         session_id=chat.id,
         status=chat.status,
         end_reason=chat.end_reason,
         visitor_name=chat.visitor_name,
         visitor_email=chat.visitor_email,
-        visitor_email_verified=False,
+        visitor_email_verified=chat.identity_source is not None and chat.visitor_email is not None,
+        identity_source=chat.identity_source,
+        handoff_reason=chat.handoff_reason,
+        handoff_at=chat.handoff_at,
+        bot_name=config_values(cfg).bot_name if cfg is not None and ai_took_part else None,
         topic_label=_topic_label(config_values(cfg) if cfg else None, chat.topic_key),
         page_url=chat.page_url,
         language=chat.language,

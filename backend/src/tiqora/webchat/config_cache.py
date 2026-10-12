@@ -10,7 +10,8 @@ same process (``PUT /admin/channels/webchat``, chat-config create/update/delete/
 a change made elsewhere (direct DB edit, another API replica) applies after at most 10 s.
 
 Entries hold a detached copy of the row with the columns the services read (``id``, ``name``,
-``public_key``, ``valid``) plus the typed values; nothing here is ever added to a session.
+``public_key``, ``valid``, encrypted ``identity_secret``) plus the typed values; nothing here
+is ever added to a session.
 """
 
 from __future__ import annotations
@@ -39,7 +40,15 @@ class CachedConfig:
 
 
 def _snapshot(row: TiqoraChatConfig) -> CachedConfig:
-    copy = TiqoraChatConfig(id=row.id, name=row.name, public_key=row.public_key, valid=row.valid)
+    # identity_secret stays encrypted; it is decrypted only by visitor_identity.website_secret,
+    # so the pre-auth path needs no extra DB read (a rotated secret applies within the TTL).
+    copy = TiqoraChatConfig(
+        id=row.id,
+        name=row.name,
+        public_key=row.public_key,
+        valid=row.valid,
+        identity_secret=row.identity_secret,
+    )
     return CachedConfig(config=copy, values=config_values(row))
 
 

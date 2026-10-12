@@ -50,6 +50,7 @@ const config: ChatConfig = {
   id: 1,
   name: "Website",
   valid: true,
+  identity_secret_set: false,
   public_key: "wc_key",
   embed_snippet: "<script></script>",
   session_count: 12,
@@ -58,7 +59,7 @@ const config: ChatConfig = {
   values: {
     ...completeValues(defaultValues()),
     allowed_origins: ["https://www.example.org"],
-    topics: [{ key: "support", label: "Support", queue_id: 1, priority_id: null }],
+    topics: [{ key: "support", label: "Support", queue_id: 1, priority_id: null, ai_mode: "off" }],
   },
 };
 

@@ -233,3 +233,167 @@ test("host API opens and reports messages without content", async ({ page, reque
   );
   expect(leaked).not.toMatch(/token|\.[A-Za-z0-9_-]{30,}/);
 });
+
+// ---- chat assistant and website sign-in (Task 14) -------------------------------------------
+
+const HANDOFF = "Mit einem Menschen sprechen";
+const sessionState = async (request: APIRequestContext) =>
+  (await (await request.get(`${TIQORA}/__test/session`)).json()) as {
+    status: string;
+    identity: { sub: string; name: string | null } | null;
+    messages: { seq: number; sender: string; code: string | null; body: string | null }[];
+  };
+
+/** Waits for the launcher (= the frame said `ready`), then lets the customer site sign the visitor in or out. */
+async function hostAction(page: Page, id: "identify" | "identify-other" | "identify-bad" | "logout") {
+  await expect(page.getByRole("button", { name: LAUNCHER })).toBeVisible();
+  // dispatched: the open chat panel may sit above the customer site's own controls
+  await page.locator(`#${id}`).dispatchEvent("click");
+}
+
+/** Sends the first line from the pre-chat form of an anonymous visitor. */
+async function startAnonymousChat(page: Page, text = "Wie setze ich mein Passwort zurück?") {
+  await page.goto(HOST);
+  await page.getByRole("button", { name: LAUNCHER }).click();
+  const frame = frameOf(page);
+  await frame.getByLabel("Name").fill("Erika Muster");
+  await frame.getByLabel("Ihre Nachricht").fill(text);
+  await frame.getByRole("button", { name: "Chat starten" }).click();
+  return frame;
+}
+
+test("bot answers first and hands over on request", async ({ page, request }) => {
+  await hook(request, "bot", { on: true });
+  const frame = await startAnonymousChat(page);
+  await expect(frame.getByText("Robin ist ein KI-Assistent und beantwortet Ihre Fragen.")).toBeVisible();
+  const botLine = frame.locator(".tq-other", { hasText: "Das beantworte ich gern (1)." });
+  await expect(botLine).toHaveCount(1);
+  await expect(botLine.locator(".tq-name")).toContainText("Robin");
+  await expect(botLine.locator(".tq-ai")).toHaveText("KI");
+  await frame.getByRole("button", { name: HANDOFF }).click();
+  await expect(frame.getByText("Wir verbinden Sie mit einem Mitarbeiter.")).toBeVisible();
+  await expect(frame.getByRole("button", { name: HANDOFF })).toHaveCount(0);
+  const s = await sessionState(request);
+  expect(s.status).toBe("waiting");
+  expect(s.messages.at(-1)).toMatchObject({ sender: "system", code: "handoff" });
+  // the agent answers in the same chat afterwards
+  await agentSays(request, "Hallo, hier ist ein Mensch");
+  await expect(frame.getByText("Hallo, hier ist ein Mensch")).toBeVisible();
+});
+
+test("signed-in visitor skips name and e-mail", async ({ page, request }) => {
+  await page.goto(HOST);
+  await hostAction(page, "identify");
+  await page.getByRole("button", { name: LAUNCHER }).click();
+  const frame = frameOf(page);
+  await expect(frame.getByText("Angemeldet als Erika Muster")).toBeVisible();
+  await expect(frame.getByLabel("Name")).toHaveCount(0);
+  await expect(frame.getByLabel("E-Mail")).toHaveCount(0);
+  await frame.getByLabel("Ihre Nachricht").fill("Ich bin schon angemeldet");
+  await frame.getByRole("button", { name: "Chat starten" }).click();
+  await expect(frame.getByText("Ich bin schon angemeldet")).toBeVisible();
+  await expect(frame.locator(".tq-signed")).toHaveText("Angemeldet als Erika Muster");
+  expect((await sessionState(request)).identity).toEqual({ sub: "cust-1", name: "Erika Muster" });
+});
+
+test("a bad sign-in token is refused and the visitor is asked for the details", async ({ page, request }) => {
+  await page.goto(HOST);
+  await hostAction(page, "identify-bad");
+  await page.getByRole("button", { name: LAUNCHER }).click();
+  const frame = frameOf(page);
+  await frame.getByLabel("Ihre Nachricht").fill("Hallo");
+  await frame.getByRole("button", { name: "Chat starten" }).click();
+  await expect(frame.getByText("Die Anmeldung konnte nicht bestätigt werden.")).toBeVisible();
+  expect((await request.get(`${TIQORA}/__test/last-session`).then((r) => r.json())).session_id).toBeNull();
+  // anonymous again: the name field is back and the chat starts
+  await frame.getByLabel("Name").fill("Erika Muster");
+  await frame.getByRole("button", { name: "Chat starten" }).click();
+  await expect(frame.getByText("Hallo", { exact: true })).toBeVisible();
+  expect((await sessionState(request)).identity).toBeNull();
+});
+
+test("a running chat that belongs to somebody else starts fresh after a sign-in", async ({ page, request }) => {
+  const frame = await startChat(page);
+  await hostAction(page, "identify"); // attaches the chat to cust-1
+  await expect(frame.locator(".tq-signed")).toHaveText("Angemeldet als Erika Muster");
+  expect((await sessionState(request)).identity?.sub).toBe("cust-1");
+  await page.locator("#identify-other").dispatchEvent("click"); // another customer: identity_conflict
+  await expect(frame.getByText("Bevor es losgeht")).toBeVisible();
+  await expect(frame.getByText("Ich brauche Hilfe")).toHaveCount(0);
+});
+
+test("logout on a shared computer starts fresh", async ({ page }) => {
+  await page.goto(HOST);
+  await hostAction(page, "identify");
+  await page.getByRole("button", { name: LAUNCHER }).click();
+  const frame = frameOf(page);
+  await frame.getByLabel("Ihre Nachricht").fill("Vertrauliche Frage");
+  await frame.getByRole("button", { name: "Chat starten" }).click();
+  await expect(frame.getByText("Vertrauliche Frage")).toBeVisible();
+  await page.locator("#logout").dispatchEvent("click");
+  // the transcript is gone at once, the pre-chat form asks for the details again
+  await expect(frame.getByText("Vertrauliche Frage")).toHaveCount(0);
+  await expect(frame.getByText("Bevor es losgeht")).toBeVisible();
+  await expect(frame.getByLabel("Name")).toBeVisible();
+  // a new page view of the next person on this computer does not bring the chat back
+  await page.reload();
+  await page.getByRole("button", { name: LAUNCHER }).click();
+  await expect(frameOf(page).getByText("Bevor es losgeht")).toBeVisible();
+  await expect(frameOf(page).getByText("Vertrauliche Frage")).toHaveCount(0);
+});
+
+test("a signed-in chat is not restored on a page view without a fresh sign-in", async ({ page }) => {
+  await page.goto(HOST);
+  await hostAction(page, "identify");
+  await page.getByRole("button", { name: LAUNCHER }).click();
+  const frame = frameOf(page);
+  await frame.getByLabel("Ihre Nachricht").fill("Meine Rechnung");
+  await frame.getByRole("button", { name: "Chat starten" }).click();
+  await expect(frame.getByText("Meine Rechnung")).toBeVisible();
+  await expect(frame.locator(".tq-signed")).toBeVisible(); // the server confirmed who the chat belongs to
+  await page.reload(); // the host does not sign in again
+  await page.getByRole("button", { name: LAUNCHER }).click();
+  await expect(frameOf(page).getByText("Bevor es losgeht")).toBeVisible();
+  await expect(frameOf(page).getByText("Meine Rechnung")).toHaveCount(0);
+});
+
+test("reconnect during a bot turn keeps one answer", async ({ page, request }) => {
+  await hook(request, "bot", { on: true, hold: true });
+  const frame = await startAnonymousChat(page);
+  await expect(frame.getByText("Robin schreibt")).toBeVisible(); // the bot is typing, its line is parked
+  const dropped = await (await hook(request, "drop-streams")).json();
+  expect(dropped.dropped).toBeGreaterThan(0);
+  const released = await (await hook(request, "bot-release")).json(); // the line lands while the stream is down
+  expect(released.released).toBe(1);
+  await expect(frame.getByText("Das beantworte ich gern (1).")).toHaveCount(1);
+  await page.waitForTimeout(2500); // a late replay would double it
+  await expect(frame.getByText("Das beantworte ich gern (1).")).toHaveCount(1);
+  expect((await sessionState(request)).messages.filter((m) => m.sender === "bot")).toHaveLength(1);
+});
+
+test("the handover button is reachable with the keyboard alone", async ({ page, request }) => {
+  await hook(request, "bot", { on: true });
+  const frame = await startAnonymousChat(page);
+  await expect(frame.getByText("Das beantworte ich gern (1).")).toBeVisible();
+  const button = frame.getByRole("button", { name: HANDOFF });
+  await expect(button).toHaveAccessibleName(HANDOFF);
+  await frame.locator(".tq-input").focus();
+  let reached = false;
+  for (let i = 0; i < 6 && !reached; i++) {
+    await page.keyboard.press("Tab");
+    reached = await button.evaluate((el) => el === el.ownerDocument.activeElement);
+  }
+  expect(reached, "Tab never reached the handover button").toBe(true);
+  await page.keyboard.press("Enter");
+  await expect(frame.getByText("Wir verbinden Sie mit einem Mitarbeiter.")).toBeVisible();
+  expect((await sessionState(request)).status).toBe("waiting");
+});
+
+test("a portal customer is recognised without the host", async ({ page, request }) => {
+  await hook(request, "portal", { token: "e30.eyJuYW1lIjoiRXJpa2EgTXVzdGVyIiwic3ViIjoiY3VzdC0xIn0.mocksig", name: "Erika Muster" });
+  await page.goto(HOST);
+  await page.getByRole("button", { name: LAUNCHER }).click();
+  const frame = frameOf(page);
+  await expect(frame.getByText("Angemeldet als Erika Muster")).toBeVisible();
+  await expect(frame.getByLabel("Name")).toHaveCount(0);
+});

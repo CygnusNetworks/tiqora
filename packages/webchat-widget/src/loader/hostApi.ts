@@ -4,15 +4,17 @@
  * out carry no message text and no session data, only `{online}` / `{sender}` style facts.
  */
 
-export type HostEvent = "ready" | "open" | "close" | "message" | "availability";
+export type HostEvent = "ready" | "open" | "close" | "message" | "availability" | "identity";
 
-export const HOST_EVENTS: readonly HostEvent[] = ["ready", "open", "close", "message", "availability"];
+export const HOST_EVENTS: readonly HostEvent[] = ["ready", "open", "close", "message", "availability", "identity"];
 
 export type HostApiImpl = {
   open(): void;
   close(): void;
   toggle(): void;
   setTopic(key: string): void;
+  identify(token: string): void;
+  logout(): void;
   on(event: HostEvent, cb: (detail: unknown) => void): () => void;
 };
 
@@ -53,7 +55,7 @@ export function createEvents(): { on: HostApiImpl["on"]; emit(event: HostEvent, 
 
 /**
  * Adds `chat` to `window.Tiqora` and touches no other key of it (the host or another
- * Tiqora widget may own the object). The exposed object holds exactly these five
+ * Tiqora widget may own the object). The exposed object holds exactly these seven
  * functions, bound to nothing the page could reach.
  */
 export function installHostApi(win: Window, impl: HostApiImpl): void {
@@ -62,6 +64,8 @@ export function installHostApi(win: Window, impl: HostApiImpl): void {
     close: () => impl.close(),
     toggle: () => impl.toggle(),
     setTopic: (key: string) => impl.setTopic(String(key)),
+    identify: (token: string) => impl.identify(token as string),
+    logout: () => impl.logout(),
     on: (event: HostEvent, cb: Cb) => impl.on(event, cb),
   });
   const w = win as unknown as { Tiqora?: Record<string, unknown> };

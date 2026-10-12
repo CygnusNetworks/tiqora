@@ -1349,3 +1349,44 @@ async def test_webchat_customer_article_is_never_auto_replied(
         assert totals["auto_replies"] == 0
     finally:
         await engine.dispose()
+
+
+async def test_outbox_tick_still_skips_webchat(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``webchat`` is a Tiqora-only channel for the chat bot, but the outbox tick never answers
+    a chat article: AUTO_REPLY_SKIP_CHANNELS is checked first, even in parallel operation."""
+    from unittest.mock import AsyncMock
+
+    seed = _seed_ticket(mariadb_znuny_url, ns=49)
+    article_id = _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Hi, chat"
+    )
+    _insert_outbox_event(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        event_type="ArticleCreate",
+        article_id=article_id,
+        channel="webchat",
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+            await set_operation_mode(session, OPERATION_MODE_PARALLEL)
+
+        process = AsyncMock(return_value=None)
+        runtime = AsyncMock()
+        monkeypatch.setattr("tiqora.ai.auto_worker._process_customer_article_event", process)
+        monkeypatch.setattr("tiqora.ai.auto_worker.run_ticket_agent", runtime)
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        assert totals["skipped_channel"] == 1
+        assert totals["tiqora_only_replies"] == 0
+        assert totals["auto_replies"] == 0
+        assert [
+            c for c in process.await_args_list if c.args[2].ticket_id == seed["ticket_id"]
+        ] == []
+        runtime.assert_not_awaited()
+    finally:
+        await engine.dispose()

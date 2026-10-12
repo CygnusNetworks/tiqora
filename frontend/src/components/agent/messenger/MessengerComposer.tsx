@@ -6,6 +6,7 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/cn";
 import { useComposerLock } from "@/lib/composerLock";
 import { ticketAiApi } from "@/lib/ticketAiApi";
+import { useTicketChat } from "@/lib/webchatApi";
 import { ComposerLockBanner } from "../ComposerLock";
 import {
   defaultPendingDate,
@@ -94,6 +95,7 @@ export function MessengerComposer({
   const primaryNext: NextState =
     hasResolveButtons && nextOptions.includes("autoclose") ? "autoclose" : next.defaultNext;
   const recipientName = adapter.useRecipientName(ticketId);
+  const assistantLed = useTicketChat(ticketId, adapter.channel === "webchat").data?.status === "bot";
   const customerLanguage = adapter.useCustomerLanguage?.(ticketId) ?? null;
   const aiQ = useQuery({
     queryKey: ["tickets", ticketId, "ai"],
@@ -435,6 +437,12 @@ export function MessengerComposer({
 
       {adapter.supportsButtons && buttonsOn && (
         <ButtonEditor buttons={buttons} onChange={setButtons} onPreset={applyPreset} onClose={closeButtons} />
+      )}
+
+      {assistantLed && (
+        <p className="text-xs text-muted" data-testid="webchat-takeover-hint">
+          {t("webchat.agent.takeoverHint")}
+        </p>
       )}
 
       <div className="relative flex items-end gap-2">

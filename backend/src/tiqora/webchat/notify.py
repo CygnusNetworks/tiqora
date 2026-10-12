@@ -4,7 +4,8 @@ A wake published before the commit would make a visitor stream re-read the DB an
 nothing, and an event for rolled-back work would ring agents for a chat that does not
 exist. So the session services only *queue* notifications on the ``AsyncSession``:
 
-- ``queue_wakeup`` / ``queue_agent_event`` add to ``db.info`` (pending, this transaction);
+- ``queue_wakeup`` / ``queue_agent_event`` / ``queue_bot_turn`` add to ``db.info`` (pending,
+  this transaction);
 - when the outermost transaction COMMITS, the pending items become ready;
 - when it ends any other way (rollback, close), the pending items are dropped;
 - the caller publishes the ready items with ``flush_chat_notifications(db, redis)`` after
@@ -15,6 +16,10 @@ Queue OUTSIDE savepoints: an item queued inside a SAVEPOINT that is rolled back 
 outer transaction commits is still published (only the outermost commit/rollback is
 tracked). The session service queues only after its SAVEPOINT succeeded; agent-side and
 sweep callers must do the same.
+
+A bot turn is published as ``RPUSH`` of the session id on ``BOT_QUEUE_KEY`` (the AI worker's
+bot loop pops it), deduplicated by ``SET tiqora:chat:bot:queued:<sid> NX EX 120``. The loop
+also rescans the database every 15 s, so a lost push only delays a turn.
 
 Agent events carry ids only (``tiqora.events.pubsub.publish_chat_event``); visitor data
 never reaches Redis.
@@ -37,7 +42,12 @@ logger = structlog.get_logger(__name__)
 WAKEUPS_KEY: Final = "tiqora.webchat.wakeups"
 AGENT_EVENTS_KEY: Final = "tiqora.webchat.agent_events"
 _READY_WAKEUPS_KEY: Final = "tiqora.webchat.ready_wakeups"
+BOT_TURNS_KEY: Final = "tiqora.webchat.bot_turns"
 _READY_EVENTS_KEY: Final = "tiqora.webchat.ready_agent_events"
+_READY_BOT_TURNS_KEY: Final = "tiqora.webchat.ready_bot_turns"
+BOT_QUEUE_KEY: Final = "tiqora:chat:bot:queue"  # Redis list of session ids
+BOT_QUEUED_PREFIX: Final = "tiqora:chat:bot:queued:"
+BOT_QUEUED_TTL_SECONDS: Final = 120
 _HOOKED_KEY: Final = "tiqora.webchat.notify_hooked"
 
 
@@ -52,6 +62,10 @@ def _on_commit(session: Session) -> None:
     events = session.info.pop(AGENT_EVENTS_KEY, None)
     if events:
         session.info.setdefault(_READY_EVENTS_KEY, []).extend(events)
+    turns = session.info.pop(BOT_TURNS_KEY, None)
+    if turns:
+        ready_turns = session.info.setdefault(_READY_BOT_TURNS_KEY, [])
+        ready_turns.extend(t for t in turns if t not in ready_turns)
 
 
 def _on_transaction_end(session: Session, transaction: SessionTransaction) -> None:
@@ -61,11 +75,13 @@ def _on_transaction_end(session: Session, transaction: SessionTransaction) -> No
         return
     dropped_w = session.info.pop(WAKEUPS_KEY, None)
     dropped_e = session.info.pop(AGENT_EVENTS_KEY, None)
-    if dropped_w or dropped_e:
+    dropped_b = session.info.pop(BOT_TURNS_KEY, None)
+    if dropped_w or dropped_e or dropped_b:
         logger.info(
             "webchat_notifications_dropped",
             wakeups=len(dropped_w or ()),
             agent_events=len(dropped_e or ()),
+            bot_turns=len(dropped_b or ()),
         )
 
 
@@ -96,10 +112,19 @@ def queue_agent_event(db: AsyncSession, payload: dict[str, Any]) -> None:
     db.info.setdefault(AGENT_EVENTS_KEY, []).append(dict(payload))
 
 
+def queue_bot_turn(db: AsyncSession, session_id: str) -> None:
+    """Ask the AI worker for a bot turn of *session_id* after this transaction commits."""
+    _hook(db)
+    pending: list[str] = db.info.setdefault(BOT_TURNS_KEY, [])
+    if session_id not in pending:
+        pending.append(session_id)
+
+
 async def flush_chat_notifications(db: AsyncSession, client: Any) -> None:
     """Publish what committed transactions queued; never raises (best-effort like pub/sub)."""
     wakeups: list[str] = db.info.pop(_READY_WAKEUPS_KEY, None) or []
     events: list[dict[str, Any]] = db.info.pop(_READY_EVENTS_KEY, None) or []
+    bot_turns: list[str] = db.info.pop(_READY_BOT_TURNS_KEY, None) or []
     for session_id in wakeups:
         try:
             await publish_chat_wake(client, session_id)
@@ -119,3 +144,14 @@ async def flush_chat_notifications(db: AsyncSession, client: Any) -> None:
             )
         except Exception:  # noqa: BLE001 - a malformed payload must not break the request
             logger.warning("webchat_agent_event_publish_failed", event_type=payload.get("type"))
+    for session_id in bot_turns:
+        try:
+            # The dedupe key keeps a burst of lines to one queue entry; a turn that starts
+            # after it expires re-reads ``last_visitor_seq`` anyway.
+            fresh = await client.set(
+                f"{BOT_QUEUED_PREFIX}{session_id}", "1", ex=BOT_QUEUED_TTL_SECONDS, nx=True
+            )
+            if fresh:
+                await client.rpush(BOT_QUEUE_KEY, session_id)
+        except Exception:  # noqa: BLE001 - the bot loop rescans the database every 15 s
+            logger.warning("webchat_bot_turn_publish_failed")

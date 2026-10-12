@@ -198,7 +198,9 @@ async def test_config_ok_and_leaks_nothing(env: Env) -> None:
     assert res.status_code == 200
     body = res.json()
     assert body["online"] is True
-    assert body["topics"] == [{"key": "support", "label": "Support", "online": True}]
+    assert body["topics"] == [
+        {"key": "support", "label": "Support", "online": True, "ai_first": False}
+    ]
     assert body["max_message_length"] == 2000
     assert body["upload"]["enabled"] is True
     assert {f["key"] for f in body["prechat_fields"]} == {"name", "email"}
@@ -383,6 +385,10 @@ async def test_session_flow_and_shapes(env: Env) -> None:
             "can_send": True,
             "needs_contact": False,
             "last_seq": 2,
+            "identified_as": None,
+            "identified": False,
+            "bot_name": None,
+            "can_handoff": False,
         }
         # Agent bus: chat_waiting + chat_message with the ticket's queue, ids only.
         events = [json.loads(m) for c, m in env.redis.published if c == TIQORA_EVENTS_CHANNEL]

@@ -157,7 +157,7 @@ export function GeneralTab({
           size="sm"
           data-testid="webchat-topic-add"
           disabled={v.topics.length >= 20}
-          onClick={() => setTopics([...v.topics, { key: "", label: "", queue_id: 0, priority_id: null }])}
+          onClick={() => setTopics([...v.topics, { key: "", label: "", queue_id: 0, priority_id: null, ai_mode: "off" }])}
         >
           {t("webchat.admin.general.addTopic")}
         </Button>

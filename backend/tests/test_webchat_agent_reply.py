@@ -202,6 +202,7 @@ async def _start(env: Env, n: int, *, email: str | None = None) -> tuple[TiqoraC
             ),
             ctx=CTX,
             now=NOW,
+            settings=get_settings(),
         )
         await db.commit()
         return chat, token

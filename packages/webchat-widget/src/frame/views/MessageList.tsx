@@ -64,6 +64,8 @@ export function MessageList(props: {
   pending: PendingMessage[];
   t: Translate;
   agentTyping: boolean;
+  typingBot: boolean;
+  botName: string;
   needsContact: boolean;
   onRetry: (clientId: string) => void;
   onContact: (email: string) => Promise<string | null>;
@@ -88,11 +90,14 @@ export function MessageList(props: {
           let key = `system.${code}`;
           if (code === "no_agent" && m.params?.has_email === false) key = "system.no_agentNoEmail";
           if (code === "agent_joined" && !m.params?.name) key = "system.agent_joinedAnon";
+          if (code === "handoff") key = `system.handoff.${String(m.params?.reason ?? "")}`;
           const line = t(key, { name: String(m.params?.name ?? "") });
           if (line === key) return null; // unknown code: nothing sensible to show
+          const notice = code === "bot_intro" && typeof m.params?.notice === "string" ? m.params.notice : "";
           return (
             <div key={m.seq}>
               <p class="tq-sys">{line}</p>
+              {notice && <p class="tq-sys">{notice}</p>}
               {i === lastNoMail && props.needsContact && <ContactPrompt t={t} onSave={props.onContact} />}
             </div>
           );
@@ -100,7 +105,13 @@ export function MessageList(props: {
         const own = m.sender === "visitor";
         return (
           <div key={m.seq} class={own ? "tq-msg tq-own" : "tq-msg tq-other"}>
-            {!own && <span class="tq-name">{m.agent_name || t("header.support")}</span>}
+            {m.sender === "bot" ? (
+              <span class="tq-name">
+                {m.agent_name || props.botName || t("header.support")} <span class="tq-ai">{t("bot.badge")}</span>
+              </span>
+            ) : (
+              !own && <span class="tq-name">{m.agent_name || t("header.support")}</span>
+            )}
             <div class="tq-bubble">
               {m.body ? <MessageText text={m.body} /> : null}
               {m.attachments.map((a) => (
@@ -128,7 +139,7 @@ export function MessageList(props: {
       ))}
       {props.agentTyping && (
         <p class="tq-typing" role="status">
-          {t("typing")}
+          {props.typingBot ? t("bot.typing", { name: props.botName }) : t("typing")}
         </p>
       )}
       <div ref={end} />

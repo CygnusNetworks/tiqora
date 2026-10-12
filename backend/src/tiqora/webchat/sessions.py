@@ -36,7 +36,7 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import structlog
 from sqlalchemy import text, update
@@ -44,6 +44,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm.attributes import set_committed_value
 
+from tiqora.ai.policies import get_queue_policy_by_queue
+from tiqora.config import Settings
 from tiqora.db.tiqora.models import (
     TiqoraChatConfig,
     TiqoraChatMessage,
@@ -64,9 +66,10 @@ from tiqora.domain.ticket_write_service import (
 )
 from tiqora.jobs.service import utc_now
 from tiqora.webchat.availability import eligible_agent_ids, topic_ref, within_business_hours
+from tiqora.webchat.bot import bot_availability, close_bot_resolved_ticket
 from tiqora.webchat.models import ChatConfigValues, ChatTopic, PrechatField
-from tiqora.webchat.notify import queue_agent_event, queue_wakeup
-from tiqora.webchat.origins import origin_allowed
+from tiqora.webchat.notify import queue_agent_event, queue_bot_turn, queue_wakeup
+from tiqora.webchat.origins import effective_allowed_origins, origin_allowed
 from tiqora.webchat.prechat import (
     CHECKBOX_NO,
     CHECKBOX_YES,
@@ -94,6 +97,9 @@ from tiqora.webchat.tokens import VISITOR_ID_RE, issue_visitor_token, new_sessio
 from tiqora.webchat.uploads import UploadRejected, check_upload
 from tiqora.znuny.sysconfig import SysConfig
 
+if TYPE_CHECKING:
+    from tiqora.webchat.visitor_identity import ResolvedIdentity
+
 __all__ = [
     "ARTICLE_CHANNEL",
     "CHANNEL",
@@ -111,6 +117,8 @@ __all__ = [
     "create_session",
     "current_queue_id",
     "end_by_visitor",
+    "lock_session",
+    "post_bot_intro",
     "post_visitor_attachment",
     "post_visitor_message",
     "set_contact",
@@ -245,8 +253,11 @@ def _pick_topic(values: ChatConfigValues, key: str | None) -> ChatTopic:
     return topic
 
 
-def _check_origin(origin: str, values: ChatConfigValues) -> None:
-    if not origin_allowed(origin, values.allowed_origins):
+def check_origin(origin: str, values: ChatConfigValues, own: str | None = None) -> None:
+    """``origin`` (403) unless the page origin may use this chat; *own* = Tiqora's own origin,
+    allowed while the chat is shown in the customer portal."""
+    allowed = values.allowed_origins if own is None else effective_allowed_origins(values, own)
+    if not origin_allowed(origin, allowed):
         raise ChatError("origin", 403)
 
 
@@ -256,10 +267,16 @@ def _check_visitor_id(visitor_id: str) -> None:
 
 
 def _validate(
-    fields: Sequence[PrechatField], values: dict[str, str | bool], *, require_email: bool
+    fields: Sequence[PrechatField],
+    values: dict[str, str | bool],
+    *,
+    require_email: bool,
+    identity_fields: bool = False,
 ) -> PrechatResult:
     try:
-        return validate_prechat(fields, values, require_email=require_email)
+        return validate_prechat(
+            fields, values, require_email=require_email, identity_fields=identity_fields
+        )
     except PrechatInvalid as exc:
         raise ChatError("invalid_prechat", 422, errors=exc.errors) from exc
 
@@ -388,7 +405,9 @@ async def touch_visitor_last_seen(db: AsyncSession, chat: TiqoraChatSession, now
     return False
 
 
-async def _lock(db: AsyncSession, session_id: str) -> TiqoraChatSession:
+async def lock_session(db: AsyncSession, session_id: str) -> TiqoraChatSession:
+    """The session row ``FOR UPDATE`` (R-LOCK-ORDER: before any ticket row); ``not_found``
+    when missing or purged."""
     locked = await get_chat_session(db, session_id, for_update=True)
     if locked is None or locked.purged_at is not None:
         raise ChatError("not_found", 404)
@@ -441,7 +460,6 @@ async def _store_visitor_line(
                 client_id=client_id,
                 now=now,
             )
-            return message, True
     except IntegrityError:
         set_committed_value(chat, "last_seq", seq_before)
         if client_id is None:
@@ -449,7 +467,15 @@ async def _store_visitor_line(
         existing = await find_by_client_id(db, chat.id, client_id, locking=True)
         if existing is None:
             raise
+        # A retried line must not move the marker (it could lower it below a newer line).
         return existing, False
+    # The bot's pending marker: only a stored new line moves it, and only upward.
+    if int(message.seq) > int(chat.last_visitor_seq):
+        chat.last_visitor_seq = int(message.seq)
+        await db.flush([chat])
+    if chat.status == "bot":
+        queue_bot_turn(db, chat.id)
+    return message, True
 
 
 # -- service functions ---------------------------------------------------------------------
@@ -472,12 +498,25 @@ async def _open_ticket_and_session(
     language: str | None,
     offline: bool,
     now: datetime,
+    identity: ResolvedIdentity | None = None,
+    bot: bool = False,
 ) -> tuple[TiqoraChatSession, str, int]:
-    """Ticket (+ dynamic fields), first customer article, session row; ``(row, token, article)``."""
+    """Ticket (+ dynamic fields), first customer article, session row; ``(row, token, article)``.
+
+    A verified *identity* replaces the typed name/address and the customer lookup.
+    """
     df_values, extra_lines = await _checked_df_values(db, values.prechat_fields, prechat)
-    customer_id, customer_user = await resolve_chat_customer(
-        db, email=prechat.email, default_customer_user=values.default_customer_user
-    )
+    customer_id: str | None
+    customer_user: str | None
+    if identity is not None:
+        customer_id, customer_user = identity.customer_id, identity.customer_user_login
+        name = identity.name[:200] if identity.name else identity.name
+        email = identity.email
+    else:
+        customer_id, customer_user = await resolve_chat_customer(
+            db, email=prechat.email, default_customer_user=values.default_customer_user
+        )
+        email = prechat.email
     state_id, priority_id = await _ticket_defaults(db, sysconfig, topic)
     title = _title(message)
     ticket_id = await create_ticket(
@@ -505,7 +544,7 @@ async def _open_ticket_and_session(
             subject=title,
             body=_article_body(message, extra_lines),
             channel=CHANNEL,
-            from_address=visitor_from_address(name, prechat.email, visitor_id),
+            from_address=visitor_from_address(name, email, visitor_id),
         ),
         user_id=SYSTEM_USER_ID,
         sysconfig=sysconfig,
@@ -519,15 +558,16 @@ async def _open_ticket_and_session(
         topic_key=topic.key,
         queue_id=topic.queue_id,
         ticket_id=ticket_id,
-        status="ended" if offline else "waiting",
+        status="ended" if offline else ("bot" if bot else "waiting"),
         end_reason="offline_form" if offline else None,
         token_hash=token_hash,
         visitor_id=visitor_id,
         visitor_name=name,
-        visitor_email=prechat.email,
+        visitor_email=email,
+        identity_source=identity.source if identity is not None else None,
         customer_user_login=customer_user,
         last_seq=0,
-        waiting_since=None if offline else now,
+        waiting_since=None if offline or bot else now,
         ended_at=now if offline else None,
         visitor_last_seen=now,
         page_url=clean_page_url(ctx.page_url if ctx.page_url is not None else page_url),
@@ -552,24 +592,50 @@ async def create_session(
     payload: ChatSessionCreateIn,
     ctx: VisitorContext,
     now: datetime,
+    settings: Settings,
+    identity: ResolvedIdentity | None = None,
+    own_origin: str | None = None,
 ) -> tuple[TiqoraChatSession, str, TiqoraChatMessage]:
     """Start a chat: ticket + first visitor article + session row + message ``seq`` 1.
 
     Returns ``(session, token, first_message)``; the token is shown to the visitor once,
     only its SHA-256 is stored. Refusals (all before any write): ``origin`` (page origin not
     allowed), ``invalid_topic``, ``message_rejected``, ``invalid_prechat``, ``offline``
-    (outside business hours or no eligible agent — checked live, not from the 10 s cache).
-    *factory* is needed for the ticket-number counter. Queues ``chat_waiting`` + a wake.
+    (neither a human nor the bot can take the chat — humans are checked live, not from the
+    10 s cache). *factory* is needed for the ticket-number counter, *settings* for the bot
+    check.
+
+    Routing (C5): a ``first_line`` topic whose bot is available, with a human available or
+    ``offline_mode == "ai"``, starts in ``bot`` (``bot_intro`` line, a ``chat_message`` event
+    — no ring — and a queued bot turn). Otherwise a human available starts ``waiting``
+    (queues ``chat_waiting`` + a wake), else ``offline``.
     """
-    _check_origin(payload.origin, values)
+    check_origin(payload.origin, values, own_origin)
     _check_visitor_id(payload.visitor_id)
     topic = _pick_topic(values, payload.topic)
     body = _clean_message(payload.message)
-    prechat = _validate(values.prechat_fields, dict(payload.prechat), require_email=False)
+    prechat = _validate(
+        values.prechat_fields,
+        dict(payload.prechat),
+        require_email=False,
+        identity_fields=identity is not None,
+    )
     client_id = _clean_client_id(payload.client_id)
-    if not await within_business_hours(sysconfig, values.business_calendar, now):
-        raise ChatError("offline", 409)
-    if not await eligible_agent_ids(db, redis_client, config_id=int(config.id), topic=topic):
+    humans = await within_business_hours(sysconfig, values.business_calendar, now) and bool(
+        await eligible_agent_ids(db, redis_client, config_id=int(config.id), topic=topic)
+    )
+    use_bot = False
+    if topic.ai_mode == "first_line" and (humans or values.offline_mode == "ai"):
+        bot = await bot_availability(
+            db,
+            redis_client,
+            settings,
+            config_id=int(config.id),
+            topic=topic,
+            queue_id=topic.queue_id,
+        )
+        use_bot = bot.ok
+    if not (humans or use_bot):
         raise ChatError("offline", 409)
 
     chat, token, article_id = await _open_ticket_and_session(
@@ -581,13 +647,15 @@ async def create_session(
         topic=topic,
         visitor_id=payload.visitor_id,
         prechat=prechat,
-        name=prechat.name,
+        name=identity.name if identity is not None else prechat.name,
         message=body,
         ctx=ctx,
         page_url=payload.page_url,
         language=payload.language,
         offline=False,
         now=now,
+        identity=identity,
+        bot=use_bot,
     )
     first = await insert_message(
         db,
@@ -598,10 +666,24 @@ async def create_session(
         client_id=client_id,
         now=now,
     )
-    queue_wakeup(db, chat.id)
-    event = _agent_event(chat, "chat_waiting", topic.queue_id)
-    event["topic_ref"] = topic_ref(int(config.id), topic.key)
-    queue_agent_event(db, event)
+    # This line bypasses ``_store_visitor_line``, so the pending marker is set here.
+    chat.last_visitor_seq = first.seq
+    if use_bot:
+        policy = await get_queue_policy_by_queue(db, topic.queue_id)
+        await post_bot_intro(
+            db,
+            chat=chat,
+            values=values,
+            notice=(policy.ai_disclosure_text if policy is not None else None),
+            now=now,
+        )
+        queue_agent_event(db, _agent_event(chat, "chat_message", topic.queue_id))
+        queue_bot_turn(db, chat.id)
+    else:
+        queue_wakeup(db, chat.id)
+        event = _agent_event(chat, "chat_waiting", topic.queue_id)
+        event["topic_ref"] = topic_ref(int(config.id), topic.key)
+        queue_agent_event(db, event)
     return chat, token, first
 
 
@@ -622,7 +704,7 @@ async def post_visitor_message(
     """
     text_body = _clean_message(body, key="body")
     cid = _clean_client_id(client_id)
-    locked = await _lock(db, chat.id)
+    locked = await lock_session(db, chat.id)
     if cid is not None:
         existing = await find_by_client_id(db, locked.id, cid)
         if existing is not None:
@@ -719,7 +801,7 @@ async def store_visitor_attachment(
         raise ChatError("upload_rejected", status, errors={"file": exc.code}) from exc
     caption_text = _clean_caption(caption)
     cid = _clean_client_id(client_id)
-    locked = await _lock(db, chat.id)
+    locked = await lock_session(db, chat.id)
     if cid is not None:
         existing = await find_by_client_id(db, locked.id, cid)
         if existing is not None:
@@ -758,6 +840,7 @@ async def submit_offline(
     payload: ChatOfflineIn,
     ctx: VisitorContext,
     now: datetime,
+    own_origin: str | None = None,
 ) -> None:
     """Offline form: a ticket with the visitor's message and an already ``ended`` session row
     (``end_reason`` ``offline_form``; the token is never handed out). The address is
@@ -768,7 +851,7 @@ async def submit_offline(
     """
     if values.offline_mode != "form":
         raise ChatError("disabled", 404)
-    _check_origin(payload.origin, values)
+    check_origin(payload.origin, values, own_origin)
     _check_visitor_id(payload.visitor_id)
     topic = _pick_topic(values, payload.topic)
     body = _clean_message(payload.message)
@@ -820,14 +903,46 @@ async def add_system_message(
     return message
 
 
-async def end_by_visitor(db: AsyncSession, *, chat: TiqoraChatSession, now: datetime) -> None:
+async def post_bot_intro(
+    db: AsyncSession,
+    *,
+    chat: TiqoraChatSession,
+    values: ChatConfigValues,
+    notice: str | None,
+    now: datetime | None = None,
+) -> TiqoraChatMessage:
+    """The ``bot_intro`` system line of a bot session: the assistant's name and, when the
+    queue policy has an AI disclosure text, that text as ``notice`` (blank counts as none).
+
+    Lives here (and is re-exported by :mod:`tiqora.webchat.bot_delivery`) because
+    ``create_session`` calls it and ``bot_delivery`` imports this module.
+    """
+    text_notice = (notice or "").strip() or None
+    return await add_system_message(
+        db,
+        chat=chat,
+        code="bot_intro",
+        params={"name": values.bot_name, "notice": text_notice},
+        now=now,
+    )
+
+
+async def end_by_visitor(
+    db: AsyncSession,
+    *,
+    chat: TiqoraChatSession,
+    now: datetime,
+    sysconfig: SysConfig | None = None,
+) -> None:
     """The visitor closes the chat: ``ended`` / ``visitor`` / ``ended_at``, system line
-    ``visitor_left``, wake + ``chat_ended``. Idempotent: an already closed chat is left
+    ``visitor_left``, wake + ``chat_ended``. A chat the bot answered alone also parks its
+    ticket (``close_bot_resolved_ticket``). Idempotent: an already closed chat is left
     alone. Refusal: ``not_found``."""
-    locked = await _lock(db, chat.id)
+    locked = await lock_session(db, chat.id)
     if locked.status not in LIVE_STATUSES:
         return
     queue_id = await current_queue_id(db, locked)
+    was_bot = locked.status == "bot"
     locked.status = "ended"
     locked.end_reason = "visitor"
     locked.ended_at = now
@@ -835,6 +950,8 @@ async def end_by_visitor(db: AsyncSession, *, chat: TiqoraChatSession, now: date
     await db.flush([locked])
     await add_system_message(db, chat=locked, code="visitor_left", params={}, now=now)
     queue_agent_event(db, _agent_event(locked, "chat_ended", queue_id))
+    if was_bot:
+        await close_bot_resolved_ticket(db, sysconfig or SysConfig(db), chat=locked)
 
 
 async def set_contact(
@@ -850,7 +967,8 @@ async def set_contact(
 
     Allowed for ``CONTACT_WINDOW_SECONDS`` after ``ended_at`` when the chat is
     ``ended``/``abandoned`` with end reason ``no_agent``/``idle``/``visitor`` and no address
-    was given yet. Sets ``visitor_email``/``visitor_name`` and the ticket customer
+    was given yet. Identified chats (``identity_source`` set) are refused even without an
+    address. Sets ``visitor_email``/``visitor_name`` and the ticket customer
     (``set_customer``: ``CustomerUpdate`` history, same matching as a new chat); wakes the
     visitor streams. Refusals: ``invalid_prechat`` (``errors.email``), ``not_found``,
     ``contact_not_allowed``.
@@ -859,7 +977,7 @@ async def set_contact(
     address = _validate([], {EMAIL_KEY: email or ""}, require_email=True).email
     clean_name = _clean_line(name, MAX_VISITOR_NAME)
 
-    locked = await _lock(db, chat.id)
+    locked = await lock_session(db, chat.id)
     ended_at = locked.ended_at
     if (
         locked.status not in _CONTACT_STATUSES
@@ -867,6 +985,9 @@ async def set_contact(
         or ended_at is None
         or (now - ended_at).total_seconds() >= CONTACT_WINDOW_SECONDS
         or locked.visitor_email
+        # An identified chat keeps its verified customer; a typed address would show as
+        # verified (R-NOTIFY b) and replace the ticket customer.
+        or locked.identity_source is not None
     ):
         raise ChatError("contact_not_allowed", 409)
     customer_id, customer_user = await resolve_chat_customer(

@@ -17,7 +17,7 @@ import resource
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Final
+from typing import Any, Final, Literal
 
 import structlog
 from fastapi import Request
@@ -51,8 +51,10 @@ async def publish_chat_wake(client: Any, session_id: str) -> None:
     await _publish(client, session_id, {"type": "wake"})
 
 
-async def publish_chat_typing(client: Any, session_id: str) -> None:
-    await _publish(client, session_id, {"type": "typing", "who": "agent"})
+async def publish_chat_typing(
+    client: Any, session_id: str, *, who: Literal["agent", "bot"] = "agent"
+) -> None:
+    await _publish(client, session_id, {"type": "typing", "who": who})
 
 
 def effective_max_streams(configured: int, soft_nofile: int | None = None) -> int:

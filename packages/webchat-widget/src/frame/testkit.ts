@@ -2,14 +2,16 @@ import type { ChatMessage, ChatPublicConfig } from "./api";
 
 export function cfg(over: Partial<ChatPublicConfig> = {}): ChatPublicConfig {
   return {
+    bot_name: "KI-Assistent",
     greeting: "Willkommen",
     max_message_length: 100,
     offline_mode: "form",
     online: true,
     prechat_fields: [
-      { key: "name", kind: "text", label: "Name", required: true, options: [] },
-      { key: "email", kind: "email", label: "E-Mail", required: true, options: [] },
+      { key: "name", kind: "text", label: "Name", required: true, options: [], identity_supplied: true },
+      { key: "email", kind: "email", label: "E-Mail", required: true, options: [], identity_supplied: true },
     ],
+    portal_identity: false,
     privacy_url: "https://example.org/privacy",
     theme: { mode: "auto", position: "right", primary_color: "#2563eb" },
     topics: [],

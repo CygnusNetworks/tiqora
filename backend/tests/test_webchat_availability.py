@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from tests._fake_redis import FakeRedis
 from tests._webchat_fixtures import NOW, cleanup_band, insert_config, seed_queue_agent
+from tiqora.config import get_settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraChatSession
 from tiqora.webchat import availability
@@ -285,14 +286,20 @@ async def test_config_availability_is_cached(
         assert config is not None
         values = config_values(config)
         assert values.business_calendar is None
-        got = await config_availability(db, r, sysconfig, config=config, values=values, now=NOW)
+        got = await config_availability(
+            db, r, sysconfig, config=config, values=values, now=NOW, settings=get_settings()
+        )
         assert got == {"support": True}
         await set_agent_state(db, A_OK, available=False, topics=[], max_concurrent=3, now=NOW)
         await db.commit()
-        again = await config_availability(db, r, sysconfig, config=config, values=values, now=NOW)
+        again = await config_availability(
+            db, r, sysconfig, config=config, values=values, now=NOW, settings=get_settings()
+        )
         assert again == {"support": True}  # served from the 10 s cache
         r.advance(11)
-        fresh = await config_availability(db, r, sysconfig, config=config, values=values, now=NOW)
+        fresh = await config_availability(
+            db, r, sysconfig, config=config, values=values, now=NOW, settings=get_settings()
+        )
         assert fresh == {"support": False}
         # outside business hours every topic is offline even with an agent ready
         await set_agent_state(db, A_OK, available=True, topics=[], max_concurrent=3, now=NOW)
@@ -302,10 +309,22 @@ async def test_config_availability_is_cached(
         closed = values.model_copy(update={"business_calendar": ""})
         sunday = datetime(2026, 10, 11, 8, 0)
         assert await config_availability(
-            db, r, sysconfig, config=config, values=closed, now=sunday
+            db,
+            r,
+            sysconfig,
+            config=config,
+            values=closed,
+            now=sunday,
+            settings=get_settings(),
         ) == {"support": False}
         # a redis outage computes uncached instead of failing
         r.fail = True
         assert await config_availability(
-            db, r, sysconfig, config=config, values=values, now=NOW
+            db,
+            r,
+            sysconfig,
+            config=config,
+            values=values,
+            now=NOW,
+            settings=get_settings(),
         ) == {"support": False}

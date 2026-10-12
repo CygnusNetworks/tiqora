@@ -142,4 +142,23 @@ describe("MessengerComposer with the web chat adapter", () => {
     const keys = invalidate.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
     expect(keys).toContain(JSON.stringify(ticketChatKey(116)));
   });
+
+  it("hints that a reply takes the chat over while the AI leads it", async () => {
+    request.mockReset().mockImplementation((method: string, path: string) =>
+      Promise.resolve(
+        method === "GET" && path.endsWith("/chat")
+          ? { session_id: "s1", status: "bot", visitor_name: "Max Beispiel" }
+          : {},
+      ),
+    );
+    await mount();
+    expect(await screen.findByTestId("webchat-takeover-hint")).toHaveTextContent(
+      "Ihre Antwort übernimmt den Chat von der KI.",
+    );
+  });
+
+  it("shows no takeover hint for an active chat", async () => {
+    await mount();
+    expect(screen.queryByTestId("webchat-takeover-hint")).toBeNull();
+  });
 });

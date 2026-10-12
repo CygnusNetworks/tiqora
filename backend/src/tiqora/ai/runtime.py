@@ -222,6 +222,7 @@ def _tool_trace_wire(messages: list[LlmMessage]) -> list[dict[str, Any]]:
 
 
 _TELEGRAM_CHANNEL = "telegram"
+_WEBCHAT_CHANNEL = "webchat"
 _TYPING_INTERVAL_SECONDS = 4.0
 # Earlier messages of the same chat shown to the identity exchange next to the
 # latest one — enough for one field per message plus some small talk.
@@ -449,29 +450,40 @@ async def _load_mcp_tools(
     return specs
 
 
-async def _resolve_telegram_tone_prompt(
+def _is_channel(channel: str | None, expected: str) -> bool:
+    return (channel or "").strip().lower() == expected
+
+
+async def _resolve_channel_tone_prompt(
     session: AsyncSession,
     *,
+    ticket_id: int,
     source_channel: str | None,
     based_on_channel: str | None,
 ) -> str | None:
-    """The Telegram chat-tone system-prompt addendum (Task: Telegram-Chat-UX),
-    or ``None`` when this run isn't Telegram-sourced.
+    """The chat-tone system-prompt addendum of a Telegram- or web-chat-sourced run
+    (Task: Telegram-Chat-UX, web chat AI first line), or ``None`` for every other run.
 
-    ``source_channel`` covers the auto-trigger (outbox event payload);
-    ``trigger=manual`` (AI draft in the agent UI) never sets it, so that path
-    is decided by the based-on/latest customer article's channel instead —
-    see the call site in :func:`run_ticket_agent`. One cheap setting lookup,
-    only when actually Telegram.
+    ``source_channel`` covers the auto-trigger (outbox event payload / bot turn);
+    ``trigger=manual`` (AI draft in the agent UI) never sets it, so that path is decided by
+    the based-on/latest customer article's channel instead — see the call site in
+    :func:`run_ticket_agent`. Telegram is decided first and unchanged; web chat uses the
+    config's ``bot_tone_prompt`` or the default chat tone. One cheap lookup, only when
+    actually a chat.
     """
-    is_telegram = (source_channel or "").strip().lower() == _TELEGRAM_CHANNEL or (
-        based_on_channel or ""
-    ).strip().lower() == _TELEGRAM_CHANNEL
-    if not is_telegram:
-        return None
-    from tiqora.channels.telegram.texts import telegram_tone_prompt
+    if _is_channel(source_channel, _TELEGRAM_CHANNEL) or _is_channel(
+        based_on_channel, _TELEGRAM_CHANNEL
+    ):
+        from tiqora.channels.telegram.texts import telegram_tone_prompt
 
-    return await telegram_tone_prompt(session)
+        return await telegram_tone_prompt(session)
+    if _is_channel(source_channel, _WEBCHAT_CHANNEL) or _is_channel(
+        based_on_channel, _WEBCHAT_CHANNEL
+    ):
+        from tiqora.webchat.bot_delivery import webchat_tone_prompt
+
+        return await webchat_tone_prompt(session, ticket_id=ticket_id)
+    return None
 
 
 def _build_system_prompt(
@@ -717,6 +729,10 @@ async def _resolve_auto_state_id(
         if row is not None:
             return int(row[0])
     return None
+
+
+# Public name for ``webchat.bot`` (closes a chat ticket with the same policy gate).
+resolve_auto_state_id = _resolve_auto_state_id
 
 
 def _build_identity_system_prompt(
@@ -1048,8 +1064,8 @@ async def _run_identity_exchange(
     )
     # This exchange is only ever entered for a Telegram-sourced run (guard in
     # run_ticket_agent), so the tone addendum is unconditional here.
-    identity_tone_prompt = await _resolve_telegram_tone_prompt(
-        session, source_channel=_TELEGRAM_CHANNEL, based_on_channel=None
+    identity_tone_prompt = await _resolve_channel_tone_prompt(
+        session, ticket_id=ticket_id, source_channel=_TELEGRAM_CHANNEL, based_on_channel=None
     )
     language = _resolve_reply_language(
         policy, ticket, [a for a in articles if a.sender_type == "customer"]
@@ -1584,8 +1600,14 @@ async def run_ticket_agent(
         # so a Telegram ticket is instead recognized off the based-on/latest
         # customer article's channel (Task: Telegram-Chat-UX).
         based_on_channel = next((a.channel for a in articles if a.id == based_on_article_id), None)
-        tone_prompt = await _resolve_telegram_tone_prompt(
-            session, source_channel=source_channel, based_on_channel=based_on_channel
+        is_webchat = _is_channel(source_channel, _WEBCHAT_CHANNEL) or _is_channel(
+            based_on_channel, _WEBCHAT_CHANNEL
+        )
+        tone_prompt = await _resolve_channel_tone_prompt(
+            session,
+            ticket_id=ticket_id,
+            source_channel=source_channel,
+            based_on_channel=based_on_channel,
         )
         system_prompt = _build_system_prompt(
             policy,
@@ -1596,8 +1618,11 @@ async def run_ticket_agent(
             tone_prompt=tone_prompt,
             # Only the auto path sends, and only a send parks the ticket — a
             # Manual Assist run must not be told the system closes anything.
+            # A live chat is never parked after an answer (the chat ends it later), so the
+            # model is not told the system closes anything there either.
             auto_state_hint=(
                 trigger != TRIGGER_MANUAL
+                and not is_webchat
                 and bool(resolve_allowed_state_types(policy.allowed_state_types))
             ),
         )
@@ -1906,6 +1931,7 @@ async def run_ticket_agent(
             if (
                 outcome.no_reply_resolved
                 and trigger != TRIGGER_MANUAL
+                and not is_webchat
                 and not executor.state_change_applied
                 and ticket.state_type.strip().lower() != "closed"
             ):
@@ -1995,7 +2021,8 @@ async def run_ticket_agent(
             )
 
         # destination == "send": auto path only (manual always drafts above)
-        footer = disclosure_footer if policy.ai_disclosure_enabled else ""
+        # The chat has no footer: its ``bot_intro`` line carries the notice.
+        footer = disclosure_footer if policy.ai_disclosure_enabled and not is_webchat else ""
         body = outcome.proposal["body"]
         if footer:
             body = f"{footer}\n\n{body}"
@@ -2007,7 +2034,61 @@ async def run_ticket_agent(
         # would otherwise parseaddr-match the email branch below and blow up
         # an SMTP send to a fake address (the central guard this dispatch
         # exists for).
-        if src is not None and src.channel.lower() == _TELEGRAM_CHANNEL:
+        if _is_channel(source_channel, _WEBCHAT_CHANNEL) or (
+            src is not None and _is_channel(src.channel, _WEBCHAT_CHANNEL)
+        ):
+            # Web chat BEFORE Telegram and e-mail: the visitor's a_from may be a real
+            # address or "...@chat.invalid" and must never reach SMTP. The answer becomes
+            # an article and a "bot" transcript line, or a draft when the chat is no
+            # longer the bot's.
+            from tiqora.webchat.bot_delivery import BotChatTakenOver, deliver_bot_chat_reply
+            from tiqora.webchat.text import MessageRejected
+
+            # Tool writes (update_ticket_fields, ...) are still uncommitted: commit them
+            # before the chat session row is locked (R-LOCK-ORDER, see bot_delivery).
+            await session.commit()
+            try:
+                article_id = await deliver_bot_chat_reply(
+                    session,
+                    sysconfig,
+                    ticket_id=ticket_id,
+                    service_user_id=actor_user_id,
+                    subject=outcome.proposal.get("subject") or ticket.title,
+                    body=body,
+                )
+            except (BotChatTakenOver, MessageRejected) as not_sent:
+                await session.rollback()
+                notes = (
+                    "chat_taken_over"
+                    if isinstance(not_sent, BotChatTakenOver)
+                    else "chat_message_rejected"
+                )
+                draft = await draft_service.create_draft(
+                    session,
+                    ticket_id=ticket_id,
+                    queue_id=ticket.queue_id,
+                    kind=outcome.proposal["kind"],
+                    body=outcome.proposal["body"],
+                    subject=outcome.proposal.get("subject") or None,
+                    based_on_article_id=based_on_article_id,
+                    tool_trace_json=encode_tool_trace(_tool_trace_wire(messages)),
+                    created_by_user_id=None,
+                    source=source,
+                    actor_user_id=actor_user_id,
+                )
+                drafted_state = await session.get(TiqoraAiTicketState, ticket_id)
+                if drafted_state is not None:
+                    drafted_state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
+                    drafted_state.last_customer_article_id = based_on_article_id
+                await session.commit()
+                return AgentRunResult(
+                    status=STATUS_DRAFTED,
+                    draft_id=draft.id,
+                    notes=notes,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                )
+        elif src is not None and src.channel.lower() == _TELEGRAM_CHANNEL:
             from tiqora.channels.telegram.outbound import deliver_agent_telegram_reply
 
             article_id = await deliver_agent_telegram_reply(
@@ -2153,7 +2234,7 @@ async def run_ticket_agent(
             # otherwise (seen in production). The model may call update_ticket_fields
             # itself; only when it did not do we park the ticket ourselves, and only
             # in a state type the queue policy already allows.
-            if not executor.state_change_applied:
+            if not executor.state_change_applied and not is_webchat:
                 auto_state_id = await _resolve_auto_state_id(
                     session,
                     kind=outcome.proposal["kind"],

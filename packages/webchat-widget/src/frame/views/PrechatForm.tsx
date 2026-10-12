@@ -2,6 +2,7 @@ import type { JSX } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { ChatPublicConfig } from "../api";
 import type { Translate } from "../i18n";
+import { visibleFields } from "../identity";
 import { safeHref } from "../linkify";
 
 type Field = ChatPublicConfig["prechat_fields"][number];
@@ -34,6 +35,8 @@ function codeKey(code: string): string {
 export function PrechatForm(props: {
   config: ChatPublicConfig;
   fields?: Field[];
+  /** A signed-in visitor: name and e-mail fields are hidden and "Angemeldet als …" shows. */
+  identity?: { name: string | null } | null;
   t: Translate;
   title: string;
   intro?: string | null;
@@ -46,7 +49,7 @@ export function PrechatForm(props: {
   onSubmit: (v: PrechatValues) => void;
 }): JSX.Element {
   const { config, t } = props;
-  const fields = props.fields ?? config.prechat_fields;
+  const fields = visibleFields(props.fields ?? config.prechat_fields, !!props.identity);
   const [values, setValues] = useState<Record<string, string | boolean>>({});
   const [message, setMessage] = useState("");
   const [local, setLocal] = useState<Record<string, string>>({});
@@ -124,6 +127,11 @@ export function PrechatForm(props: {
     <form class="tq-form" ref={root} onSubmit={submit} noValidate>
       <h2>{props.title}</h2>
       {props.intro && <p class="tq-intro">{props.intro}</p>}
+      {props.identity && (
+        <p class="tq-signed" role="status">
+          {props.identity.name ? t("identity.signedIn", { name: props.identity.name }) : t("identity.signedInAnon")}
+        </p>
+      )}
       {fields.map((f) => (
         <div class="tq-field" key={f.key}>
           {f.kind === "checkbox" ? (

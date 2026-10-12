@@ -552,6 +552,10 @@ class Settings(BaseSettings):
     ai_worker_interval_seconds: int = Field(
         default=10, validation_alias="TIQORA_AI_WORKER_INTERVAL"
     )
+    # Web chat assistant turns the AI worker runs at the same time.
+    chat_bot_concurrency: int = Field(
+        default=4, ge=1, le=32, validation_alias="TIQORA_CHAT_BOT_CONCURRENCY"
+    )
 
     # PGP / S/MIME. The authoritative switches and paths are Znuny's SysConfig
     # (``PGP``, ``PGP::Options --homedir``, ``SMIME``, ``SMIME::CertPath``,

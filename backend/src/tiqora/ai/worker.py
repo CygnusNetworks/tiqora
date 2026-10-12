@@ -30,6 +30,7 @@ import structlog
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from tiqora.ai.auto_worker import run_auto_tick
+from tiqora.ai.chat_bot_loop import run_chat_bot_loop
 from tiqora.ai.triage_worker import run_triage_tick
 from tiqora.config import get_settings
 from tiqora.db.engine import get_session_factory
@@ -131,7 +132,7 @@ async def _run_loop(stop: asyncio.Event) -> None:
 
 
 async def _run_all(stop: asyncio.Event) -> None:
-    await asyncio.gather(_heartbeat_loop(stop), _run_loop(stop))
+    await asyncio.gather(_heartbeat_loop(stop), _run_loop(stop), run_chat_bot_loop(stop))
 
 
 def run_ai_worker() -> None:
