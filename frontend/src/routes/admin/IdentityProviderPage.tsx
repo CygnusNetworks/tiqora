@@ -7,6 +7,7 @@ import { LinksTab } from "@/components/admin/identity/LinksTab";
 import { MappingTab } from "@/components/admin/identity/MappingTab";
 import { ProvisioningTab } from "@/components/admin/identity/ProvisioningTab";
 import { RolesTab } from "@/components/admin/identity/RolesTab";
+import { SessionTab } from "@/components/admin/identity/SessionTab";
 import { TestTab } from "@/components/admin/identity/TestTab";
 import { ProviderIcon } from "@/components/auth/ProviderIcon";
 import { Badge } from "@/components/ui/Badge";
@@ -16,10 +17,10 @@ import { apiErrorMessage } from "@/lib/avatarApi";
 import { identityApi, type IdentityProvider, type ProviderChanges } from "@/lib/identityApi";
 import { IDENTITY_LIST_KEY } from "./IdentityProvidersPage";
 
-export type IdentityProviderTab = "connection" | "mapping" | "roles" | "provisioning" | "test" | "links";
+export type IdentityProviderTab = "connection" | "mapping" | "roles" | "provisioning" | "session" | "test" | "links";
 export type IdentityProviderSearch = { tab?: IdentityProviderTab; test?: string };
 
-const TABS: IdentityProviderTab[] = ["connection", "mapping", "roles", "provisioning", "test", "links"];
+const TABS: IdentityProviderTab[] = ["connection", "mapping", "roles", "provisioning", "session", "test", "links"];
 const ROUTE = "/admin/identity-providers/$providerId" as const;
 
 export function IdentityProviderPage() {
@@ -93,7 +94,7 @@ export function IdentityProviderPage() {
       </div>
 
       <Tabs
-        items={TABS.filter((id) => id !== "provisioning" || provider.kind !== "ldap").map((id) => ({ id, label: t(`admin.identity.tabs.${id}`) }))}
+        items={TABS.filter((id) => (id !== "provisioning" && id !== "session") || provider.kind !== "ldap").map((id) => ({ id, label: t(`admin.identity.tabs.${id}`) }))}
         value={tab}
         onChange={(next) =>
           navigate({
@@ -127,6 +128,9 @@ export function IdentityProviderPage() {
       )}
       {tab === "provisioning" && provider.kind !== "ldap" && (
         <ProvisioningTab key={provider.id} provider={provider} onSaved={onSaved} />
+      )}
+      {tab === "session" && provider.kind !== "ldap" && (
+        <SessionTab key={provider.id} provider={provider} onSaved={onSaved} />
       )}
       {tab === "test" && (
         <TestTab

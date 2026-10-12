@@ -170,6 +170,14 @@ export function TestTab({
                         <td className="break-all py-1 text-ink">{show(value)}</td>
                       </tr>
                     ))}
+                    {result.mfa && result.mfa.evidence.length > 0 && (
+                      <tr className="border-t border-hairline" data-testid="identity-test-mfa-evidence">
+                        <th scope="row" className="py-1 pr-3 align-top font-mono text-[12.5px] font-normal text-muted">
+                          {t("admin.identity.test.mfa.evidence")}
+                        </th>
+                        <td className="break-all py-1 text-ink">{result.mfa.evidence.join(", ")}</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -182,7 +190,7 @@ export function TestTab({
                   {t("admin.identity.test.useForPreview")}
                 </Button>
               )}
-              {result.plan && <LoginPlanView plan={result.plan} />}
+              {result.plan && <LoginPlanView plan={result.plan} mfa={result.mfa} />}
             </>
           )}
         </section>

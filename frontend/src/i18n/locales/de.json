@@ -4352,7 +4352,8 @@
         "roles": "Rollen aus dem Anmeldedienst",
         "test": "Testanmeldung",
         "links": "Verknüpfungen",
-        "provisioning": "Bereitstellung (SCIM)"
+        "provisioning": "Bereitstellung (SCIM)",
+        "session": "Sitzung & zweiter Faktor"
       },
       "sections": {
         "general": "Allgemein",
@@ -4422,7 +4423,14 @@
         "timeout": "Das Ergebnis ist nach zwei Minuten nicht eingetroffen. Bitte die Testanmeldung erneut starten.",
         "subject": "Kennung",
         "attributesHeading": "Vom Anmeldedienst übermittelte Werte",
-        "useForPreview": "Werte für die Vorschau übernehmen"
+        "useForPreview": "Werte für die Vorschau übernehmen",
+        "mfa": {
+          "label": "Zweiter Faktor vom Anmeldedienst",
+          "satisfied": "bestätigt",
+          "unsatisfied": "nicht bestätigt",
+          "notRequired": "nicht verlangt",
+          "evidence": "Nachweis des zweiten Faktors"
+        }
       },
       "plan": {
         "rejected": "Die Anmeldung würde abgelehnt:",
@@ -4800,6 +4808,38 @@
             "group_delete": "Gruppe gelöscht"
           }
         }
+      },
+      "session": {
+        "envReadOnly": "Dieser Anbieter stammt aus Umgebungsvariablen. Sitzungseinstellungen setzen einen hier im Adminbereich angelegten Anbieter voraus; legen Sie ihn dort neu an.",
+        "loadError": "Die Einstellungen konnten nicht geladen werden.",
+        "requireMfa": "Zweiten Faktor vom Anmeldedienst verlangen",
+        "requireMfaHelp": "Anmeldungen ohne Nachweis eines zweiten Faktors vom Anmeldedienst werden nicht als vertrauenswürdig behandelt. Entra ID meldet ihn als amr \"mfa\", Okta als amr \"mfa\" oder \"otp\", Keycloak als acr \"2\" oder höher (mit Step-up-Flows).",
+        "fallback": {
+          "title": "Ohne Bestätigung",
+          "local_second_factor": "Ohne Bestätigung: zweiten Faktor in Tiqora abfragen",
+          "reject": "Anmeldung ablehnen",
+          "local_second_factor_or_enroll": "In Tiqora abfragen oder Einrichtung eines Faktors erlauben",
+          "enrollHelp": "Ermöglicht Ersteinrichtung ohne Nachweis. Wer nur das Kennwort des Anmeldedienstes kennt, kann dann einen Faktor registrieren."
+        },
+        "oidcAmr": "amr-Werte",
+        "oidcAmrHelp": "Methoden, die als zweiter Faktor gelten, zum Beispiel mfa, otp, hwk. Entra ID: mfa. Okta: mfa, otp. Keycloak: meist stattdessen acr.",
+        "oidcAcr": "acr-Werte",
+        "oidcAcrHelp": "Authentifizierungsklassen, die als zweiter Faktor gelten, zum Beispiel 2 (Keycloak-Vertrauensstufe).",
+        "oidcRequestAcr": "acr_values anfordern",
+        "oidcRequestAcrHelp": "Wird mit der Anmeldeanfrage gesendet, damit der Anmeldedienst den Faktor abfragt. Leer lassen, um nichts zu senden.",
+        "samlClasses": "Authentifizierungsklassen",
+        "samlClassesHelp": "AuthnContext-Klassen, die als zweiter Faktor gelten, zum Beispiel urn:oasis:names:tc:SAML:2.0:ac:classes:TimeSyncToken.",
+        "samlAttribute": "MFA-Attribut",
+        "samlAttributeHelp": "Attribut, das die Methoden enthält. Entra ID und AD FS verwenden den Claim authnmethodsreferences.",
+        "samlAttributeValues": "Werte des MFA-Attributs",
+        "samlRequest": "Authentifizierungsklasse anfordern",
+        "lifetime": "Sitzungsdauer",
+        "useGlobal": "Allgemeine Einstellung verwenden",
+        "idle": "Abmeldung nach Inaktivität (Minuten)",
+        "absolute": "Spätestens abmelden nach (Stunden)",
+        "idleRange": "Zwischen {{min}} und {{max}} Minuten.",
+        "absoluteRange": "Zwischen {{min}} und {{max}} Stunden.",
+        "lifetimeHelp": "Die allgemeine Einstellung ist die Obergrenze: bis zu {{idle}} Minuten Inaktivität und {{hours}} Stunden insgesamt."
       }
     },
     "reporting": {

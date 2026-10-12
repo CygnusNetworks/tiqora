@@ -4344,7 +4344,8 @@
         "roles": "Roles from the sign-in service",
         "test": "Test sign-in",
         "links": "Links",
-        "provisioning": "Provisioning (SCIM)"
+        "provisioning": "Provisioning (SCIM)",
+        "session": "Session & second factor"
       },
       "sections": {
         "general": "General",
@@ -4414,7 +4415,14 @@
         "timeout": "No result arrived within two minutes. Please start the test sign-in again.",
         "subject": "Identifier",
         "attributesHeading": "Values sent by the sign-in service",
-        "useForPreview": "Use these values for the preview"
+        "useForPreview": "Use these values for the preview",
+        "mfa": {
+          "label": "Second factor from the sign-in service",
+          "satisfied": "confirmed",
+          "unsatisfied": "not confirmed",
+          "notRequired": "not required",
+          "evidence": "Second-factor evidence"
+        }
       },
       "plan": {
         "rejected": "The sign-in would be rejected:",
@@ -4792,6 +4800,38 @@
             "group_delete": "Group deleted"
           }
         }
+      },
+      "session": {
+        "envReadOnly": "This provider comes from environment variables. Session settings need a provider created here in the admin area; recreate it to use them.",
+        "loadError": "The settings could not be loaded.",
+        "requireMfa": "Require a second factor from the sign-in service",
+        "requireMfaHelp": "Sign-ins without proof of a second factor from the sign-in service are not trusted. Entra ID reports it as amr \"mfa\", Okta as amr \"mfa\" or \"otp\", Keycloak as acr \"2\" or higher (with step-up flows).",
+        "fallback": {
+          "title": "Without proof",
+          "local_second_factor": "Without proof: ask for the second factor in Tiqora",
+          "reject": "Reject the sign-in",
+          "local_second_factor_or_enroll": "Ask in Tiqora, or let users set up a second factor",
+          "enrollHelp": "Allows first-time setup without proof. Anyone who knows only the password of the sign-in service can then register a factor."
+        },
+        "oidcAmr": "amr values",
+        "oidcAmrHelp": "Methods that count as a second factor, for example mfa, otp, hwk. Entra ID: mfa. Okta: mfa, otp. Keycloak: usually acr instead.",
+        "oidcAcr": "acr values",
+        "oidcAcrHelp": "Authentication classes that count as a second factor, for example 2 (Keycloak level of assurance).",
+        "oidcRequestAcr": "Request acr_values",
+        "oidcRequestAcrHelp": "Sent with the sign-in request so the sign-in service asks for the factor. Leave empty to send nothing.",
+        "samlClasses": "Authentication classes",
+        "samlClassesHelp": "AuthnContext classes that count as a second factor, for example urn:oasis:names:tc:SAML:2.0:ac:classes:TimeSyncToken.",
+        "samlAttribute": "MFA attribute",
+        "samlAttributeHelp": "Attribute that carries the methods. Entra ID and AD FS use the authnmethodsreferences claim.",
+        "samlAttributeValues": "Values of the MFA attribute",
+        "samlRequest": "Request an authentication class",
+        "lifetime": "Session duration",
+        "useGlobal": "Use the general setting",
+        "idle": "Sign out after inactivity (minutes)",
+        "absolute": "Sign out after at most (hours)",
+        "idleRange": "Between {{min}} and {{max}} minutes.",
+        "absoluteRange": "Between {{min}} and {{max}} hours.",
+        "lifetimeHelp": "The general setting is the upper limit: up to {{idle}} minutes of inactivity and {{hours}} hours in total."
       }
     },
     "reporting": {

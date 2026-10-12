@@ -1988,6 +1988,7 @@ function identityDetail(id: number) {
 const identityTestResult = {
   status: "done",
   error: null,
+  mfa: { required: true, satisfied: true, evidence: ["amr=mfa", "amr=pwd"] },
   subject: "7f3b9c1e-0d52-4c1a-9a6e-3f1d2b8a4c10",
   attributes: { preferred_username: "anna.example", email: "anna@example.com", given_name: "Anna", family_name: "Example" },
   plan: {

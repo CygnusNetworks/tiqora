@@ -850,6 +850,7 @@ const adminIdentityProviderRoute = createRoute({
       s.tab === "mapping" ||
       s.tab === "roles" ||
       s.tab === "provisioning" ||
+      s.tab === "session" ||
       s.tab === "test" ||
       s.tab === "links"
         ? s.tab

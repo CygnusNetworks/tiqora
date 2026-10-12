@@ -7,7 +7,7 @@ import { ApiError } from "@/lib/api";
 import { TestTab } from "./TestTab";
 import { LoginPlanView } from "./LoginPlanView";
 import { makeProvider } from "./testFixtures";
-import type { LoginPlan } from "@/lib/identityApi";
+import type { IdentityTestMfa, LoginPlan } from "@/lib/identityApi";
 
 const startTest = vi.fn();
 const testResult = vi.fn();
@@ -181,5 +181,33 @@ describe("LoginPlanView", () => {
     expect(screen.getByTestId("identity-plan-roles-remove")).toHaveTextContent("Vertrieb");
     expect(screen.getByTestId("identity-plan-groups-add")).toHaveTextContent("users");
     expect(screen.getByTestId("identity-plan-groups-remove")).toHaveTextContent("admin");
+  });
+
+  it("shows the MFA result in the test result", async () => {
+    testResult.mockResolvedValue({
+      status: "done", error: null, subject: "s1", attributes: { email: ["a@example.org"] },
+      plan: { ...basePlan }, mfa: { required: true, satisfied: false, evidence: ["amr=pwd"] },
+    });
+    wrap(<TestTab provider={makeProvider()} testId="t9" />);
+    expect(await screen.findByTestId("identity-plan-mfa")).toHaveTextContent(
+      "Zweiter Faktor vom Anmeldedienst: nicht bestätigt",
+    );
+    expect(screen.getByTestId("identity-test-mfa-evidence")).toHaveTextContent("amr=pwd");
+  });
+});
+
+describe("LoginPlanView MFA line", () => {
+  const cases: [IdentityTestMfa, string][] = [
+    [{ required: true, satisfied: true, evidence: [] }, "bestätigt"],
+    [{ required: true, satisfied: false, evidence: [] }, "nicht bestätigt"],
+    [{ required: false, satisfied: false, evidence: [] }, "nicht verlangt"],
+  ];
+  it.each(cases)("renders %j", (mfa, text) => {
+    wrap(<LoginPlanView plan={basePlan} mfa={mfa} />);
+    expect(screen.getByTestId("identity-plan-mfa")).toHaveTextContent(`Anmeldedienst: ${text}`);
+  });
+  it("renders no line without mfa", () => {
+    wrap(<LoginPlanView plan={basePlan} />);
+    expect(screen.queryByTestId("identity-plan-mfa")).toBeNull();
   });
 });
