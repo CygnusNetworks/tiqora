@@ -24,6 +24,8 @@ import type {
   FilterField,
   FormOptions,
   ImpactGraph,
+  ImportTemplate,
+  ImportTemplateIn,
   LinkOut,
   LinkType,
   RenderedAttr,
@@ -161,13 +163,13 @@ function seedCis(): DemoCi[] {
 type DemoJob = {
   id: number;
   kind: string;
-  status: "succeeded";
+  status: "succeeded" | "failed";
   title_key: string;
   progress_done: number;
   progress_total: number;
   progress_message: null;
   cancel_requested: boolean;
-  error: null;
+  error: string | null;
   result: Record<string, unknown> | null;
   files: Array<{ id: number; name: string; content_type: string; size_bytes: number }>;
   created_by: number;
@@ -186,25 +188,40 @@ export type DemoCmdb = {
   nextSavedId: number;
   jobs: Record<number, DemoJob>;
   nextJobId: number;
+  /** Text of the report files, by job id (served by the jobs file route of the demo / e2e mock). */
+  reports: Record<number, string>;
+  templates: ImportTemplate[];
+  nextTemplateId: number;
 };
 
 /** Finished background job of the demo (bulk edit / export): answers `GET /api/v1/jobs/:id`. */
+/** Text of a job's report file, or undefined (the file route answers 404). */
+export function demoCmdbReport(store: DemoCmdb, jobId: number): string | undefined {
+  return store.reports[jobId];
+}
+
 export function demoCmdbJob(store: DemoCmdb, id: number): DemoJob | undefined {
   return store.jobs[id];
 }
 
-function finishedJob(store: DemoCmdb, kind: "cmdb_bulk" | "cmdb_export", result: Record<string, unknown> | null, files: DemoJob["files"]): number {
+function finishedJob(
+  store: DemoCmdb,
+  kind: "cmdb_bulk" | "cmdb_export" | "cmdb_import",
+  result: Record<string, unknown> | null,
+  files: DemoJob["files"],
+  failure: string | null = null,
+): number {
   const id = store.nextJobId++;
   store.jobs[id] = {
     id,
     kind: `core.${kind}`,
-    status: "succeeded",
+    status: failure ? "failed" : "succeeded",
     title_key: `jobs.kinds.core.${kind}`,
     progress_done: 1,
     progress_total: 1,
     progress_message: null,
     cancel_requested: false,
-    error: null,
+    error: failure,
     result,
     files,
     created_by: 1,
@@ -231,6 +248,9 @@ export function createDemoCmdb(): DemoCmdb {
     nextSavedId: 1,
     jobs: {},
     nextJobId: 9311,
+    reports: {},
+    templates: [],
+    nextTemplateId: 1,
   };
 }
 
@@ -760,7 +780,62 @@ export function resolveCmdb(
   }
   if (sub === "/companies/lookup") return ok([{ id: "beispiel", label: "Beispiel GmbH" }]);
   if (sub === "/link-types") return ok(LINK_TYPES);
-  if (sub === "/import-templates") return ok([]);
+  if (sub === "/import-templates" && method === "GET") {
+    const cid = Number(query.get("class_id"));
+    return ok(Number.isInteger(cid) && cid > 0 ? store.templates.filter((x) => x.class_id === cid) : store.templates);
+  }
+  if (sub === "/import-templates" && method === "POST") {
+    const b = (body ?? {}) as ImportTemplateIn;
+    const row: ImportTemplate = {
+      id: store.nextTemplateId++,
+      name: b.name,
+      class_id: b.class_id,
+      file_format: b.file_format,
+      mapping: b.mapping,
+      options: b.options,
+      shared: b.shared ?? false,
+      owned: true,
+      owner_user_id: 1,
+      lock_version: 1,
+      created_at: AT,
+      changed_at: AT,
+    };
+    store.templates.push(row);
+    return ok(row, 201);
+  }
+  if (sub === "/import-jobs" && method === "POST") {
+    // multipart: the dry-run flag and `on_error` sit in the JSON `request` field
+    const raw = body instanceof FormData ? body.get("request") : null;
+    const req = (typeof raw === "string" ? JSON.parse(raw) : {}) as { dry_run?: boolean; options?: { on_error?: string } };
+    const skip = req.options?.on_error === "skip";
+    const dry = req.dry_run === true;
+    const bad = "IP-Adresse: ungültiges Format (Wert „10.0.0.999“)";
+    const aborted = !dry && !skip; // the faulty row stops a run with "abort": nothing is written
+    const rows = [
+      "row;status;ci_number;message",
+      aborted ? "2;skipped;;nicht geschrieben (Abbruch)" : "2;created;SRV-0007;",
+      aborted ? "3;skipped;;nicht geschrieben (Abbruch)" : "3;created;SRV-0008;",
+      aborted ? "4;skipped;;nicht geschrieben (Abbruch)" : "4;updated;SRV-0001;",
+      dry || aborted ? `5;error;;${bad}` : `5;skipped;;${bad}`,
+      aborted ? "6;skipped;;nicht geschrieben (Abbruch)" : "6;created;SRV-0009;",
+    ];
+    const counts = dry
+      ? { created: 3, updated: 1, unchanged: 0, errors: 1, skipped: 0 }
+      : { created: 3, updated: 1, unchanged: 0, errors: 0, skipped: 1 };
+    const failure = aborted ? "Die Datei enthält 1 fehlerhafte Zeile(n). Es wurde nichts geschrieben. Einzelheiten stehen im Bericht." : null;
+    const jobId = finishedJob(
+      store,
+      "cmdb_import",
+      failure ? null : { ...counts, dry_run: dry },
+      [
+        { id: 1, name: "input-import.csv", content_type: "text/csv", size_bytes: 256 },
+        { id: 2, name: "report.csv", content_type: "text/csv; charset=utf-8", size_bytes: 256 },
+      ],
+      failure,
+    );
+    store.reports[jobId] = "\ufeff" + rows.join("\r\n") + "\r\n";
+    return ok({ job_id: jobId, status: "queued" }, 202);
+  }
   if (sub === "/saved-searches" && method === "GET") return ok(store.saved);
   if (sub === "/saved-searches" && method === "POST") {
     const b = (body ?? {}) as { name: string; shared?: boolean; criteria: CmdbSavedSearch["criteria"] };

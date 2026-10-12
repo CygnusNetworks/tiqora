@@ -8051,6 +8051,124 @@
       "customers": "Betroffene Kunden und Firmen",
       "tickets": "Offene Tickets zu betroffenen CIs",
       "truncated": "Die Liste ist gekürzt: Es gibt mehr betroffene Objekte als angezeigt werden."
+    },
+    "import": {
+      "title": "CIs importieren",
+      "loadFailed": "Die Klassen konnten nicht geladen werden.",
+      "noWritableClasses": "Sie dürfen in keiner Klasse CIs anlegen, daher gibt es nichts zu importieren.",
+      "next": "Weiter",
+      "back": "Zurück",
+      "startFailed": "Der Import konnte nicht gestartet werden.",
+      "steps": {
+        "label": "Schritte",
+        "file": "Datei",
+        "mapping": "Zuordnung",
+        "dry": "Probelauf",
+        "run": "Import"
+      },
+      "file": {
+        "class": "Klasse",
+        "classPlaceholder": "Klasse wählen",
+        "template": "Zuordnungsvorlage",
+        "templatePlaceholder": "Keine Vorlage",
+        "noTemplates": "Keine Vorlagen für diese Klasse",
+        "noTemplate": "Keine Vorlage verwenden",
+        "file": "Datei (CSV oder XLSX)",
+        "hint": "Bis 25 MB. Eine aus der CMDB exportierte Datei lässt sich ohne Zuordnung wieder importieren.",
+        "encoding": "Zeichenkodierung",
+        "delimiter": "Trennzeichen",
+        "delimiters": {
+          "semicolon": "Semikolon",
+          "comma": "Komma",
+          "tab": "Tabulator",
+          "pipe": "Senkrechter Strich"
+        },
+        "sheet": "Tabellenblatt",
+        "sheetPlaceholder": "Erstes Tabellenblatt",
+        "xlsxHint": "Die Spaltenüberschriften einer Excel-Datei liest der Server. Überschriften, die selbst ein Ziel sind (wie im Export), werden automatisch zugeordnet; für andere Überschriften wählen Sie eine Vorlage.",
+        "decodeFailed": "Die Datei passt nicht zur gewählten Zeichenkodierung. Bitte wählen Sie die andere Kodierung.",
+        "empty": "Die Datei ist leer.",
+        "downloadTemplate": "Vorlage herunterladen"
+      },
+      "fixed": {
+        "number": "CI-Nummer",
+        "name": "Name",
+        "deployment_state": "Verwendungsstatus",
+        "incident_state": "Vorfallsstatus"
+      },
+      "map": {
+        "column": "Spalte",
+        "samples": "Beispiele",
+        "target": "Ziel",
+        "targetFor": "Ziel der Spalte {{column}}",
+        "unnamed": "Spalte {{n}}",
+        "skip": "Nicht importieren",
+        "taken": "bereits zugeordnet",
+        "xlsxNotice": "Die Spaltenüberschriften einer Excel-Datei liest der Server beim Start des Probelaufs. Ohne Vorlage werden Überschriften zugeordnet, die selbst ein Ziel sind (number, name, attr:…); alle anderen werden übersprungen.",
+        "identifier": "Vorhandene CIs erkennen an",
+        "identifierHint": "Das erste gewählte Feld mit einem Wert in der Zeile bestimmt, welches CI aktualisiert wird. Zeilen ohne Treffer legen ein neues CI an.",
+        "emptyCells": "Leere Zellen",
+        "emptyKeep": "Vorhandenen Wert behalten",
+        "emptyClear": "Wert löschen",
+        "onError": "Fehlerhafte Zeilen",
+        "onErrorAbort": "Abbrechen, nichts schreiben",
+        "onErrorSkip": "Fehlerhafte Zeilen überspringen",
+        "createMissing": "Noch nicht vorhandene CIs anlegen"
+      },
+      "problem": {
+        "nothingMapped": "Bitte ordnen Sie mindestens eine Spalte zu.",
+        "duplicate": "Jedes Ziel kann nur von einer Spalte gefüllt werden.",
+        "identifierUnmapped": "Eine gewählte Kennung ist keiner Spalte zugeordnet.",
+        "noIdentifier": "Bitte wählen Sie mindestens eine Kennung.",
+        "nameMissing": "Für neue CIs ordnen Sie eine Spalte dem Namen zu."
+      },
+      "template": {
+        "shared": "geteilt",
+        "saveTitle": "Zuordnung als Vorlage speichern",
+        "name": "Name der Vorlage",
+        "namePlaceholder": "Name der Vorlage",
+        "save": "Als Vorlage speichern",
+        "saved": "Vorlage „{{name}}“ gespeichert.",
+        "saveFailed": "Die Vorlage konnte nicht gespeichert werden."
+      },
+      "dry": {
+        "intro": "Der Probelauf prüft jede Zeile und zeigt, was ein Import tun würde. Es wird nichts geschrieben.",
+        "start": "Probelauf starten",
+        "again": "Probelauf wiederholen",
+        "failed": "Der Probelauf ist fehlgeschlagen.",
+        "stale": "Datei oder Zuordnung wurden geändert. Bitte wiederholen Sie den Probelauf.",
+        "blocked": "Die Datei enthält fehlerhafte Zeilen. Korrigieren Sie die Datei oder wählen Sie in der Zuordnung „Fehlerhafte Zeilen überspringen“."
+      },
+      "run": {
+        "start": "Import starten",
+        "summary": "Laut Probelauf: {{created}} neu, {{updated}} geändert, {{errors}} fehlerhaft.",
+        "failed": "Der Import ist fehlgeschlagen. Einzelheiten stehen im Bericht.",
+        "toList": "Zur Liste"
+      },
+      "counts": {
+        "created": "Neu",
+        "updated": "Geändert",
+        "unchanged": "Unverändert",
+        "errors": "Fehlerhaft",
+        "skipped": "Übersprungen"
+      },
+      "report": {
+        "title": "Bericht (erste {{count}} Zeilen)",
+        "download": "Bericht herunterladen",
+        "loadFailed": "Der Bericht kann nicht angezeigt werden. Laden Sie ihn stattdessen herunter.",
+        "empty": "Der Bericht ist leer.",
+        "row": "Zeile",
+        "status": "Status",
+        "ci": "CI",
+        "message": "Meldung",
+        "statuses": {
+          "created": "neu",
+          "updated": "geändert",
+          "unchanged": "unverändert",
+          "skipped": "übersprungen",
+          "error": "fehlerhaft"
+        }
+      }
     }
   }
 }

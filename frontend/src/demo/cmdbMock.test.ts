@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { CiPage, ImpactGraph, LinkOut } from "@/lib/cmdbApi";
 import type { PortalCiPage } from "@/lib/portalCmdbApi";
-import { createDemoCmdb, resolveCmdb } from "./cmdbMock";
+import { createDemoCmdb, demoCmdbJob, demoCmdbReport, resolveCmdb } from "./cmdbMock";
 import { DEMO_ITSM_MODE_KEY } from "./itsmMode";
 
 afterEach(() => localStorage.removeItem(DEMO_ITSM_MODE_KEY));
@@ -61,6 +61,34 @@ describe("cmdbMock", () => {
     const detail = get(store, "/api/portal/config-items/1")?.body as { rendered: { key: string; portal: boolean }[] };
     expect(detail.rendered.map((r) => r.key)).toEqual(["hostname", "ip"]);
     expect(get(store, "/api/portal/config-items/5")?.status).toBe(404);
+  });
+
+  it("runs import jobs: a dry run reports a faulty row, 'abort' fails the real run, 'skip' writes the rest", () => {
+    const store = createDemoCmdb();
+    const start = (dry_run: boolean, on_error: string) => {
+      const form = new FormData();
+      form.set("file", new File(["a"], "a.csv"));
+      form.set("request", JSON.stringify({ dry_run, options: { on_error } }));
+      return (resolveCmdb(store, "POST", "/api/v1/cmdb/import-jobs", form)?.body as { job_id: number }).job_id;
+    };
+    const dry = demoCmdbJob(store, start(true, "abort"));
+    expect(dry).toMatchObject({ status: "succeeded", result: { errors: 1, created: 3, dry_run: true } });
+    expect(demoCmdbReport(store, dry!.id)).toContain("5;error;;");
+    const aborted = demoCmdbJob(store, start(false, "abort"));
+    expect(aborted).toMatchObject({ status: "failed", result: null });
+    expect(aborted?.error).toContain("nichts geschrieben");
+    expect(aborted?.files.map((f) => f.name)).toContain("report.csv");
+    const skipped = demoCmdbJob(store, start(false, "skip"));
+    expect(skipped).toMatchObject({ status: "succeeded", result: { errors: 0, skipped: 1, dry_run: false } });
+  });
+
+  it("stores import templates per class", () => {
+    const store = createDemoCmdb();
+    const body = { name: "Alt", class_id: 1, file_format: "csv", mapping: [{ column: "A", target: "name" }], options: { identifiers: ["name"] }, shared: false };
+    const created = resolveCmdb(store, "POST", "/api/v1/cmdb/import-templates", body);
+    expect(created?.status).toBe(201);
+    expect((get(store, "/api/v1/cmdb/import-templates", "class_id=1")?.body as unknown[]).length).toBe(1);
+    expect((get(store, "/api/v1/cmdb/import-templates", "class_id=2")?.body as unknown[]).length).toBe(0);
   });
 
   it("returns undefined for unknown routes", () => {

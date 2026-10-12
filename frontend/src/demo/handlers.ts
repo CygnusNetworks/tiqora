@@ -8,7 +8,7 @@ import {
   demoRefine,
 } from "./mockData";
 import { demoDashboards, resolve as resolveDashboards } from "./dashboardsMock";
-import { demoCmdb, demoCmdbJob, resolveCmdb } from "./cmdbMock";
+import { demoCmdb, demoCmdbJob, demoCmdbReport, resolveCmdb } from "./cmdbMock";
 import { resolveKiosk } from "./kioskMock";
 import { resolve as resolveSchedules } from "./schedulesMock";
 import { setDemoFactsBuilding } from "./reportsMock";
@@ -113,7 +113,8 @@ async function schedulesResponse(request: Request): Promise<Response | undefined
 async function cmdbResponse(request: Request): Promise<Response | undefined> {
   const url = new URL(request.url);
   const hasBody = request.method !== "GET" && request.method !== "DELETE";
-  const body = hasBody && !request.headers.get("content-type")?.includes("multipart") ? await request.json().catch(() => ({})) : undefined;
+  const multipart = request.headers.get("content-type")?.includes("multipart") === true;
+  const body = hasBody ? (multipart ? await request.formData().catch(() => undefined) : await request.json().catch(() => ({}))) : undefined;
   const out = resolveCmdb(demoCmdb, request.method, url.pathname, body, url.searchParams);
   if (!out) return undefined;
   return out.status === 204 ? new HttpResponse(null, { status: 204 }) : HttpResponse.json(out.body as never, { status: out.status });
@@ -130,6 +131,10 @@ export const handlers = [
   http.get("*/api/v1/jobs/:id", ({ params }) => {
     const job = demoCmdbJob(demoCmdb, Number(params.id));
     return job ? HttpResponse.json(job as never) : undefined;
+  }),
+  http.get("*/api/v1/jobs/:id/files/:fid", ({ params }) => {
+    const text = demoCmdbReport(demoCmdb, Number(params.id));
+    return text === undefined ? undefined : new HttpResponse(text, { headers: { "content-type": "text/csv; charset=utf-8" } });
   }),
   http.all("*/api/portal/config-items*", async ({ request }) => (await cmdbResponse(request)) ?? HttpResponse.json({}, { status: 404 })),
   http.all("*/api/v1/admin/cmdb/*", async ({ request }) => (await cmdbResponse(request)) ?? HttpResponse.json([])),

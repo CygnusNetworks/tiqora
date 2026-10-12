@@ -1,6 +1,6 @@
 import { test, type Page, type Route, type TestInfo } from "@playwright/test";
 import { GONE_SAVED_SEARCH_ID, createDemoDashboards, demoDefaultWidgets, demoTemplateUpdateHint, resolveDashboards, type DemoDashboards } from "../../src/demo/dashboardsMock";
-import { createDemoCmdb, demoCmdbJob, resolveCmdb, type DemoCmdb } from "../../src/demo/cmdbMock";
+import { createDemoCmdb, demoCmdbJob, demoCmdbReport, resolveCmdb, type DemoCmdb } from "../../src/demo/cmdbMock";
 import { resolveKiosk } from "../../src/demo/kioskMock";
 import type { ReportRunIn } from "../../src/lib/reportsApi";
 // Reports reuse the demo's pure report data (catalogue definitions + deterministic results).
@@ -752,10 +752,28 @@ export async function mockApi(page: Page) {
       }
     }
 
+    const cmdbJobFile = /\/api\/v1\/jobs\/(\d+)\/files\/\d+$/.exec(path);
+    if (cmdbJobFile && method === "GET") {
+      const text = demoCmdbReport(cmdbStore, Number(cmdbJobFile[1]));
+      if (text !== undefined) {
+        await route.fulfill({ status: 200, contentType: "text/csv; charset=utf-8", body: text });
+        return;
+      }
+    }
+
     // CMDB (Mode B): in-memory store of the demo mock.
     if (/\/api\/v1\/(admin\/)?cmdb(\/|$)/.test(path)) {
-      const hasBody = method !== "GET" && method !== "DELETE" && !(req.headers()["content-type"] ?? "").includes("multipart");
-      const out = resolveCmdb(cmdbStore, method, path, hasBody ? req.postDataJSON() : undefined, url.searchParams);
+      const multipart = (req.headers()["content-type"] ?? "").includes("multipart");
+      const hasBody = method !== "GET" && method !== "DELETE" && !multipart;
+      let body: unknown = hasBody ? req.postDataJSON() : undefined;
+      if (multipart) {
+        // the mock only needs the JSON `request` field of an import upload
+        const field = /name="request"\r?\n\r?\n([\s\S]*?)\r?\n--/.exec(req.postData() ?? "");
+        const form = new FormData();
+        if (field) form.set("request", field[1]);
+        body = form;
+      }
+      const out = resolveCmdb(cmdbStore, method, path, body, url.searchParams);
       if (out) {
         if (out.status === 204) await route.fulfill({ status: 204 });
         else await json(route, out.status, out.body);

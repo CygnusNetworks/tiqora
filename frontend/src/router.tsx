@@ -3,6 +3,7 @@ import { validateCmdbListSearch } from "@/components/cmdb/ciFilterModel";
 import { validateCiDetailSearch } from "@/components/cmdb/ciDetailModel";
 import { CiDetailPage } from "@/routes/agent/cmdb/CiDetailPage";
 import { CiEditRoute, CiNewRoute } from "@/routes/agent/cmdb/CiEditPage";
+import { CmdbImportPage } from "@/routes/agent/cmdb/CmdbImportPage";
 import { CmdbListPage } from "@/routes/agent/cmdb/CmdbListPage";
 import { CmdbCatalogPage } from "@/routes/admin/cmdb/CmdbCatalogPage";
 import { CmdbClassEditorPage } from "@/routes/admin/cmdb/CmdbClassEditorPage";
@@ -1321,7 +1322,11 @@ const agentCmdbNewRoute = createRoute({
 const agentCmdbImportRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/cmdb/import",
-  component: CmdbComingSoon,
+  validateSearch: (s: Record<string, unknown>): { class?: number } => {
+    const n = Number(s.class);
+    return Number.isInteger(n) && n > 0 ? { class: n } : {};
+  },
+  component: CmdbImportPage,
 });
 
 const agentCmdbCiRoute = createRoute({

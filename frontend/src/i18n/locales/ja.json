@@ -8051,6 +8051,124 @@
       "customers": "Affected customers and companies",
       "tickets": "Open tickets on affected CIs",
       "truncated": "The list is shortened: more objects are affected than shown."
+    },
+    "import": {
+      "title": "Import CIs",
+      "loadFailed": "The classes could not be loaded.",
+      "noWritableClasses": "You may not create CIs in any class, so there is nothing to import into.",
+      "next": "Next",
+      "back": "Back",
+      "startFailed": "The import could not be started.",
+      "steps": {
+        "label": "Steps",
+        "file": "File",
+        "mapping": "Mapping",
+        "dry": "Dry run",
+        "run": "Import"
+      },
+      "file": {
+        "class": "Class",
+        "classPlaceholder": "Select a class",
+        "template": "Mapping template",
+        "templatePlaceholder": "No template",
+        "noTemplates": "No templates for this class",
+        "noTemplate": "Do not use a template",
+        "file": "File (CSV or XLSX)",
+        "hint": "Up to 25 MB. A file exported from the CMDB can be imported again without a mapping.",
+        "encoding": "Encoding",
+        "delimiter": "Delimiter",
+        "delimiters": {
+          "semicolon": "Semicolon",
+          "comma": "Comma",
+          "tab": "Tab",
+          "pipe": "Pipe"
+        },
+        "sheet": "Worksheet",
+        "sheetPlaceholder": "First worksheet",
+        "xlsxHint": "The server reads the column headings of an Excel file. Headings that are targets themselves (as in an export) are mapped automatically; for other headings choose a template.",
+        "decodeFailed": "The file does not match the chosen encoding. Please choose the other one.",
+        "empty": "The file is empty.",
+        "downloadTemplate": "Download template"
+      },
+      "fixed": {
+        "number": "CI number",
+        "name": "Name",
+        "deployment_state": "Deployment state",
+        "incident_state": "Incident state"
+      },
+      "map": {
+        "column": "Column",
+        "samples": "Examples",
+        "target": "Target",
+        "targetFor": "Target of column {{column}}",
+        "unnamed": "Column {{n}}",
+        "skip": "Do not import",
+        "taken": "already used",
+        "xlsxNotice": "The column headings of an Excel file are read by the server when the dry run starts. Without a template, headings that are targets themselves (number, name, attr:…) are mapped; all others are skipped.",
+        "identifier": "Match existing CIs by",
+        "identifierHint": "The first chosen field that has a value in a row identifies the CI to update. Rows without a match create a new CI.",
+        "emptyCells": "Empty cells",
+        "emptyKeep": "Keep existing value",
+        "emptyClear": "Clear value",
+        "onError": "Faulty rows",
+        "onErrorAbort": "Abort, write nothing",
+        "onErrorSkip": "Skip faulty rows",
+        "createMissing": "Create CIs that do not exist yet"
+      },
+      "problem": {
+        "nothingMapped": "Map at least one column.",
+        "duplicate": "Each target can be used by one column only.",
+        "identifierUnmapped": "A chosen identifier is not mapped to any column.",
+        "noIdentifier": "Choose at least one identifier.",
+        "nameMissing": "To create new CIs, map a column to the name."
+      },
+      "template": {
+        "shared": "shared",
+        "saveTitle": "Save mapping as template",
+        "name": "Template name",
+        "namePlaceholder": "Template name",
+        "save": "Save as template",
+        "saved": "Template “{{name}}” saved.",
+        "saveFailed": "The template could not be saved."
+      },
+      "dry": {
+        "intro": "The dry run checks every row and shows what an import would do. Nothing is written.",
+        "start": "Start dry run",
+        "again": "Repeat dry run",
+        "failed": "The dry run failed.",
+        "stale": "The file or the mapping changed. Please repeat the dry run.",
+        "blocked": "The file contains faulty rows. Fix the file or choose “Skip faulty rows” in the mapping."
+      },
+      "run": {
+        "start": "Start import",
+        "summary": "{{created}} new, {{updated}} changed, {{errors}} faulty according to the dry run.",
+        "failed": "The import failed. Details are in the report.",
+        "toList": "Go to the list"
+      },
+      "counts": {
+        "created": "New",
+        "updated": "Changed",
+        "unchanged": "Unchanged",
+        "errors": "Faulty",
+        "skipped": "Skipped"
+      },
+      "report": {
+        "title": "Report (first {{count}} rows)",
+        "download": "Download report",
+        "loadFailed": "The report could not be shown. Download it instead.",
+        "empty": "The report is empty.",
+        "row": "Row",
+        "status": "Status",
+        "ci": "CI",
+        "message": "Message",
+        "statuses": {
+          "created": "new",
+          "updated": "changed",
+          "unchanged": "unchanged",
+          "skipped": "skipped",
+          "error": "faulty"
+        }
+      }
     }
   }
 }
