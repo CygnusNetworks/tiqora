@@ -13,6 +13,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import create_engine, delete, insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from structlog.testing import capture_logs
 
 from tests._fake_redis import FakeRedis
 from tiqora.ai import chat_bot_loop
@@ -27,6 +28,7 @@ from tiqora.webchat.notify import BOT_QUEUE_KEY
 
 pytestmark = pytest.mark.db
 
+WEBCHAT_KEY = "channel.webchat.enabled"
 CONFIG_LO, CONFIG_HI = 54630, 54660
 _URLS = ["mariadb_znuny_url", "postgres_znuny_url"]
 
@@ -51,7 +53,11 @@ def _cleanup(url: str) -> None:
                 TiqoraChatSession.config_id >= CONFIG_LO, TiqoraChatSession.config_id < CONFIG_HI
             )
         )
-        conn.execute(delete(TiqoraSettings).where(TiqoraSettings.key == KEY_AI_WORKER_ENABLED))
+        conn.execute(
+            delete(TiqoraSettings).where(
+                TiqoraSettings.key.in_([KEY_AI_WORKER_ENABLED, WEBCHAT_KEY])
+            )
+        )
     engine.dispose()
 
 
@@ -106,15 +112,14 @@ class Env:
         engine.dispose()
         return sid
 
-    def set_enabled(self, enabled: bool) -> None:
+    def set_enabled(self, enabled: bool, *, webchat: bool = True) -> None:
         engine = create_engine(self.url)
         with engine.begin() as conn:
-            conn.execute(delete(TiqoraSettings).where(TiqoraSettings.key == KEY_AI_WORKER_ENABLED))
-            conn.execute(
-                insert(TiqoraSettings).values(
-                    key=KEY_AI_WORKER_ENABLED, value="true" if enabled else "false"
+            for key, on in ((KEY_AI_WORKER_ENABLED, enabled), (WEBCHAT_KEY, webchat)):
+                conn.execute(delete(TiqoraSettings).where(TiqoraSettings.key == key))
+                conn.execute(
+                    insert(TiqoraSettings).values(key=key, value="true" if on else "false")
                 )
-            )
         engine.dispose()
 
 
@@ -323,3 +328,45 @@ async def test_hanging_blpop_does_not_stall_rescan(
     assert turn.await_args is not None
     assert turn.await_args.kwargs["session_id"] == sid
     await _stop(stop, task)
+
+
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+@pytest.mark.asyncio
+async def test_webchat_disabled_idles_quietly(env: Env, turn: AsyncMock) -> None:
+    env.set_enabled(True, webchat=False)  # prod: ai-worker on, web chat off
+    env.add_session(1)
+    env.redis.fail = True  # would warn on every BLPOP / SET if the loop touched Redis
+    with capture_logs() as logs:
+        stop, task = _start(env)
+        await asyncio.sleep(0.4)
+        await _stop(stop, task)
+    assert [e for e in logs if e["log_level"] == "warning"] == []
+    assert turn.await_count == 0
+
+
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+@pytest.mark.asyncio
+async def test_failure_warning_has_error_and_is_rate_limited(
+    env: Env, turn: AsyncMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(chat_bot_loop, "BOT_REDIS_ERROR_SLEEP_SECONDS", 0.005)
+    env.redis.fail = True
+    clock = FakeClock()
+    with capture_logs() as logs:
+        stop, task = _start(env, clock)
+        await asyncio.sleep(0.3)  # many identical failures within one clock instant
+        warned = [e for e in logs if e["event"] == "webchat_bot_queue_pop_failed"]
+        assert len(warned) == 1
+        assert "fake redis is down" in warned[0]["error"]
+        assert warned[0]["exc_info"]
+        clock.now += chat_bot_loop.BOT_WARN_REPEAT_SECONDS + 1
+        await asyncio.sleep(0.2)
+        await _stop(stop, task)
+    warned = [e for e in logs if e["event"] == "webchat_bot_queue_pop_failed"]
+    assert len(warned) == 2
+
+
+def test_default_redis_socket_timeout_outlives_blpop() -> None:
+    client = chat_bot_loop.make_bot_redis(get_settings())
+    kwargs = client.connection_pool.connection_kwargs
+    assert kwargs["socket_timeout"] > chat_bot_loop.BOT_BLPOP_TIMEOUT
