@@ -119,6 +119,7 @@ from tiqora.domain.ticket_write_service import (
     unpause_ai_automation as _unpause_ai_automation,
 )
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.plugins.sync_hooks import OperationVetoed
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -1177,6 +1178,12 @@ async def accept_ai_triage(
         # allowlist) -- this asymmetry is deliberate and surfaced in the
         # admin UI as a warning when configuring the allowlist.
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden") from exc
+    except OperationVetoed as exc:
+        # A plugin before-hook refused the move; undo a customer half applied before it.
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
 
     if "queue" in applied and row.suggested_queue_id is not None:
         # Same as the worker's auto-apply: the destination queue decides

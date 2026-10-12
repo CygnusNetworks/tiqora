@@ -1747,8 +1747,9 @@ async def create_article(
     into the ticket's live chat. A chat nobody accepted yet is accepted first, in its own
     transaction (R-REPLY-ACCEPT-FIRST); a refused accept refuses the reply (409
     ``at_capacity`` / ``already_taken``, 403 ``forbidden``). No live chat → 409
-    ``chat_not_live``; nothing is stored in either case. The text and ``state_id`` are
-    validated before the implicit accept. ``attachments`` are allowed.
+    ``chat_not_live``; nothing is stored in either case. The text and ``state_id`` (including
+    the plugins' ``ticket.state_change`` before-hooks) are validated before the implicit accept;
+    an ``article.create`` veto can only come after it. ``attachments`` are allowed.
     """
     attachments, telegram_options = _telegram_extras(body)
     wants_security = body.email_security is not None and body.email_security.active
@@ -1760,10 +1761,15 @@ async def create_article(
     svc = _write_service(session, settings)
     chat_reply = _is_chat_reply(body)
     if chat_reply and body.state_id is not None:
-        # The implicit accept below commits; an invalid next state must refuse first.
+        # The implicit accept below commits; an invalid next state (or a plugin veto, run
+        # here once) must refuse first.
         try:
             await svc.validate_state_change(
-                user.id, ticket_id, body.state_id, pending_time=body.pending_time
+                user.id,
+                ticket_id,
+                body.state_id,
+                pending_time=body.pending_time,
+                run_hooks=True,
             )
         except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
             await session.rollback()
@@ -1791,7 +1797,7 @@ async def create_article(
                     ticket_id,
                     body.state_id,
                     pending_time=body.pending_time,
-                    run_hooks=True,
+                    run_hooks=not chat_reply,  # chat replies ran the hook before the accept
                 )
             aid = await svc.add_article(
                 user.id,

@@ -21,11 +21,12 @@ from tests._plugin_points import boot_points_plugin, points_behaviour
 from tests._row_cleanup import delete_above_marks, snapshot_marks
 from tiqora.channels.email.smtp import CapturingMailSender
 from tiqora.domain import ticket_write_service as tws
+from tiqora.domain.mail_outbound import ResolvedOutboundSmtp
 from tiqora.domain.ticket_write_service import ArticleIn, TicketIn, TicketWriteService
 from tiqora.plugins import sync_hooks
 from tiqora.plugins.context import PluginTickets
 from tiqora.plugins.sync_hooks import OperationVetoed, SyncBreaker
-from tiqora.plugins.writes import TicketDraft
+from tiqora.plugins.writes import PluginWriteError, TicketDraft
 from tiqora.znuny.sysconfig import SysConfig
 
 pytestmark = pytest.mark.db
@@ -36,6 +37,7 @@ VETO = "Vertragsnummer fehlt"
 
 MARK_TABLES: tuple[str, ...] = (
     "tiqora_event_outbox",
+    "tiqora_mail_log",
     "tiqora_cache_invalidation",
     "ticket_history",
     "dynamic_field_value",
@@ -179,6 +181,25 @@ async def env(
     SyncBreaker.reset_for_tests()
     SyncBreaker.persistence = False
     boot_points_plugin(tmp_path, monkeypatch)
+
+    async def _dispatch_on(*_a: Any, **_kw: Any) -> ResolvedOutboundSmtp:
+        # Outbound mail is off in the test env, which would leave the injected sender unused
+        # and make every "nothing sent" assert vacuous; with this on, an unvetoed email goes
+        # through CapturingMailSender (see test_unvetoed_email_is_sent_positive_control).
+        return ResolvedOutboundSmtp(
+            enabled=True,
+            host="localhost",
+            port=25,
+            security="none",
+            auth_type="none",
+            auth_user="",
+            auth_password="",
+            from_default="",
+            timeout_seconds=5,
+            source="db",
+        )
+
+    monkeypatch.setattr("tiqora.domain.mail_outbound.resolve_outbound_smtp", _dispatch_on)
     yield Env(sync_url, fac)
     SyncBreaker.reset_for_tests()
     await engine.dispose()
@@ -226,6 +247,15 @@ async def test_veto_before_email_send(env: Env) -> None:
     assert env.count("article", "ticket_id = :t", t=tid) == before
     (op,) = _calls("article.create")
     assert (op.ticket_id, op.channel, op.to) == (tid, "email", "pp55-cust@example.org")
+
+
+async def test_unvetoed_email_is_sent_positive_control(env: Env) -> None:
+    """Without the veto the same call really sends: the `sent == []` asserts mean something."""
+    tid = await env.ticket()
+    before = env.count("article", "ticket_id = :t", t=tid)
+    await env.run(lambda svc: svc.add_article(AGENT, tid, _article()))
+    assert len(env.sender.sent) == 1
+    assert env.count("article", "ticket_id = :t", t=tid) == before + 1
 
 
 async def test_article_hook_sees_op_and_lets_note_through(env: Env) -> None:
@@ -382,7 +412,7 @@ async def test_module_level_functions_never_hook(env: Env) -> None:
 async def test_plugin_write_as_agent_is_hooked(env: Env) -> None:
     tid = await env.ticket()
     points_behaviour().MODE["hook.ticket.state_change"] = "veto"
-    with pytest.raises(Exception, match=VETO):
+    with pytest.raises(PluginWriteError, match=VETO):  # the veto text, as the plugin's error
         await PluginTickets().set_state(tid, "closed successful", as_agent=AGENT)
     assert (
         env.scalar(
@@ -473,6 +503,16 @@ async def test_reply_with_state_veto_sends_nothing(
     assert env.sender.sent == []  # the veto came before the send
     assert env.count("article", "ticket_id = :t", t=tid) == before
     assert _calls("article.create") == []  # the state veto stopped the request first
+
+
+async def test_unvetoed_api_email_reply_is_sent_positive_control(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tid = await env.ticket()
+    async with _client(env, monkeypatch) as client:
+        resp = await client.post(f"/api/v1/tickets/{tid}/articles", json=_body())
+    assert resp.status_code == 201, resp.text
+    assert len(env.sender.sent) == 1
 
 
 async def test_reply_with_state_fires_state_hook_once(

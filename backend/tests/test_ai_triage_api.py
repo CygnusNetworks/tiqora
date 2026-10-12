@@ -9,6 +9,7 @@ docstring for the ``ns`` registry); ns=75–83 — 74 is taken by
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -432,6 +433,58 @@ async def test_accept_moves_into_a_queue_the_agent_can_enter(
         assert await _triage_status(mariadb_znuny_url, triage_id) == TRIAGE_STATUS_ACCEPTED
         assert _ticket_queue(mariadb_znuny_url, seed["ticket_id"]) == target_queue_id
     finally:
+        await _cleanup_triage(mariadb_znuny_url, seed["ticket_id"])
+        await client.aclose()
+        await client_engine.dispose()
+        _set_ticket_queue(mariadb_znuny_url, seed["ticket_id"], seed["queue_id"])
+        _delete_queue(mariadb_znuny_url, target_queue_id)
+        _cleanup_ticket(
+            mariadb_znuny_url,
+            ticket_id=seed["ticket_id"],
+            queue_id=seed["queue_id"],
+            agent_id=seed["agent_id"],
+            group_id=_group_id(seed),
+        )
+
+
+async def test_accept_plugin_veto_is_422_and_moves_nothing(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A plugin's ticket.move_queue veto reaches the agent as 422 with its text (not 500)."""
+    from tests._plugin_points import boot_points_plugin, points_behaviour
+    from tiqora.plugins.sync_hooks import SyncBreaker
+
+    seed, client, client_engine = await _seed(mariadb_znuny_url, ns=83, monkeypatch=monkeypatch)
+    target_queue_id = seed["queue_id"] + 500
+    SyncBreaker.reset_for_tests()
+    SyncBreaker.persistence = False
+    try:
+        _add_queue(
+            mariadb_znuny_url,
+            queue_id=target_queue_id,
+            group_id=_group_id(seed),
+            name=f"AiTriageTarget96{83}",
+        )
+        _grant_move_into(mariadb_znuny_url, agent_id=seed["agent_id"], group_id=_group_id(seed))
+        triage_id = await _insert_triage(
+            mariadb_znuny_url,
+            ticket_id=seed["ticket_id"],
+            source_queue_id=seed["queue_id"],
+            suggested_queue_id=target_queue_id,
+        )
+        boot_points_plugin(tmp_path, monkeypatch)
+        points_behaviour().MODE["hook.ticket.queue_move"] = "veto"
+
+        resp = await client.post(
+            f"/api/v1/tickets/{seed['ticket_id']}/ai/triage/{triage_id}/accept",
+            json={"queue": True, "customer": False},
+        )
+        assert resp.status_code == 422, resp.text
+        assert resp.json()["detail"] == "Vertragsnummer fehlt"
+        assert await _triage_status(mariadb_znuny_url, triage_id) == TRIAGE_STATUS_OPEN
+        assert _ticket_queue(mariadb_znuny_url, seed["ticket_id"]) == seed["queue_id"]
+    finally:
+        SyncBreaker.reset_for_tests()
         await _cleanup_triage(mariadb_znuny_url, seed["ticket_id"])
         await client.aclose()
         await client_engine.dispose()

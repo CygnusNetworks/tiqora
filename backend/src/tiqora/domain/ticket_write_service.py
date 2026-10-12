@@ -2923,7 +2923,10 @@ class TicketWriteService:
         pending_time: datetime | None = None,
         hooks_checked: bool = False,
     ) -> None:
-        """``hooks_checked=True``: ``validate_state_change(..., run_hooks=True)`` already ran
+        """Change the state; plugins' ``ticket.state_change`` before-hooks run for every caller
+        (REST, MCP, webchat close, plugin ``as_agent``) and a veto raises ``OperationVetoed``.
+
+        ``hooks_checked=True``: ``validate_state_change(..., run_hooks=True)`` already ran
         the plugin before-hooks for exactly this change (reply + next state)."""
         t = await _ticket_must_exist(self._session, ticket_id)
         await self._assert_rw(user_id, int(t["queue_id"]))
