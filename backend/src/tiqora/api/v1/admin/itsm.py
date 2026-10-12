@@ -26,7 +26,7 @@ from tiqora.api.v1.admin.itsm_schemas import (
     SetupItemOut,
     SetupOut,
 )
-from tiqora.api.v1.itsm_schemas import MatrixOut, matrix_out
+from tiqora.api.v1.itsm_schemas import MatrixOut, ServiceItsmOut, matrix_out, service_out
 from tiqora.itsm.ci_provider import CiReadOnly, CiUnavailable
 from tiqora.itsm.link_types import (
     LinkTypeError,
@@ -49,6 +49,7 @@ from tiqora.itsm.mode import (
 from tiqora.itsm.models import TiqoraItsmLinkType
 from tiqora.itsm.priority import InvalidMatrix, MatrixCell, load_matrix, save_matrix
 from tiqora.itsm.providers import tiqora_cmdb_empty
+from tiqora.itsm.services import ServiceMetaIn, ServiceNotFound, save_service_meta, service_info
 from tiqora.itsm.settings import load_itsm_settings
 from tiqora.itsm.setup import SetupItem, apply_setup, plan_setup
 from tiqora.znuny.sysconfig import SysConfig
@@ -296,5 +297,49 @@ async def put_priority_matrix(
     cfg = await load_itsm_settings(session, settings)
     view = await load_matrix(session, await get_itsm_mode(session), cfg)
     out = matrix_out(view, enabled=cfg.priority_matrix_enabled)
+    await session.commit()
+    return out
+
+
+async def _service_meta_out(
+    session: DbSession, settings: AppSettings, service_id: int, user_id: int
+) -> ServiceItsmOut:
+    cfg = await load_itsm_settings(session, settings)
+    try:
+        info = await service_info(session, service_id, user_id=user_id)
+    except ServiceNotFound as exc:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, detail={"code": "service_not_found"}
+        ) from exc
+    except CiUnavailable as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail={"code": exc.code}) from exc
+    return service_out(info, default_minutes=cfg.min_minutes_between_incidents)
+
+
+@router.get("/services/{service_id}/meta", response_model=ServiceItsmOut)
+async def get_service_meta(
+    service_id: int, admin: AdminUser, session: DbSession, settings: AppSettings
+) -> ServiceItsmOut:
+    return await _service_meta_out(session, settings, service_id, admin.id)
+
+
+@router.put("/services/{service_id}/meta", response_model=ServiceItsmOut)
+async def put_service_meta(
+    service_id: int,
+    body: ServiceMetaIn,
+    admin: AdminUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> ServiceItsmOut:
+    """Replace the Tiqora-side meta (409 ``read_only``: changed Znuny-owned type or criticality)."""
+    try:
+        await save_service_meta(session, service_id, body, user_id=admin.id)
+    except ServiceNotFound as exc:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, detail={"code": "service_not_found"}
+        ) from exc
+    except CiReadOnly as exc:  # refused before anything was written
+        raise HTTPException(status.HTTP_409_CONFLICT, detail={"code": "read_only"}) from exc
+    out = await _service_meta_out(session, settings, service_id, admin.id)
     await session.commit()
     return out

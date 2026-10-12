@@ -3793,6 +3793,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/itsm/priority-matrix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Priority Matrix
+         * @description The matrix of the current mode; Mode A shows Znuny's ``cip_allocate`` read-only.
+         */
+        get: operations["get_priority_matrix_api_v1_admin_itsm_priority_matrix_get"];
+        /**
+         * Put Priority Matrix
+         * @description Replace Tiqora's matrix (409 ``read_only`` in Mode A, 422 for an invalid cell set).
+         */
+        put: operations["put_priority_matrix_api_v1_admin_itsm_priority_matrix_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/services/{service_id}/meta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Service Meta */
+        get: operations["get_service_meta_api_v1_admin_itsm_services__service_id__meta_get"];
+        /**
+         * Put Service Meta
+         * @description Replace the Tiqora-side meta (409 ``read_only``: changed Znuny-owned type or criticality).
+         */
+        put: operations["put_service_meta_api_v1_admin_itsm_services__service_id__meta_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Setup
+         * @description Preview: what exists and what "Einrichten" would create. Writes nothing.
+         */
+        get: operations["get_setup_api_v1_admin_itsm_setup_get"];
+        put?: never;
+        /**
+         * Post Setup
+         * @description Create the missing rows of the selected groups; existing rows are never changed.
+         */
+        post: operations["post_setup_api_v1_admin_itsm_setup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/mail-accounts": {
         parameters: {
             query?: never;
@@ -7772,6 +7841,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/itsm/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Catalog
+         * @description Classes the user may read and the deployment / incident states, for the search filters.
+         */
+        get: operations["get_catalog_api_v1_itsm_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/cis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Cis
+         * @description Search CIs by number / name (Mode A also by attribute values) and state filters.
+         */
+        get: operations["search_cis_api_v1_itsm_cis_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/cis/{source}/{ci_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ci
+         * @description One CI with its attributes (the current version unless ``version_id`` asks for another).
+         */
+        get: operations["get_ci_api_v1_itsm_cis__source___ci_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/cis/{source}/{ci_id}/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ci Tickets
+         * @description Tickets linked to the CI that the user may read (the newest ``CI_TICKETS_MAX`` at most).
+         *
+         *     ``source_key`` is the ticket id and ``target_key`` the CI ref; ``other_*`` describe the ticket.
+         */
+        get: operations["get_ci_tickets_api_v1_itsm_cis__source___ci_id__tickets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/cis/{source}/{ci_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ci Versions
+         * @description The version history of one CI, newest first.
+         */
+        get: operations["get_ci_versions_api_v1_itsm_cis__source___ci_id__versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/itsm/link-types": {
         parameters: {
             query?: never;
@@ -7784,6 +7955,123 @@ export interface paths {
          * @description The link types the picker offers for *pair* in the current ITSM mode.
          */
         get: operations["get_offered_link_types_api_v1_itsm_link_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/priority-matrix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Priority Matrix
+         * @description The criticality x impact grid of the current mode (Znuny's in Mode A).
+         */
+        get: operations["get_priority_matrix_api_v1_itsm_priority_matrix_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/priority-suggestion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Priority Suggestion
+         * @description What the matrix says for the pair, or ``null`` (unknown pair, matrix disabled).
+         */
+        get: operations["get_priority_suggestion_api_v1_itsm_priority_suggestion_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/services/incident-states": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Service Incident States
+         * @description Live incident state of up to 200 services (the service picker and list badges).
+         */
+        get: operations["get_service_incident_states_api_v1_itsm_services_incident_states_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/services/{service_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Service */
+        get: operations["get_service_api_v1_itsm_services__service_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/services/{service_id}/recent-incident": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Recent Incident
+         * @description The incident flood warning: a recent incident on the same service (null = none).
+         */
+        get: operations["get_recent_incident_api_v1_itsm_services__service_id__recent_incident_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Status
+         * @description Mode and CI availability for the UI. Answers while ITSM is off (mode ``off``).
+         */
+        get: operations["get_status_api_v1_itsm_status_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10689,6 +10977,52 @@ export interface paths {
          */
         post: operations["post_ticket_chat_typing_api_v1_tickets__ticket_id__chat_typing_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/cis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Ticket Cis
+         * @description CIs linked to the ticket (those the user may read). Needs ``ro`` on the ticket.
+         */
+        get: operations["list_ticket_cis_api_v1_tickets__ticket_id__cis_get"];
+        put?: never;
+        /**
+         * Link Ticket Ci
+         * @description Link a CI to the ticket. Needs ``rw`` on the ticket and ``ro`` on the CI. Idempotent.
+         */
+        post: operations["link_ticket_ci_api_v1_tickets__ticket_id__cis_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/cis/{source}/{ci_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unlink Ticket Ci
+         * @description Remove the link(s) between the ticket and the CI. Needs ``rw`` on the ticket.
+         *
+         *     Idempotent: 204 also when no such link existed.
+         */
+        delete: operations["unlink_ticket_ci_api_v1_tickets__ticket_id__cis__source___ci_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -13934,6 +14268,15 @@ export interface components {
             /** Options */
             options?: components["schemas"]["ProcessDialogOptionOut"][];
         };
+        /** CatalogOut */
+        CatalogOut: {
+            /** Classes */
+            classes: components["schemas"]["CiClassOut"][];
+            /** Deployment States */
+            deployment_states: components["schemas"]["CatalogValueOut"][];
+            /** Incident States */
+            incident_states: components["schemas"]["CatalogValueOut"][];
+        };
         /** CatalogParamOut */
         CatalogParamOut: {
             /** Kind */
@@ -13946,6 +14289,15 @@ export interface components {
             one_of: string[];
             /** Required */
             required: boolean;
+        };
+        /** CatalogValueOut */
+        CatalogValueOut: {
+            /** Functionality */
+            functionality: string | null;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
         };
         /** CategoryIn */
         CategoryIn: {
@@ -14606,6 +14958,136 @@ export interface components {
             queue_id: number;
             /** Ref */
             ref: string;
+        };
+        /** CiAttributeOut */
+        CiAttributeOut: {
+            /**
+             * Children
+             * @default []
+             */
+            children: components["schemas"]["CiAttributeOut"][];
+            /** Display */
+            display: string;
+            /** Key */
+            key: string;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+            /** Raw */
+            raw: string | null;
+            /** Ref */
+            ref: string | null;
+        };
+        /** CiClassOut */
+        CiClassOut: {
+            /** Can Read */
+            can_read: boolean;
+            /** Can Write */
+            can_write: boolean;
+            /** Icon */
+            icon: string | null;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+        };
+        /** CiDetailOut */
+        CiDetailOut: {
+            /** Attributes */
+            attributes: components["schemas"]["CiAttributeOut"][];
+            /** Definition Version */
+            definition_version: number | null;
+            /** Read Only */
+            read_only: boolean;
+            summary: components["schemas"]["CiSummaryOut"];
+            version: components["schemas"]["CiVersionOut"] | null;
+        };
+        /** CiPageOut */
+        CiPageOut: {
+            /** Items */
+            items: components["schemas"]["CiSummaryOut"][];
+            /** Total */
+            total: number;
+            /** Truncated */
+            truncated: boolean;
+        };
+        /** CiSummaryOut */
+        CiSummaryOut: {
+            /** Changed At */
+            changed_at: string | null;
+            /** Class Key */
+            class_key: string;
+            /** Class Name */
+            class_name: string;
+            deployment_state: components["schemas"]["CatalogValueOut"] | null;
+            /** Edit Url */
+            edit_url: string | null;
+            /** Id */
+            id: number;
+            incident_state: components["schemas"]["CatalogValueOut"] | null;
+            /** Name */
+            name: string;
+            /** Number */
+            number: string;
+            /** Ref */
+            ref: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "znuny" | "tiqora";
+        };
+        /** CiTicketLinkIn */
+        CiTicketLinkIn: {
+            /** Ci */
+            ci: string;
+            /** Link Type */
+            link_type?: string | null;
+        };
+        /** CiTicketLinkOut */
+        CiTicketLinkOut: {
+            ci: components["schemas"]["CiSummaryOut"];
+            /** Created At */
+            created_at: string | null;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "source" | "target" | "both";
+            /** Link Type */
+            link_type: string;
+            /** Ticket Id */
+            ticket_id: number;
+        };
+        /** CiVersionOut */
+        CiVersionOut: {
+            /** Change Note */
+            change_note: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number | null;
+            /** Created By Name */
+            created_by_name: string | null;
+            deployment_state: components["schemas"]["CatalogValueOut"] | null;
+            /** Id */
+            id: number;
+            incident_state: components["schemas"]["CatalogValueOut"] | null;
+            /** Name */
+            name: string;
+            /** Seq */
+            seq: number;
+        };
+        /** CiVersionPageOut */
+        CiVersionPageOut: {
+            /** Items */
+            items: components["schemas"]["CiVersionOut"][];
+            /** Total */
+            total: number;
         };
         /** CompanyCreateOut */
         CompanyCreateOut: {
@@ -17429,6 +17911,33 @@ export interface components {
              */
             mode: "off" | "znuny_readthrough" | "tiqora";
         };
+        /**
+         * ItsmStatusOut
+         * @description ``GET /itsm/status`` (no gate): what the UI may offer right now.
+         */
+        ItsmStatusOut: {
+            /** Ci Available */
+            ci_available: boolean;
+            /** Ci Read Only */
+            ci_read_only: boolean;
+            /** Ci Source */
+            ci_source: ("znuny" | "tiqora") | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "off" | "znuny_readthrough" | "tiqora";
+            /** Setup Complete */
+            setup_complete: boolean;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "auto" | "admin" | "importer";
+            /** Unavailable Code */
+            unavailable_code: string | null;
+            znuny: components["schemas"]["ItsmZnunyInfoOut"];
+        };
         /** ItsmSwitchOut */
         ItsmSwitchOut: {
             /** By */
@@ -17437,6 +17946,22 @@ export interface components {
             run_id: number | null;
             /** Switched At */
             switched_at: string | null;
+        };
+        /**
+         * ItsmZnunyInfoOut
+         * @description What of Znuny's ITSM is installed (same facts as the admin page, without the change flag).
+         */
+        ItsmZnunyInfoOut: {
+            /** Cmdb Installed */
+            cmdb_installed: boolean;
+            /** Core Installed */
+            core_installed: boolean;
+            /** Packages */
+            packages: {
+                [key: string]: string;
+            };
+            /** Profile */
+            profile: string | null;
         };
         /** JitDefaults */
         JitDefaults: {
@@ -18561,6 +19086,53 @@ export interface components {
              * @default preview
              */
             subject: string;
+        };
+        /** MatrixCellIn */
+        MatrixCellIn: {
+            /** Criticality */
+            criticality: string;
+            /** Impact */
+            impact: string;
+            /** Priority Id */
+            priority_id: number;
+        };
+        /** MatrixCellOut */
+        MatrixCellOut: {
+            /** Criticality */
+            criticality: string;
+            /** Impact */
+            impact: string;
+            /** Priority Id */
+            priority_id: number;
+        };
+        /**
+         * MatrixIn
+         * @description Replaces every cell of Tiqora's matrix (``PUT /admin/itsm/priority-matrix``).
+         */
+        MatrixIn: {
+            /** Cells */
+            cells: components["schemas"]["MatrixCellIn"][];
+        };
+        /**
+         * MatrixOut
+         * @description The criticality x impact grid; source "znuny" is ``cip_allocate`` (read-only).
+         */
+        MatrixOut: {
+            /** Cells */
+            cells: components["schemas"]["MatrixCellOut"][];
+            /** Criticality Values */
+            criticality_values: string[];
+            /** Editable */
+            editable: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Impact Values */
+            impact_values: string[];
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "znuny" | "tiqora";
         };
         /** McpClientCreate */
         McpClientCreate: {
@@ -20095,6 +20667,11 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** PrioritySuggestionOut */
+        PrioritySuggestionOut: {
+            /** Priority Id */
+            priority_id: number | null;
+        };
         /** PriorityUpdate */
         PriorityUpdate: {
             /** Name */
@@ -20791,6 +21368,26 @@ export interface components {
             queue_id?: number | null;
             /** Value */
             value?: string | null;
+        };
+        /** RecentIncidentOut */
+        RecentIncidentOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Minutes Ago */
+            minutes_ago: number;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+            /** Type Name */
+            type_name: string;
+            /** Window Minutes */
+            window_minutes: number;
         };
         /**
          * Rect
@@ -22113,6 +22710,70 @@ export interface components {
              */
             valid_id: number;
         };
+        /** ServiceIncidentStateOut */
+        ServiceIncidentStateOut: {
+            /** Cis Incident */
+            cis_incident: number;
+            /** Cis Warning */
+            cis_warning: number;
+            /** Service Id */
+            service_id: number;
+            state: components["schemas"]["CatalogValueOut"] | null;
+        };
+        /** ServiceItsmOut */
+        ServiceItsmOut: {
+            /** Criticality */
+            criticality: string | null;
+            /** Description */
+            description: string | null;
+            /** Effective Min Minutes Between Incidents */
+            effective_min_minutes_between_incidents: number;
+            incident_state: components["schemas"]["ServiceIncidentStateOut"] | null;
+            /** Min Minutes Between Incidents */
+            min_minutes_between_incidents: number | null;
+            /** Name */
+            name: string;
+            /** Owner Name */
+            owner_name: string | null;
+            /** Owner User Id */
+            owner_user_id: number | null;
+            /** Portal Visible */
+            portal_visible: boolean;
+            /** Service Id */
+            service_id: number;
+            /** Service Type */
+            service_type: string | null;
+            /** Znuny Owned */
+            znuny_owned: boolean;
+            /** Znuny Sla Min Times */
+            znuny_sla_min_times: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * ServiceMetaIn
+         * @description Replacement of the Tiqora-side meta of one service (PUT semantics).
+         *
+         *     ``service_type`` / ``criticality`` are Znuny's in Mode A: sending a different value is
+         *     refused (``CiReadOnly``); ``None`` means "leave to Znuny" there and "empty" elsewhere.
+         */
+        ServiceMetaIn: {
+            /** Criticality */
+            criticality?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Min Minutes Between Incidents */
+            min_minutes_between_incidents?: number | null;
+            /** Owner User Id */
+            owner_user_id?: number | null;
+            /**
+             * Portal Visible
+             * @default true
+             */
+            portal_visible: boolean;
+            /** Service Type */
+            service_type?: string | null;
+        };
         /** ServiceOut */
         ServiceOut: {
             /** Change Time */
@@ -22182,6 +22843,40 @@ export interface components {
             values: {
                 [key: string]: unknown;
             };
+        };
+        /** SetupApplyIn */
+        SetupApplyIn: {
+            /** Groups */
+            groups?: ("incident_problem" | "change")[];
+        };
+        /** SetupItemOut */
+        SetupItemOut: {
+            /** Detail */
+            detail?: string | null;
+            /**
+             * Group
+             * @enum {string}
+             */
+            group: "incident_problem" | "change";
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "ticket_type" | "ticket_state" | "dynamic_field";
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "present" | "missing" | "conflict" | "invalid";
+        };
+        /** SetupOut */
+        SetupOut: {
+            /** Complete */
+            complete: boolean;
+            /** Items */
+            items: components["schemas"]["SetupItemOut"][];
         };
         /** ShareGroupOut */
         ShareGroupOut: {
@@ -34791,6 +35486,220 @@ export interface operations {
             };
         };
     };
+    get_priority_matrix_api_v1_admin_itsm_priority_matrix_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatrixOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_priority_matrix_api_v1_admin_itsm_priority_matrix_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatrixIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatrixOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_service_meta_api_v1_admin_itsm_services__service_id__meta_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                service_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceItsmOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_service_meta_api_v1_admin_itsm_services__service_id__meta_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                service_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceMetaIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceItsmOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_setup_api_v1_admin_itsm_setup_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_setup_api_v1_admin_itsm_setup_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_mail_accounts_api_v1_admin_mail_accounts_get: {
         parameters: {
             query?: {
@@ -41030,7 +41939,7 @@ export interface operations {
         parameters: {
             query?: {
                 type?: ("Provider" | "Requester") | null;
-                source?: ("tiqora" | "znuny") | null;
+                source?: ("znuny" | "tiqora") | null;
                 from?: string | null;
                 to?: string | null;
                 remote_ip?: string | null;
@@ -45479,6 +46388,195 @@ export interface operations {
             };
         };
     };
+    get_catalog_api_v1_itsm_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_cis_api_v1_itsm_cis_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                class?: string[] | null;
+                depl?: string[] | null;
+                inci?: string[] | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CiPageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ci_api_v1_itsm_cis__source___ci_id__get: {
+        parameters: {
+            query?: {
+                version_id?: number | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                /** @description CI data source */
+                source: "znuny" | "tiqora";
+                ci_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CiDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ci_tickets_api_v1_itsm_cis__source___ci_id__tickets_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                /** @description CI data source */
+                source: "znuny" | "tiqora";
+                ci_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketLinkTargetOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ci_versions_api_v1_itsm_cis__source___ci_id__versions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                /** @description CI data source */
+                source: "znuny" | "tiqora";
+                ci_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CiVersionPageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_offered_link_types_api_v1_itsm_link_types_get: {
         parameters: {
             query?: {
@@ -45502,6 +46600,218 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LinkTypeOptionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_priority_matrix_api_v1_itsm_priority_matrix_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatrixOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_priority_suggestion_api_v1_itsm_priority_suggestion_get: {
+        parameters: {
+            query?: {
+                criticality?: string | null;
+                impact?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrioritySuggestionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_service_incident_states_api_v1_itsm_services_incident_states_get: {
+        parameters: {
+            query: {
+                /** @description Service ids (at most 200) */
+                ids: number[];
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: components["schemas"]["ServiceIncidentStateOut"];
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_service_api_v1_itsm_services__service_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                service_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceItsmOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_recent_incident_api_v1_itsm_services__service_id__recent_incident_get: {
+        parameters: {
+            query?: {
+                exclude_ticket_id?: number | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                service_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecentIncidentOut"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_status_api_v1_itsm_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItsmStatusOut"];
                 };
             };
             /** @description Validation Error */
@@ -51443,6 +52753,119 @@ export interface operations {
             };
             /** @description The ticket has no live chat (`chat_not_live`) */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ticket_cis_api_v1_tickets__ticket_id__cis_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CiTicketLinkOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_ticket_ci_api_v1_tickets__ticket_id__cis_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CiTicketLinkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CiTicketLinkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlink_ticket_ci_api_v1_tickets__ticket_id__cis__source___ci_id__delete: {
+        parameters: {
+            query?: {
+                /** @description Only this type (default: every type) */
+                link_type?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                /** @description CI data source */
+                source: "znuny" | "tiqora";
+                ci_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -28,7 +28,12 @@ from tiqora.api.v1.itsm_schemas import (
     LinkTypeOptionOut,
     MatrixOut,
     PrioritySuggestionOut,
+    RecentIncidentOut,
+    ServiceIncidentStateOut,
+    ServiceItsmOut,
+    incident_state_out,
     matrix_out,
+    service_out,
 )
 from tiqora.domain.schemas import TicketLinkTargetOut
 from tiqora.itsm.ci_provider import (
@@ -50,6 +55,12 @@ from tiqora.itsm.link_types import LinkPair, offered_link_types
 from tiqora.itsm.mode import ItsmModeState, get_itsm_mode, require_itsm_enabled
 from tiqora.itsm.priority import load_matrix, suggest_priority
 from tiqora.itsm.providers import get_ci_provider
+from tiqora.itsm.services import (
+    ServiceNotFound,
+    incident_states,
+    recent_incident,
+    service_info,
+)
 from tiqora.itsm.settings import ItsmSettings, load_itsm_settings
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
@@ -544,3 +555,65 @@ async def unlink_ticket_ci(
         )
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- services (Task 17) ----------------------------------------------------------------------
+
+
+@router.get("/services/incident-states", response_model=dict[int, ServiceIncidentStateOut])
+async def get_service_incident_states(
+    user: CurrentUser,
+    session: DbSession,
+    ids: Annotated[list[int], Query(max_length=200, description="Service ids (at most 200)")],
+) -> dict[int, ServiceIncidentStateOut]:
+    """Live incident state of up to 200 services (the service picker and list badges)."""
+    _ = user
+    state = await require_itsm_enabled(session)
+    found = await incident_states(session, sorted(set(ids)), mode=state)
+    return {sid: incident_state_out(s) for sid, s in found.items()}
+
+
+@router.get("/services/{service_id}", response_model=ServiceItsmOut)
+async def get_service(
+    service_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> ServiceItsmOut:
+    await require_itsm_enabled(session)
+    cfg = await load_itsm_settings(session, settings)
+    try:
+        info = await service_info(session, service_id, user_id=user.id)
+    except ServiceNotFound:
+        _refuse("service_not_found", status.HTTP_404_NOT_FOUND)
+    except CiUnavailable as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail={"code": exc.code}) from exc
+    return service_out(info, default_minutes=cfg.min_minutes_between_incidents)
+
+
+@router.get("/services/{service_id}/recent-incident", response_model=RecentIncidentOut | None)
+async def get_recent_incident(
+    service_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+    exclude_ticket_id: Annotated[int | None, Query(ge=1)] = None,
+) -> RecentIncidentOut | None:
+    """The incident flood warning: a recent incident on the same service (null = none)."""
+    await require_itsm_enabled(session)
+    cfg = await load_itsm_settings(session, settings)
+    found = await recent_incident(
+        session,
+        service_id=service_id,
+        exclude_ticket_id=exclude_ticket_id,
+        settings=cfg,
+        user_id=user.id,
+    )
+    if found is None:
+        return None
+    return RecentIncidentOut(
+        ticket_id=found.ticket_id,
+        tn=found.tn,
+        title=found.title,
+        type_name=found.type_name,
+        created_at=found.created_at,
+        minutes_ago=found.minutes_ago,
+        window_minutes=found.window_minutes,
+    )

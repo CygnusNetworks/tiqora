@@ -8,7 +8,9 @@ from pydantic import BaseModel, Field
 
 from tiqora.api.v1.admin.itsm_schemas import LinkPropagation
 from tiqora.domain.schemas import UtcDateTime
+from tiqora.itsm.ci_provider import ServiceIncidentState
 from tiqora.itsm.priority import MatrixView
+from tiqora.itsm.services import ServiceItsmInfo
 
 
 class LinkTypeOptionOut(BaseModel):
@@ -183,4 +185,78 @@ def matrix_out(view: MatrixView, *, enabled: bool) -> MatrixOut:
             MatrixCellOut(criticality=c.criticality, impact=c.impact, priority_id=c.priority_id)
             for c in view.cells
         ],
+    )
+
+
+# --- services (Task 17) --------------------------------------------------------------------------
+
+
+class ServiceIncidentStateOut(BaseModel):
+    service_id: int
+    #: worst functionality over the service's CIs; None = no CI linked / no provider
+    state: CatalogValueOut | None
+    cis_incident: int
+    cis_warning: int
+
+
+class ServiceItsmOut(BaseModel):
+    service_id: int
+    name: str
+    service_type: str | None
+    criticality: str | None
+    #: Mode A: type and criticality are Znuny's and cannot be changed here
+    znuny_owned: bool
+    owner_user_id: int | None
+    owner_name: str | None
+    description: str | None
+    portal_visible: bool
+    #: own value; None = settings default
+    min_minutes_between_incidents: int | None
+    #: the window actually applied (own value or default); 0 = off
+    effective_min_minutes_between_incidents: int
+    #: Mode A: SLA id (as string key) -> minimum minutes between incidents
+    znuny_sla_min_times: dict[str, int]
+    incident_state: ServiceIncidentStateOut | None
+
+
+class RecentIncidentOut(BaseModel):
+    ticket_id: int
+    tn: str
+    title: str
+    type_name: str
+    created_at: UtcDateTime
+    minutes_ago: int
+    window_minutes: int
+
+
+def incident_state_out(s: ServiceIncidentState) -> ServiceIncidentStateOut:
+    value = s.state
+    return ServiceIncidentStateOut(
+        service_id=s.service_id,
+        state=None
+        if value is None
+        else CatalogValueOut(key=value.key, name=value.name, functionality=value.functionality),
+        cis_incident=s.cis_incident,
+        cis_warning=s.cis_warning,
+    )
+
+
+def service_out(info: ServiceItsmInfo, *, default_minutes: int) -> ServiceItsmOut:
+    own = info.min_minutes_between_incidents
+    return ServiceItsmOut(
+        service_id=info.service_id,
+        name=info.name,
+        service_type=info.service_type,
+        criticality=info.criticality,
+        znuny_owned=info.znuny_owned,
+        owner_user_id=info.owner_user_id,
+        owner_name=info.owner_name,
+        description=info.description,
+        portal_visible=info.portal_visible,
+        min_minutes_between_incidents=own,
+        effective_min_minutes_between_incidents=default_minutes if own is None else own,
+        znuny_sla_min_times={str(k): v for k, v in info.znuny_sla_min_times.items()},
+        incident_state=None
+        if info.incident_state is None
+        else incident_state_out(info.incident_state),
     )

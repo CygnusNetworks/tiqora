@@ -18607,8 +18607,8 @@
             "anyOf": [
               {
                 "enum": [
-                  "tiqora",
-                  "znuny"
+                  "znuny",
+                  "tiqora"
                 ],
                 "type": "string"
               },
@@ -22102,6 +22102,127 @@
           "attributes"
         ],
         "title": "MappingPreviewIn",
+        "type": "object"
+      },
+      "MatrixCellIn": {
+        "properties": {
+          "criticality": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Criticality",
+            "type": "string"
+          },
+          "impact": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Impact",
+            "type": "string"
+          },
+          "priority_id": {
+            "minimum": 1.0,
+            "title": "Priority Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "criticality",
+          "impact",
+          "priority_id"
+        ],
+        "title": "MatrixCellIn",
+        "type": "object"
+      },
+      "MatrixCellOut": {
+        "properties": {
+          "criticality": {
+            "title": "Criticality",
+            "type": "string"
+          },
+          "impact": {
+            "title": "Impact",
+            "type": "string"
+          },
+          "priority_id": {
+            "title": "Priority Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "criticality",
+          "impact",
+          "priority_id"
+        ],
+        "title": "MatrixCellOut",
+        "type": "object"
+      },
+      "MatrixIn": {
+        "description": "Replaces every cell of Tiqora's matrix (``PUT /admin/itsm/priority-matrix``).",
+        "properties": {
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/MatrixCellIn"
+            },
+            "maxItems": 400,
+            "title": "Cells",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cells"
+        ],
+        "title": "MatrixIn",
+        "type": "object"
+      },
+      "MatrixOut": {
+        "description": "The criticality x impact grid; source \"znuny\" is ``cip_allocate`` (read-only).",
+        "properties": {
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/MatrixCellOut"
+            },
+            "title": "Cells",
+            "type": "array"
+          },
+          "criticality_values": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Criticality Values",
+            "type": "array"
+          },
+          "editable": {
+            "title": "Editable",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "impact_values": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Impact Values",
+            "type": "array"
+          },
+          "source": {
+            "enum": [
+              "znuny",
+              "tiqora"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "editable",
+          "enabled",
+          "criticality_values",
+          "impact_values",
+          "cells"
+        ],
+        "title": "MatrixOut",
         "type": "object"
       },
       "McpClientCreate": {
@@ -26491,6 +26612,26 @@
         "title": "PriorityRefOut",
         "type": "object"
       },
+      "PrioritySuggestionOut": {
+        "properties": {
+          "priority_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority Id"
+          }
+        },
+        "required": [
+          "priority_id"
+        ],
+        "title": "PrioritySuggestionOut",
+        "type": "object"
+      },
       "PriorityUpdate": {
         "properties": {
           "name": {
@@ -28649,6 +28790,50 @@
           }
         },
         "title": "QueueVariableUpdate",
+        "type": "object"
+      },
+      "RecentIncidentOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "minutes_ago": {
+            "title": "Minutes Ago",
+            "type": "integer"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tn": {
+            "title": "Tn",
+            "type": "string"
+          },
+          "type_name": {
+            "title": "Type Name",
+            "type": "string"
+          },
+          "window_minutes": {
+            "title": "Window Minutes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "tn",
+          "title",
+          "type_name",
+          "created_at",
+          "minutes_ago",
+          "window_minutes"
+        ],
+        "title": "RecentIncidentOut",
         "type": "object"
       },
       "Rect": {
@@ -32835,6 +33020,237 @@
           "name"
         ],
         "title": "ServiceCreate",
+        "type": "object"
+      },
+      "ServiceIncidentStateOut": {
+        "properties": {
+          "cis_incident": {
+            "title": "Cis Incident",
+            "type": "integer"
+          },
+          "cis_warning": {
+            "title": "Cis Warning",
+            "type": "integer"
+          },
+          "service_id": {
+            "title": "Service Id",
+            "type": "integer"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CatalogValueOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "service_id",
+          "state",
+          "cis_incident",
+          "cis_warning"
+        ],
+        "title": "ServiceIncidentStateOut",
+        "type": "object"
+      },
+      "ServiceItsmOut": {
+        "properties": {
+          "criticality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criticality"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "effective_min_minutes_between_incidents": {
+            "title": "Effective Min Minutes Between Incidents",
+            "type": "integer"
+          },
+          "incident_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceIncidentStateOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "min_minutes_between_incidents": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Minutes Between Incidents"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "owner_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Name"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          },
+          "portal_visible": {
+            "title": "Portal Visible",
+            "type": "boolean"
+          },
+          "service_id": {
+            "title": "Service Id",
+            "type": "integer"
+          },
+          "service_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Type"
+          },
+          "znuny_owned": {
+            "title": "Znuny Owned",
+            "type": "boolean"
+          },
+          "znuny_sla_min_times": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Znuny Sla Min Times",
+            "type": "object"
+          }
+        },
+        "required": [
+          "service_id",
+          "name",
+          "service_type",
+          "criticality",
+          "znuny_owned",
+          "owner_user_id",
+          "owner_name",
+          "description",
+          "portal_visible",
+          "min_minutes_between_incidents",
+          "effective_min_minutes_between_incidents",
+          "znuny_sla_min_times",
+          "incident_state"
+        ],
+        "title": "ServiceItsmOut",
+        "type": "object"
+      },
+      "ServiceMetaIn": {
+        "description": "Replacement of the Tiqora-side meta of one service (PUT semantics).\n\n``service_type`` / ``criticality`` are Znuny's in Mode A: sending a different value is\nrefused (``CiReadOnly``); ``None`` means \"leave to Znuny\" there and \"empty\" elsewhere.",
+        "properties": {
+          "criticality": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criticality"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "min_minutes_between_incidents": {
+            "anyOf": [
+              {
+                "maximum": 10080.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Minutes Between Incidents"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          },
+          "portal_visible": {
+            "default": true,
+            "title": "Portal Visible",
+            "type": "boolean"
+          },
+          "service_type": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Type"
+          }
+        },
+        "title": "ServiceMetaIn",
         "type": "object"
       },
       "ServiceOut": {
@@ -60943,6 +61359,303 @@
         ]
       }
     },
+    "/api/v1/admin/itsm/priority-matrix": {
+      "get": {
+        "description": "The matrix of the current mode; Mode A shows Znuny's ``cip_allocate`` read-only.",
+        "operationId": "get_priority_matrix_api_v1_admin_itsm_priority_matrix_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatrixOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Priority Matrix",
+        "tags": [
+          "admin:itsm"
+        ]
+      },
+      "put": {
+        "description": "Replace Tiqora's matrix (409 ``read_only`` in Mode A, 422 for an invalid cell set).",
+        "operationId": "put_priority_matrix_api_v1_admin_itsm_priority_matrix_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatrixIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatrixOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Priority Matrix",
+        "tags": [
+          "admin:itsm"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/services/{service_id}/meta": {
+      "get": {
+        "operationId": "get_service_meta_api_v1_admin_itsm_services__service_id__meta_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "service_id",
+            "required": true,
+            "schema": {
+              "title": "Service Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceItsmOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Service Meta",
+        "tags": [
+          "admin:itsm"
+        ]
+      },
+      "put": {
+        "description": "Replace the Tiqora-side meta (409 ``read_only``: changed Znuny-owned type or criticality).",
+        "operationId": "put_service_meta_api_v1_admin_itsm_services__service_id__meta_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "service_id",
+            "required": true,
+            "schema": {
+              "title": "Service Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceMetaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceItsmOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Service Meta",
+        "tags": [
+          "admin:itsm"
+        ]
+      }
+    },
     "/api/v1/admin/itsm/setup": {
       "get": {
         "description": "Preview: what exists and what \"Einrichten\" would create. Writes nothing.",
@@ -75149,8 +75862,8 @@
               "anyOf": [
                 {
                   "enum": [
-                    "tiqora",
-                    "znuny"
+                    "znuny",
+                    "tiqora"
                   ],
                   "type": "string"
                 },
@@ -85059,6 +85772,431 @@
           }
         },
         "summary": "Get Offered Link Types",
+        "tags": [
+          "itsm"
+        ]
+      }
+    },
+    "/api/v1/itsm/priority-matrix": {
+      "get": {
+        "description": "The criticality x impact grid of the current mode (Znuny's in Mode A).",
+        "operationId": "get_priority_matrix_api_v1_itsm_priority_matrix_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatrixOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Priority Matrix",
+        "tags": [
+          "itsm"
+        ]
+      }
+    },
+    "/api/v1/itsm/priority-suggestion": {
+      "get": {
+        "description": "What the matrix says for the pair, or ``null`` (unknown pair, matrix disabled).",
+        "operationId": "get_priority_suggestion_api_v1_itsm_priority_suggestion_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "criticality",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Criticality"
+            }
+          },
+          {
+            "in": "query",
+            "name": "impact",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Impact"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrioritySuggestionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Priority Suggestion",
+        "tags": [
+          "itsm"
+        ]
+      }
+    },
+    "/api/v1/itsm/services/incident-states": {
+      "get": {
+        "description": "Live incident state of up to 200 services (the service picker and list badges).",
+        "operationId": "get_service_incident_states_api_v1_itsm_services_incident_states_get",
+        "parameters": [
+          {
+            "description": "Service ids (at most 200)",
+            "in": "query",
+            "name": "ids",
+            "required": true,
+            "schema": {
+              "description": "Service ids (at most 200)",
+              "items": {
+                "type": "integer"
+              },
+              "maxItems": 200,
+              "title": "Ids",
+              "type": "array"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/ServiceIncidentStateOut"
+                  },
+                  "title": "Response Get Service Incident States Api V1 Itsm Services Incident States Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Service Incident States",
+        "tags": [
+          "itsm"
+        ]
+      }
+    },
+    "/api/v1/itsm/services/{service_id}": {
+      "get": {
+        "operationId": "get_service_api_v1_itsm_services__service_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "service_id",
+            "required": true,
+            "schema": {
+              "title": "Service Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceItsmOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Service",
+        "tags": [
+          "itsm"
+        ]
+      }
+    },
+    "/api/v1/itsm/services/{service_id}/recent-incident": {
+      "get": {
+        "description": "The incident flood warning: a recent incident on the same service (null = none).",
+        "operationId": "get_recent_incident_api_v1_itsm_services__service_id__recent_incident_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "service_id",
+            "required": true,
+            "schema": {
+              "title": "Service Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "exclude_ticket_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Exclude Ticket Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/RecentIncidentOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Recent Incident Api V1 Itsm Services  Service Id  Recent Incident Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Recent Incident",
         "tags": [
           "itsm"
         ]
