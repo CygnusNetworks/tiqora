@@ -1,7 +1,7 @@
 """Provider traffic in the GenericInterface debugger (MariaDB and PostgreSQL).
 
-Seed band 51370-51389: webservices 51370-51373, agent 51374. Debug entry and content ids are
-autoincrement: every row this module adds is deleted again via ``tests._row_cleanup`` marks.
+Seed band 51370-51389: webservices 51370-51373 and 51375, agent 51374. Debug entry and content
+ids are autoincrement: every row this module adds is deleted again via ``tests._row_cleanup`` marks.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ PASSWORD = "dbg-provider-secret"
 LOGIN = "gi51370.agent"
 AGENT_ID = 51374
 WS_DEBUG, WS_ERROR, WS_SOAP, WS_BOOM = 51370, 51371, 51372, 51373
+WS_TICKET = 51375
 CLIENT = "203.0.113.9"
 _TABLES = ("tiqora_gi_debug_content", "tiqora_gi_debug_entry")
 
@@ -74,6 +75,10 @@ _WEBSERVICES = {
     WS_ERROR: ("gi51371-error", _rest_cfg("error", {"Login": "/Login"})),
     WS_SOAP: ("gi51372-soap", _SOAP_CFG),
     WS_BOOM: ("gi51373-boom", _rest_cfg("error", {"Boom": "/Boom"})),
+    WS_TICKET: (
+        "gi51375-ticket",
+        _rest_cfg("debug", {"Get": "/Ticket/:TicketID", "Search": "/Search"}),
+    ),
 }
 
 _STATE: dict[str, dict[str, int]] = {}
@@ -90,7 +95,11 @@ def _async_url(sync_url: str) -> str:
 def _cleanup_rows(sync_url: str) -> None:
     engine = create_engine(sync_url)
     with engine.begin() as conn:
-        conn.execute(text("DELETE FROM gi_webservice_config WHERE id BETWEEN 51370 AND 51373"))
+        conn.execute(
+            text(
+                "DELETE FROM gi_webservice_config WHERE id BETWEEN 51370 AND 51375 AND id <> 51374"
+            )
+        )
         conn.execute(
             text(
                 "DELETE FROM sessions WHERE session_id IN (SELECT session_id FROM"
@@ -152,7 +161,9 @@ def sync_url(request: pytest.FixtureRequest) -> str:
     return url
 
 
-async def _client_for(sync_url: str, *, trusted_proxies: str = "127.0.0.1") -> Any:
+async def _client_for(
+    sync_url: str, *, trusted_proxies: str = "127.0.0.1", **engine_kwargs: Any
+) -> Any:
     from httpx import ASGITransport, AsyncClient
 
     from tiqora.api.app import create_app
@@ -160,7 +171,7 @@ async def _client_for(sync_url: str, *, trusted_proxies: str = "127.0.0.1") -> A
     from tiqora.config import Settings
     from tiqora.domain.auth import SessionStore
 
-    engine = create_async_engine(_async_url(sync_url))
+    engine = create_async_engine(_async_url(sync_url), **engine_kwargs)
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async def _override_get_db() -> Any:
@@ -202,13 +213,14 @@ def _entries(sync_url: str, ws_id: int) -> list[dict[str, Any]]:
         with engine.connect() as conn:
             rows = conn.execute(
                 text(
-                    "SELECT id, communication_type, remote_ip, name FROM tiqora_gi_debug_entry"
+                    "SELECT id, communication_type, remote_ip, name, ticket_id"
+                    " FROM tiqora_gi_debug_entry"
                     " WHERE webservice_id = :ws ORDER BY id"
                 ),
                 {"ws": ws_id},
             ).all()
             out = []
-            for entry_id, ctype, remote_ip, name in rows:
+            for entry_id, ctype, remote_ip, name, ticket_id in rows:
                 lines = conn.execute(
                     text(
                         "SELECT debug_level, subject, content FROM tiqora_gi_debug_content"
@@ -221,6 +233,7 @@ def _entries(sync_url: str, ws_id: int) -> list[dict[str, Any]]:
                         "type": ctype,
                         "remote_ip": remote_ip,
                         "name": name,
+                        "ticket_id": ticket_id,
                         "lines": [
                             (lvl, subj, bytes(body).decode("utf-8") if body is not None else "")
                             for lvl, subj, body in lines
@@ -431,3 +444,49 @@ async def test_soap_provider_logged(sync_url: str) -> None:
     assert PASSWORD not in blob
     after = json.loads(entry["lines"][4][2])
     assert after["Token"] == "***"
+
+
+async def test_debugger_lines_need_no_second_pool_connection(sync_url: str) -> None:
+    """Final review I3: with one pooled connection, held by the request session, every line
+    must still be written (buffered, flushed after the request session is released). Writing
+    each line in its own session would wait for the pool and lose the lines."""
+    _clear(sync_url, WS_DEBUG)
+    client, engine = await _client_for(sync_url, pool_size=1, max_overflow=0, pool_timeout=1)
+    async with client:
+        resp = await client.post(
+            "/znuny-compat/Webservice/gi51370-debug/Login",
+            json={"UserLogin": LOGIN, "Password": PASSWORD},
+        )
+    await engine.dispose()
+    assert resp.status_code == 200, resp.text
+    (entry,) = _entries(sync_url, WS_DEBUG)
+    assert [subject for _, subject, _ in entry["lines"]] == [
+        "Communication sequence started",
+        "Detected operation 'Login'",
+        "Incoming data before mapping",
+        "Outgoing data before mapping",
+    ]
+
+
+async def test_single_ticket_request_links_the_entry(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Final review m6: a request for one TicketID links its entry to that ticket (GDPR
+    erasure deletes by ticket id); a search over several tickets stays unlinked."""
+    from tiqora.api.compat import router
+
+    _clear(sync_url, WS_TICKET)
+
+    async def _fake(operation: str, data: dict[str, Any], *args: Any, **kwargs: Any) -> Any:
+        return {"Ticket": [{"TicketID": 51389, "Title": "x"}], "TicketID": "51388,51389"}
+
+    monkeypatch.setattr(router, "_dispatch_operation", _fake)
+    client, engine = await _client_for(sync_url)
+    async with client:
+        base = "/znuny-compat/Webservice/gi51375-ticket"
+        one = await client.post(f"{base}/Ticket/51389", json={"A": "b"})
+        many = await client.post(f"{base}/Search", json={"A": "b"})
+    await engine.dispose()
+    assert one.status_code == 200 and many.status_code == 200, (one.text, many.text)
+    entries = _entries(sync_url, WS_TICKET)
+    assert [(e["name"], e["ticket_id"]) for e in entries] == [("Get", 51389), ("Search", None)]

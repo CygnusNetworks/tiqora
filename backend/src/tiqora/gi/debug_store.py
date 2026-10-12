@@ -14,7 +14,7 @@ from datetime import datetime
 from typing import Any, Final, Literal
 
 import structlog
-from sqlalchemy import bindparam, delete, func, select, text
+from sqlalchemy import bindparam, delete, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -55,6 +55,76 @@ class DebugContentRow:
     create_time: datetime
 
 
+async def _entry_id(session: AsyncSession, communication_id: str) -> int | None:
+    found = (
+        await session.execute(
+            select(TiqoraGiDebugEntry.id).where(
+                TiqoraGiDebugEntry.communication_id == communication_id
+            )
+        )
+    ).scalar_one_or_none()
+    return int(found) if found is not None else None
+
+
+async def _write_lines(session: AsyncSession, lines: Sequence[Mapping[str, Any]]) -> None:
+    """Write the lines of ONE communication (entry row on first sight, then content rows).
+    The caller commits. ``ticket_id`` and ``replay`` come from the lines: the entry gets the
+    first ``replay`` and the last known ``ticket_id``."""
+    first = lines[0]
+    communication_id = str(first["communication_id"])
+    ticket_id = next(
+        (line["ticket_id"] for line in reversed(lines) if line["ticket_id"] is not None), None
+    )
+    replay = next((line["replay"] for line in lines if line.get("replay") is not None), None)
+    entry_id = await _entry_id(session, communication_id)
+    if entry_id is None:
+        remote_ip = first["remote_ip"]
+        name = first["name"]
+        entry = TiqoraGiDebugEntry(
+            communication_id=communication_id,
+            communication_type=str(first["communication_type"])[:50],
+            remote_ip=remote_ip[:50] if remote_ip else None,
+            webservice_id=first["webservice_id"],
+            create_time=first["now"],
+            name=name[:200] if name else None,
+            ticket_id=ticket_id,
+            replay=(
+                json.dumps(replay, sort_keys=True, ensure_ascii=False, default=str)
+                if replay is not None
+                else None
+            ),
+        )
+        session.add(entry)
+        try:
+            await session.flush()
+            entry_id = int(entry.id)
+        except IntegrityError:
+            # A concurrent add created it first (unique communication_id).
+            await session.rollback()
+            entry_id = await _entry_id(session, communication_id)
+            if entry_id is None:
+                raise
+    elif ticket_id is not None:
+        # The ticket id often becomes known after the first line (ticket create).
+        await session.execute(
+            text(
+                "UPDATE tiqora_gi_debug_entry SET ticket_id = :t"
+                " WHERE id = :i AND ticket_id IS NULL"
+            ),
+            {"t": ticket_id, "i": entry_id},
+        )
+    for line in lines:
+        session.add(
+            TiqoraGiDebugContent(
+                entry_id=entry_id,
+                debug_level=str(line["debug_level"])[:50],
+                subject=str(line["summary"])[:255],
+                content=str(line["content"]).encode("utf-8"),
+                create_time=line["now"],
+            )
+        )
+
+
 class DbDebugSink:
     """Implements :class:`tiqora.gi.debugger.DebugSink`.
 
@@ -79,64 +149,84 @@ class DbDebugSink:
         content: str,
         replay: Mapping[str, Any] | None = None,
     ) -> None:
-        now = utc_now()
+        line = {
+            "communication_id": communication_id,
+            "communication_type": communication_type,
+            "webservice_id": webservice_id,
+            "remote_ip": remote_ip,
+            "name": name,
+            "ticket_id": ticket_id,
+            "debug_level": debug_level,
+            "summary": summary,
+            "content": content,
+            "replay": replay,
+            "now": utc_now(),
+        }
         async with self._factory() as session:
-            entry_id = await self._entry_id(session, communication_id)
-            if entry_id is None:
-                entry = TiqoraGiDebugEntry(
-                    communication_id=communication_id,
-                    communication_type=communication_type[:50],
-                    remote_ip=remote_ip[:50] if remote_ip else None,
-                    webservice_id=webservice_id,
-                    create_time=now,
-                    name=name[:200] if name else None,
-                    ticket_id=ticket_id,
-                    replay=(
-                        json.dumps(replay, sort_keys=True, ensure_ascii=False, default=str)
-                        if replay is not None
-                        else None
-                    ),
-                )
-                session.add(entry)
-                try:
-                    await session.flush()
-                    entry_id = int(entry.id)
-                except IntegrityError:
-                    # A concurrent add created it first (unique communication_id).
-                    await session.rollback()
-                    entry_id = await self._entry_id(session, communication_id)
-                    if entry_id is None:
-                        raise
-            elif ticket_id is not None:
-                # The ticket id often becomes known after the first line (ticket create).
-                await session.execute(
-                    text(
-                        "UPDATE tiqora_gi_debug_entry SET ticket_id = :t"
-                        " WHERE id = :i AND ticket_id IS NULL"
-                    ),
-                    {"t": ticket_id, "i": entry_id},
-                )
-            session.add(
-                TiqoraGiDebugContent(
-                    entry_id=entry_id,
-                    debug_level=debug_level[:50],
-                    subject=summary[:255],
-                    content=content.encode("utf-8"),
-                    create_time=now,
-                )
-            )
+            await _write_lines(session, [line])
             await session.commit()
 
-    @staticmethod
-    async def _entry_id(session: AsyncSession, communication_id: str) -> int | None:
-        found = (
-            await session.execute(
-                select(TiqoraGiDebugEntry.id).where(
-                    TiqoraGiDebugEntry.communication_id == communication_id
-                )
-            )
-        ).scalar_one_or_none()
-        return int(found) if found is not None else None
+
+class BufferedDebugSink:
+    """A :class:`tiqora.gi.debugger.DebugSink` that keeps the lines in memory until
+    :meth:`flush`.
+
+    For provider requests: the request already holds a pooled connection, and a
+    :class:`DbDebugSink` would check out a second one per line (at Znuny's default threshold
+    ``debug`` that is 5-8 per request). The router flushes once, after the request session
+    released its connection; the trail still survives a rolled-back operation.
+    """
+
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+        self._factory = session_factory
+        self._lines: list[dict[str, Any]] = []
+
+    @property
+    def pending(self) -> int:
+        return len(self._lines)
+
+    async def add(
+        self,
+        *,
+        communication_id: str,
+        communication_type: str,
+        webservice_id: int,
+        remote_ip: str | None,
+        name: str | None,
+        ticket_id: int | None,
+        debug_level: str,
+        summary: str,
+        content: str,
+        replay: Mapping[str, Any] | None = None,
+    ) -> None:
+        self._lines.append(
+            {
+                "communication_id": communication_id,
+                "communication_type": communication_type,
+                "webservice_id": webservice_id,
+                "remote_ip": remote_ip,
+                "name": name,
+                "ticket_id": ticket_id,
+                "debug_level": debug_level,
+                "summary": summary,
+                "content": content,
+                "replay": replay,
+                "now": utc_now(),
+            }
+        )
+
+    async def flush(self) -> None:
+        """Write every buffered line, one commit per communication, in one session."""
+        lines, self._lines = self._lines, []
+        groups: dict[str, list[dict[str, Any]]] = {}
+        for line in lines:
+            groups.setdefault(line["communication_id"], []).append(line)
+        if not groups:
+            return
+        async with self._factory() as session:
+            for group in groups.values():
+                await _write_lines(session, group)
+                await session.commit()
 
 
 def _rank(level: str) -> int:
@@ -437,7 +527,3 @@ async def delete_debug_entries_for_tickets(session: AsyncSession, ticket_ids: Se
             await _delete_entries(session, entry_ids)
             total += len(entry_ids)
     return total
-
-
-async def count_entries(session: AsyncSession) -> int:
-    return int((await session.execute(select(func.count(TiqoraGiDebugEntry.id)))).scalar_one())

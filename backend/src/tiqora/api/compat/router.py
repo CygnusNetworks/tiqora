@@ -79,7 +79,7 @@ from tiqora.api.deps import DbSession, get_session_store
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.domain.auth import SessionStore
 from tiqora.gi.config import parse_debugger
-from tiqora.gi.debug_store import DbDebugSink
+from tiqora.gi.debug_store import BufferedDebugSink
 from tiqora.gi.debugger import GiDebugger
 from tiqora.security.ratelimit import client_ip
 from tiqora.znuny.sysconfig import SysConfig
@@ -100,17 +100,23 @@ async def _open_debugger(
     """The provider debugger of one webservice request (Provider.pm: ``Debugger->new`` with
     the webservice's ``Debugger`` config) plus its ``Communication sequence started`` line.
 
-    Lines go through :class:`DbDebugSink` (own sessions), so a rolled-back operation keeps
-    its trail. The remote IP honours ``TIQORA_TRUSTED_PROXIES``.
+    Lines are buffered per request (:class:`BufferedDebugSink`) and written by
+    :func:`_flush_debugger` after the request session released its connection, in their own
+    session, so a rolled-back operation keeps its trail. The remote IP honours
+    ``TIQORA_TRUSTED_PROXIES``.
     """
-    factory = getattr(request.app.state, "session_factory", None)
-    if factory is None:
-        from tiqora.db.engine import get_session_factory
+    sink: BufferedDebugSink | None = getattr(request.state, "gi_debug_sink", None)
+    if sink is None:
+        factory = getattr(request.app.state, "session_factory", None)
+        if factory is None:
+            from tiqora.db.engine import get_session_factory
 
-        factory = get_session_factory()
+            factory = get_session_factory()
+        sink = BufferedDebugSink(factory)
+        request.state.gi_debug_sink = sink
     settings = getattr(request.app.state, "settings", None)
     debugger = GiDebugger(
-        sink=DbDebugSink(factory),
+        sink=sink,
         config=parse_debugger(webservice.config),
         webservice_id=webservice.id,
         communication_type="Provider",
@@ -126,6 +132,23 @@ async def _open_debugger(
         {"RequestMethod": request.method, "RequestURI": request.url.path},
     )
     return debugger
+
+
+async def _flush_debugger(request: Request, session: AsyncSession) -> None:
+    """Write the buffered provider debugger lines of this request; never raises.
+
+    The request session is closed first (it holds no uncommitted work the response needs:
+    ``get_db`` would only roll it back later), so the flush never waits for a second pooled
+    connection while the request still holds one.
+    """
+    sink: BufferedDebugSink | None = getattr(request.state, "gi_debug_sink", None)
+    if sink is None or not sink.pending:
+        return
+    try:
+        await session.close()
+        await sink.flush()
+    except Exception:  # noqa: BLE001
+        logger.warning("gi_provider_debugger_failed", summary="flush", exc_info=True)
 
 
 async def _merge_params(request: Request) -> dict[str, Any]:
@@ -538,6 +561,22 @@ def _text_error(status_code: int, message: str) -> Response:
 
 
 async def _serve_webservice(
+    request: Request,
+    session: AsyncSession,
+    session_store: SessionStore,
+    *,
+    ws_name: str | None,
+    ws_id: int | None,
+) -> Response:
+    try:
+        return await _serve_webservice_inner(
+            request, session, session_store, ws_name=ws_name, ws_id=ws_id
+        )
+    finally:
+        await _flush_debugger(request, session)
+
+
+async def _serve_webservice_inner(
     request: Request,
     session: AsyncSession,
     session_store: SessionStore,

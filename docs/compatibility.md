@@ -476,8 +476,11 @@ sources in one view (filter by direction, source, time and IP). Tiqora writes to
 only; rows of Znuny's `gi_debugger_entry*` are read, masked and shown beside them. Entries
 older than `gi.debugger.retention_days` (default 14) are deleted by the worker (service
 "Webservice-Protokoll aufräumen"). The GDPR erasure deletes entries linked to the erased
-customer's tickets in every mode (not backed up); provider calls without a ticket id are only
-covered by the retention.
+customer's tickets in every mode (not backed up). A provider call is linked to a ticket when
+its request names exactly one `TicketID`, or when it created one (`TicketCreate`); other
+provider calls, such as a `TicketSearch` over several tickets, are only covered by the
+retention. Znuny's own `gi_debugger_*` rows, which the view also shows, are never erased by
+Tiqora; Znuny's debugger cleanup removes them.
 
 ## What is not emulated (and why)
 

@@ -125,6 +125,28 @@ async def provider_log(
         logger.warning("gi_provider_debugger_failed", summary=summary[:80], exc_info=True)
 
 
+def _single_ticket_id(data: Any) -> int | None:
+    """The ticket of a request or result that names exactly one (``TicketID: 7`` or
+    ``"7"``); lists and ``"1,2"`` name none."""
+    if not isinstance(data, dict):
+        return None
+    raw = data.get("TicketID")
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, int):
+        return raw if raw > 0 else None
+    if isinstance(raw, str) and raw.strip().isdigit():
+        value = int(raw.strip())
+        return value if value > 0 else None
+    return None
+
+
+def _note_ticket(debugger: GiDebugger | None, data: Any) -> None:
+    """Link the debugger entry to a single ticket (GDPR erasure deletes entries by ticket)."""
+    if debugger is not None and debugger.ticket_id is None:
+        debugger.ticket_id = _single_ticket_id(data)
+
+
 async def run_provider(
     ws: Webservice,
     operation: str,
@@ -148,6 +170,7 @@ async def run_provider(
 
     data_include: dict[str, Any] = {"ProviderRequestInput": copy.deepcopy(data)}
 
+    _note_ticket(debugger, data)
     await provider_log(debugger, "debug", "Incoming data before mapping", data)
     data_in = data
     if op.mapping_inbound is not None:
@@ -157,6 +180,7 @@ async def run_provider(
             await provider_log(debugger, "error", str(exc))
             return _fault(str(exc))
         data_include["ProviderRequestMapOutput"] = copy.deepcopy(data_in)
+        _note_ticket(debugger, data_in)
         await provider_log(debugger, "debug", "Incoming data after mapping", data_in)
 
     if op.handler is None:
@@ -177,6 +201,7 @@ async def run_provider(
         except OperationFault as exc:
             await provider_log(debugger, "error", exc.message)
             return _fault(exc.message)
+    _note_ticket(debugger, result)  # TicketCreate: the new ticket
     error = result.get("Error")
     if isinstance(error, dict):
         # Operation/Common.pm ReturnError: Summary = ErrorCode, Data = ErrorMessage
