@@ -13,6 +13,7 @@ import type { FrontendPlugin, PluginAdminList } from "@/lib/pluginsApi";
 import { resolve as resolveDashboardsDemo } from "./dashboardsMock";
 import { resolveSavedRequest } from "./savedMock";
 import { resolveWebchatData } from "./webchatMock";
+import { resolveGiData } from "./giMock";
 import { demoCatalogue, demoFacts, demoReport, demoReportingStatus, demoReportJob, demoSources } from "./reportsMock";
 
 export { resolveReportRun } from "./reportsMock";
@@ -2015,6 +2016,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/plugins/org.example.demo/assets/1.0.0/i18n/en.json")) return demoPluginTexts.en;
   const wcData = resolveWebchatData(p, method);
   if (wcData !== undefined) return wcData;
+  const giData = resolveGiData(p, method); if (giData !== undefined) return giData;
   // Auth
   if (p.endsWith("/auth/methods")) return {
     password: true, oidc: false, spnego: false, webauthn: true, ldap: false, saml: true,

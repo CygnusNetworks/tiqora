@@ -105,6 +105,9 @@ import { SignaturesPage } from "@/routes/admin/SignaturesPage";
 import { AutoResponsesPage } from "@/routes/admin/AutoResponsesPage";
 import { DynamicFieldsPage } from "@/routes/admin/DynamicFieldsPage";
 import { WebhooksPage } from "@/routes/admin/WebhooksPage";
+import { WebservicesPage } from "@/routes/admin/WebservicesPage";
+import { WebserviceDetailPage } from "@/routes/admin/WebserviceDetailPage";
+import { WEBSERVICE_TABS, type WebserviceTab } from "@/lib/webservicesApi";
 import { MailOutboundPage } from "@/routes/admin/MailOutboundPage";
 import { PgpKeysPage } from "@/routes/admin/PgpKeysPage";
 import { SmimePage } from "@/routes/admin/SmimePage";
@@ -964,6 +967,21 @@ const adminWebhooksRoute = createRoute({
   component: WebhooksPage,
 });
 
+const adminWebservicesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/webservices",
+  component: WebservicesPage,
+});
+
+const adminWebserviceDetailRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/webservices/$wsId",
+  validateSearch: (s: Record<string, unknown>): { tab: WebserviceTab } => ({
+    tab: WEBSERVICE_TABS.includes(s.tab as WebserviceTab) ? (s.tab as WebserviceTab) : "overview",
+  }),
+  component: WebserviceDetailPage,
+});
+
 const adminApiKeysRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/api-keys",
@@ -1289,6 +1307,8 @@ const routeTree = rootRoute.addChildren([
     adminAutoResponsesRoute,
     adminDynamicFieldsRoute,
     adminWebhooksRoute,
+    adminWebservicesRoute,
+    adminWebserviceDetailRoute,
     adminApiKeysRoute,
     adminMailOutboundRoute,
     adminPgpRoute,

@@ -449,6 +449,17 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     keywords: ["integration", "callback", "http hook"],
   },
   {
+    slug: "webservices",
+    route: "/admin/webservices",
+    group: "automation",
+    nameKey: "admin.nav.webservices",
+    descriptionKey: "admin.pageDescriptions.webservices",
+    keywords: [
+      "webservice", "genericinterface", "gi", "invoker", "requester", "debugger",
+      "schnittstelle", "soap", "rest", "integration",
+    ],
+  },
+  {
     slug: "api-keys",
     route: "/admin/api-keys",
     group: "automation",

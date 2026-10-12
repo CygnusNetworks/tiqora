@@ -240,4 +240,23 @@ describe("DaemonsPage", () => {
     await screen.findByTestId("daemon-row-deploy_watch");
     expect(screen.queryByTestId("daemons-deploy-live")).not.toBeInTheDocument();
   });
+  it("renders the gi_requester notices under its row with warning styling", async () => {
+    getDaemons.mockResolvedValue({
+      services: [
+        poller({ slug: "gi_requester", enabled: false, toggleable: true, notices: ["admin.daemons.notices.giRequesterOff"] }),
+      ],
+    });
+    renderPage();
+    const box = await screen.findByTestId("daemon-notices-gi_requester");
+    expect(box).toHaveTextContent(i18n.t("admin.daemons.notices.giRequesterOff"));
+    expect(box).toHaveTextContent(/does not trigger/);
+    expect(box.className).toContain("border-amber");
+  });
+
+  it("renders nothing for a service without notices", async () => {
+    getDaemons.mockResolvedValue({ services: [poller({ slug: "gi_requester", notices: [] })] });
+    renderPage();
+    await screen.findByTestId("daemon-row-gi_requester");
+    expect(screen.queryByTestId("daemon-notices-gi_requester")).not.toBeInTheDocument();
+  });
 });

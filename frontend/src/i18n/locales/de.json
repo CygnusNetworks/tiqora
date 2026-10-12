@@ -2183,7 +2183,8 @@
       "reporting": "Berichtsdaten",
       "webchat": "Web-Chat",
       "plugins": "Erweiterungen",
-      "dashboardTemplates": "Dashboard-Vorlagen"
+      "dashboardTemplates": "Dashboard-Vorlagen",
+      "webservices": "Webservices"
     },
     "table": {
       "id": "ID",
@@ -3134,11 +3135,23 @@
         "plugin_tasks": {
           "name": "Erweiterungen: zeitgesteuerte Aufgaben",
           "description": "Startet die regelmäßigen Aufgaben der Erweiterungen."
+        },
+        "gi_requester": {
+          "name": "Ausgehende Webservice-Aufrufe",
+          "description": "Sendet Ticket-Ereignisse an die Webservices (GenericInterface)."
+        },
+        "gi_debug_cleanup": {
+          "name": "Webservice-Protokoll aufräumen",
+          "description": "Löscht alte Einträge des Webservice-Protokolls."
         }
       },
       "takeoverBadge": "Übernahme",
       "settingsLink": "Einstellungen",
-      "deployLive": "Noch keine Bereitstellung erkannt: Tiqora nutzt den Entwurfsstand. Bitte in Znuny einmal bereitstellen."
+      "deployLive": "Noch keine Bereitstellung erkannt: Tiqora nutzt den Entwurfsstand. Bitte in Znuny einmal bereitstellen.",
+      "notices": {
+        "giRequesterOff": "Tiqora löst die Ereignis-Aufrufe der Webservices nicht aus, solange dieser Dienst ausgeschaltet ist. Nur Änderungen in Znuny führen dann zu Aufrufen.",
+        "giRequesterDouble": "Dieser Dienst ist eingeschaltet, aber der Ereignis-Handler von Znuny ist noch aktiv. Jeder Aufruf wird doppelt gesendet. Schalten Sie den Handler in Znuny ab."
+      }
     },
     "mailLog": {
       "title": "E-Mail-Kommunikationsprotokoll",
@@ -3513,7 +3526,8 @@
       "settingsReporting": "Berichte: Zeitzone, Zugriff, Zwischenspeicher sowie Grenzen für Ergebnisse und Exporte.",
       "webchat": "Chats für Websites einrichten, Aussehen festlegen und den Einbettungscode holen.",
       "plugins": "Installierte Erweiterungen ein- und ausschalten, Zustand prüfen und einstellen.",
-      "dashboardTemplates": "Startseiten je Rolle als Vorlage festlegen, optional verbindlich."
+      "dashboardTemplates": "Startseiten je Rolle als Vorlage festlegen, optional verbindlich.",
+      "webservices": "Webservices (GenericInterface) einsehen, ausgehende Aufrufe prüfen und Zielfreigaben verwalten."
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -4519,6 +4533,85 @@
       "deleteTitle": "Vorlage „{{name}}“ löschen?",
       "deleteMessage": "Dashboards, die Benutzer bereits aus dieser Vorlage erhalten haben, bleiben bestehen.",
       "deleteFailed": "Die Vorlage konnte nicht gelöscht werden."
+    },
+    "webservices": {
+      "title": "Webservices",
+      "description": "Webservices werden in Znuny angelegt und hier angezeigt. Bearbeiten folgt in einer späteren Version. Ein „Invoker“ ist ein ausgehender Aufruf an ein fremdes System, den Ticket-Ereignisse auslösen können.",
+      "loadError": "Die Webservices konnten nicht geladen werden.",
+      "detailLoadError": "Der Webservice konnte nicht geladen werden.",
+      "empty": "Es sind keine Webservices eingerichtet.",
+      "back": "← Alle Webservices",
+      "noticeLink": "Zu den Diensten",
+      "valid": "gültig",
+      "invalid": "ungültig",
+      "yes": "ja",
+      "no": "nein",
+      "columns": {
+        "name": "Name",
+        "status": "Status",
+        "incoming": "Eingehend",
+        "invokers": "Ausgehende Aufrufe",
+        "byEvents": "Ausgelöst durch Ereignisse",
+        "note": "Hinweis"
+      },
+      "tabs": {
+        "overview": "Übersicht",
+        "invokers": "Ausgehende Aufrufe",
+        "debugger": "Protokoll (Debugger)",
+        "settings": "Einstellungen"
+      },
+      "overview": {
+        "transport": "Verbindung für ausgehende Aufrufe",
+        "type": "Transport",
+        "endpoint": "Adresse",
+        "auth": "Anmeldung",
+        "noAuth": "keine",
+        "proxy": "Proxy",
+        "clientCert": "Client-Zertifikat",
+        "insecureTls": "Unsichere TLS-Verbindung angefordert",
+        "noTransport": "Dieser Webservice hat keine Verbindung für ausgehende Aufrufe.",
+        "errorHandling": "Fehlerbehandlung",
+        "noErrorHandling": "Keine Fehlerbehandlung eingerichtet.",
+        "debugThreshold": "Protokollstufe: {{level}}"
+      },
+      "invokers": {
+        "description": "Ausgehende Aufrufe (Invoker) senden Ticketdaten an das fremde System, sobald das passende Ereignis eintritt.",
+        "none": "Dieser Webservice hat keine ausgehenden Aufrufe.",
+        "noEvents": "Mit keinem Ereignis verbunden.",
+        "mappings": "Zuordnung ausgehend: {{outbound}} · eingehend: {{inbound}}",
+        "immediate": "sofort",
+        "background": "im Hintergrund",
+        "condition": "Bedingung",
+        "notFired": "wird von Tiqora noch nicht ausgelöst",
+        "dryRun": "Probelauf"
+      },
+      "dryRun": {
+        "title": "Probelauf: {{invoker}}",
+        "description": "Baut die Anfrage für ein Ticket genau wie ein echter Aufruf auf und zeigt sie an.",
+        "ticketId": "Ticket-ID",
+        "articleId": "Artikel-ID (optional)",
+        "event": "Ereignis",
+        "nothingSent": "Es wird nichts an das fremde System gesendet.",
+        "start": "Probelauf starten",
+        "startFailed": "Der Probelauf konnte nicht gestartet werden.",
+        "headers": "Kopfzeilen",
+        "masked": "Zugangsdaten sind maskiert.",
+        "body": "Inhalt"
+      },
+      "settings": {
+        "targetsTitle": "Interne Ziele erlauben",
+        "targets": "Erlaubte Ziele (ein Eintrag pro Zeile)",
+        "targetsHelp": "Standardmäßig sendet Tiqora nicht an interne Adressen. Tragen Sie hier Hostnamen oder Netze (z. B. 198.51.100.0/24) ein, die dieser Webservice erreichen darf.",
+        "tlsTitle": "Zertifikatsprüfung",
+        "insecureTls": "Unsichere TLS-Verbindung erlauben",
+        "insecureTlsWarning": "Achtung: Ohne Zertifikatsprüfung kann jemand im Netz den Datenverkehr mitlesen oder verändern. Aktivieren Sie das nur für Testsysteme.",
+        "save": "Speichern",
+        "saved": "Gespeichert.",
+        "saveFailed": "Die Einstellungen konnten nicht gespeichert werden."
+      },
+      "debugger": {
+        "placeholder": "Das Protokoll wird in Kürze hier angezeigt."
+      }
     }
   },
   "kb": {
@@ -5123,7 +5216,9 @@
         "ticket_export": "Ticket-Export",
         "report_run": "Bericht",
         "report_export": "Berichtsexport",
-        "report_backfill": "Berichtsdaten aufbauen"
+        "report_backfill": "Berichtsdaten aufbauen",
+        "gi_invoke": "Webservice-Aufruf",
+        "gi_invoke_sync": "Webservice-Aufruf"
       },
       "gi_mail": "E-Mail aus einer Webservice-Anfrage versenden"
     },

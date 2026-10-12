@@ -270,6 +270,16 @@ export function DaemonsPage() {
                             {t("admin.daemons.deployLive")}
                           </div>
                         )}
+                      {svc.notices.length > 0 && (
+                        <ul
+                          className="mt-1.5 space-y-1 rounded-md border border-amber/30 bg-amber/10 px-2 py-1.5 text-xs text-ink"
+                          data-testid={`daemon-notices-${svc.slug}`}
+                        >
+                          {svc.notices.map((key) => (
+                            <li key={key}>{t(key, { defaultValue: key })}</li>
+                          ))}
+                        </ul>
+                      )}
                       {svc.slug === "jobs" && (
                         <Link
                           to="/admin/settings/$section"
