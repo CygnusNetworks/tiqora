@@ -94,6 +94,15 @@ class FakeRedis:
         items = self._lists.get(key)
         return items.pop(0) if items else None
 
+    async def blpop(self, key: str, timeout: float = 0) -> tuple[str, str] | None:  # noqa: ASYNC109
+        """Pop the head or wait (at most 50 ms of real time) and answer ``None``."""
+        self._check()
+        items = self._lists.get(key)
+        if items:
+            return key, items.pop(0)
+        await asyncio.sleep(min(float(timeout), 0.05) if timeout else 0.05)
+        return None
+
     async def llen(self, key: str) -> int:
         self._check()
         return len(self._lists.get(key, []))
