@@ -10,15 +10,22 @@ drops or changes the fate of a mail.
 * ``post`` filters run after the transaction of the message committed, so they see the ticket
   (``ctx.plugin.tickets.get``). Their failure changes nothing.
 
-The outbound types (``OutboundMail`` and friends) live here too; the runner follows with the
-outbound wiring.
+Outbound filters run at the start of :meth:`SmtpMailSender.send`. They may only add ``X-``
+headers or veto the send (permanent 550). A filter that raises, hangs or breaks the header rules
+contributes nothing and the mail goes out unchanged. One :class:`PluginCallBudget` of
+``OUTBOUND_BUDGET_SECONDS`` is shared by all outbound filters of one ``send()``, each capped at
+``OUTBOUND_FILTER_CAP_SECONDS``; an exhausted budget sends the mail unchanged.
 """
 
 from __future__ import annotations
 
+import copy
 import re
 from collections.abc import Awaitable, Callable, Mapping, MutableMapping
 from dataclasses import dataclass, field
+from email.header import Header
+from email.message import EmailMessage
+from email.utils import getaddresses
 from typing import TYPE_CHECKING, Any, Final, Literal
 
 import aiosmtplib
@@ -49,14 +56,24 @@ __all__ = [
     "MailVetoed",
     "OutboundMail",
     "OutboundMailVetoed",
+    "OUTBOUND_BUDGET_SECONDS",
+    "OUTBOUND_FILTER_CAP_SECONDS",
+    "apply_outbound_headers",
     "run_inbound_post_filters",
     "run_inbound_pre_filters",
+    "run_outbound_filters",
 ]
 
 MailFilterStage = Literal["pre", "post", "outbound"]
 
 #: all inbound filters of one stage together; filters beyond it are skipped (fail-open)
 INBOUND_BUDGET_SECONDS: float = 30.0
+
+#: all outbound filters of one ``send()`` together (the request that sends may still be waiting)
+OUTBOUND_BUDGET_SECONDS: float = 10.0
+#: upper bound for one outbound filter, whatever its ``timeout_seconds`` says
+OUTBOUND_FILTER_CAP_SECONDS: float = 5.0
+_VETO_MAX: Final = 300
 
 _HEADER_NAME_RE: Final = re.compile(r"^X-[A-Za-z0-9-]{1,60}$")
 _MAX_HEADER_VALUE: Final = 998
@@ -228,3 +245,119 @@ async def run_inbound_post_filters(
             await _run_filter(f, mail_result, budget)
     except Exception:
         logger.exception("plugin_mail_post_filters_failed", account_id=account_id)
+
+
+def _outbound_filters() -> list[MailFilter]:
+    found = [f for f in get_registry().items(OUTBOUND_MAIL_FILTERS) if is_active(f.plugin_id)]
+    found.sort(key=lambda f: (f.order, f.key))
+    return found
+
+
+def _address_list(values: list[str]) -> tuple[str, ...]:
+    return tuple(addr for _name, addr in getaddresses(values) if addr)
+
+
+def _outbound_view(message: EmailMessage, added: Mapping[str, str]) -> OutboundMail:
+    headers = {str(k): str(v) for k, v in message.items()}
+    headers.update(added)
+    return OutboundMail(
+        to=_address_list([str(v) for v in message.get_all("To", [])]),
+        cc=_address_list([str(v) for v in message.get_all("Cc", [])]),
+        subject=str(message.get("Subject", "")),
+        from_address=next(iter(_address_list([str(message.get("From", ""))])), ""),
+        message_id=str(message["Message-ID"]) if message.get("Message-ID") else None,
+        headers=headers,
+    )
+
+
+async def run_outbound_filters(message: EmailMessage) -> dict[str, str]:
+    """Run the ``outbound`` filters in ``(order, key)`` order; return the ``X-`` headers to add.
+
+    Raises :class:`OutboundMailVetoed` (permanent 550) when a filter raises
+    :class:`MailVetoed`. Any other failure, a timeout or an exhausted budget contributes no
+    header and never stops the send. Never touches *message*.
+    """
+    filters = _outbound_filters()
+    if not filters:
+        return {}
+    budget = PluginCallBudget(OUTBOUND_BUDGET_SECONDS)
+    added: dict[str, str] = {}
+    for f in filters:
+        if budget.remaining() <= 0:
+            logger.warning(
+                "plugin_mail_filter_skipped", plugin=f.plugin_id, filter=f.key, reason="budget"
+            )
+            break
+        mail = _outbound_view(message, added)
+        ctx = MailFilterContext(plugin=f.context or minimal_context(f.plugin_id))
+        vetoes: list[str] = []
+
+        async def _call(
+            f: MailFilter = f,
+            ctx: MailFilterContext = ctx,
+            mail: OutboundMail = mail,
+            vetoes: list[str] = vetoes,
+        ) -> None:
+            try:
+                await f.run(ctx, mail)
+            except MailVetoed as exc:
+                vetoes.append(str(exc))
+
+        outcome = await call_plugin(
+            f.plugin_id,
+            f"mail filter {f.key} (outbound)",
+            _call,
+            timeout=budget.timeout_for(min(float(f.timeout_seconds), OUTBOUND_FILTER_CAP_SECONDS)),
+        )
+        if vetoes:
+            reason = vetoes[0].strip()[:_VETO_MAX] or "Versand durch eine Erweiterung abgelehnt"
+            logger.info("plugin_mail_vetoed", plugin=f.plugin_id, filter=f.key)
+            raise OutboundMailVetoed(reason)
+        if outcome.ok:
+            added.update(mail.added)
+    return added
+
+
+def _header_line(name: str, value: str) -> bytes:
+    if value.isascii():
+        return f"{name}: {value}\r\n".encode("ascii")
+    return f"{name}: {Header(value, 'utf-8').encode()}\r\n".encode("ascii")
+
+
+def apply_outbound_headers(message: EmailMessage, added: Mapping[str, str]) -> EmailMessage:
+    """A copy of *message* carrying the *added* ``X-`` headers; *message* stays untouched.
+
+    A message with fixed wire bytes (``tiqora_raw``: signed or encrypted mail) gets the header
+    lines prepended to those bytes, so no MIME part (and no signature) changes.
+    """
+    if not added:
+        return message
+    out = copy.deepcopy(message)
+    raw = getattr(message, "tiqora_raw", None)
+    if raw:
+        lowered = {n.lower() for n in added}
+        # A header of the same name already in the top-level block is replaced, not duplicated.
+        head, sep, rest = bytes(raw).partition(b"\r\n\r\n")
+        kept = _drop_top_headers(head, lowered)
+        prefix = b"".join(_header_line(n, v) for n, v in added.items())
+        out.tiqora_raw = prefix + kept + sep + rest  # type: ignore[attr-defined]
+    for name, value in added.items():
+        del out[name]
+        out[name] = value
+    return out
+
+
+def _drop_top_headers(head: bytes, lowered: set[str]) -> bytes:
+    lines = head.split(b"\r\n")
+    kept: list[bytes] = []
+    skipping = False
+    for line in lines:
+        if line[:1] in (b" ", b"\t"):
+            if not skipping:
+                kept.append(line)
+            continue
+        name = line.partition(b":")[0].decode("ascii", "replace").strip().lower()
+        skipping = name in lowered
+        if not skipping:
+            kept.append(line)
+    return b"\r\n".join(kept)

@@ -20,7 +20,13 @@ from tiqora_sdk.hooks import (
     SyncOperation,
     TicketCreatePatch,
 )
-from tiqora_sdk.mail import InboundMail, InboundMailResult, MailFilterContext
+from tiqora_sdk.mail import (
+    InboundMail,
+    InboundMailResult,
+    MailFilterContext,
+    MailVetoed,
+    OutboundMail,
+)
 from tiqora_sdk.process import ActionContext
 from tiqora_sdk.templates import NumberRequest, PlaceholderRequest
 
@@ -287,6 +293,45 @@ def _register_mail_filters(registry: PluginRegistry) -> None:
     registry.mail_filter("recorder", "post", _recorder, order=100, timeout_seconds=2)
 
 
+async def _stamp(ctx: MailFilterContext, mail: OutboundMail) -> None:
+    """``outbound``: every mail gets ``X-Points-Checked: 1``."""
+    behaviour.CALLS.append(("mail.out.stamp", mail.subject))
+    mail.add_header("X-Points-Checked", "1")
+
+
+async def _guard(ctx: MailFilterContext, mail: OutboundMail) -> None:
+    """``outbound``: a recipient at @blocked.example.net stops the send."""
+    if any(a.endswith("@blocked.example.net") for a in (*mail.to, *mail.cc)):
+        raise MailVetoed("Empfänger gesperrt")
+
+
+async def _broken_out(ctx: MailFilterContext, mail: OutboundMail) -> None:
+    """``outbound``, ``MODE["mail.out"]``: raise | hang | bad_header (after a valid header)."""
+    mode = behaviour.MODE.get("mail.out", "ok")
+    if mode == "raise":
+        mail.add_header("X-Broken", "1")  # must not reach the mail: the filter failed
+        raise RuntimeError("kaputt")
+    if mode == "hang":
+        mail.add_header("X-Broken", "1")
+        await asyncio.sleep(30)
+    if mode == "bad_header":
+        mail.add_header("X-Broken", "1")
+        mail.add_header("Subject", "x")  # ValueError: only X- headers
+
+
+async def _broken_out_late(ctx: MailFilterContext, mail: OutboundMail) -> None:
+    """``outbound``, second hanging filter (for the shared budget)."""
+    if behaviour.MODE.get("mail.out") == "hang":
+        await asyncio.sleep(30)
+
+
+def _register_outbound(registry: PluginRegistry) -> None:
+    registry.mail_filter("stamp", "outbound", _stamp, order=100)
+    registry.mail_filter("guard", "outbound", _guard, order=110)
+    registry.mail_filter("broken_out", "outbound", _broken_out, order=120, timeout_seconds=1)
+    registry.mail_filter("broken_late", "outbound", _broken_out_late, order=130, timeout_seconds=2)
+
+
 class PointsPlugin:
     def register(self, registry: PluginRegistry) -> None:
         # Each task of the plugin-points plan adds its ``_register_<point>(registry)`` call here.
@@ -296,6 +341,7 @@ class PointsPlugin:
         _register_number_generators(registry)
         _register_df_types(registry)
         _register_mail_filters(registry)
+        _register_outbound(registry)
 
 
 plugin = PointsPlugin()

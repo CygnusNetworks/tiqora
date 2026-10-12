@@ -17,6 +17,8 @@ from typing import TYPE_CHECKING, Literal, Protocol
 import aiosmtplib
 import structlog
 
+from tiqora.plugins.mail_filters import apply_outbound_headers, run_outbound_filters
+
 if TYPE_CHECKING:
     from tiqora.config import Settings
     from tiqora.domain.mail_outbound import ResolvedOutboundSmtp
@@ -231,6 +233,8 @@ class SmtpMailSender:
         auto-responses (``SendmailNotificationEnvelopeFrom``, empty by default),
         so their bounces go nowhere instead of back into a ticket queue.
         """
+        added = await run_outbound_filters(message)
+        message = apply_outbound_headers(message, added)
         use_tls = self._security == "ssl"
         start_tls = True if self._security == "starttls" else False if use_tls else None
         explicit = envelope_recipients(message, self.sendmail_bcc)
