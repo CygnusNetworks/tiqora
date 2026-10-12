@@ -1,5 +1,7 @@
 import { CmdbComingSoon } from "@/components/cmdb/CmdbComingSoon";
 import { validateCmdbListSearch } from "@/components/cmdb/ciFilterModel";
+import { validateCiDetailSearch } from "@/components/cmdb/ciDetailModel";
+import { CiDetailPage } from "@/routes/agent/cmdb/CiDetailPage";
 import { CmdbListPage } from "@/routes/agent/cmdb/CmdbListPage";
 import { PluginRoutePage } from "@/routes/agent/PluginRoutePage";
 import {
@@ -1321,7 +1323,8 @@ const agentCmdbImportRoute = createRoute({
 const agentCmdbCiRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/cmdb/$ciId",
-  component: CmdbComingSoon,
+  validateSearch: validateCiDetailSearch,
+  component: CiDetailPage,
 });
 
 const agentCmdbCiEditRoute = createRoute({

@@ -7663,6 +7663,88 @@
         "created_at": "Created",
         "changed_at": "Changed"
       }
+    },
+    "detail": {
+      "notFound": "CI not found",
+      "back": "Back to list",
+      "edit": "Edit",
+      "delete": "Delete",
+      "deleteTitle": "Delete CI?",
+      "deleteMessage": "CI {{number}} ({{name}}) will be permanently deleted with all its versions, links, attachments and history.",
+      "deleteConfirm": "Delete permanently",
+      "deleteFailed": "The CI could not be deleted.",
+      "loadFailed": "The CI could not be loaded.",
+      "loadMore": "Load more",
+      "tabsLabel": "CI sections",
+      "derivedHint": "Warning (derived)",
+      "derivedTitle": "The state comes from a dependent CI with an incident, not from this CI itself.",
+      "deployment": "Deployment state",
+      "incidentOwn": "Own incident state",
+      "incidentCurrent": "Current incident state",
+      "tabs": {
+        "overview": "Overview",
+        "links": "Links",
+        "dependencies": "Dependencies",
+        "tickets": "Tickets",
+        "versions": "Versions",
+        "history": "History"
+      },
+      "links": {
+        "empty": "No links.",
+        "loadFailed": "The links could not be loaded."
+      },
+      "tickets": {
+        "openOnly": "open only",
+        "empty": "No tickets linked.",
+        "loadFailed": "The tickets could not be loaded.",
+        "number": "Ticket",
+        "title": "Title",
+        "state": "State",
+        "queue": "Queue",
+        "linkType": "Link"
+      },
+      "versions": {
+        "empty": "No versions.",
+        "loadFailed": "The versions could not be loaded.",
+        "showChanges": "Show changes",
+        "pickHint": "Pick two versions to compare them.",
+        "pick": "Select version from {{date}}",
+        "definition": "Definition {{version}}",
+        "archived": "archived",
+        "loadArchived": "Load older versions ({{count}})",
+        "changes": "Changes",
+        "close": "Close"
+      },
+      "diff": {
+        "empty": "No differences.",
+        "attribute": "Attribute",
+        "change": "Change",
+        "added": "added",
+        "removed": "removed",
+        "changed": "changed"
+      }
+    },
+    "history": {
+      "loadFailed": "The history could not be loaded.",
+      "empty": "No history yet.",
+      "when": "When",
+      "who": "By",
+      "event": "Event",
+      "detail": "Details",
+      "events": {
+        "ConfigItemCreate": "CI created",
+        "VersionCreate": "New version",
+        "DeploymentStateUpdate": "Deployment state changed",
+        "IncidentStateUpdate": "Incident state changed",
+        "ConfigItemDelete": "CI deleted",
+        "LinkAdd": "Link added",
+        "LinkDelete": "Link removed",
+        "DefinitionUpdate": "Definition updated",
+        "NameUpdate": "Name changed",
+        "ValueUpdate": "Value changed",
+        "AttachmentAddPost": "Attachment added",
+        "AttachmentDeletePost": "Attachment removed"
+      }
     }
   }
 }

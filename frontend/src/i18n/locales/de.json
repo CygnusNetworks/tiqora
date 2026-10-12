@@ -7671,6 +7671,88 @@
         "created_at": "Erstellt",
         "changed_at": "Geändert"
       }
+    },
+    "detail": {
+      "notFound": "CI nicht gefunden",
+      "back": "Zur Liste",
+      "edit": "Bearbeiten",
+      "delete": "Löschen",
+      "deleteTitle": "CI löschen?",
+      "deleteMessage": "Das CI {{number}} ({{name}}) wird mit allen Versionen, Verknüpfungen, Anhängen und seinem Verlauf unwiderruflich gelöscht.",
+      "deleteConfirm": "Endgültig löschen",
+      "deleteFailed": "Das CI konnte nicht gelöscht werden.",
+      "loadFailed": "Das CI konnte nicht geladen werden.",
+      "loadMore": "Weitere laden",
+      "tabsLabel": "Bereiche des CI",
+      "derivedHint": "Warnung (abgeleitet)",
+      "derivedTitle": "Der Status kommt von einem abhängigen CI mit Vorfall, nicht von diesem CI selbst.",
+      "deployment": "Einsatzstatus",
+      "incidentOwn": "Eigener Vorfallsstatus",
+      "incidentCurrent": "Aktueller Vorfallsstatus",
+      "tabs": {
+        "overview": "Übersicht",
+        "links": "Verknüpfungen",
+        "dependencies": "Abhängigkeiten",
+        "tickets": "Tickets",
+        "versions": "Versionen",
+        "history": "Verlauf"
+      },
+      "links": {
+        "empty": "Keine Verknüpfungen.",
+        "loadFailed": "Die Verknüpfungen konnten nicht geladen werden."
+      },
+      "tickets": {
+        "openOnly": "nur offene",
+        "empty": "Keine Tickets verknüpft.",
+        "loadFailed": "Die Tickets konnten nicht geladen werden.",
+        "number": "Ticket",
+        "title": "Titel",
+        "state": "Status",
+        "queue": "Queue",
+        "linkType": "Verknüpfung"
+      },
+      "versions": {
+        "empty": "Keine Versionen.",
+        "loadFailed": "Die Versionen konnten nicht geladen werden.",
+        "showChanges": "Änderungen anzeigen",
+        "pickHint": "Wählen Sie zwei Versionen aus, um sie zu vergleichen.",
+        "pick": "Version vom {{date}} auswählen",
+        "definition": "Definition {{version}}",
+        "archived": "archiviert",
+        "loadArchived": "Ältere Versionen laden ({{count}})",
+        "changes": "Änderungen",
+        "close": "Schließen"
+      },
+      "diff": {
+        "empty": "Keine Unterschiede.",
+        "attribute": "Attribut",
+        "change": "Änderung",
+        "added": "hinzugefügt",
+        "removed": "entfernt",
+        "changed": "geändert"
+      }
+    },
+    "history": {
+      "loadFailed": "Der Verlauf konnte nicht geladen werden.",
+      "empty": "Noch kein Verlauf.",
+      "when": "Zeitpunkt",
+      "who": "Von",
+      "event": "Ereignis",
+      "detail": "Details",
+      "events": {
+        "ConfigItemCreate": "CI angelegt",
+        "VersionCreate": "Neue Version",
+        "DeploymentStateUpdate": "Einsatzstatus geändert",
+        "IncidentStateUpdate": "Vorfallsstatus geändert",
+        "ConfigItemDelete": "CI gelöscht",
+        "LinkAdd": "Verknüpfung hinzugefügt",
+        "LinkDelete": "Verknüpfung entfernt",
+        "DefinitionUpdate": "Definition aktualisiert",
+        "NameUpdate": "Name geändert",
+        "ValueUpdate": "Wert geändert",
+        "AttachmentAddPost": "Anhang hinzugefügt",
+        "AttachmentDeletePost": "Anhang entfernt"
+      }
     }
   }
 }

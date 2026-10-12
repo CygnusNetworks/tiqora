@@ -459,6 +459,8 @@ const TICKETS: CiTicket[] = [
   { ticket_id: 1, number: "2026100801", title: "Datenbank antwortet nicht", state_name: "open", state_type: "open", queue_id: 1, queue_name: "Raw", link_type: "RelevantTo", open: true },
 ];
 
+const CLOSED_TICKET: CiTicket = { ticket_id: 2, number: "2026092201", title: "Festplatte getauscht", state_name: "closed successful", state_type: "closed", queue_id: 1, queue_name: "Raw", link_type: "RelevantTo", open: false };
+
 const adminStatus = (store: DemoCmdb): CmdbAdminStatus => ({
   mode: demoItsmMode(),
   views_present: true,
@@ -663,7 +665,9 @@ export function resolveCmdb(
       return versionIds(ci).includes(vid) ? ok(versionOut(store, ci, vid)) : notFound();
     }
     if (part === "versions") {
-      const items: CiVersionSummary[] = versionIds(ci)
+      const before = Number(query.get("before_id")) || Infinity;
+      const limit = Number(query.get("limit")) || 20;
+      const all: CiVersionSummary[] = versionIds(ci)
         .map((id) => ({
           id,
           definition_id: classOf(ci.classId).definition?.id ?? 1,
@@ -679,8 +683,9 @@ export function resolveCmdb(
           created_at: AT,
           archived: false,
         }))
-        .reverse();
-      return ok({ items, has_more: false, archived_count: 0 });
+        .reverse()
+        .filter((v) => v.id < before);
+      return ok({ items: all.slice(0, limit), has_more: all.length > limit, archived_count: 0 });
     }
     if (part === "diff") {
       const ids = versionIds(ci);
@@ -691,16 +696,17 @@ export function resolveCmdb(
       });
     }
     if (part === "history") {
-      const page: CiHistoryPage = {
-        has_more: false,
-        items: versionIds(ci)
-          .map((vid, i) => ({ id: vid, event: i === 0 ? "created" : "updated", detail: i === 0 ? "CI angelegt" : "Attribute geändert", version_id: vid, created_by: 1, created_by_name: "Ada Agent", created_at: AT }))
-          .reverse(),
-      };
+      const before = Number(query.get("before_id")) || Infinity;
+      const limit = Number(query.get("limit")) || 25;
+      const all = versionIds(ci)
+        .map((vid, i) => ({ id: vid, event: i === 0 ? "ConfigItemCreate" : "VersionCreate", detail: i === 0 ? ci.number : String(i + 1), version_id: vid, created_by: 1, created_by_name: "Ada Agent", created_at: AT }))
+        .reverse()
+        .filter((h) => h.id < before);
+      const page: CiHistoryPage = { has_more: all.length > limit, items: all.slice(0, limit) };
       return ok(page);
     }
     if (part === "links") return ok(store.links.filter((l) => l.source === ci.id || l.target === ci.id).map((l) => linkOut(store, l, ci.id)));
-    if (part === "tickets") return ok(ci.id === 3 ? TICKETS : []);
+    if (part === "tickets") return ok(ci.id === 3 ? [...TICKETS, CLOSED_TICKET].filter((tk) => query.get("open_only") !== "true" || tk.open) : []);
     if (part === "impact") return ok(impact(store, ci.id));
     if (part === "affected") {
       const affected: Affected =
