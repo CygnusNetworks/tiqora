@@ -40,6 +40,10 @@ describe("reducer", () => {
     s = reducer(s, { type: "config-loaded", config: cfg({ online: false, offline_mode: "hide" }) });
     expect(s.view).toBe("ended");
     expect(reducer(s, { type: "reset" })).toBe(s);
+    // logout / identity conflict: the old transcript goes even when no new chat can be offered
+    const forced = reducer(s, { type: "reset", force: true });
+    expect(forced.session).toBeNull();
+    expect(forced.messages).toEqual([]);
     s = reducer(s, { type: "config-loaded", config: cfg({ online: false, offline_mode: "form" }) });
     expect(reducer(s, { type: "reset" }).view).toBe("offline");
   });

@@ -62,6 +62,18 @@ describe("PrechatForm", () => {
     expect(opts.map((o) => o.disabled)).toEqual([false, true]);
   });
 
+  it("an AI-first topic without a human stays disabled: the server refuses it under form/hide (I4)", async () => {
+    const { container } = await setup({
+      offline_mode: "form",
+      topics: [
+        { key: "a", label: "A", online: true },
+        { key: "b", label: "B", online: false, ai_first: true },
+      ],
+    });
+    const opts = Array.from(container.querySelectorAll<HTMLOptionElement>("#tq-f-topic option"));
+    expect(opts.map((o) => o.disabled)).toEqual([false, true]);
+  });
+
   it("links the privacy notice with noopener", async () => {
     const { container } = await setup();
     const a = container.querySelector(".tq-privacy a");

@@ -65,7 +65,7 @@ export type Action =
   | { type: "stream-state"; state: StreamState }
   | { type: "error"; error: string | null }
   | { type: "session-refreshed"; session: ChatSession }
-  | { type: "reset" };
+  | { type: "reset"; force?: boolean };
 
 export const initial: ChatState = {
   view: "loading",
@@ -256,7 +256,10 @@ export function reducer(s: ChatState, a: Action): ChatState {
     case "session-refreshed":
       return s.session ? { ...s, session: a.session } : s;
     case "reset":
-      if (!canStartNew(s.config)) return s; // never an empty panel (T16 M11)
+      if (!canStartNew(s.config)) {
+        // never an empty panel (T16 M11) - except after logout/conflict: the old chat must go
+        return a.force && s.config ? { ...initial, config: s.config, view: "hidden", open: s.open, topic: s.topic } : s;
+      }
       return {
         ...initial,
         config: s.config,

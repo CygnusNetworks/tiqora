@@ -191,7 +191,7 @@ export function PrechatForm(props: {
             onChange={(e) => props.onTopic(e.currentTarget.value)}
           >
             {config.topics.map((tp) => (
-              <option value={tp.key} disabled={!tp.online && !tp.ai_first}>
+              <option value={tp.key} disabled={!tp.online}>
                 {tp.label}
               </option>
             ))}

@@ -22,6 +22,7 @@ type StreamLike = { start(): void; stop(): void };
 
 const TYPING_VISIBLE_MS = 5000;
 const PREVIEW_AGENT = "Max";
+const PORTAL_REFRESH_MS = 9 * 60 * 1000;
 
 const PREVIEW_DEFAULT: ChatPublicConfig = {
   bot_name: "KI-Assistent",
@@ -103,6 +104,8 @@ export function App(props: {
   // The signed token: memory only, never stored (C9). `deferred` is a stored signed-in chat
   // waiting for the host to vouch for the visitor before it is restored.
   const identRef = useRef<string | null>(null);
+  // Portal assertions live 600 s on the server: refetch one that is older than 9 minutes.
+  const portalRef = useRef<{ at: number } | null>(null);
   const deferred = useRef<StoredSession | null>(null);
   const restoreRef = useRef<(s: StoredSession) => Promise<void>>(async () => undefined);
   const identifyRef = useRef<(token: string) => Promise<void>>(async () => undefined);
@@ -155,20 +158,32 @@ export function App(props: {
   // --- identity ---------------------------------------------------------------------
   const setIdentity = useCallback((token: string, name?: string | null) => {
     identRef.current = token;
+    if (portalRef.current) portalRef.current.at = Date.now();
     dispatch({ type: "identity-set", name: name ?? claimName(token) });
   }, []);
   const dropIdentity = useCallback(() => {
     identRef.current = null;
     dispatch({ type: "identity-cleared" });
   }, []);
+  const freshPortal = useCallback(async () => {
+    const p = portalRef.current;
+    if (!p || !identRef.current || Date.now() - p.at < PORTAL_REFRESH_MS) return;
+    try {
+      const r = await api.portalIdentity({ key: params.k, origin: params.origin, visitor_id: visitorId(props.store) });
+      identRef.current = r.identity;
+      p.at = Date.now();
+    } catch {
+      // keep the old one: the server decides (a retry or the 422 path follows)
+    }
+  }, [api, params.k, params.origin, props.store]);
   const toStart = useCallback(() => {
-    const a = auth.current;
-    if (a || stateRef.current.session) clearSession(params.k, props.store);
+    // unconditional: a deferred signed-in chat has neither auth nor a session yet (C9 logout)
+    clearSession(params.k, props.store);
     auth.current = null;
     seq.current = 0;
     seqFloor.current = 0;
     deferred.current = null;
-    dispatch({ type: "reset" });
+    dispatch({ type: "reset", force: true });
   }, [params.k, props.store]);
 
   /** Attach the pending identity to the running chat (204 also for the same one again). */
@@ -195,6 +210,27 @@ export function App(props: {
 
   const restoreStored = async (stored: StoredSession, isDead: () => boolean) => {
     try {
+      // Ownership first: nothing of the stored chat is fetched or shown before the server
+      // confirms that the signed-in visitor may have it (a shared browser).
+      let identified = false;
+      if (identRef.current) {
+        await freshPortal();
+        try {
+          await api.identify(stored.sessionId, stored.token, identRef.current!);
+          identified = true;
+        } catch (e) {
+          if (!(e instanceof ChatApiError)) throw e;
+          if (e.code === "identity_conflict") {
+            toStart();
+            return;
+          }
+          if (e.code === "invalid_identity") {
+            dropIdentity();
+            bridgeRef.current?.post({ p: "tiqora-chat/1", type: "identity", verified: false });
+          } else if (e.status === 404) throw e;
+          else if (stored.identified) return; // cannot prove ownership: show nothing
+        }
+      }
       const session = await api.session(stored.sessionId, stored.token);
       const all: ChatMessage[] = [];
       // The frame is reloaded on every host page: the transcript comes from the server.
@@ -210,7 +246,7 @@ export function App(props: {
       seqFloor.current = maxSeq(all);
       seq.current = seqFloor.current;
       dispatch({ type: "session-restored", session, messages: all });
-      if (identRef.current && isLive(session.status)) void attachIdentity(identRef.current);
+      if (identified) bridgeRef.current?.post({ p: "tiqora-chat/1", type: "identity", verified: !!session.identified_as });
     } catch (e) {
       if (e instanceof ChatApiError && e.status === 404) clearSession(params.k, props.store);
       // other failures: show the pre-chat form, the stored session survives for the next load
@@ -267,6 +303,7 @@ export function App(props: {
         try {
           const p = await api.portalIdentity({ key: params.k, origin: params.origin, visitor_id: visitorId(props.store) });
           if (dead) return;
+          portalRef.current = { at: Date.now() };
           setIdentity(p.identity, p.name);
         } catch {
           // 404 and every failure: anonymous
@@ -531,6 +568,7 @@ export function App(props: {
     }
     setBusy(true);
     try {
+      await freshPortal();
       const created = await api.createSession({
         key: params.k,
         origin: params.origin,
@@ -543,7 +581,7 @@ export function App(props: {
         ...(identRef.current ? { identity: identRef.current } : {}),
       });
       auth.current = { id: created.session_id, token: created.token };
-      saveSession(params.k, { sessionId: created.session_id, token: created.token, lastSeq: created.message.seq, identified: false }, props.store);
+      saveSession(params.k, { sessionId: created.session_id, token: created.token, lastSeq: created.message.seq, identified: !!identRef.current }, props.store);
       dispatch({ type: "session-created", created });
       if (identRef.current) {
         // who the server recognised (identified_as) is only on the session

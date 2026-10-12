@@ -647,6 +647,71 @@ describe("App", () => {
     expect(byLabel(n.container, "Name")).toBeTruthy();
   });
 
+  it("logout before the visitor opens the chat clears a deferred signed-in chat (I1)", async () => {
+    const store = memStore();
+    saveSession("wc_key", { sessionId: "sid1", token: "tok1", lastSeq: 1, identified: true }, store);
+    const { api } = await mountHost({ store });
+    toHost({ p: "tiqora-chat/1", type: "logout" });
+    await flush();
+    expect(loadSession("wc_key", store)).toBeNull();
+    toHost({ p: "tiqora-chat/1", type: "identify", token: TOKEN });
+    toHost({ p: "tiqora-chat/1", type: "open" });
+    await flush();
+    expect(api.session).not.toHaveBeenCalled(); // nobody restores A's chat for B
+  });
+
+  it("a restore checks ownership first: on identity_conflict no transcript is fetched or shown (I3)", async () => {
+    const store = memStore();
+    saveSession("wc_key", { sessionId: "sid1", token: "tok1", lastSeq: 1, identified: true }, store);
+    const identify = vi.fn(async () => {
+      throw new ChatApiError(409, "identity_conflict");
+    });
+    const { container, api } = await mountHost({ store, api: fakeApi({ identify }) });
+    toHost({ p: "tiqora-chat/1", type: "identify", token: TOKEN });
+    toHost({ p: "tiqora-chat/1", type: "open" });
+    await flush();
+    expect(identify).toHaveBeenCalledWith("sid1", "tok1", TOKEN);
+    expect(api.session).not.toHaveBeenCalled();
+    expect(api.messages).not.toHaveBeenCalled();
+    expect(container.querySelector(".tq-log")).toBeNull();
+    expect(loadSession("wc_key", store)).toBeNull();
+  });
+
+  it("a portal assertion older than 9 minutes is fetched again before the chat starts (I2)", async () => {
+    let n = 0;
+    const portalIdentity = vi.fn(async (_b: Record<string, unknown>) => ({ identity: `tok.${++n}.sig`, name: "Erika Muster" }));
+    const api = fakeApi({ config: vi.fn(async () => cfg({ portal_identity: true })), portalIdentity, createSession: botCreate() });
+    const now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+    const { container } = await mountHost({ api, p: { origin: "http://localhost" } });
+    expect(portalIdentity).toHaveBeenCalledTimes(1);
+    clock.mockReturnValue(now + 10 * 60 * 1000);
+    toHost({ p: "tiqora-chat/1", type: "open" });
+    await fillAndStart(container, false);
+    clock.mockRestore();
+    expect(portalIdentity).toHaveBeenCalledTimes(2);
+    expect((api.createSession.mock.calls[0][0] as { identity?: string }).identity).toBe("tok.2.sig");
+  });
+
+  it("a signed-in chat is stored as identified even if the follow-up session read fails (M1)", async () => {
+    let first = true;
+    const api = fakeApi({
+      createSession: botCreate(),
+      session: vi.fn(async () => {
+        if (first) {
+          first = false;
+          throw new ChatApiError(500, "boom");
+        }
+        return session();
+      }),
+    });
+    const { container, store } = await mountHost({ api });
+    toHost({ p: "tiqora-chat/1", type: "identify", token: TOKEN });
+    toHost({ p: "tiqora-chat/1", type: "open" });
+    await fillAndStart(container, false);
+    expect(loadSession("wc_key", store)?.identified).toBe(true);
+  });
+
   it("preview frames never ask for the portal identity and ignore the host's sign-in", async () => {
     const portalIdentity = vi.fn(async () => ({ identity: TOKEN, name: "X" }));
     const api = fakeApi({ config: vi.fn(async () => cfg({ portal_identity: true })), portalIdentity });

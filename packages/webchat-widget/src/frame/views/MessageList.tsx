@@ -107,7 +107,7 @@ export function MessageList(props: {
           <div key={m.seq} class={own ? "tq-msg tq-own" : "tq-msg tq-other"}>
             {m.sender === "bot" ? (
               <span class="tq-name">
-                {props.botName || t("header.support")} <span class="tq-ai">{t("bot.badge")}</span>
+                {m.agent_name || props.botName || t("header.support")} <span class="tq-ai">{t("bot.badge")}</span>
               </span>
             ) : (
               !own && <span class="tq-name">{m.agent_name || t("header.support")}</span>
