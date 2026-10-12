@@ -7543,6 +7543,30 @@
       "incident": "Vorfall"
     },
     "unknownValues": "Diese Werte kennt die Klassendefinition nicht mehr. Beim Speichern werden sie entfernt.",
-    "hiddenNode": "Kein Zugriff"
+    "hiddenNode": "Kein Zugriff",
+    "form": {
+      "clear": "Leeren",
+      "noHits": "Keine Treffer.",
+      "ciSearch": "CIs nach Nummer oder Name suchen…",
+      "companySearch": "Firmen suchen…",
+      "select": "Auswählen…",
+      "addEntry": "Weiteren Eintrag hinzufügen",
+      "removeEntry": "Entfernen",
+      "upload": "Datei hochladen",
+      "empty": "—",
+      "noAttributes": "Keine Attributwerte."
+    },
+    "validation": {
+      "required": "Pflichtfeld.",
+      "too_few": "Zu wenige Einträge.",
+      "too_many": "Zu viele Einträge.",
+      "bad_type": "Der Wert hat den falschen Typ.",
+      "too_long": "Der Wert ist zu lang.",
+      "out_of_range": "Der Wert liegt außerhalb des erlaubten Bereichs.",
+      "bad_format": "Der Wert hat ein ungültiges Format.",
+      "unknown_key": "Unbekanntes Attribut.",
+      "unknown_reference": "Der verknüpfte Eintrag existiert nicht.",
+      "wrong_class": "Der verknüpfte Eintrag ist hier nicht erlaubt."
+    }
   }
 }

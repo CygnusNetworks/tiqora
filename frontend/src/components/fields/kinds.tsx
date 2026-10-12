@@ -4,6 +4,8 @@ import { Switch } from "@/components/ui/Switch";
 import { TagInput } from "@/components/ui/TagInput";
 import { createExtensionPoint } from "@/extensions/registry";
 import { cn } from "@/lib/cn";
+import { CiRefKind } from "./CiRefKind";
+import { CompanyKind } from "./CompanyKind";
 import { CustomerKind } from "./CustomerKind";
 import { MultiSelectInput } from "./MultiSelectInput";
 import { TicketAttachmentsKind } from "./TicketAttachmentsKind";
@@ -249,6 +251,8 @@ export function registerCoreFieldKinds(): void {
     { kind: "tags", component: TagsKind },
     { kind: "customer", component: CustomerKind },
     { kind: "ticket_attachments", component: TicketAttachmentsKind },
+    { kind: "ci_ref", component: CiRefKind },
+    { kind: "company", component: CompanyKind },
   ];
   for (const k of core) if (!FIELD_KINDS.get(k.kind)) FIELD_KINDS.register(k);
 }

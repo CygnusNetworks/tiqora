@@ -7543,6 +7543,30 @@
       "incident": "Incident"
     },
     "unknownValues": "The class definition no longer has these values. Saving removes them.",
-    "hiddenNode": "No access"
+    "hiddenNode": "No access",
+    "form": {
+      "clear": "Clear",
+      "noHits": "No matches.",
+      "ciSearch": "Search CIs by number or name…",
+      "companySearch": "Search companies…",
+      "select": "Select…",
+      "addEntry": "Add another entry",
+      "removeEntry": "Remove",
+      "upload": "Upload file",
+      "empty": "—",
+      "noAttributes": "No attribute values."
+    },
+    "validation": {
+      "required": "Required field.",
+      "too_few": "Too few entries.",
+      "too_many": "Too many entries.",
+      "bad_type": "This value has the wrong type.",
+      "too_long": "The value is too long.",
+      "out_of_range": "The value is out of range.",
+      "bad_format": "The value has an invalid format.",
+      "unknown_key": "Unknown attribute.",
+      "unknown_reference": "The referenced entry does not exist.",
+      "wrong_class": "The referenced entry is not allowed here."
+    }
   }
 }
