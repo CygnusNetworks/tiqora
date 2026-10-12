@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <otrs_package version="1.0">
     <Name>TiqoraSync</Name>
-    <Version>1.1.1</Version>
+    <Version>1.2.0</Version>
     <!-- Multi-framework: parallel-op peers OTRS/Znuny 6.0–6.5 and Znuny 7.0–7.3.
          Package Manager installs when any listed Framework matches the peer. -->
     <Framework>6.0.x</Framework>
@@ -17,6 +17,7 @@
     <Vendor>Cygnus Networks GmbH</Vendor>
     <URL>https://cygnusnetworks.de/</URL>
     <License>GPL-3.0-only</License>
+    <ChangeLog Version="1.2.0" Date="2026-10-12">Writes a heartbeat (tiqorasync.heartbeat) on every run and deploys processes and ACLs when Tiqora asks for it (TiqoraDeploy_process_N / TiqoraDeploy_acl_N signals: ProcessDump + EntitySyncStatePurge, ACLDump + ACLsNeedSyncReset), reporting the result in tiqora_settings. Settings are written without ON DUPLICATE KEY (PostgreSQL-neutral).</ChangeLog>
     <ChangeLog Version="1.1.1" Date="2026-08-14">Also clear the article-list cache (CacheType Article) per ticket — without it, articles Tiqora wrote by SQL stayed invisible in the Znuny UI for up to 20 days.</ChangeLog>
     <ChangeLog Version="1.1.0" Date="2026-07-27">Declare Framework 6.0.x–7.3.x for multi-version parallel operation.</ChangeLog>
     <ChangeLog Version="1.0.1" Date="2026-07-21">Also drain cache_type master-data signals (Queue, State, DynamicField, …).</ChangeLog>
@@ -29,6 +30,9 @@
         hand-off table Tiqora writes to and clears the affected Znuny ticket
         and CacheType caches, so agents using the Znuny GUI do not see stale
         data for objects that were last modified via Tiqora.
+        Deploys processes and ACLs when Tiqora asks for it: the add-on runs
+        Znuny's own process and ACL deployment (the Deploy buttons of the
+        admin screens) and reports the result back to Tiqora.
     </Description>
     <Description Lang="de">
         Haelt den prozessinternen Cache von Znuny (Kernel::System::Cache)

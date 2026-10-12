@@ -14,9 +14,15 @@ use strict;
 use warnings;
 
 our @ObjectDependencies = (
+    'Kernel::Config',
+    'Kernel::System::ACL::DB::ACL',
     'Kernel::System::Cache',
+    'Kernel::System::DateTime',
     'Kernel::System::DB',
+    'Kernel::System::JSON',
     'Kernel::System::Log',
+    'Kernel::System::ProcessManagement::DB::Entity',
+    'Kernel::System::ProcessManagement::DB::Process',
 );
 
 =head1 NAME
@@ -53,6 +59,16 @@ non-null C<cache_type> found
 
 =item * advances the watermark to the highest id processed
 
+=item * writes a heartbeat (C<tiqorasync.heartbeat>) on every run, so Tiqora
+knows that this add-on is alive and which deploy capabilities it has
+
+=item * when Tiqora queued a deploy signal (C<cache_type>
+C<TiqoraDeploy_process_E<lt>revisionE<gt>> or C<TiqoraDeploy_acl_E<lt>revisionE<gt>>),
+does what the "Deploy" button of Znuny's process and ACL admin screens does
+(C<ProcessDump> + C<EntitySyncStatePurge>, C<ACLDump> + C<ACLsNeedSyncReset>)
+and reports C<ok> or C<error> in C<tiqorasync.deploy.process> /
+C<tiqorasync.deploy.acl>. Deploy signals are never passed to C<CleanUp>.
+
 =back
 
 Both tables are created by Tiqora's own Alembic migrations and are therefore
@@ -74,6 +90,26 @@ scheduler log.
 use constant BATCH_LIMIT => 500;
 
 use constant WATERMARK_KEY => 'tiqorasync.watermark';
+use constant HEARTBEAT_KEY => 'tiqorasync.heartbeat';
+
+use constant VERSION => '1.2.0';
+
+# What the heartbeat announces. Tiqora only offers "deploy through Znuny" for a kind
+# whose capability is listed here.
+use constant CAPABILITIES => (qw(process_deploy acl_deploy));
+
+# Per deploy kind: the status key, and how Znuny's own admin screen deploys it
+# (AdminProcessManagement.pm ProcessSync, AdminACL.pm ACLDeploy).
+my %DeployKind = (
+    process => {
+        StatusKey => 'tiqorasync.deploy.process',
+        File      => 'ZZZProcessManagement.pm',
+    },
+    acl => {
+        StatusKey => 'tiqorasync.deploy.acl',
+        File      => 'ZZZACL.pm',
+    },
+);
 
 =head2 new()
 
@@ -124,6 +160,9 @@ sub Run {
         return 1;
     }
 
+    # The heartbeat first: it proves the daemon is alive even when there is nothing to do.
+    $Self->_HeartbeatSet();
+
     my $Watermark = $Self->_WatermarkGet();
 
     my $SelectSuccess = eval {
@@ -144,6 +183,7 @@ sub Run {
 
     my %TicketIDs;
     my %CacheTypes;
+    my %Deploy;    # kind => { SignalID => highest row id, RevisionID => highest revision id }
     my $MaxID = $Watermark;
 
     while ( my @Row = $DBObject->FetchrowArray() ) {
@@ -155,7 +195,17 @@ sub Run {
             # Strip whitespace; skip empty / all-whitespace types so a bad
             # row never becomes CleanUp( Type => '' ).
             $CacheType =~ s/^\s+|\s+$//g;
-            $CacheTypes{$CacheType} = 1 if length $CacheType;
+
+            # Deploy signals are for this add-on only; they are not Znuny CacheTypes.
+            if ( $CacheType =~ m{\ATiqoraDeploy_(process|acl)_(\d+)\z} ) {
+                my ( $Kind, $RevisionID ) = ( $1, $2 + 0 );
+                $Deploy{$Kind} //= { SignalID => 0, RevisionID => 0 };
+                $Deploy{$Kind}->{SignalID}   = $ID         if $ID > $Deploy{$Kind}->{SignalID};
+                $Deploy{$Kind}->{RevisionID} = $RevisionID if $RevisionID > $Deploy{$Kind}->{RevisionID};
+            }
+            elsif ( length $CacheType ) {
+                $CacheTypes{$CacheType} = 1;
+            }
         }
         $MaxID = $ID if $ID > $MaxID;
     }
@@ -204,7 +254,220 @@ sub Run {
         }
     }
 
+    # Deploy on request from Tiqora, process first (an ACL can name processes).
+    # One dump per kind however many signals piled up: the dump reads the
+    # current state, so the highest revision stands for all of them.
+    for my $Kind (qw(process acl)) {
+        next if !$Deploy{$Kind};
+        $Self->_DeployRun(
+            Kind       => $Kind,
+            SignalID   => $Deploy{$Kind}->{SignalID},
+            RevisionID => $Deploy{$Kind}->{RevisionID},
+        );
+    }
+
     $Self->_WatermarkSet( Watermark => $MaxID );
+
+    return 1;
+}
+
+=head2 _DeployRun()
+
+Does for one kind what Znuny's own "Deploy" button does, and reports the
+outcome in C<tiqorasync.deploy.E<lt>kindE<gt>>:
+
+    $Self->_DeployRun( Kind => 'process', SignalID => 17, RevisionID => 12 );
+
+The status is C<{"signal_id": n, "revision_id": n, "status": "ok"|"error",
+"message": "", "at": epoch}>. Tiqora trusts a deploy only when C<signal_id> is
+at least the id of the signal it queued last. Framework differences between
+6.0 and 7.3 end up in C<eval> and are reported as C<error>; the sync table is
+purged only after the file was written.
+
+=cut
+
+sub _DeployRun {
+    my ( $Self, %Param ) = @_;
+
+    my $Kind   = $Param{Kind};
+    my $Config = $DeployKind{$Kind} or return;
+
+    my $Message = '';
+    my $Success = eval {
+        my $Home     = $Kernel::OM->Get('Kernel::Config')->Get('Home');
+        my $Location = $Home . '/Kernel/Config/Files/' . $Config->{File};
+
+        if ( $Kind eq 'process' ) {
+            my $ProcessObject = $Kernel::OM->Get('Kernel::System::ProcessManagement::DB::Process');
+            my $EntityObject  = $Kernel::OM->Get('Kernel::System::ProcessManagement::DB::Entity');
+
+            $ProcessObject->ProcessDump(
+                ResultType => 'FILE',
+                Location   => $Location,
+                UserID     => 1,
+            ) or die "ProcessDump into $Location failed\n";
+
+            $EntityObject->EntitySyncStatePurge( UserID => 1 )
+                or die "EntitySyncStatePurge failed\n";
+        }
+        else {
+            my $ACLObject = $Kernel::OM->Get('Kernel::System::ACL::DB::ACL');
+
+            $ACLObject->ACLDump(
+                ResultType => 'FILE',
+                Location   => $Location,
+                UserID     => 1,
+            ) or die "ACLDump into $Location failed\n";
+
+            $ACLObject->ACLsNeedSyncReset()
+                or die "ACLsNeedSyncReset failed\n";
+        }
+        1;
+    };
+    if ( !$Success ) {
+        $Message = $@ || 'deploy failed';
+        $Message =~ s/\s+\z//;
+        $Message = substr( $Message, 0, 500 );
+        $Kernel::OM->Get('Kernel::System::Log')->Log(
+            Priority => 'error',
+            Message  => "TiqoraSync: deploy of $Kind failed ($Message).",
+        );
+    }
+
+    $Self->_StatusSet(
+        Key  => $Config->{StatusKey},
+        Data => {
+            signal_id   => $Param{SignalID} + 0,
+            revision_id => $Param{RevisionID} + 0,
+            status      => $Success ? 'ok' : 'error',
+            message     => $Message,
+            at          => $Self->_Now(),
+        },
+    );
+
+    return $Success ? 1 : 0;
+}
+
+=head2 _HeartbeatSet()
+
+Writes C<tiqorasync.heartbeat>: version, Znuny framework version, capabilities
+and the time of this run as integer epoch seconds (never a formatted time:
+Znuny formats in C<OTRSTimeZone>, which need not be UTC).
+
+=cut
+
+sub _HeartbeatSet {
+    my ( $Self, %Param ) = @_;
+
+    return $Self->_StatusSet(
+        Key  => HEARTBEAT_KEY,
+        Data => {
+            version      => VERSION,
+            framework    => ( eval { $Kernel::OM->Get('Kernel::Config')->Get('Version') } // '' ) . '',
+            capabilities => [CAPABILITIES],
+            at           => $Self->_Now(),
+        },
+    );
+}
+
+=head2 _StatusSet()
+
+Stores a hash as JSON under a C<tiqora_settings> key. Never dies.
+
+    $Self->_StatusSet( Key => 'tiqorasync.heartbeat', Data => {...} );
+
+=cut
+
+sub _StatusSet {
+    my ( $Self, %Param ) = @_;
+
+    my $Value = eval { $Kernel::OM->Get('Kernel::System::JSON')->Encode( Data => $Param{Data} ) };
+    if ( !defined $Value || $@ ) {
+        $Kernel::OM->Get('Kernel::System::Log')->Log(
+            Priority => 'notice',
+            Message  => "TiqoraSync: could not encode $Param{Key} ($@).",
+        );
+        return;
+    }
+
+    return $Self->_SettingSet( Key => $Param{Key}, Value => $Value );
+}
+
+=head2 _Now()
+
+Integer epoch seconds (UTC based, C<DateTime-E<gt>ToEpoch()>).
+
+=cut
+
+sub _Now {
+    my ( $Self, %Param ) = @_;
+
+    return $Kernel::OM->Create('Kernel::System::DateTime')->ToEpoch() + 0;
+}
+
+=head2 _KeyColumn()
+
+The C<tiqora_settings.key> column quoted for the database in use. C<key> is a
+reserved word in MySQL/MariaDB (backticks) and needs double quotes in
+PostgreSQL.
+
+=cut
+
+sub _KeyColumn {
+    my ( $Self, %Param ) = @_;
+
+    my $Type = eval { $Kernel::OM->Get('Kernel::System::DB')->GetDatabaseFunction('Type') } // 'mysql';
+
+    return '"key"' if $Type eq 'postgresql';
+    return '`key`';
+}
+
+=head2 _SettingSet()
+
+Dialect-neutral upsert on C<tiqora_settings>: an C<UPDATE ... WHERE key>,
+then an C<INSERT> when the key does not exist yet (no C<ON DUPLICATE KEY>,
+which PostgreSQL lacks). Writers of one key are this daemon task only, so the
+two statements cannot race with each other.
+
+    $Self->_SettingSet( Key => 'tiqorasync.watermark', Value => '123' );
+
+=cut
+
+sub _SettingSet {
+    my ( $Self, %Param ) = @_;
+
+    my $DBObject = $Kernel::OM->Get('Kernel::System::DB');
+    my $Column   = $Self->_KeyColumn();
+
+    my $Success = eval {
+        $DBObject->Do(
+            SQL  => "UPDATE tiqora_settings SET value = ? WHERE $Column = ?",
+            Bind => [ \$Param{Value}, \$Param{Key} ],
+        ) or die "UPDATE failed\n";
+
+        # The affected-rows count of an UPDATE that stores the same value is 0 on
+        # MySQL, so ask for the row instead of trusting it.
+        $DBObject->Prepare(
+            SQL   => "SELECT value FROM tiqora_settings WHERE $Column = ?",
+            Bind  => [ \$Param{Key} ],
+            Limit => 1,
+        ) or die "SELECT failed\n";
+        my @Row = $DBObject->FetchrowArray();
+        return 1 if @Row;
+
+        $DBObject->Do(
+            SQL  => "INSERT INTO tiqora_settings ($Column, value) VALUES (?, ?)",
+            Bind => [ \$Param{Key}, \$Param{Value} ],
+        ) or die "INSERT failed\n";
+        1;
+    };
+    if ( !$Success ) {
+        $Kernel::OM->Get('Kernel::System::Log')->Log(
+            Priority => 'notice',
+            Message  => "TiqoraSync: could not write $Param{Key} to tiqora_settings ($@).",
+        );
+        return;
+    }
 
     return 1;
 }
@@ -221,7 +484,23 @@ sub _TablesExist {
 
     my $DBObject = $Kernel::OM->Get('Kernel::System::DB');
 
+    my $Type = eval { $DBObject->GetDatabaseFunction('Type') } // 'mysql';
+
     for my $Table (qw(tiqora_cache_invalidation tiqora_settings)) {
+        if ( $Type ne 'mysql' ) {
+
+            # PostgreSQL & co.: information_schema instead of SHOW TABLES.
+            my $Found = eval {
+                $DBObject->Prepare(
+                    SQL   => 'SELECT 1 FROM information_schema.tables WHERE table_name = ?',
+                    Bind  => [ \$Table ],
+                    Limit => 1,
+                ) && $DBObject->FetchrowArray();
+            };
+            return 0 if !$Found;
+            next;
+        }
+
         my $Success = eval {
             # NB: no Limit here — Znuny's DB layer would append "LIMIT 1",
             # and MariaDB/MySQL reject LIMIT on a SHOW TABLES statement
@@ -254,9 +533,10 @@ sub _WatermarkGet {
 
     my $DBObject = $Kernel::OM->Get('Kernel::System::DB');
 
+    my $Column  = $Self->_KeyColumn();
     my $Success = eval {
         $DBObject->Prepare(
-            SQL   => 'SELECT value FROM tiqora_settings WHERE `key` = ?',
+            SQL   => "SELECT value FROM tiqora_settings WHERE $Column = ?",
             Bind  => [ \WATERMARK_KEY ],
             Limit => 1,
         );
@@ -271,7 +551,7 @@ sub _WatermarkGet {
 
 =head2 _WatermarkSet()
 
-Persists the given watermark value to C<tiqora_settings> via an UPSERT.
+Persists the given watermark value to C<tiqora_settings> (see L</_SettingSet()>).
 
     $Self->_WatermarkSet( Watermark => 123 );
 
@@ -280,21 +560,7 @@ Persists the given watermark value to C<tiqora_settings> via an UPSERT.
 sub _WatermarkSet {
     my ( $Self, %Param ) = @_;
 
-    my $DBObject = $Kernel::OM->Get('Kernel::System::DB');
-
-    eval {
-        $DBObject->Do(
-            SQL => 'INSERT INTO tiqora_settings (`key`, value) VALUES (?, ?) '
-                . 'ON DUPLICATE KEY UPDATE value = VALUES(value)',
-            Bind => [ \WATERMARK_KEY, \$Param{Watermark} ],
-        );
-    };
-    if ($@) {
-        $Kernel::OM->Get('Kernel::System::Log')->Log(
-            Priority => 'notice',
-            Message  => "TiqoraSync: could not update watermark in tiqora_settings ($@).",
-        );
-    }
+    $Self->_SettingSet( Key => WATERMARK_KEY, Value => $Param{Watermark} . '' );
 
     return 1;
 }

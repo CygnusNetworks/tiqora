@@ -16,6 +16,42 @@ stable across this range.
 - `Kernel/Config/Files/XML/TiqoraSync.xml` — SysConfig registration of the
   daemon cron task `Daemon::SchedulerCronTaskManager::Task###TiqoraSync`.
 
+## Deploying processes and ACLs for Tiqora (since 1.2.0)
+
+Every run (once a minute) writes a heartbeat to `tiqora_settings`
+(`tiqorasync.heartbeat`: version, Znuny framework version, capabilities
+`process_deploy` / `acl_deploy`, time as epoch seconds). Tiqora offers
+"deploy" while Znuny still runs only when it saw a heartbeat younger than
+10 minutes.
+
+When an admin deploys in the Tiqora process designer, Tiqora records the
+revision and queues a signal in `tiqora_cache_invalidation`
+(`TiqoraDeploy_process_<revision>` or `TiqoraDeploy_acl_<revision>`). On its
+next run TiqoraSync does what the Deploy buttons of Znuny's admin screens do:
+
+- process: `ProcessDump` into `Kernel/Config/Files/ZZZProcessManagement.pm`,
+  then `EntitySyncStatePurge`;
+- ACL: `ACLDump` into `Kernel/Config/Files/ZZZACL.pm`, then
+  `ACLsNeedSyncReset`.
+
+It reports `ok` or `error` (with the message) in `tiqorasync.deploy.process`
+/ `tiqorasync.deploy.acl`, keyed by the id of the signal row. Several signals
+of one kind in a run lead to one dump. Deploy signals are never passed to the
+cache cleanup. After an `error`, Znuny keeps running the previous version
+until the problem is fixed and the deploy is requested again.
+
+Requirements:
+
+- The Znuny user that runs the daemon must be able to **write
+  `Kernel/Config/Files/ZZZProcessManagement.pm` and `ZZZACL.pm`** (the
+  same permission Znuny's own Deploy buttons need).
+- **Multi-node Znuny:** the file is written on the node that runs the Znuny
+  daemon. Nodes that serve web requests need `Kernel/Config/Files` shared
+  with that node (or the file distributed), exactly as for Znuny's own button.
+- **Database:** the settings are written with `UPDATE` then `INSERT` (no
+  `ON DUPLICATE KEY`). MySQL/MariaDB is covered by the golden tests; a
+  PostgreSQL Znuny is verified manually.
+
 ## Install paths
 
 | Peer | Typical home | Console |
@@ -40,7 +76,7 @@ $CONSOLE Dev::Package::Build \
     $OTRS/var/packages/
 ```
 
-This produces `$OTRS/var/packages/TiqoraSync-1.1.1.opm` (version from the SOPM).
+This produces `$OTRS/var/packages/TiqoraSync-1.2.0.opm` (version from the SOPM).
 
 If your peer accepts `.sopm` files directly for installation, you can skip the
 build step. If in doubt, build the `.opm` first.
@@ -52,7 +88,7 @@ OTRS 6.0 build, ship a one-line SOPM fork with only `<Framework>6.0.x</Framework
 ## Install
 
 ```sh
-$CONSOLE Admin::Package::Install $OTRS/var/packages/TiqoraSync-1.1.1.opm
+$CONSOLE Admin::Package::Install $OTRS/var/packages/TiqoraSync-1.2.0.opm
 ```
 
 ## Verify
@@ -63,7 +99,7 @@ $CONSOLE Admin::Package::Install $OTRS/var/packages/TiqoraSync-1.1.1.opm
    $CONSOLE Admin::Package::List
    ```
 
-   `TiqoraSync 1.1.1` should be listed.
+   `TiqoraSync 1.2.0` should be listed.
 
 2. Confirm the daemon cron task is registered and enabled:
 
