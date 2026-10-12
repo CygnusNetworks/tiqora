@@ -32,9 +32,10 @@ der Dienst für ausgehende Aufrufe ausgeschaltet ist.
 Anmeldung (JWT bei REST, NTLM bei SOAP).
 
 **Ausgehende Aufrufe.** Je Invoker: Typ, Ereignisse mit „sofort“ oder „im Hintergrund“, ein Abzeichen
-„Bedingung“, wenn eine Bedingung gesetzt ist, und das Abzeichen „wird von Tiqora nicht ausgelöst“ für Ereignisse
-oder Invoker-Typen, die Tiqora nicht unterstützt. Mit **Probelauf** wählen Sie ein Ticket (Nummer oder ID, auf
-Wunsch mit Artikel). Tiqora baut den Aufruf nach, zeigt Methode, Adresse, Kopfzeilen (maskiert) und Inhalt und
+„Bedingung“, wenn eine Bedingung gesetzt ist, und das Abzeichen „wird von Tiqora noch nicht ausgelöst“ für Ereignisse
+oder Invoker-Typen, die Tiqora nicht unterstützt. Mit **Probelauf** wählen Sie ein Ticket (Ticket-ID) und das
+Ereignis, auf
+Wunsch mit Artikel. Tiqora baut den Aufruf nach, zeigt Methode, Adresse, Kopfzeilen (maskiert) und Inhalt und
 **sendet nichts**.
 
 **Protokoll.** Alle Aufrufe, eingehend und ausgehend, aus Tiqora und aus Znuny in einer Liste. Sie können nach
@@ -45,9 +46,9 @@ einmal gesendet (nach einer Rückfrage). Einträge werden nach 14 Tagen gelösch
 
 **Einstellungen.** Gelten nur in Tiqora:
 
-- **Interne Ziele erlauben**: Standardmäßig verweigert Tiqora Ziele in privaten Netzen und auf dem eigenen
-  Rechner. Tragen Sie hier je Zeile einen Host oder ein Netz ein (zum Beispiel `crm.example.org` oder
-  `10.20.0.0/24`), das der Webservice erreichen darf.
+- **Interne Ziele erlauben**: Standardmäßig verweigert Tiqora Ziele in privaten Netzen. Tragen Sie hier je Zeile einen Host oder ein Netz ein (zum Beispiel `crm.example.org` oder
+  `10.20.0.0/24`), das der Webservice erreichen darf. Der eigene Rechner (localhost, 127.0.0.1), Link-Local-Adressen
+  (169.254.x.x), Multicast und reservierte Adressen sind nie erlaubt, auch nicht, wenn sie hier stehen.
 - **Unsichere TLS-Verbindung erlauben**: Nur wirksam, wenn der Webservice in Znuny `SSLNoHostnameVerification`
   verwendet. Ohne diesen Schalter prüft Tiqora das Zertifikat immer.
 
@@ -58,8 +59,9 @@ einmal gesendet (nach einer Rückfrage). Einträge werden nach 14 Tagen gelösch
 - Bedingungen sehen die Ticketdaten zum Zeitpunkt der Verarbeitung, wenige Sekunden nach der Änderung.
 - Tiqora folgt keinen Weiterleitungen (Redirects) und nutzt keine Proxy-Einstellungen der Umgebung.
 - Clientzertifikate müssen in einem Verzeichnis liegen, das der Betrieb in `TIQORA_GI_CERT_DIRS` freigegeben hat.
-- Nicht unterstützt: JWT (REST), NTLM (SOAP), `Module`-Bedingungen, `OTRS_TicketArticleCreateEvent` und
-  Ereignisse, die nicht zu Tickets gehören.
+- Nicht unterstützt: JWT (REST), NTLM (SOAP), `Module`-Bedingungen, `OTRS_TicketArticleCreateEvent`,
+  Eskalationsereignisse (`Escalation*`), `TicketFlag*`, `TicketDelete`, andere `Article*`-Ereignisse als
+  `ArticleCreate` und Ereignisse, die nicht zu Tickets gehören.
 
 Die vollständige Liste aller Abweichungen steht in
 [compatibility.md](../compatibility.md#deviations-from-znuny).

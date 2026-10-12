@@ -257,9 +257,9 @@ stage, in [`../cutover.md`](../cutover.md). Summary of what it covers:
 
 1. **Freeze Znuny web** — block new logins/writes via the Znuny frontend
    (nginx maintenance response), Tiqora's UI stays up.
-2. **Verify daemon-flag takeover is complete** — each of the six takeover
+2. **Verify daemon-flag takeover is complete** — each of the seven takeover
    flags from Stage 3 above (`postmaster`, `escalation`, `notifications`,
-   `generic_agent`, `unlock_timeout`, `pending_check`) is `1`; stop the
+   `generic_agent`, `unlock_timeout`, `pending_check`, `gi_requester`) is `1`; stop the
    Znuny daemon process itself. Other `daemon.*.enabled` keys —
    `ai_worker`, `telegram_poller` and Tiqora-only housekeeping — are not
    Znuny-duty takeovers and are not part of this check.

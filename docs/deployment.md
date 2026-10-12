@@ -355,10 +355,10 @@ run in the **worker**. They are off until the takeover flag is set
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `TIQORA_GI_CERT_DIRS` | *(empty)* | Colon-separated directories from which client certificates, keys and CA files named in a webservice config (`SSLCertificate`, `SSLKey`, `SSLCAFile`, `SSLCADir`) may be read. Empty = client certificates are refused. |
+| `TIQORA_GI_CERT_DIRS` | *(empty)* | Colon-separated directories from which client certificates, keys and CA files named in a webservice config (`SSLCertificate`, `SSLKey`, `SSLCAFile`, `SSLCADir`, and for REST `X509CertFile`, `X509KeyFile`, `X509CAFile`) may be read. Empty = client certificates are refused. |
 | `TIQORA_GI_MAX_TIMEOUT_SECONDS` | `300` | Upper limit (1-900) for a webservice's `Timeout`; a larger value in the YAML is cut to it. |
 | `TIQORA_GI_MAX_RESPONSE_BYTES` | `20971520` | Largest response body (bytes) the requester reads; more is an error. |
-| `TIQORA_GI_REQUESTER_INTERVAL` | `5` | Seconds between two ticks of the event follower. |
+| `TIQORA_GI_REQUESTER_INTERVAL` | `5` | Seconds between two ticks of the event follower (the Dienste page can override it). |
 
 Further knobs: `TIQORA_GI_REQUESTER_GAP_HOLD_SECONDS` (default 30, how long a gap in the history
 ids is held back) and `TIQORA_GI_DEBUG_MAX_CONTENT_BYTES` (default 204800, longest debugger

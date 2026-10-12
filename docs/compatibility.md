@@ -419,11 +419,11 @@ the ticket, so a slow or dead remote system cannot block an agent.
 | Invoker type | `Ticket::Generic` (the stock `Invoker::Ticket::Generic`). Other invoker types, including `Generic::Tunnel`, are shown as unsupported and never fire |
 | Transports | `HTTP::REST` (all methods except `CONNECT` and `TRACE`) and `HTTP::SOAP` |
 | Mappings | `Simple`, `XSLT`, `OutOfOffice` on request and response (same engine as the provider side). `Znuny` and `Test` mappings are not supported |
-| Events | All ticket events that Znuny writes to `ticket_history`, including `TicketDynamicFieldUpdate_<Name>`, `ArticleCreate`, `TicketMerge` and `TicketAccountTime`; synchronous (`Asynchronous: 0`) and background invokers |
+| Events | Fired: `TicketCreate`, `TicketStateUpdate`, `TicketQueueUpdate`, `TicketOwnerUpdate`, `TicketResponsibleUpdate`, `TicketPriorityUpdate`, `TicketTypeUpdate`, `TicketServiceUpdate`, `TicketSLAUpdate`, `TicketTitleUpdate`, `TicketCustomerUpdate`, `TicketPendingTimeUpdate`, `TicketLockUpdate`, `TicketArchiveFlagUpdate`, `TicketAccountTime`, `TicketMerge`, `TicketSubscribe`, `TicketUnsubscribe`, `ArticleCreate` and `TicketDynamicFieldUpdate_<Name>`; synchronous (`Asynchronous: 0`) and background invokers |
 | Retries | `ErrorHandling` of type `RequestRetry` (interval, factor, maximum interval, maximum count, maximum period, `ScheduleRetry`) |
 | Conditions | Znuny's condition syntax (`Type`, `Fields`, `Fields->Match`, `Any`/`All`/`None`/`Only`, `and`/`or`/`xor`, regex `[Rr][Ee]#` and plain compare); evaluated with the ticket data at the time the worker processes the event |
 | Response actions | `OTRS_TicketTitleUpdate`, `OTRS_TicketServiceSet`, `OTRS_TicketTypeSet`, `OTRS_TicketQueueSet`, `OTRS_TicketSLASet`, `OTRS_TicketStateSet`, `OTRS_TicketPrioritySet`, `OTRS_TicketCustomerSet`, `OTRS_TicketOwnerSet`, `OTRS_TicketResponsibleSet`, `OTRS_TicketHistoryAdd`, `OTRS_TicketArticleAdd`, `OTRS_TicketCreate`, `OTRS_TicketDynamicFieldSet_<Name>`, `OTRS_AsynchronousInvokerExecution`. All writes go through the normal ticket services (history, escalation, events), as user 1 like Znuny |
-| `ExecuteInvoker` process action | Yes, see deviation 8 |
+| `ExecuteInvoker` process action | Handler in `gi/process_action.py`, registered by the process merge; see deviation 8 |
 
 ### Authentication matrix
 
@@ -432,6 +432,8 @@ the ticket, so a slow or dead remote system cannot block an agent.
 | None | yes | yes |
 | BasicAuth (user, password) | yes | yes |
 | Client certificate (`SSLCertificate`, `SSLKey`, `SSLPassword`, `SSLCAFile`, `SSLCADir`) | yes, files below `TIQORA_GI_CERT_DIRS` only | yes, same |
+| Client certificate via `X509` (`UseX509`, `X509CertFile`, `X509KeyFile`, `X509CAFile`) | yes, files below `TIQORA_GI_CERT_DIRS` only | n/a |
+| OAuth2 token (`AuthType: OAuth2Token`, `OAuth2TokenConfigID`; the token replaces `<OTRS_OAUTH2_TOKEN>` in `AdditionalHeaders`) | yes | n/a |
 | Proxy with `ProxyUser`/`ProxyPassword` | yes | yes |
 | `AdditionalHeaders` (REST) | yes | n/a |
 | JWT | **nein** (configuration error) | n/a |
@@ -442,7 +444,8 @@ the ticket, so a slow or dead remote system cannot block an agent.
 | Item | Behaviour |
 |---|---|
 | `OTRS_TicketArticleCreateEvent` response action | **nein**: shown in the debugger as an error; no event is raised |
-| Events of objects other than tickets (`Appointment`, `ConfigItem`, `CustomerUser`, `User`, ... event object types) | **nein**: not fired, the webservice page marks such invokers "wird von Tiqora nicht ausgelöst" |
+| Ticket events not in the fired list above: `Escalation*` (`EscalationResponseTimeStart/Stop/NotifyBefore`, `EscalationUpdateTime*`, `EscalationSolutionTime*`), `TicketFlagSet`/`TicketFlagDelete`, `TicketDelete`, `TicketUnlockTimeoutUpdate` and every `Article*` event other than `ArticleCreate` | **nein**: never fired, although Znuny writes the escalation events to `ticket_history`; invokers bound to them never run |
+| Events of objects other than tickets (`Appointment`, `ConfigItem`, `CustomerUser`, `User`, ... event object types) | **nein**: not fired, the webservice page marks such invokers "wird von Tiqora noch nicht ausgelöst" |
 | `Module` conditions | never match (Tiqora cannot load Perl modules) |
 | `jq#` condition fields | never match (Znuny without Jq behaves the same) |
 | JWT, NTLM | see matrix |
@@ -455,7 +458,7 @@ Each is deliberate. Numbering is used in the code, the tests and the golden-mast
 2. **Event source.** Tiqora does not hook into ticket code; a follower reads new `ticket_history` rows and derives the events from them. The same rows already feed the plugin event system, so there is one source and no double events.
 3. **Synchronous invokers run in the worker**, on a single-slot lane that keeps the order of events, not inside the request that changed the ticket. Conditions therefore see the ticket a few seconds later than in Znuny.
 4. **The debugger never stores secrets.** Znuny's REST requester logs the raw request parameters including the `Authorization` header. Tiqora logs method, URL (user info and secret query parameters masked), masked headers and the body size, and masks every known secret value (Basic and proxy passwords, certificate passwords, all `AdditionalHeaders` values of four or more characters) in every row. Debugger content is JSON, not `Data::Dumper`. Znuny's own rows are masked on read with the same rules and marked "Von Tiqora maskiert".
-5. **Stricter outbound rules.** No redirects are followed, `CONNECT` and `TRACE` are refused, environment proxies are ignored. Targets in private, loopback, link-local or carrier-grade NAT ranges are refused unless the webservice's "Interne Ziele erlauben" list (Tiqora-only setting, one host or network per line) names them. Certificate files are read only from `TIQORA_GI_CERT_DIRS`. `SSLNoHostnameVerification` only works after an admin switches "Unsichere TLS-Verbindung erlauben" on for that webservice. Timeout and response size are capped by `TIQORA_GI_MAX_TIMEOUT_SECONDS` and `TIQORA_GI_MAX_RESPONSE_BYTES`.
+5. **Stricter outbound rules.** No redirects are followed, `CONNECT` and `TRACE` are refused, environment proxies are ignored. Targets in private (RFC 1918/ULA) or carrier-grade NAT ranges are refused unless the webservice's "Interne Ziele erlauben" list (Tiqora-only setting, one host or network per line) names them. Loopback, link-local (including the cloud metadata address), multicast and reserved addresses are never allowed, even when listed. Certificate files are read only from `TIQORA_GI_CERT_DIRS`. `SSLNoHostnameVerification` only works after an admin switches "Unsichere TLS-Verbindung erlauben" on for that webservice. Timeout and response size are capped by `TIQORA_GI_MAX_TIMEOUT_SECONDS` and `TIQORA_GI_MAX_RESPONSE_BYTES`.
 6. **`ReuseClient` and `KeepAlive` are ignored.** Every request uses a fresh connection, pinned to the address that was checked.
 7. **JWT (REST) and NTLM (SOAP)** are configuration errors with a plain message.
 8. **`ExecuteInvoker` is always queued.** The process action takes Znuny's parameters (`Webservice` by name, `Invoker`, `Asynchronous`, `UserID`), but `Asynchronous` is accepted and ignored: the call never runs inside the dialog submit. It also works without the takeover flag, because it is an explicit action and not an event handler that Znuny also runs.
