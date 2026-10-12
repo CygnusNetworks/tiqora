@@ -5,7 +5,8 @@ answers ``text/event-stream`` with these events:
 
 - ``id: <seq>`` + ``event: message`` + ``ChatMessageOut`` JSON — persisted lines only carry ids;
 - ``event: session`` ``{"status", "agent_name"}`` — on connect and whenever either changes;
-- ``event: typing`` ``{"who": "agent"}`` — forwarded from the hub without a DB read;
+- ``event: typing`` ``{"who": "agent" | "bot"}`` — forwarded from the hub without a DB read
+  (the hub item carries ``who``; anything else counts as ``agent``);
 - ``event: end`` ``{"reason"}`` — the session is ``ended``/``abandoned``/purged; the stream then
   closes and the client stops reconnecting (R-SSE-CAPS e: also right after the replay when
   the session was already over at connect);
@@ -75,6 +76,12 @@ def sse_event(*, event: str, data: dict[str, Any], event_id: int | None = None) 
 
 
 TYPING_CHUNK: Final = sse_event(event="typing", data={"who": "agent"})
+BOT_TYPING_CHUNK: Final = sse_event(event="typing", data={"who": "bot"})
+
+
+def typing_chunk(item: dict[str, Any]) -> bytes:
+    """The SSE frame of a hub typing item: ``bot`` only when the item says so."""
+    return BOT_TYPING_CHUNK if item.get("who") == "bot" else TYPING_CHUNK
 
 
 def parse_last_event_id(raw: str | None) -> int | None:
@@ -218,20 +225,21 @@ async def visitor_event_stream(
                 if kind == CLOSE_ITEM["type"]:
                     return
                 if kind == "typing":
-                    yield TYPING_CHUNK
+                    yield typing_chunk(item)
                     last_sent = clock()
                     continue
                 if kind != "wake":
                     continue
                 # Collapse a burst of queued wakes into ONE re-read (typing/close still count).
-                typing = False
+                typing: dict[str, Any] | None = None
                 while not queue.empty():
-                    extra = queue.get_nowait().get("type")
-                    if extra == CLOSE_ITEM["type"]:
+                    extra = queue.get_nowait()
+                    if extra.get("type") == CLOSE_ITEM["type"]:
                         return
-                    typing = typing or extra == "typing"
-                if typing:
-                    yield TYPING_CHUNK
+                    if extra.get("type") == "typing":
+                        typing = extra
+                if typing is not None:
+                    yield typing_chunk(typing)
                     last_sent = clock()
                 break
     finally:

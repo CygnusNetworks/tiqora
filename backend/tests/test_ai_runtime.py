@@ -74,6 +74,7 @@ from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraTelegramContact
 from tiqora.domain.settings_store import KEY_AI_LLM_MAX_COMPLETION_TOKENS, set_setting
 from tiqora.domain.ticket_write_service import ArticleIn, add_article
+from tiqora.webchat.sessions import COMM_CHANNEL_MODULE, COMM_CHANNEL_NAME
 from tiqora.znuny.password import hash_password
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -4235,3 +4236,58 @@ def test_user_message_drops_quoted_earlier_mail_from_customer_articles() -> None
     assert "Still broken." in msg
     assert "> alt" not in msg
     assert "[quoted earlier message removed]" in msg
+
+
+async def test_webchat_source_never_sends_email(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A customer article from the web chat has a real-looking ``a_from`` (the visitor gave
+    an address), yet the answer never reaches SMTP: it goes to the chat delivery, and without
+    a chat in ``bot`` status it is kept as a draft."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=93)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL, enabled_auto_reply=True)
+            webchat_channel_id = await ensure_channel_row(
+                session, COMM_CHANNEL_NAME, COMM_CHANNEL_MODULE
+            )
+            await session.execute(
+                text("UPDATE article SET communication_channel_id = :cid WHERE id = :aid"),
+                {"cid": webchat_channel_id, "aid": seed["customer_article_id"]},
+            )
+            await session.execute(
+                text("UPDATE article_data_mime SET a_from = :f WHERE article_id = :aid"),
+                {"f": '"Erika Muster" <erika@example.org>', "aid": seed["customer_article_id"]},
+            )
+            await session.commit()
+
+        email_calls: list[Any] = []
+
+        async def _fake_email_deliver(*_args: Any, **_kwargs: Any) -> int:
+            email_calls.append(True)
+            raise AssertionError("deliver_agent_email_reply must not be called for web chat")
+
+        monkeypatch.setattr(
+            "tiqora.channels.email.outbound_reply.deliver_agent_email_reply", _fake_email_deliver
+        )
+
+        llm = ScriptedLlm([_propose_response("reply", "Chat-Antwort.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-webchat-1",
+            )
+        assert email_calls == []
+        assert result.status == "drafted"
+        assert result.notes == "chat_taken_over"
+        assert result.draft_id is not None
+    finally:
+        await engine.dispose()

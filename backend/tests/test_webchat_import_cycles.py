@@ -18,6 +18,7 @@ MODULES = [
     "tiqora.webchat.notify",
     "tiqora.webchat.sessions",
     "tiqora.webchat.bot",
+    "tiqora.webchat.bot_delivery",
     "tiqora.ai.auto_run",
     "tiqora.ai.auto_worker",
     "tiqora.ai.gate",

@@ -44,6 +44,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm.attributes import set_committed_value
 
+from tiqora.ai.policies import get_queue_policy_by_queue
 from tiqora.config import Settings
 from tiqora.db.tiqora.models import (
     TiqoraChatConfig,
@@ -117,6 +118,7 @@ __all__ = [
     "current_queue_id",
     "end_by_visitor",
     "lock_session",
+    "post_bot_intro",
     "post_visitor_attachment",
     "post_visitor_message",
     "set_contact",
@@ -660,12 +662,12 @@ async def create_session(
     # This line bypasses ``_store_visitor_line``, so the pending marker is set here.
     chat.last_visitor_seq = first.seq
     if use_bot:
-        # The notice (the policy's AI disclosure text) joins the line with the bot delivery.
-        await add_system_message(
+        policy = await get_queue_policy_by_queue(db, topic.queue_id)
+        await post_bot_intro(
             db,
             chat=chat,
-            code="bot_intro",
-            params={"name": values.bot_name, "notice": None},
+            values=values,
+            notice=(policy.ai_disclosure_text if policy is not None else None),
             now=now,
         )
         queue_agent_event(db, _agent_event(chat, "chat_message", topic.queue_id))
@@ -892,6 +894,30 @@ async def add_system_message(
     )
     queue_wakeup(db, chat.id)
     return message
+
+
+async def post_bot_intro(
+    db: AsyncSession,
+    *,
+    chat: TiqoraChatSession,
+    values: ChatConfigValues,
+    notice: str | None,
+    now: datetime | None = None,
+) -> TiqoraChatMessage:
+    """The ``bot_intro`` system line of a bot session: the assistant's name and, when the
+    queue policy has an AI disclosure text, that text as ``notice`` (blank counts as none).
+
+    Lives here (and is re-exported by :mod:`tiqora.webchat.bot_delivery`) because
+    ``create_session`` calls it and ``bot_delivery`` imports this module.
+    """
+    text_notice = (notice or "").strip() or None
+    return await add_system_message(
+        db,
+        chat=chat,
+        code="bot_intro",
+        params={"name": values.bot_name, "notice": text_notice},
+        now=now,
+    )
 
 
 async def end_by_visitor(db: AsyncSession, *, chat: TiqoraChatSession, now: datetime) -> None:
