@@ -13,6 +13,11 @@ import { isDirty, shapeOf, type ProcessShape } from "@/components/process-design
 import { ProcessPanel, type ProcessFields, type ProcessStateId } from "@/components/process-designer/panels/ProcessPanel";
 import { ActivityPanel } from "@/components/process-designer/panels/ActivityPanel";
 import { NEW_DIALOG_CONFIG } from "@/components/process-designer/panels/activityModel";
+import { TransitionPanel } from "@/components/process-designer/panels/TransitionPanel";
+import { TransitionActions } from "@/components/process-designer/panels/TransitionActions";
+import { ActionPanel } from "@/components/process-designer/panels/ActionPanel";
+import { MODULE_PREFIX } from "@/components/process-designer/panels/actionForm";
+import { setActions } from "@/components/process-designer/canvasModel";
 import { usePhoneWidth } from "@/components/process-designer/usePhoneWidth";
 
 /**
@@ -131,7 +136,7 @@ export function ProcessDesignerPage() {
 
   // New entities are created at once (like Znuny's popups) and added to the cached draft.
   const createEntity = useCallback(
-    async (type: "Activity" | "ActivityDialog" | "Transition", name: string, config: Record<string, unknown>) => {
+    async (type: "Activity" | "ActivityDialog" | "Transition" | "TransitionAction", name: string, config: Record<string, unknown>) => {
       const created: DesignerEntity = await processDesignerApi.createEntity(type, { name, config });
       qc.setQueryData<ProcessDraft>(draftKey, (cur) =>
         cur
@@ -157,6 +162,41 @@ export function ProcessDesignerPage() {
   const createTransition = useCallback(
     (name: string) => createEntity("Transition", name, { ConditionLinking: "and", Condition: {} }),
     [createEntity],
+  );
+
+  const createAction = useCallback(
+    () => createEntity("TransitionAction", t("admin.processDesigner.newAction"), { Module: MODULE_PREFIX + "TicketStateSet", Config: {} }),
+    [createEntity, t],
+  );
+  const [actionId, setActionId] = useState<string | null>(null);
+  const selectedTransition = useMemo(
+    () => (draft && selection?.kind === "transition" ? draft.transitions.find((x) => x.entity_id === selection.transitionId) : undefined),
+    [draft, selection],
+  );
+  const transitionActionIds = useMemo(() => {
+    if (!shape || selection?.kind !== "transition") return [];
+    const a = shape.path[selection.from]?.[selection.transitionId]?.TransitionAction;
+    return Array.isArray(a) ? a.filter((x): x is string => typeof x === "string") : [];
+  }, [shape, selection]);
+  const selectedAction = useMemo(
+    () => (draft && actionId ? draft.transition_actions.find((a) => a.entity_id === actionId) : undefined),
+    [draft, actionId],
+  );
+  const onTransitionSaved = useCallback(
+    (saved: DesignerEntity) =>
+      qc.setQueryData<ProcessDraft>(draftKey, (cur) =>
+        cur ? { ...cur, transitions: cur.transitions.map((x) => (x.entity_id === saved.entity_id ? saved : x)) } : cur,
+      ),
+    [qc, draftKey],
+  );
+  const onActionSaved = useCallback(
+    (saved: DesignerEntity) =>
+      qc.setQueryData<ProcessDraft>(draftKey, (cur) =>
+        cur
+          ? { ...cur, transition_actions: cur.transition_actions.map((x) => (x.entity_id === saved.entity_id ? saved : x)) }
+          : cur,
+      ),
+    [qc, draftKey],
   );
 
   const selectedActivity = useMemo(
@@ -269,7 +309,10 @@ export function ProcessDesignerPage() {
                     draft={draft}
                     shape={shape}
                     selection={selection}
-                    onSelect={setSelection}
+                    onSelect={(sel) => {
+                      setSelection(sel);
+                      setActionId(null);
+                    }}
                     onShapeChange={setEdited}
                     createActivity={createActivity}
                     createTransition={createTransition}
@@ -290,6 +333,33 @@ export function ProcessDesignerPage() {
                       onSaved={onActivitySaved}
                       onReload={() => void draftQ.refetch()}
                     />
+                  ) : selectedTransition && shape && catalogQ.data && selection?.kind === "transition" ? (
+                    <div className="space-y-4">
+                      <TransitionPanel
+                        key={`${selectedTransition.entity_id}:${selectedTransition.version}`}
+                        transition={selectedTransition}
+                        catalog={catalogQ.data}
+                        onSaved={onTransitionSaved}
+                        onReload={() => void draftQ.refetch()}
+                      />
+                      <TransitionActions
+                        actionIds={transitionActionIds}
+                        actions={draft.transition_actions}
+                        selectedId={actionId}
+                        createAction={createAction}
+                        onChange={(ids) => setEdited(setActions(shape, selection.from, selection.transitionId, ids))}
+                        onSelect={setActionId}
+                      />
+                      {selectedAction && transitionActionIds.includes(selectedAction.entity_id) ? (
+                        <ActionPanel
+                          key={`${selectedAction.entity_id}:${selectedAction.version}`}
+                          action={selectedAction}
+                          catalog={catalogQ.data}
+                          onSaved={onActionSaved}
+                          onReload={() => void draftQ.refetch()}
+                        />
+                      ) : null}
+                    </div>
                   ) : selection ? (
                     <p className="text-sm text-muted" data-testid="process-designer-selection">
                       {t("admin.processDesigner.selected", { name: selectedName })}

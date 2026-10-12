@@ -2935,6 +2935,39 @@
           "LessThan": "kleiner als",
           "LessThanOrEqual": "kleiner oder gleich"
         }
+      },
+      "newAction": "Neue Aktion",
+      "panelAction": {
+        "title": "Aktion"
+      },
+      "action": {
+        "title": "Aktionen",
+        "none": "Noch keine Aktionen.",
+        "module": "Art der Aktion",
+        "group": {
+          "ticket": "Ticket",
+          "article": "Artikel",
+          "dynamicField": "Dynamische Felder",
+          "calendar": "Kalender",
+          "other": "Sonstiges"
+        },
+        "unsupported": "nur in Znuny wirksam",
+        "tiqoraOnly": "nur in Tiqora wirksam",
+        "unknownModule": "Unbekanntes Modul: {{module}}. Nur Rohparameter sind bearbeitbar.",
+        "oneOf": "Name oder ID",
+        "byName": "Name",
+        "byId": "ID",
+        "rawParams": "Weitere Parameter",
+        "rawKey": "Schlüssel",
+        "rawValue": "Wert",
+        "rawAdd": "Parameter hinzufügen",
+        "rawRemove": "Parameter „{{key}}“ entfernen",
+        "moreSettings": "Weitere Einstellungen",
+        "userOverride": "Ausführen als",
+        "userOverrideHint": "Benutzer-ID (leer = Standard)",
+        "moveUp": "„{{name}}“ nach oben",
+        "moveDown": "„{{name}}“ nach unten",
+        "remove": "„{{name}}“ vom Übergang entfernen"
       }
     },
     "mailOutbound": {
