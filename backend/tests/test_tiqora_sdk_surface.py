@@ -42,7 +42,22 @@ def test_surface_is_exactly_the_planned_one() -> None:
     assert len(tiqora_sdk.__all__) == len(EXPECTED)
     for name in EXPECTED:
         assert getattr(tiqora_sdk, name) is not None
-    assert tiqora_sdk.SDK_VERSION == "0.1.0"
+    assert tiqora_sdk.SDK_VERSION == "0.2.0"
+
+
+#: exact ``__all__`` of every SDK submodule; later tasks add one entry each
+SUBMODULES: dict[str, set[str]] = {}
+
+
+def test_submodules_are_exact() -> None:
+    import importlib
+
+    for module_name, expected in SUBMODULES.items():
+        module = importlib.import_module(module_name)
+        assert set(module.__all__) == expected, module_name
+        assert len(module.__all__) == len(expected), module_name
+        for name in expected:
+            assert getattr(module, name) is not None, (module_name, name)
 
 
 def test_registry_protocol_matches_registrar() -> None:

@@ -1,0 +1,17 @@
+manifest_version = 1
+id = "org.example.points"
+short_id = "points"
+name = "Erweiterungspunkte-Test"
+version = "1.0.0"
+publisher = "Example GmbH"
+publisher_id = "org.example"
+description = "Testerweiterung für die Erweiterungspunkte der Phase 2a."
+license = "MIT"
+homepage = "https://example.org/points"
+support = "support@example.org"
+categories = ["tickets"]
+entry = "tq_fixture_points:plugin"
+sdk = ">=0.2,<0.3"
+
+[capabilities]
+extension_points = []

@@ -72,7 +72,7 @@ def _registrar(
             "version": "1.0.0",
             "publisher": "Example GmbH",
             "entry": "x:plugin",
-            "sdk": ">=0.1,<0.2",
+            "sdk": ">=0.2,<0.3",
             "capabilities": {"extension_points": ALL_POINTS if points is None else points},
         }
     )

@@ -6,6 +6,7 @@ import os
 import random
 import shutil
 import subprocess
+import sys
 import warnings
 from collections.abc import Generator
 from dataclasses import dataclass
@@ -186,6 +187,15 @@ def _reset_oidc_discovery_cache() -> Generator[None, None, None]:
     clear_discovery_cache()
     yield
     clear_discovery_cache()
+
+
+@pytest.fixture(autouse=True)
+def _reset_points_plugin() -> Generator[None, None, None]:
+    """``boot_points_plugin`` (tests/_plugin_points.py) installs process-wide state: undo it."""
+    yield
+    helper = sys.modules.get("tests._plugin_points")
+    if helper is not None:
+        helper.teardown_points_plugin()
 
 
 @pytest.fixture(autouse=True, scope="module")

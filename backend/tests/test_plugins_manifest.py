@@ -20,7 +20,7 @@ def test_parse_valid_manifest() -> None:
     m = parse_manifest(_manifest_text())
     assert m.id == "org.example.hello"
     assert m.short_id == "hello"
-    assert m.sdk == ">=0.1,<0.2"
+    assert m.sdk == ">=0.2,<0.3"
     assert "core.mcp.tools" in m.capabilities.extension_points
     assert m.capabilities.outbound_hosts == ["api.example.org", "*.example.net"]
 
@@ -44,7 +44,7 @@ def test_unknown_key_rejected() -> None:
 
 def test_bad_specifier_rejected() -> None:
     with pytest.raises(ManifestError, match="sdk"):
-        parse_manifest(_manifest_text(**{'sdk = ">=0.1,<0.2"': 'sdk = "banana"'}))
+        parse_manifest(_manifest_text(**{'sdk = ">=0.2,<0.3"': 'sdk = "banana"'}))
 
 
 def test_toml_syntax_error_is_manifest_error() -> None:

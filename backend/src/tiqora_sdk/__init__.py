@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import typing as _t
 
-SDK_VERSION: _t.Final = "0.1.0"
+SDK_VERSION: _t.Final = "0.2.0"
 
 # ruff: noqa: E402  (SDK_VERSION must exist before the imports below, see tiqora.plugins.compat)
 from collections import abc as _abc

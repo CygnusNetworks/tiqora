@@ -46,7 +46,7 @@ def _discovered(plugin_id: str, requires: dict[str, str] | None = None) -> Disco
             "version": "1.0.0",
             "publisher": "Example GmbH",
             "entry": "x:plugin",
-            "sdk": ">=0.1,<0.2",
+            "sdk": ">=0.2,<0.3",
             "requires": requires or {},
         }
     )

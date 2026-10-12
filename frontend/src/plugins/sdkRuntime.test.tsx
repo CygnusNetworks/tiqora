@@ -148,7 +148,7 @@ describe("SDK values and components", () => {
   it("SDK_VERSION equals the package version", async () => {
     const pkg = await import("../../../packages/plugin-sdk/package.json");
     expect(SDK_VERSION).toBe(pkg.version);
-    expect(SDK_VERSION).toBe("0.1.0");
+    expect(SDK_VERSION).toBe("0.2.0");
   });
 
   it("definePlugin returns the definition unchanged", () => {

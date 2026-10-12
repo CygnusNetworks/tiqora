@@ -5,7 +5,7 @@ name = "Erweiterung ohne Angabe"
 version = "1.0.0"
 publisher = "Example GmbH"
 entry = "tq_fixture_undeclared:plugin"
-sdk = ">=0.1,<0.2"
+sdk = ">=0.2,<0.3"
 
 [capabilities]
 extension_points = ["core.job_handlers"]
