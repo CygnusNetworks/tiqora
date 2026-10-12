@@ -12553,6 +12553,62 @@
         "title": "DashboardDataOut",
         "type": "object"
       },
+      "DashboardFilters": {
+        "additionalProperties": false,
+        "description": "Filters stored on a dashboard and applied to its filter-aware widgets.",
+        "properties": {
+          "queue_ids": {
+            "items": {
+              "maximum": 2147483647.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            "maxItems": 50,
+            "title": "Queue Ids",
+            "type": "array"
+          },
+          "time_range": {
+            "anyOf": [
+              {
+                "enum": [
+                  "today",
+                  "7d",
+                  "30d",
+                  "90d",
+                  "this_month",
+                  "last_month"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Range"
+          }
+        },
+        "title": "DashboardFilters",
+        "type": "object"
+      },
+      "DashboardFiltersIn": {
+        "additionalProperties": false,
+        "properties": {
+          "filters": {
+            "$ref": "#/components/schemas/DashboardFilters"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "filters",
+          "version"
+        ],
+        "title": "DashboardFiltersIn",
+        "type": "object"
+      },
       "DashboardOrderIn": {
         "additionalProperties": false,
         "properties": {
@@ -12582,6 +12638,9 @@
           "can_share": {
             "title": "Can Share",
             "type": "boolean"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/DashboardFilters"
           },
           "group_ids": {
             "items": {
@@ -12652,6 +12711,16 @@
             ],
             "title": "Source Template Id"
           },
+          "template_update": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TemplateUpdateHint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -12686,6 +12755,16 @@
       "DashboardSaveIn": {
         "additionalProperties": false,
         "properties": {
+          "filters": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DashboardFilters"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "icon": {
             "anyOf": [
               {
@@ -13605,6 +13684,56 @@
           "changed"
         ],
         "title": "DraftOut",
+        "type": "object"
+      },
+      "DrillPageOut": {
+        "description": "The tickets behind a widget or a chart point, as one page (E5).",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filter"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TicketListItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "title",
+          "items",
+          "total"
+        ],
+        "title": "DrillPageOut",
         "type": "object"
       },
       "DynamicFieldCreate": {
@@ -17050,6 +17179,399 @@
           "estimated_total"
         ],
         "title": "KbSearchResponse",
+        "type": "object"
+      },
+      "KioskBoardOut": {
+        "properties": {
+          "dashboards": {
+            "items": {
+              "$ref": "#/components/schemas/KioskDashboardOut"
+            },
+            "title": "Dashboards",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "refresh_seconds": {
+            "title": "Refresh Seconds",
+            "type": "integer"
+          },
+          "rotate_seconds": {
+            "title": "Rotate Seconds",
+            "type": "integer"
+          },
+          "server_time": {
+            "format": "date-time",
+            "title": "Server Time",
+            "type": "string"
+          },
+          "show_details": {
+            "title": "Show Details",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "rotate_seconds",
+          "refresh_seconds",
+          "show_details",
+          "dashboards",
+          "server_time"
+        ],
+        "title": "KioskBoardOut",
+        "type": "object"
+      },
+      "KioskDashboardOut": {
+        "properties": {
+          "filters": {
+            "$ref": "#/components/schemas/DashboardFilters"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "widgets": {
+            "items": {
+              "$ref": "#/components/schemas/KioskWidgetOut"
+            },
+            "title": "Widgets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "widgets"
+        ],
+        "title": "KioskDashboardOut",
+        "type": "object"
+      },
+      "KioskDashboardRef": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "visible": {
+            "title": "Visible",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "visible"
+        ],
+        "title": "KioskDashboardRef",
+        "type": "object"
+      },
+      "KioskLinkCreatedOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "integer"
+          },
+          "created_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Name"
+          },
+          "dashboards": {
+            "items": {
+              "$ref": "#/components/schemas/KioskDashboardRef"
+            },
+            "title": "Dashboards",
+            "type": "array"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "rotate_seconds": {
+            "title": "Rotate Seconds",
+            "type": "integer"
+          },
+          "show_details": {
+            "title": "Show Details",
+            "type": "boolean"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "token_hint": {
+            "title": "Token Hint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "dashboards",
+          "rotate_seconds",
+          "show_details",
+          "token_hint",
+          "created_by",
+          "created_by_name",
+          "created_at",
+          "expires_at",
+          "revoked_at",
+          "last_used_at",
+          "active",
+          "token"
+        ],
+        "title": "KioskLinkCreatedOut",
+        "type": "object"
+      },
+      "KioskLinkIn": {
+        "additionalProperties": false,
+        "description": "Admin request for a new wallboard link.",
+        "properties": {
+          "dashboard_ids": {
+            "items": {
+              "maximum": 9.223372036854776e+18,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Dashboard Ids",
+            "type": "array"
+          },
+          "expires_in_days": {
+            "default": 90,
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Expires In Days",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "rotate_seconds": {
+            "default": 60,
+            "maximum": 900.0,
+            "minimum": 15.0,
+            "title": "Rotate Seconds",
+            "type": "integer"
+          },
+          "show_details": {
+            "default": false,
+            "title": "Show Details",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "dashboard_ids"
+        ],
+        "title": "KioskLinkIn",
+        "type": "object"
+      },
+      "KioskLinkOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "integer"
+          },
+          "created_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Name"
+          },
+          "dashboards": {
+            "items": {
+              "$ref": "#/components/schemas/KioskDashboardRef"
+            },
+            "title": "Dashboards",
+            "type": "array"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "rotate_seconds": {
+            "title": "Rotate Seconds",
+            "type": "integer"
+          },
+          "show_details": {
+            "title": "Show Details",
+            "type": "boolean"
+          },
+          "token_hint": {
+            "title": "Token Hint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "dashboards",
+          "rotate_seconds",
+          "show_details",
+          "token_hint",
+          "created_by",
+          "created_by_name",
+          "created_at",
+          "expires_at",
+          "revoked_at",
+          "last_used_at",
+          "active"
+        ],
+        "title": "KioskLinkOut",
+        "type": "object"
+      },
+      "KioskWidgetOut": {
+        "description": "A widget as the wallboard gets it: only what it needs to render (E9 ruling).\n\n``settings`` is a per-type whitelist subset; ``title_override`` only with details. Never the\nticket source, report key, parameters, notes or links (unless the link shows details).",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "layout": {
+            "$ref": "#/components/schemas/WidgetLayouts"
+          },
+          "settings": {
+            "additionalProperties": true,
+            "title": "Settings",
+            "type": "object"
+          },
+          "title_override": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Override"
+          },
+          "type_key": {
+            "title": "Type Key",
+            "type": "string"
+          },
+          "type_version": {
+            "title": "Type Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "type_key",
+          "type_version",
+          "layout"
+        ],
+        "title": "KioskWidgetOut",
         "type": "object"
       },
       "KnowledgeArticle": {
@@ -32606,6 +33128,91 @@
         "title": "TemplateOut",
         "type": "object"
       },
+      "TemplateUpdateApplyIn": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "merge",
+              "dismiss"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "action",
+          "version"
+        ],
+        "title": "TemplateUpdateApplyIn",
+        "type": "object"
+      },
+      "TemplateUpdateHint": {
+        "description": "A newer version of the source template has widgets this copy lacks (Task 8 fills it).",
+        "properties": {
+          "new_widget_count": {
+            "title": "New Widget Count",
+            "type": "integer"
+          },
+          "template_id": {
+            "title": "Template Id",
+            "type": "integer"
+          },
+          "template_name": {
+            "title": "Template Name",
+            "type": "string"
+          },
+          "template_version": {
+            "title": "Template Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "template_id",
+          "template_name",
+          "template_version",
+          "new_widget_count"
+        ],
+        "title": "TemplateUpdateHint",
+        "type": "object"
+      },
+      "TemplateUpdateOut": {
+        "description": "The widgets a merge would add to a template copy, already placed.",
+        "properties": {
+          "template_id": {
+            "title": "Template Id",
+            "type": "integer"
+          },
+          "template_name": {
+            "title": "Template Name",
+            "type": "string"
+          },
+          "template_version": {
+            "title": "Template Version",
+            "type": "integer"
+          },
+          "widgets": {
+            "items": {
+              "$ref": "#/components/schemas/WidgetOut"
+            },
+            "title": "Widgets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "template_id",
+          "template_name",
+          "template_version",
+          "widgets"
+        ],
+        "title": "TemplateUpdateOut",
+        "type": "object"
+      },
       "TicketAclActionsOut": {
         "description": "Zoom menu entries the ticket's ACLs leave available (in ``ZOOM_ACTIONS`` order).",
         "properties": {
@@ -36409,6 +37016,11 @@
           "layout": {
             "$ref": "#/components/schemas/WidgetLayouts"
           },
+          "pinned": {
+            "default": false,
+            "title": "Pinned",
+            "type": "boolean"
+          },
           "settings": {
             "additionalProperties": true,
             "title": "Settings",
@@ -36482,6 +37094,11 @@
           "layout": {
             "$ref": "#/components/schemas/WidgetLayouts"
           },
+          "pinned": {
+            "default": false,
+            "title": "Pinned",
+            "type": "boolean"
+          },
           "settings": {
             "additionalProperties": true,
             "title": "Settings",
@@ -36523,6 +37140,16 @@
       "WidgetPreviewIn": {
         "additionalProperties": false,
         "properties": {
+          "filters": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DashboardFilters"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "settings": {
             "additionalProperties": true,
             "title": "Settings",
@@ -51346,6 +51973,293 @@
         "summary": "Update Daemon",
         "tags": [
           "admin:daemons"
+        ]
+      }
+    },
+    "/api/v1/admin/dashboard-kiosk-links": {
+      "get": {
+        "operationId": "list_links_api_v1_admin_dashboard_kiosk_links_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/KioskLinkOut"
+                  },
+                  "title": "Response List Links Api V1 Admin Dashboard Kiosk Links Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Links",
+        "tags": [
+          "admin:dashboard-kiosk-links"
+        ]
+      },
+      "post": {
+        "operationId": "create_link_api_v1_admin_dashboard_kiosk_links_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KioskLinkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KioskLinkCreatedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Link",
+        "tags": [
+          "admin:dashboard-kiosk-links"
+        ]
+      }
+    },
+    "/api/v1/admin/dashboard-kiosk-links/{link_id}": {
+      "delete": {
+        "operationId": "delete_link_api_v1_admin_dashboard_kiosk_links__link_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Link Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Link",
+        "tags": [
+          "admin:dashboard-kiosk-links"
+        ]
+      }
+    },
+    "/api/v1/admin/dashboard-kiosk-links/{link_id}/revoke": {
+      "post": {
+        "operationId": "revoke_link_api_v1_admin_dashboard_kiosk_links__link_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Link Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KioskLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Link",
+        "tags": [
+          "admin:dashboard-kiosk-links"
         ]
       }
     },
@@ -75829,6 +76743,93 @@
         ]
       }
     },
+    "/api/v1/dashboards/{dashboard_id}/filters": {
+      "patch": {
+        "description": "Set the dashboard-wide filters (same rights and version lock as the save).",
+        "operationId": "patch_filters_api_v1_dashboards__dashboard_id__filters_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Dashboard Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DashboardFiltersIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Filters",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
     "/api/v1/dashboards/{dashboard_id}/share": {
       "put": {
         "description": "Share with groups (owner only); ``[]`` unshares. Templates are distributed by role.",
@@ -75916,6 +76917,168 @@
         ]
       }
     },
+    "/api/v1/dashboards/{dashboard_id}/template-update": {
+      "get": {
+        "description": "Widgets the source template gained since the copy; 404 when there are none.",
+        "operationId": "get_template_update_api_v1_dashboards__dashboard_id__template_update_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Dashboard Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateUpdateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Template Update",
+        "tags": [
+          "dashboards"
+        ]
+      },
+      "post": {
+        "description": "Take over the new template widgets (``merge``) or hide the offer (``dismiss``).",
+        "operationId": "post_template_update_api_v1_dashboards__dashboard_id__template_update_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Dashboard Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TemplateUpdateApplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Template Update",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
     "/api/v1/dashboards/{dashboard_id}/widgets/{widget_id}/data": {
       "get": {
         "description": "One widget's data with the longer single-widget budget (25 s).",
@@ -75997,6 +77160,92 @@
           }
         },
         "summary": "Widget Data",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboards/{dashboard_id}/widgets/{widget_id}/report-job": {
+      "post": {
+        "description": "Run a report widget's report in the background (it answered ``deferred``).\n\nThe job carries the widget's effective run (settings, the dashboard's time range and\nqueue narrowing unless pinned) and stores its result under the key the widget reads, so\nthe widget's next fetch is answered from the cache. The enqueue commits.",
+        "operationId": "widget_report_job_api_v1_dashboards__dashboard_id__widgets__widget_id__report_job_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Dashboard Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "widget_id",
+            "required": true,
+            "schema": {
+              "title": "Widget Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Widget Report Job",
         "tags": [
           "dashboards"
         ]
@@ -76092,6 +77341,170 @@
           }
         },
         "summary": "Patch Widget Settings",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboards/{dashboard_id}/widgets/{widget_id}/tickets": {
+      "get": {
+        "description": "The tickets behind a widget (or one chart point), computed like the widget itself.\n\nThe browser sends the widget id and, for a chart, one dimension value (``point``, a small\nJSON object); the filter is rebuilt here from the stored settings, the viewer's scope and the\ndashboard filters. Statements are bounded to the single-widget budget.",
+        "operationId": "widget_tickets_api_v1_dashboards__dashboard_id__widgets__widget_id__tickets_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "maximum": 9223372036854775807,
+              "minimum": 1,
+              "title": "Dashboard Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "widget_id",
+            "required": true,
+            "schema": {
+              "title": "Widget Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 100000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sort"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Order"
+            }
+          },
+          {
+            "in": "query",
+            "name": "point",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 600,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Point"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrillPageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Widget Tickets",
         "tags": [
           "dashboards"
         ]
@@ -78179,6 +79592,115 @@
         "summary": "List Tags",
         "tags": [
           "kb"
+        ]
+      }
+    },
+    "/api/v1/kiosk/board": {
+      "get": {
+        "description": "The link's dashboards in rotation order, widgets reduced to what rendering needs.",
+        "operationId": "kiosk_board_api_v1_kiosk_board_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Tiqora-Kiosk",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tiqora-Kiosk"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KioskBoardOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Kiosk Board",
+        "tags": [
+          "kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk/dashboards/{dashboard_id}/data": {
+      "get": {
+        "description": "Redacted widget data, computed as the link's creator (cached for 20 s).",
+        "operationId": "kiosk_dashboard_data_api_v1_kiosk_dashboards__dashboard_id__data_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Tiqora-Kiosk",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tiqora-Kiosk"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardDataOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Kiosk Dashboard Data",
+        "tags": [
+          "kiosk"
         ]
       }
     },

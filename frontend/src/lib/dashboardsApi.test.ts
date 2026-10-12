@@ -124,3 +124,65 @@ describe("dashboardKeys / settingsHash", () => {
     expect(settingsHash({ a: 1 })).not.toBe(settingsHash({ a: 2 }));
   });
 });
+
+describe("dashboardsApi phase 2", () => {
+  const filters = { filters: { queue_ids: [2], time_range: "7d" as const }, version: 3 };
+
+  it("patchFilters PATCHes the filters route and maps 409 to DashboardConflictError", async () => {
+    await dashboardsApi.patchFilters(4, filters);
+    expect(lastCall()).toMatchObject({ method: "PATCH", url: "/api/v1/dashboards/4/filters", body: filters });
+    reply = async () => {
+      throw new ApiError(
+        409,
+        { detail: { message: "Dieses Dashboard wurde inzwischen geändert.", current_version: 9 } },
+        "/api/v1/dashboards/4/filters",
+      );
+    };
+    const err = await dashboardsApi.patchFilters(4, filters).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(DashboardConflictError);
+    expect(err).toMatchObject({ currentVersion: 9 });
+  });
+
+  it("templateUpdate reads and applyTemplateUpdate posts the action with the version", async () => {
+    await dashboardsApi.templateUpdate(4);
+    expect(lastCall()).toMatchObject({ method: "GET", url: "/api/v1/dashboards/4/template-update" });
+    await dashboardsApi.applyTemplateUpdate(4, { action: "merge", version: 2 });
+    expect(lastCall()).toMatchObject({
+      method: "POST",
+      url: "/api/v1/dashboards/4/template-update",
+      body: { action: "merge", version: 2 },
+    });
+    reply = async () => {
+      throw new ApiError(409, { detail: { message: "Stale.", current_version: 5 } }, "/x");
+    };
+    await expect(dashboardsApi.applyTemplateUpdate(4, { action: "dismiss", version: 2 })).rejects.toBeInstanceOf(
+      DashboardConflictError,
+    );
+  });
+
+  it("drillTickets encodes the widget id and passes paging, sort and point as query", async () => {
+    await dashboardsApi.drillTickets(4, "w/1", { offset: 20, limit: 20, sort: "age", order: "desc", point: "Support" });
+    expect(lastCall()).toMatchObject({
+      method: "GET",
+      url: "/api/v1/dashboards/4/widgets/w%2F1/tickets",
+      query: { offset: 20, limit: 20, sort: "age", order: "desc", point: "Support" },
+    });
+  });
+
+  it("startReportJob POSTs to the widget's report-job route", async () => {
+    await dashboardsApi.startReportJob(4, "w-1");
+    expect(lastCall()).toMatchObject({ method: "POST", url: "/api/v1/dashboards/4/widgets/w-1/report-job" });
+  });
+
+  it("kioskLinks list/create/remove hit the admin routes", async () => {
+    await dashboardsApi.kioskLinks.list();
+    expect(lastCall()).toMatchObject({ method: "GET", url: "/api/v1/admin/dashboard-kiosk-links" });
+    const body = { name: "Lobby", dashboard_ids: [1], rotate_seconds: 60, expires_in_days: 90, show_details: false };
+    await dashboardsApi.kioskLinks.create(body);
+    expect(lastCall()).toMatchObject({ method: "POST", url: "/api/v1/admin/dashboard-kiosk-links", body });
+    await dashboardsApi.kioskLinks.revoke(7);
+    expect(lastCall()).toMatchObject({ method: "POST", url: "/api/v1/admin/dashboard-kiosk-links/7/revoke" });
+    await dashboardsApi.kioskLinks.remove(7);
+    expect(lastCall()).toMatchObject({ method: "DELETE", url: "/api/v1/admin/dashboard-kiosk-links/7" });
+  });
+});

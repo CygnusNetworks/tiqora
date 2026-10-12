@@ -372,6 +372,8 @@ Core widget registry additions/changes (`defineCoreWidget`; sizes `default / min
 11. **API-key area for dashboards** stays `_unknown` (R-DASH-APIKEY said "phase 2"; Open question 12): `/data` still mixes the tickets, calendar, agents, chat, AI and reports areas.
 12. **Export/import JSON** stays deferred (Open question 13).
 13. **`core.queue-overview` becomes server-backed** (was frontend-only in phase 1) so it can run on kiosks and show escalated counts per queue.
+14. **Notes and links never render on a wallboard link**, with or without details (final fix wave; the ruling allowed them with `show_details`). Their settings are free text and URLs, and a link on the kiosk would be clickable; the board sends no settings for them and the tile reads "Auf dem Wallboard nicht verfügbar".
+15. **Kiosk results without details** (final fix wave): error texts become the runner's generic text (a provider error may quote a saved report's name or a stored filter literal); the web-chat tile never sends `mine` (it would be the link creator's own chats); queue token budgets of the AI tile stay with and without details (E9 drops only provider cost budgets and the currency). The last good value that replaces a `pending` widget is kept 30 min instead of 6 h, because it carries no stale marker (no `stale_widgets` field in `DashboardDataOut`).
 
 ## Shared files (coordination with other wave-3 plans)
 

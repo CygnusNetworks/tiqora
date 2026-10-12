@@ -1,0 +1,369 @@
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
+import type { WidgetMode, WidgetProps } from "@/plugins/dashboardWidgets";
+import { ReportView } from "@/components/reports/ReportView";
+import { useJob } from "@/components/jobs/useJob";
+import { ApiError } from "@/lib/api";
+import { dashboardsApi, settingsHash } from "@/lib/dashboardsApi";
+import { reportErrorMessage, reportsApi, type ReportDefinition, type ReportResult } from "@/lib/reportsApi";
+import { useWidgetData } from "../data";
+import { useDrill } from "../drill/useDrill";
+import { useDashboardFilters } from "../filters/filtersContext";
+import { WidgetFrame, useWidgetChrome } from "../chrome/WidgetFrame";
+import { WidgetDataBody, WidgetEmpty } from "../chrome/WidgetDataBody";
+import { WidgetError } from "../chrome/WidgetError";
+import { WidgetSkeleton } from "../chrome/WidgetSkeleton";
+import { skeletonRows } from "../chrome/mode";
+import { ChooseSourceAction } from "./SourceAction";
+import { capJobRows } from "./capJobRows";
+
+export interface ReportWidgetSettings {
+  report_key?: string;
+  time_range?: string;
+  parameters: Record<string, unknown>;
+  dimension_choices: Record<string, string>;
+  display: "auto" | "table";
+  max_rows: number;
+}
+
+export interface ReportTileData {
+  report?: { key: string | null; kind?: string; name?: string | null; title_key?: string | null };
+  display?: "auto" | "table";
+  deferred?: boolean;
+  reason?: string;
+  /** The server renders a wallboard: no job is ever started. */
+  kiosk?: boolean;
+  /** Also on a deferred answer (not on a kiosk): the effective definition the background job runs. */
+  definition?: ReportDefinition;
+  /** Deferred answer: the rows the tile shows of the job's own result (200 for pivot/heatmap, else `max_rows`). */
+  row_cap?: number;
+  result?: ReportResult;
+  ignored_filters?: string[];
+  drillable_dimensions?: string[];
+}
+
+/** A deferred answer after the last job finished longer ago than this may start a new job (the cache entry expired). */
+export const JOB_RESTART_AFTER_MS = 60_000;
+
+type Run = { key: string; jobId: number | null; error: string | null; rateLimited: boolean };
+
+/**
+ * The background run of a deferred report. One job per `settings + filters` (the guard key); a
+ * deferred answer that arrives more than 60 s after the last job finished may start another one.
+ * When the job succeeded the widget is fetched again; until that answer is in (or with
+ * `cache_seconds = 0`, where the result is never cached) the job's own result is shown.
+ */
+function useBackgroundRun({
+  active,
+  dashboardId,
+  widgetId,
+  guardKey,
+  tick,
+  refetch,
+}: {
+  active: boolean;
+  dashboardId: number | undefined;
+  widgetId: string;
+  guardKey: string;
+  /** Changes with every deferred answer. */
+  tick: unknown;
+  refetch: () => void;
+}) {
+  const { t } = useTranslation();
+  const [run, setRun] = useState<Run | null>(null);
+  const startedKey = useRef<string | null>(null);
+  const finishedAt = useRef<number | null>(null);
+  const handledJob = useRef<number | null>(null);
+  const { job } = useJob(run?.jobId);
+
+  const start = useCallback(() => {
+    if (dashboardId === undefined) return;
+    startedKey.current = guardKey;
+    finishedAt.current = null;
+    const mine: Run = { key: guardKey, jobId: null, error: null, rateLimited: false };
+    setRun(mine);
+    dashboardsApi.startReportJob(dashboardId, widgetId).then(
+      (accepted) => setRun((r) => (r === mine ? { ...mine, jobId: accepted.job_id } : r)),
+      (err: unknown) =>
+        setRun((r) =>
+          r === mine
+            ? {
+                ...mine,
+                rateLimited: err instanceof ApiError && err.status === 429,
+                error:
+                  err instanceof ApiError && err.status === 429
+                    ? t("dashboards.widgets.report.tooManyJobs")
+                    : reportErrorMessage(err, t("dashboards.widgets.report.jobFailed")),
+              }
+            : r,
+        ),
+    );
+  }, [dashboardId, widgetId, guardKey, t]);
+
+  useEffect(() => {
+    if (!active || dashboardId === undefined) return;
+    const running = run !== null && run.key === guardKey && run.error === null && finishedAt.current === null;
+    if (running) return;
+    const sameKey = startedKey.current === guardKey;
+    if (!sameKey) {
+      start();
+      return;
+    }
+    // Same settings: only a deferred answer long after the last job (expired cache) starts another.
+    if (finishedAt.current !== null && Date.now() - finishedAt.current > JOB_RESTART_AFTER_MS) start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `tick` is the trigger
+  }, [active, dashboardId, guardKey, tick]);
+
+  useEffect(() => {
+    if (!job || run?.jobId == null || handledJob.current === run.jobId) return;
+    if (job.status === "succeeded") {
+      handledJob.current = run.jobId;
+      finishedAt.current = Date.now();
+      refetch();
+    } else if (job.status === "failed" || job.status === "cancelled") {
+      handledJob.current = run.jobId;
+      finishedAt.current = Date.now();
+      setRun((r) => (r && r.jobId === run.jobId ? { ...r, error: job.error || t("dashboards.widgets.report.jobFailed") } : r));
+    }
+  }, [job, run?.jobId, refetch, t]);
+
+  const succeeded = job?.status === "succeeded" && run?.jobId === job.id;
+  return {
+    run: run && run.key === guardKey ? run : null,
+    jobResult: succeeded ? ((job.result ?? undefined) as ReportResult | undefined) : undefined,
+    retry: start,
+  };
+}
+
+function Waiting({ children }: { children: string }) {
+  return (
+    <div role="status" className="flex h-full flex-col items-start justify-center gap-2 text-sm text-muted" data-testid="report-waiting">
+      <p>{children}</p>
+    </div>
+  );
+}
+
+function RetryButton({ onClick, mode }: { onClick: () => void; mode: WidgetMode }) {
+  const { t } = useTranslation();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      tabIndex={mode === "view" ? undefined : -1}
+      className="rounded-md border border-hairline bg-surface px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+    >
+      {t("dashboards.state.retry")}
+    </button>
+  );
+}
+
+/** Table display: the report's own definition with the visualisation swapped. */
+function shownDefinition(definition: ReportDefinition, display: "auto" | "table"): ReportDefinition {
+  if (display !== "table") return definition;
+  return { ...definition, visualization: { ...(definition.visualization ?? {}), type: "table" } } as ReportDefinition;
+}
+
+/** Modes in which a deferred report runs as a background job (view and the logged-in TV mode). */
+const jobModes: ReadonlySet<WidgetMode> = new Set<WidgetMode>(["view", "wallboard"]);
+
+/** How a tile draws a finished result; `fromJob` marks the background job's own result (rows already capped). */
+export type TileRender = (args: TileRenderArgs) => ReactNode;
+
+type TileRenderArgs = {
+  definition: ReportDefinition;
+  result: ReportResult;
+  tile: ReportTileData | undefined;
+  fromJob: boolean;
+  /** Set where a chart mark may open the tickets behind it (view mode, a stored dashboard). */
+  onSelectPoint?: (point: Record<string, string | number | null>) => void;
+  /** Dimensions the server can turn into a ticket list (`drillable_dimensions` of the answer). */
+  drillableDimensions?: readonly string[];
+};
+
+function ReportBody({
+  data,
+  render,
+  emptyText,
+  mode,
+  size,
+  refetch,
+  bg,
+  jobDefinition,
+  rowCap,
+  dashboardId,
+  onSelectPoint,
+}: {
+  data: ReportTileData | undefined;
+  render: TileRender;
+  emptyText: string;
+  mode: WidgetMode;
+  size: { h: number };
+  refetch: () => void;
+  bg: ReturnType<typeof useBackgroundRun>;
+  jobDefinition: ReportDefinition | undefined;
+  /** Fallback row cap of the job's result when the deferred answer carries none. */
+  rowCap: number | undefined;
+  dashboardId: number | undefined;
+  onSelectPoint: TileRenderArgs["onSelectPoint"];
+}) {
+  const { t } = useTranslation();
+  if (!data) {
+    return (
+      <WidgetEmpty action={<ChooseSourceAction mode={mode} />}>{emptyText}</WidgetEmpty>
+    );
+  }
+
+  if (data.deferred === true) {
+    // Only a wallboard opened with a link never computes; the logged-in TV mode runs the job like the view.
+    if (data.kiosk === true) return <Waiting>{t("dashboards.widgets.report.tooLargeWallboard")}</Waiting>;
+    if (!jobModes.has(mode) || dashboardId === undefined) {
+      return <Waiting>{t("dashboards.widgets.report.tooLargePreview")}</Waiting>;
+    }
+    const definition = data.definition ?? jobDefinition;
+    if (bg.jobResult && definition) {
+      return <>{render({ definition, result: capJobRows(bg.jobResult, data.row_cap ?? rowCap), tile: data, fromJob: true })}</>;
+    }
+    if (bg.run?.error) {
+      return (
+        <div role="alert" className="flex h-full flex-col items-start justify-center gap-2.5 text-sm" data-testid="report-job-error">
+          <p className="text-danger">{bg.run.error}</p>
+          <RetryButton onClick={bg.retry} mode={mode} />
+        </div>
+      );
+    }
+    return (
+      <div className="flex h-full flex-col gap-2" data-testid="report-job-running">
+        <Waiting>{t("dashboards.widgets.report.running")}</Waiting>
+        <WidgetSkeleton rows={Math.max(1, skeletonRows(size.h) - 2)} />
+      </div>
+    );
+  }
+
+  if (!data.definition || !data.result) {
+    return <WidgetError message={t("dashboards.state.loadFailed")} onRetry={refetch} />;
+  }
+  const ignored = data.ignored_filters ?? [];
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <div className="min-h-0 flex-1 overflow-auto">
+        {render({
+          definition: data.definition,
+          result: data.result,
+          tile: data,
+          fromJob: false,
+          onSelectPoint,
+          drillableDimensions: data.drillable_dimensions,
+        })}
+      </div>
+      {ignored.includes("queue") && (
+        <p className="text-xs text-muted" data-testid="report-ignored-filters">
+          {t("dashboards.widgets.report.queueIgnored")}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The shared shell of every report-backed tile (report, SLA gauge, backlog aging, heatmap): the data gate,
+ * the background run of a deferred result and the job's own result; `render` draws a finished result.
+ */
+export function ReportTileWidget({
+  instanceId,
+  settings,
+  size,
+  mode,
+  title,
+  emptyText,
+  testId,
+  render,
+}: {
+  instanceId: string;
+  /** Hashed (with the dashboard filters) as the one-job guard key; `report_key` names the report of a deferred job. */
+  settings: Record<string, unknown> & { report_key?: string };
+  size: { h: number };
+  mode: WidgetMode;
+  title: (tile: ReportTileData | undefined) => string;
+  emptyText: string;
+  testId: string;
+  render: TileRender;
+}) {
+  const { status, data, refetch } = useWidgetData<ReportTileData>();
+  const chrome = useWidgetChrome();
+  const navigate = useNavigate();
+  const drill = useDrill(instanceId, mode);
+  const onSelectPoint = drill ? (point: Record<string, string | number | null>) => void navigate(drill(point)) : undefined;
+  const { filters } = useDashboardFilters();
+  const tile = status === "ok" ? data : undefined;
+  const deferred = tile?.deferred === true;
+  // The job state lives here, above the data gate: refetching after the job swaps the body for a skeleton.
+  const bg = useBackgroundRun({
+    active: deferred && jobModes.has(mode) && tile?.kiosk !== true && chrome.dashboardId !== undefined,
+    dashboardId: chrome.dashboardId,
+    widgetId: instanceId,
+    guardKey: settingsHash({ settings, filters }),
+    tick: tile,
+    refetch,
+  });
+  const reportKey = tile?.report?.key ?? settings.report_key ?? null;
+  // The job's own result is drawn with the deferred answer's definition; an older server sent none,
+  // then the report's stored definition is the fallback.
+  const reportQ = useQuery({
+    queryKey: ["reports", "get", reportKey],
+    queryFn: ({ signal }) => reportsApi.get(reportKey as string, signal),
+    enabled: deferred && bg.jobResult !== undefined && reportKey !== null && tile?.definition === undefined,
+    retry: false,
+  });
+  return (
+    <WidgetFrame title={title(tile)} mode={mode} testId={testId}>
+      <WidgetDataBody<ReportTileData> h={size.h}>
+        {(d) => (
+          <ReportBody
+            data={status === "ok" ? d : undefined}
+            render={render}
+            emptyText={emptyText}
+            mode={mode}
+            size={size}
+            refetch={refetch}
+            bg={bg}
+            jobDefinition={reportQ.data?.definition ?? undefined}
+            rowCap={typeof settings.max_rows === "number" ? settings.max_rows : undefined}
+            dashboardId={chrome.dashboardId}
+            onSelectPoint={onSelectPoint}
+          />
+        )}
+      </WidgetDataBody>
+    </WidgetFrame>
+  );
+}
+
+/** A report on the dashboard: the report's own visualisation (compact) or a table; large reports run as a background job. */
+export function ReportWidget({ instanceId, settings, size, mode }: WidgetProps<ReportWidgetSettings>) {
+  const { t } = useTranslation();
+  const render: TileRender = ({ definition, result, tile, onSelectPoint, drillableDimensions }) => (
+    <ReportView
+      report={{ key: tile?.report?.key ?? settings.report_key ?? null, definition: shownDefinition(definition, settings.display) }}
+      result={result}
+      compact
+      testId="report-widget-view"
+      onSelectPoint={onSelectPoint}
+      drillableDimensions={drillableDimensions}
+    />
+  );
+  return (
+    <ReportTileWidget
+      instanceId={instanceId}
+      settings={settings as unknown as Record<string, unknown>}
+      size={size}
+      mode={mode}
+      title={(tile) =>
+        (tile?.report?.name ?? "") || (tile?.report?.title_key ? t(tile.report.title_key) : "") || t("dashboards.widgets.report.title")
+      }
+      emptyText={t("dashboards.widgets.report.empty")}
+      testId="report-widget"
+      render={render}
+    />
+  );
+}

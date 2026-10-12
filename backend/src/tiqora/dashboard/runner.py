@@ -36,10 +36,13 @@ import structlog
 from pydantic import ValidationError
 from redis.asyncio import Redis
 
+from tiqora.config import Settings
+from tiqora.dashboard.filters import DashboardFilters, effective_filters
 from tiqora.dashboard.providers import (
     DASHBOARD_PROVIDERS,
     DashboardProvider,
     ProviderContext,
+    ProviderError,
     ProviderForbidden,
 )
 from tiqora.dashboard.schemas import WidgetDataOut
@@ -89,6 +92,8 @@ class WidgetRow(Protocol):
     def type_version(self) -> int: ...
     @property
     def settings(self) -> Mapping[str, Any]: ...
+    @property
+    def pinned(self) -> bool: ...
 
 
 SessionFactory = Callable[[], AbstractAsyncContextManager[Any]]
@@ -123,6 +128,12 @@ def _pending() -> WidgetDataOut:
 
 def _error(message: str) -> WidgetDataOut:
     return WidgetDataOut(status="error", error=message)
+
+
+def _ctx_filters(filters: DashboardFilters, widget: WidgetRow) -> dict[str, Any]:
+    """``ProviderContext.filters`` of a widget: the empty filters when it is pinned."""
+    eff = effective_filters(filters, pinned=bool(getattr(widget, "pinned", False)))
+    return {"queue_ids": list(eff.queue_ids), "time_range": eff.time_range}
 
 
 def _prepare(provider: DashboardProvider, widget: WidgetRow) -> Any:
@@ -161,6 +172,10 @@ async def _unit(
     redis: Redis | None,
     now: datetime,
     preview: bool,
+    filters: Mapping[str, Any],
+    app_settings: Settings | None,
+    report_cache_backend: Any | None,
+    kiosk: bool,
 ) -> dict[str, Any]:
     loop = asyncio.get_running_loop()
     started = loop.time()
@@ -178,7 +193,16 @@ async def _unit(
         async with factory() as session:
             conn = _Connection(session)
             ctx = ProviderContext(
-                user_id=user_id, session=session, now=now, filters={}, redis=redis, preview=preview
+                user_id=user_id,
+                session=session,
+                now=now,
+                filters=filters,
+                redis=redis,
+                preview=preview,
+                app_settings=app_settings,
+                report_cache_backend=report_cache_backend,
+                kiosk=kiosk,
+                deadline=started + budget,
             )
             try:
                 if getattr(session, "bind", None) is not None:
@@ -186,7 +210,14 @@ async def _unit(
                     conn.held = True
                     # whole seconds of what is left: the database aborts before the client
                     seconds = max(1, int(remaining()))
-                    async with statement_timeout(session, seconds):
+                    # a self-limited provider bounds its statements itself (its engine would
+                    # reset a MariaDB session limit to 0 after the first statement)
+                    limit = (
+                        nullcontext()
+                        if provider.self_limited
+                        else statement_timeout(session, seconds)
+                    )
+                    async with limit:
                         try:
                             data = await provider.run(ctx, settings)
                         except asyncio.CancelledError:
@@ -216,6 +247,10 @@ async def _run_one(
     redis: Redis | None,
     now: datetime,
     preview: bool,
+    filters: Mapping[str, Any],
+    app_settings: Settings | None,
+    report_cache_backend: Any | None,
+    kiosk: bool,
 ) -> WidgetDataOut:
     try:
         data = await asyncio.wait_for(
@@ -229,6 +264,10 @@ async def _run_one(
                 redis=redis,
                 now=now,
                 preview=preview,
+                filters=filters,
+                app_settings=app_settings,
+                report_cache_backend=report_cache_backend,
+                kiosk=kiosk,
             ),
             budget + grace,
         )
@@ -239,6 +278,8 @@ async def _run_one(
         return _pending()
     except ProviderForbidden as exc:
         return WidgetDataOut(status="forbidden", error=exc.message)
+    except ProviderError as exc:
+        return _error(exc.message)
     except ReportQueryTimeout:
         return _pending()
     except Exception as exc:
@@ -267,12 +308,18 @@ async def run_batch(
     deadline: float = BATCH_DEADLINE_SECONDS,
     concurrency: int | None = None,
     grace: float = CLIENT_GRACE_SECONDS,
+    filters: DashboardFilters | None = None,
+    app_settings: Settings | None = None,
+    report_cache_backend: Any | None = None,
+    kiosk: bool = False,
 ) -> dict[str, WidgetDataOut]:
     """Data of every widget that has a provider, keyed by widget id.
 
     ``timeout`` overrides the providers' own budgets (``None`` = each provider's
-    ``timeout_seconds``). Widgets without a provider are absent from the result.
+    ``timeout_seconds``). Widgets without a provider are absent from the result. ``filters``
+    are the dashboard's; a pinned widget gets the empty filters instead.
     """
+    base_filters = filters or DashboardFilters()
     run_now = now or utc_now()
     results: dict[str, WidgetDataOut] = {}
     runnable: list[tuple[WidgetRow, DashboardProvider, Any]] = []
@@ -303,6 +350,10 @@ async def run_batch(
                 redis=redis,
                 now=run_now,
                 preview=preview,
+                filters=_ctx_filters(base_filters, w),
+                app_settings=app_settings,
+                report_cache_backend=report_cache_backend,
+                kiosk=kiosk,
             )
 
     tasks = {w.id: asyncio.create_task(guarded(w, p, s)) for w, p, s in runnable}
@@ -339,6 +390,10 @@ async def run_widget(
     now: datetime | None = None,
     preview: bool = False,
     grace: float = CLIENT_GRACE_SECONDS,
+    filters: DashboardFilters | None = None,
+    app_settings: Settings | None = None,
+    report_cache_backend: Any | None = None,
+    kiosk: bool = False,
 ) -> WidgetDataOut | None:
     """One widget with the single-widget budget; ``None`` when its type has no provider."""
     provider = registry.get(DASHBOARD_PROVIDERS, widget.type_key)
@@ -358,4 +413,8 @@ async def run_widget(
         redis=redis,
         now=now or utc_now(),
         preview=preview,
+        filters=_ctx_filters(filters or DashboardFilters(), widget),
+        app_settings=app_settings,
+        report_cache_backend=report_cache_backend,
+        kiosk=kiosk,
     )

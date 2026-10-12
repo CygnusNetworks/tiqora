@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from tiqora.dashboard.layout import Rect, normalize_rects
+from tiqora.dashboard.layout import Rect, first_free_spot, normalize_rects
 from tiqora.dashboard.settings_models import SettingsError
 
 
@@ -93,3 +93,22 @@ def test_matches_the_frontend_cross_check_fixture(case: dict[str, Any]) -> None:
         return
     out = normalize_rects(items, cols=case["cols"])
     assert {k: [v.x, v.y, v.w, v.h] for k, v in out.items()} == case["expected"]
+
+
+_SPOT_CASES_FILE = (
+    Path(__file__).resolve().parents[2] / "frontend/src/dashboard/layout/firstFreeSpotCases.json"
+)
+_SPOT_CASES = json.loads(_SPOT_CASES_FILE.read_text())["cases"]
+
+
+@pytest.mark.parametrize("case", _SPOT_CASES, ids=[c["name"] for c in _SPOT_CASES])
+def test_first_free_spot_matches_shared_cases(case: dict[str, Any]) -> None:
+    """Drift guard: the frontend firstFreeSpot (grid.ts) runs the same cases."""
+    rects = [Rect(x=r[0], y=r[1], w=r[2], h=r[3]) for r in case["rects"]]
+    spot = first_free_spot(rects, case["w"], case["h"], cols=case["cols"])
+    assert list(spot) == case["expected"]
+
+
+def test_first_free_spot_terminates_below_a_dense_grid() -> None:
+    rects = [Rect(x=0, y=i, w=12, h=1) for i in range(20)]
+    assert first_free_spot(rects, 12, 3) == (0, 20)

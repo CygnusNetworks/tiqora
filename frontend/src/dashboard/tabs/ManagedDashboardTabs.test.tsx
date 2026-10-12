@@ -30,17 +30,17 @@ const spies = {
   order: vi.spyOn(dashboardsApi, "order"),
 };
 
-function Harness() {
+function Harness({ onWallboard }: { onWallboard?: (tab: { id: number }) => void }) {
   const q = useQuery({ queryKey: dashboardKeys.list(), queryFn: () => dashboardsApi.list() });
   const [selected, setSelected] = useState<number | null>(1);
   if (!q.data) return null;
-  return <ManagedDashboardTabs tabs={q.data} selectedId={selected} onSelect={setSelected} />;
+  return <ManagedDashboardTabs tabs={q.data} selectedId={selected} onSelect={setSelected} onWallboard={onWallboard} />;
 }
 
-async function renderTabs() {
+async function renderTabs(onWallboard?: (tab: { id: number }) => void) {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <Harness />
+      <Harness onWallboard={onWallboard} />
     </QueryClientProvider>,
   );
   await screen.findByRole("tab", { name: "Mein Start" });
@@ -251,5 +251,25 @@ describe("dashboard management in the tab row", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("menu")).toBeNull();
     expect(menuButtonOf("Eigen B")).toHaveFocus();
+  });
+});
+
+describe("Als Wallboard anzeigen", () => {
+  it("is in the menu of own and foreign dashboards and opens the TV mode of that tab", async () => {
+    const open = vi.fn();
+    await renderTabs(open);
+    await openMenuOf("Mein Start");
+    await user.click(screen.getByRole("menuitem", { name: "Als Wallboard anzeigen" }));
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+    await openMenuOf("Team Support");
+    expect(screen.getByRole("menuitem", { name: "Als Wallboard anzeigen" })).toBeVisible();
+    await user.click(screen.getByRole("menuitem", { name: "Als Wallboard anzeigen" }));
+    expect(open).toHaveBeenLastCalledWith(expect.objectContaining({ id: 2 }));
+  });
+
+  it("is absent where the host offers no TV mode", async () => {
+    await renderTabs();
+    await openMenuOf("Mein Start");
+    expect(screen.queryByRole("menuitem", { name: "Als Wallboard anzeigen" })).toBeNull();
   });
 });

@@ -3,8 +3,16 @@ import { useChartFormat } from "./chartLocale";
 import { ChartLegend } from "./ChartLegend";
 import { ChartTooltip } from "./ChartTooltip";
 import { EmptyChart } from "./chartKit";
+import { markButtonProps } from "./markButton";
 
-export type DonutDatum = { key: string; label: string; value: number; color: string };
+export type DonutDatum = {
+  key: string;
+  label: string;
+  value: number;
+  color: string;
+  /** With `onSelect`: false = this slice is not a button (e.g. the folded "other" bucket). */
+  selectable?: boolean;
+};
 
 export type DonutChartProps = {
   data: DonutDatum[];
@@ -14,6 +22,8 @@ export type DonutChartProps = {
   emptyLabel?: string;
   testId?: string;
   formatValue?: (v: number) => string;
+  /** Additive: slices become buttons (keyboard reachable) and report their key. */
+  onSelect?: (key: string) => void;
 };
 
 function arcPath(cx: number, cy: number, rOut: number, rIn: number, a0: number, a1: number): string {
@@ -33,6 +43,7 @@ export function DonutChart({
   emptyLabel,
   testId,
   formatValue,
+  onSelect,
 }: DonutChartProps) {
   const { t, number, percent } = useChartFormat();
   const fmt = formatValue ?? number;
@@ -75,8 +86,9 @@ export function DonutChart({
               fill={d.color}
               stroke="var(--color-surface)"
               strokeWidth={2}
-              tabIndex={0}
-              role="img"
+              {...(onSelect && d.selectable !== false
+                ? markButtonProps(() => onSelect(d.key))
+                : { tabIndex: 0, role: "img" })}
               aria-label={`${d.label}: ${fmt(d.value)} (${percentOf(d.value)})`}
               onFocus={() => setHover(d.key)}
               onBlur={() => setHover(null)}

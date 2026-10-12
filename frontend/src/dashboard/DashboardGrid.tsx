@@ -23,6 +23,7 @@ import {
   type WidgetMode,
 } from "@/plugins/dashboardWidgets";
 import { WidgetChromeProvider, WidgetFrame, type WidgetChrome } from "./chrome/WidgetFrame";
+import { WidgetEmpty } from "./chrome/WidgetDataBody";
 import { WidgetForbidden } from "./chrome/WidgetError";
 import { WidgetSkeleton } from "./chrome/WidgetSkeleton";
 import { WidgetUnavailable } from "./chrome/WidgetUnavailable";
@@ -30,6 +31,8 @@ import { skeletonRows } from "./chrome/mode";
 import { usePreviewData, WidgetDataProvider, type WidgetDataState } from "./data";
 import { canUseWidget, settingsWithDefaults } from "./definitions";
 import { GearIcon, PhoneControls } from "./edit/PhoneControls";
+import { useIsKiosk } from "./wallboard/kioskContext";
+import { usePrefersReducedMotion } from "./wallboard/useReducedMotion";
 import { useDragResize, type DragCommit } from "./edit/useDragResize";
 import { WIDGET_DRAG_TYPE } from "./gallery/galleryModel";
 import { layoutForBreakpoint } from "./layout/breakpoints";
@@ -123,7 +126,9 @@ function GridCell({
   onConfigure,
   cellEdit,
   style,
+  dashboardId,
 }: {
+  dashboardId?: number;
   widget: EditWidget;
   def: WidgetDefinition | undefined;
   state: WidgetDataState;
@@ -142,6 +147,8 @@ function GridCell({
   const { t } = useTranslation();
   const { ready: pluginsReady } = usePlugins();
   const user = useOptionalAuth()?.user;
+  // The public wallboard has no login: the server already decided what the link may show.
+  const kiosk = useIsKiosk();
   const settings = useMemo(
     () => (def ? settingsWithDefaults(def, widget.settings, widget.type_version) : {}),
     [def, widget.settings, widget.type_version],
@@ -155,15 +162,24 @@ function GridCell({
   const handle = cellEdit?.chrome.handle;
   const actions = cellEdit?.chrome.actions;
   const chrome = useMemo(
-    () => ({ titleOverride: widget.title_override, canEdit, handle, actions, onConfigure: edit?.onOpenSettings ? () => edit.onOpenSettings?.(id) : onConfigure && (() => onConfigure(id)) }),
-    [widget.title_override, canEdit, handle, actions, edit, onConfigure, id],
+    () => ({ titleOverride: widget.title_override, canEdit, handle, actions, pinned: widget.pinned === true, dashboardId, onConfigure: edit?.onOpenSettings ? () => edit.onOpenSettings?.(id) : onConfigure && (() => onConfigure(id)) }),
+    [widget.title_override, widget.pinned, canEdit, handle, actions, edit, onConfigure, id, dashboardId],
   );
   const waiting = state.status === "loading" || state.status === "pending";
   const size = { w: rect.w, h: rect.h };
   const defTitle = def ? t(def.titleKey, { ns: def.ns, defaultValue: def.key }) : t("dashboards.state.unavailable");
 
   let body: ReactNode;
-  if (!def) {
+  if (kiosk && (!def || def.dataEndpoint == null)) {
+    // Plugin widgets and widgets without server data (recent views, notes, links) have nothing to show to a link.
+    body = (
+      <WidgetChromeProvider value={chrome}>
+        <WidgetFrame title={defTitle} mode={mode} testId="widget-kiosk-unavailable">
+          <WidgetEmpty>{t("dashboards.wallboard.unavailable")}</WidgetEmpty>
+        </WidgetFrame>
+      </WidgetChromeProvider>
+    );
+  } else if (!def) {
     // Plugin types register once the plugin list arrived; until then the slot only waits.
     body =
       !pluginsReady && !widget.type_key.startsWith("core.") ? (
@@ -179,7 +195,7 @@ function GridCell({
           />
         </WidgetChromeProvider>
       );
-  } else if (!canUseWidget(def, { is_admin: user?.is_admin === true, can_view_reports: user?.can_view_reports === true })) {
+  } else if (!kiosk && !canUseWidget(def, { is_admin: user?.is_admin === true, can_view_reports: user?.can_view_reports === true })) {
     body = (
       <WidgetChromeProvider value={chrome}>
         <WidgetFrame title={widget.title_override?.trim() || defTitle} mode={mode} testId="widget-forbidden">
@@ -247,31 +263,8 @@ function GridCell({
 
 /** A changed or new data widget while editing: its data comes from the preview route. */
 function PreviewGridCell(props: Omit<Parameters<typeof GridCell>[0], "state" | "retry">) {
-  const { refetch, ...state } = usePreviewData(props.widget.type_key, props.widget.settings);
+  const { refetch, ...state } = usePreviewData(props.widget.type_key, props.widget.settings, { pinned: props.widget.pinned === true });
   return <GridCell {...props} state={state} retry={refetch} />;
-}
-
-function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(() => {
-    try {
-      return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-    } catch {
-      return false;
-    }
-  });
-  useEffect(() => {
-    let query: MediaQueryList | undefined;
-    try {
-      query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    } catch {
-      query = undefined;
-    }
-    if (!query?.addEventListener) return;
-    const onChange = () => setReduced(query!.matches);
-    query.addEventListener("change", onChange);
-    return () => query!.removeEventListener("change", onChange);
-  }, []);
-  return reduced;
 }
 
 const ICON_BTN =
@@ -315,17 +308,22 @@ export function DashboardGrid({
   onRetry,
   edit,
   onConfigureWidget,
+  rowHeight = ROW_H,
+  gap = GAP,
 }: {
   widgets: EditWidget[];
-  mode: "view" | "edit";
+  /** `wallboard`: the lg layout with `rowHeight` / `gap` (the wallboard view computes them), no editing. */
+  mode: "view" | "edit" | "wallboard";
   breakpoint: Breakpoint;
-  dashboardId: number;
+  dashboardId?: number;
   canEdit: boolean;
   data: Record<string, WidgetDataState>;
   onRetry: (id: string) => void;
   edit?: EditHandlers;
   /** View mode, editors only: a tile's "Suche wählen" / "Filter ändern" opens that widget's settings in edit mode. */
   onConfigureWidget?: (id: string) => void;
+  rowHeight?: number;
+  gap?: number;
 }) {
   const { t } = useTranslation();
   const defs = useDashboardWidgetDefinitions();
@@ -604,6 +602,7 @@ export function DashboardGrid({
       onConfigure: canEdit ? onConfigureWidget : undefined,
       cellEdit,
       style,
+      dashboardId,
     };
     return editing && edit?.previewIds?.has(w.id) ? (
       <PreviewGridCell key={w.id} {...props} />
@@ -661,8 +660,8 @@ export function DashboardGrid({
   const gridStyle: CSSProperties = {
     display: "grid",
     gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-    gridAutoRows: `${ROW_H}px`,
-    gap: `${GAP}px`,
+    gridAutoRows: `${rowHeight}px`,
+    gap: `${gap}px`,
   };
   if (!editing) {
     return (

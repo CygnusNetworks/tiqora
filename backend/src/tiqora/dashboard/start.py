@@ -65,6 +65,8 @@ async def _template_copies(session: AsyncSession, template_id: int) -> list[Tiqo
             settings=w.settings,
             layout=w.layout,
             position=i,
+            pinned=bool(w.pinned),
+            template_widget_id=w.id,
         )
         for i, w in enumerate(res.scalars().all())
     ]
@@ -95,7 +97,7 @@ async def ensure_start(session: AsyncSession, user_id: int) -> tuple[DashboardOu
                 source_key=f"tpl:{template.id}" if template else DEFAULT_TEMPLATE_KEY,
                 source_template_id=template.id if template else None,
                 source_template_version=template.version if template else DEFAULT_TEMPLATE_VERSION,
-                filters="{}",
+                filters=store.dashboard_filters(template).model_dump_json() if template else "{}",
                 version=1,
                 created_at=now,
                 changed_at=now,

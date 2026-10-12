@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from tiqora.dashboard.providers import DashboardProvider, ProviderContext
+from tiqora.dashboard.providers import DashboardProvider, ProviderContext, filter_queue_ids
 from tiqora.dashboard.settings_models import EscalationsSettings
 from tiqora.domain.schemas import TicketListItem
 from tiqora.domain.ticket_service import TicketService
@@ -36,6 +36,7 @@ async def run_escalations(ctx: ProviderContext, settings: EscalationsSettings) -
         sort="deadline",
         order="asc",
         limit=settings.limit,
+        queue_ids=filter_queue_ids(ctx),
     )
     items: list[dict[str, Any]] = []
     skipped = 0

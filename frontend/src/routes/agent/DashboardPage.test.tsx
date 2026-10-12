@@ -22,9 +22,11 @@ import {
 import { handleSSEMessage } from "@/lib/useSSE";
 import { setDisplayTimeZone } from "@/lib/timeZone";
 import { DASHBOARD_WIDGETS, defineWidget, type WidgetProps } from "@/plugins/dashboardWidgets";
-import { demoDashboard, demoDefaultWidgets, demoTab, demoWidgetData } from "@/demo/dashboardsMock";
+import { demoDashboard, demoDefaultWidgets, demoTab, demoTemplateUpdateHint, demoWidgetData } from "@/demo/dashboardsMock";
 import { makeUser } from "@/test/fireUser";
 import { savedSearchesApi } from "@/lib/savedSearchesApi";
+import { reportsApi } from "@/lib/reportsApi";
+import { demoCatalogue } from "@/demo/reportsMock";
 import { registerCoreWidgets } from "@/dashboard/widgets";
 import { DashboardPage } from "./DashboardPage";
 
@@ -89,7 +91,7 @@ const DEFAULT_TYPES_IN_ORDER = DEFAULT_WIDGETS.map((w) => w.type_key);
 const DEFAULT_DASHBOARD = demoDashboard({ id: 1, name: "Mein Start", widgets: DEFAULT_WIDGETS });
 
 function wire(id: string, type_key: string, layout: DashboardWidgetRow["layout"], settings = {}): DashboardWidgetRow {
-  return { id, type_key, type_version: 1, title_override: null, settings, layout };
+  return { id, type_key, type_version: 1, title_override: null, settings, layout, pinned: false };
 }
 
 const SHARED = demoDashboard({
@@ -318,6 +320,23 @@ describe("DashboardPage", () => {
     expect(await screen.findByTestId("widget-w-counter-1")).toBeVisible();
   });
 
+  it("template update banner: 'Übernehmen' merges and the new widget appears; it is gone in edit mode", async () => {
+    mockDashboard({ source_template_id: 100, template_update: demoTemplateUpdateHint({ new_widget_count: 1 }) });
+    const merged = demoDashboard({
+      ...DEFAULT_DASHBOARD,
+      version: DEFAULT_DASHBOARD.version + 1,
+      template_update: null,
+      widgets: [...DEFAULT_WIDGETS, wire("w-new", "core.notes", { lg: { x: 0, y: 20, w: 4, h: 2 } }, { markdown: "Neu" })],
+    });
+    const apply = vi.spyOn(dashboardsApi, "applyTemplateUpdate").mockResolvedValue(merged);
+    await renderPage();
+    expect(await screen.findByRole("status", { name: "" })).toHaveTextContent("Neue Version der Vorlage");
+    fireEvent.click(screen.getByRole("button", { name: "Übernehmen" }));
+    expect(await screen.findByTestId("widget-w-new")).toBeVisible();
+    expect(apply).toHaveBeenCalledWith(1, { action: "merge", version: DEFAULT_DASHBOARD.version });
+    expect(screen.queryByText(/Neue Version der Vorlage/)).toBeNull();
+  });
+
   it("picking a tab drops ?d= from the address, so a reload opens the picked dashboard", async () => {
     await renderPage({ d: 2 });
     expect(await screen.findByRole("tab", { name: "Team Support", selected: true })).toBeVisible();
@@ -495,9 +514,8 @@ describe("DashboardPage", () => {
     emitSSE({ type: "ticket_changed", ticket_id: 2, event: "x" });
     await flush(2100);
     expect(apiMock.data).toHaveBeenCalledTimes(2);
-    expect(apiMock.data).toHaveBeenLastCalledWith(1, expect.arrayContaining(["w-list", "w-counter", "w-esc"]), expect.anything());
+    expect(apiMock.data).toHaveBeenLastCalledWith(1, expect.arrayContaining(["w-list", "w-counter", "w-esc", "w-queues"]), expect.anything());
     expect(apiMock.data.mock.calls.at(-1)![1]).not.toContain("w-recent");
-    expect(apiMock.data.mock.calls.at(-1)![1]).not.toContain("w-queues");
   });
 
   it("interval:60 widgets refetch on their timer and pause while the tab is hidden", async () => {
@@ -932,6 +950,7 @@ describe("DashboardPage", () => {
         title_override: null,
         settings: DEFAULT_WIDGETS[0].settings,
         layout: { lg: { x: 1, y: 0, w: 3, h: 2 } },
+        pinned: false,
       });
       expect(localStorage.getItem(KEY)).toBeNull();
       expect(cellOf("w-counter-1").style.gridColumn).toBe("2 / span 3");
@@ -1095,6 +1114,7 @@ describe("DashboardPage", () => {
         title_override: null,
         settings: { a: 1 },
         layout: { lg: { x: 0, y: 0, w: 4, h: 2 } },
+        pinned: false,
       });
     });
 
@@ -1164,6 +1184,33 @@ describe("DashboardPage", () => {
         expect(within(gallery()).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Tickets", "Für mich", "Team"]);
         expect(within(gallery()).getByRole("button", { name: /Hallo-Widget/ })).toBeVisible();
         expect(screen.getByRole("button", { name: "Widget hinzufügen", expanded: true })).toBeVisible();
+      });
+
+      it("offers the 'Berichte' group only to people who may view reports; a new report opens its settings and cancelling removes it again", async () => {
+        const catalogue = vi.spyOn(reportsApi, "catalogue").mockResolvedValue(demoCatalogue() as never);
+        mockDashboard({ widgets: [WIDE] });
+        await enterEdit();
+        expect(within(gallery()).queryByRole("heading", { name: "Berichte" })).toBeNull();
+        expect(within(gallery()).queryByRole("button", { name: /Bericht/ })).toBeNull();
+        cleanup();
+        auth.user.can_view_reports = true;
+        try {
+          await enterEdit();
+          expect(within(gallery()).getByRole("heading", { level: 3, name: "Berichte" })).toBeVisible();
+          fireEvent.click(within(gallery()).getByRole("button", { name: /^Bericht/ }));
+          const drawer = await screen.findByRole("dialog");
+          expect(within(drawer).getByRole("button", { name: "Übernehmen" })).toBeDisabled();
+          expect(ids()).toHaveLength(2);
+          fireEvent.click(within(drawer).getByRole("button", { name: "Abbrechen" }));
+          await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+          expect(ids()).toEqual(["w-wide"]);
+          // the removal is an undo step
+          fireEvent.click(undoButton());
+          expect(ids()).toHaveLength(2);
+          expect(catalogue).toHaveBeenCalled();
+        } finally {
+          auth.user.can_view_reports = false;
+        }
       });
 
       it("a click adds the widget with a fresh uuid in the first free spot, as one undo step", async () => {

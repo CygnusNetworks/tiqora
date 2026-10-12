@@ -10,12 +10,13 @@ import {
   createRouter,
 } from "@tanstack/react-router";
 import i18n from "@/i18n";
-import type { OccurrenceOut, OnlineAgentOut, QueueNode, TicketListItem } from "@/lib/api";
+import { api, type OccurrenceOut, type OnlineAgentOut, type TicketListItem } from "@/lib/api";
 import { setDisplayTimeZone } from "@/lib/timeZone";
 import { DASHBOARD_WIDGETS, type WidgetMode } from "@/plugins/dashboardWidgets";
 import { CORE_WIDGET_KEYS, settingsWithDefaults } from "../definitions";
 import { WidgetDataProvider, type WidgetDataValue } from "../data";
 import { WidgetChromeProvider, type WidgetChrome } from "../chrome/WidgetFrame";
+import { KioskProvider } from "../wallboard/kioskContext";
 import { registerCoreWidgets } from "./index";
 
 vi.mock("@/auth/AuthContext", async () => {
@@ -27,7 +28,7 @@ vi.mock("@/auth/AuthContext", async () => {
 
 type WidgetDataState = Omit<WidgetDataValue, "refetch">;
 
-/** The six core widgets that read provider data. */
+/** The core widgets that read provider data. */
 const DATA_WIDGET_KEYS = [
   "core.ticket-list",
   "core.counter",
@@ -35,6 +36,9 @@ const DATA_WIDGET_KEYS = [
   "core.reminders",
   "core.calendar-agenda",
   "core.team-presence",
+  "core.queue-overview",
+  "core.chat-queue",
+  "core.ai-status",
 ];
 
 function ticket(id: number, over: Partial<TicketListItem> = {}): TicketListItem {
@@ -93,15 +97,7 @@ function agent(fullName: string, id = fullName.length): OnlineAgentOut {
   return { id, login: fullName.toLowerCase().replace(/\s+/g, "."), full_name: fullName, avatar_url: null };
 }
 
-function q(id: number, name: string, open: number, fresh: number): QueueNode {
-  return { id, name, group_id: 1, valid: true, counts: { open, new: fresh, locked: 0, unlocked: open + fresh, total: open + fresh } };
-}
-
 let queryClient: QueryClient;
-
-function seedQueryData(key: unknown[], data: unknown) {
-  queryClient.setQueryData(key, data);
-}
 
 /**
  * Mounts the registered core widget `key` the way the host does: settings with defaults, the
@@ -114,25 +110,27 @@ async function renderWidget(
   mode: WidgetMode = "view",
   chrome: WidgetChrome = {},
   refetch: () => void = () => {},
+  opts: { size?: { w: number; h: number }; kiosk?: boolean } = {},
 ) {
   const def = DASHBOARD_WIDGETS.get(key);
   if (!def) throw new Error(`widget ${key} is not registered`);
   const Component = def.component;
-  const ui = (
+  const inner = (
     <WidgetChromeProvider value={chrome}>
       <WidgetDataProvider value={{ ...state, refetch }}>
         <Component
           instanceId="w-test"
           settings={settingsWithDefaults(def, settings, def.version)}
-          size={{ w: def.size.default[0], h: def.size.default[1] }}
+          size={opts.size ?? { w: def.size.default[0], h: def.size.default[1] }}
           filters={{}}
           mode={mode}
         />
       </WidgetDataProvider>
     </WidgetChromeProvider>
   );
+  const ui = opts.kiosk ? <KioskProvider>{inner}</KioskProvider> : inner;
   const rootRoute = createRootRoute({ component: () => ui });
-  const children = ["/agent/tickets/$ticketId", "/agent/queues", "/agent/calendar", "/agent/searches/$searchId"].map((path) =>
+  const children = ["/agent/tickets/drill", "/agent/tickets/$ticketId", "/agent/queues", "/agent/calendar", "/agent/searches/$searchId"].map((path) =>
     createRoute({ getParentRoute: () => rootRoute, path }),
   );
   const router = createRouter({
@@ -171,12 +169,15 @@ afterEach(() => {
 
 // ---------------------------------------------------------------- registry wiring
 
+const REPORT_WIDGET_KEYS = ["core.report", "core.sla-gauge", "core.backlog-aging", "core.heatmap"];
+const TEAM_WIDGET_KEYS = ["core.chat-queue", "core.ai-status"];
+
 describe("registerCoreWidgets", () => {
-  it("registers exactly the ten core keys once, owned by core, with the D9 sizes, and is idempotent", () => {
+  it("registers exactly the ten phase-1 core keys and the phase-2 widgets once, owned by core, with the D9 sizes, and is idempotent", () => {
     DASHBOARD_WIDGETS.clearForTests();
     registerCoreWidgets();
     registerCoreWidgets();
-    expect(DASHBOARD_WIDGETS.list().map((w) => w.key).sort()).toEqual([...CORE_WIDGET_KEYS].sort());
+    expect(DASHBOARD_WIDGETS.list().map((w) => w.key).sort()).toEqual([...CORE_WIDGET_KEYS, ...REPORT_WIDGET_KEYS, ...TEAM_WIDGET_KEYS].sort());
     expect(CORE_WIDGET_KEYS).toHaveLength(10);
     expect(DASHBOARD_WIDGETS.get("core.counter")!.size).toEqual({ default: [3, 2], min: [2, 2], max: [4, 3] });
     expect(DASHBOARD_WIDGETS.get("core.ticket-list")!.size).toEqual({ default: [6, 5], min: [4, 3], max: [12, 10] });
@@ -186,16 +187,22 @@ describe("registerCoreWidgets", () => {
 
   it("wires the D9 data endpoints, refresh triggers and categories", () => {
     const get = (k: string) => DASHBOARD_WIDGETS.get(k)!;
-    expect(get("core.queue-overview").dataEndpoint).toBeNull();
     expect(get("core.recent-views").dataEndpoint).toBeNull();
     expect(get("core.notes").dataEndpoint).toBeNull();
     expect(get("core.links").dataEndpoint).toBeNull();
     for (const k of DATA_WIDGET_KEYS) expect(get(k).dataEndpoint).toBe(k);
     expect(get("core.escalations").refreshOn).toEqual(["ticket_changed", "interval:60"]);
+    // the server-backed queue overview also counts brand-new tickets (E10: TICKET_EVENTS)
+    expect(get("core.queue-overview").refreshOn).toEqual(["ticket_changed", "ticket_new_in_queue"]);
     expect(get("core.team-presence").refreshOn).toEqual(["interval:30"]);
+    expect(get("core.chat-queue").refreshOn).toEqual(["chat_waiting", "chat_assigned", "chat_ended", "interval:30"]);
+    expect(get("core.chat-queue").category).toBe("team");
+    expect(get("core.ai-status").category).toBe("ai");
+    expect(get("core.chat-queue").size).toEqual({ default: [4, 3], min: [3, 2], max: [6, 6] });
+    expect(get("core.ai-status").size).toEqual({ default: [4, 3], min: [3, 3], max: [6, 6] });
     expect(get("core.reminders").category).toBe("other");
     expect(get("core.notes").category).toBe("team");
-    for (const k of CORE_WIDGET_KEYS) expect(get(k).permission).toBeNull();
+    for (const k of [...CORE_WIDGET_KEYS, ...TEAM_WIDGET_KEYS]) expect(get(k).permission).toBeNull();
   });
 
   it("keeps a key someone else registered first instead of throwing", () => {
@@ -204,7 +211,7 @@ describe("registerCoreWidgets", () => {
     DASHBOARD_WIDGETS.register(counter, "org.example");
     expect(() => registerCoreWidgets()).not.toThrow();
     expect(DASHBOARD_WIDGETS.owner("core.counter")).toBe("org.example");
-    expect(DASHBOARD_WIDGETS.list()).toHaveLength(10);
+    expect(DASHBOARD_WIDGETS.list()).toHaveLength(10 + REPORT_WIDGET_KEYS.length + TEAM_WIDGET_KEYS.length);
   });
 });
 
@@ -280,13 +287,57 @@ describe("core.counter", () => {
     expect(container.querySelector("polyline")).toBeNull();
   });
 
-  it("is not a link (phase 1 has no drill-down) and uses the host's title override as label", async () => {
+  it("uses the host's title override as label; outside a stored dashboard it is no link", async () => {
     await renderWidget("core.counter", preset("mine_new"), { status: "ok", data: { value: 3, delta: 0, spark: [3, 3] } }, "view", {
       titleOverride: "Neu bei mir",
     });
     expect(screen.getByText("Neu bei mir")).toBeVisible();
     expect(screen.getByText("3")).toBeVisible();
     expect(screen.queryByRole("link")).toBeNull();
+  });
+
+  it("links the whole tile to the drill page in view and TV mode, not in edit or preview", async () => {
+    const data: WidgetDataState = { status: "ok", data: { value: 3, delta: 0, spark: [3, 3] } };
+    await renderWidget("core.counter", preset("mine_new"), data, "view", { dashboardId: 7, titleOverride: "Neu bei mir" });
+    const link = screen.getByRole("link", { name: "Tickets zu „Neu bei mir“" });
+    const href = link.getAttribute("href") ?? "";
+    expect(href).toContain("/agent/tickets/drill");
+    expect(href).toContain("d=7");
+    expect(href).toContain("w=w-test");
+    expect(href).not.toContain("filter");
+    cleanup();
+    await renderWidget("core.counter", preset("mine_new"), data, "wallboard", { dashboardId: 7 });
+    expect(screen.getByRole("link", { name: /Tickets zu/ })).toBeInTheDocument();
+    for (const mode of ["edit", "preview"] as const) {
+      cleanup();
+      await renderWidget("core.counter", preset("mine_new"), data, mode, { dashboardId: 7 });
+      expect(screen.queryByRole("link")).toBeNull();
+    }
+  });
+});
+
+describe("wallboard titles without details (no source on the wire)", () => {
+  const ok: WidgetDataState = { status: "ok", data: { value: 3, delta: 0, spark: [3, 3] } };
+  it("titles a counter by the preset name the server sent", async () => {
+    await renderWidget("core.counter", { preset: "unowned_new" }, ok, "wallboard", {}, () => {}, { kiosk: true });
+    expect(screen.getByText("Zum Übernehmen")).toBeInTheDocument();
+    expect(screen.queryByText("Meine offenen")).toBeNull();
+  });
+  it("does not fall back to Meine offenen for a custom source (no preset sent)", async () => {
+    await renderWidget("core.counter", {}, ok, "wallboard", {}, () => {}, { kiosk: true });
+    expect(screen.queryByText("Meine offenen")).toBeNull();
+  });
+  it("titles a ticket list by the preset name the server sent", async () => {
+    await renderWidget(
+      "core.ticket-list",
+      { preset: "escalated" },
+      { status: "ok", data: { items: [], total: 0 } },
+      "wallboard",
+      {},
+      () => {},
+      { kiosk: true },
+    );
+    expect(screen.queryByText("Meine offenen Tickets")).toBeNull();
   });
 });
 
@@ -362,33 +413,36 @@ describe("core.ticket-list", () => {
     expect(screen.getByTestId("dashboard-ticket-7-customer")).toHaveTextContent("kunde@example.org");
   });
 
-  it("offers 'Alle 12 anzeigen' only when total > rows, linking to the matching queue view", async () => {
-    await renderWidget("core.ticket-list", preset("mine_new"), { status: "ok", data: { items: rows(8), total: 12 } });
-    const link = screen.getByRole("link", { name: "Alle 12 anzeigen" });
-    expect(link.getAttribute("href")).toContain("/agent/queues");
-    expect(link.getAttribute("href")).toContain("owner_id=5");
-    expect(link.getAttribute("href")).toContain("state_type=new");
+  it("footer 'Alle 12 anzeigen' appears only when total > rows and always links to the drill page", async () => {
+    const drill = { dashboardId: 7 };
+    for (const source of [
+      { kind: "preset", preset: "mine_new" },
+      { kind: "preset", preset: "mine_open" },
+      { kind: "preset", preset: "escalated" },
+      { kind: "saved_search", id: 9 },
+      { kind: "filter", filter: { version: 1 } },
+    ]) {
+      cleanup();
+      await renderWidget("core.ticket-list", { source, limit: 8 }, { status: "ok", data: { items: rows(8), total: 12 } }, "view", drill);
+      const href = screen.getByRole("link", { name: "Alle 12 anzeigen" }).getAttribute("href") ?? "";
+      expect(href).toContain("/agent/tickets/drill");
+      expect(href).toContain("d=7");
+      expect(href).toContain("w=w-test");
+    }
     cleanup();
-    await renderWidget("core.ticket-list", preset("mine_new"), { status: "ok", data: { items: rows(3), total: 3 } });
-    expect(screen.queryByText(/Alle \d+ anzeigen/)).toBeNull();    expect(screen.queryByText(/insgesamt/)).toBeNull();
+    await renderWidget("core.ticket-list", preset("mine_new"), { status: "ok", data: { items: rows(3), total: 3 } }, "view", drill);
+    expect(screen.queryByText(/Alle \d+ anzeigen/)).toBeNull();
+    expect(screen.queryByText(/insgesamt/)).toBeNull();
   });
 
-  it("shows the total as text, not a link, where no queue view lists the same tickets", async () => {
+  it("without a stored dashboard (or in preview) the total is plain text", async () => {
     await renderWidget("core.ticket-list", preset("mine_open"), { status: "ok", data: { items: rows(8), total: 12 } });
     expect(screen.getByText("12 insgesamt")).toBeVisible();
     expect(screen.queryByRole("link", { name: /anzeigen/ })).toBeNull();
     cleanup();
-    await renderWidget("core.ticket-list", preset("escalated"), { status: "ok", data: { items: rows(8), total: 9 } });
-    expect(screen.getByText("9 insgesamt")).toBeVisible();
-  });
-
-  it("'Alle 12 anzeigen' of a saved-search list links to /agent/searches/<id>; an own filter has no link", async () => {
-    await renderWidget("core.ticket-list", { source: { kind: "saved_search", id: 9 }, limit: 8 }, { status: "ok", data: { items: rows(8), total: 12 } });
-    expect(screen.getByText("Alle 12 anzeigen").closest("a")).toHaveAttribute("href", "/agent/searches/9");
-    cleanup();
-    await renderWidget("core.ticket-list", { source: { kind: "filter", filter: { version: 1 } }, limit: 8 }, { status: "ok", data: { items: rows(8), total: 12 } });
-    expect(screen.queryByText("Alle 12 anzeigen")).toBeNull();
+    await renderWidget("core.ticket-list", preset("mine_open"), { status: "ok", data: { items: rows(8), total: 12 } }, "preview", { dashboardId: 7 });
     expect(screen.getByText("12 insgesamt")).toBeVisible();
+    expect(screen.queryByRole("link", { name: /anzeigen/ })).toBeNull();
   });
 
   it("keeps a saved-search or filter source instead of resetting it to the default preset", async () => {
@@ -463,6 +517,15 @@ describe("core.escalations", () => {
     expect(screen.getByText(/^Erste Antwort · /)).toBeVisible();
   });
 
+  it("the header link opens the drill page with the widget's total; none while empty", async () => {
+    const items = [{ ticket: ticket(1), epoch: 1, kind: "solution" }];
+    await renderWidget("core.escalations", {}, { status: "ok", data: { items, total: 5, oldest_epoch: 1 } }, "view", { dashboardId: 7 });
+    expect(screen.getByRole("link", { name: "Alle 5 anzeigen" }).getAttribute("href")).toContain("/agent/tickets/drill?d=7&w=w-test");
+    cleanup();
+    await renderWidget("core.escalations", {}, { status: "ok", data: { items: [], total: 0, oldest_epoch: null } }, "view", { dashboardId: 7 });
+    expect(screen.queryByRole("link", { name: /anzeigen/ })).toBeNull();
+  });
+
   it("has an empty state that matches the setting", async () => {
     await renderWidget("core.escalations", { within_hours: 0 }, { status: "ok", data: { items: [], total: 0, oldest_epoch: null } });
     expect(screen.getByText("Keine eskalierten Tickets.")).toBeVisible();
@@ -475,6 +538,13 @@ describe("core.escalations", () => {
 // ---------------------------------------------------------------- reminders
 
 describe("core.reminders", () => {
+  it("the header link opens the drill page with the widget's total", async () => {
+    await renderWidget("core.reminders", {}, { status: "ok", data: { items: [{ ticket: ticket(1), until: 1, overdue: true }], total: 4 } }, "view", {
+      dashboardId: 7,
+    });
+    expect(screen.getByRole("link", { name: "Alle 4 anzeigen" }).getAttribute("href")).toContain("/agent/tickets/drill?d=7&w=w-test");
+  });
+
   it("colours overdue entries danger", async () => {
     await renderWidget("core.reminders", {}, {
       status: "ok",
@@ -541,6 +611,20 @@ describe("core.team-presence", () => {
     expect(screen.getByText("2 online")).toBeVisible();
   });
 
+  it("shows 'im Chat' for agents in a chat", async () => {
+    const inChat = { ...agent("Clara Lenz", 7), status: "in_chat" as const };
+    const free = { ...agent("Ben Krause", 8), status: "available" as const };
+    await renderWidget("core.team-presence", {}, { status: "ok", data: { online: [inChat, free], total_online: 2 } });
+    expect(screen.getByTestId("presence-in-chat-7")).toHaveTextContent("im Chat");
+    expect(screen.queryByTestId("presence-in-chat-8")).toBeNull();
+  });
+
+  it("shows per-status counts when the wallboard sends no people", async () => {
+    await renderWidget("core.team-presence", {}, { status: "ok", data: { total_online: 3, by_status: { available: 2, in_chat: 1 } } });
+    expect(screen.getByTestId("team-presence-counts")).toHaveTextContent("2 verfügbar");
+    expect(screen.getByTestId("team-presence-counts")).toHaveTextContent("1 im Chat");
+  });
+
   it("has an empty state", async () => {
     await renderWidget("core.team-presence", {}, { status: "ok", data: { online: [], total_online: 0 } });
     expect(screen.getByText("Gerade ist niemand online.")).toBeVisible();
@@ -550,28 +634,177 @@ describe("core.team-presence", () => {
 // ---------------------------------------------------------------- queue overview
 
 describe("core.queue-overview", () => {
-  it("uses the cached queue tree, hides empty queues when only_with_work, caps at limit", async () => {
-    seedQueryData(["queues"], [q(1, "Support", 38, 6), q(2, "Leer", 0, 0), q(3, "Buchhaltung", 9, 2)]);
-    await renderWidget("core.queue-overview", { limit: 1, only_with_work: true }, { status: "none" });
+  const row = (id: number, name: string, open: number, fresh: number, escalated = 0) => ({ id, name, open, new: fresh, escalated });
+
+  it("renders server data with an escalated segment and makes no queues request", async () => {
+    const listQueues = vi.spyOn(api, "listQueues");
+    await renderWidget(
+      "core.queue-overview",
+      {},
+      { status: "ok", data: { queues: [row(1, "Support", 38, 6, 5), row(3, "Buchhaltung::Mahnwesen", 9, 2)], total: 2 } },
+    );
+    expect(listQueues).not.toHaveBeenCalled();
     expect(screen.getByText("Support")).toBeVisible();
     expect(screen.getByText("38 offen · 6 neu")).toBeVisible();
-    expect(screen.queryByText("Leer")).toBeNull();
-    expect(screen.queryByText("Buchhaltung")).toBeNull();
+    expect(screen.getByTestId("queue-escalated-1")).toHaveTextContent("5 eskaliert");
+    expect(screen.queryByTestId("queue-escalated-3")).toBeNull();
+    expect(screen.getByText("Mahnwesen")).toBeVisible();
+    // widths: max total is 44; open-without-escalated 33, new 6, escalated 5
+    const segments = Array.from(screen.getByTestId("queue-row-1").querySelectorAll<HTMLElement>("[data-segment]"));
+    expect(segments.map((el) => el.dataset.segment)).toEqual(["open", "new", "escalated"]);
+    expect(segments.map((el) => el.style.width)).toEqual(["75%", "13.6%", "11.4%"]);
+    expect(screen.getByTestId("queue-overview-legend")).toHaveTextContent("offen");
+    expect(screen.getByTestId("queue-overview-legend")).toHaveTextContent("neu");
+    expect(screen.getByTestId("queue-overview-legend")).toHaveTextContent("eskaliert");
   });
 
-  it("shows empty queues when only_with_work is off, busiest first, including children", async () => {
-    const parent = { ...q(1, "Support", 3, 0), children: [q(4, "Support::2nd Level", 7, 1)] };
-    seedQueryData(["queues"], [parent, q(2, "Leer", 0, 0)]);
-    await renderWidget("core.queue-overview", { limit: 8, only_with_work: false }, { status: "none" });
-    const names = screen.getAllByTestId(/^queue-row-\d+$/).map((el) => el.getAttribute("data-testid"));
-    expect(names).toEqual(["queue-row-4", "queue-row-1", "queue-row-2"]);
+  it("keeps the server order", async () => {
+    await renderWidget(
+      "core.queue-overview",
+      { only_with_work: false },
+      { status: "ok", data: { queues: [row(4, "Support::2nd Level", 7, 1), row(1, "Support", 3, 0), row(2, "Leer", 0, 0)], total: 3 } },
+    );
+    const ids = screen.getAllByTestId(/^queue-row-\d+$/).map((el) => el.getAttribute("data-testid"));
+    expect(ids).toEqual(["queue-row-4", "queue-row-1", "queue-row-2"]);
     expect(screen.getByText("2nd Level")).toBeVisible();
   });
 
-  it("says so when no queue has work", async () => {
-    seedQueryData(["queues"], [q(2, "Leer", 0, 0)]);
-    await renderWidget("core.queue-overview", {}, { status: "none" });
+  it("says so when no queue has work, and when none is visible", async () => {
+    await renderWidget("core.queue-overview", {}, { status: "ok", data: { queues: [], total: 0 } });
     expect(screen.getByText("Keine Queues mit offenen oder neuen Tickets.")).toBeVisible();
+    cleanup();
+    await renderWidget("core.queue-overview", { only_with_work: false }, { status: "ok", data: { queues: [], total: 0 } });
+    expect(screen.getByText("Keine Queues sichtbar.")).toBeVisible();
+  });
+});
+
+// ---------------------------------------------------------------- chat queue
+
+describe("core.chat-queue", () => {
+  const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+  const item = (id: number, title: string, m: number) => ({
+    session_id: id,
+    ticket_id: 1000 + id,
+    tn: `T${id}`,
+    title,
+    topic_label: "Support",
+    waiting_since: minutesAgo(m),
+  });
+
+  it("shows the waiting count, the oldest wait, my chats and the items as ticket links", async () => {
+    await renderWidget(
+      "core.chat-queue",
+      {},
+      {
+        status: "ok",
+        data: { enabled: true, waiting: 2, oldest_waiting_since: minutesAgo(7), mine: 1, items: [item(1, "Rechnung fehlt", 7), item(2, "Login", 3)] },
+      },
+    );
+    expect(screen.getByTestId("chat-waiting")).toHaveTextContent("2");
+    expect(screen.getByText("warten")).toBeVisible();
+    expect(screen.getByTestId("chat-mine")).toHaveTextContent("1");
+    expect(screen.getByText("Meine Chats")).toBeVisible();
+    expect(screen.getByTestId("chat-oldest")).toHaveTextContent("Der älteste wartet seit 7 Min.");
+    expect(screen.getByTestId("chat-item-1")).toHaveTextContent("Rechnung fehlt");
+    expect(screen.getByTestId("chat-item-1")).toHaveTextContent("wartet seit 7 Min.");
+    expect(screen.getByTestId("chat-item-1").closest("a")).not.toBeNull();
+  });
+
+  it("caps the item list at the limit setting and shows 200+ at the inbox cap", async () => {
+    await renderWidget(
+      "core.chat-queue",
+      { limit: 1 },
+      { status: "ok", data: { enabled: true, waiting: 200, oldest_waiting_since: minutesAgo(90), mine: 0, items: [item(1, "A", 90), item(2, "B", 80)] } },
+    );
+    expect(screen.getByTestId("chat-waiting")).toHaveTextContent("200+");
+    expect(screen.getByTestId("chat-item-1")).toBeVisible();
+    expect(screen.queryByTestId("chat-item-2")).toBeNull();
+  });
+
+  it("shows counts only on a wallboard without details (no items, no 'Meine Chats')", async () => {
+    await renderWidget("core.chat-queue", {}, { status: "ok", data: { enabled: true, waiting: 3, oldest_waiting_since: minutesAgo(2) } }, "wallboard", {}, () => {}, {
+      kiosk: true,
+    });
+    expect(screen.getByTestId("chat-waiting")).toHaveTextContent("3");
+    expect(screen.queryByTestId(/^chat-item-/)).toBeNull();
+    expect(screen.queryByTestId("chat-mine")).toBeNull();
+    expect(screen.queryByText("Meine Chats")).toBeNull();
+  });
+
+  it("never shows 'Meine Chats' on a wallboard link, even if an older server sent the count", async () => {
+    await renderWidget("core.chat-queue", {}, { status: "ok", data: { enabled: true, waiting: 1, oldest_waiting_since: minutesAgo(2), mine: 4 } }, "wallboard", {}, () => {}, {
+      kiosk: true,
+    });
+    expect(screen.queryByTestId("chat-mine")).toBeNull();
+  });
+
+  it("says so when the web chat is not set up", async () => {
+    await renderWidget("core.chat-queue", {}, { status: "ok", data: { enabled: false, waiting: 0, oldest_waiting_since: null, mine: 0, items: [] } });
+    expect(screen.getByText("Web-Chat ist nicht eingerichtet.")).toBeVisible();
+    expect(screen.queryByTestId("chat-waiting")).toBeNull();
+  });
+
+  it("is refreshed by chat_waiting, chat_assigned and chat_ended", () => {
+    const refresh = DASHBOARD_WIDGETS.get("core.chat-queue")!.refreshOn;
+    for (const type of ["chat_waiting", "chat_assigned", "chat_ended"]) expect(refresh).toContain(type);
+  });
+});
+
+// ---------------------------------------------------------------- AI status
+
+describe("core.ai-status", () => {
+  const budget = (over: Record<string, unknown> = {}) => ({
+    kind: "queue_tokens_day",
+    subject_name: "Support",
+    window: "day",
+    used: 1_900_000,
+    limit: 3_000_000,
+    exhausted: false,
+    resets_at: "2026-10-13T00:00:00Z",
+    currency: null,
+    ...over,
+  });
+
+  it("shows the escalated count, the runs today and a budget bar per queue", async () => {
+    await renderWidget(
+      "core.ai-status",
+      {},
+      { status: "ok", data: { ai_escalated: 3, runs_today: { auto_reply: 14, summary: 31 }, budgets: [budget()] } },
+    );
+    expect(screen.getByTestId("ai-escalated")).toHaveTextContent("3");
+    expect(screen.getByText("An Menschen übergeben")).toBeVisible();
+    expect(screen.getByTestId("ai-runs")).toHaveTextContent("45");
+    expect(screen.getByText("KI-Läufe heute")).toBeVisible();
+    const bar = within(screen.getByTestId("ai-budget-0")).getByRole("progressbar");
+    expect(bar).toHaveAttribute("aria-valuenow", "63");
+    expect(screen.getByTestId("ai-budget-0")).toHaveAttribute("data-tone", "ok");
+    expect(screen.getByTestId("ai-budget-0")).toHaveTextContent("1,1 Mio. verfügbar");
+  });
+
+  it("marks an exhausted budget in the danger tone", async () => {
+    await renderWidget(
+      "core.ai-status",
+      {},
+      {
+        status: "ok",
+        data: {
+          ai_escalated: 0,
+          runs_today: {},
+          budgets: [budget({ subject_name: "Buchhaltung", used: 3_000_000, exhausted: true })],
+        },
+      },
+    );
+    const row = screen.getByTestId("ai-budget-0");
+    expect(row).toHaveAttribute("data-tone", "danger");
+    expect(row).toHaveTextContent("aufgebraucht");
+    expect(within(row).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
+    expect(row.querySelector(".bg-danger")).not.toBeNull();
+  });
+
+  it("renders without budgets (wallboard without details)", async () => {
+    await renderWidget("core.ai-status", {}, { status: "ok", data: { ai_escalated: 0, runs_today: { draft: 2 } } });
+    expect(screen.getByTestId("ai-runs")).toHaveTextContent("2");
+    expect(screen.queryByRole("progressbar")).toBeNull();
   });
 });
 
@@ -726,6 +959,114 @@ describe("edit and preview modes across widgets", () => {
     for (const a of screen.getAllByRole("link", { hidden: true })) expect(a).toHaveAttribute("tabindex", "-1");
     cleanup();
     await renderWidget("core.ticket-list", preset("mine_new"), { status: "ok", data: { items: rows(8), total: 12 } }, "preview");
+    expect(screen.queryByRole("link", { hidden: true })).toBeNull();
+    expect(screen.getAllByText("Ticket 1").length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------- wallboard styles (Task 19)
+
+describe("wallboard mode", () => {
+  it("counter: 96px mono value, a sub line with the change, no sparkline", async () => {
+    await renderWidget("core.counter", preset("mine_open"), { status: "ok", data: { value: 12, delta: 6, spark: [1, 2, 3, 4] } }, "wallboard");
+    const value = screen.getByTestId("counter-value");
+    expect(value).toHaveTextContent("12");
+    expect(value.className).toContain("96px");
+    expect(value).toHaveClass("font-mono");
+    expect(screen.getByTestId("counter-sub")).toHaveTextContent("+6 seit dem letzten Stand");
+    expect(screen.getByTestId("counter-sub").className).toContain("20px");
+    expect(document.querySelector("svg polyline")).toBeNull();
+    cleanup();
+    // the same data in view mode still draws the sparkline
+    await renderWidget("core.counter", preset("mine_open"), { status: "ok", data: { value: 12, delta: 6, spark: [1, 2, 3, 4] } }, "view");
+    expect(document.querySelector("svg")).not.toBeNull();
+  });
+
+  it("escalations at h <= 2 render the single 'Nächste Frist' banner, taller ones the list", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-10T12:00:00Z"));
+    const soon = Date.parse("2026-10-10T12:25:00Z") / 1000;
+    const later = Date.parse("2026-10-10T15:00:00Z") / 1000;
+    const data = {
+      status: "ok" as const,
+      data: {
+        items: [
+          { ticket: ticket(1, { title: "VPN gesperrt", customer_id: "Beispiel GmbH", customer_email: null }), epoch: soon, kind: "solution" },
+          { ticket: ticket(2, { title: "Backup-Fehler" }), epoch: later, kind: "first_response" },
+        ],
+        total: 2,
+        oldest_epoch: soon,
+      },
+    };
+    await renderWidget("core.escalations", {}, data, "wallboard", {}, () => {}, { size: { w: 4, h: 2 } });
+    const banner = screen.getByTestId("escalation-banner");
+    expect(banner).toHaveTextContent("Nächste Frist: VPN gesperrt · Beispiel GmbH · in 25 Min.");
+    expect(banner).toHaveClass("text-danger");
+    expect(screen.queryByText("Backup-Fehler")).toBeNull();
+    cleanup();
+    await renderWidget("core.escalations", {}, data, "wallboard", {}, () => {}, { size: { w: 4, h: 4 } });
+    expect(screen.queryByTestId("escalation-banner")).toBeNull();
+    expect(screen.getByText("Backup-Fehler")).toBeVisible();
+  });
+
+  it("escalations banner without details names the ticket number only", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-10T12:00:00Z"));
+    const soon = Date.parse("2026-10-10T12:25:00Z") / 1000;
+    await renderWidget(
+      "core.escalations",
+      {},
+      { status: "ok", data: { items: [{ ticket: ticket(1, { title: null as unknown as string, tn: "2026101001", customer_id: null, customer_email: null }), epoch: soon, kind: "solution" }], total: 1, oldest_epoch: soon } },
+      "wallboard",
+      {},
+      () => {},
+      { size: { w: 4, h: 2 } },
+    );
+    expect(screen.getByTestId("escalation-banner")).toHaveTextContent("Nächste Frist: #2026101001 · in 25 Min.");
+  });
+
+  it("queue overview: name, three-segment bar, 'open / new neu' and the legend", async () => {
+    await renderWidget(
+      "core.queue-overview",
+      {},
+      { status: "ok", data: { queues: [{ id: 3, name: "Support::Netz", open: 82, new: 19, escalated: 4 }], total: 1 } },
+      "wallboard",
+    );
+    const row = screen.getByTestId("queue-row-3");
+    expect(row).toHaveTextContent("Netz");
+    expect(row).toHaveTextContent("82 / 19 neu");
+    expect(row.querySelector("[data-segment=open]")).not.toBeNull();
+    expect(row.querySelector("[data-segment=new]")).not.toBeNull();
+    expect(row.querySelector("[data-segment=escalated]")).not.toBeNull();
+    expect(screen.getByTestId("queue-overview-legend")).toHaveTextContent("offen");
+    expect(screen.getByTestId("queue-overview-legend")).toHaveTextContent("eskaliert");
+  });
+
+  it("team presence: two-column cards with a status dot and 'verfügbar' / 'im Chat'", async () => {
+    await renderWidget(
+      "core.team-presence",
+      {},
+      { status: "ok", data: { online: [{ ...agent("Clara Lenz", 1), status: "available" }, { ...agent("Ben Krause", 2), status: "in_chat" }], total_online: 2 } },
+      "wallboard",
+    );
+    const free = screen.getByTestId("presence-card-1");
+    const chat = screen.getByTestId("presence-card-2");
+    expect(free).toHaveTextContent("Clara Lenz");
+    expect(free).toHaveTextContent("verfügbar");
+    expect(free.querySelector("[data-status=available]")).toHaveClass("bg-green");
+    expect(chat).toHaveTextContent("im Chat");
+    expect(chat.querySelector("[data-status=in_chat]")).toHaveClass("bg-accent");
+  });
+
+  it("no hover actions and, on a kiosk, no links at all", async () => {
+    const items = [{ ticket: ticket(1), epoch: 1, kind: "solution" }];
+    await renderWidget("core.escalations", {}, { status: "ok", data: { items, total: 5, oldest_epoch: 1 } }, "wallboard", { dashboardId: 7 }, () => {}, { size: { w: 4, h: 4 } });
+    expect(screen.getAllByRole("link").length).toBeGreaterThan(0); // TV mode of a logged-in agent keeps links
+    cleanup();
+    await renderWidget("core.escalations", {}, { status: "ok", data: { items, total: 5, oldest_epoch: 1 } }, "wallboard", { dashboardId: 7 }, () => {}, { size: { w: 4, h: 4 }, kiosk: true });
+    expect(screen.queryByRole("link")).toBeNull();
+    cleanup();
+    await renderWidget("core.ticket-list", preset("mine_new"), { status: "ok", data: { items: rows(4), total: 4 } }, "wallboard", { dashboardId: 7 }, () => {}, { kiosk: true });
     expect(screen.queryByRole("link", { hidden: true })).toBeNull();
     expect(screen.getAllByText("Ticket 1").length).toBeGreaterThan(0);
   });

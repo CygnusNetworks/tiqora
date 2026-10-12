@@ -484,6 +484,7 @@ class TicketService:
         escalating_within: int | None = None,
         channel: Sequence[str] | None = None,
         include_archived: bool = False,
+        queue_ids: Sequence[int] | None = None,
     ) -> Select[tuple[Ticket]] | None:
         """Build the permission-filtered, unordered ``Ticket`` select.
 
@@ -511,6 +512,11 @@ class TicketService:
             filter_queues = {queue_id}
         else:
             filter_queues = allowed_queues
+
+        if queue_ids:  # dashboard filter: ANDed after the scope; empty/None = no narrowing
+            filter_queues = filter_queues & set(queue_ids)
+            if not filter_queues:
+                return None
 
         stmt = select(Ticket).where(Ticket.queue_id.in_(filter_queues))
         if not include_archived:
@@ -628,6 +634,7 @@ class TicketService:
         sort: str = "age",
         order: str = "desc",
         include_archived: bool = False,
+        queue_ids: Sequence[int] | None = None,
     ) -> PaginatedTickets:
         stmt = await self._filtered_ticket_stmt(
             user_id,
@@ -647,6 +654,7 @@ class TicketService:
             escalating_within=escalating_within,
             channel=channel,
             include_archived=include_archived,
+            queue_ids=queue_ids,
         )
         return await self.page_from_stmt(
             user_id, stmt, offset=offset, limit=limit, sort=sort, order=order
@@ -1474,6 +1482,27 @@ class TicketService:
             return 0
         count_stmt = select(func.count()).select_from(stmt.subquery())
         return int((await self._session.execute(count_stmt)).scalar_one())
+
+    async def count_by_queue(self, user_id: int, **filter_kwargs: Any) -> dict[int, int]:
+        """Per-queue ``COUNT(*)`` of :meth:`_filtered_ticket_stmt`; queues without hits are absent.
+
+        Same scoping and filter arguments as :meth:`count_filtered`, so the values add up to it.
+        """
+        kwargs: dict[str, Any] = {
+            "queue_id": None,
+            "state_id": None,
+            "state_type": None,
+            "owner_id": None,
+            **filter_kwargs,
+        }
+        stmt = await self._filtered_ticket_stmt(user_id, **kwargs)
+        if stmt is None:
+            return {}
+        sub = stmt.subquery()
+        rows = await self._session.execute(
+            select(sub.c.queue_id, func.count()).group_by(sub.c.queue_id)
+        )
+        return {int(q): int(n) for q, n in rows.all()}
 
     async def get_ticket(self, user_id: int, ticket_id: int) -> TicketDetail:
         ticket = await self._assert_ticket_ro(user_id, ticket_id)

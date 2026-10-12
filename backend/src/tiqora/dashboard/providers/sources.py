@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from collections.abc import Sequence
+from dataclasses import dataclass, replace
 
 from pydantic import ValidationError
 from sqlalchemy import Select
@@ -35,6 +36,8 @@ class ResolvedSource:
     criteria: Filter
     scope: TicketQueryScope
     counter_key: str
+    #: the saved search's name (``None`` for an own filter)
+    name: str | None = None
 
 
 def filter_counter_key(flt: dict[str, object]) -> str:
@@ -45,8 +48,15 @@ def filter_counter_key(flt: dict[str, object]) -> str:
 
 
 async def resolve_source(
-    session: AsyncSession, viewer: int, source: SavedSearchSource | FilterSource
+    session: AsyncSession,
+    viewer: int,
+    source: SavedSearchSource | FilterSource,
+    queue_ids: Sequence[int] | None = None,
 ) -> ResolvedSource:
+    """``queue_ids`` (the dashboard filter) narrows the viewer's scope; empty = no narrowing.
+
+    Narrowing the scope here makes counters, lists and drills all inherit it.
+    """
     if isinstance(source, SavedSearchSource):
         try:
             search, _ = await get_visible(session, source.id, viewer, admin=False)
@@ -56,14 +66,18 @@ async def resolve_source(
             raise ProviderForbidden(MSG_SEARCH_UNREADABLE)
         criteria = search.criteria
         key = f"search:{source.id}"
+        name: str | None = search.name
     else:
         try:
             criteria = Filter.model_validate(source.filter)
         except ValidationError:
             raise ProviderForbidden(MSG_FILTER_INVALID) from None
         key = filter_counter_key(source.filter)
+        name = None
     scope = await ticket_query_scope(session, viewer, include_archived=False)
-    return ResolvedSource(criteria, scope, key)
+    if queue_ids:
+        scope = replace(scope, queue_ids=scope.queue_ids & frozenset(queue_ids))
+    return ResolvedSource(criteria, scope, key, name)
 
 
 async def compile_for_viewer(

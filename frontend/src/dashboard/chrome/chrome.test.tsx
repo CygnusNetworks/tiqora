@@ -5,6 +5,7 @@ import { Sparkline } from "./Sparkline";
 import { WidgetError } from "./WidgetError";
 import { WidgetUnavailable } from "./WidgetUnavailable";
 import { WidgetSkeleton } from "./WidgetSkeleton";
+import { DashboardFiltersProvider } from "../filters/filtersContext";
 import { WidgetChromeProvider, WidgetFrame } from "./WidgetFrame";
 
 beforeAll(async () => {
@@ -120,5 +121,29 @@ describe("WidgetFrame", () => {
     );
     expect(screen.getByRole("button", { name: "Einstellungen" })).toBeVisible();
     expect(screen.queryByText("2 online")).toBeNull();
+  });
+});
+
+describe("WidgetFrame pin glyph", () => {
+  const frame = (pinned: boolean, filters: { queue_ids: number[]; time_range: null }) =>
+    render(
+      <DashboardFiltersProvider filters={filters}>
+        <WidgetChromeProvider value={{ pinned }}>
+          <WidgetFrame title="Tickets" mode="view" testId="w">
+            x
+          </WidgetFrame>
+        </WidgetChromeProvider>
+      </DashboardFiltersProvider>,
+    );
+
+  it("shows only for a pinned widget while filters are active", () => {
+    frame(true, { queue_ids: [3], time_range: null });
+    expect(screen.getByLabelText("Dashboard-Filter gelten hier nicht")).toBeVisible();
+    cleanup();
+    frame(true, { queue_ids: [], time_range: null });
+    expect(screen.queryByLabelText("Dashboard-Filter gelten hier nicht")).toBeNull();
+    cleanup();
+    frame(false, { queue_ids: [3], time_range: null });
+    expect(screen.queryByLabelText("Dashboard-Filter gelten hier nicht")).toBeNull();
   });
 });

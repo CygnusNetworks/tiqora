@@ -21,6 +21,8 @@ export function TabMenu({
   onMove,
   onDelete,
   onCopy,
+  onWallboard,
+  onWallboardLink,
 }: {
   tab: DashboardTab;
   index: number;
@@ -29,6 +31,9 @@ export function TabMenu({
   onMove: (dir: -1 | 1) => void;
   onDelete: () => void;
   onCopy: () => void;
+  onWallboard?: () => void;
+  /** Admins only: "Wallboard-Link erstellen …". */
+  onWallboardLink?: () => void;
 }) {
   const { t } = useTranslation();
   const own = tab.is_owner;
@@ -62,6 +67,9 @@ export function TabMenu({
         </button>
       )}
     >
+      {onWallboard && <MenuItem onSelect={run(onWallboard)}>{t("dashboards.manage.wallboard")}</MenuItem>}
+      {onWallboardLink && <MenuItem onSelect={run(onWallboardLink)}>{t("dashboards.manage.wallboardLink")}</MenuItem>}
+      {(onWallboard || onWallboardLink) && <MenuSeparator />}
       {own ? (
         <>
           <MenuItem onSelect={run(onRename)}>{t("dashboards.manage.rename")}</MenuItem>

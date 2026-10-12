@@ -5,16 +5,23 @@
  */
 import { DASHBOARD_WIDGETS, type WidgetDefinition } from "@/plugins/dashboardWidgets";
 import { COLUMN_KEYS, TICKET_PRESETS, defineCoreWidget } from "../definitions";
+import { AiStatusWidget, type AiStatusSettings } from "./AiStatusWidget";
+import { BacklogAgingWidget, type BacklogAgingSettings } from "./BacklogAgingWidget";
 import { CalendarAgendaWidget, type CalendarAgendaSettings } from "./CalendarAgendaWidget";
+import { ChatQueueWidget, type ChatQueueSettings } from "./ChatQueueWidget";
 import { CounterWidget, type CounterSettings } from "./CounterWidget";
 import { EscalationsWidget, type EscalationsSettings } from "./EscalationsWidget";
+import { HeatmapWidget, type HeatmapSettings } from "./HeatmapWidget";
 import { LinksWidget, type LinksSettings } from "./LinksWidget";
 import { NotesWidget, type NotesSettings } from "./NotesWidget";
 import { QueueOverviewWidget, type QueueOverviewSettings } from "./QueueOverviewWidget";
 import { RecentViewsWidget, type RecentViewsSettings } from "./RecentViewsWidget";
 import { RemindersWidget, type RemindersSettings } from "./RemindersWidget";
+import { ReportWidget, type ReportWidgetSettings } from "./ReportWidget";
+import { SlaGaugeWidget, type SlaGaugeSettings } from "./SlaGaugeWidget";
 import { TeamPresenceWidget, type TeamPresenceSettings } from "./TeamPresenceWidget";
 import { TicketListWidget, type TicketListSettings } from "./TicketListWidget";
+import { TIME_RANGE_PRESETS } from "../filters/timeRanges";
 import { DEFAULT_SOURCE } from "./presets";
 
 const int = (minimum: number, maximum: number, dflt: number) => ({
@@ -90,8 +97,8 @@ export const CORE_WIDGETS: WidgetDefinition<any>[] = [
     icon: "queue",
     size: { default: [12, 3], min: [4, 2], max: [12, 6] },
     settings: object({ limit: int(1, 12, 8), only_with_work: { type: "boolean", default: true } }),
-    data: null,
-    refreshOn: ["ticket_changed"],
+    data: { endpoint: "core.queue-overview" },
+    refreshOn: TICKET_EVENTS,
     component: QueueOverviewWidget,
   }),
   defineCoreWidget<EscalationsSettings>({
@@ -188,9 +195,96 @@ export const CORE_WIDGETS: WidgetDefinition<any>[] = [
     refreshOn: [],
     component: LinksWidget,
   }),
+  defineCoreWidget<ReportWidgetSettings>({
+    key: "core.report",
+    version: 1,
+    ...texts("report"),
+    category: "reports",
+    icon: "chart",
+    size: { default: [6, 5], min: [4, 3], max: [12, 10] },
+    settings: object({
+      // no default: a report has to be chosen (the settings drawer opens on add)
+      report_key: { type: "string", maxLength: 80 },
+      time_range: { type: "string", enum: [...TIME_RANGE_PRESETS] },
+      parameters: { type: "object", default: {} },
+      dimension_choices: { type: "object", default: {} },
+      display: { type: "string", enum: ["auto", "table"], default: "auto" },
+      max_rows: int(1, 50, 10),
+    }),
+    data: { endpoint: "core.report" },
+    refreshOn: ["interval:300"],
+    permission: "stats",
+    component: ReportWidget,
+  }),
+  defineCoreWidget<SlaGaugeSettings>({
+    key: "core.sla-gauge",
+    version: 1,
+    ...texts("slaGauge"),
+    category: "reports",
+    icon: "gauge",
+    size: { default: [3, 3], min: [3, 3], max: [6, 5] },
+    settings: object({
+      time_range: { type: "string", enum: [...TIME_RANGE_PRESETS], default: "30d" },
+      target_percent: int(50, 100, 90),
+    }),
+    data: { endpoint: "core.sla-gauge" },
+    refreshOn: ["interval:300"],
+    permission: "stats",
+    component: SlaGaugeWidget,
+  }),
+  defineCoreWidget<BacklogAgingSettings>({
+    key: "core.backlog-aging",
+    version: 1,
+    ...texts("backlogAging"),
+    category: "reports",
+    icon: "layers",
+    size: { default: [6, 5], min: [4, 4], max: [12, 8] },
+    settings: object({ max_rows: int(1, 15, 8) }),
+    data: { endpoint: "core.backlog-aging" },
+    refreshOn: ["interval:300"],
+    permission: "stats",
+    component: BacklogAgingWidget,
+  }),
+  defineCoreWidget<HeatmapSettings>({
+    key: "core.heatmap",
+    version: 1,
+    ...texts("heatmap"),
+    category: "reports",
+    icon: "grid",
+    size: { default: [6, 4], min: [6, 4], max: [12, 6] },
+    settings: object({ time_range: { type: "string", enum: ["30d", "90d"], default: "90d" } }),
+    data: { endpoint: "core.heatmap" },
+    refreshOn: ["interval:900"],
+    permission: "stats",
+    component: HeatmapWidget,
+  }),
+  defineCoreWidget<ChatQueueSettings>({
+    key: "core.chat-queue",
+    version: 1,
+    ...texts("chatQueue"),
+    category: "team",
+    icon: "chat",
+    size: { default: [4, 3], min: [3, 2], max: [6, 6] },
+    settings: object({ limit: int(1, 10, 5) }),
+    data: { endpoint: "core.chat-queue" },
+    refreshOn: ["chat_waiting", "chat_assigned", "chat_ended", "interval:30"],
+    component: ChatQueueWidget,
+  }),
+  defineCoreWidget<AiStatusSettings>({
+    key: "core.ai-status",
+    version: 1,
+    ...texts("aiStatus"),
+    category: "ai",
+    icon: "spark",
+    size: { default: [4, 3], min: [3, 3], max: [6, 6] },
+    settings: object({}),
+    data: { endpoint: "core.ai-status" },
+    refreshOn: ["interval:300"],
+    component: AiStatusWidget,
+  }),
 ];
 
-/** Registers the ten core widgets once (owner "core"); keys already registered are left alone. */
+/** Registers the core widgets once (owner "core"); keys already registered are left alone. */
 export function registerCoreWidgets(): void {
   for (const def of CORE_WIDGETS) {
     if (DASHBOARD_WIDGETS.get(def.key)) continue;

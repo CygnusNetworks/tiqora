@@ -75,7 +75,10 @@ export function readDraft(userId: number, dashboardId: number, baseVersion: numb
   } catch {
     parsed = null;
   }
-  if (isDraft(parsed) && parsed.baseVersion === baseVersion) return parsed;
+  if (isDraft(parsed) && parsed.baseVersion === baseVersion) {
+    // Drafts written before `pinned` existed read as "filters apply".
+    return { ...parsed, widgets: parsed.widgets.map((w) => ({ ...w, pinned: w.pinned === true })) };
+  }
   if (isDraft(parsed) && parsed.baseVersion > baseVersion) return null;
   clearDraft(userId, dashboardId);
   return null;

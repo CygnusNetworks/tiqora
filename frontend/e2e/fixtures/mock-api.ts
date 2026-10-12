@@ -1,5 +1,6 @@
 import { test, type Page, type Route } from "@playwright/test";
-import { GONE_SAVED_SEARCH_ID, createDemoDashboards, resolveDashboards, type DemoDashboards } from "../../src/demo/dashboardsMock";
+import { GONE_SAVED_SEARCH_ID, createDemoDashboards, demoDefaultWidgets, demoTemplateUpdateHint, resolveDashboards, type DemoDashboards } from "../../src/demo/dashboardsMock";
+import { resolveKiosk } from "../../src/demo/kioskMock";
 import type { ReportRunIn } from "../../src/lib/reportsApi";
 // Reports reuse the demo's pure report data (catalogue definitions + deterministic results).
 import { DEMO_FACTS, DEMO_REPORT_CATALOGUE, demoReport, demoSources, resolveReportRun } from "../../src/demo/reportsMock";
@@ -472,6 +473,27 @@ let authenticated = false;
  * not - serial tests in one worker would otherwise inherit each other's saves. Seeded with the
  * default dashboard "Mein Start" plus a second dashboard "Alt" holding one widget of an unknown type.
  */
+/** The "Leitstand" board of the e2e store and the wallboard screenshot: four titled KPIs, two lists. */
+function wallboardWidgets() {
+  const base = demoDefaultWidgets();
+  const place = (id: string, title: string, x: number, y: number, w: number, h: number) => {
+    const src = base.find((b) => b.id === id)!;
+    return { ...src, id: `lb-${id}`, title_override: title, layout: { lg: { x, y, w, h } } };
+  };
+  const counters = [
+    place("demo-w-open", "Offen", 0, 0, 3, 3),
+    place("demo-w-new", "Neu", 3, 0, 3, 3),
+    place("demo-w-unowned", "Zum Übernehmen", 6, 0, 3, 3),
+    place("demo-w-escalated", "Eskaliert", 9, 0, 3, 3),
+  ];
+  return [
+    ...counters,
+    place("demo-w-escalations", "Nächste Fristen", 0, 3, 12, 4),
+    place("demo-w-list-new", "Neue Tickets", 0, 7, 6, 5),
+    place("demo-w-list-open", "Offene Tickets", 6, 7, 6, 5),
+  ];
+}
+
 const dashboardStores = new Map<string, DemoDashboards>();
 function dashboardStore(): DemoDashboards {
   const id = test.info().testId;
@@ -499,6 +521,18 @@ function dashboardStore(): DemoDashboards {
               layout: { lg: { x: 6, y: 0, w: 6, h: 5 } },
             },
           ],
+        },
+        {
+          // A copy of the role template "Support-Team" whose template has gained two widgets since.
+          name: "Teamvorlage",
+          source_template_id: 100,
+          template_update: demoTemplateUpdateHint(),
+          widgets: demoDefaultWidgets().slice(0, 4),
+        },
+        {
+          // Sized for a screen: 12 rows (the link dialog warns above 14), titled tiles.
+          name: "Leitstand",
+          widgets: wallboardWidgets(),
         },
       ],
     });
@@ -626,8 +660,18 @@ export async function mockApi(page: Page) {
     const path = url.pathname;
     const method = req.method();
 
+    // Wallboard (public, header-authenticated): redacted view of the same per-test store, with the
+    // default link setting (details off), so the derived-preset titles are what the e2e sees.
+    if (path.includes("/api/v1/kiosk/")) {
+      const out = resolveKiosk(dashboardStore(), method, path, req.headers()["x-tiqora-kiosk"]);
+      if (out) {
+        await json(route, out.status, out.body);
+        return;
+      }
+    }
+
     // Dashboards (/agent home page): stateful per test, answered from the request body/query.
-    if (/\/api\/v1\/(dashboards|dashboard-widget-types|admin\/dashboard-templates)(\/|$)/.test(path)) {
+    if (/\/api\/v1\/(dashboards|dashboard-widget-types|admin\/dashboard-templates|admin\/dashboard-kiosk-links)(\/|$)/.test(path)) {
       const hasBody = method !== "GET" && method !== "DELETE";
       const out = resolveDashboards(dashboardStore(), method, path, hasBody ? req.postDataJSON() : undefined, url.searchParams);
       if (out) {

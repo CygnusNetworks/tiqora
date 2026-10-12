@@ -1,5 +1,5 @@
 /**
- * Which settings UI a widget type gets: the four bespoke core editors (ticket list, counter, links, notes), or a `SchemaForm` over the
+ * Which settings UI a widget type gets: the five bespoke core editors (ticket list, counter, links, notes, report), or a `SchemaForm` over the
  * definition's `settingsSchema` (every other core widget and every plugin widget).
  */
 import type { ComponentType } from "react";
@@ -8,6 +8,7 @@ import type { WidgetDefinition } from "@/plugins/dashboardWidgets";
 import { CounterSettingsEditor } from "./editors/CounterSettings";
 import { LinksSettingsEditor } from "./editors/LinksSettings";
 import { NotesSettingsEditor } from "./editors/NotesSettings";
+import { ReportSettingsEditor } from "./editors/ReportSettings";
 import { TicketListSettingsEditor } from "./editors/TicketListSettings";
 
 export interface SettingsEditorProps {
@@ -24,6 +25,7 @@ export const CORE_SETTINGS_EDITORS: Record<string, ComponentType<SettingsEditorP
   "core.counter": CounterSettingsEditor,
   "core.links": LinksSettingsEditor,
   "core.notes": NotesSettingsEditor,
+  "core.report": ReportSettingsEditor,
 };
 
 const isSourcePath = (p: string) => p === "source" || p.startsWith("source.");
@@ -34,6 +36,7 @@ const CORE_EDITOR_ERROR_PATHS: Record<string, (path: string) => boolean> = {
   "core.counter": isSourcePath,
   "core.links": (p) => /^items\.\d+\.(label|url)$/.test(p),
   "core.notes": (p) => p === "markdown",
+  "core.report": (p) => /^(report_key|time_range|display|max_rows|parameters(\..+)?|dimension_choices(\..+)?)$/.test(p),
 };
 
 /**
@@ -62,6 +65,10 @@ const CORE_FORM_NAMES: Record<string, string> = {
   "core.recent-views": "recentViews",
   "core.calendar-agenda": "calendarAgenda",
   "core.team-presence": "teamPresence",
+  "core.sla-gauge": "slaGauge",
+  "core.backlog-aging": "backlogAging",
+  "core.heatmap": "heatmap",
+  "core.chat-queue": "chatQueue",
 };
 
 const identity = {

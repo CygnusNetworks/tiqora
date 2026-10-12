@@ -11,8 +11,11 @@ import { displayTimeZone } from "@/lib/timeZone";
 import { DashboardGrid } from "@/dashboard/DashboardGrid";
 import { useDashboardData } from "@/dashboard/data";
 import { DashboardEditMode } from "@/dashboard/edit/DashboardEditMode";
+import { FilterBar } from "@/dashboard/filters/FilterBar";
+import { DashboardFiltersProvider } from "@/dashboard/filters/filtersContext";
 import { greetingKey } from "@/dashboard/legacy";
 import { toEditWidget } from "@/dashboard/model";
+import { TemplateUpdateBanner } from "@/dashboard/template/TemplateUpdateBanner";
 import { ShareDialog } from "@/dashboard/tabs/ShareDialog";
 import { ManagedDashboardTabs } from "@/dashboard/tabs/ManagedDashboardTabs";
 import { useGridBreakpoint } from "@/dashboard/useGridBreakpoint";
@@ -239,6 +242,7 @@ export function DashboardPage() {
   }
 
   return (
+    <DashboardFiltersProvider filters={dashboard?.filters}>
     <div className="mx-auto w-full max-w-7xl space-y-5 px-4 py-6 sm:px-8" data-testid="dashboard">
       {!isEditing && (
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -247,7 +251,13 @@ export function DashboardPage() {
             <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">{greeting}</h1>
             <p className="mt-1 text-sm text-muted">{today}</p>
           </div>
-          {tabs && tabs.length > 0 && <ManagedDashboardTabs tabs={tabs} selectedId={selectedId} onSelect={onSelect} panelId={panelId} />}
+          {tabs && tabs.length > 0 && <ManagedDashboardTabs
+              tabs={tabs}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              panelId={panelId}
+              onWallboard={(tab) => void navigate({ to: "/agent/wallboard", search: { ids: String(tab.id) } })}
+            />}
         </div>
         {dashboard && (dashboard.can_share || dashboard.can_edit) && (
           <div className="flex gap-2">
@@ -275,6 +285,10 @@ export function DashboardPage() {
       </header>
       )}
 
+      {dashboard && <FilterBar dashboard={dashboard} disabled={isEditing} />}
+
+      {dashboard && <TemplateUpdateBanner dashboard={dashboard} editing={isEditing} />}
+
       {!isEditing && dashboard?.kind === "template" && dashboard.can_edit && (
         <p className="rounded-[14px] border border-accent/30 bg-accent/10 px-4 py-2.5 text-sm text-ink">
           {t("dashboards.view.templateBanner", { name: dashboard.name })}
@@ -300,5 +314,6 @@ export function DashboardPage() {
       </div>
       {sharing && dashboard && <ShareDialog dashboard={dashboard} onClose={() => setSharing(false)} />}
     </div>
+    </DashboardFiltersProvider>
   );
 }

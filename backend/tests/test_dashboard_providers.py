@@ -81,12 +81,19 @@ def ticket_ids(data: dict[str, Any]) -> list[int]:
     return [x["ticket"]["id"] for x in data["items"]]
 
 
-def test_core_providers_cover_the_six_data_widgets() -> None:
+def test_core_providers_cover_the_data_widgets() -> None:
     assert sorted(p.key for p in core_providers()) == [
+        "core.ai-status",
+        "core.backlog-aging",
         "core.calendar-agenda",
+        "core.chat-queue",
         "core.counter",
         "core.escalations",
+        "core.heatmap",
+        "core.queue-overview",
         "core.reminders",
+        "core.report",
+        "core.sla-gauge",
         "core.team-presence",
         "core.ticket-list",
     ]
@@ -303,7 +310,16 @@ async def test_team_presence_without_redis_is_empty_not_an_error(env: Env) -> No
     out = await run_widget(
         env.factory, registry(), USER_A, W("p", "core.team-presence"), redis=None
     )
-    assert out is not None and out.status == "ok" and out.data == {"online": [], "total_online": 0}
+    assert (
+        out is not None
+        and out.status == "ok"
+        and out.data
+        == {
+            "online": [],
+            "total_online": 0,
+            "by_status": {},
+        }
+    )
 
 
 async def test_online_route_and_helper_return_the_same_list(env: Env) -> None:
@@ -325,12 +341,10 @@ async def test_online_route_and_helper_return_the_same_list(env: Env) -> None:
 
 
 async def test_reminders_scan_finds_a_due_reminder_behind_older_pending_tickets(
-    env: Env, monkeypatch: pytest.MonkeyPatch
+    env: Env,
 ) -> None:
-    """The scan is ordered by due time, so older-created far-future reminders cannot hide it."""
-    from tiqora.dashboard.providers import reminders
-
-    monkeypatch.setattr(reminders, "_SCAN_LIMIT", 2)
+    """The due window is part of the query (shared with the drill-down), so older-created
+    far-future reminders can neither hide the due one nor count in the total."""
     far = int(time.time()) + 90 * 86400
     for i in range(3):  # created before a_pending, due in three months
         env._sql_write(
@@ -410,7 +424,13 @@ async def test_default_dashboard_batch_returns_data_for_every_provider_widget(en
     r = await env.client.get(f"/api/v1/dashboards/{d['id']}/data")
     assert r.status_code == 200
     data = r.json()["widgets"]
-    provider_types = {"core.counter", "core.escalations", "core.ticket-list", "core.reminders"}
+    provider_types = {
+        "core.counter",
+        "core.escalations",
+        "core.ticket-list",
+        "core.reminders",
+        "core.queue-overview",
+    }
     assert set(data) == {w["id"] for w in d["widgets"] if w["type_key"] in provider_types}
-    assert len(data) == 9  # 4 counters, escalations, 3 lists, reminders
-    assert all(x["status"] == "ok" for x in data.values())  # recent-views, queue-overview: frontend
+    assert len(data) == 10  # 4 counters, escalations, 3 lists, reminders, queue overview
+    assert all(x["status"] == "ok" for x in data.values())  # recent-views: frontend

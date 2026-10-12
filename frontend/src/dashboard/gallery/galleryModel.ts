@@ -10,10 +10,10 @@ import type { WidgetLike } from "../layout/session";
 /** MIME type of the drag payload; the data is the widget key. */
 export const WIDGET_DRAG_TYPE = "application/x-tiqora-widget";
 
-export type GalleryGroupId = "tickets" | "me" | "team";
+export type GalleryGroupId = "tickets" | "me" | "team" | "reports";
 export type GalleryGroup = { id: GalleryGroupId; items: WidgetDefinition[] };
 
-const ORDER: GalleryGroupId[] = ["tickets", "me", "team"];
+const ORDER: GalleryGroupId[] = ["tickets", "me", "team", "reports"];
 
 /** The mockup's glyph per core widget; plugin widgets get a neutral diamond. */
 export const GLYPHS: Record<string, string> = {
@@ -27,6 +27,7 @@ export const GLYPHS: Record<string, string> = {
   "core.team-presence": "●",
   "core.notes": "✎",
   "core.links": "↗",
+  "core.report": "▥",
 };
 
 export type GlyphTone = "accent" | "green" | "danger" | "amber" | "purple" | "muted";
@@ -42,6 +43,7 @@ const TONES: Record<string, GlyphTone> = {
   "core.team-presence": "green",
   "core.notes": "amber",
   "core.links": "muted",
+  "core.report": "accent",
 };
 
 export function glyphOf(def: Pick<WidgetDefinition, "key">): string {
@@ -61,7 +63,7 @@ export function widgetTexts(def: WidgetDefinition, t: TFunction): { title: strin
 }
 
 /**
- * Groups in the fixed order Tickets / Für mich / Team, items sorted by translated title, empty
+ * Groups in the fixed order Tickets / Für mich / Team / Berichte, items sorted by translated title, empty
  * groups omitted. `query` matches title and description case-insensitively; every
  * whitespace-separated term must match somewhere.
  */

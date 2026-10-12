@@ -29,6 +29,23 @@ export const CORE_WIDGET_KEYS: readonly string[] = [
   "core.links",
 ];
 
+/**
+ * Widget types that honour the dashboard-wide filters (the backend providers read
+ * `ProviderContext.filters`); only these get the "Dashboard-Filter anwenden" switch.
+ */
+export const FILTER_AWARE_KEYS: readonly string[] = [
+  "core.ticket-list",
+  "core.counter",
+  "core.escalations",
+  "core.reminders",
+  "core.queue-overview",
+  "core.ai-status",
+  "core.report",
+  "core.sla-gauge",
+  "core.backlog-aging",
+  "core.heatmap",
+];
+
 /** Ticket-list columns — the same literal list as the backend's `TicketColumn`. */
 export const COLUMN_KEYS = [
   "tn",
@@ -90,10 +107,11 @@ export function defineCoreWidget<S>(d: CoreWidgetSpec<S>): WidgetDefinition<any>
   });
 }
 
-/** Gallery groups of the mockup: Tickets / Für mich / Team. */
-export function galleryGroupOf(def: Pick<WidgetDefinition, "category">): "tickets" | "me" | "team" {
+/** Gallery groups: Tickets / Für mich / Team / Berichte (the AI status sits with the team). */
+export function galleryGroupOf(def: Pick<WidgetDefinition, "category">): "tickets" | "me" | "team" | "reports" {
   if (def.category === "tickets") return "tickets";
-  if (def.category === "team") return "team";
+  if (def.category === "team" || def.category === "ai") return "team";
+  if (def.category === "reports") return "reports";
   return "me";
 }
 

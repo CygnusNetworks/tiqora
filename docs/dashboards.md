@@ -9,6 +9,15 @@
 > everybody only sees tickets from queues they may read. Developers add widgets via the frontend
 > extension point `core.dashboard.widgets` (plugins) and the backend extension point
 > `core.dashboard.providers` (data sources); see the last section.
+>
+> **Phase 2.** A filter bar applies queues and a time range to a whole dashboard. Report widgets
+> (chart, table, SLA gauge, backlog aging, heatmap), AI status and chat queue widgets show analytics
+> next to ticket lists. Numbers, lists and chart points drill down to the tickets behind them (and
+> can be saved as a search or a widget). A dashboard copied from a role template offers a merge of
+> widgets the template gained later. TV mode (`/agent/wallboard`) and read-only **wallboard links**
+> (`/wallboard#<token>`, no login) put dashboards on a screen; the link carries the creator's rights
+> and a whitelist of settings, never filters of private searches or customer data unless the link
+> shows details.
 
 ## Für Agenten
 
@@ -59,6 +68,10 @@ Fassungen nicht zusammen.
 | Team | Wer gerade online ist |
 | Notizen | Freier Text (Markdown) für Sie oder Ihr Team |
 | Links | Wichtige Adressen (`/`, `http://`, `https://`, `mailto:`) |
+| Bericht | Ein Bericht aus der Auswertung als Diagramm oder Tabelle |
+| SLA-Quote, Rückstand nach Alter, Heatmap | Fertige Auswertungen als Kachel |
+| KI-Status | Autopilot, Übergaben und Budget der KI |
+| Chat-Warteschlange | Wartende Web-Chats (bis 200; „200+“ bei Erreichen der Grenze) |
 
 Plugins können weitere Widgets mitbringen; sie erscheinen in derselben Galerie.
 
@@ -100,6 +113,73 @@ Dashboard oder in einer Vorlage. Fehlt die Berechtigung für eine Quelle, zeigt 
 Hinweis statt der Daten. Ein einzelnes Widget, das zu lange braucht oder ausfällt, blockiert die
 anderen nicht und lässt sich mit **Erneut versuchen** neu laden.
 
+### Filter für das ganze Dashboard
+
+Unter den Reitern steht die Filterleiste mit **Queues** und **Zeitraum**. Wer das Dashboard
+bearbeiten darf, ändert die Filter in der Ansicht; sie werden sofort gespeichert und gelten für alle,
+die das Dashboard sehen. Der Queue-Filter schränkt Kennzahlen, Ticketlisten und Berichte zusätzlich
+zu Ihren Queue-Rechten ein (er erweitert sie nie). Der Zeitraum ersetzt den Zeitraum der Berichte;
+„Wie im Bericht“ lässt ihn unverändert. Berichte, die keinen Queue-Filter kennen, weisen darauf hin.
+Einzelne Widgets lassen sich vom Dashboard-Filter ausnehmen („Dashboard-Filter gelten hier nicht“).
+Beim Duplizieren eines Dashboards und beim Anlegen aus einer Vorlage werden die Filter mitkopiert.
+
+### Berichte als Widgets
+
+In der Galerie enthält die Gruppe **Berichte** das Widget „Bericht“. Beim Hinzufügen öffnen sich die
+Einstellungen: Sie wählen einen Standardbericht oder einen gespeicherten Bericht, Darstellung
+(Diagramm oder Tabelle), Zeilenzahl, Aufteilung und Parameter. Bricht man die Einstellungen für ein
+neu hinzugefügtes Berichts-Widget ab, entfällt das Widget wieder. Kleine Berichte erscheinen sofort.
+Ist ein Bericht zu umfangreich für den direkten Aufruf, rechnet Tiqora ihn im Hintergrund
+(„Wird im Hintergrund berechnet …“); das Ergebnis erscheint danach in der Kachel, auch im
+TV-Modus. Auf einem Wallboard-Link bleiben Berichtskacheln leer, deren Ergebnis nicht im
+Zwischenspeicher liegt; das Ergebnis-Caching der Auswertung (Redis) ist dafür Voraussetzung.
+
+### Drill-down
+
+Kennzahlen, Listenköpfe und Diagrammpunkte sind in der Ansicht anklickbar und führen zu den Tickets
+dahinter (`/agent/tickets/drill`). Dort sortieren und blättern Sie, speichern die Liste mit
+**Als Suche speichern** (der Suchen-Editor öffnet mit den Bedingungen) oder legen sie mit
+**Als Widget hinzufügen** als Ticketliste auf dem Dashboard an. Es gelten Ihre Queue-Rechte; die
+Liste braucht höchstens etwa 25 Sekunden, danach meldet Tiqora, dass der Filter eingegrenzt werden
+soll. Bei Berichtsdaten kann die Liste wenige Minuten hinter dem Diagramm zurückliegen.
+
+### Vorlagen-Update
+
+Wurde eine Rollenvorlage seit der Kopie um Widgets erweitert, zeigt das kopierte Dashboard oben
+„Neue Version der Vorlage …“. **Übernehmen** hängt die neuen Widgets unten an (Ihre eigenen
+Änderungen bleiben), **Ausblenden** blendet den Hinweis aus, bis die Vorlage sich wieder ändert.
+
+### Wallboard und TV-Modus
+
+**TV-Modus** (Menü des Reiters, `/agent/wallboard?ids=1,3&rotate=60`) zeigt ein oder mehrere
+Dashboards formatfüllend, dunkel und mit größerer Schrift; mehrere wechseln im eingestellten Takt
+(15 bis 900 Sekunden, bis zu 10 Dashboards). **Vollbild** und **Beenden** erscheinen, wenn Sie die
+Maus bewegen. Ein Dashboard mit mehr als 14 Zeilen wird dort sehr klein; planen Sie für Bildschirme
+ein eigenes, flaches Dashboard.
+
+Für Bildschirme ohne Anmeldung erstellen Sie einen **Wallboard-Link** (Menü des Reiters oder
+**Verwaltung → Wallboard-Links**): Name, Dashboards, Wechselzeit, Gültigkeit (1 bis 365 Tage) und
+ob Details angezeigt werden. Der Link wird nur einmal angezeigt; das Geheimnis steht hinter dem `#`
+und erreicht dadurch weder Server-Logs noch Referrer. Verwaltung: Widerrufen und Löschen unter
+**Wallboard-Links**.
+
+**Rechte und Datenschutz.**
+
+- Der Link zeigt die Daten so, wie die Person sie sieht, die ihn erstellt hat; wer den Link hat,
+  sieht das Wallboard ohne Anmeldung. Kacheln wie „Meine offenen Tickets“ zählen die Tickets des
+  Erstellers; der Dialog warnt, wenn ein gewähltes Dashboard solche Kacheln enthält.
+- Der Link sendet nur Einstellungen aus einer festen Liste je Widget-Art (zum Beispiel Spalten und
+  Zeilenzahl einer Ticketliste), nie Quelle, Suchen, Filterbedingungen, Notizen oder Links.
+  Notizen und Links zeigen „Auf dem Wallboard nicht verfügbar“. Eigene Titel von Kacheln erscheinen
+  nur mit **Details anzeigen**.
+- Ohne Details entfallen Tickettitel, Kunden und Namen in Listen; Fehlermeldungen von Kacheln
+  lauten dann allgemein „Diese Daten konnten nicht geladen werden.“ Widget-Arten ohne
+  Wallboard-Regel (Plugins) erscheinen als „Auf dem Wallboard ausgeblendet“ und laufen nicht.
+- Die Web-Chat-Kachel zeigt auf dem Wallboard nur die wartenden Chats, nicht „Meine Chats“ des
+  Erstellers. Die KI-Kachel zeigt die Token-Budgets der Queues, nie die Kosten der KI-Anbieter.
+- Abgelaufene, widerrufene oder unbekannte Links zeigen dieselbe Meldung („Dieser Wallboard-Link
+  ist ungültig oder abgelaufen“); wiederholtes Raten wird begrenzt.
+
 ### Tastaturbedienung
 
 Im Bearbeitungsmodus gilt: Widget mit Tab fokussieren, **Pfeiltasten** verschieben es,
@@ -115,6 +195,14 @@ ab etwa 900 Pixeln mit zwölf Spalten. Die Widget-Galerie ist ab 1280 Pixel Fens
 Seitenpanel, darunter ein Overlay.
 
 ## Für Administratoren
+
+### Wallboard-Links
+
+Unter **Verwaltung → Wallboard-Links** sehen Sie alle Links mit Ersteller, Ablauf und letzter
+Nutzung und widerrufen sie. Ein Link endet mit dem Widerruf sofort für neue Abrufe (gecachte Daten
+höchstens 20 Sekunden). Voraussetzungen: Redis (Zwischenspeicher und Begrenzung), und hinter einem
+Reverse-Proxy `TIQORA_TRUSTED_PROXIES` und `TIQORA_FORWARDED_ALLOW_IPS`, damit jeder Bildschirm
+eine eigene Adresse hat; siehe [deployment.md](deployment.md#wallboard-links).
 
 ### Vorlagen für Rollen
 
@@ -137,7 +225,12 @@ einer neueren Fassung fragt Tiqora ausdrücklich nach, weil das alle betroffenen
 ### Grenzen
 
 Jeder Benutzer kann höchstens 20 eigene Dashboards anlegen (Vorlagen und mit ihm geteilte zählen
-nicht mit). Ein Dashboard fasst höchstens 40 Widgets, eine Ticketliste höchstens acht Spalten.
+nicht mit). Ein Dashboard fasst höchstens 40 Widgets, eine Ticketliste höchstens acht Spalten. Ein Wallboard-Link
+umfasst höchstens 10 Dashboards. Berichts-Widgets teilen sich die Grenzen der Berichte (höchstens
+10 Parameter je Widget); es laufen höchstens wenige Berichte gleichzeitig im Hintergrund.
+Ein Wallboard-Abruf je Adresse ist auf 240 pro Minute begrenzt, fehlgeschlagene Versuche auf 30
+je zehn Minuten; die Daten eines Wallboards werden 20 Sekunden zwischengespeichert, unfertige
+Kacheln nur 5 Sekunden, und ein Bildschirm zeigt bei Ausfall das letzte gute Bild als veraltet an.
 
 Der Verlauf einer Kennzahl beginnt, wenn ein Benutzer ein Dashboard mit dieser Kennzahl zum ersten
 Mal öffnet: Tiqora speichert je Benutzer, Kennzahl und Tag (UTC) einen Wert, zeigt die letzten

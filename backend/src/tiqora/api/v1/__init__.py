@@ -22,6 +22,7 @@ from tiqora.api.v1 import (
     integrations,
     jobs,
     kb,
+    kiosk,
     oauth2_callback,
     phone_calls,
     phone_cti,
@@ -86,6 +87,7 @@ api_v1_router.include_router(saved_searches.router)
 api_v1_router.include_router(reports.sources_router)
 api_v1_router.include_router(dashboards.router)
 api_v1_router.include_router(dashboards.widget_types_router)
+api_v1_router.include_router(kiosk.router)
 api_v1_router.include_router(integrations.router)
 api_v1_router.include_router(jobs.router)
 api_v1_router.include_router(plugins.router)

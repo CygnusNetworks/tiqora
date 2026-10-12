@@ -7,7 +7,8 @@ import {
   demoPortalProcess,
   demoRefine,
 } from "./mockData";
-import { resolve as resolveDashboards } from "./dashboardsMock";
+import { demoDashboards, resolve as resolveDashboards } from "./dashboardsMock";
+import { resolveKiosk } from "./kioskMock";
 import { resolve as resolveSchedules } from "./schedulesMock";
 import { setDemoFactsBuilding } from "./reportsMock";
 import { demoReportFile, resolveSavedRequest } from "./savedMock";
@@ -107,10 +108,18 @@ async function schedulesResponse(request: Request): Promise<Response | undefined
   return out.status === 204 ? new HttpResponse(null, { status: 204 }) : HttpResponse.json(out.body as never, { status: out.status });
 }
 
+/** The wallboard answers from the same demo store; the secret comes in its own header. */
+function kioskResponse(request: Request): Response | undefined {
+  const out = resolveKiosk(demoDashboards, request.method, new URL(request.url).pathname, request.headers.get("X-Tiqora-Kiosk"));
+  return out ? HttpResponse.json(out.body as never, { status: out.status }) : undefined;
+}
+
 export const handlers = [
   http.all("*/api/v1/report-schedules*", async ({ request }) => (await schedulesResponse(request)) ?? HttpResponse.json([])),
   http.get("*/api/v1/report-runs/*", async ({ request }) => (await schedulesResponse(request)) ?? new HttpResponse(null, { status: 404 })),
   http.all("*/api/v1/reports/import/znuny*", async ({ request }) => (await schedulesResponse(request)) ?? HttpResponse.json({})),
+  http.get("*/api/v1/kiosk/*", ({ request }) => kioskResponse(request) ?? HttpResponse.json({}, { status: 404 })),
+  http.all("*/api/v1/admin/dashboard-kiosk-links*", async ({ request }) => (await dashboardsResponse(request)) ?? HttpResponse.json([])),
   http.all("*/api/v1/dashboards*", async ({ request }) => (await dashboardsResponse(request)) ?? HttpResponse.json([])),
   http.post("*/api/v1/dashboard-widget-types/*/data", async ({ request }) => (await dashboardsResponse(request)) ?? HttpResponse.json({})),
   http.all("*/api/v1/admin/dashboard-templates*", async ({ request }) => (await dashboardsResponse(request)) ?? HttpResponse.json({})),

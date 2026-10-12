@@ -530,3 +530,13 @@ def _count_when(cond: ColumnElement[bool]) -> ColumnElement[Any]:
 
 def _unlabel(cols: Sequence[ColumnElement[Any]]) -> list[ColumnElement[Any]]:
     return [getattr(c, "element", c) for c in cols]
+
+
+def effective_definition(
+    defn: ReportDefinition, src: ReportSource, params: RunParams
+) -> tuple[ReportDefinition, list[tuple[str, Condition]]]:
+    """The definition a run compiles (runtime choices, grain and parameters applied) and one
+    condition per applied parameter: the public entry for the dashboard drill-down, which must
+    rebuild exactly what :func:`compile_report` ran."""
+    effective = _apply_choices_and_grain(defn, src, params)
+    return _apply_parameters(effective, src, params)

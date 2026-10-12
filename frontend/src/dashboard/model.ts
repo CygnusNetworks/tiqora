@@ -32,6 +32,8 @@ export interface EditWidget {
   title_override: string | null;
   settings: Record<string, unknown>;
   layout: { lg: Rect; md?: Rect };
+  /** True: the widget ignores the dashboard-wide filters. */
+  pinned: boolean;
 }
 
 /** A stored widget row (API shape) as the edit model; `md` only when stored. */
@@ -42,6 +44,7 @@ export function toEditWidget(row: {
   title_override?: string | null;
   settings?: Record<string, unknown> | null;
   layout: { lg: Rect; md?: Rect | null };
+  pinned?: boolean;
 }): EditWidget {
   return {
     id: row.id,
@@ -50,5 +53,6 @@ export function toEditWidget(row: {
     title_override: row.title_override ?? null,
     settings: row.settings ?? {},
     layout: { lg: row.layout.lg, ...(row.layout.md ? { md: row.layout.md } : {}) },
+    pinned: row.pinned ?? false,
   };
 }

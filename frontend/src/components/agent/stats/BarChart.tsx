@@ -2,12 +2,15 @@ import { useState } from "react";
 import { useChartFormat } from "./chartLocale";
 import { ChartTooltip } from "./ChartTooltip";
 import { ChartFrame, EmptyChart, GridLines, YAxisLabels } from "./chartKit";
+import { markButtonProps } from "./markButton";
 import { barPath, niceTicks } from "./chartMath";
 
 export type BarDatum = {
   label: string;
   /** `null` = no data: no bar, "—" as text (not a zero). */
   value: number | null;
+  /** With `onSelect`: false = this bar is not a button (e.g. the folded "other" bucket). */
+  selectable?: boolean;
 };
 
 export type BarChartProps = {
@@ -18,6 +21,8 @@ export type BarChartProps = {
   emptyLabel?: string;
   testId?: string;
   formatValue?: (v: number) => string;
+  /** Additive: bars become buttons (keyboard reachable) and report their index. */
+  onSelect?: (index: number) => void;
 };
 
 /**
@@ -35,6 +40,7 @@ export function BarChart({
   emptyLabel,
   testId,
   formatValue,
+  onSelect,
 }: BarChartProps) {
   const { t, number } = useChartFormat();
   const fmt = formatValue ?? number;
@@ -93,8 +99,9 @@ export function BarChart({
             width={barWidth}
             height={chartHeight}
             fill="transparent"
-            tabIndex={data.length > 12 ? -1 : 0}
-            role="img"
+            {...(onSelect && d.selectable !== false
+              ? markButtonProps(() => onSelect(i))
+              : { tabIndex: data.length > 12 ? -1 : 0, role: "img" })}
             aria-label={`${d.label}: ${d.value === null ? "—" : fmt(d.value)}`}
             onFocus={() => setHover(i)}
             onBlur={() => setHover(null)}

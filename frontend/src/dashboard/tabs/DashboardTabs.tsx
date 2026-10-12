@@ -19,6 +19,10 @@ export interface TabActions {
   onMove: (tab: DashboardTab, dir: -1 | 1) => void;
   onDelete: (tab: DashboardTab) => void;
   onCopy: (tab: DashboardTab) => void;
+  /** "Als Wallboard anzeigen"; without it the menu has no such item. */
+  onWallboard?: (tab: DashboardTab) => void;
+  /** "Wallboard-Link erstellen …" (admins); without it the menu has no such item. */
+  onWallboardLink?: (tab: DashboardTab) => void;
 }
 
 export function DashboardTabs({
@@ -119,6 +123,8 @@ export function DashboardTabs({
           onMove={(dir) => actions.onMove(selectedTab, dir)}
           onDelete={() => actions.onDelete(selectedTab)}
           onCopy={() => actions.onCopy(selectedTab)}
+          onWallboard={actions.onWallboard ? () => actions.onWallboard?.(selectedTab) : undefined}
+          onWallboardLink={actions.onWallboardLink ? () => actions.onWallboardLink?.(selectedTab) : undefined}
         />
       )}
       <button

@@ -15,6 +15,19 @@ vi.mock("@/auth/AuthContext", async () => {
   const actual = await vi.importActual<typeof import("@/auth/AuthContext")>("@/auth/AuthContext");
   return { ...actual, useOptionalAuth: () => ({ user: { id: 5, is_admin: false, can_view_reports: false } }) };
 });
+// The grid is rendered without a router: links (the counter's drill link) become plain anchors.
+vi.mock("@tanstack/react-router", async () => {
+  const actual = await vi.importActual<typeof import("@tanstack/react-router")>("@tanstack/react-router");
+  return {
+    ...actual,
+    Link: ({ children, to, ...rest }: { children?: React.ReactNode; to: string; [k: string]: unknown }) => (
+      <a href={to} {...(rest as Record<string, unknown>)}>
+        {children}
+      </a>
+    ),
+    useNavigate: () => vi.fn(),
+  };
+});
 const plugins = vi.hoisted(() => ({ ready: true }));
 vi.mock("@/plugins/PluginProvider", async () => {
   const actual = await vi.importActual<typeof import("@/plugins/PluginProvider")>("@/plugins/PluginProvider");
@@ -22,7 +35,7 @@ vi.mock("@/plugins/PluginProvider", async () => {
 });
 
 function wire(id: string, type_key: string, x = 0, y = 0, w = 3, h = 2): EditWidget {
-  return { id, type_key, type_version: 1, title_override: null, settings: {}, layout: { lg: { x, y, w, h } } };
+  return { id, type_key, type_version: 1, title_override: null, settings: {}, pinned: false, layout: { lg: { x, y, w, h } } };
 }
 
 function grid(

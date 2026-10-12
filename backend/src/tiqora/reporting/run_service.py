@@ -122,6 +122,21 @@ class TooManyReportJobs(Exception):  # noqa: N818 - plan D6 name
         self.message = TOO_MANY_JOBS_MESSAGE
 
 
+def parse_dimension_choices(raw: Mapping[str, str]) -> dict[int, str]:
+    """``{"0": "queue"}`` (request keys are strings) -> ``{0: "queue"}``; 422 on a bad key."""
+    choices: dict[int, str] = {}
+    for raw_key, choice in raw.items():
+        try:
+            index = int(raw_key)
+        except ValueError:
+            raise RequestError(
+                "Der Schlüssel muss eine Dimensionsnummer sein.",
+                path=f"dimension_choices.{raw_key}",
+            ) from None
+        choices[index] = choice
+    return choices
+
+
 @dataclass(frozen=True, slots=True)
 class RunOverrides:
     """What a caller may change when running a report (HTTP body, dashboard widget, job)."""
@@ -141,16 +156,7 @@ class RunOverrides:
 
     @classmethod
     def from_run_in(cls, body: ReportRunIn) -> RunOverrides:
-        choices: dict[int, str] = {}
-        for raw_key, choice in body.dimension_choices.items():
-            try:
-                index = int(raw_key)
-            except ValueError:
-                raise RequestError(
-                    "Der Schlüssel muss eine Dimensionsnummer sein.",
-                    path=f"dimension_choices.{raw_key}",
-                ) from None
-            choices[index] = choice
+        choices = parse_dimension_choices(body.dimension_choices)
         return cls(
             time_range=body.time_range,
             grain=body.grain,
@@ -310,6 +316,10 @@ class RunRefOutcome:
     #: effective narrowing filter a job must carry
     extra_filter: Filter | None
     ignored_common: tuple[str, ...]
+    #: the effective definition (dashboards render it); appended after the wave-1 fields
+    definition: ReportDefinition | None = None
+    #: the saved report's name (``None`` for built-in and inline reports)
+    saved_name: str | None = None
 
 
 async def run_report_ref(
@@ -357,6 +367,8 @@ async def run_report_ref(
                 deferred=None,
                 extra_filter=prepared.params.extra_filter,
                 ignored_common=prepared.ignored_common,
+                definition=prepared.definition,
+                saved_name=prepared.saved.name if prepared.saved else None,
             )
     deferred: Literal["forced", "events_window", "estimate"] | None = None
     window = plan.compiled.window
@@ -379,6 +391,8 @@ async def run_report_ref(
             deferred=deferred,
             extra_filter=prepared.params.extra_filter,
             ignored_common=prepared.ignored_common,
+            definition=prepared.definition,
+            saved_name=prepared.saved.name if prepared.saved else None,
         )
     # the plan above is reused: no second scope/state/compile, no second lookup
     result = await execute_and_store(
@@ -394,6 +408,8 @@ async def run_report_ref(
         deferred=None,
         extra_filter=prepared.params.extra_filter,
         ignored_common=prepared.ignored_common,
+        definition=prepared.definition,
+        saved_name=prepared.saved.name if prepared.saved else None,
     )
 
 

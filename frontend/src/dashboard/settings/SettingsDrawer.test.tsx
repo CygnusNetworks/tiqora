@@ -3,7 +3,8 @@ import { useState } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
-import { dashboardsApi, type WidgetResult } from "@/lib/dashboardsApi";
+import { dashboardsApi, type DashboardFilters, type WidgetResult } from "@/lib/dashboardsApi";
+import { DashboardFiltersProvider } from "../filters/filtersContext";
 import { DASHBOARD_WIDGETS, defineWidget, type WidgetDefinition } from "@/plugins/dashboardWidgets";
 import { createEditReducer, initialEditState } from "../layout/session";
 import type { EditWidget } from "../model";
@@ -20,6 +21,7 @@ const listWidget: EditWidget = {
   type_version: 1,
   title_override: "Meine offenen Tickets",
   settings: {},
+  pinned: false,
   layout: { lg: { x: 0, y: 0, w: 8, h: 5 } },
 };
 const widgetOf = (type_key: string, settings: Record<string, unknown> = {}, over: Partial<EditWidget> = {}): EditWidget => ({
@@ -34,6 +36,7 @@ const widgetOf = (type_key: string, settings: Record<string, unknown> = {}, over
 const okList = (): WidgetResult => ({ status: "ok", data: { items: [], total: 0 } });
 let preview: ReturnType<typeof vi.spyOn>;
 const onApply = vi.fn();
+const onPinned = vi.fn();
 const onCancel = vi.fn();
 
 type Props = Partial<Parameters<typeof SettingsDrawer>[0]>;
@@ -60,8 +63,9 @@ function Page({ widget = listWidget, def, errors, focusSource, closeOnApply = tr
           def={def ?? defOf(widget.type_key)}
           errors={errors}
           focusSource={focusSource}
-          onApply={(s, t) => {
+          onApply={(s, t, pinned) => {
             onApply(s, t);
+            onPinned(pinned);
             if (closeOnApply) setOpen(false);
           }}
           onCancel={() => {
@@ -74,12 +78,14 @@ function Page({ widget = listWidget, def, errors, focusSource, closeOnApply = tr
   );
 }
 
-function mount(props: Props = {}) {
+function mount(props: Props = {}, filters?: DashboardFilters) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const user = makeUser();
   render(
     <QueryClientProvider client={client}>
-      <Page {...props} />
+      <DashboardFiltersProvider filters={filters}>
+        <Page {...props} />
+      </DashboardFiltersProvider>
     </QueryClientProvider>,
   );
   return user;
@@ -100,6 +106,7 @@ beforeAll(async () => {
 beforeEach(() => {
   registerCoreWidgets();
   onApply.mockClear();
+  onPinned.mockClear();
   onCancel.mockClear();
   preview = vi.spyOn(dashboardsApi, "previewData").mockResolvedValue(okList());
   vi.spyOn(savedSearchesApi, "list").mockResolvedValue(demoSavedSearches());
@@ -490,5 +497,59 @@ describe("SettingsDrawer", () => {
     expect(s1.widgets[0].title_override).toBe("Neu");
     expect(save).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+describe("SettingsDrawer: dashboard filters", () => {
+  const FILTERS: DashboardFilters = { queue_ids: [3], time_range: null };
+
+  it("shows the switch for filter-aware types only; on means not pinned", async () => {
+    const user = mount();
+    const { dialog } = await open(user);
+    const sw = within(dialog).getByRole("switch", { name: "Dashboard-Filter auf dieses Widget anwenden" });
+    expect(sw).toBeChecked();
+    cleanup();
+    const user2 = mount({ widget: widgetOf("core.notes"), def: defOf("core.notes") });
+    const { dialog: d2 } = await open(user2);
+    expect(within(d2).queryByRole("switch", { name: "Dashboard-Filter auf dieses Widget anwenden" })).toBeNull();
+  });
+
+  it("switching it off hands pinned=true to the host on apply", async () => {
+    const user = mount();
+    const { dialog } = await open(user);
+    await user.click(within(dialog).getByRole("switch", { name: "Dashboard-Filter auf dieses Widget anwenden" }));
+    await user.click(applyBtn());
+    expect(onPinned).toHaveBeenCalledWith(true);
+  });
+
+  it("an already pinned widget opens with the switch off", async () => {
+    const user = mount({ widget: { ...listWidget, pinned: true } });
+    const { dialog } = await open(user);
+    expect(within(dialog).getByRole("switch", { name: "Dashboard-Filter auf dieses Widget anwenden" })).not.toBeChecked();
+    await user.click(applyBtn());
+    expect(onPinned).toHaveBeenCalledWith(true);
+  });
+
+  it("settings preview sends the dashboard filters", async () => {
+    const user = mount({}, FILTERS);
+    await open(user);
+    await waitFor(() => expect(preview).toHaveBeenCalled());
+    expect(preview.mock.calls[0][3]).toEqual(FILTERS);
+  });
+
+  it("the preview sends no filters when none are active or the widget is switched off", async () => {
+    const user = mount();
+    await open(user);
+    await waitFor(() => expect(preview).toHaveBeenCalled());
+    expect(preview.mock.calls[0][3]).toBeUndefined();
+    cleanup();
+    preview.mockClear();
+    const user2 = mount({}, FILTERS);
+    const { dialog } = await open(user2);
+    await waitFor(() => expect(preview).toHaveBeenCalled());
+    preview.mockClear();
+    await user2.click(within(dialog).getByRole("switch", { name: "Dashboard-Filter auf dieses Widget anwenden" }));
+    await waitFor(() => expect(preview).toHaveBeenCalled());
+    expect(preview.mock.calls.at(-1)![3]).toBeUndefined();
   });
 });

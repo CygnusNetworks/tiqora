@@ -1,5 +1,6 @@
 import { test, type Page } from "@playwright/test";
 import { mockRich, loginAsAgentRich } from "./fixtures/rich-mock";
+import { mockApi, loginAsAgent } from "./fixtures/mock-api";
 
 /**
  * Screenshot generator for the README / GitHub project page. Not part of the
@@ -328,4 +329,41 @@ test("portal + login + security screenshots", async ({ page }) => {
   await loginAsAgentRich(page);
   await shot(page, "/agent/security", "agent-security");
   await shot(page, "/portal", "portal");
+});
+
+// Dashboards phase 2: the home page with the filter bar and a report widget, and the public
+// wallboard (always dark, 1920x1080). Uses the stateful dashboards mock of the e2e suite because
+// it also answers /api/v1/kiosk; its dashboard names are German whatever LANG_UI says.
+test("dashboard filter bar, report widget and wallboard screenshots", async ({ page }) => {
+  await prep(page);
+  await mockApi(page);
+  await loginAsAgent(page);
+  await page.goto("/agent", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "Customize" }).or(page.getByRole("button", { name: "Anpassen" })).click();
+  await page.getByRole("button", { name: /^(Report|Bericht)/ }).first().click();
+  const drawer = page.getByRole("dialog");
+  await drawer.getByTestId("report-settings-report").selectOption({ index: 1 });
+  await drawer.getByRole("button", { name: /^(Apply|Übernehmen)$/ }).click();
+  await page.getByRole("button", { name: /^(Save|Speichern)$/ }).click();
+  await page.getByTestId("filter-bar").getByRole("button").first().click();
+  await page.getByRole("checkbox", { name: "Raw::Misc" }).check();
+  await page.getByRole("button", { name: /^(Apply|Übernehmen)$/ }).click();
+  await page.waitForLoadState("networkidle").catch(() => undefined);
+  await page.waitForTimeout(700);
+  // Full page: the report widget sits below the fold of the 900 px window.
+  await page.screenshot({ path: `${OUT}/agent-dashboard-filters${SUFFIX}.png`, fullPage: true });
+
+  // The public wallboard rotates through every dashboard of the link; the fake clock jumps to the last one ("Leitstand").
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.clock.install({ time: new Date("2026-10-12T08:00:00Z") });
+  await page.goto("/wallboard#demo-kiosk-token", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("wallboard").waitFor({ timeout: 10_000 });
+  for (let i = 0; i < 3; i++) {
+    await page.clock.fastForward(61_000);
+    await page.waitForTimeout(400);
+  }
+  await page.getByTestId("wallboard-header").getByText("Leitstand").waitFor({ timeout: 10_000 });
+  await page.waitForLoadState("networkidle").catch(() => undefined);
+  await page.waitForTimeout(900);
+  await page.screenshot({ path: `${OUT}/wallboard-dark.png`, fullPage: false });
 });

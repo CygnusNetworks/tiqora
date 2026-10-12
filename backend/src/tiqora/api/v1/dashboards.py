@@ -9,26 +9,46 @@ cookie-authenticated writes is the global ``csrf_origin_middleware``.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
-from typing import Annotated, Any, Final, NoReturn
+from typing import Annotated, Any, Final, Literal, NoReturn, get_args
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
+from pydantic import ValidationError
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.api.deps import CurrentUser, DbSession, get_redis, get_session_factory_dep
-from tiqora.dashboard import start, store
-from tiqora.dashboard.providers import DASHBOARD_PROVIDERS
-from tiqora.dashboard.runner import run_batch, run_widget
+from tiqora.api.deps import (
+    CurrentUser,
+    DbSession,
+    get_app_settings,
+    get_redis,
+    get_session_factory_dep,
+)
+from tiqora.config import Settings
+from tiqora.dashboard import drill, start, store, template_update
+from tiqora.dashboard.filters import effective_filters
+from tiqora.dashboard.providers import DASHBOARD_PROVIDERS, ProviderForbidden
+from tiqora.dashboard.providers.report import REPORT_WIDGET_TYPES, report_spec
+from tiqora.dashboard.runner import (
+    INVALID_SETTINGS_MESSAGE,
+    SINGLE_WIDGET_TIMEOUT_SECONDS,
+    run_batch,
+    run_widget,
+)
 from tiqora.dashboard.schemas import (
     MAX_WIDGETS_PER_DASHBOARD,
     DashboardCreateIn,
     DashboardDataOut,
+    DashboardFiltersIn,
     DashboardOrderIn,
     DashboardOut,
     DashboardSaveIn,
     DashboardShareIn,
     DashboardTabOut,
+    DrillPageOut,
+    TemplateUpdateApplyIn,
+    TemplateUpdateOut,
     WidgetDataOut,
     WidgetOut,
     WidgetPreviewIn,
@@ -40,17 +60,40 @@ from tiqora.dashboard.settings_models import (
     SettingsError,
     validate_widget_settings,
 )
+from tiqora.domain.schemas import TicketSortKey
 from tiqora.extensions import Registry, get_registry
+from tiqora.filters import FilterError
+from tiqora.jobs.schemas import JobAccepted
 from tiqora.jobs.service import utc_now
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.permissions.sharing import ShareGroupError
+from tiqora.reporting.access import require_report_access
+from tiqora.reporting.definition import DefinitionError
+from tiqora.reporting.run_service import (
+    RequestError,
+    RunOverrides,
+    TooManyReportJobs,
+    enqueue_report_ref,
+    parse_dimension_choices,
+    prepare_ref,
+)
+from tiqora.reporting.schemas import ReportRunIn
+from tiqora.reporting.settings import load_reporting_settings
+from tiqora.reporting.sql import ReportQueryTimeout, statement_timeout
 
 router = APIRouter(prefix="/dashboards", tags=["dashboards"])
 widget_types_router = APIRouter(prefix="/dashboard-widget-types", tags=["dashboards"])
 
 NOT_FOUND_MESSAGE: Final = "Dashboard nicht gefunden."
 NO_DATA_MESSAGE: Final = "Dieses Widget hat keine Daten."
+NOT_A_REPORT_MESSAGE: Final = "Dieses Widget zeigt keinen Bericht."
+JOBS_FULL_MESSAGE: Final = (
+    "Es laufen bereits mehrere Berichte im Hintergrund. Bitte warten Sie, bis einer fertig ist."
+)
+DRILL_TIMEOUT_MESSAGE: Final = "Die Liste braucht zu lange. Bitte grenzen Sie den Filter ein."
 CORE_WIDGET_VERSION: Final = 1
+#: sort keys of the drill-down list: the public ticket sort keys plus the reminders' ``until``
+DRILL_SORT_KEYS: Final = frozenset(get_args(TicketSortKey)) | {"until"}
 
 
 def get_dashboard_registry() -> Registry:
@@ -83,6 +126,7 @@ class _PreviewWidget:
     type_key: str
     type_version: int
     settings: dict[str, Any]
+    pinned: bool = False
 
 
 def _widget_ids(raw: str | None) -> set[str] | None:
@@ -178,11 +222,53 @@ async def get_dashboard(
     dashboard_id: DashboardId, session: DbSession, user: CurrentUser
 ) -> DashboardOut:
     try:
-        return await store.get_dashboard(
+        out = await store.get_dashboard(
+            session, dashboard_id, user.id, admin=await _is_admin(session, user)
+        )
+        if out.source_template_id is not None and out.can_edit:
+            hint = await template_update.update_hint(session, out.id, user.id)
+            if hint is not None:
+                out = out.model_copy(update={"template_update": hint})
+        return out
+    except _STORE_ERRORS as exc:
+        _raise_http(exc)
+
+
+@router.get("/{dashboard_id}/template-update", response_model=TemplateUpdateOut)
+async def get_template_update(
+    dashboard_id: DashboardId, session: DbSession, user: CurrentUser
+) -> TemplateUpdateOut:
+    """Widgets the source template gained since the copy; 404 when there are none."""
+    try:
+        return await template_update.preview_update(
             session, dashboard_id, user.id, admin=await _is_admin(session, user)
         )
     except _STORE_ERRORS as exc:
         _raise_http(exc)
+
+
+@router.post("/{dashboard_id}/template-update", response_model=DashboardOut)
+async def post_template_update(
+    dashboard_id: DashboardId,
+    body: TemplateUpdateApplyIn,
+    session: DbSession,
+    user: CurrentUser,
+) -> DashboardOut:
+    """Take over the new template widgets (``merge``) or hide the offer (``dismiss``)."""
+    try:
+        out = await template_update.apply_update(
+            session,
+            dashboard_id,
+            user.id,
+            body.action,
+            body.version,
+            admin=await _is_admin(session, user),
+        )
+        await session.commit()
+    except _STORE_ERRORS as exc:
+        await session.rollback()
+        _raise_http(exc)
+    return out
 
 
 @router.put("/{dashboard_id}", response_model=DashboardOut)
@@ -192,6 +278,27 @@ async def save_dashboard(
     try:
         out = await store.save_dashboard(
             session, dashboard_id, user.id, body, admin=await _is_admin(session, user)
+        )
+        await session.commit()
+    except _STORE_ERRORS as exc:
+        await session.rollback()
+        _raise_http(exc)
+    return out
+
+
+@router.patch("/{dashboard_id}/filters", response_model=DashboardOut)
+async def patch_filters(
+    dashboard_id: DashboardId, body: DashboardFiltersIn, session: DbSession, user: CurrentUser
+) -> DashboardOut:
+    """Set the dashboard-wide filters (same rights and version lock as the save)."""
+    try:
+        out = await store.set_filters(
+            session,
+            dashboard_id,
+            user.id,
+            body.filters,
+            body.version,
+            admin=await _is_admin(session, user),
         )
         await session.commit()
     except _STORE_ERRORS as exc:
@@ -259,10 +366,10 @@ async def patch_widget_settings(
     return out
 
 
-async def _visible_widgets(
+async def _visible_dashboard(
     session: DbSession, user: CurrentUser, dashboard_id: int
-) -> list[WidgetOut]:
-    """The widgets of a dashboard the caller may see; frees the request's connection.
+) -> DashboardOut:
+    """The dashboard (widgets and filters) the caller may see; frees the request's connection.
 
     Providers open their own sessions, so the request session must not keep a pooled
     connection while they run.
@@ -275,7 +382,7 @@ async def _visible_widgets(
         _raise_http(exc)
     finally:
         await session.rollback()
-    return out.widgets
+    return out
 
 
 @router.get("/{dashboard_id}/data", response_model=DashboardDataOut)
@@ -286,6 +393,7 @@ async def dashboard_data(
     user: CurrentUser,
     factory: SessionFactory,
     registry: DashboardRegistry,
+    app_settings: Annotated[Settings, Depends(get_app_settings)],
     widgets: Annotated[str | None, Query(max_length=2000)] = None,
 ) -> DashboardDataOut:
     """Data of the dashboard's widgets (``widgets`` = comma list of ids; default all).
@@ -294,10 +402,21 @@ async def dashboard_data(
     out of time is ``pending``. Ids that are not on this dashboard are ignored.
     """
     wanted = _widget_ids(widgets)
-    rows = await _visible_widgets(session, user, dashboard_id)
+    board = await _visible_dashboard(session, user, dashboard_id)
+    rows = board.widgets
     if wanted is not None:
         rows = [w for w in rows if w.id in wanted]
-    results = await run_batch(factory, registry, user.id, rows, redis=await _redis_or_none(request))
+    redis = await _redis_or_none(request)
+    results = await run_batch(
+        factory,
+        registry,
+        user.id,
+        rows,
+        redis=redis,
+        filters=board.filters,
+        app_settings=app_settings,
+        report_cache_backend=redis,
+    )
     return DashboardDataOut(widgets=results, generated_at=utc_now())
 
 
@@ -310,16 +429,178 @@ async def widget_data(
     user: CurrentUser,
     factory: SessionFactory,
     registry: DashboardRegistry,
+    app_settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> WidgetDataOut:
     """One widget's data with the longer single-widget budget (25 s)."""
-    rows = await _visible_widgets(session, user, dashboard_id)
-    widget = next((w for w in rows if w.id == widget_id), None)
+    board = await _visible_dashboard(session, user, dashboard_id)
+    widget = next((w for w in board.widgets if w.id == widget_id), None)
     if widget is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Widget nicht gefunden.")
-    out = await run_widget(factory, registry, user.id, widget, redis=await _redis_or_none(request))
+    redis = await _redis_or_none(request)
+    out = await run_widget(
+        factory,
+        registry,
+        user.id,
+        widget,
+        redis=redis,
+        filters=board.filters,
+        app_settings=app_settings,
+        report_cache_backend=redis,
+    )
     if out is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, NO_DATA_MESSAGE)
     return out
+
+
+def _parse_point(raw: str | None) -> dict[str, Any] | None:
+    """The chart point of a drill request: a small JSON object, never a filter."""
+    if raw is None:
+        return None
+    bad = {"message": drill.MSG_BAD_POINT, "path": "point"}
+    if len(raw.encode("utf-8")) > drill.MAX_POINT_BYTES:
+        raise HTTPException(422, bad)
+    try:
+        point = json.loads(raw)
+    except ValueError:
+        raise HTTPException(422, bad) from None
+    if not isinstance(point, dict) or not point or len(point) > drill.MAX_POINT_KEYS:
+        raise HTTPException(422, bad)
+    return point
+
+
+@router.get("/{dashboard_id}/widgets/{widget_id}/tickets", response_model=DrillPageOut)
+async def widget_tickets(
+    dashboard_id: DashboardId,
+    widget_id: str,
+    session: DbSession,
+    user: CurrentUser,
+    app_settings: Annotated[Settings, Depends(get_app_settings)],
+    offset: Annotated[int, Query(ge=0, le=100_000)] = 0,
+    limit: Annotated[int, Query(ge=1, le=50)] = 50,
+    sort: Annotated[str | None, Query(max_length=20)] = None,
+    order: Literal["asc", "desc"] | None = None,
+    point: Annotated[str | None, Query(max_length=600)] = None,
+) -> DrillPageOut:
+    """The tickets behind a widget (or one chart point), computed like the widget itself.
+
+    The browser sends the widget id and, for a chart, one dimension value (``point``, a small
+    JSON object); the filter is rebuilt here from the stored settings, the viewer's scope and the
+    dashboard filters. Statements are bounded to the single-widget budget.
+    """
+    chosen = _parse_point(point)
+    if sort is not None and sort not in DRILL_SORT_KEYS:
+        raise HTTPException(422, {"message": "Diese Sortierung gibt es nicht.", "path": "sort"})
+    board = await _visible_dashboard(session, user, dashboard_id)
+    widget = next((w for w in board.widgets if w.id == widget_id), None)
+    if widget is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Widget nicht gefunden.")
+    try:
+        async with statement_timeout(session, int(SINGLE_WIDGET_TIMEOUT_SECONDS)):
+            return await drill.widget_tickets(
+                session,
+                user.id,
+                widget,
+                board.filters,
+                offset=offset,
+                limit=limit,
+                sort=sort,
+                order=order,
+                point=chosen,
+                app_settings=app_settings,
+            )
+    except drill.DrillNotPossible as exc:
+        raise HTTPException(
+            422, {"message": exc.message, "path": "point" if chosen else "widget_id"}
+        ) from None
+    except ProviderForbidden as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, exc.message) from None
+    except RequestError as exc:
+        raise HTTPException(exc.status_code, {"message": exc.message, "path": exc.path}) from None
+    except (DefinitionError, FilterError) as exc:
+        raise HTTPException(422, {"message": exc.message, "path": exc.path}) from None
+    except ReportQueryTimeout:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, {"message": DRILL_TIMEOUT_MESSAGE}
+        ) from None
+    finally:
+        await session.rollback()  # frees the connection and ends the transaction before any commit
+
+
+@router.post(
+    "/{dashboard_id}/widgets/{widget_id}/report-job",
+    response_model=JobAccepted,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def widget_report_job(
+    dashboard_id: DashboardId,
+    widget_id: str,
+    session: DbSession,
+    user: CurrentUser,
+    app_settings: Annotated[Settings, Depends(get_app_settings)],
+) -> JobAccepted:
+    """Run a report widget's report in the background (it answered ``deferred``).
+
+    The job carries the widget's effective run (settings, the dashboard's time range and
+    queue narrowing unless pinned) and stores its result under the key the widget reads, so
+    the widget's next fetch is answered from the cache. The enqueue commits.
+    """
+    board = await _visible_dashboard(session, user, dashboard_id)
+    widget = next((w for w in board.widgets if w.id == widget_id), None)
+    if widget is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Widget nicht gefunden.")
+    if widget.type_key not in REPORT_WIDGET_TYPES:
+        raise HTTPException(422, {"message": NOT_A_REPORT_MESSAGE, "path": "widget_id"})
+    try:
+        settings = CORE_WIDGET_SETTINGS[widget.type_key].model_validate(dict(widget.settings))
+    except ValidationError:
+        raise HTTPException(
+            422, {"message": INVALID_SETTINGS_MESSAGE, "path": "settings"}
+        ) from None
+    eff = effective_filters(board.filters, pinned=widget.pinned)
+    spec = report_spec(
+        widget.type_key,
+        settings,
+        {"queue_ids": list(eff.queue_ids), "time_range": eff.time_range},
+    )
+    reporting = await load_reporting_settings(session, app_settings)
+    await require_report_access(session, user.id, reporting)
+    try:
+        run = ReportRunIn(
+            report_key=spec.report_key,
+            definition=spec.definition,
+            time_range=spec.time_range,
+            grain=None,
+            time_zone=None,
+            parameters=dict(spec.parameters),
+            dimension_choices=dict(spec.dimension_choices),
+        )
+        prepared = await prepare_ref(
+            session,
+            user.id,
+            report_key=spec.report_key,
+            definition=spec.definition,
+            overrides=RunOverrides(
+                time_range=spec.time_range,
+                parameters=dict(spec.parameters),
+                dimension_choices=parse_dimension_choices(spec.dimension_choices),
+                common={"queue": list(eff.queue_ids)} if eff.queue_ids else {},
+            ),
+        )
+        return await enqueue_report_ref(
+            session,
+            user_id=user.id,
+            run=run,
+            extra_filter=prepared.params.extra_filter,
+            reporting=reporting,
+        )
+    except RequestError as exc:
+        raise HTTPException(exc.status_code, {"message": exc.message, "path": exc.path}) from None
+    except (DefinitionError, FilterError) as exc:
+        raise HTTPException(422, {"message": exc.message, "path": exc.path}) from None
+    except TooManyReportJobs:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS, {"message": JOBS_FULL_MESSAGE}
+        ) from None
 
 
 @widget_types_router.get("", response_model=list[WidgetTypeOut])
@@ -340,6 +621,7 @@ async def preview_widget_data(
     user: CurrentUser,
     factory: SessionFactory,
     registry: DashboardRegistry,
+    app_settings: Annotated[Settings, Depends(get_app_settings)],
 ) -> WidgetDataOut:
     """Data for unsaved settings (settings drawer); runs as the viewer, writes no history."""
     provider = registry.get(DASHBOARD_PROVIDERS, key)
@@ -352,8 +634,17 @@ async def preview_widget_data(
     widget = _PreviewWidget(
         id="preview", type_key=key, type_version=provider.version, settings=settings
     )
+    redis = await _redis_or_none(request)
     out = await run_widget(
-        factory, registry, user.id, widget, redis=await _redis_or_none(request), preview=True
+        factory,
+        registry,
+        user.id,
+        widget,
+        redis=redis,
+        preview=True,
+        filters=body.filters,
+        app_settings=app_settings,
+        report_cache_backend=redis,
     )
     assert out is not None  # the provider exists
     return out

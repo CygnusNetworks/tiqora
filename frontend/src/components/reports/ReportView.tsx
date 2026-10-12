@@ -17,7 +17,7 @@ import {
   keyColor,
 } from "@/components/agent/stats/chartColors";
 import { cn } from "@/lib/cn";
-import type { ReportColumn, ReportDefinition, ReportResult } from "@/lib/reportsApi";
+import type { ReportCell, ReportColumn, ReportDefinition, ReportResult } from "@/lib/reportsApi";
 import { PivotTable } from "./PivotTable";
 import { ReportTable } from "./ReportTable";
 import { ADDITIVE_AGGS, useMeasureAggs } from "./useMeasureAggs";
@@ -137,6 +137,8 @@ export function ReportView({
   testId = "report-view",
   compact = false,
   kpiSparklines,
+  onSelectPoint,
+  drillableDimensions,
 }: {
   report: { key: string | null; definition: ReportDefinition };
   result: ReportResult;
@@ -144,6 +146,13 @@ export function ReportView({
   compact?: boolean;
   /** Small trend lines under the KPI tiles, by measure key. */
   kpiSparklines?: Record<string, number[]>;
+  /**
+   * Additive: chart marks (bars, segments, slices, cells) become buttons that report the clicked
+   * point as dimension key -> raw value. Only where every dimension the mark stands for is in
+   * `drillableDimensions`; without both props the charts render as before.
+   */
+  onSelectPoint?: (point: Record<string, ReportCell>) => void;
+  drillableDimensions?: readonly string[];
 }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.resolvedLanguage ?? i18n.language ?? "de";
@@ -225,6 +234,18 @@ export function ReportView({
     );
   }
 
+  /** The raw cell value behind a chart key (keys are `String(cell)`; ids stay numbers, gaps stay null). */
+  const rawValue = (col: ReportColumn, key: string): ReportCell => {
+    const at = result.columns.indexOf(col);
+    const hit = result.rows.find((row) => String(row[at]) === key);
+    return hit ? hit[at] : key;
+  };
+  /** The point callback for marks standing for `cols`, or undefined when any of them is not drillable. */
+  const selectable = (cols: (ReportColumn | undefined)[]) =>
+    onSelectPoint && drillableDimensions && cols.length > 0 && cols.every((c) => c && drillableDimensions.includes(c.key))
+      ? onSelectPoint
+      : undefined;
+
   let chart: ReactNode;
   if (type === "heatmap" && dims.length >= 2 && measureIdx >= 0) {
     const [r, c] = [result.columns.indexOf(dims[0]), result.columns.indexOf(dims[1])];
@@ -236,8 +257,12 @@ export function ReportView({
     const colKeys = order(c);
     const cells = new Map(result.rows.map((row) => [`${String(row[r])}|${String(row[c])}`, row[measureIdx]]));
     const label = (col: ReportColumn, k: string) => cellLabel(result, col.key, k, t, lang);
+    const pick = selectable([dims[0], dims[1]]);
     chart = (
       <HeatmapChart
+        onSelect={
+          pick && ((cell) => pick({ [dims[0].key]: rawValue(dims[0], cell.row), [dims[1].key]: rawValue(dims[1], cell.column) }))
+        }
         testId={`${testId}-heatmap`}
         rows={rowKeys.map((k) => ({ key: k, label: label(dims[0], k) }))}
         columns={colKeys.map((k) => ({ key: k, label: label(dims[1], k) }))}
@@ -252,6 +277,13 @@ export function ReportView({
     );
   } else {
     const { categories, series } = colouredSeries(result, definition, t);
+    const seriesIdx = definition.visualization?.series_dimension;
+    const seriesCol = seriesIdx != null ? dims[seriesIdx] : undefined;
+    const catCol = dims.find((c) => c !== seriesCol);
+    const notOther = (key: string) => key !== OTHER_SERIES_KEY;
+    const catPick = selectable([catCol]);
+    const barPick =
+      catPick && catCol ? (i: number) => catPick({ [catCol.key]: rawValue(catCol, categories[i].key) }) : undefined;
     if (type === "donut") {
       const values = series[0]?.values ?? [];
       const slots = displaySlots(
@@ -263,9 +295,12 @@ export function ReportView({
         label: c.label,
         value: values[i] ?? 0,
         color: (slots.get(c.key) ?? SERIES_SLOTS) < SERIES_SLOTS ? keyColor(c.key, slots) : "var(--color-muted)",
+        selectable: notOther(c.key),
       }));
+      const pick = selectable([catCol]);
       chart = (
         <DonutChart
+          onSelect={pick && catCol && ((key) => pick({ [catCol.key]: rawValue(catCol, key) }))}
           testId={`${testId}-donut`}
           data={slices}
           centerLabel={measure ? t(measure.label_key, { defaultValue: measure.key }) : undefined}
@@ -284,8 +319,24 @@ export function ReportView({
         />
       );
     } else if ((type === "bar" && series.length > 1) || type === "stacked_bar") {
+      const pick = selectable(seriesCol ? [catCol, seriesCol] : [catCol]);
       chart = (
-        <StackedBarChart testId={`${testId}-stacked`} height={height} categories={categories} series={series} formatValue={fmt} />
+        <StackedBarChart
+          testId={`${testId}-stacked`}
+          height={height}
+          categories={categories.map((c) => ({ ...c, selectable: notOther(c.key) }))}
+          series={series.map((s) => ({ ...s, selectable: notOther(s.key) }))}
+          formatValue={fmt}
+          onSelect={
+            pick &&
+            catCol &&
+            ((p) =>
+              pick({
+                [catCol.key]: rawValue(catCol, p.category),
+                ...(seriesCol ? { [seriesCol.key]: rawValue(seriesCol, p.series) } : {}),
+              }))
+          }
+        />
       );
     } else if (dims[0] != null && !["date", "hour", "weekday"].includes(dims[0].type)) {
       // Rankings (queues, customers, owners ...): horizontal bars keep long names and top-25 lists readable.
@@ -293,8 +344,9 @@ export function ReportView({
         <HorizontalBarChart
           testId={`${testId}-bar`}
           color="var(--color-series-1)"
-          data={categories.map((c, i) => ({ label: c.label, value: series[0]?.values[i] ?? null }))}
+          data={categories.map((c, i) => ({ label: c.label, value: series[0]?.values[i] ?? null, selectable: notOther(c.key) }))}
           formatValue={fmt}
+          onSelect={barPick}
         />
       );
     } else {
@@ -303,8 +355,9 @@ export function ReportView({
           testId={`${testId}-bar`}
           height={height}
           color="var(--color-series-1)"
-          data={categories.map((c, i) => ({ label: c.label, value: series[0]?.values[i] ?? null }))}
+          data={categories.map((c, i) => ({ label: c.label, value: series[0]?.values[i] ?? null, selectable: notOther(c.key) }))}
           formatValue={fmt}
+          onSelect={barPick}
         />
       );
     }

@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { WidgetMode, WidgetProps } from "@/plugins/dashboardWidgets";
 import type { TicketListItem } from "@/lib/api";
-import { useOptionalAuth } from "@/auth/AuthContext";
 import { toBcp47 } from "@/i18n";
 import { cn } from "@/lib/cn";
 import { formatListTime } from "@/lib/format";
@@ -10,14 +9,16 @@ import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
 import { DashboardTicketRow } from "@/components/agent/dashboard/DashboardTicketRow";
 import { ticketCustomer } from "@/components/agent/dashboard/ticketCustomer";
 import { linkTabIndex, rowLinkMode } from "../chrome/mode";
+import { useIsKiosk } from "../wallboard/kioskContext";
 import { useWidgetData } from "../data";
 import type { ColumnKey } from "../definitions";
 import { WidgetFrame, useWidgetChrome, type FrameLink } from "../chrome/WidgetFrame";
+import { useDrill } from "../drill/useDrill";
 import { WidgetDataBody, WidgetEmpty } from "../chrome/WidgetDataBody";
 import { TicketLink } from "../chrome/TicketLink";
 import { DueText } from "./DueText";
 import { ChooseSourceAction } from "./SourceAction";
-import { presetOf, presetQueueSearch, savedSearchIdOf, type TicketSource } from "./presets";
+import { widgetPreset, type TicketSource } from "./presets";
 
 export interface TicketListSettings {
   source: TicketSource;
@@ -121,24 +122,20 @@ const HEADER_KEY: Record<Col, string> = {
 };
 
 /** Tickets of a preset as the mockup's table (stacked rows on phones). */
-export function TicketListWidget({ settings, size, mode }: WidgetProps<TicketListSettings>) {
+export function TicketListWidget({ instanceId, settings, size, mode }: WidgetProps<TicketListSettings>) {
   const { t, i18n } = useTranslation();
   const locale = toBcp47(i18n.language);
   const chrome = useWidgetChrome();
-  const auth = useOptionalAuth();
+  const kiosk = useIsKiosk();
+  const drill = useDrill(instanceId, mode);
   const { status, data } = useWidgetData<TicketListData>();
-  const preset = presetOf(settings.source);
+  const preset = widgetPreset(settings, kiosk);
   const items = Array.isArray(data?.items) ? data.items : [];
   const total = typeof data?.total === "number" ? data.total : items.length;
-  const search = preset ? presetQueueSearch(preset, auth?.user?.id) : null;
-  const searchId = savedSearchIdOf(settings.source);
   const more = status === "ok" && total > items.length;
-  const showAll = t("dashboards.state.showAll", { count: total });
-  // A preset links to the queue view that lists exactly its tickets, a saved search to its own
-  // page; an own filter has no page to go to.
-  let link: FrameLink | undefined;
-  if (more && search) link = { label: showAll, to: "/agent/queues", search };
-  else if (more && searchId !== null) link = { label: showAll, to: "/agent/searches/$searchId", params: { searchId: String(searchId) } };
+  // The drill page lists exactly the tickets of this widget (same code path on the server), so
+  // "Alle N anzeigen" is a link for every kind of source.
+  const link: FrameLink | undefined = more && drill ? { label: t("dashboards.state.showAll", { count: total }), ...drill() } : undefined;
   const cols = tableColumns(settings.columns);
   const navIds = items.map((x) => x.id);
   const density = settings.density === "compact" ? "compact" : "comfortable";
@@ -227,7 +224,7 @@ export function TicketListWidget({ settings, size, mode }: WidgetProps<TicketLis
                     ticket={ticket}
                     density={density}
                     columns={settings.columns}
-                    linkMode={rowLinkMode(mode)}
+                    linkMode={rowLinkMode(mode, kiosk)}
                     trailing={settings.columns.includes("due") ? <DueText ticket={ticket} /> : undefined}
                   />
                 ))}

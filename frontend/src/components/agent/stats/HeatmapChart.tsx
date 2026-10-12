@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { ChartTooltip } from "./ChartTooltip";
 import { EmptyChart } from "./chartKit";
+import { markButtonProps } from "./markButton";
 import { sequentialColor, valueTextColor } from "./chartColors";
 import { truncate } from "./chartMath";
 import { useChartFormat } from "./chartLocale";
@@ -13,6 +14,8 @@ export type HeatmapChartProps = {
   emptyLabel?: string;
   testId?: string;
   formatValue?: (v: number) => string;
+  /** Additive: cells with data become buttons (keyboard reachable) and report their row and column keys. */
+  onSelect?: (cell: { row: string; column: string }) => void;
 };
 
 const CELL_W = 32;
@@ -28,6 +31,7 @@ export function HeatmapChart({
   emptyLabel,
   testId,
   formatValue,
+  onSelect,
 }: HeatmapChartProps) {
   const { t, number } = useChartFormat();
   const fmt = formatValue ?? number;
@@ -103,8 +107,9 @@ export function HeatmapChart({
                       fill={v === null ? "var(--color-surface-subtle)" : sequentialColor(tone)}
                       stroke="var(--color-surface)"
                       strokeWidth={2}
-                      tabIndex={-1}
-                      role="img"
+                      {...(onSelect && v !== null
+                        ? markButtonProps(() => onSelect({ row: row.key, column: col.key }))
+                        : { tabIndex: -1, role: "img" })}
                       aria-label={`${row.label} · ${col.label}: ${v === null ? "—" : fmt(v)}`}
                       onFocus={(e) => hoverCell(r, c, e.currentTarget)}
                       onBlur={() => setHover(null)}

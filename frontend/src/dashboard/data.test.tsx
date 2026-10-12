@@ -17,6 +17,7 @@ function wire(id: string, type_key: string): EditWidget {
     type_version: 1,
     title_override: null,
     settings: {},
+    pinned: false,
     layout: { lg: { x: 0, y: 0, w: 3, h: 2 } },
   };
 }
@@ -270,6 +271,38 @@ describe("useDashboardData", () => {
     expect(data).toHaveBeenLastCalledWith(1, ["w-counter"], expect.anything());
     expect(result.current.byWidget["w-counter"]).toMatchObject({ status: "ok", data: { value: 7 } });
     expect(result.current.byWidget["w-esc"].status).toBe("ok");
+  });
+
+  it.each(["chat_waiting", "chat_assigned", "chat_ended"])("the chat queue widget refreshes on %s", async (type) => {
+    vi.useFakeTimers();
+    const chat = [wire("w-chat", "core.chat-queue")];
+    const { result } = renderHook(() => useDashboardData(1, chat, { enabled: true }), { wrapper });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(data).toHaveBeenCalledTimes(1);
+    data.mockResolvedValueOnce({ widgets: { "w-chat": ok(5) } });
+    emit({ type, session_id: 1, ticket_id: 1 });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_500); // below the interval:30 tick
+    });
+    expect(data).toHaveBeenCalledTimes(2);
+    expect(data).toHaveBeenLastCalledWith(1, ["w-chat"], expect.anything());
+    expect(result.current.byWidget["w-chat"]).toMatchObject({ status: "ok", data: { value: 5 } });
+  });
+
+  it("the chat queue widget ignores chat_typing", async () => {
+    vi.useFakeTimers();
+    const chat = [wire("w-chat", "core.chat-queue")];
+    renderHook(() => useDashboardData(1, chat, { enabled: true }), { wrapper });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    emit({ type: "chat_typing", session_id: 1 });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_500);
+    });
+    expect(data).toHaveBeenCalledTimes(1);
   });
 
   it("no SSE refresh while hidden; one refresh when the page becomes visible again", async () => {

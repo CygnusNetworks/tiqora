@@ -43,7 +43,9 @@ export type EditAction =
   | { type: "resize"; id: string; size: { w: number; h: number }; bp: Bp; now?: number; coalesce?: boolean }
   | { type: "remove"; id: string }
   | { type: "duplicate"; id: string; newId: string }
-  | { type: "settings"; id: string; settings: Record<string, unknown>; titleOverride: string | null }
+  | { type: "settings"; id: string; settings: Record<string, unknown>; titleOverride: string | null; pinned?: boolean }
+  /** Dashboard filters apply to the widget (`pinned: false`) or not (`pinned: true`); one undo step. */
+  | { type: "pin"; id: string; pinned: boolean }
   | { type: "rename"; name: string }
   | { type: "shift"; id: string; dir: "up" | "down" }
   | { type: "select"; id: string | null }
@@ -169,6 +171,7 @@ function reduce(s: EditState, a: EditAction, sizes: SizeLookup): EditState {
         type_version: a.def.version,
         title_override: null,
         settings: structuredClone(a.def.settingsDefaults),
+        pinned: false,
         layout: { lg: rect },
       };
       let widgets = [...s.widgets, widget];
@@ -202,8 +205,13 @@ function reduce(s: EditState, a: EditAction, sizes: SizeLookup): EditState {
     case "settings": {
       if (!s.widgets.some((w) => w.id === a.id)) return s;
       return commit(s, {
-        widgets: s.widgets.map((w) => (w.id === a.id ? { ...w, settings: structuredClone(a.settings), title_override: a.titleOverride } : w)),
+        widgets: s.widgets.map((w) => (w.id === a.id ? { ...w, settings: structuredClone(a.settings), title_override: a.titleOverride, ...(a.pinned === undefined ? {} : { pinned: a.pinned }) } : w)),
       });
+    }
+    case "pin": {
+      const w = s.widgets.find((x) => x.id === a.id);
+      if (!w || (w.pinned ?? false) === a.pinned) return s;
+      return commit(s, { widgets: s.widgets.map((x) => (x.id === a.id ? { ...x, pinned: a.pinned } : x)) });
     }
     case "rename":
       return commit(s, { name: a.name });

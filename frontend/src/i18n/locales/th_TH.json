@@ -2183,7 +2183,8 @@
       "reporting": "Report data",
       "webchat": "Web chat",
       "plugins": "Extensions",
-      "dashboardTemplates": "Dashboard templates"
+      "dashboardTemplates": "Dashboard templates",
+      "dashboardKioskLinks": "Wallboard links"
     },
     "table": {
       "id": "ID",
@@ -3513,7 +3514,8 @@
       "settingsReporting": "Reports: time zone, access, cache and limits for results and exports.",
       "webchat": "Set up chats for websites, adjust the look and get the embed code.",
       "plugins": "Switch installed extensions on or off, check their state and configure them.",
-      "dashboardTemplates": "Define home page dashboards per role, optionally binding."
+      "dashboardTemplates": "Define home page dashboards per role, optionally binding.",
+      "dashboardKioskLinks": "Create, check and revoke links for wallboards without sign-in."
     },
     "types": {
       "title_plural": "ประเภทตั๋ว",
@@ -4539,6 +4541,38 @@
       "deleteTitle": "Delete template \"{{name}}\"?",
       "deleteMessage": "Dashboards that users already received from this template are kept.",
       "deleteFailed": "The template could not be deleted."
+    },
+    "kioskLinks": {
+      "title": "Wallboard links",
+      "subtitle": "Links that run dashboards on a screen without signing in.",
+      "new": "Create wallboard link",
+      "loadFailed": "The wallboard links could not be loaded.",
+      "empty": "There are no wallboard links yet. Create the first link.",
+      "columns": {
+        "name": "Name",
+        "dashboards": "Dashboards",
+        "status": "Status",
+        "usage": "Usage",
+        "actions": "Actions"
+      },
+      "active": "Active",
+      "revoked": "Revoked",
+      "expired": "Expired",
+      "withDetails": "with details",
+      "lastUsed": "last used {{when}}",
+      "neverUsed": "never used",
+      "expiresAt": "expires {{when}}",
+      "expiredAt": "expired {{when}}",
+      "revokedAt": "revoked {{when}}",
+      "createdBy": "by {{name}}",
+      "hidden": "no longer visible",
+      "revoke": "Revoke",
+      "delete": "Delete",
+      "revokeTitle": "Revoke link \"{{name}}\"?",
+      "revokeMessage": "The link stops showing anything at once. Screens running it lose access.",
+      "deleteTitle": "Delete link \"{{name}}\"?",
+      "deleteMessage": "The revoked link is removed from the list.",
+      "actionFailed": "That did not work. Please try again."
     }
   },
   "kb": {
@@ -5466,7 +5500,9 @@
       "deltaFlat": "Unchanged",
       "points": "{{value}} pp",
       "ofTotal": "{{percent}} of total",
-      "total": "Total"
+      "total": "Total",
+      "gaugeNoData": "No tickets in this period",
+      "gaugeTarget": "Target {{value}}"
     },
     "openReport": "Open report",
     "retry": "Try again",
@@ -6203,7 +6239,14 @@
         "empty": "No queues with open or new tickets.",
         "emptyNone": "No queues visible.",
         "all": "Show all queues",
-        "counts": "{{open}} open · {{new}} new"
+        "counts": "{{open}} open · {{new}} new",
+        "escalatedCount": " · {{count}} escalated",
+        "legend": {
+          "open": "open",
+          "new": "new",
+          "escalated": "escalated"
+        },
+        "wallboardCounts": "{{open}} / {{new}} new"
       },
       "escalations": {
         "title": "Escalations",
@@ -6218,7 +6261,8 @@
           "update": "Update",
           "solution": "Solution time",
           "escalation": "Escalation"
-        }
+        },
+        "nextDeadline": "Next deadline: {{what}} · {{when}}"
       },
       "reminders": {
         "title": "Reminders due",
@@ -6250,7 +6294,13 @@
         "online_one": "{{count}} online",
         "online_other": "{{count}} online",
         "more_one": "and {{count}} more person",
-        "more_other": "and {{count}} more"
+        "more_other": "and {{count}} more",
+        "inChat": "in chat",
+        "countAvailable_one": "{{count}} available",
+        "countAvailable_other": "{{count}} available",
+        "countInChat_one": "{{count}} in chat",
+        "countInChat_other": "{{count}} in chat",
+        "statusAvailable": "available"
       },
       "notes": {
         "title": "Notes",
@@ -6262,7 +6312,55 @@
         "description": "Important addresses at a glance",
         "empty": "No links yet. You can add some in the settings."
       },
-      "chooseSearch": "Choose search"
+      "chooseSearch": "Choose search",
+      "report": {
+        "title": "Report",
+        "description": "A report as a chart or table",
+        "empty": "Choose a report in the settings.",
+        "running": "Calculating in the background …",
+        "tooManyJobs": "Several reports are already running in the background.",
+        "jobFailed": "The report could not be calculated.",
+        "tooLargePreview": "Too large for the preview – it is calculated in the background after saving.",
+        "tooLargeWallboard": "This report is too large for the wallboard.",
+        "queueIgnored": "The queue filter does not apply to this report."
+      },
+      "slaGauge": {
+        "title": "SLA compliance",
+        "description": "Share of tickets that met their SLA, against the target",
+        "label": "SLA compliance",
+        "noTickets": "No tickets in this period",
+        "tickets_one": "{{count}} ticket in this period",
+        "tickets_other": "{{count}} tickets in this period"
+      },
+      "backlogAging": {
+        "title": "Backlog by age",
+        "description": "Open tickets per queue, stacked by age",
+        "empty": "No open tickets."
+      },
+      "heatmap": {
+        "title": "Arrivals by time",
+        "description": "New tickets by weekday and hour",
+        "empty": "No tickets in this period."
+      },
+      "chatQueue": {
+        "title": "Web chat",
+        "description": "Waiting chats and your own chats",
+        "disabled": "Web chat is not set up.",
+        "waiting": "waiting",
+        "mine": "My chats",
+        "oldest": "The oldest has been waiting for {{d}}",
+        "since": "waiting for {{d}}",
+        "none": "No chat is waiting."
+      },
+      "aiStatus": {
+        "title": "AI status",
+        "description": "Handovers to humans, AI runs today and budgets",
+        "handover": "Handed over to humans",
+        "runsToday": "AI runs today",
+        "budget": "Budget",
+        "exhausted": "used up",
+        "available": "{{left}} available"
+      }
     },
     "tabs": {
       "label": "Dashboards",
@@ -6280,6 +6378,12 @@
       "widgetCrashed": "This widget could not be shown.",
       "templateBanner": "You are viewing the template “{{name}}”. Changes apply to everyone who gets it through their role.",
       "lockedHint": "This dashboard is mandatory for your role and cannot be customized.",
+      "updateBanner_one": "New version of the template “{{name}}”: {{count}} new widget.",
+      "updateBanner_other": "New version of the template “{{name}}”: {{count}} new widgets.",
+      "updateMerge": "Apply",
+      "updateDismiss": "Dismiss",
+      "updateConflict": "The dashboard has been changed in the meantime.",
+      "updateFailed": "That did not work. Please try again.",
       "empty": "There is nothing on this dashboard yet.",
       "emptyEdit": "There is nothing on this dashboard yet. Use “Customize” to add widgets."
     },
@@ -6333,7 +6437,8 @@
       "groups": {
         "tickets": "Tickets",
         "me": "For me",
-        "team": "Team"
+        "team": "Team",
+        "reports": "Reports"
       },
       "hint": "Drag onto the grid or click – the widget lands in the first free gap.",
       "limit": "No more than {{max}} widgets are possible.",
@@ -6461,6 +6566,51 @@
               "label": "Number of people"
             }
           }
+        },
+        "slaGauge": {
+          "fields": {
+            "time_range": {
+              "label": "Time range",
+              "help": "The dashboard can override the time range.",
+              "options": {
+                "today": "Today",
+                "7d": "Last 7 days",
+                "30d": "Last 30 days",
+                "90d": "Last 90 days",
+                "this_month": "This month",
+                "last_month": "Last month"
+              }
+            },
+            "target_percent": {
+              "label": "Target in percent"
+            }
+          }
+        },
+        "backlogAging": {
+          "fields": {
+            "max_rows": {
+              "label": "Number of queues"
+            }
+          }
+        },
+        "heatmap": {
+          "fields": {
+            "time_range": {
+              "label": "Time range",
+              "help": "The dashboard can override the time range.",
+              "options": {
+                "30d": "Last 30 days",
+                "90d": "Last 90 days"
+              }
+            }
+          }
+        },
+        "chatQueue": {
+          "fields": {
+            "limit": {
+              "label": "Number of chats"
+            }
+          }
         }
       },
       "source": {
@@ -6473,6 +6623,20 @@
       },
       "counter": {
         "tone": "Colour"
+      },
+      "useFilters": "Apply dashboard filters to this widget",
+      "useFiltersHint": "Off: the widget ignores the queue and time filters of the dashboard.",
+      "report": {
+        "report": "Bericht",
+        "choose": "Choose a report",
+        "builtin": "Built-in reports",
+        "saved": "Saved reports",
+        "catalogueFailed": "The reports could not be loaded.",
+        "required": "Please choose a report.",
+        "splitBy": "Split by",
+        "display": "Display",
+        "table": "Table",
+        "rows": "Rows"
       }
     },
     "manage": {
@@ -6498,7 +6662,9 @@
       "copyName": "{{name}} (copy)",
       "deleteTitle": "Delete dashboard \"{{name}}\"?",
       "deleteMessage": "The dashboard and all its widgets will be deleted. This cannot be undone.",
-      "actionFailed": "That did not work. Please try again."
+      "actionFailed": "That did not work. Please try again.",
+      "wallboard": "Show as wallboard",
+      "wallboardLink": "Create wallboard link …"
     },
     "share": {
       "title": "Share dashboard",
@@ -6515,6 +6681,90 @@
       "cancel": "Cancel",
       "failed": "Sharing failed. Please try again.",
       "pickOne": "Select at least one group."
+    },
+    "filters": {
+      "label": "Dashboard filters",
+      "queues": "Queues",
+      "allQueues": "All queues",
+      "allShort": "All",
+      "timeRange": "Time range",
+      "asReport": "As in the report",
+      "chip": "{{label}}: {{value}}",
+      "queueCount": "{{count}} queues",
+      "queuesLoading": "Loading queues",
+      "queuesFailed": "The queues could not be loaded.",
+      "apply": "Apply",
+      "reset": "Reset",
+      "ranges": {
+        "today": "Today",
+        "7d": "Last 7 days",
+        "30d": "Last 30 days",
+        "90d": "Last 90 days",
+        "this_month": "This month",
+        "last_month": "Last month"
+      },
+      "readOnly": "Only people who may edit the dashboard change the filters.",
+      "editHint": "Change filters in view mode",
+      "conflict": "The dashboard was changed in the meantime. It is being reloaded.",
+      "saveFailed": "The filter could not be saved.",
+      "pinned": "Dashboard filters do not apply here"
+    },
+    "drill": {
+      "title": "Tickets for “{{title}}”",
+      "back": "Back to the dashboard",
+      "saveSearch": "Save as search",
+      "addWidget": "Add as widget",
+      "added": "The list is now a widget on your dashboard.",
+      "conflict": "The dashboard was changed in the meantime. Please try again.",
+      "addFailed": "The widget could not be added.",
+      "loadFailed": "The ticket list could not be loaded.",
+      "gone": "This widget no longer exists.",
+      "invalid": "This ticket list is no longer valid."
+    },
+    "wallboard": {
+      "label": "Wallboard",
+      "loading": "Loading …",
+      "updatedSeconds": "updated {{count}} s ago",
+      "updatedMinutes": "updated {{count}} min ago",
+      "updatedHours": "updated {{count}} h ago",
+      "stale": "Connection lost – as of {{time}}",
+      "position": "{{index}} / {{count}}",
+      "fullscreen": "Full screen",
+      "exit": "Exit",
+      "loadFailed": "This dashboard could not be loaded.",
+      "none": "There is no dashboard to show.",
+      "invalidLink": "This wallboard link is invalid or has expired.",
+      "unavailable": "Not available on the wallboard"
+    },
+    "kiosk": {
+      "title": "Create wallboard link",
+      "name": "Name",
+      "nameRequired": "Please enter a name.",
+      "dashboards": "Dashboards",
+      "dashboardsRequired": "Please choose at least one dashboard.",
+      "dashboardsMax": "At most 10 dashboards per link.",
+      "rotate": "Switch every",
+      "seconds": "seconds",
+      "rotateRange": "Between 15 and 900 seconds.",
+      "expires": "Valid for",
+      "days": "days",
+      "expiresRange": "Between 1 and 365 days.",
+      "details": "Show details (ticket titles, customers, names)",
+      "rights": "The link shows the data the way you see it. Anyone with the link sees the wallboard without signing in.",
+      "tooTall": "\"{{name}}\" is too tall for a wallboard (more than 14 rows). Its tiles will be very small there.",
+      "mine": "\"{{name}}\" has \"My tickets\" tiles. They show the tickets of the person who creates the link.",
+      "create": "Create link",
+      "cancel": "Cancel",
+      "createFailed": "The link could not be created.",
+      "createdTitle": "Wallboard link created",
+      "oneTime": "This link is only shown now.",
+      "linkLabel": "Wallboard link",
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyHint": "Copying was not possible. The link is selected, please copy it by hand.",
+      "close": "Close",
+      "manageAll": "Manage all wallboard links",
+      "loadFailed": "The dashboards could not be loaded."
     }
   },
   "filters": {

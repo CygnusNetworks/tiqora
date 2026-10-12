@@ -9,6 +9,8 @@ import {
 import { SetPasswordPage } from "@/routes/SetPasswordPage";
 import { LoginPage } from "@/routes/LoginPage";
 import { DashboardPage, type DashboardSearch } from "@/routes/agent/DashboardPage";
+import { WallboardPage } from "@/routes/agent/WallboardPage";
+import { KioskWallboardPage } from "@/routes/KioskWallboardPage";
 import { ReportsPage, type ReportsSearch } from "@/routes/agent/ReportsPage";
 import { ReportBuilderPage } from "@/routes/agent/ReportBuilderPage";
 import { validateReportBuilderSearch } from "@/routes/agent/reportBuilderSearch";
@@ -19,6 +21,9 @@ import { validateScheduleNewSearch } from "@/routes/agent/reportScheduleSearch";
 import { validateReportViewSearch } from "@/routes/agent/reportViewSearch";
 import { SavedSearchPage } from "@/routes/agent/SavedSearchPage";
 import { SavedSearchEditorPage } from "@/routes/agent/SavedSearchEditorPage";
+import { DrillPage } from "@/dashboard/drill/DrillPage";
+import { validateDrillSearch } from "@/dashboard/drill/drillLinks";
+import { validateWallboardSearch } from "@/dashboard/wallboard/search";
 import { validateSavedSearchSearch } from "@/routes/agent/savedSearchSearch";
 import { QueuesPage, type QueuesSearch } from "@/routes/agent/QueuesPage";
 import { TicketZoomPage } from "@/routes/agent/TicketZoomPage";
@@ -121,6 +126,7 @@ import { SubjectConfigPage } from "@/routes/admin/SubjectConfigPage";
 import { SettingsSectionPage } from "@/routes/admin/SettingsSectionPage";
 import { DaemonsPage } from "@/routes/admin/DaemonsPage";
 import { PluginsPage } from "@/routes/admin/PluginsPage";
+import { DashboardKioskLinksPage } from "@/routes/admin/DashboardKioskLinksPage";
 import { DashboardTemplatesPage } from "@/routes/admin/DashboardTemplatesPage";
 import { ReportingAdminPage } from "@/routes/admin/ReportingAdminPage";
 import { SystemInfoPage } from "@/routes/admin/SystemInfoPage";
@@ -186,6 +192,14 @@ const loginRoute = createRoute({
   component: LoginPage,
 });
 
+// Public wallboard: the link's secret is the URL fragment, no auth gate and not inside the agent
+// layout (like /login). Everything it loads comes from /api/v1/kiosk.
+const kioskWallboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/wallboard",
+  component: KioskWallboardPage,
+});
+
 // Public: the one-time link a new agent gets by mail. No auth gate — the
 // token in the query string is the credential.
 const setPasswordRoute = createRoute({
@@ -218,6 +232,14 @@ const agentIndexRoute = createRoute({
     return typeof raw === "number" && Number.isSafeInteger(raw) && raw > 0 ? { d: raw } : {};
   },
   component: DashboardPage,
+});
+
+// TV mode: `?ids=7,9` (at most 10) and `?rotate=` seconds (15..900).
+const agentWallboardRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/wallboard",
+  validateSearch: validateWallboardSearch,
+  component: WallboardPage,
 });
 
 const agentQueuesRoute = createRoute({
@@ -342,6 +364,14 @@ const agentNewProcessTicketRoute = createRoute({
     process: typeof s.process === "string" && s.process !== "" ? s.process : undefined,
   }),
   component: NewProcessTicketPage,
+});
+
+// Literal path, registered before "$ticketId" so "drill" is never read as a ticket id.
+const agentDrillRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/tickets/drill",
+  validateSearch: validateDrillSearch,
+  component: DrillPage,
 });
 
 const agentTicketRoute = createRoute({
@@ -1141,6 +1171,12 @@ const adminDashboardTemplatesRoute = createRoute({
   component: DashboardTemplatesPage,
 });
 
+const adminDashboardKioskLinksRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/dashboard-kiosk-links",
+  component: DashboardKioskLinksPage,
+});
+
 const adminSettingsSectionRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/settings/$section",
@@ -1237,11 +1273,14 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
   setPasswordRoute,
+  kioskWallboardRoute,
   agentLayoutRoute.addChildren([
     agentIndexRoute,
+    agentWallboardRoute,
     agentQueuesRoute,
     agentNewTicketRoute,
     agentNewProcessTicketRoute,
+    agentDrillRoute,
     agentTicketRoute,
     agentSearchRoute,
     agentKbRoute,
@@ -1341,6 +1380,7 @@ const routeTree = rootRoute.addChildren([
     adminPluginsRoute,
     adminReportingRoute,
     adminDashboardTemplatesRoute,
+    adminDashboardKioskLinksRoute,
     adminSettingsSectionRoute,
     adminSystemRoute,
     adminAiRoute,

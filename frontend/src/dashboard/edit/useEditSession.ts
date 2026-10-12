@@ -189,7 +189,7 @@ export function useEditSession(dashboard: Dashboard, userId: number): EditSessio
         name: s.name,
         icon,
         version: s.baseVersion,
-        widgets: s.widgets.map((w) => ({ ...w })),
+        widgets: s.widgets.map((w) => ({ ...w, pinned: w.pinned ?? false })),
       });
       finished.current = true;
       clearDraft(userId, dashboardId);

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useOptionalAuth } from "@/auth/AuthContext";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { KioskLinksDialog } from "@/dashboard/kiosk/KioskLinksDialog";
 import { apiErrorMessage } from "@/lib/avatarApi";
 import { dashboardKeys, dashboardsApi, type Dashboard, type DashboardTab } from "@/lib/dashboardsApi";
 import { DashboardTabs } from "./DashboardTabs";
@@ -23,17 +25,22 @@ export function ManagedDashboardTabs({
   selectedId,
   onSelect,
   panelId,
+  onWallboard,
 }: {
   tabs: DashboardTab[];
   selectedId: number | null;
   onSelect: (id: number) => void;
   panelId?: string;
+  /** Opens the TV mode of a dashboard ("Als Wallboard anzeigen"). */
+  onWallboard?: (tab: DashboardTab) => void;
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
   const [renaming, setRenaming] = useState<DashboardTab | null>(null);
   const [deleting, setDeleting] = useState<DashboardTab | null>(null);
+  const [linking, setLinking] = useState<DashboardTab | null>(null);
+  const isAdmin = Boolean(useOptionalAuth()?.user?.is_admin);
   const [deletePending, setDeletePending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const rowRef = useRef<HTMLDivElement | null>(null);
@@ -152,6 +159,8 @@ export function ManagedDashboardTabs({
             onMove: (tab, dir) => void move(tab, dir),
             onDelete: setDeleting,
             onCopy: (tab) => void copy(tab),
+            onWallboard,
+            onWallboardLink: isAdmin ? setLinking : undefined,
           }}
         />
       </div>
@@ -170,6 +179,7 @@ export function ManagedDashboardTabs({
           onClose={() => setCreating(false)}
         />
       )}
+      {linking && <KioskLinksDialog dashboards={tabs} initialDashboardId={linking.id} onClose={() => setLinking(null)} />}
       {renaming && (
         <RenameDashboardDialog name={renaming.name} onRename={(name) => rename(renaming, name)} onClose={() => setRenaming(null)} />
       )}

@@ -16,6 +16,19 @@ describe("ADMIN_PAGES", () => {
     expect(p[0].keywords).toEqual(expect.arrayContaining(["startseite", "vorlage", "dashboard", "widgets", "rolle"]));
   });
 
+  it("contains the wallboard links page once and finds it by German keywords", async () => {
+    const p = ADMIN_PAGES.filter((x) => x.slug === "dashboard-kiosk-links");
+    expect(p).toHaveLength(1);
+    expect(p[0].route).toBe("/admin/dashboard-kiosk-links");
+    expect(p[0].group).toBe("system");
+    await i18n.changeLanguage("de");
+    const t = (key: string) => i18n.t(key);
+    expect(t(p[0].nameKey)).toBe("Wallboard-Links");
+    for (const query of ["Wallboard", "Bildschirm", "Kiosk"]) {
+      expect(rankAdminPages(ADMIN_PAGES, query, t).map((x) => x.slug), query).toContain("dashboard-kiosk-links");
+    }
+  });
+
   it("finds the page by its German keywords in the command palette", async () => {
     await i18n.changeLanguage("de");
     const t = (key: string) => i18n.t(key);
