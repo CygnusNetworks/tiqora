@@ -22,6 +22,7 @@ from tiqora.db.tiqora.models import (
     TiqoraSettings,
 )
 from tiqora.deployed import clear_revision_cache, record_revision
+from tiqora.deployed.watcher import check_deploy_state, deploy_from_tiqora
 from tiqora.process.designer.versioning import entity_version
 from tiqora.process.designer.writer import (
     EntityInUse,
@@ -626,6 +627,52 @@ async def test_engine_keeps_revision_after_designer_edit(env: Env) -> None:
     assert source.revision_id == info.id  # the draft is not deployed
     assert await short(source) == "before"
     assert await short(LiveProcessSource(env.session)) == "after"
+
+
+async def test_engine_keeps_revision_after_designer_edit_in_ownership_mode(env: Env) -> None:
+    """Ownership does not make drafts live: only deploy_from_tiqora(mode="local") does."""
+    made = await _wired(env)
+    await env.session.commit()
+    first = await check_deploy_state(env.session, "process", ownership_active=True)
+    assert first.action in {"snapshot", "running_live"}
+    if first.action == "running_live":  # leftover sync rows of the wiring: deploy them first
+        await deploy_from_tiqora(env.session, "process", user_id=USER, mode="local")
+    clear_revision_cache()
+    dialog = made["dialog"]
+    eid = dialog.entity_id
+
+    async def short(source: object) -> str:
+        records = await source.load("ActivityDialog", [eid])  # type: ignore[attr-defined]
+        return str(records[eid].data["DescriptionShort"])
+
+    before = await active_process_source(env.session)
+    assert await short(before) == "before"
+
+    await env.fresh_writer().update_entity(
+        "ActivityDialog",
+        eid,
+        expected_version=dialog.version,
+        name="wf3 dialog",
+        config={
+            "DescriptionShort": "after",
+            "Fields": {"Title": {"Display": 1}},
+            "FieldOrder": ["Title"],
+            "Interface": ["AgentInterface"],
+        },
+    )
+    await env.session.commit()
+    tick = await check_deploy_state(env.session, "process", ownership_active=True)
+    clear_revision_cache()
+    assert tick.action == "waiting_for_deploy" and tick.pending_changes >= 1
+    assert await short(await active_process_source(env.session)) == "before"
+
+    result = await deploy_from_tiqora(env.session, "process", user_id=USER, mode="local")
+    clear_revision_cache()
+    assert result.action == "recorded"
+    source = await active_process_source(env.session)
+    assert source.revision_id == result.revision_id
+    assert await short(source) == "after"
+    assert await env.one("SELECT COUNT(*) FROM pm_entity_sync") == 0
 
 
 async def test_config_normalisation(env: Env) -> None:

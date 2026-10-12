@@ -4041,6 +4041,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/process-designer/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Revisions
+         * @description Deployed process revisions, newest first.
+         */
+        get: operations["get_revisions_api_v1_admin_process_designer_revisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/process-designer/revisions/{revision_id}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Revision Diff
+         * @description Compare a revision with ``against`` (default: the one before it; 0 = empty).
+         */
+        get: operations["get_revision_diff_api_v1_admin_process_designer_revisions__revision_id__diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/process-designer/revisions/{revision_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Revision
+         * @description Write one process of a deployed revision back as a draft (nothing is deleted).
+         */
+        post: operations["restore_revision_api_v1_admin_process_designer_revisions__revision_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/processes": {
         parameters: {
             query?: never;
@@ -14899,11 +14959,14 @@ export interface components {
         };
         /** DeployKindStatusOut */
         DeployKindStatusOut: {
+            /** Deploy Mode */
+            deploy_mode: ("local" | "signal") | null;
             /** Pending Changes */
             pending_changes: number;
             revision: components["schemas"]["RevisionOut"] | null;
             /** Running Live */
             running_live: boolean;
+            znuny_sync: components["schemas"]["ZnunySyncOut"];
         };
         /** DeployOut */
         DeployOut: {
@@ -14919,6 +14982,11 @@ export interface components {
              * @enum {string}
              */
             kind: "process" | "acl";
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "local" | "signal";
             /** Revision Id */
             revision_id: number;
         };
@@ -15238,6 +15306,22 @@ export interface components {
             method: "detached" | "inline";
             /** Sign Key */
             sign_key?: string | null;
+        };
+        /** EntityChangeOut */
+        EntityChangeOut: {
+            /**
+             * Change
+             * @enum {string}
+             */
+            change: "added" | "removed" | "changed";
+            /** Changed Keys */
+            changed_keys: string[];
+            /** Entity Id */
+            entity_id: string;
+            /** Entity Type */
+            entity_type: string;
+            /** Name */
+            name: string;
         };
         /** EntityCreateIn */
         EntityCreateIn: {
@@ -19717,6 +19801,11 @@ export interface components {
             /** Url */
             url: string | null;
         };
+        /** RestoreIn */
+        RestoreIn: {
+            /** Process Entity Id */
+            process_entity_id: string;
+        };
         /** ResultColumnOut */
         ResultColumnOut: {
             /** Grain */
@@ -19737,6 +19826,21 @@ export interface components {
              * @enum {string}
              */
             type: "id" | "string" | "enum" | "date" | "hour" | "weekday" | "count" | "number" | "minutes" | "hours" | "days" | "units" | "percent";
+        };
+        /** RevisionDiffOut */
+        RevisionDiffOut: {
+            /** Changes */
+            changes: components["schemas"]["EntityChangeOut"][];
+            /** From Revision */
+            from_revision: number;
+            /** Process Entity Id */
+            process_entity_id: string | null;
+            /** To Revision */
+            to_revision: number;
+            /** Yaml After */
+            yaml_after: string;
+            /** Yaml Before */
+            yaml_before: string;
         };
         /** RevisionOut */
         RevisionOut: {
@@ -22701,6 +22805,28 @@ export interface components {
             partial: boolean;
             /** Unmapped */
             unmapped: components["schemas"]["UnmappedOut"][];
+        };
+        /** ZnunySyncOut */
+        ZnunySyncOut: {
+            /**
+             * Message
+             * @default
+             */
+            message: string;
+            /**
+             * Overdue
+             * @default false
+             */
+            overdue: boolean;
+            /** Revision Id */
+            revision_id?: number | null;
+            /** Since */
+            since?: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "not_needed" | "pending" | "ok" | "error" | "addon_missing";
         };
     };
     responses: never;
@@ -33700,6 +33826,119 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ValidationIssueOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_revisions_api_v1_admin_process_designer_revisions_get: {
+        parameters: {
+            query?: {
+                kind?: "process";
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_revision_diff_api_v1_admin_process_designer_revisions__revision_id__diff_get: {
+        parameters: {
+            query?: {
+                against?: number | null;
+                process?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                revision_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionDiffOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_revision_api_v1_admin_process_designer_revisions__revision_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                revision_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestoreIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessDraftOut"];
                 };
             };
             /** @description Validation Error */

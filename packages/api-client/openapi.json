@@ -13372,6 +13372,21 @@
       },
       "DeployKindStatusOut": {
         "properties": {
+          "deploy_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "local",
+                  "signal"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deploy Mode"
+          },
           "pending_changes": {
             "title": "Pending Changes",
             "type": "integer"
@@ -13389,12 +13404,17 @@
           "running_live": {
             "title": "Running Live",
             "type": "boolean"
+          },
+          "znuny_sync": {
+            "$ref": "#/components/schemas/ZnunySyncOut"
           }
         },
         "required": [
           "revision",
           "pending_changes",
-          "running_live"
+          "running_live",
+          "znuny_sync",
+          "deploy_mode"
         ],
         "title": "DeployKindStatusOut",
         "type": "object"
@@ -13421,6 +13441,14 @@
             "title": "Kind",
             "type": "string"
           },
+          "mode": {
+            "enum": [
+              "local",
+              "signal"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
           "revision_id": {
             "title": "Revision Id",
             "type": "integer"
@@ -13430,7 +13458,8 @@
           "kind",
           "revision_id",
           "checksum",
-          "action"
+          "action",
+          "mode"
         ],
         "title": "DeployOut",
         "type": "object"
@@ -36295,6 +36324,59 @@
           "partial"
         ],
         "title": "ZnunyProfilePreviewOut",
+        "type": "object"
+      },
+      "ZnunySyncOut": {
+        "properties": {
+          "message": {
+            "default": "",
+            "title": "Message",
+            "type": "string"
+          },
+          "overdue": {
+            "default": false,
+            "title": "Overdue",
+            "type": "boolean"
+          },
+          "revision_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Id"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          },
+          "state": {
+            "enum": [
+              "not_needed",
+              "pending",
+              "ok",
+              "error",
+              "addon_missing"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "ZnunySyncOut",
         "type": "object"
       }
     }

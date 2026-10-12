@@ -13,11 +13,13 @@ from pydantic import BaseModel
 
 from tiqora.api.deps import AppSettings, DbSession
 from tiqora.api.v1.admin.deps import AdminUser
-from tiqora.deployed.gate import can_deploy_from_tiqora
+from tiqora.deployed.gate import deploy_mode
 from tiqora.deployed.store import RevisionInfo, RevisionKind, latest_revision_info
 from tiqora.deployed.sync_tables import pending_sync_count
+from tiqora.deployed.znuny_sync import DeployMode, ZnunySyncOut, read_znuny_sync_status
 from tiqora.domain.ownership import get_ownership_state
 from tiqora.domain.schemas import UtcDateTime
+from tiqora.jobs.service import utc_now
 from tiqora.process.graph import ProcessRepository
 
 router = APIRouter(tags=["admin:deploy"])
@@ -35,6 +37,8 @@ class DeployKindStatusOut(BaseModel):
     revision: RevisionOut | None
     pending_changes: int
     running_live: bool  # no revision yet: the engine reads the live rows
+    znuny_sync: ZnunySyncOut
+    deploy_mode: DeployMode | None
 
 
 class DeployStatusOut(BaseModel):
@@ -65,12 +69,19 @@ def _revision_out(info: RevisionInfo | None) -> RevisionOut | None:
     )
 
 
-async def _kind_status(session: DbSession, kind: RevisionKind) -> DeployKindStatusOut:
+async def _kind_status(
+    session: DbSession, settings: AppSettings, kind: RevisionKind
+) -> DeployKindStatusOut:
     info = await latest_revision_info(session, kind)
+    mode = await deploy_mode(session, settings, kind)
     return DeployKindStatusOut(
         revision=_revision_out(info),
         pending_changes=await pending_sync_count(session, kind),
         running_live=info is None,
+        znuny_sync=await read_znuny_sync_status(
+            session, kind, newest=info, mode=mode, now=utc_now()
+        ),
+        deploy_mode=mode,
     )
 
 
@@ -79,10 +90,10 @@ async def get_deploy_status(
     _admin: AdminUser, session: DbSession, settings: AppSettings
 ) -> DeployStatusOut:
     return DeployStatusOut(
-        process=await _kind_status(session, "process"),
-        acl=await _kind_status(session, "acl"),
+        process=await _kind_status(session, settings, "process"),
+        acl=await _kind_status(session, settings, "acl"),
         ownership_active=(await get_ownership_state(session, settings)).active,
-        can_deploy_from_tiqora=await can_deploy_from_tiqora(session, settings),
+        can_deploy_from_tiqora=(await deploy_mode(session, settings, "process")) is not None,
     )
 
 

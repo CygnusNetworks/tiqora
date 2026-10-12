@@ -30,6 +30,8 @@ const kind = (over: Partial<DeployStatus["process"]> = {}): DeployStatus["proces
     deployed_at: "2026-10-08T10:00:00Z",
     deployed_by: null,
   },
+  znuny_sync: { state: "not_needed", revision_id: null, message: "", since: null, overdue: false },
+  deploy_mode: null,
   ...over,
 });
 
