@@ -265,7 +265,8 @@
       "state": "The sign-in took too long or was started in another window. Please try again.",
       "saml_invalid": "The response of the sign-in service was invalid. Please try again.",
       "oidc_failed": "Signing in with the sign-in service failed. Please try again.",
-      "idp_error": "The sign-in service rejected the sign-in."
+      "idp_error": "The sign-in service rejected the sign-in.",
+      "mfa_required": "Your sign-in service did not confirm a sign-in with a second factor. Please sign in there with a second factor, or set up a second factor in Tiqora."
     },
     "loggedOut": "You have been signed out."
   },

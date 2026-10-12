@@ -326,7 +326,9 @@ async def test_pending_endpoint_never_extends_a_session(env: Env) -> None:
     token = env.client.cookies.get(AGENT_COOKIE)
     assert token
     before = dict(env.redis.ttls)
-    await env.client.get("/api/v1/auth/pending")
+    resp = await env.client.get("/api/v1/auth/pending")
+    assert resp.status_code == 200
+    assert resp.json()["state"] == "pending_2fa"
     assert env.redis.ttls == before
 
 

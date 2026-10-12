@@ -265,7 +265,8 @@
       "state": "Die Anmeldung hat zu lange gedauert oder wurde in einem anderen Fenster begonnen. Bitte erneut versuchen.",
       "saml_invalid": "Die Antwort des Anmeldedienstes war ungültig. Bitte erneut versuchen.",
       "oidc_failed": "Die Anmeldung beim Anmeldedienst ist fehlgeschlagen. Bitte erneut versuchen.",
-      "idp_error": "Der Anmeldedienst hat die Anmeldung abgelehnt."
+      "idp_error": "Der Anmeldedienst hat die Anmeldung abgelehnt.",
+      "mfa_required": "Ihr Anmeldedienst hat keine Anmeldung mit zweitem Faktor bestätigt. Bitte melden Sie sich dort mit zweitem Faktor an oder richten Sie in Tiqora einen zweiten Faktor ein."
     },
     "loggedOut": "Sie wurden abgemeldet."
   },
