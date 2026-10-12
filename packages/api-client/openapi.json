@@ -7908,6 +7908,25 @@
         "title": "Body_preview_vcard_import_api_v1_customers_vcard_import_preview_post",
         "type": "object"
       },
+      "Body_start_import_api_v1_cmdb_import_jobs_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          },
+          "request": {
+            "title": "Request",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "request"
+        ],
+        "title": "Body_start_import_api_v1_cmdb_import_jobs_post",
+        "type": "object"
+      },
       "Body_upload_attachment_api_portal_tickets__ticket_id__attachments_post": {
         "properties": {
           "file": {
@@ -20356,6 +20375,217 @@
         "title": "ImportIssueOut",
         "type": "object"
       },
+      "ImportOptions": {
+        "properties": {
+          "create_missing": {
+            "default": true,
+            "title": "Create Missing",
+            "type": "boolean"
+          },
+          "delimiter": {
+            "default": ";",
+            "enum": [
+              ";",
+              ",",
+              "\t",
+              "|"
+            ],
+            "title": "Delimiter",
+            "type": "string"
+          },
+          "empty_cells": {
+            "default": "keep",
+            "enum": [
+              "keep",
+              "clear"
+            ],
+            "title": "Empty Cells",
+            "type": "string"
+          },
+          "encoding": {
+            "default": "utf-8",
+            "enum": [
+              "utf-8",
+              "cp1252"
+            ],
+            "title": "Encoding",
+            "type": "string"
+          },
+          "header_row": {
+            "default": true,
+            "title": "Header Row",
+            "type": "boolean"
+          },
+          "identifiers": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Identifiers",
+            "type": "array"
+          },
+          "on_error": {
+            "default": "abort",
+            "enum": [
+              "abort",
+              "skip"
+            ],
+            "title": "On Error",
+            "type": "string"
+          },
+          "sheet": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sheet"
+          }
+        },
+        "title": "ImportOptions",
+        "type": "object"
+      },
+      "ImportTemplateIn": {
+        "properties": {
+          "class_id": {
+            "minimum": 1.0,
+            "title": "Class Id",
+            "type": "integer"
+          },
+          "file_format": {
+            "enum": [
+              "csv",
+              "xlsx"
+            ],
+            "title": "File Format",
+            "type": "string"
+          },
+          "lock_version": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lock Version"
+          },
+          "mapping": {
+            "items": {
+              "$ref": "#/components/schemas/MappingRowIn"
+            },
+            "maxItems": 500,
+            "title": "Mapping",
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "options": {
+            "$ref": "#/components/schemas/ImportOptions"
+          },
+          "shared": {
+            "default": false,
+            "title": "Shared",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "class_id",
+          "file_format",
+          "options",
+          "mapping"
+        ],
+        "title": "ImportTemplateIn",
+        "type": "object"
+      },
+      "ImportTemplateOut": {
+        "properties": {
+          "changed_at": {
+            "format": "date-time",
+            "title": "Changed At",
+            "type": "string"
+          },
+          "class_id": {
+            "title": "Class Id",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "file_format": {
+            "enum": [
+              "csv",
+              "xlsx"
+            ],
+            "title": "File Format",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "lock_version": {
+            "title": "Lock Version",
+            "type": "integer"
+          },
+          "mapping": {
+            "items": {
+              "$ref": "#/components/schemas/MappingRowIn"
+            },
+            "title": "Mapping",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "options": {
+            "$ref": "#/components/schemas/ImportOptions"
+          },
+          "owned": {
+            "title": "Owned",
+            "type": "boolean"
+          },
+          "owner_user_id": {
+            "title": "Owner User Id",
+            "type": "integer"
+          },
+          "shared": {
+            "title": "Shared",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "class_id",
+          "file_format",
+          "options",
+          "mapping",
+          "shared",
+          "owned",
+          "owner_user_id",
+          "lock_version",
+          "created_at",
+          "changed_at"
+        ],
+        "title": "ImportTemplateOut",
+        "type": "object"
+      },
       "ImportedStatOut": {
         "properties": {
           "action": {
@@ -23615,6 +23845,34 @@
           "attributes"
         ],
         "title": "MappingPreviewIn",
+        "type": "object"
+      },
+      "MappingRowIn": {
+        "description": "One import column: its header text (or 1-based position) and the target it fills.",
+        "properties": {
+          "column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Column"
+          },
+          "target": {
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "column",
+          "target"
+        ],
+        "title": "MappingRowIn",
         "type": "object"
       },
       "McpClientCreate": {
@@ -84433,6 +84691,461 @@
           }
         },
         "summary": "Form Options",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/import-jobs": {
+      "post": {
+        "description": "Queue the import of ``file``; poll ``GET /jobs/{id}`` for progress and the report.\n\nThe mapping is checked now (422 ``invalid_mapping``); permissions are checked again when\nthe worker runs the job.",
+        "operationId": "start_import_api_v1_cmdb_import_jobs_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_start_import_api_v1_cmdb_import_jobs_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Import",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/import-templates": {
+      "get": {
+        "operationId": "list_import_templates_api_v1_cmdb_import_templates_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "class_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Class Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ImportTemplateOut"
+                  },
+                  "title": "Response List Import Templates Api V1 Cmdb Import Templates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Import Templates",
+        "tags": [
+          "cmdb"
+        ]
+      },
+      "post": {
+        "operationId": "create_import_template_api_v1_cmdb_import_templates_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportTemplateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportTemplateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Import Template",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/import-templates/{template_id}": {
+      "delete": {
+        "operationId": "delete_import_template_api_v1_cmdb_import_templates__template_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Import Template",
+        "tags": [
+          "cmdb"
+        ]
+      },
+      "get": {
+        "operationId": "read_import_template_api_v1_cmdb_import_templates__template_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportTemplateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Import Template",
+        "tags": [
+          "cmdb"
+        ]
+      },
+      "put": {
+        "operationId": "update_import_template_api_v1_cmdb_import_templates__template_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportTemplateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportTemplateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Import Template",
         "tags": [
           "cmdb"
         ]

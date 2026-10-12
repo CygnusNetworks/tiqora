@@ -27,6 +27,7 @@ from tiqora.cmdb.errors import CmdbError, CmdbForbidden, CmdbNotFound
 from tiqora.cmdb.gate import CmdbUnavailable, require_tiqora_cmdb
 from tiqora.cmdb.links import UnknownLinkType
 from tiqora.cmdb.service import CiConflict, InvalidValues, UnknownAttributes
+from tiqora.cmdb.transfer.templates import TemplateConflict
 from tiqora.cmdb.znuny_definition import DefinitionParseError
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.filters import FilterError
@@ -57,7 +58,7 @@ def cmdb_http_error(exc: Exception) -> HTTPException:
             status.HTTP_403_FORBIDDEN,
             {"code": "forbidden", "message": "Dafür fehlt die Berechtigung."},
         )
-    if isinstance(exc, ClassConflict | CiConflict):
+    if isinstance(exc, ClassConflict | CiConflict | TemplateConflict):
         return HTTPException(status.HTTP_409_CONFLICT, dict(CONFLICT))
     if isinstance(exc, DefinitionInvalid):
         return HTTPException(

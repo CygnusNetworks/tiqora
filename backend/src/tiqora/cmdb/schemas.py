@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from tiqora.cmdb.definition import AttributeDef, AttributeType
 from tiqora.cmdb.render import RefKind
+from tiqora.cmdb.transfer.mapping import ImportOptions
 from tiqora.domain.field_options import FieldOptionOut
 from tiqora.domain.schemas import UtcDateTime
 from tiqora.filters.model import Filter
@@ -508,7 +509,59 @@ class CmdbSavedSearchOut(BaseModel):
     changed_at: UtcDateTime
 
 
+class MappingRowIn(BaseModel):
+    """One import column: its header text (or 1-based position) and the target it fills."""
+
+    column: str | int
+    target: str = Field(min_length=1, max_length=300)
+
+
+class ImportTemplateIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    class_id: int = Field(ge=1)
+    file_format: Literal["csv", "xlsx"]
+    options: ImportOptions
+    mapping: list[MappingRowIn] = Field(max_length=500)
+    shared: bool = False
+    #: required for a PUT (optimistic locking), ignored on create
+    lock_version: int | None = Field(None, ge=1)
+
+
+class ImportTemplateOut(BaseModel):
+    id: int
+    name: str
+    class_id: int
+    file_format: Literal["csv", "xlsx"]
+    options: ImportOptions
+    mapping: list[MappingRowIn]
+    shared: bool
+    owned: bool
+    owner_user_id: int
+    lock_version: int
+    created_at: UtcDateTime
+    changed_at: UtcDateTime
+
+
+class CmdbImportRequestIn(BaseModel):
+    """The ``request`` form field of ``POST /import-jobs``: a saved template, or mapping and
+    options spelled out. Without both the columns are mapped by their header text."""
+
+    class_id: int | None = Field(None, ge=1)
+    template_id: int | None = Field(None, ge=1)
+    file_format: Literal["csv", "xlsx"] | None = None
+    options: ImportOptions | None = None
+    mapping: list[MappingRowIn] | None = Field(None, max_length=500)
+    dry_run: bool = True
+    #: IANA zone of the person importing; naive date-times in the file are read in it
+    time_zone: str = Field("UTC", max_length=64)
+
+
 __all__ = [
+    "CmdbImportRequestIn",
+    "ImportOptions",
+    "ImportTemplateIn",
+    "ImportTemplateOut",
+    "MappingRowIn",
     "AffectedOut",
     "CiTicketOut",
     "ImpactEdgeOut",
