@@ -7830,6 +7830,38 @@
         "title": "CatalogFieldOut",
         "type": "object"
       },
+      "CatalogOut": {
+        "properties": {
+          "classes": {
+            "items": {
+              "$ref": "#/components/schemas/CiClassOut"
+            },
+            "title": "Classes",
+            "type": "array"
+          },
+          "deployment_states": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogValueOut"
+            },
+            "title": "Deployment States",
+            "type": "array"
+          },
+          "incident_states": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogValueOut"
+            },
+            "title": "Incident States",
+            "type": "array"
+          }
+        },
+        "required": [
+          "classes",
+          "deployment_states",
+          "incident_states"
+        ],
+        "title": "CatalogOut",
+        "type": "object"
+      },
       "CatalogParamOut": {
         "properties": {
           "kind": {
@@ -7864,6 +7896,36 @@
           "list_value"
         ],
         "title": "CatalogParamOut",
+        "type": "object"
+      },
+      "CatalogValueOut": {
+        "properties": {
+          "functionality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Functionality"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "functionality"
+        ],
+        "title": "CatalogValueOut",
         "type": "object"
       },
       "CategoryIn": {
@@ -9633,6 +9695,454 @@
           "queue_id"
         ],
         "title": "ChatTopicRefOut",
+        "type": "object"
+      },
+      "CiAttributeOut": {
+        "properties": {
+          "children": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CiAttributeOut"
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "display": {
+            "title": "Display",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "raw": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "kind",
+          "display",
+          "raw",
+          "ref"
+        ],
+        "title": "CiAttributeOut",
+        "type": "object"
+      },
+      "CiClassOut": {
+        "properties": {
+          "can_read": {
+            "title": "Can Read",
+            "type": "boolean"
+          },
+          "can_write": {
+            "title": "Can Write",
+            "type": "boolean"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "icon",
+          "can_read",
+          "can_write"
+        ],
+        "title": "CiClassOut",
+        "type": "object"
+      },
+      "CiDetailOut": {
+        "properties": {
+          "attributes": {
+            "items": {
+              "$ref": "#/components/schemas/CiAttributeOut"
+            },
+            "title": "Attributes",
+            "type": "array"
+          },
+          "definition_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition Version"
+          },
+          "read_only": {
+            "title": "Read Only",
+            "type": "boolean"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/CiSummaryOut"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CiVersionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "summary",
+          "version",
+          "attributes",
+          "definition_version",
+          "read_only"
+        ],
+        "title": "CiDetailOut",
+        "type": "object"
+      },
+      "CiPageOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CiSummaryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "truncated"
+        ],
+        "title": "CiPageOut",
+        "type": "object"
+      },
+      "CiSummaryOut": {
+        "properties": {
+          "changed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed At"
+          },
+          "class_key": {
+            "title": "Class Key",
+            "type": "string"
+          },
+          "class_name": {
+            "title": "Class Name",
+            "type": "string"
+          },
+          "deployment_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CatalogValueOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "edit_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edit Url"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "incident_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CatalogValueOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "znuny",
+              "tiqora"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ref",
+          "source",
+          "id",
+          "number",
+          "name",
+          "class_key",
+          "class_name",
+          "deployment_state",
+          "incident_state",
+          "changed_at",
+          "edit_url"
+        ],
+        "title": "CiSummaryOut",
+        "type": "object"
+      },
+      "CiTicketLinkIn": {
+        "properties": {
+          "ci": {
+            "maxLength": 40,
+            "minLength": 3,
+            "title": "Ci",
+            "type": "string"
+          },
+          "link_type": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link Type"
+          }
+        },
+        "required": [
+          "ci"
+        ],
+        "title": "CiTicketLinkIn",
+        "type": "object"
+      },
+      "CiTicketLinkOut": {
+        "properties": {
+          "ci": {
+            "$ref": "#/components/schemas/CiSummaryOut"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "direction": {
+            "enum": [
+              "source",
+              "target",
+              "both"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "link_type": {
+            "title": "Link Type",
+            "type": "string"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "ci",
+          "link_type",
+          "direction",
+          "created_at"
+        ],
+        "title": "CiTicketLinkOut",
+        "type": "object"
+      },
+      "CiVersionOut": {
+        "properties": {
+          "change_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Note"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Name"
+          },
+          "deployment_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CatalogValueOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "incident_state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CatalogValueOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "seq",
+          "name",
+          "deployment_state",
+          "incident_state",
+          "created_at",
+          "created_by",
+          "created_by_name",
+          "change_note"
+        ],
+        "title": "CiVersionOut",
+        "type": "object"
+      },
+      "CiVersionPageOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CiVersionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "CiVersionPageOut",
         "type": "object"
       },
       "CompanyCreateOut": {
@@ -18082,6 +18592,82 @@
         "title": "ItsmModeIn",
         "type": "object"
       },
+      "ItsmStatusOut": {
+        "description": "``GET /itsm/status`` (no gate): what the UI may offer right now.",
+        "properties": {
+          "ci_available": {
+            "title": "Ci Available",
+            "type": "boolean"
+          },
+          "ci_read_only": {
+            "title": "Ci Read Only",
+            "type": "boolean"
+          },
+          "ci_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "tiqora",
+                  "znuny"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ci Source"
+          },
+          "mode": {
+            "enum": [
+              "off",
+              "znuny_readthrough",
+              "tiqora"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "setup_complete": {
+            "title": "Setup Complete",
+            "type": "boolean"
+          },
+          "source": {
+            "enum": [
+              "auto",
+              "admin",
+              "importer"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "unavailable_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unavailable Code"
+          },
+          "znuny": {
+            "$ref": "#/components/schemas/ItsmZnunyInfoOut"
+          }
+        },
+        "required": [
+          "mode",
+          "source",
+          "ci_available",
+          "ci_read_only",
+          "ci_source",
+          "unavailable_code",
+          "znuny",
+          "setup_complete"
+        ],
+        "title": "ItsmStatusOut",
+        "type": "object"
+      },
       "ItsmSwitchOut": {
         "properties": {
           "by": {
@@ -18124,6 +18710,45 @@
           "run_id"
         ],
         "title": "ItsmSwitchOut",
+        "type": "object"
+      },
+      "ItsmZnunyInfoOut": {
+        "description": "What of Znuny's ITSM is installed (same facts as the admin page, without the change flag).",
+        "properties": {
+          "cmdb_installed": {
+            "title": "Cmdb Installed",
+            "type": "boolean"
+          },
+          "core_installed": {
+            "title": "Core Installed",
+            "type": "boolean"
+          },
+          "packages": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Packages",
+            "type": "object"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          }
+        },
+        "required": [
+          "core_installed",
+          "cmdb_installed",
+          "profile",
+          "packages"
+        ],
+        "title": "ItsmZnunyInfoOut",
         "type": "object"
       },
       "JitDefaults": {
@@ -83570,6 +84195,554 @@
         ]
       }
     },
+    "/api/v1/itsm/catalog": {
+      "get": {
+        "description": "Classes the user may read and the deployment / incident states, for the search filters.",
+        "operationId": "get_catalog_api_v1_itsm_catalog_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Catalog",
+        "tags": [
+          "itsm"
+        ]
+      }
+    },
+    "/api/v1/itsm/cis": {
+      "get": {
+        "description": "Search CIs by number / name (Mode A also by attribute values) and state filters.",
+        "operationId": "search_cis_api_v1_itsm_cis_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "class",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 50,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Class"
+            }
+          },
+          {
+            "in": "query",
+            "name": "depl",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 50,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Depl"
+            }
+          },
+          {
+            "in": "query",
+            "name": "inci",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 50,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Inci"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 100000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CiPageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Cis",
+        "tags": [
+          "itsm"
+        ]
+      }
+    },
+    "/api/v1/itsm/cis/{source}/{ci_id}": {
+      "get": {
+        "description": "One CI with its attributes (the current version unless ``version_id`` asks for another).",
+        "operationId": "get_ci_api_v1_itsm_cis__source___ci_id__get",
+        "parameters": [
+          {
+            "description": "CI data source",
+            "in": "path",
+            "name": "source",
+            "required": true,
+            "schema": {
+              "description": "CI data source",
+              "enum": [
+                "znuny",
+                "tiqora"
+              ],
+              "title": "Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ci_id",
+            "required": true,
+            "schema": {
+              "title": "Ci Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CiDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ci",
+        "tags": [
+          "itsm"
+        ]
+      }
+    },
+    "/api/v1/itsm/cis/{source}/{ci_id}/tickets": {
+      "get": {
+        "description": "Tickets linked to the CI that the user may read (the newest ``CI_TICKETS_MAX`` at most).\n\n``source_key`` is the ticket id and ``target_key`` the CI ref; ``other_*`` describe the ticket.",
+        "operationId": "get_ci_tickets_api_v1_itsm_cis__source___ci_id__tickets_get",
+        "parameters": [
+          {
+            "description": "CI data source",
+            "in": "path",
+            "name": "source",
+            "required": true,
+            "schema": {
+              "description": "CI data source",
+              "enum": [
+                "znuny",
+                "tiqora"
+              ],
+              "title": "Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ci_id",
+            "required": true,
+            "schema": {
+              "title": "Ci Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TicketLinkTargetOut"
+                  },
+                  "title": "Response Get Ci Tickets Api V1 Itsm Cis  Source   Ci Id  Tickets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ci Tickets",
+        "tags": [
+          "itsm"
+        ]
+      }
+    },
+    "/api/v1/itsm/cis/{source}/{ci_id}/versions": {
+      "get": {
+        "description": "The version history of one CI, newest first.",
+        "operationId": "get_ci_versions_api_v1_itsm_cis__source___ci_id__versions_get",
+        "parameters": [
+          {
+            "description": "CI data source",
+            "in": "path",
+            "name": "source",
+            "required": true,
+            "schema": {
+              "description": "CI data source",
+              "enum": [
+                "znuny",
+                "tiqora"
+              ],
+              "title": "Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ci_id",
+            "required": true,
+            "schema": {
+              "title": "Ci Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 100000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CiVersionPageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ci Versions",
+        "tags": [
+          "itsm"
+        ]
+      }
+    },
     "/api/v1/itsm/link-types": {
       "get": {
         "description": "The link types the picker offers for *pair* in the current ITSM mode.",
@@ -83653,6 +84826,72 @@
           }
         },
         "summary": "Get Offered Link Types",
+        "tags": [
+          "itsm"
+        ]
+      }
+    },
+    "/api/v1/itsm/status": {
+      "get": {
+        "description": "Mode and CI availability for the UI. Answers while ITSM is off (mode ``off``).",
+        "operationId": "get_status_api_v1_itsm_status_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItsmStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Status",
         "tags": [
           "itsm"
         ]
@@ -98796,6 +100035,279 @@
         "summary": "Post Ticket Chat Typing",
         "tags": [
           "chat"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/cis": {
+      "get": {
+        "description": "CIs linked to the ticket (those the user may read). Needs ``ro`` on the ticket.",
+        "operationId": "list_ticket_cis_api_v1_tickets__ticket_id__cis_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CiTicketLinkOut"
+                  },
+                  "title": "Response List Ticket Cis Api V1 Tickets  Ticket Id  Cis Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Ticket Cis",
+        "tags": [
+          "itsm"
+        ]
+      },
+      "post": {
+        "description": "Link a CI to the ticket. Needs ``rw`` on the ticket and ``ro`` on the CI. Idempotent.",
+        "operationId": "link_ticket_ci_api_v1_tickets__ticket_id__cis_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CiTicketLinkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CiTicketLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Link Ticket Ci",
+        "tags": [
+          "itsm"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/cis/{source}/{ci_id}": {
+      "delete": {
+        "description": "Remove the link(s) between the ticket and the CI. Needs ``rw`` on the ticket.\n\nIdempotent: 204 also when no such link existed.",
+        "operationId": "unlink_ticket_ci_api_v1_tickets__ticket_id__cis__source___ci_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "CI data source",
+            "in": "path",
+            "name": "source",
+            "required": true,
+            "schema": {
+              "description": "CI data source",
+              "enum": [
+                "znuny",
+                "tiqora"
+              ],
+              "title": "Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ci_id",
+            "required": true,
+            "schema": {
+              "title": "Ci Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Only this type (default: every type)",
+            "in": "query",
+            "name": "link_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this type (default: every type)",
+              "title": "Link Type"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unlink Ticket Ci",
+        "tags": [
+          "itsm"
         ]
       }
     },
