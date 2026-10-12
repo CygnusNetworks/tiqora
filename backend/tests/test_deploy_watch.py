@@ -208,7 +208,7 @@ async def test_acl_changes_wait_for_acl_sync_to_empty(session: AsyncSession) -> 
     assert done.action == "snapshot" and done.revision_id != first.revision_id
 
 
-async def test_ownership_mode_snapshots_and_clears_sync_tables(session: AsyncSession) -> None:
+async def test_ownership_mode_waits_for_local_deploy(session: AsyncSession) -> None:
     # Drafts must not run in ownership mode either: the watcher waits, only
     # deploy_from_tiqora(mode="local") clears the sync table (Znuny's draft semantics).
     first = await check_deploy_state(session, "process", ownership_active=True)

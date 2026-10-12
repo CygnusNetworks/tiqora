@@ -25,8 +25,10 @@ Not listed on purpose:
   ``ArticleSend``/``TicketArticleCreate`` (added together with their handler
   support by plan Task 5).
 
-This module imports nothing from :mod:`tiqora.process.engine` at import time
-(the engine imports :func:`resolve_action` lazily, ruling F22).
+This module imports nothing from :mod:`tiqora.process.engine` at import time:
+:func:`core_transition_actions` imports the engine handlers lazily inside the
+function (ruling F22), so the engine can import :func:`resolve_action` at
+module level.
 """
 
 from __future__ import annotations
@@ -183,7 +185,9 @@ _ARTICLE_ATTACHMENT_PARAMS = (
 _ARTICLE_SEND = (
     ActionParam("SenderType", "text", required=True, one_of=("SenderType", "SenderTypeID")),
     ActionParam("IsVisibleForCustomer", "bool", required=True),
-    ActionParam("From", "text", required=True),
+    # Optional although the POD lists it: ArticleSend.pm:162 always replaces From via FromGet
+    # (378-432: queue system address fallback); ported as engine._article_send_from.
+    ActionParam("From", "text"),
     ActionParam("To", "text"),
     ActionParam("Cc", "text"),
     ActionParam("Bcc", "text"),

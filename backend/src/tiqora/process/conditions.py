@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Iterator, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from typing import Any
 
@@ -35,7 +37,9 @@ from tiqora.util.perl_regex import REGEX_TIMEOUT_SECONDS, PerlRegexError, compil
 logger = logging.getLogger(__name__)
 
 ConditionValue = str | list[str] | None
-_WARNED_MODULES: set[str] = set()
+# Unknown condition modules already logged in the current process run (D5: "once per process
+# run"); set by :func:`condition_module_warning_scope`. Outside a scope every miss is logged.
+_WARNED_MODULES: ContextVar[set[str] | None] = ContextVar("_warned_condition_modules", default=None)
 ConditionData = dict[str, ConditionValue]
 
 # Condition types derived from TransitionValidation::Base: only these substitute smart tags
@@ -59,6 +63,7 @@ __all__ = [
     "ConditionData",
     "ConditionValue",
     "check_transition",
+    "condition_module_warning_scope",
     "as_integer",
     "evaluate_condition_field",
     "evaluate_transition",
@@ -451,12 +456,25 @@ def _evaluate_field(
     return _ERROR
 
 
+@contextmanager
+def condition_module_warning_scope() -> Iterator[None]:
+    """One process run (one transition check of a ticket): each unknown module is logged once."""
+    token = _WARNED_MODULES.set(set())
+    try:
+        yield
+    finally:
+        _WARNED_MODULES.reset(token)
+
+
 def _warn_module_unavailable(match: Any) -> None:
     """Log an unavailable condition module once per process run."""
     key = str(match)
-    if key not in _WARNED_MODULES:
-        _WARNED_MODULES.add(key)
-        logger.warning("transition condition module not available: %s", key)
+    warned = _WARNED_MODULES.get()
+    if warned is not None:
+        if key in warned:
+            return
+        warned.add(key)
+    logger.warning("transition condition module not available: %s", key)
 
 
 _ORDERED_OPS = {

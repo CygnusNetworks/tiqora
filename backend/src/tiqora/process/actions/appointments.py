@@ -42,7 +42,7 @@ from tiqora.calendar.service import (
 from tiqora.db.legacy.calendar import Calendar, CalendarAppointment
 from tiqora.domain.ticket_write_service import InvalidInput, update_dynamic_field
 from tiqora.permissions.engine import PermissionEngine
-from tiqora.util.perl import perl_truthy
+from tiqora.util.perl import perl_comma_list, perl_truthy
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,6 @@ _IGNORED_KEYS = (
     "TicketAppointmentRuleID",
 )
 _DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$")
-_COMMA_SPLIT_RE = re.compile(r"\s*,\s*")
 _MAX_LEN = 255  # calendar_appointment.title/location are String(255)
 
 
@@ -82,12 +81,6 @@ def _too_long(config: dict[str, Any], action: str) -> bool:
             _skip(action, f"{key} is longer than {_MAX_LEN} characters")
             return True
     return False
-
-
-def _split_list(value: str | None) -> list[str]:
-    if value is None:
-        return []
-    return [p for p in _COMMA_SPLIT_RE.split(value.strip()) if p]
 
 
 def _acting_user(config: dict[str, Any], user_id: int, action: str) -> int:
@@ -210,8 +203,8 @@ async def action_appointment_create(
         start_time=start,
         end_time=end,
         all_day=perl_truthy(config.get("AllDay")),
-        team_id=",".join(_split_list(_text(config, "TeamID"))) or None,
-        resource_id=",".join(_split_list(_text(config, "ResourceID"))) or None,
+        team_id=",".join(perl_comma_list(_text(config, "TeamID"))) or None,
+        resource_id=",".join(perl_comma_list(_text(config, "ResourceID"))) or None,
         recurrence=_recurrence(config, zone, action),
     )
     # Appointment.pm AppointmentCreate checks no calendar permission.
@@ -281,7 +274,7 @@ async def action_appointment_update(
     if "AllDay" in config:
         values["all_day"] = perl_truthy(config.get("AllDay"))
     for key, field in (("TeamID", "team_id"), ("ResourceID", "resource_id")):
-        ids = _split_list(_text(config, key))
+        ids = perl_comma_list(_text(config, key))
         if ids:
             values[field] = ",".join(ids)
     new_start = values.get("start_time", row.start_time)

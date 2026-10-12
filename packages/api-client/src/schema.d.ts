@@ -3919,7 +3919,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get Entity
+         * @description One step, form, transition or action (the designer adds an existing one to a process).
+         */
+        get: operations["get_entity_api_v1_admin_process_designer_entities__entity_type___entity_id__get"];
         /** Update Entity */
         put: operations["update_entity_api_v1_admin_process_designer_entities__entity_type___entity_id__put"];
         post?: never;
@@ -18785,6 +18789,8 @@ export interface components {
              * @enum {string}
              */
             entity_type: "Process" | "Activity" | "ActivityDialog" | "Transition" | "TransitionAction";
+            /** Has Draft Changes */
+            has_draft_changes: boolean;
             /** Name */
             name: string;
             /** State Entity Id */
@@ -33428,6 +33434,42 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignerEntityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_entity_api_v1_admin_process_designer_entities__entity_type___entity_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                entity_type: "Activity" | "ActivityDialog" | "Transition" | "TransitionAction";
+                entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -144,10 +144,10 @@ async def _wired(env: Env) -> dict[str, WrittenEntity]:
     )
     second = await w.create_entity("Activity", name="wf3 second", config={"ActivityDialog": {}})
     third = await w.create_entity("Activity", name="wf3 third", config={"ActivityDialog": {}})
-    process = await w.create_process(name="wf3 process", description="d")
-    await w.update_process(
-        process.entity_id,
-        expected_version=process.version,
+    created = await w.create_process(name="wf3 process", description="d")
+    process = await w.update_process(
+        created.entity_id,
+        expected_version=created.version,
         name="wf3 process",
         description="d",
         state_entity_id="S1",
@@ -195,7 +195,7 @@ async def test_draft_lists_activities_in_path_order_and_marks_sync_state(env: En
     assert draft.missing_references == []
     assert draft.process.config["Description"] == "d"
     assert draft.process.config["StartActivity"] == ids["first"].entity_id
-    assert draft.process.version == ids["process"].version or draft.process.version
+    assert draft.process.version == ids["process"].version  # the version after update_process
     assert draft.process.changed_by == USER
     # the writer marked everything as a draft
     assert draft.process.sync_state == "not_sync"
@@ -287,6 +287,29 @@ async def test_entities_list_used_by(env: Env) -> None:
     summaries = {p.entity_id: p for p in await list_process_summaries(env.session)}
     assert summaries[pid].state_name == "Active"
     assert summaries[pid].sync_state == "not_sync"
+    assert summaries[pid].has_draft_changes
+
+
+async def test_summary_has_draft_changes_for_an_edited_form(env: Env) -> None:
+    ids = await _wired(env)
+    pid = ids["process"].entity_id
+
+    async def clear(*entity_ids: str) -> None:
+        for eid in entity_ids:
+            await env.session.execute(
+                text("DELETE FROM pm_entity_sync WHERE entity_id = :e"), {"e": eid}
+            )
+        await env.session.commit()
+
+    async def summary() -> Any:
+        return {p.entity_id: p for p in await list_process_summaries(env.session)}[pid]
+
+    # "deployed" except the form of the first step: the process row itself looks synced
+    await clear(*(w.entity_id for k, w in ids.items() if k != "dialog"))
+    row = await summary()
+    assert row.sync_state == "synced" and row.has_draft_changes
+    await clear(ids["dialog"].entity_id)
+    assert not (await summary()).has_draft_changes
 
 
 async def _seed_df(env: Env, df_id: int, name: str, ftype: str, cfg: str, valid: int = 1) -> None:

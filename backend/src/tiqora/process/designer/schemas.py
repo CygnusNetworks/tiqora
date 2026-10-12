@@ -51,6 +51,9 @@ class ProcessDraftSummaryOut(EntitySummaryOut):
 
     state_entity_id: str
     state_name: str
+    # True when the process or any step, form, transition or action it uses has an undeployed
+    # edit (``pm_entity_sync`` row); ``sync_state`` only covers the process row itself.
+    has_draft_changes: bool
 
 
 class ProcessCreateIn(BaseModel):

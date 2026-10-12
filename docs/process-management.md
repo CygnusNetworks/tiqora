@@ -74,7 +74,7 @@ admin presses **"Bereitstellen"** (Znuny writes the deployed file and empties
   | Same changed dump on the next tick | `snapshot` | records revision `znuny` ("aus Znuny") |
   | Sync table empty, dump equal | `unchanged` | nothing |
   | Tiqora owns the schema (after cutover), drafts pending | `waiting_for_deploy` | drafts never run; only "Bereitstellen" in Tiqora clears the sync rows |
-| Tiqora owns the schema (after cutover), sync table empty, dump differs | `snapshot` | records revision `tiqora` ("von Tiqora") without the two-tick confirmation (an import or a direct DB edit) |
+  | Tiqora owns the schema (after cutover), sync table empty, dump differs | `snapshot` | records revision `tiqora` ("von Tiqora") without the two-tick confirmation (an import or a direct DB edit) |
 
 - **"Bereitstellen" in Tiqora.** `POST /api/v1/admin/deploy` (`{"kind":
   "process" | "acl"}`, admins only) does Znuny's deploy DB effect: it records
@@ -92,8 +92,9 @@ admin presses **"Bereitstellen"** (Znuny writes the deployed file and empties
   when that gate is open and changes are pending. Only switch the setting on
   when Znuny no longer runs: Znuny keeps its own deployed file
   (`ZZZProcessManagement.pm` / `ZZZACL.pm`) and would go on showing the old
-  state. After cutover the watcher deploys within one tick anyway, so the
-  button rarely matters there.
+  state. After cutover the button is the only way to deploy: edits stay
+  drafts until someone presses "Bereitstellen" (the watcher never deploys
+  drafts).
 - Every engine call reads the newest revision id and checksum (one indexed
   `SELECT`); the stored JSON is read again only when that pair changed. Each
   caller gets its own parsed copy, so a caller cannot change the deployed state
@@ -366,8 +367,9 @@ validates mandatory fields).
 
 ## Process designer
 
-`/admin/processes` lists the **draft** state (processes that are not yet
-deployed carry the badge "Entwurf"); a process opens in the designer at
+`/admin/processes` lists the **draft** state (a process with an undeployed
+edit, of its own or of one of its steps, forms, transitions or actions,
+carries the badge "Entwurf"); a process opens in the designer at
 `/admin/processes/<id>`. Concepts use Znuny's words: a process has *Schritte*
 (activities), *Formulare* (activity dialogs), *Übergänge* (transitions)
 and *Aktionen* (transition actions). Desktop only: on a phone the designer is
@@ -380,6 +382,17 @@ read-only.
   values, interface, permission), a transition (condition blocks with
   and/or/xor and typed values) and an action (a typed parameter form per
   module, raw key/value for unknown modules). Delete asks for confirmation.
+  `Escape` discards the unsaved edits of a panel. The top bar shows the
+  process state and links the export.
+- **Shared entities.** Steps, forms, transitions and actions are Znuny
+  entities that several processes can use. "Vorhandene verwenden" (palette,
+  "add an existing form", the connect popover and "add an existing action")
+  lists them from all processes (`GET .../entities/{type}` with `used_by`);
+  a picked one is loaded with `GET .../entities/{type}/{id}`. A panel of a
+  shared entity says which other processes (or, for a form, steps) use it,
+  because an edit changes them as well. Entries that nothing uses any more
+  are listed under "Nicht mehr verwendet" in the palette and can be deleted
+  there; an entry still in use cannot be deleted (409 names the users).
 - **Drafts.** Every save writes `pm_*` rows exactly like Znuny's
   `ProcessManagement::DB::*` modules (entity ids `<Type>-<32 hex>`, YAML
   `config`, `create_by` / `change_by`) and a `pm_entity_sync` row. The
@@ -426,7 +439,8 @@ read-only.
   generated from the parameter specs, so an action module added to the
   registry shows up in the designer without frontend work.
 - **API.** `/api/v1/admin/process-designer/*` (admin only, see the OpenAPI
-  document): `catalog`, `processes`, `entities/{type}`, per-process
+  document): `catalog`, `processes`, `entities/{type}`,
+  `entities/{type}/{id}`, per-process
   `validation`, `export`, `import`, `revisions`, `revisions/{id}/diff` and
   `revisions/{id}/restore`.
 
@@ -561,7 +575,8 @@ Deployment:
   hides that deploy (the sync table is never seen empty); Tiqora catches up
   with the next deploy.
 - "Bereitstellen" in Tiqora is gated (see "Deployed revisions" and "Deploy in
-  parallel operation"); after cutover Tiqora deploys automatically.
+  parallel operation"); after cutover edits in the designer and the ACL
+  editor stay drafts until someone presses "Bereitstellen" in Tiqora.
 - Edits between a Tiqora deploy and TiqoraSync's dump (about one minute) are
   deployed in Znuny as well; Tiqora picks them up within two watch intervals
   as a `znuny` revision.
@@ -577,6 +592,9 @@ Deployment:
   there are no appointment notifications.
 - A *Probelauf* (test run), visual diff on the canvas and process analytics
   are not built; the version diff is a per-entity list plus a text view.
+- On a phone (< 768 px) the designer only lists the steps of the process
+  (read-only); the planned list of steps, forms and transitions with the
+  panels as full-screen sheets is not built.
 
 Engine:
 

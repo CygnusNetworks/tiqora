@@ -315,7 +315,9 @@ async def test_edit_writes_not_sync_row_and_cache_signal(env: Env) -> None:
 async def test_noop_update_writes_nothing(env: Env) -> None:
     cfg = {"ActivityDialog": {"1": "ActivityDialog-" + "a" * 32}}
     made = await env.writer.create_entity("Activity", name="wf3 noop", config=cfg)
-    await env.session.execute(text("DELETE FROM pm_entity_sync"))
+    await env.session.execute(
+        text("DELETE FROM pm_entity_sync WHERE entity_id = :e"), {"e": made.entity_id}
+    )
     await env.session.commit()
     marks = len(await env.signals())
 
@@ -339,7 +341,9 @@ async def test_noop_update_writes_nothing(env: Env) -> None:
     assert await env.sync_rows(made.entity_id) == []
 
     proc = await env.writer.create_process(name="wf3 noop proc")
-    await env.session.execute(text("DELETE FROM pm_entity_sync"))
+    await env.session.execute(
+        text("DELETE FROM pm_entity_sync WHERE entity_id = :e"), {"e": proc.entity_id}
+    )
     await env.session.commit()
     same = await env.fresh_writer().update_process(
         proc.entity_id,

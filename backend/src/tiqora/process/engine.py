@@ -113,6 +113,7 @@ from tiqora.process.conditions import (
     ConditionData,
     as_integer,
     check_transition,
+    condition_module_warning_scope,
     evaluate_transition,
     get_condition_data,
     resolve_transition_tags,
@@ -149,7 +150,7 @@ from tiqora.process.ticket_state import (
     TicketProcessCandidates,
     get_ticket_process_state,
 )
-from tiqora.util.perl import perl_truthy
+from tiqora.util.perl import perl_comma_list, perl_truthy
 from tiqora.znuny.cache_invalidation import invalidate_ticket_cache
 from tiqora.znuny.history import (
     TYPE_ADD_NOTE,
@@ -670,7 +671,7 @@ async def _action_article_send(
         cc=_address_list(config.get("Cc")),
         bcc=_address_list(config.get("Bcc")),
         attachments=await collect_action_attachments(
-            session, config, ticket_id=ticket_id, sysconfig=sysconfig, user_id=user_id
+            session, config, ticket_id=ticket_id, sysconfig=sysconfig
         ),
     )
     await deliver_agent_email_reply(
@@ -783,7 +784,7 @@ async def _action_ticket_article_create(
         body=str(config.get("Body", "")),
         channel=channel,
         attachments=await collect_action_attachments(
-            session, config, ticket_id=ticket_id, sysconfig=sysconfig, user_id=user_id
+            session, config, ticket_id=ticket_id, sysconfig=sysconfig
         ),
     )
     await add_article(
@@ -848,14 +849,6 @@ async def _action_ticket_sla_set(
         user_id=user_id,
         sysconfig=sysconfig,
     )
-
-
-def _comma_list(value: Any) -> list[str]:
-    """``split /\\s*,\\s*/`` of a Znuny list key (a list value is taken as is)."""
-    if value is None:
-        return []
-    items = value if isinstance(value, (list, tuple)) else str(value).split(",")
-    return [str(i).strip() for i in items if str(i).strip()]
 
 
 def _acting_user(config: dict[str, Any], user_id: int, module: str) -> int:
@@ -956,9 +949,9 @@ async def _action_ticket_watch_set(
             )
         return
 
-    logins = _comma_list(config.get("UserLogin"))
-    searches = _comma_list(config.get("PostMasterSearch"))
-    user_ids = _comma_list(config.get("UserIDs"))
+    logins = perl_comma_list(config.get("UserLogin"))
+    searches = perl_comma_list(config.get("PostMasterSearch"))
+    user_ids = perl_comma_list(config.get("UserIDs"))
     if not (logins or searches or user_ids):
         # Tiqora's own keys: one watcher, ``User`` (login) or ``UserID``.
         watcher_id = await _resolve_user_id(
@@ -2062,44 +2055,49 @@ async def run_transitions(
         data,
         render=_render,
     )
-    for transition in sorted(activity.outgoing_transitions, key=lambda t: t.entity_id):
-        try:
-            if not check_transition(transition.config, data, tags=tags):
-                continue
-        except ConditionConfigError as exc:
-            # Znuny's bare ``return`` leaves TransitionCheck: nothing fires (Transition.pm:322).
-            logger.error("transition %s: %s; no transition runs", transition.entity_id, exc)
-            return _NO_TRANSITION
-        # The new activity is stored BEFORE the actions run (Process.pm:501, actions from :558),
-        # so the history shows the activity update first.
-        await update_dynamic_field(
+    chosen = None
+    with condition_module_warning_scope():
+        for candidate in sorted(activity.outgoing_transitions, key=lambda t: t.entity_id):
+            try:
+                if check_transition(candidate.config, data, tags=tags):
+                    chosen = candidate
+                    break
+            except ConditionConfigError as exc:
+                # Znuny's bare ``return`` leaves TransitionCheck: nothing fires (Transition.pm:322).
+                logger.error("transition %s: %s; no transition runs", candidate.entity_id, exc)
+                return _NO_TRANSITION
+    if chosen is None:
+        return _NO_TRANSITION
+    transition = chosen
+    # The new activity is stored BEFORE the actions run (Process.pm:501, actions from :558),
+    # so the history shows the activity update first.
+    await update_dynamic_field(
+        session,
+        ticket_id=ticket_id,
+        field_name=ACTIVITY_ID_DF_NAME,
+        values=[transition.target_activity_entity_id],
+        user_id=user_id,
+    )
+    unsupported: list[str] = []
+    for action_node in transition.actions:
+        skipped = await execute_transition_action(
             session,
+            action=action_node.config,
             ticket_id=ticket_id,
-            field_name=ACTIVITY_ID_DF_NAME,
-            values=[transition.target_activity_entity_id],
-            user_id=user_id,
-        )
-        unsupported: list[str] = []
-        for action_node in transition.actions:
-            skipped = await execute_transition_action(
-                session,
-                action=action_node.config,
-                ticket_id=ticket_id,
-                process_entity_id=graph.entity_id,
-                activity_entity_id=activity.entity_id,
-                transition_entity_id=transition.entity_id,
-                user_id=user_id,
-                sysconfig=sysconfig,
-            )
-            if skipped is not None:
-                unsupported.append(skipped)
-        return TransitionOutcome(
-            activity_changed=True,
-            new_activity_entity_id=transition.target_activity_entity_id,
+            process_entity_id=graph.entity_id,
+            activity_entity_id=activity.entity_id,
             transition_entity_id=transition.entity_id,
-            unsupported_actions=unsupported,
+            user_id=user_id,
+            sysconfig=sysconfig,
         )
-    return _NO_TRANSITION
+        if skipped is not None:
+            unsupported.append(skipped)
+    return TransitionOutcome(
+        activity_changed=True,
+        new_activity_entity_id=transition.target_activity_entity_id,
+        transition_entity_id=transition.entity_id,
+        unsupported_actions=unsupported,
+    )
 
 
 async def submit_activity_dialog(

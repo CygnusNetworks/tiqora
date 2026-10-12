@@ -330,6 +330,19 @@ async def test_heartbeat_age_boundary(factory: async_sessionmaker[AsyncSession])
         assert not await addon_can_deploy(s, "process", now=now + timedelta(minutes=1))
 
 
+async def test_heartbeat_from_the_future_is_not_fresh(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    now = utc_now()
+    # A clock slightly ahead still counts; one far ahead must not stay "fresh" forever.
+    await _heartbeat(factory, age=-timedelta(minutes=5))
+    async with factory() as s:
+        assert await addon_can_deploy(s, "process", now=now)
+    await _heartbeat(factory, age=-timedelta(hours=2))
+    async with factory() as s:
+        assert not await addon_can_deploy(s, "process", now=now)
+
+
 async def test_signal_mode_records_revision_and_queues_signal(
     make_client: Make, factory: async_sessionmaker[AsyncSession]
 ) -> None:

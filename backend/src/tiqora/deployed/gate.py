@@ -36,7 +36,3 @@ async def deploy_mode(
         ).model_dump()
     )
     return "local" if values.deploy_from_tiqora else None
-
-
-async def can_deploy_from_tiqora(session: AsyncSession, settings: Settings) -> bool:
-    return await deploy_mode(session, settings, "process") is not None

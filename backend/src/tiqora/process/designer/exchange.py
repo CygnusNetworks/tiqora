@@ -14,20 +14,13 @@ from collections.abc import Mapping
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.legacy.dynamic_field import DynamicField
-from tiqora.db.legacy.process_management import (
-    PmActivity,
-    PmActivityDialog,
-    PmProcess,
-    PmTransition,
-    PmTransitionAction,
-)
 from tiqora.process.config import _load_yaml_mapping
-from tiqora.process.designer.draft import _order_key
+from tiqora.process.designer._rows import ENTITY_MODELS, as_mapping, as_text, order_key
 from tiqora.process.designer.ids import SUB_ENTITY_TYPES, EntityType, generate_entity_id
 from tiqora.process.designer.writer import EntityNotFound, ProcessWriter
 from tiqora.process.designer.yaml_codec import dump_znuny_yaml, load_znuny_yaml
@@ -53,13 +46,6 @@ _HEX_ID = {
     t: re.compile(rf"\A{t}-[0-9a-f]{{32}}\Z")
     for t in ("Process", "Activity", "ActivityDialog", "Transition", "TransitionAction")
 }
-_MODELS: dict[str, Any] = {
-    "Process": PmProcess,
-    "Activity": PmActivity,
-    "ActivityDialog": PmActivityDialog,
-    "Transition": PmTransition,
-    "TransitionAction": PmTransitionAction,
-}
 
 UNREADABLE = (
     "Die Prozessdatei konnte nicht gelesen werden. Bitte prüfen Sie, ob die Datei gültig ist."
@@ -68,7 +54,9 @@ TOO_LARGE = "Datei zu groß."
 
 
 class ProcessImportIn(BaseModel):
-    content: str = Field(max_length=MAX_CONTENT_BYTES)
+    # No pydantic max_length: import_process_yaml checks the byte size and answers with the
+    # German "Datei zu groß." instead of pydantic's generic English 422.
+    content: str
     overwrite_existing: bool = False
 
 
@@ -83,16 +71,8 @@ class ImportRefused(ValueError):
     """The file cannot be imported (422, Znuny's message text in German)."""
 
 
-def _dict(value: object) -> dict[str, Any]:
-    return dict(value) if isinstance(value, Mapping) else {}
-
-
 def _list(value: object) -> list[Any]:
     return list(value) if isinstance(value, list | tuple) else []
-
-
-def _text(value: object) -> str:
-    return "" if value is None else str(value)
 
 
 # --- export ---------------------------------------------------------------------------------
@@ -102,7 +82,7 @@ async def _rows(session: AsyncSession, etype: EntityType, ids: list[str]) -> dic
     wanted = sorted(set(ids))
     if not wanted:
         return {}
-    model = _MODELS[etype]
+    model = ENTITY_MODELS[etype]
     found = (await session.execute(select(model).where(model.entity_id.in_(wanted)))).scalars()
     return {r.entity_id: r for r in found if r.entity_id in wanted}  # exact case only
 
@@ -126,14 +106,14 @@ async def export_process_yaml(session: AsyncSession, process_entity_id: str) -> 
     if process is None:
         raise EntityNotFound(process_entity_id)
     cfg = _load_yaml_mapping(process.config)
-    path = _dict(cfg.get("Path"))
+    path = as_mapping(cfg.get("Path"))
     activity_ids = sorted(path)
     transition_ids: list[str] = []
     action_ids: list[str] = []
     for act in activity_ids:
-        for tid in sorted(_dict(path[act])):
+        for tid in sorted(as_mapping(path[act])):
             transition_ids.append(tid)
-            actions = _dict(_dict(path[act])[tid]).get("TransitionAction")
+            actions = as_mapping(as_mapping(path[act])[tid]).get("TransitionAction")
             action_ids.extend(sorted(str(a) for a in _list(actions)))
     # The id lists keep repeats, exactly like ``ProcessGet`` (a transition used from two
     # activities is listed twice); the entity sections below are keyed, so they do not.
@@ -146,8 +126,8 @@ async def export_process_yaml(session: AsyncSession, process_entity_id: str) -> 
         if row is None:
             continue
         entry = _entity(row)
-        by_order = _dict(entry["Config"].get("ActivityDialog"))
-        entry["ActivityDialogs"] = [str(by_order[k]) for k in sorted(by_order, key=_order_key)]
+        by_order = as_mapping(entry["Config"].get("ActivityDialog"))
+        entry["ActivityDialogs"] = [str(by_order[k]) for k in sorted(by_order, key=order_key)]
         dialog_ids.extend(entry["ActivityDialogs"])
         activities[eid] = entry
     dialog_rows = await _rows(session, "ActivityDialog", dialog_ids)
@@ -199,7 +179,7 @@ async def _missing_dynamic_fields(session: AsyncSession, dialogs: Mapping[str, A
     valid dynamic field of that name backs."""
     used: list[str] = []
     for eid in sorted(dialogs):
-        fields = _dict(_dict(_dict(dialogs[eid]).get("Config")).get("Fields"))
+        fields = as_mapping(as_mapping(as_mapping(dialogs[eid]).get("Config")).get("Fields"))
         for field in sorted(fields):
             found = re.search(r"DynamicField_(\w+)", str(field))
             if found:
@@ -216,12 +196,12 @@ async def _missing_dynamic_fields(session: AsyncSession, dialogs: Mapping[str, A
 
 def _check_present(data: dict[str, Any]) -> None:
     """``DB/Process.pm:1552-1612``: everything the process lists must be in the file."""
-    process = _dict(data["Process"])
-    activities = _dict(data.get("Activities"))
-    dialogs = _dict(data.get("ActivityDialogs"))
+    process = as_mapping(data["Process"])
+    activities = as_mapping(data.get("Activities"))
+    dialogs = as_mapping(data.get("ActivityDialogs"))
     used_dialogs: list[str] = []
     for raw in _list(process.get("Activities")):
-        eid = _text(raw)
+        eid = as_text(raw)
         activity = activities.get(eid)
         if not isinstance(activity, dict):
             raise ImportRefused(f"Für Activity {eid} fehlen die Daten.")
@@ -234,8 +214,8 @@ def _check_present(data: dict[str, Any]) -> None:
         ("TransitionActions", "TransitionActions"),
     ):
         for raw in _list(process.get(key)):
-            eid = _text(raw)
-            if not isinstance(_dict(data.get(section)).get(eid), dict):
+            eid = as_text(raw)
+            if not isinstance(as_mapping(data.get(section)).get(eid), dict):
                 raise ImportRefused(f"Für {key[:-1]} {eid} fehlen die Daten.")
 
 
@@ -258,9 +238,9 @@ class _Mapping:
         return new
 
     def __call__(self, etype: EntityType, old: object) -> str:
-        new = self._map[etype].get(_text(old))
+        new = self._map[etype].get(as_text(old))
         if not new:
-            raise ImportRefused(f"Für {etype}: {_text(old)} wurde keine Zuordnung gefunden.")
+            raise ImportRefused(f"Für {etype}: {as_text(old)} wurde keine Zuordnung gefunden.")
         return new
 
 
@@ -268,17 +248,17 @@ def _remap_process(
     process: dict[str, Any], mapping: _Mapping
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """``_ImportedEntitiesUpdate`` (1862-2056): the process config and layout, remapped."""
-    cfg = _dict(process.get("Config"))
+    cfg = as_mapping(process.get("Config"))
     layout = {
-        mapping("Activity", act): _dict(pos)
-        for act, pos in sorted(_dict(process.get("Layout")).items())
+        mapping("Activity", act): as_mapping(pos)
+        for act, pos in sorted(as_mapping(process.get("Layout")).items())
     }
     new_path: dict[str, Any] = {}
-    for act, transitions in sorted(_dict(cfg.get("Path")).items()):
+    for act, transitions in sorted(as_mapping(cfg.get("Path")).items()):
         new_act = mapping("Activity", act)
         new_path[new_act] = {}
-        for tid, spec in sorted(_dict(transitions).items()):
-            spec_m = _dict(spec)
+        for tid, spec in sorted(as_mapping(transitions).items()):
+            spec_m = as_mapping(spec)
             new_spec: dict[str, Any] = {
                 "ActivityEntityID": mapping("Activity", spec_m.get("ActivityEntityID"))
             }
@@ -288,7 +268,7 @@ def _remap_process(
                 ]
             new_path[new_act][mapping("Transition", tid)] = new_spec
     config: dict[str, Any] = {
-        "Description": _text(cfg.get("Description")),
+        "Description": as_text(cfg.get("Description")),
         "Path": new_path,
         "StartActivity": "",
         "StartActivityDialog": "",
@@ -306,7 +286,7 @@ def _remap_activity(config: dict[str, Any], mapping: _Mapping) -> dict[str, Any]
         out["ActivityDialog"] = {
             str(k): mapping("ActivityDialog", v)
             for k, v in sorted(
-                _dict(out["ActivityDialog"]).items(), key=lambda kv: _order_key(kv[0])
+                as_mapping(out["ActivityDialog"]).items(), key=lambda kv: order_key(kv[0])
             )
         }
     return out
@@ -316,8 +296,8 @@ async def _import(
     session: AsyncSession, writer: ProcessWriter, content: str, overwrite_existing: bool
 ) -> ProcessImportOut:
     data = _parse(content)
-    process = _dict(data["Process"])
-    sections = {etype: _dict(data.get(_SECTION[etype])) for etype in SUB_ENTITY_TYPES}
+    process = as_mapping(data["Process"])
+    sections = {etype: as_mapping(data.get(_SECTION[etype])) for etype in SUB_ENTITY_TYPES}
     if 1 + sum(len(s) for s in sections.values()) > MAX_ENTITIES:
         raise ImportRefused(TOO_LARGE)
     missing = await _missing_dynamic_fields(session, sections["ActivityDialog"])
@@ -329,7 +309,7 @@ async def _import(
     _check_present(data)
 
     mapping = _Mapping(overwrite_existing)
-    process_id = mapping.add("Process", _text(process.get("EntityID")))
+    process_id = mapping.add("Process", as_text(process.get("EntityID")))
     for etype in SUB_ENTITY_TYPES:
         for old in sorted(sections[etype]):
             mapping.add(etype, old)
@@ -340,21 +320,21 @@ async def _import(
 
     for etype in _WRITE_ORDER:
         for old, entry in sorted(sections[etype].items()):
-            entry_m = _dict(entry)
-            config = _dict(entry_m.get("Config"))
+            entry_m = as_mapping(entry)
+            config = as_mapping(entry_m.get("Config"))
             if etype == "Activity":
                 config = _remap_activity(config, mapping)
             _, was_created = await writer.import_entity(
-                etype, mapping(etype, old), name=_text(entry_m.get("Name")), config=config
+                etype, mapping(etype, old), name=as_text(entry_m.get("Name")), config=config
             )
             (created if was_created else updated)[etype] += 1
     written, was_created = await writer.import_entity(
         "Process",
         process_id,
-        name=_text(process.get("Name")),
+        name=as_text(process.get("Name")),
         config=process_config,
         layout=process_layout,
-        state_entity_id=_text(process.get("StateEntityID")),
+        state_entity_id=as_text(process.get("StateEntityID")),
     )
     (created if was_created else updated)["Process"] += 1
     return ProcessImportOut(

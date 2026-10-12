@@ -42,14 +42,17 @@ def test_match_with_trailing_pm_and_whitespace_resolves() -> None:
     assert resolve_condition_module(["x"]) is None
 
 
-def test_unknown_module_does_not_match_and_logs_once(caplog: pytest.LogCaptureFixture) -> None:
-    conditions._WARNED_MODULES.discard("Some::Missing::Module")
+def test_unknown_module_does_not_match_and_logs_once_per_run(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     field = _module_field("Some::Missing::Module")
     with caplog.at_level(logging.WARNING, logger="tiqora.process.conditions"):
-        assert not evaluate_condition_field("Any", field, {"Queue": "Raw"})
-        assert not evaluate_condition_field("Any", field, {"Queue": "Raw"})
+        for _run in range(2):  # two process runs: one warning each (D5), not one per worker
+            with conditions.condition_module_warning_scope():
+                assert not evaluate_condition_field("Any", field, {"Queue": "Raw"})
+                assert not evaluate_condition_field("Any", field, {"Queue": "Raw"})
     messages = [r.getMessage() for r in caplog.records if "not available" in r.getMessage()]
-    assert messages == ["transition condition module not available: Some::Missing::Module"]
+    assert messages == ["transition condition module not available: Some::Missing::Module"] * 2
 
 
 def test_module_condition_inside_or_group_with_string_condition() -> None:

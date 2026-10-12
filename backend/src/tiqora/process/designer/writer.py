@@ -22,14 +22,8 @@ from typing import Any
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.db.legacy.process_management import (
-    PmActivity,
-    PmActivityDialog,
-    PmProcess,
-    PmTransition,
-    PmTransitionAction,
-)
 from tiqora.process.config import _load_yaml_mapping
+from tiqora.process.designer._rows import ENTITY_MODELS, as_mapping, as_text
 from tiqora.process.designer.ids import (
     ENTITY_ID_RE,
     EntityType,
@@ -40,13 +34,6 @@ from tiqora.process.designer.versioning import entity_version
 from tiqora.process.designer.yaml_codec import dump_znuny_yaml, stringify_scalars
 from tiqora.znuny.cache_invalidation import invalidate_cache_type
 
-_MODELS: dict[str, Any] = {
-    "Process": PmProcess,
-    "Activity": PmActivity,
-    "ActivityDialog": PmActivityDialog,
-    "Transition": PmTransition,
-    "TransitionAction": PmTransitionAction,
-}
 _TABLES = {
     "Process": "pm_process",
     "Activity": "pm_activity",
@@ -115,16 +102,6 @@ class _Row:
         )
 
 
-def _text(value: object) -> str:
-    if isinstance(value, memoryview | bytearray | bytes):
-        return bytes(value).decode("utf-8", errors="replace")
-    return "" if value is None else str(value)
-
-
-def _mapping(value: object) -> dict[str, Any]:
-    return dict(value) if isinstance(value, Mapping) else {}
-
-
 def _check_name(name: str) -> str:
     if not name or not name.strip():
         raise InvalidReference("Der Name darf nicht leer sein.")
@@ -169,13 +146,13 @@ def normalise_config(
     Golden-master finding (``tests/golden/test_process_designer.py``)."""
     if not isinstance(config, Mapping):
         raise InvalidReference("Die Konfiguration muss ein Objekt sein.")
-    cfg: dict[str, Any] = stringify_scalars(_mapping(config))
+    cfg: dict[str, Any] = stringify_scalars(as_mapping(config))
     if creating or entity_type == "Activity":
         _scope(cfg)
     if entity_type == "Activity":
         cfg["ActivityDialog"] = _renumber(cfg.get("ActivityDialog"))
     elif entity_type == "ActivityDialog":
-        fields = _mapping(cfg.get("Fields"))
+        fields = as_mapping(cfg.get("Fields"))
         order = cfg.get("FieldOrder")
         wanted = [str(f) for f in order] if isinstance(order, list) else []
         ordered = [f for f in dict.fromkeys(wanted) if f in fields]
@@ -199,7 +176,7 @@ def normalise_config(
         module = cfg.get("Module")
         if not isinstance(module, str) or "::" not in module:
             raise InvalidReference("Das Modul der Aktion muss ein Perl-Modulpfad sein.")
-        cfg["Config"] = _mapping(cfg.get("Config"))
+        cfg["Config"] = as_mapping(cfg.get("Config"))
     return cfg
 
 
@@ -214,7 +191,7 @@ class ProcessWriter:
     async def _row(
         self, entity_type: EntityType, entity_id: str, *, lock: bool = False
     ) -> _Row | None:
-        model = _MODELS[entity_type]
+        model = ENTITY_MODELS[entity_type]
         cols = [model.id, model.entity_id, model.name, model.config]
         if entity_type == "Process":
             cols += [model.layout, model.state_entity_id]
@@ -228,9 +205,9 @@ class ProcessWriter:
             id=int(found[0]),
             entity_id=found[1],
             name=found[2],
-            config=_text(found[3]),
-            layout=_text(found[4]) if entity_type == "Process" else "",
-            state_entity_id=_text(found[5]) if entity_type == "Process" else "",
+            config=as_text(found[3]),
+            layout=as_text(found[4]) if entity_type == "Process" else "",
+            state_entity_id=as_text(found[5]) if entity_type == "Process" else "",
         )
 
     async def _require(
@@ -409,8 +386,8 @@ class ProcessWriter:
         if not ENTITY_ID_RE.match(entity_id):
             raise InvalidReference(f"Ungültige Kennung: {entity_id}")
         _check_name(name)
-        cfg: dict[str, Any] = stringify_scalars(_mapping(config))
-        layout_cfg = stringify_scalars(_mapping(layout))
+        cfg: dict[str, Any] = stringify_scalars(as_mapping(config))
+        layout_cfg = stringify_scalars(as_mapping(layout))
         if entity_type == "Process":
             if state_entity_id not in _PROCESS_STATES:
                 raise InvalidReference(f"Unbekannter Prozessstatus: {state_entity_id}")
@@ -472,29 +449,29 @@ class ProcessWriter:
             return sorted(
                 eid
                 for eid, cfg in rows.items()
-                if entity_id in _mapping(cfg.get("ActivityDialog")).values()
+                if entity_id in as_mapping(cfg.get("ActivityDialog")).values()
             )
         users: list[str] = []
         for eid, cfg in (await self._configs("Process")).items():
-            path = _mapping(cfg.get("Path"))
+            path = as_mapping(cfg.get("Path"))
             if entity_type == "Activity":
                 hit = entity_id in path
             elif entity_type == "Transition":
-                hit = any(entity_id in _mapping(trs) for trs in path.values())
+                hit = any(entity_id in as_mapping(trs) for trs in path.values())
             else:
                 hit = any(
-                    entity_id in (_mapping(tr).get("TransitionAction") or [])
+                    entity_id in (as_mapping(tr).get("TransitionAction") or [])
                     for trs in path.values()
-                    for tr in _mapping(trs).values()
+                    for tr in as_mapping(trs).values()
                 )
             if hit:
                 users.append(eid)
         return sorted(users)
 
     async def _configs(self, entity_type: EntityType) -> dict[str, dict[str, Any]]:
-        model = _MODELS[entity_type]
+        model = ENTITY_MODELS[entity_type]
         rows = await self._session.execute(select(model.entity_id, model.config))
-        return {eid: _load_yaml_mapping(_text(cfg)) for eid, cfg in rows.all()}
+        return {eid: _load_yaml_mapping(as_text(cfg)) for eid, cfg in rows.all()}
 
     # -- processes ---------------------------------------------------------------------
 
@@ -546,7 +523,7 @@ class ProcessWriter:
                 "StartActivityDialog": start_activity_dialog,
             }
         )
-        layout_cfg = stringify_scalars(_mapping(layout))
+        layout_cfg = stringify_scalars(as_mapping(layout))
         if (
             name == row.name
             and state_entity_id == row.state_entity_id
@@ -574,12 +551,12 @@ class ProcessWriter:
         activities: set[str] = set()
         transitions: set[str] = set()
         actions: set[str] = set()
-        for act, trs in _mapping(path).items():
+        for act, trs in as_mapping(path).items():
             clean[act] = {}
             activities.add(act)
-            for tr, spec in _mapping(trs).items():
+            for tr, spec in as_mapping(trs).items():
                 transitions.add(tr)
-                spec_m = _mapping(spec)
+                spec_m = as_mapping(spec)
                 target = spec_m.get("ActivityEntityID")
                 if target:
                     activities.add(str(target))
@@ -602,7 +579,7 @@ class ProcessWriter:
             if not start_activity:
                 raise InvalidReference("Ein Startformular braucht eine Startaktivität.")
             act_row = await self._require("Activity", start_activity)
-            dialogs = _mapping(_load_yaml_mapping(act_row.config).get("ActivityDialog"))
+            dialogs = as_mapping(_load_yaml_mapping(act_row.config).get("ActivityDialog"))
             if start_activity_dialog not in dialogs.values():
                 raise InvalidReference("Das Startformular gehört nicht zur Startaktivität.")
         return clean
@@ -614,7 +591,7 @@ class ProcessWriter:
         bad = sorted(i for i in wanted if not ENTITY_ID_RE.match(i))
         if bad:
             raise InvalidReference(f"Ungültige Kennung: {', '.join(bad)}")
-        model = _MODELS[entity_type]
+        model = ENTITY_MODELS[entity_type]
         found = set(
             (
                 await self._session.execute(

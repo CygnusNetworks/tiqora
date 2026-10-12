@@ -89,11 +89,13 @@ async def _kind_status(
 async def get_deploy_status(
     _admin: AdminUser, session: DbSession, settings: AppSettings
 ) -> DeployStatusOut:
+    process = await _kind_status(session, settings, "process")
     return DeployStatusOut(
-        process=await _kind_status(session, settings, "process"),
+        process=process,
         acl=await _kind_status(session, settings, "acl"),
         ownership_active=(await get_ownership_state(session, settings)).active,
-        can_deploy_from_tiqora=(await deploy_mode(session, settings, "process")) is not None,
+        # Same gate as POST /admin/deploy for processes; reuse the per-kind result.
+        can_deploy_from_tiqora=process.deploy_mode is not None,
     )
 
 

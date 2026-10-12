@@ -114,8 +114,9 @@ async def addon_can_deploy(session: AsyncSession, kind: RevisionKind, *, now: da
     info = await read_addon_info(session)
     if info is None or f"{kind}_deploy" not in info.capabilities:
         return False
-    # A clock slightly ahead of ours still counts as a live add-on.
-    return now - info.seen_at <= HEARTBEAT_MAX_AGE
+    # A clock slightly ahead of ours still counts as a live add-on; one further ahead than the
+    # max age would otherwise stay "fresh" forever.
+    return -HEARTBEAT_MAX_AGE <= now - info.seen_at <= HEARTBEAT_MAX_AGE
 
 
 async def _upsert_setting(session: AsyncSession, key: str, value: str) -> None:

@@ -950,9 +950,13 @@ While Znuny is still in use:
   local deploy in Tiqora; with Znuny still running, Znuny's own deployed
   configuration would then stay on the old state.
 
-After the schema cutover (see below) Tiqora is the only system and deploys
-automatically: each tick records a revision when something changed and clears
-`pm_entity_sync` / `acl_sync`.
+After the schema cutover (see below) Tiqora is the only system, but it does
+not deploy on its own: edits in the designer or the ACL editor stay drafts
+(`pm_entity_sync` / `acl_sync` rows) until an admin presses "Bereitstellen" in
+Tiqora, which records the revision and clears the sync rows (`local` mode).
+While drafts are pending, the watcher keeps the current revision running
+(`waiting_for_deploy`). Without drafts it records a `tiqora` revision when the
+rows changed anyway (an import or a direct DB edit).
 
 ## Schema ownership
 

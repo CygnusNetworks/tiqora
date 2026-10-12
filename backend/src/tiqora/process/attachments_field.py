@@ -32,7 +32,7 @@ from tiqora.domain.dynamic_field_values import get_df_values, load_ticket_dynami
 from tiqora.domain.ticket_write_service import update_dynamic_field
 from tiqora.process.schemas import ProcessDialogOptionOut
 from tiqora.storage.backend import DbMimeStorage, _as_bytes
-from tiqora.util.perl import perl_truthy
+from tiqora.util.perl import perl_comma_list, perl_truthy
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = logging.getLogger(__name__)
@@ -213,7 +213,7 @@ def _encrypted(filename: str | None, content_type: str | None) -> bool:
 
 
 async def collect_reused_attachments(
-    session: AsyncSession, *, ticket_id: int, sysconfig: SysConfig, user_id: int = 1
+    session: AsyncSession, *, ticket_id: int, sysconfig: SysConfig
 ) -> list[tuple[str, str, bytes]]:
     """``Base.pm _GetAttachments`` (:145-243): the files named by the ticket's selection field.
 
@@ -221,7 +221,7 @@ async def collect_reused_attachments(
     *ticket_id* is skipped with a warning, as is an encrypted blob (no decryption context here)
     and a file that does not exist. The field is cleared afterwards unless
     ``Process::DynamicFieldProcessManagementAttachment::Keep`` is truthy. Znuny clears with
-    ``UserID => 1``; *user_id* is accepted for call compatibility and not used."""
+    ``UserID => 1`` (not the acting user), so no user id is taken."""
     config = await load_ticket_dynamic_field(session, await _df_name(sysconfig))
     if config is None:  # `return ... if !IsHashRefWithData($DynamicFieldConfig)`
         return []
@@ -276,13 +276,6 @@ async def collect_reused_attachments(
     return files
 
 
-def _split_list(value: Any) -> list[str]:
-    """``split /\\s*,\\s*/`` of a Config value (a list value is taken as is)."""
-    if isinstance(value, list | tuple):
-        return [str(v).strip() for v in value if str(v).strip()]
-    return [p for p in re.split(r"\s*,\s*", str(value or "").strip()) if p]
-
-
 async def collect_std_attachments(
     session: AsyncSession, config: Mapping[str, Any]
 ) -> list[tuple[str, str, bytes]]:
@@ -290,8 +283,8 @@ async def collect_std_attachments(
 
     A name or id that does not exist is skipped; an invalid standard attachment is logged as an
     error and skipped (``ValidID != 1``)."""
-    ids: list[int] = [int(i) for i in _split_list(config.get("AttachmentIDs")) if i.isdecimal()]
-    names = _split_list(config.get("Attachments"))
+    ids: list[int] = [int(i) for i in perl_comma_list(config.get("AttachmentIDs")) if i.isdecimal()]
+    names = perl_comma_list(config.get("Attachments"))
     if names:
         rows = (
             await session.execute(
@@ -334,16 +327,13 @@ async def collect_action_attachments(
     *,
     ticket_id: int,
     sysconfig: SysConfig,
-    user_id: int,
 ) -> list[tuple[str, str, bytes]]:
     """What ``ArticleSend`` / ``TicketArticleCreate`` attach: the reused selection when
     ``AttachmentsReuse`` is truthy (``ArticleSend.pm:163``), then the standard attachments."""
     files: list[tuple[str, str, bytes]] = []
     if perl_truthy(config.get("AttachmentsReuse")):
         files.extend(
-            await collect_reused_attachments(
-                session, ticket_id=ticket_id, sysconfig=sysconfig, user_id=user_id
-            )
+            await collect_reused_attachments(session, ticket_id=ticket_id, sysconfig=sysconfig)
         )
     if config.get("Attachments") or config.get("AttachmentIDs"):
         files.extend(await collect_std_attachments(session, config))

@@ -263,6 +263,19 @@ def test_action_required_param_missing() -> None:
     assert codes(with_action("TicketStateSet", {"StateID": "1"})) == []
 
 
+def test_article_send_without_from_is_valid() -> None:
+    # Znuny ArticleSend.pm:162 always replaces From via FromGet (queue address fallback), so a
+    # missing From is how imported Znuny processes look; it must not be reported as an error.
+    config = {
+        "SenderType": "agent",
+        "IsVisibleForCustomer": "1",
+        "To": "customer@example.org",
+        "Subject": "Hello",
+        "Body": "Text",
+    }
+    assert codes(with_action("ArticleSend", config)) == []
+
+
 # --- warnings -------------------------------------------------------------------------------
 
 

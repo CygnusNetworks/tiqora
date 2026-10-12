@@ -178,6 +178,7 @@ async def test_create_edit_delete_round_trip(
         assert row["name"] == "wf3 round trip"
         assert row["sync_state"] == "not_sync"
         assert row["state_entity_id"] == "S2"
+        assert row["has_draft_changes"] is True
 
         dialog = await client.post(
             f"{BASE}/entities/ActivityDialog",
@@ -199,6 +200,10 @@ async def test_create_edit_delete_round_trip(
         )
         assert activity.status_code == 201
         aid = activity.json()["entity_id"]
+        one = await client.get(f"{BASE}/entities/Activity/{aid}")
+        assert one.status_code == 200 and one.json() == activity.json()
+        assert (await client.get(f"{BASE}/entities/Activity/{did}")).status_code == 404
+        assert (await client.get(f"{BASE}/entities/Process/{pid}")).status_code == 422
 
         updated = await client.put(
             f"{BASE}/processes/{pid}",

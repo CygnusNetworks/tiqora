@@ -400,7 +400,7 @@ async def test_broken_yaml_is_422(env: Env) -> None:
         resp = await c.post(f"{BASE}/import", json={"content": "a: [unclosed"})
         assert resp.status_code == 422 and "nicht gelesen" in resp.json()["detail"]
         huge = await c.post(f"{BASE}/import", json={"content": "x" * 1_000_001})
-        assert huge.status_code == 422
+        assert huge.status_code == 422 and huge.json()["detail"] == "Datei zu groß."
 
 
 async def test_import_refuses_missing_entity_data(env: Env) -> None:

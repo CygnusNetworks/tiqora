@@ -127,6 +127,16 @@ async def list_entity_summaries(
     return await list_entities(session, entity_type)
 
 
+@router.get("/entities/{entity_type}/{entity_id}", response_model=DesignerEntityOut)
+async def get_entity(
+    entity_type: SubEntityPath, entity_id: str, admin: AdminUser, session: DbSession
+) -> DesignerEntityOut:
+    """One step, form, transition or action (the designer adds an existing one to a process)."""
+    _ = admin
+    with _mapped_errors():
+        return await load_entity(session, entity_type, entity_id)
+
+
 @router.get("/processes/{process_entity_id}/validation", response_model=list[ValidationIssueOut])
 async def get_validation(
     process_entity_id: str, admin: AdminUser, session: DbSession, settings: AppSettings
