@@ -198,7 +198,9 @@ async def test_config_ok_and_leaks_nothing(env: Env) -> None:
     assert res.status_code == 200
     body = res.json()
     assert body["online"] is True
-    assert body["topics"] == [{"key": "support", "label": "Support", "online": True}]
+    assert body["topics"] == [
+        {"key": "support", "label": "Support", "online": True, "ai_first": False}
+    ]
     assert body["max_message_length"] == 2000
     assert body["upload"]["enabled"] is True
     assert {f["key"] for f in body["prechat_fields"]} == {"name", "email"}

@@ -74,7 +74,7 @@ describe("reducer", () => {
   });
 
   it("set-topic only accepts a topic of the loaded config", () => {
-    let s = reducer(initial, { type: "config-loaded", config: cfg({ topics: [{ key: "sales", label: "Vertrieb", online: true }] }) });
+    let s = reducer(initial, { type: "config-loaded", config: cfg({ topics: [{ key: "sales", label: "Vertrieb", online: true, ai_first: false }] }) });
     expect(reducer(s, { type: "set-topic", topic: "nope" }).topic).toBeNull();
     s = reducer(s, { type: "set-topic", topic: "sales" });
     expect(s.topic).toBe("sales");

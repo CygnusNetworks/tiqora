@@ -2,6 +2,7 @@ import type { ChatMessage, ChatPublicConfig } from "./api";
 
 export function cfg(over: Partial<ChatPublicConfig> = {}): ChatPublicConfig {
   return {
+    bot_name: "KI-Assistent",
     greeting: "Willkommen",
     max_message_length: 100,
     offline_mode: "form",

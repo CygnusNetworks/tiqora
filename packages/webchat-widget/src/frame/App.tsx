@@ -23,6 +23,7 @@ const TYPING_VISIBLE_MS = 5000;
 const PREVIEW_AGENT = "Max";
 
 const PREVIEW_DEFAULT: ChatPublicConfig = {
+  bot_name: "KI-Assistent",
   greeting: null,
   max_message_length: 4000,
   offline_mode: "form",
@@ -42,7 +43,7 @@ function applyPreview(base: ChatPublicConfig, p: PreviewConfig | null): ChatPubl
     greeting: p.greeting,
     theme: { ...base.theme, ...p.theme },
     prechat_fields: p.prechat_fields,
-    topics: p.topics.map((t) => ({ ...t, online: true })),
+    topics: p.topics.map((t) => ({ ...t, ai_first: false, online: true })),
   };
 }
 
