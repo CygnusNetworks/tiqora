@@ -14293,6 +14293,11 @@ export interface components {
             /** Last Run At */
             last_run_at?: string | null;
             /**
+             * Notices
+             * @default []
+             */
+            notices: string[];
+            /**
              * Schedule
              * @enum {string}
              */

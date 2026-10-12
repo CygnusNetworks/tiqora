@@ -40,6 +40,7 @@ function daemon(overrides: Partial<DaemonServiceOut> = {}): DaemonServiceOut {
     last_ok_at: "2026-07-19T10:00:00+00:00",
     last_error: null,
     last_result: null,
+    notices: [],
     ...overrides,
   };
 }

@@ -11,15 +11,24 @@ from __future__ import annotations
 import json
 from datetime import datetime
 
+import structlog
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import delete, select, text
 
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.schemas import DaemonListOut, DaemonServiceOut, DaemonUpdate
 from tiqora.config import get_settings
 from tiqora.db.tiqora.models import TiqoraSettings
+from tiqora.domain.settings_store import (
+    KEY_GI_REQUESTER_CURSOR,
+    KEY_GI_REQUESTER_LAST_ENABLED_TICK,
+)
+from tiqora.gi.takeover import daemon_notices
 from tiqora.worker.services import DAEMON_SERVICES, DAEMON_SERVICES_BY_SLUG, DaemonService
+from tiqora.znuny.sysconfig import SysConfig
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/daemons", tags=["admin:daemons"])
 
@@ -56,17 +65,21 @@ def _parse_dt(raw: str | None) -> datetime | None:
         return None
 
 
-def _to_out(svc: DaemonService, raw: dict[str, str]) -> DaemonServiceOut:
+def _is_enabled(svc: DaemonService, raw: dict[str, str]) -> bool:
+    if svc.enabled_key is None:
+        return True
+    raw_enabled = raw.get(svc.enabled_key)
+    if raw_enabled is None or raw_enabled == "":
+        return svc.default_enabled
+    return raw_enabled.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _to_out(
+    svc: DaemonService, raw: dict[str, str], notices: list[str] | None = None
+) -> DaemonServiceOut:
     settings = get_settings()
 
-    if svc.enabled_key is None:
-        enabled = True
-    else:
-        raw_enabled = raw.get(svc.enabled_key)
-        if raw_enabled is None or raw_enabled == "":
-            enabled = svc.default_enabled
-        else:
-            enabled = raw_enabled.strip().lower() in ("1", "true", "yes", "on")
+    enabled = _is_enabled(svc, raw)
 
     interval_seconds: int | None = None
     interval_overridden = False
@@ -105,7 +118,20 @@ def _to_out(svc: DaemonService, raw: dict[str, str]) -> DaemonServiceOut:
         last_ok_at=_parse_dt(raw.get(f"{status_base}.last_ok")),
         last_error=raw.get(f"{status_base}.last_error"),
         last_result=last_result,
+        notices=notices or [],
     )
+
+
+async def _notices(svc: DaemonService, session: DbSession) -> list[str]:
+    """Warnings for the takeover row; a failure here must never break the page."""
+    if svc.slug != "gi_requester":
+        return []
+    try:
+        return await daemon_notices(session, SysConfig(session))
+    except Exception:  # noqa: BLE001 - diagnostics only
+        logger.exception("gi_requester_notices_failed")
+        await session.rollback()
+        return []
 
 
 async def _upsert_setting(session: DbSession, key: str, value: str) -> None:
@@ -126,11 +152,23 @@ async def _delete_setting(session: DbSession, key: str) -> None:
         await session.delete(existing)
 
 
+async def _start_gi_requester_at_head(session: DbSession) -> None:
+    """Switching the requester on must not replay history written while it was off: move the
+    cursor to the newest history row in the same transaction as the flag and drop the marker."""
+    head = (await session.execute(text("SELECT MAX(id) FROM ticket_history"))).scalar()
+    await _upsert_setting(session, KEY_GI_REQUESTER_CURSOR, str(int(head or 0)))
+    await session.execute(
+        delete(TiqoraSettings).where(TiqoraSettings.key == KEY_GI_REQUESTER_LAST_ENABLED_TICK)
+    )
+
+
 @router.get("", response_model=DaemonListOut)
 async def list_daemons(admin: AdminUser, session: DbSession) -> DaemonListOut:
     _ = admin
     raw = await _raw_settings(session)
-    return DaemonListOut(services=[_to_out(svc, raw) for svc in DAEMON_SERVICES])
+    return DaemonListOut(
+        services=[_to_out(svc, raw, await _notices(svc, session)) for svc in DAEMON_SERVICES]
+    )
 
 
 @router.put("/{slug}", response_model=DaemonServiceOut)
@@ -151,6 +189,12 @@ async def update_daemon(
                 detail=f"{slug} cannot be toggled (always on)",
             )
         assert svc.enabled_key is not None
+        if (
+            slug == "gi_requester"
+            and data["enabled"]
+            and not _is_enabled(svc, await _raw_settings(session))
+        ):
+            await _start_gi_requester_at_head(session)
         await _upsert_setting(session, svc.enabled_key, "1" if data["enabled"] else "0")
 
     if "interval_seconds" in data:
@@ -172,4 +216,4 @@ async def update_daemon(
 
     await session.commit()
     raw = await _raw_settings(session)
-    return _to_out(svc, raw)
+    return _to_out(svc, raw, await _notices(svc, session))

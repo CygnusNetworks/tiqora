@@ -18,6 +18,7 @@ function svc(overrides: Partial<DaemonServiceOut> = {}): DaemonServiceOut {
     last_ok_at: null,
     last_error: null,
     last_result: null,
+    notices: [],
     ...overrides,
   };
 }

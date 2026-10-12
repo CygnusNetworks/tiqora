@@ -16,6 +16,7 @@ from tiqora.config import get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.deployed.watcher import run_deploy_watch_tick
 from tiqora.domain.settings_store import (
+    KEY_GI_REQUESTER_INTERVAL_SECONDS,
     KEY_REPORT_FACTS_INTERVAL_SECONDS,
     KEY_WEBCHAT_SWEEP_INTERVAL_SECONDS,
     get_setting_int,
@@ -184,7 +185,25 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
         return await run_webchat_worker_tick(settings)
 
     from tiqora.extensions import get_registry
+    from tiqora.gi.follower import make_gap_tracker, run_gi_requester_tick
+    from tiqora.gi.loader import GiWebservices
     from tiqora.plugins.event_dispatch import run_plugin_events_tick
+    from tiqora.plugins.events import GapTracker
+
+    # process-level state of the GenericInterface follower: the webservice snapshot and the
+    # tracker that remembers which holes in the history ids it is still holding back
+    gi_webservices = GiWebservices()
+    gi_tracker: list[GapTracker] = []
+
+    async def gi_requester_tick() -> dict[str, int]:
+        if not gi_tracker:
+            gi_tracker.append(await make_gap_tracker(settings, get_session_factory()))
+        return await run_gi_requester_tick(
+            settings=settings,
+            session_factory=get_session_factory(),
+            webservices=gi_webservices,
+            tracker=gi_tracker[0],
+        )
 
     async def plugin_events_tick() -> dict[str, int]:
         # the registry object is read every tick: a late plugin boot swaps its contents
@@ -293,6 +312,13 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             run_znuny_session_purge_tick,
             settings.znuny_session_purge_interval_seconds,
             None,
+            stop,
+        ),
+        _interval_loop(
+            "gi_requester",
+            gi_requester_tick,
+            settings.gi_requester_interval_seconds,
+            KEY_GI_REQUESTER_INTERVAL_SECONDS,
             stop,
         ),
         _interval_loop(

@@ -40,6 +40,7 @@ function poller(overrides: Partial<DaemonServiceOut> = {}): DaemonServiceOut {
     last_ok_at: "2026-07-19T10:00:00+00:00",
     last_error: null,
     last_result: null,
+    notices: [],
     ...overrides,
   };
 }
@@ -58,6 +59,7 @@ function postmaster(overrides: Partial<DaemonServiceOut> = {}): DaemonServiceOut
     last_ok_at: null,
     last_error: null,
     last_result: null,
+    notices: [],
     ...overrides,
   };
 }
@@ -76,6 +78,7 @@ function gdprRetention(overrides: Partial<DaemonServiceOut> = {}): DaemonService
     last_ok_at: null,
     last_error: null,
     last_result: null,
+    notices: [],
     ...overrides,
   };
 }

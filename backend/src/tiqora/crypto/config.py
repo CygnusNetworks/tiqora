@@ -205,13 +205,15 @@ async def resolve_crypto_config(
     )
 
 
-async def setting_is_valid(session: AsyncSession, name: str) -> bool:
+async def setting_is_valid(session: AsyncSession, name: str, *, default: bool = True) -> bool:
     """Whether the SysConfig setting *name* is active (``is_valid``).
 
     Unlike :meth:`SysConfig.get` a system-wide ``sysconfig_modified`` row with
     ``is_valid = 0`` counts: that is how Znuny's admin deactivates a module
     registration such as ``PostMaster::PreFilterModule###000-SMIMEFetchFromCustomer``.
-    A setting missing from both tables counts as valid (Znuny's shipped default).
+    A setting missing from both tables (or unreadable tables) counts as *default*, valid unless
+    the caller says otherwise: for settings that exist in every Znuny install the shipped default
+    is "valid", a caller probing for a Znuny that may be absent passes ``default=False``.
     """
     from sqlalchemy import text
 
@@ -233,8 +235,8 @@ async def setting_is_valid(session: AsyncSession, name: str) -> bool:
                 )
             ).first()
     except Exception:  # noqa: BLE001 — SysConfig tables absent (fresh test DB)
-        return True
-    return row is None or bool(row[0])
+        return default
+    return default if row is None else bool(row[0])
 
 
 @dataclass(frozen=True)

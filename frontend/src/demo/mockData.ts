@@ -1656,6 +1656,7 @@ const demoDaemons = {
       last_ok_at: "2026-10-08T10:00:00Z",
       last_error: null,
       last_result: { mode: "live" },
+      notices: [],
     },
   ],
 };
