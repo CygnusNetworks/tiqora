@@ -39,6 +39,10 @@ def _sync_handler(operation: SyncOperation) -> SyncHandler:
             return TicketCreatePatch(title="Angereichert")
         if mode == "bad_priority":
             return TicketCreatePatch(priority="gibt-es-nicht")
+        if mode == "bad_shape_scalar":
+            return TicketCreatePatch(dynamic_fields={"X": 5})  # type: ignore[dict-item]
+        if mode == "bad_shape_list":
+            return TicketCreatePatch(dynamic_fields=["x"])  # type: ignore[arg-type]
         return None
 
     return handler

@@ -199,6 +199,22 @@ async def test_patch_with_unknown_priority_is_failure(
     assert patched.priority == "gibt-es-nicht" and patched.title == op.title
 
 
+@pytest.mark.parametrize("mode", ["bad_shape_scalar", "bad_shape_list"])
+async def test_malformed_patch_is_contained(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str
+) -> None:
+    registry = boot_points_plugin(tmp_path, monkeypatch)
+    points_behaviour().MODE["hook.ticket.create"] = mode
+    op = _create_op()
+    assert await _run(op) is op  # fail-open: skipped and counted
+    assert SyncBreaker.failures(hook_key(_hook(registry))) == 1
+
+    deny = dataclasses.replace(_hook(registry), on_error="deny")
+    with pytest.raises(OperationVetoed) as caught:
+        await _run(op, _registry_of(deny))
+    assert "fehlgeschlagen" in str(caught.value)
+
+
 async def test_trip_after_five_and_reset(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     registry = boot_points_plugin(tmp_path, monkeypatch)
     behaviour = points_behaviour()

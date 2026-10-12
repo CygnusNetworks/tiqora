@@ -20,11 +20,10 @@ from datetime import datetime
 from typing import Any, Final, Literal, get_args
 
 import structlog
-from sqlalchemy import text, update
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.db.engine import get_session_factory
-from tiqora.db.tiqora.models import TiqoraPluginHook
 from tiqora.domain.ticket_write_service import InvalidInput
 from tiqora.extensions.core import get_registry
 from tiqora.extensions.registry import ExtensionPoint, Registry
@@ -37,6 +36,7 @@ from tiqora.plugins.store import (
     ensure_hook,
     load_hooks,
     record_hook_failure,
+    record_hook_recovery,
 )
 
 logger = structlog.get_logger(__name__)
@@ -286,7 +286,8 @@ class SyncBreaker:
             return
         cls._last_refresh = now
         try:
-            await asyncio.wait_for(cls.flush(), 2.0)  # own writes first, or they look stale
+            if cls._pending:  # own writes first, or they look stale; never cancel them
+                await asyncio.wait(set(cls._pending), timeout=2.0)
             async with get_session_factory()() as session:
                 rows = await load_hooks(session, kind=HOOK_KIND)
                 states = {k: h.tripped_at is not None for k, h in rows.items()}
@@ -328,11 +329,7 @@ async def _persist_failure(key: str, plugin_id: str, error: str) -> None:
 async def _persist_recovery(key: str) -> None:
     try:
         async with get_session_factory()() as session:
-            await session.execute(
-                update(TiqoraPluginHook)
-                .where(TiqoraPluginHook.hook_key == key)
-                .values(consecutive_failures=0, tripped_at=None, last_ok_at=utc_now())
-            )
+            await record_hook_recovery(session, key, now=utc_now())
             await session.commit()
     except Exception as exc:  # noqa: BLE001
         logger.warning(
@@ -399,9 +396,16 @@ async def _validated_merge(
             raise ValueError(f"{attr} „{value}“ gibt es nicht")
         changes[attr] = value
     if patch.dynamic_fields:
+        fields = patch.dynamic_fields
+        if not isinstance(fields, Mapping):
+            raise ValueError("Ungültige Werte für dynamische Felder")
         merged = dict(op.dynamic_fields)
-        for name, values in patch.dynamic_fields.items():
-            if not isinstance(name, str) or isinstance(values, str):
+        for name, values in fields.items():
+            if (
+                not isinstance(name, str)
+                or not isinstance(values, Sequence)
+                or isinstance(values, (str, bytes, bytearray))
+            ):
                 raise ValueError("Ungültige Werte für dynamische Felder")
             merged[name] = tuple(str(v) for v in values)
         changes["dynamic_fields"] = merged

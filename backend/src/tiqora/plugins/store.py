@@ -423,6 +423,15 @@ async def record_hook_success(
         hook.cursor = cursor
 
 
+async def record_hook_recovery(session: AsyncSession, hook_key: str, *, now: datetime) -> None:
+    """A tripped sync hook answered again: failures reset and the breaker closed."""
+    await session.execute(
+        update(TiqoraPluginHook)
+        .where(TiqoraPluginHook.hook_key == hook_key)
+        .values(consecutive_failures=0, tripped_at=None, last_ok_at=now)
+    )
+
+
 async def advance_hook_cursor(
     session: AsyncSession, hook: TiqoraPluginHook, *, cursor: int
 ) -> None:
