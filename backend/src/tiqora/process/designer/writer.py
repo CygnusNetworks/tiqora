@@ -162,7 +162,7 @@ def normalise_config(entity_type: SubEntityType, config: Mapping[str, Any]) -> d
     """Shape a sub-entity config like Znuny's own forms store it (stringified scalars)."""
     if not isinstance(config, Mapping):
         raise InvalidReference("Die Konfiguration muss ein Objekt sein.")
-    cfg = stringify_scalars(_mapping(config))
+    cfg: dict[str, Any] = stringify_scalars(_mapping(config))
     _scope(cfg)
     if entity_type == "Activity":
         cfg["ActivityDialog"] = _renumber(cfg.get("ActivityDialog"))
