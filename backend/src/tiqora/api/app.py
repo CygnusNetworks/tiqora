@@ -17,6 +17,7 @@ from tiqora import __version__
 from tiqora.api.compat.router import compat_router
 from tiqora.api.portal import portal_router
 from tiqora.api.portal.deps import require_portal_enabled
+from tiqora.api.scim.router import SCIM_PREFIX, scim_router
 from tiqora.api.spa import mount_spa, spa_is_available
 from tiqora.api.v1 import api_v1_router
 from tiqora.api.v1.admin.chat_configs import chat_config_validation_handler
@@ -377,6 +378,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         prefix="/api/portal",
         dependencies=[Depends(require_portal_enabled)],
     )
+    # SCIM 2.0 provisioning (bearer token only, outside /api so the CSRF check never applies).
+    # Must be registered before mount_spa: the SPA fallback matches any remaining GET path.
+    app.include_router(scim_router, prefix=SCIM_PREFIX)
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:

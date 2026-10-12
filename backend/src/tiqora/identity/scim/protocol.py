@@ -343,6 +343,7 @@ def schemas_document() -> list[dict[str, Any]]:
         ),
         _attr("id", mutability="readOnly", uniqueness="server", case_exact=True),
     ]
+    enterprise_attrs = [_attr("employeeNumber"), _attr("department")]
     return [
         {
             "schemas": [SCHEMA_SCHEMA],
@@ -358,6 +359,14 @@ def schemas_document() -> list[dict[str, Any]]:
             "name": "Group",
             "description": "Group",
             "attributes": group_attrs,
+            "meta": {"resourceType": "Schema"},
+        },
+        {
+            "schemas": [SCHEMA_SCHEMA],
+            "id": SCHEMA_ENTERPRISE,
+            "name": "EnterpriseUser",
+            "description": "Enterprise user attributes (accepted and ignored)",
+            "attributes": enterprise_attrs,
             "meta": {"resourceType": "Schema"},
         },
     ]

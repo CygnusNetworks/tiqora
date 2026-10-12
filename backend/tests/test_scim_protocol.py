@@ -8,6 +8,7 @@ import pytest
 
 from tiqora.identity.scim.errors import ScimError, scim_error_body
 from tiqora.identity.scim.protocol import (
+    SCHEMA_ENTERPRISE,
     SCHEMA_GROUP,
     SCHEMA_LIST,
     SCHEMA_USER,
@@ -159,7 +160,7 @@ def test_resource_types_groups_flag() -> None:
 
 def test_schemas_document_lists_user_and_group() -> None:
     docs = schemas_document()
-    assert [d["id"] for d in docs] == [SCHEMA_USER, SCHEMA_GROUP]
+    assert [d["id"] for d in docs] == [SCHEMA_USER, SCHEMA_GROUP, SCHEMA_ENTERPRISE]
     user_names = {a["name"] for a in docs[0]["attributes"]}
     assert {"userName", "emails", "active"} <= user_names
     id_attr = next(a for a in docs[0]["attributes"] if a["name"] == "id")
