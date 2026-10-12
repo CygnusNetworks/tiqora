@@ -60,7 +60,7 @@ class DefinitionImportResult:
 
 
 class _NoAliasLoader(yaml.SafeLoader):
-    """SafeLoader that refuses aliases (``*x``): they allow exponential fan-out ("billion laughs")."""
+    """SafeLoader that refuses aliases (``*x``): exponential fan-out."""
 
     def compose_node(self, parent: Any, index: Any) -> Any:
         if self.check_event(yaml.events.AliasEvent):
