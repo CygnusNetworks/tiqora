@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Fornyer Kerberos-logon om {{seconds}}s...",
     "kerberosReauthNow": "Log ind nu",
     "ssoFailed": "SSO mislykkedes - log venligst ind med din adgangskode.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Konfigurer to-faktor-godkendelse",
       "hint": "2FA er påkrævet for denne konto - konfigurer den nu.",
@@ -1350,6 +1353,9 @@
       "preferences": "Indstillinger"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Log ind på din supportkonto",
       "email": "E-mail eller brugernavn",
       "ssoDivider": "or",

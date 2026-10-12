@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Kerberos साइन-इन को {{seconds}}s में नवीनीकृत किया जा रहा है...",
     "kerberosReauthNow": "अभी साइन इन करें",
     "ssoFailed": "SSO विफल - कृपया अपने पासवर्ड से साइन इन करें।",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "दो-कारक प्रमाणीकरण सेट करें",
       "hint": "इस खाते के लिए 2FA आवश्यक है - कृपया इसे अभी सेट करें।",
@@ -1350,6 +1353,9 @@
       "preferences": "वरीयताएँ"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "अपने सहायता खाते में साइन इन करें",
       "email": "ईमेल या उपयोगकर्ता नाम",
       "ssoDivider": "or",

@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "กำลังต่ออายุการลงชื่อเข้าใช้ Kerberos ใน {{seconds}}s...",
     "kerberosReauthNow": "เข้าสู่ระบบตอนนี้",
     "ssoFailed": "SSO ล้มเหลว — โปรดลงชื่อเข้าใช้ด้วยรหัสผ่านของคุณ",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "ตั้งค่าการตรวจสอบสิทธิ์แบบสองปัจจัย",
       "hint": "บัญชีนี้จำเป็นต้องมี 2FA — โปรดตั้งค่าทันที",
@@ -1350,6 +1353,9 @@
       "preferences": "การตั้งค่า"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "ลงชื่อเข้าใช้บัญชีสนับสนุนของคุณ",
       "email": "อีเมลหรือชื่อผู้ใช้",
       "ssoDivider": "or",

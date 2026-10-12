@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Оновлення входу Kerberos через {{seconds}}с…",
     "kerberosReauthNow": "Увійдіть зараз",
     "ssoFailed": "Помилка системи єдиного входу — увійдіть, використовуючи свій пароль.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Налаштуйте двофакторну аутентифікацію",
       "hint": "Для цього облікового запису потрібен 2FA — налаштуйте його зараз.",
@@ -1350,6 +1353,9 @@
       "preferences": "Налаштування"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Увійдіть у свій обліковий запис служби підтримки",
       "email": "Електронна пошта або ім'я користувача",
       "ssoDivider": "or",

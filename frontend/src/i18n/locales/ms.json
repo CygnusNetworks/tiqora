@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Memperbaharui log masuk Kerberos {{seconds}}s…",
     "kerberosReauthNow": "Log masuk sekarang",
     "ssoFailed": "SSO gagal — sila log masuk dengan kata laluan anda.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Sediakan pengesahan dua faktor",
       "hint": "2FA diperlukan untuk akaun ini — sila sediakannya sekarang.",
@@ -1350,6 +1353,9 @@
       "preferences": "Tetapan"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Log masuk ke akaun sokongan anda",
       "email": "E-mel atau nama pengguna",
       "ssoDivider": "or",

@@ -11,6 +11,7 @@ const verifyTotp = vi.fn();
 const verifyPasskey = vi.fn();
 const completeEnroll2fa = vi.fn();
 const completeEnrollPasskey = vi.fn();
+const refreshPending = vi.fn();
 const authMethods = vi.fn();
 const totpEnroll = vi.fn();
 const spnegoLoginUrl = vi.fn(() => "/api/v1/auth/spnego");
@@ -25,6 +26,7 @@ let searchParams: {
   next?: string;
   sso_error?: string;
   logged_out?: string;
+  sso_step_up?: string;
 } = {};
 
 vi.mock("@tanstack/react-router", () => ({
@@ -39,6 +41,7 @@ vi.mock("@/auth/AuthContext", () => ({
     verifyPasskey,
     completeEnroll2fa,
     completeEnrollPasskey,
+    refreshPending,
     pending2fa,
     pendingFactors,
     mustEnroll2fa,
@@ -92,6 +95,8 @@ describe("LoginPage", () => {
     verifyPasskey.mockReset();
     completeEnroll2fa.mockReset();
     completeEnrollPasskey.mockReset();
+    refreshPending.mockReset();
+    refreshPending.mockResolvedValue("none");
     authMethods.mockReset();
     totpEnroll.mockReset();
     spnegoLoginUrl.mockClear();
@@ -353,6 +358,48 @@ describe("LoginPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("sso-error")).toBeInTheDocument();
     });
+  });
+
+  it("with sso_step_up shows the TOTP step from the pending state", async () => {
+    searchParams = { sso_step_up: "1" };
+    pending2fa = true;
+    pendingFactors = { totp: true, passkey: false };
+    refreshPending.mockResolvedValue("pending_2fa");
+    renderPage();
+    expect(await screen.findByTestId("totp-form")).toBeInTheDocument();
+    expect(screen.getByTestId("sso-step-up-hint")).toHaveTextContent(
+      i18n.t("auth.stepUp.hint"),
+    );
+    expect(refreshPending).toHaveBeenCalledTimes(1);
+  });
+
+  it("with sso_step_up shows enrolment when must_enroll_2fa", async () => {
+    searchParams = { sso_step_up: "1" };
+    mustEnroll2fa = true;
+    refreshPending.mockResolvedValue("must_enroll_2fa");
+    totpEnroll.mockResolvedValue({
+      secret: "JBSWY3DPEHPK3PXP",
+      provisioning_uri: "otpauth://x",
+    });
+    renderPage();
+    expect(await screen.findByTestId("must-enroll-step")).toBeInTheDocument();
+    expect(screen.getByTestId("sso-step-up-hint")).toBeInTheDocument();
+    expect(refreshPending).toHaveBeenCalledTimes(1);
+  });
+
+  it("with sso_step_up and state none shows the normal form", async () => {
+    searchParams = { sso_step_up: "1" };
+    renderPage();
+    expect(await screen.findByTestId("login-form")).toBeInTheDocument();
+    expect(screen.queryByTestId("sso-step-up-hint")).toBeNull();
+    expect(screen.queryByTestId("totp-form")).toBeNull();
+    expect(refreshPending).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not ask for a pending login without sso_step_up", async () => {
+    renderPage();
+    expect(await screen.findByTestId("login-form")).toBeInTheDocument();
+    expect(refreshPending).not.toHaveBeenCalled();
   });
 
   it("renders forced enrollment step and completes on confirm", async () => {

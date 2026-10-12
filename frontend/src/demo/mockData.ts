@@ -2224,6 +2224,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
       { slug: "demo-adfs", kind: "saml", label: "Firmenkonto (SAML)", icon: "building" },
     ],
   };
+  if (p.endsWith("/auth/pending")) return { state: "none", totp_enrolled: false, passkey_enrolled: false };
   if (p.endsWith("/auth/me")) return demoUser;
   // The demo cannot read the body; saving keeps the browser-zone default.
   if (p.endsWith("/auth/me/time-zone") && method === "PUT") return demoUser;

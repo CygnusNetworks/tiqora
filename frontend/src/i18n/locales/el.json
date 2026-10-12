@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Ανανέωση σύνδεσης Kerberos σε {{seconds}}s…",
     "kerberosReauthNow": "Συνδεθείτε τώρα",
     "ssoFailed": "SSO απέτυχε — συνδεθείτε με τον κωδικό πρόσβασής σας.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Ρυθμίστε τον έλεγχο ταυτότητας δύο παραγόντων",
       "hint": "Απαιτείται 2FA για αυτόν τον λογαριασμό — ρυθμίστε τον τώρα.",
@@ -1350,6 +1353,9 @@
       "preferences": "Προτιμήσεις"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Συνδεθείτε στον λογαριασμό υποστήριξής σας",
       "email": "email ή όνομα χρήστη",
       "ssoDivider": "or",

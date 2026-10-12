@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Notiek Kerberos pierakstīšanās atjaunošana pēc {{seconds}}s…",
     "kerberosReauthNow": "Pierakstieties tūlīt",
     "ssoFailed": "SSO neizdevās — lūdzu, pierakstieties ar savu paroli.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Iestatiet divu faktoru autentifikāciju",
       "hint": "Šim kontam ir nepieciešams 2FA — lūdzu, iestatiet to tūlīt.",
@@ -1350,6 +1353,9 @@
       "preferences": "Iestatījumi"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Pierakstieties savā atbalsta kontā",
       "email": "E-pasts vai lietotājvārds",
       "ssoDivider": "or",

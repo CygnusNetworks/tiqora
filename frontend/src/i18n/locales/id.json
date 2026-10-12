@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Memperbarui proses masuk Kerberos dalam {{seconds}}s…",
     "kerberosReauthNow": "Masuk sekarang",
     "ssoFailed": "SSO gagal — silakan masuk dengan kata sandi Anda.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Siapkan autentikasi dua faktor",
       "hint": "2FA diperlukan untuk akun ini — silakan atur sekarang.",
@@ -1350,6 +1353,9 @@
       "preferences": "Preferensi"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Masuk ke akun dukungan Anda",
       "email": "Email atau nama pengguna",
       "ssoDivider": "or",

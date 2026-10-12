@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Se reînnoiește conectarea Kerberos în {{seconds}}s...",
     "kerberosReauthNow": "Conectați-vă acum",
     "ssoFailed": "SSO a eșuat — vă rugăm să vă conectați cu parola.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Configurați autentificarea cu doi factori",
       "hint": "Este necesar 2FA pentru acest cont - vă rugăm să-l configurați acum.",
@@ -1350,6 +1353,9 @@
       "preferences": "Preferințe"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Conectați-vă la contul dvs. de asistență",
       "email": "E-mail sau nume de utilizator",
       "ssoDivider": "or",

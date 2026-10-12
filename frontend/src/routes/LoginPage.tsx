@@ -42,6 +42,7 @@ export function LoginPage() {
     completeEnrollPasskey,
     pending2fa,
     pendingFactors,
+    refreshPending,
     mustEnroll2fa,
     isAuthenticated,
     isLoading,
@@ -52,6 +53,7 @@ export function LoginPage() {
     next?: string;
     sso_error?: string;
     logged_out?: string;
+    sso_step_up?: string;
   };
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -104,6 +106,16 @@ export function LoginPage() {
     search.next,
     history,
   ]);
+
+  // Back from a single sign-on that still owes a second factor: ask the backend
+  // what the session cookie is waiting for, once per mount.
+  const stepUp = search.sso_step_up === "1";
+  const stepUpChecked = useRef(false);
+  useEffect(() => {
+    if (!stepUp || stepUpChecked.current) return;
+    stepUpChecked.current = true;
+    void refreshPending();
+  }, [stepUp, refreshPending]);
 
   // Seamless SSO re-auth: when an expired session bounced the agent here (a
   // `next` target is present) and Kerberos/SPNEGO is available, start a short
@@ -296,6 +308,14 @@ export function LoginPage() {
           <h1 className="text-center font-display text-2xl font-bold tracking-tight text-ink">
             {t("auth.mustEnroll.title")}
           </h1>
+          {stepUp && (
+            <p
+              className="mt-3 text-center text-sm text-muted"
+              data-testid="sso-step-up-hint"
+            >
+              {t("auth.stepUp.hint")}
+            </p>
+          )}
           <p
             className="mt-1.5 text-center text-sm text-muted"
             data-testid="must-enroll-hint"
@@ -425,6 +445,14 @@ export function LoginPage() {
           <p className="mt-1.5 text-center text-sm text-muted">
             {totpAvailable ? t("auth.totpHint") : t("auth.passkeyOnlyHint")}
           </p>
+          {stepUp && (
+            <p
+              className="mt-3 text-center text-sm text-muted"
+              data-testid="sso-step-up-hint"
+            >
+              {t("auth.stepUp.hint")}
+            </p>
+          )}
           {totpAvailable && (
             <form
               onSubmit={(e) => void onVerifyTotp(e)}

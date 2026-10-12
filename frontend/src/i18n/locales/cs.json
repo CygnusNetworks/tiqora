@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Obnovuji Kerberos přihlášení za {{seconds}}s…",
     "kerberosReauthNow": "Přihlásit se nyní",
     "ssoFailed": "SSO se nezdařilo — přihlaste se prosím heslem.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Nastavit dvoufaktorové ověření",
       "hint": "Pro tento účet je vyžadováno 2FA — nastavte jej prosím nyní.",
@@ -1350,6 +1353,9 @@
       "preferences": "Nastavení"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Přihlaste se ke svému účtu podpory",
       "email": "E-mail nebo uživatelské jméno",
       "ssoDivider": "or",

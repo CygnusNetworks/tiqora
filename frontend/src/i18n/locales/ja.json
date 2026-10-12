@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "{{seconds}}秒後にKerberosサインインを更新します…",
     "kerberosReauthNow": "今すぐサインイン",
     "ssoFailed": "SSOに失敗しました — パスワードでサインインしてください。",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "2要素認証の設定",
       "hint": "このアカウントでは2FAが必須です — 今すぐ設定してください。",
@@ -1350,6 +1353,9 @@
       "preferences": "個人設定"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "サポートアカウントにサインインしてください",
       "email": "メールアドレスまたはユーザー名",
       "ssoDivider": "or",

@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Inasasisha kuingia kwa Kerberos katika {{seconds}}s...",
     "kerberosReauthNow": "Ingia sasa",
     "ssoFailed": "SSO imeshindwa - tafadhali ingia kwa kutumia nenosiri lako.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Sanidi uthibitishaji wa vipengele viwili",
       "hint": "2FA inahitajika kwa akaunti hii — tafadhali isanidi sasa.",
@@ -1350,6 +1353,9 @@
       "preferences": "Mapendeleo"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Ingia katika akaunti yako ya usaidizi",
       "email": "Barua pepe au jina la mtumiaji",
       "ssoDivider": "or",

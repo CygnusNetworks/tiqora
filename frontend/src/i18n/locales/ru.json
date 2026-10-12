@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Повторный вход Kerberos через {{seconds}} с…",
     "kerberosReauthNow": "Войти сейчас",
     "ssoFailed": "SSO не удался — войдите с паролем.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Настройте двухфакторную аутентификацию",
       "hint": "Для этой учётной записи требуется 2FA — настройте её сейчас.",
@@ -1350,6 +1353,9 @@
       "preferences": "Настройки"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Войдите в свою учетную запись поддержки",
       "email": "Электронная почта или имя пользователя",
       "ssoDivider": "or",

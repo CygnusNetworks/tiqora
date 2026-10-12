@@ -1,7 +1,19 @@
 import type { Schemas } from "@tiqora/api-client";
 import { ApiError, api } from "./api";
+import { portalApi } from "./portalApi";
 
 export type LoginProvider = Schemas["LoginProviderOut"];
+export type PendingLogin = Schemas["PendingLoginOut"];
+
+/** State of the agent login behind the session cookie (a second factor after single sign-on). */
+export function getPendingLogin(): Promise<PendingLogin> {
+  return api.request<PendingLogin>("GET", "/api/v1/auth/pending");
+}
+
+/** State of the customer login behind the portal cookie. */
+export function getPortalPendingLogin(): Promise<PendingLogin> {
+  return portalApi.request<PendingLogin>("GET", "/api/portal/auth/pending");
+}
 
 function loginUrl(base: string, slug: string, next?: string): string {
   const url = `${base}/${encodeURIComponent(slug)}/login`;

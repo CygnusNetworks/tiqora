@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "در حال تمدید ورود به سیستم Kerberos در {{seconds}} ثانیه…",
     "kerberosReauthNow": "اکنون وارد شوید",
     "ssoFailed": "SSO ناموفق - لطفا با رمز عبور خود وارد شوید.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "احراز هویت دو مرحله ای را تنظیم کنید",
       "hint": "2FA برای این حساب مورد نیاز است — لطفاً اکنون آن را تنظیم کنید.",
@@ -1350,6 +1353,9 @@
       "preferences": "ترجیحات"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "به حساب پشتیبانی خود وارد شوید",
       "email": "ایمیل یا نام کاربری",
       "ssoDivider": "or",

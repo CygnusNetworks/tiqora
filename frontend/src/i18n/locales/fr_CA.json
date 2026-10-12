@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Renouvellement de la connexion Kerberos en {{seconds}}s…",
     "kerberosReauthNow": "Connectez-vous maintenant",
     "ssoFailed": "Échec de l'authentification unique — veuillez vous connecter avec votre mot de passe.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Configurer l'authentification à deux facteurs",
       "hint": "2FA est requis pour ce compte – veuillez le configurer maintenant.",
@@ -1350,6 +1353,9 @@
       "preferences": "Préférences"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Connectez-vous à votre compte d'assistance",
       "email": "E-mail ou nom d'utilisateur",
       "ssoDivider": "or",

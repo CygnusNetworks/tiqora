@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "חידוש הכניסה ל-Kerberos בעוד {{seconds}} שניות...",
     "kerberosReauthNow": "היכנס עכשיו",
     "ssoFailed": "SSO נכשל - אנא היכנס עם הסיסמה שלך.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "הגדר אימות דו-גורמי",
       "hint": "2FA נדרש עבור חשבון זה - אנא הגדר אותו כעת.",
@@ -1350,6 +1353,9 @@
       "preferences": "העדפות"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "היכנס לחשבון התמיכה שלך",
       "email": "אימייל או שם משתמש",
       "ssoDivider": "or",

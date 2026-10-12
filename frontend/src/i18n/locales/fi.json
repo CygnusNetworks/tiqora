@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Uusitaan Kerberos-sisäänkirjautumista {{seconds}}s kuluttua…",
     "kerberosReauthNow": "Kirjaudu sisään nyt",
     "ssoFailed": "SSO epäonnistui – kirjaudu sisään salasanallasi.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Määritä kaksivaiheinen todennus",
       "hint": "2FA vaaditaan tälle tilille – määritä se nyt.",
@@ -1350,6 +1353,9 @@
       "preferences": "Asetukset"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Kirjaudu sisään tukitilillesi",
       "email": "Sähköposti tai käyttäjätunnus",
       "ssoDivider": "or",

@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Kerberos-aanmelding vernieuwen over {{seconds}}s…",
     "kerberosReauthNow": "Nu aanmelden",
     "ssoFailed": "SSO is mislukt. Meld u aan met uw wachtwoord.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Stel tweefactorauthenticatie in",
       "hint": "Voor dit account is 2FA vereist. Stel dit nu in.",
@@ -1350,6 +1353,9 @@
       "preferences": "Voorkeuren"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Meld u aan bij uw ondersteuningsaccount",
       "email": "E-mailadres of gebruikersnaam",
       "ssoDivider": "or",

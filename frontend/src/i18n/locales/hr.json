@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Obnavljanje Kerberos prijave za {{seconds}}s…",
     "kerberosReauthNow": "Prijavite se sada",
     "ssoFailed": "SSO nije uspio — prijavite se svojom zaporkom.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Postavite dvofaktornu autentifikaciju",
       "hint": "2FA je potreban za ovaj račun — postavite ga sada.",
@@ -1350,6 +1353,9 @@
       "preferences": "Postavke"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Prijavite se na svoj račun podrške",
       "email": "Email ili korisničko ime",
       "ssoDivider": "or",

@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Kerberos bejelentkezés megújítása {{seconds}}s múlva…",
     "kerberosReauthNow": "Bejelentkezés most",
     "ssoFailed": "Az egyszeri bejelentkezés sikertelen – kérjük, jelentkezzen be jelszavával.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Kétfaktoros hitelesítés beállítása",
       "hint": "Ehhez a fiókhoz 2FA szükséges – kérjük, állítsa be most.",
@@ -1350,6 +1353,9 @@
       "preferences": "Beállítások"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Bejelentkezés támogatási fiókjába",
       "email": "E-mail vagy felhasználónév",
       "ssoDivider": "or",

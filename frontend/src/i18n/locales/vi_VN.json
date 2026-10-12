@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Đang gia hạn đăng nhập Kerberos trong {{seconds}}s…",
     "kerberosReauthNow": "Đăng nhập ngay bây giờ",
     "ssoFailed": "SSO không thành công — vui lòng đăng nhập bằng mật khẩu của bạn.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Thiết lập xác thực hai yếu tố",
       "hint": "2FA là bắt buộc đối với tài khoản này — vui lòng thiết lập ngay bây giờ.",
@@ -1350,6 +1353,9 @@
       "preferences": "Tùy chọn"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Đăng nhập vào tài khoản hỗ trợ của bạn",
       "email": "Email hoặc tên người dùng",
       "ssoDivider": "or",

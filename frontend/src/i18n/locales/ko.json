@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "{{seconds}}초 후에 Kerberos 로그인 갱신 중…",
     "kerberosReauthNow": "지금 로그인하세요",
     "ssoFailed": "SSO 실패 — 비밀번호로 로그인하세요.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "이중 인증 설정",
       "hint": "이 계정에는 2FA가 필요합니다. 지금 설정하세요.",
@@ -1350,6 +1353,9 @@
       "preferences": "환경설정"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "지원 계정에 로그인하세요.",
       "email": "이메일 또는 사용자 이름",
       "ssoDivider": "or",

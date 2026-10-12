@@ -16,6 +16,7 @@ const {
   passkeyBegin,
   passkeyFinish,
   startAuthentication,
+  pendingLogin,
 } = vi.hoisted(() => ({
   navigate: vi.fn(),
   portalMe: vi.fn(),
@@ -25,8 +26,14 @@ const {
   passkeyBegin: vi.fn(),
   passkeyFinish: vi.fn(),
   startAuthentication: vi.fn(),
+  pendingLogin: vi.fn(),
 }));
-let searchParams: { next?: string; sso_error?: string; logged_out?: string } = {};
+let searchParams: {
+  next?: string;
+  sso_error?: string;
+  logged_out?: string;
+  sso_step_up?: string;
+} = {};
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
@@ -36,6 +43,11 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/lib/portalApi", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/portalApi")>();
   return { ...actual, portalApi: { portalMe, portalLogin, portalLogout: vi.fn() } };
+});
+
+vi.mock("@/lib/identityApi", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/identityApi")>();
+  return { ...actual, getPortalPendingLogin: (...a: unknown[]) => pendingLogin(...a) };
 });
 
 vi.mock("@/lib/portalSecurityApi", () => ({
@@ -87,6 +99,26 @@ describe("PortalLoginPage", () => {
     searchParams = {};
     portalMe.mockRejectedValue(new ApiError(401, "Unauthorized", "/api/portal/auth/me"));
     methods.mockResolvedValue({ password: true, providers: [], webauthn: false });
+  });
+
+  it("with sso_step_up shows the second-factor step", async () => {
+    searchParams = { sso_step_up: "1" };
+    pendingLogin.mockResolvedValue({ state: "pending_2fa", totp_enrolled: true, passkey_enrolled: false });
+    renderPage();
+    expect(await screen.findByTestId("sso-step-up-hint")).toHaveTextContent(
+      i18n.t("portal.login.stepUp.hint"),
+    );
+    expect(screen.queryByTestId("portal-login-form")).toBeNull();
+    expect(pendingLogin).toHaveBeenCalledTimes(1);
+  });
+
+  it("with sso_step_up and state none shows the password form", async () => {
+    searchParams = { sso_step_up: "1" };
+    pendingLogin.mockResolvedValue({ state: "none", totp_enrolled: false, passkey_enrolled: false });
+    renderPage();
+    expect(await screen.findByTestId("portal-login-form")).toBeInTheDocument();
+    await waitFor(() => expect(pendingLogin).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId("sso-step-up-hint")).toBeNull();
   });
 
   it("renders one button per identity provider linking to the portal SSO start", async () => {

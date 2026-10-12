@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "将在 {{seconds}} 秒后续签 Kerberos 登录…",
     "kerberosReauthNow": "立即登录",
     "ssoFailed": "SSO 失败 — 请使用密码登录。",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "设置双重身份验证",
       "hint": "此账户必须启用 2FA — 请立即设置。",
@@ -1350,6 +1353,9 @@
       "preferences": "偏好设置"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "登录您的支持帐户",
       "email": "电子邮件或用户名",
       "ssoDivider": "or",

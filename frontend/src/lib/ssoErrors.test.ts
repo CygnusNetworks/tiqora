@@ -15,6 +15,13 @@ describe("ssoErrorKey", () => {
     expect(ssoErrorKey("")).toBeNull();
   });
 
+  it("maps mfa_required to its message", () => {
+    expect(ssoErrorKey("mfa_required")).toBe("auth.ssoErrors.mfa_required");
+    expect(SSO_ERROR_CODES).toContain("mfa_required");
+    expect(de.auth.ssoErrors.mfa_required).toContain("zweit");
+    expect(en.auth.ssoErrors.mfa_required).toContain("second factor");
+  });
+
   it("has a German and an English message for every code", () => {
     for (const code of SSO_ERROR_CODES) {
       expect(

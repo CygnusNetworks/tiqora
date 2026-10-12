@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "S'està renovant l'inici de sessió de Kerberos a {{seconds}}s...",
     "kerberosReauthNow": "Inicieu la sessió ara",
     "ssoFailed": "SSO fallat: inicieu la sessió amb la vostra contrasenya.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Configureu l'autenticació de dos factors",
       "hint": "Es requereix 2FA per a aquest compte; configureu-lo ara.",
@@ -1350,6 +1353,9 @@
       "preferences": "Preferències"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Inicieu la sessió al vostre compte d'assistència",
       "email": "Correu electrònic o nom d'usuari",
       "ssoDivider": "or",

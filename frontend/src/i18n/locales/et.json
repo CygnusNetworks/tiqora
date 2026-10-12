@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Kerberose sisselogimise uuendamine {{seconds}}s pärast…",
     "kerberosReauthNow": "Logige kohe sisse",
     "ssoFailed": "SSO ebaõnnestus — logige sisse oma parooliga.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Seadistage kahefaktoriline autentimine",
       "hint": "Selle konto jaoks on vaja 2FA-d – seadistage see kohe.",
@@ -1350,6 +1353,9 @@
       "preferences": "Eelistused"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Logige sisse oma tugikontole",
       "email": "E-post või kasutajanimi",
       "ssoDivider": "or",

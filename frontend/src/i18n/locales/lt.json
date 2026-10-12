@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Atnaujinamas „Kerberos“ prisijungimas per {{seconds}}s…",
     "kerberosReauthNow": "Prisijunkite dabar",
     "ssoFailed": "SSO nepavyko – prisijunkite naudodami savo slaptažodį.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Nustatykite dviejų veiksnių autentifikavimą",
       "hint": "Šiai paskyrai reikalingas 2FA – nustatykite ją dabar.",
@@ -1350,6 +1353,9 @@
       "preferences": "Nuostatos"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Prisijunkite prie savo palaikymo paskyros",
       "email": "Paštas arba vartotojo vardas",
       "ssoDivider": "or",

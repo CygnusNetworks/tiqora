@@ -185,8 +185,15 @@ const loginRoute = createRoute({
   path: "/login",
   validateSearch: (
     s: Record<string, unknown>,
-  ): { next?: string; sso_error?: string; logged_out?: string } => ({
+  ): {
+    next?: string;
+    sso_error?: string;
+    logged_out?: string;
+    sso_step_up?: "1";
+  } => ({
     next: typeof s.next === "string" ? s.next : undefined,
+    // The backend's "1" sends the browser back to finish a second factor after SSO.
+    sso_step_up: searchFlag(s.sso_step_up) === "1" ? "1" : undefined,
     // The router JSON-parses search values: `?sso_error=1` arrives as a number.
     sso_error: searchFlag(s.sso_error),
     // Only the backend's "1" marks a sign-out; "0"/"false" must not show the note.
@@ -705,8 +712,15 @@ const portalLoginRoute = createRoute({
   path: "/portal/login",
   validateSearch: (
     s: Record<string, unknown>,
-  ): { next?: string; sso_error?: string; logged_out?: string } => ({
+  ): {
+    next?: string;
+    sso_error?: string;
+    logged_out?: string;
+    sso_step_up?: "1";
+  } => ({
     next: typeof s.next === "string" ? s.next : undefined,
+    // The backend's "1" sends the browser back to finish a second factor after SSO.
+    sso_step_up: searchFlag(s.sso_step_up) === "1" ? "1" : undefined,
     // The router JSON-parses search values: `?sso_error=1` arrives as a number.
     sso_error: searchFlag(s.sso_error),
     // Only the backend's "1" marks a sign-out; "0"/"false" must not show the note.

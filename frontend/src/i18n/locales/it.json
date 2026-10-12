@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Rinnovo accesso Kerberos tra {{seconds}}s…",
     "kerberosReauthNow": "Accedi ora",
     "ssoFailed": "SSO non riuscito — acceda con la Sua password.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Configurare l'autenticazione a due fattori",
       "hint": "La 2FA è obbligatoria per questo account — la configuri ora.",
@@ -1350,6 +1353,9 @@
       "preferences": "Impostazioni"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Acceda al Suo account di supporto",
       "email": "Email o nome utente",
       "ssoDivider": "or",

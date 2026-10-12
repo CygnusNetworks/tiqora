@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Kerberos-Anmeldung wird in {{seconds}}s erneuert…",
     "kerberosReauthNow": "Jetzt anmelden",
     "ssoFailed": "SSO fehlgeschlagen — bitte per Passwort anmelden.",
+    "stepUp": {
+      "hint": "Ihr Anmeldedienst hat keinen zweiten Faktor bestätigt. Bitte bestätigen Sie ihn hier, um die Anmeldung abzuschließen."
+    },
     "mustEnroll": {
       "title": "Zwei-Faktor-Authentifizierung einrichten",
       "hint": "2FA ist für dieses Konto erforderlich — bitte jetzt einrichten.",
@@ -1350,6 +1353,9 @@
       "preferences": "Einstellungen"
     },
     "login": {
+      "stepUp": {
+        "hint": "Ihr Anmeldedienst hat keinen zweiten Faktor bestätigt. Bitte bestätigen Sie ihn hier, um die Anmeldung abzuschließen."
+      },
       "subtitle": "Bei Ihrem Support-Konto anmelden",
       "email": "E-Mail oder Benutzername",
       "ssoDivider": "oder",

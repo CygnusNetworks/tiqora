@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Се обновува најавувањето на Kerberos за {{seconds}}s…",
     "kerberosReauthNow": "Пријавете се сега",
     "ssoFailed": "ДЗС не успеа - најавете се со вашата лозинка.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Поставете двофакторна автентикација",
       "hint": "2FA е потребен за оваа сметка - поставете ја сега.",
@@ -1350,6 +1353,9 @@
       "preferences": "Поставки"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Најавете се на вашата сметка за поддршка",
       "email": "Е-пошта или корисничко име",
       "ssoDivider": "or",

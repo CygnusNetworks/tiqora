@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Obnovuje sa prihlásenie Kerberos o {{seconds}}s…",
     "kerberosReauthNow": "Prihláste sa teraz",
     "ssoFailed": "Jednotné prihlásenie zlyhalo – prihláste sa pomocou svojho hesla.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Nastavte si dvojfaktorové overenie",
       "hint": "Pre tento účet sa vyžaduje 2FA – nastavte si ho teraz.",
@@ -1350,6 +1353,9 @@
       "preferences": "Nastavenia"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Prihláste sa do svojho účtu podpory",
       "email": "E-mail alebo používateľské meno",
       "ssoDivider": "or",

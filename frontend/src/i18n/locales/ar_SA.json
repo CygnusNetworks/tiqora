@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "جارٍ تجديد تسجيل الدخول إلى Kerberos خلال {{seconds}}ث...",
     "kerberosReauthNow": "قم بتسجيل الدخول الآن",
     "ssoFailed": "فشل تسجيل الدخول الموحد — يرجى تسجيل الدخول باستخدام كلمة المرور الخاصة بك.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "قم بإعداد المصادقة الثنائية",
       "hint": "المصادقة الثنائية (2FA) مطلوبة لهذا الحساب — يرجى إعدادها الآن.",
@@ -1350,6 +1353,9 @@
       "preferences": "التفضيلات"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "قم بتسجيل الدخول إلى حساب الدعم الخاص بك",
       "email": "البريد الإلكتروني أو اسم المستخدم",
       "ssoDivider": "or",

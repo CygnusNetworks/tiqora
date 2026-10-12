@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Odnawiam logowanie Kerberos za {{seconds}} s…",
     "kerberosReauthNow": "Zaloguj się teraz",
     "ssoFailed": "SSO nie powiodło się — zaloguj się przy użyciu hasła.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "Skonfiguruj uwierzytelnianie dwuskładnikowe",
       "hint": "Dla tego konta wymagane jest 2FA — skonfiguruj je teraz.",
@@ -1350,6 +1353,9 @@
       "preferences": "Ustawienia"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Zaloguj się na konto wsparcia",
       "email": "E-mail lub nazwa użytkownika",
       "ssoDivider": "or",

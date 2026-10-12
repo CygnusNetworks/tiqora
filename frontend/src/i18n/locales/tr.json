@@ -236,6 +236,9 @@
     "kerberosReauthCountdown": "Kerberos girişi {{seconds}} sn içinde yenileniyor…",
     "kerberosReauthNow": "Şimdi giriş yap",
     "ssoFailed": "SSO başarısız — lütfen parolanızla giriş yapın.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+    },
     "mustEnroll": {
       "title": "İki adımlı doğrulamayı ayarlayın",
       "hint": "Bu hesap için 2FA zorunludur — lütfen şimdi ayarlayın.",
@@ -1350,6 +1353,9 @@
       "preferences": "Tercihler"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Destek hesabınıza giriş yapın",
       "email": "E-posta veya kullanıcı adı",
       "ssoDivider": "or",

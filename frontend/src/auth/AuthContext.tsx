@@ -15,6 +15,7 @@ import {
   type PublicKeyCredentialRequestOptionsJSON,
 } from "@simplewebauthn/browser";
 import { api, ApiError, type UserMe } from "@/lib/api";
+import { getPendingLogin, type PendingLogin } from "@/lib/identityApi";
 import { clearLoginMethod, rememberLoginMethod } from "@/lib/loginMethod";
 import { submitSsoLogout } from "@/lib/ssoLogout";
 import { setDisplayTimeZone } from "@/lib/timeZone";
@@ -57,6 +58,12 @@ type AuthContextValue = {
   completeEnrollPasskey: (name?: string | null) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  /**
+   * Read the login state behind the session cookie (after a single sign-on that
+   * still owes a second factor) and enter the matching step. Resolves to the
+   * state; a failed request counts as "none".
+   */
+  refreshPending: () => Promise<PendingLogin["state"]>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -135,6 +142,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [queryClient],
   );
+
+  const refreshPending = useCallback(async (): Promise<PendingLogin["state"]> => {
+    let res: PendingLogin;
+    try {
+      res = await getPendingLogin();
+    } catch {
+      return "none";
+    }
+    if (res.state === "pending_2fa") {
+      setPending2fa(true);
+      setPendingFactors({
+        totp: Boolean(res.totp_enrolled),
+        passkey: Boolean(res.passkey_enrolled),
+      });
+      setMustEnroll2fa(false);
+    } else if (res.state === "must_enroll_2fa") {
+      setMustEnroll2fa(true);
+      setPending2fa(false);
+      setPendingFactors(null);
+    }
+    return res.state;
+  }, []);
 
   const verifyTotp = useCallback(
     async (code: string) => {
@@ -241,6 +270,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       completeEnrollPasskey,
       logout,
       refresh,
+      refreshPending,
     }),
     [
       meQuery.data,
@@ -256,6 +286,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       completeEnrollPasskey,
       logout,
       refresh,
+      refreshPending,
     ],
   );
 
