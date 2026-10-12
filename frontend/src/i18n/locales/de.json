@@ -5938,7 +5938,6 @@
         "regenerateConfirm": "Bestehende Anmeldungen auf Ihrer Website funktionieren erst wieder, wenn Sie den neuen Schlüssel dort eintragen.",
         "remove": "Entfernen",
         "removeConfirm": "Danach kann sich niemand mehr über Ihre Website anmelden. Der Chat selbst funktioniert weiter.",
-        "removed": "Der Schlüssel wurde entfernt.",
         "shownOnce": "Nur jetzt sichtbar",
         "shownOnceHint": "Kopieren Sie den Schlüssel jetzt und tragen Sie ihn auf Ihrem Server ein. Er wird nicht noch einmal angezeigt.",
         "secretLabel": "Neuer Schlüssel",
@@ -5950,7 +5949,6 @@
         "samplesHint": "Erzeugen Sie auf Ihrem Server pro Besucher eine kurze signierte Anmeldung (HS256) mit E-Mail-Adresse oder Kennung, Name und Ablaufzeit. Geben Sie den Schlüssel niemals im Browser oder im Seitenquelltext aus.",
         "samplesCall": "Übergeben Sie das Ergebnis im Browser an den Chat:",
         "sampleTabs": "Programmiersprache",
-        "customersTitle": "Kunden",
         "createCustomers": "Unbekannte Kunden anlegen",
         "createCustomersHint": "Ist die bestätigte E-Mail-Adresse noch kein Kunde, legt Tiqora einen Kundenbenutzer an. Sonst wird die Adresse nur am Ticket vermerkt.",
         "warning": "Wer den Schlüssel kennt, kann sich auf Ihrer Website als jeder Kunde anmelden."

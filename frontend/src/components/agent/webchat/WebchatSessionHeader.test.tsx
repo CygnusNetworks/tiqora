@@ -197,6 +197,14 @@ describe("WebchatSessionHeader", () => {
     expect(await screen.findByTestId("webchat-identity-confirmed")).toHaveTextContent("Kundenportal");
   });
 
+  it("an identity without an e-mail (sub only) still shows the confirmed chip (final M2)", async () => {
+    ticketChat.mockResolvedValue({ ...base, visitor_email: null, identity_source: "website", visitor_email_verified: false });
+    mount();
+    expect(await screen.findByTestId("webchat-identity-confirmed")).toHaveTextContent("Website-Anmeldung");
+    expect(screen.queryByTestId("webchat-visitor-email")).toBeNull();
+    expect(screen.queryByTestId("webchat-email-unverified")).toBeNull();
+  });
+
   it("an unknown identity source is not shown as confirmed", async () => {
     ticketChat.mockResolvedValue({ ...base, identity_source: "future", visitor_email_verified: true });
     mount();

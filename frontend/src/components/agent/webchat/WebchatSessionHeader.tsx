@@ -110,7 +110,8 @@ export function WebchatSessionHeader({ ticketId }: { ticketId: number }) {
       : chat.identity_source === "website"
         ? "webchat.agent.identity.website"
         : null;
-  const identityConfirmed = chat.visitor_email_verified && identityKey !== null;
+  // identity_source is set only for a verified identity, also one without an e-mail (sub only)
+  const identityConfirmed = identityKey !== null;
   const identityLabel = identityKey ? t(identityKey) : "";
   const statusLabel = isBot
     ? botName
@@ -154,9 +155,9 @@ export function WebchatSessionHeader({ ticketId }: { ticketId: number }) {
           )}
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
-          {chat.visitor_email && (
+          {(chat.visitor_email || identityConfirmed) && (
             <span className="inline-flex items-center gap-1.5">
-              <span data-testid="webchat-visitor-email">{chat.visitor_email}</span>
+              {chat.visitor_email && <span data-testid="webchat-visitor-email">{chat.visitor_email}</span>}
               {identityConfirmed ? (
                 <Badge tone="success" data-testid="webchat-identity-confirmed">
                   {identityLabel}

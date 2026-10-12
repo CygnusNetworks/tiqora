@@ -5938,7 +5938,6 @@
         "regenerateConfirm": "Existing sign-ins on your website only work again once you enter the new key there.",
         "remove": "Remove",
         "removeConfirm": "Afterwards nobody can sign in through your website. The chat itself keeps working.",
-        "removed": "The key was removed.",
         "shownOnce": "Only visible now",
         "shownOnceHint": "Copy the key now and enter it on your server. It will not be shown again.",
         "secretLabel": "New key",
@@ -5950,7 +5949,6 @@
         "samplesHint": "On your server, create a short signed sign-in (HS256) per visitor with an e-mail address or ID, a name and an expiry time. Never print the key in the browser or in the page source.",
         "samplesCall": "Hand the result to the chat in the browser:",
         "sampleTabs": "Programming language",
-        "customersTitle": "Customers",
         "createCustomers": "Create unknown customers",
         "createCustomersHint": "If the confirmed e-mail address is not a customer yet, Tiqora creates a customer user. Otherwise the address is only noted on the ticket.",
         "warning": "Whoever knows the key can sign in on your website as any customer."

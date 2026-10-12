@@ -6,7 +6,7 @@ export type SegmentedItem<T extends string | number> = { value: T; label: string
 /**
  * Single-choice segmented control for two to four short options. Screen
  * readers see a radiogroup: one tab stop (the checked option, else the
- * first), arrow keys move and select, Home/End jump to the ends.
+ * first enabled one), arrow keys move and select, Home/End jump to the ends.
  *
  * `data-testid={testId}` sits on the group, `${testId}-${value}` on each
  * option.
@@ -41,7 +41,10 @@ export function SegmentedControl<T extends string | number>({
 }) {
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const checkedIdx = items.findIndex((i) => String(i.value) === String(value ?? ""));
-  const tabStop = checkedIdx >= 0 ? checkedIdx : 0;
+  // The checked option, unless it cannot be chosen (then keyboard users could not reach the
+  // group at all): the first enabled option instead.
+  const firstEnabled = Math.max(0, items.findIndex((i) => !i.disabled));
+  const tabStop = checkedIdx >= 0 && !items[checkedIdx].disabled ? checkedIdx : firstEnabled;
 
   const move = (to: number, dir: 1 | -1 = 1) => {
     const n = items.length;
