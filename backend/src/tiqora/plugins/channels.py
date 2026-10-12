@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.channels.common import (
     EMPTY_TABLES_CHANNEL_DATA,
     ensure_channel_row,
+    normalize_phone,
     resolve_customer_by_phone,
     resolve_ticket_for_inbound,
 )
@@ -60,8 +61,10 @@ MIN_CHANNEL_TIMEOUT: Final = 1
 MAX_CHANNEL_TIMEOUT: Final = 30
 
 #: ``external_id`` ends up in a Message-ID header-like string: keep it boring
+_PHONE_SHAPE_RE: Final = re.compile(r"^\+?[0-9 ()/.-]+$")
+_MIN_PHONE_DIGITS: Final = 7
 _EXTERNAL_ID_RE: Final = re.compile(r"^[A-Za-z0-9._-]{1,100}$")
-#: ``ticket.customer_id`` is varchar(150), ``customer_user_id`` varchar(250)
+#: ``customer_user_id`` is varchar(250); the driver key prefix plus 150 characters fits
 _MAX_SENDER: Final = 150
 
 
@@ -229,7 +232,9 @@ async def _find_customer(
         ).first()
         if row is not None:
             return (str(row[1]) if row[1] else None), str(row[0])
-    else:
+    elif _PHONE_SHAPE_RE.fullmatch(sender) and len(normalize_phone(sender)) >= _MIN_PHONE_DIGITS:
+        # only real phone numbers: the resolver suffix-matches the digits, so a handle like
+        # "max-1" would otherwise hit any customer whose number ends in 1
         customer_id, login = await resolve_customer_by_phone(session, sender)
         if login is not None:
             return customer_id, login
@@ -268,9 +273,10 @@ async def _ingest(
 
     customer_no, customer_user = await _find_customer(session, msg, sender)
     if customer_user is None:
-        # Like the mail pipeline: the unknown sender is the "customer user", so the next
-        # message of the same sender lands on the same open ticket.
-        customer_user = sender
+        # The unknown sender is the "customer user", so the next message of the same sender
+        # lands on the same open ticket. E-mail addresses behave like the mail pipeline;
+        # other handles get a driver prefix so they can never equal a customer login.
+        customer_user = sender if "@" in sender else f"{driver.key}:{sender}"
 
     title = (msg.subject or f"{driver.label}: {msg.sender_display or sender}")[:255]
     sysconfig = SysConfig(session)

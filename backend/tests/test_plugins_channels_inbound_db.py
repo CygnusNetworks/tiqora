@@ -237,7 +237,7 @@ async def test_ingest_phone_match_and_unknown_sender(env: Env) -> None:
     stranger = await channels.ingest("Chat", _msg(sender="stranger-77", sender_display="Fremder"))
     assert env.rows(
         "SELECT customer_user_id, customer_id FROM ticket WHERE id = :t", t=stranger.ticket_id
-    ) == [("stranger-77", None)]
+    ) == [("plugin_points_chat:stranger-77", None)]
     assert stranger.created is True and stranger.ticket_id != by_phone.ticket_id
     ((a_from,),) = env.rows(
         "SELECT a_from FROM article_data_mime WHERE article_id = :a", a=stranger.article_id
@@ -249,6 +249,27 @@ async def test_ingest_phone_match_and_unknown_sender(env: Env) -> None:
     # the unknown sender's next message lands on the same ticket
     again = await channels.ingest("Chat", _msg(sender="stranger-77", body="Hallo?"))
     assert again.created is False and again.ticket_id == stranger.ticket_id
+
+
+async def test_handle_does_not_phone_match_customer(env: Env) -> None:
+    # pp55-phone's mobile ends in 1; "max-1" is a handle, not a phone number
+    res = await PluginChannels(PLUGIN_ID).ingest("Chat", _msg(sender="max-1"))
+    assert env.rows(
+        "SELECT customer_user_id, customer_id FROM ticket WHERE id = :t", t=res.ticket_id
+    ) == [("plugin_points_chat:max-1", None)]
+
+
+async def test_handle_equal_to_login_does_not_join_customer(env: Env) -> None:
+    channels = PluginChannels(PLUGIN_ID)
+    known = await channels.ingest("Chat", _msg(sender="pp55-cust@example.org"))
+    before = env.articles(known.ticket_id)
+    stranger = await channels.ingest("Chat", _msg(sender="pp55-cust", body="Ich bin jemand"))
+    assert stranger.created is True and stranger.ticket_id != known.ticket_id
+    assert env.articles(known.ticket_id) == before
+    assert (
+        env.scalar("SELECT customer_user_id FROM ticket WHERE id = :t", t=stranger.ticket_id)
+        == "plugin_points_chat:pp55-cust"
+    )
 
 
 async def test_explicit_customer_queue_and_attachment(env: Env) -> None:
