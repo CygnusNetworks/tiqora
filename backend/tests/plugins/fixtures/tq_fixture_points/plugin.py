@@ -8,10 +8,18 @@ from collections.abc import Mapping
 from enum import Enum
 from typing import Any
 
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
 from tiqora_sdk import PluginRegistry
+from tiqora_sdk.channels import (
+    ChannelCapabilities,
+    ChannelContext,
+    DeliveryResult,
+    InboundChannelMessage,
+    OutboundChannelMessage,
+)
 from tiqora_sdk.fields import DfBaseType
 from tiqora_sdk.hooks import (
     HookContext,
@@ -30,6 +38,7 @@ from tiqora_sdk.mail import (
 from tiqora_sdk.notifications import NotificationMessage, TransportContext
 from tiqora_sdk.process import ActionContext
 from tiqora_sdk.templates import NumberRequest, PlaceholderRequest
+from tiqora_sdk.tickets import PluginWriteError
 
 from . import behaviour
 
@@ -350,6 +359,63 @@ def _register_transports(registry: PluginRegistry) -> None:
     registry.notification_transport("Chat", _chat, label="Chat (Test)", timeout_seconds=1)
 
 
+async def _send(ctx: ChannelContext, message: OutboundChannelMessage) -> DeliveryResult:
+    """``MODE["channel.send"]``: raise | hang (Task 14)."""
+    behaviour.CALLS.append(("channel.Chat.send", message))
+    mode = behaviour.MODE.get("channel.send", "ok")
+    if mode == "raise":
+        raise RuntimeError("kaputt")
+    if mode == "hang":
+        await asyncio.sleep(30)
+    return DeliveryResult(external_id="m-1")
+
+
+class InboundBody(BaseModel):
+    sender: str
+    body: str
+    external_id: str | None = None
+    customer_user: str | None = None
+    sender_display: str | None = None
+    queue: str | None = None
+    channel: str = "Chat"
+
+
+def _register_channels(registry: PluginRegistry) -> None:
+    """Channel ``Chat`` (500 characters) and the public inbound route ``POST /inbound``."""
+    registry.channel(
+        "Chat", label="Chat (Test)", capabilities=ChannelCapabilities(max_length=500), send=_send
+    )
+    ctx = registry.context
+    router = APIRouter()
+
+    @router.post("/inbound")
+    async def inbound(payload: InboundBody) -> dict[str, Any]:
+        assert ctx.channels is not None
+        try:
+            result = await ctx.channels.ingest(
+                payload.channel,
+                InboundChannelMessage(
+                    sender=payload.sender,
+                    body=payload.body,
+                    external_id=payload.external_id,
+                    customer_user=payload.customer_user,
+                    sender_display=payload.sender_display,
+                    queue=payload.queue,
+                ),
+            )
+        except PluginWriteError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        behaviour.CALLS.append(("channel.Chat.ingest", result))
+        return {
+            "ticket_id": result.ticket_id,
+            "article_id": result.article_id,
+            "created": result.created,
+            "duplicate": result.duplicate,
+        }
+
+    registry.route(router, public=True)
+
+
 class PointsPlugin:
     def register(self, registry: PluginRegistry) -> None:
         # Each task of the plugin-points plan adds its ``_register_<point>(registry)`` call here.
@@ -361,6 +427,7 @@ class PointsPlugin:
         _register_mail_filters(registry)
         _register_outbound(registry)
         _register_transports(registry)
+        _register_channels(registry)
 
 
 plugin = PointsPlugin()

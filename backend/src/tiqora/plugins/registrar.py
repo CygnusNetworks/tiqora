@@ -21,6 +21,14 @@ from pydantic import BaseModel
 
 from tiqora.extensions.registry import ExtensionPoint
 from tiqora.jobs.registry import JOB_HANDLERS, JobHandler
+from tiqora.plugins.channels import (
+    CHANNEL_DRIVERS,
+    MAX_CHANNEL_TIMEOUT,
+    MIN_CHANNEL_TIMEOUT,
+    ChannelCapabilities,
+    ChannelDriver,
+    ChannelSend,
+)
 from tiqora.plugins.context import PluginContext
 from tiqora.plugins.df_types import (
     BASE_TYPES,
@@ -39,7 +47,7 @@ from tiqora.plugins.mail_filters import (
 )
 from tiqora.plugins.manifest import PluginManifest
 from tiqora.plugins.mcp import CORE_MCP_TOOL_NAMES, MCP_TOOLS, McpTool
-from tiqora.plugins.naming import CAMEL_NAME_RE, TAG_NAME_RE, qualified
+from tiqora.plugins.naming import CAMEL_NAME_RE, TAG_NAME_RE, channel_key, qualified
 from tiqora.plugins.notification_transports import (
     MAX_TRANSPORT_TIMEOUT,
     MIN_TRANSPORT_TIMEOUT,
@@ -817,6 +825,74 @@ class PluginRegistrar:
         )
         self._stage(NOTIFICATION_TRANSPORTS, item, check=check)
         return qname
+
+    def channel(
+        self,
+        name: str,
+        *,
+        label: str,
+        capabilities: ChannelCapabilities = ChannelCapabilities(),  # noqa: B008  (frozen)
+        send: ChannelSend | None = None,
+        timeout_seconds: int = 20,
+    ) -> str:
+        """Stage the customer channel ``Plugin_<short_id>_<name>`` (D11); returns its channel key.
+
+        The key (``plugin_<short_id>_<name lowercase>``) is the ``ArticleIn.channel`` value of the
+        channel's articles. ``send`` is ``async def (ctx: ChannelContext, message:
+        OutboundChannelMessage) -> DeliveryResult``; without it agents cannot answer on the
+        channel (inbound only). Inbound messages are stored with ``ctx.channels.ingest``.
+        """
+        qname = qualified(self._manifest.short_id, name)
+        key = channel_key(self._manifest.short_id, name) if isinstance(name, str) else ""
+
+        def check() -> None:
+            if not isinstance(name, str) or not CAMEL_NAME_RE.fullmatch(name):
+                raise RegistrationRejected(
+                    f"Ungültiger Name „{name}“ für den Kanal: "
+                    "2 bis 41 Zeichen, A-Z, a-z und 0-9, beginnt mit einem Großbuchstaben"
+                )
+            if not isinstance(label, str) or not label.strip() or len(label) > 100:
+                raise RegistrationRejected(
+                    f"Der Kanal „{name}“ braucht eine Bezeichnung (höchstens 100 Zeichen)"
+                )
+            if not isinstance(capabilities, ChannelCapabilities):
+                raise RegistrationRejected(f"Die Fähigkeiten des Kanals „{name}“ sind ungültig")
+            if not all(
+                isinstance(v, bool)
+                for v in (capabilities.subject, capabilities.html, capabilities.attachments)
+            ):
+                raise RegistrationRejected(f"Die Fähigkeiten des Kanals „{name}“ sind ungültig")
+            max_length = capabilities.max_length
+            if max_length is not None and (
+                isinstance(max_length, bool) or not isinstance(max_length, int) or max_length < 1
+            ):
+                raise RegistrationRejected(
+                    f"Die Höchstlänge des Kanals „{name}“ muss mindestens 1 Zeichen betragen"
+                )
+            if send is not None:
+                _require_async(send, f"Das Senden des Kanals „{name}“")
+            if (
+                isinstance(timeout_seconds, bool)
+                or not isinstance(timeout_seconds, int)
+                or not MIN_CHANNEL_TIMEOUT <= timeout_seconds <= MAX_CHANNEL_TIMEOUT
+            ):
+                raise RegistrationRejected(
+                    f"Das Zeitlimit des Kanals „{name}“ muss zwischen "
+                    f"{MIN_CHANNEL_TIMEOUT} und {MAX_CHANNEL_TIMEOUT} Sekunden liegen"
+                )
+
+        item = ChannelDriver(
+            key=key,
+            plugin_id=self.plugin_id,
+            name=qname,
+            label=label,
+            capabilities=capabilities,
+            send=send,
+            timeout_seconds=timeout_seconds,
+            context=self._context,
+        )
+        self._stage(CHANNEL_DRIVERS, item, check=check)
+        return key
 
 
 _NUMBER_REASONS: Final = {

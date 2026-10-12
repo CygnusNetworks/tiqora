@@ -24,4 +24,7 @@ extension_points = [
   "core.mail.inbound_filters",
   "core.mail.outbound_filters",
   "core.notifications.transports",
+  "core.channels.drivers",
+  "core.http.routes",
+  "core.http.public_routes",
 ]

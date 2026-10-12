@@ -20,9 +20,7 @@ from tiqora.plugins.customers import PluginCustomers
 from tiqora.security.outbound import HostResolver, pin_outbound_url
 
 if TYPE_CHECKING:
-    from tiqora.plugins.channels import (  # type: ignore[import-untyped]  # Task 13
-        PluginChannels,
-    )
+    from tiqora.plugins.channels import PluginChannels
     from tiqora.plugins.discovery import DiscoveredPlugin
 
 
@@ -268,7 +266,15 @@ class PluginContext:
 
 def minimal_context(plugin_id: str) -> PluginContext:
     """Fallback context for items staged without one (tests, direct construction)."""
-    return PluginContext(plugin_id, "0", http=PluginHttp([]), tickets=PluginTickets())
+    from tiqora.plugins.channels import PluginChannels  # channels imports this module
+
+    return PluginContext(
+        plugin_id,
+        "0",
+        http=PluginHttp([]),
+        tickets=PluginTickets(),
+        channels=PluginChannels(plugin_id),
+    )
 
 
 def make_plugin_context(plugin: DiscoveredPlugin) -> PluginContext:
@@ -277,9 +283,12 @@ def make_plugin_context(plugin: DiscoveredPlugin) -> PluginContext:
         from tiqora.plugins.registrar import RegistrationRejected  # registrar imports this module
 
         raise RegistrationRejected("Erweiterung hat kein gültiges Manifest")
+    from tiqora.plugins.channels import PluginChannels  # channels imports this module
+
     return PluginContext(
         plugin_id=plugin.plugin_id,
         version=plugin.manifest.version,
         http=PluginHttp(plugin.manifest.capabilities.outbound_hosts),
         tickets=PluginTickets(),
+        channels=PluginChannels(plugin.plugin_id),
     )

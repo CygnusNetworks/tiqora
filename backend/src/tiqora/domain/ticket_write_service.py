@@ -699,7 +699,17 @@ async def add_article(
         "webchat": "WebChat",
     }
     ch_name = channel_name_map.get(article.channel.lower(), "Internal")
-    if ch_name == "WebChat":
+    plugin_channel = None
+    if article.channel.lower() not in channel_name_map:
+        # A channel a plugin registered (D11): its own row, never the Internal fallback.
+        from tiqora.plugins.channels import driver_for
+
+        plugin_channel = driver_for(article.channel)
+    if plugin_channel is not None:
+        from tiqora.plugins.channels import ensure_tiqora_channel_row
+
+        comm_channel_id = await ensure_tiqora_channel_row(session, plugin_channel.name)
+    elif ch_name == "WebChat":
         # Never fall back to Internal for a chat line (``_channel_id`` would):
         # register the row on first use (idempotent; cache cleanup inside).
         from tiqora.channels.common import ensure_webchat_channel_row
@@ -829,7 +839,9 @@ async def add_article(
             from tiqora.znuny.history import TYPE_PHONE_CALL_CUSTOMER
 
             history_type = TYPE_PHONE_CALL_CUSTOMER
-    elif channel_lower in _CHAT_CHANNELS and article.is_visible_for_customer:
+    elif (
+        channel_lower in _CHAT_CHANNELS or plugin_channel is not None
+    ) and article.is_visible_for_customer:
         # Znuny has no chat history types; a chat message is a web request.
         # Customer: the first message opens the ticket (NotificationNewTicket),
         # later ones are follow-ups (NotificationFollowUp) -- as AddNote they

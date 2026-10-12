@@ -5,6 +5,7 @@ from pathlib import Path
 
 from tiqora.channels.registry import CHANNELS
 from tiqora.jobs.registry import JOB_HANDLERS
+from tiqora.plugins.channels import CHANNEL_DRIVERS
 from tiqora.plugins.df_types import DYNAMIC_FIELD_TYPES
 from tiqora.plugins.events import EVENT_SUBSCRIBERS
 from tiqora.plugins.mail_filters import INBOUND_MAIL_FILTERS, OUTBOUND_MAIL_FILTERS
@@ -94,6 +95,16 @@ SUBMODULES: dict[str, set[str]] = {
         "TransportContext",
         "TransportSend",
     },
+    "tiqora_sdk.channels": {
+        "ChannelCapabilities",
+        "ChannelContext",
+        "OutboundChannelMessage",
+        "DeliveryResult",
+        "InboundChannelMessage",
+        "IngestResult",
+        "ChannelSend",
+        "verify_shared_secret",
+    },
 }
 
 
@@ -134,6 +145,7 @@ def test_registry_protocol_matches_registrar() -> None:
             "dynamic_field_type",
             "mail_filter",
             "notification_transport",
+            "channel",
         }
     )
 
@@ -162,6 +174,7 @@ def test_phase1_points_are_sdk_stable() -> None:
             DYNAMIC_FIELD_TYPES,
             INBOUND_MAIL_FILTERS,
             OUTBOUND_MAIL_FILTERS,
+            CHANNEL_DRIVERS,
         )
     )
     assert CHANNELS.sdk_stable is False

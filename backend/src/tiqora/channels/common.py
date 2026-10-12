@@ -186,17 +186,13 @@ async def ensure_channel_row(
 
 
 async def ensure_webchat_channel_row(session: AsyncSession) -> int:
-    """``ensure_channel_row`` for the WebChat channel (empty ``ArticleDataTables``).
+    """The WebChat channel row (empty ``ArticleDataTables``); a Tiqora-owned channel.
 
     Every webchat article path goes through this (R-CHANNEL-ROW)."""
-    from tiqora.webchat.sessions import COMM_CHANNEL_MODULE, COMM_CHANNEL_NAME
+    from tiqora.plugins.channels import ensure_tiqora_channel_row
+    from tiqora.webchat.sessions import COMM_CHANNEL_NAME
 
-    return await ensure_channel_row(
-        session,
-        COMM_CHANNEL_NAME,
-        COMM_CHANNEL_MODULE,
-        channel_data_yaml=EMPTY_TABLES_CHANNEL_DATA,
-    )
+    return await ensure_tiqora_channel_row(session, COMM_CHANNEL_NAME)
 
 
 def normalize_phone(raw: str | None) -> str:

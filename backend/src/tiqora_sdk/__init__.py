@@ -33,6 +33,7 @@ if _t.TYPE_CHECKING:
     from fastapi import APIRouter
     from pydantic import BaseModel
 
+    from tiqora.plugins.channels import ChannelCapabilities, ChannelSend
     from tiqora.plugins.df_types import DfBaseType, DfDisplay, DfValidate
     from tiqora.plugins.mail_filters import MailFilterStage
     from tiqora.plugins.notification_transports import TransportSend
@@ -176,6 +177,16 @@ class PluginRegistry(_t.Protocol):
 
     def notification_transport(
         self, name: str, send: TransportSend, *, label: str, timeout_seconds: int = 15
+    ) -> str: ...
+
+    def channel(
+        self,
+        name: str,
+        *,
+        label: str,
+        capabilities: ChannelCapabilities = ...,
+        send: ChannelSend | None = None,
+        timeout_seconds: int = 20,
     ) -> str: ...
 
 
