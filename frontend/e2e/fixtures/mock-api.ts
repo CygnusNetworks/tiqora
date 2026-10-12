@@ -1,5 +1,6 @@
 import { test, type Page, type Route, type TestInfo } from "@playwright/test";
 import { GONE_SAVED_SEARCH_ID, createDemoDashboards, demoDefaultWidgets, demoTemplateUpdateHint, resolveDashboards, type DemoDashboards } from "../../src/demo/dashboardsMock";
+import { createDemoCmdb, resolveCmdb, type DemoCmdb } from "../../src/demo/cmdbMock";
 import { resolveKiosk } from "../../src/demo/kioskMock";
 import type { ReportRunIn } from "../../src/lib/reportsApi";
 // Reports reuse the demo's pure report data (catalogue definitions + deterministic results).
@@ -648,6 +649,8 @@ async function json(route: Route, status: number, body: unknown) {
 // The test whose run last reset the module-level mock state (session flag, KB article, process
 // state, saved searches).
 let stateResetFor: TestInfo | undefined;
+// CMDB demo store (two classes, six CIs); reset with the rest of the per-test state.
+let cmdbStore: DemoCmdb = createDemoCmdb();
 
 /**
  * Intercept all /api/v1/* calls with deterministic fixtures.
@@ -662,6 +665,7 @@ export async function mockApi(page: Page) {
     kbArticleFull = initialKbArticle();
     ticketProcessState = ticketProcessStateNotInProcess;
     resetSavedStore();
+    cmdbStore = createDemoCmdb();
   }
 
   await page.route("**/api/v1/**", async (route) => {
@@ -736,6 +740,17 @@ export async function mockApi(page: Page) {
     if (!authenticated) {
       await json(route, 401, { detail: "Not authenticated" });
       return;
+    }
+
+    // CMDB (Mode B): in-memory store of the demo mock.
+    if (/\/api\/v1\/(admin\/)?cmdb(\/|$)/.test(path)) {
+      const hasBody = method !== "GET" && method !== "DELETE" && !(req.headers()["content-type"] ?? "").includes("multipart");
+      const out = resolveCmdb(cmdbStore, method, path, hasBody ? req.postDataJSON() : undefined, url.searchParams);
+      if (out) {
+        if (out.status === 204) await route.fulfill({ status: 204 });
+        else await json(route, out.status, out.body);
+        return;
+      }
     }
 
     if (path.endsWith("/api/v1/queues") && method === "GET") {

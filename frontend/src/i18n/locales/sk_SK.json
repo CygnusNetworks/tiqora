@@ -2186,7 +2186,9 @@
       "plugins": "Extensions",
       "dashboardTemplates": "Dashboard templates",
       "webservices": "Web services",
-      "dashboardKioskLinks": "Wallboard links"
+      "dashboardKioskLinks": "Wallboard links",
+      "cmdbClasses": "CMDB classes",
+      "cmdbCatalog": "CMDB catalog"
     },
     "table": {
       "id": "ID",
@@ -3811,7 +3813,9 @@
       "plugins": "Switch installed extensions on or off, check their state and configure them.",
       "dashboardTemplates": "Define home page dashboards per role, optionally binding.",
       "webservices": "View web services (GenericInterface), check outgoing calls and manage allowed targets.",
-      "dashboardKioskLinks": "Create, check and revoke links for wallboards without sign-in."
+      "dashboardKioskLinks": "Create, check and revoke links for wallboards without sign-in.",
+      "cmdbClasses": "Define configuration item classes and their attributes.",
+      "cmdbCatalog": "Maintain the selection lists (general catalog) used by CMDB attributes."
     },
     "types": {
       "title_plural": "Typy ticketov",
@@ -4271,6 +4275,39 @@
           "deploy_from_tiqora": {
             "label": "Deploy processes and ACLs in Tiqora (Znuny no longer runs)",
             "help": "Only turn this on when Znuny no longer runs in parallel. Otherwise Znuny keeps showing the old state."
+          }
+        }
+      },
+      "cmdb": {
+        "title": "CMDB",
+        "fields": {
+          "propagation_node_cap": {
+            "label": "Propagation limit",
+            "help": "Maximum number of CIs recalculated for incident states in one run."
+          },
+          "impact_graph_node_cap": {
+            "label": "Dependency graph limit",
+            "help": "Maximum number of nodes shown in the dependency graph."
+          },
+          "import_max_mb": {
+            "label": "Maximum import size (MB)",
+            "help": "Largest import file accepted, up to 25 MB."
+          },
+          "version_archive_enabled": {
+            "label": "Archive old versions",
+            "help": "Move old CI versions to the archive in the background."
+          },
+          "version_archive_keep": {
+            "label": "Versions to keep",
+            "help": "This many of the newest versions per CI always stay in the main history."
+          },
+          "version_archive_min_age_days": {
+            "label": "Minimum age in days",
+            "help": "Only versions older than this are archived."
+          },
+          "access_group": {
+            "label": "CMDB group",
+            "help": "Optional group name. If set, only agents with write access to this group may use the CMDB. Leave empty to turn the gate off."
           }
         }
       }
@@ -7483,5 +7520,21 @@
       "nothingDone": "Nothing was imported.",
       "whereToFind": "You will find the searches under “All saved searches…” in the sidebar."
     }
+  },
+  "cmdb": {
+    "title": "CMDB",
+    "comingSoon": "This page is being built.",
+    "noClasses": "No classes yet.",
+    "modeNotice": {
+      "znuny": "The CMDB is currently managed in Znuny. You see CIs in the tickets; you can edit them in Znuny.",
+      "off": "The CMDB is not enabled."
+    },
+    "state": {
+      "operational": "Operational",
+      "warning": "Warning",
+      "incident": "Incident"
+    },
+    "unknownValues": "The class definition no longer has these values. Saving removes them.",
+    "hiddenNode": "No access"
   }
 }

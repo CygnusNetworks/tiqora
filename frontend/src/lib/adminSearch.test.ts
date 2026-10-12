@@ -36,4 +36,15 @@ describe("ADMIN_PAGES", () => {
       expect(rankAdminPages(ADMIN_PAGES, query, t).map((p) => p.slug), query).toContain("dashboard-templates");
     }
   });
+
+  it("lists the CMDB admin pages (no link-type page: ITSM owns it) and finds them by CMDB keywords", async () => {
+    const slugs = ADMIN_PAGES.map((p) => p.slug);
+    expect(slugs).toEqual(expect.arrayContaining(["cmdb-classes", "cmdb-catalog"]));
+    expect(slugs).not.toContain("cmdb-link-types");
+    await i18n.changeLanguage("de");
+    const t = (key: string) => i18n.t(key);
+    for (const query of ["CMDB", "Asset", "Inventar", "Klasse"]) {
+      expect(rankAdminPages(ADMIN_PAGES, query, t).map((p) => p.slug), query).toContain("cmdb-classes");
+    }
+  });
 });

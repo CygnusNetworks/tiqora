@@ -2186,7 +2186,9 @@
       "plugins": "Erweiterungen",
       "dashboardTemplates": "Dashboard-Vorlagen",
       "webservices": "Webservices",
-      "dashboardKioskLinks": "Wallboard-Links"
+      "dashboardKioskLinks": "Wallboard-Links",
+      "cmdbClasses": "CMDB-Klassen",
+      "cmdbCatalog": "CMDB-Auswahllisten"
     },
     "table": {
       "id": "ID",
@@ -3819,7 +3821,9 @@
       "plugins": "Installierte Erweiterungen ein- und ausschalten, Zustand prüfen und einstellen.",
       "dashboardTemplates": "Startseiten je Rolle als Vorlage festlegen, optional verbindlich.",
       "webservices": "Webservices (GenericInterface) einsehen, ausgehende Aufrufe prüfen und Zielfreigaben verwalten.",
-      "dashboardKioskLinks": "Links für Wallboards ohne Anmeldung erstellen, prüfen und widerrufen."
+      "dashboardKioskLinks": "Links für Wallboards ohne Anmeldung erstellen, prüfen und widerrufen.",
+      "cmdbClasses": "Klassen von Configuration Items und ihre Attribute festlegen.",
+      "cmdbCatalog": "Auswahllisten (Allgemeiner Katalog) für CMDB-Attribute pflegen."
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -4279,6 +4283,39 @@
           "deploy_from_tiqora": {
             "label": "Prozesse und ACLs in Tiqora bereitstellen (Znuny läuft nicht mehr)",
             "help": "Nur einschalten, wenn Znuny nicht mehr parallel läuft. Sonst zeigt Znuny weiter den alten Stand an."
+          }
+        }
+      },
+      "cmdb": {
+        "title": "CMDB",
+        "fields": {
+          "propagation_node_cap": {
+            "label": "Grenze für die Weitergabe",
+            "help": "Höchstzahl der CIs, deren Vorfallsstatus in einem Lauf neu berechnet wird."
+          },
+          "impact_graph_node_cap": {
+            "label": "Grenze für die Abhängigkeitsansicht",
+            "help": "Höchstzahl der Knoten in der Abhängigkeitsansicht."
+          },
+          "import_max_mb": {
+            "label": "Maximale Importgröße (MB)",
+            "help": "Größte zulässige Importdatei, höchstens 25 MB."
+          },
+          "version_archive_enabled": {
+            "label": "Alte Versionen archivieren",
+            "help": "Alte CI-Versionen im Hintergrund ins Archiv verschieben."
+          },
+          "version_archive_keep": {
+            "label": "Zu behaltende Versionen",
+            "help": "So viele der neuesten Versionen je CI bleiben immer im Verlauf."
+          },
+          "version_archive_min_age_days": {
+            "label": "Mindestalter in Tagen",
+            "help": "Nur ältere Versionen werden archiviert."
+          },
+          "access_group": {
+            "label": "CMDB-Gruppe",
+            "help": "Optionaler Gruppenname. Ist er gesetzt, dürfen nur Agenten mit Schreibrecht in dieser Gruppe die CMDB nutzen. Leer lassen, um die Sperre auszuschalten."
           }
         }
       }
@@ -7491,5 +7528,21 @@
       "nothingDone": "Es wurde nichts übernommen.",
       "whereToFind": "Sie finden die Suchen unter „Alle gespeicherten Suchen…“ in der Seitenleiste."
     }
+  },
+  "cmdb": {
+    "title": "CMDB",
+    "comingSoon": "Diese Seite wird gerade erstellt.",
+    "noClasses": "Noch keine Klassen.",
+    "modeNotice": {
+      "znuny": "Die CMDB wird zurzeit in Znuny geführt. Sie sehen CIs in den Tickets; bearbeiten können Sie sie in Znuny.",
+      "off": "Die CMDB ist nicht aktiviert."
+    },
+    "state": {
+      "operational": "Betriebsbereit",
+      "warning": "Warnung",
+      "incident": "Vorfall"
+    },
+    "unknownValues": "Diese Werte kennt die Klassendefinition nicht mehr. Beim Speichern werden sie entfernt.",
+    "hiddenNode": "Kein Zugriff"
   }
 }

@@ -173,6 +173,22 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     keywords: ["postfach", "queue", "mailbox"],
   },
   {
+    slug: "cmdb-classes",
+    route: "/admin/cmdb/classes",
+    group: "tickets",
+    nameKey: "admin.nav.cmdbClasses",
+    descriptionKey: "admin.pageDescriptions.cmdbClasses",
+    keywords: ["cmdb", "configuration item", "ci", "klasse", "klassen", "asset", "inventar", "klassendefinition"],
+  },
+  {
+    slug: "cmdb-catalog",
+    route: "/admin/cmdb/catalog",
+    group: "tickets",
+    nameKey: "admin.nav.cmdbCatalog",
+    descriptionKey: "admin.pageDescriptions.cmdbCatalog",
+    keywords: ["cmdb", "configuration item", "ci", "auswahlliste", "katalog", "general catalog", "asset", "inventar"],
+  },
+  {
     slug: "queue-templates",
     route: "/admin/queue-templates",
     group: "tickets",

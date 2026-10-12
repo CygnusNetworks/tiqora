@@ -8,6 +8,7 @@ import {
   demoRefine,
 } from "./mockData";
 import { demoDashboards, resolve as resolveDashboards } from "./dashboardsMock";
+import { demoCmdb, resolveCmdb } from "./cmdbMock";
 import { resolveKiosk } from "./kioskMock";
 import { resolve as resolveSchedules } from "./schedulesMock";
 import { setDemoFactsBuilding } from "./reportsMock";
@@ -108,6 +109,16 @@ async function schedulesResponse(request: Request): Promise<Response | undefined
   return out.status === 204 ? new HttpResponse(null, { status: 204 }) : HttpResponse.json(out.body as never, { status: out.status });
 }
 
+/** CMDB (agent, admin and portal plane): bodies, queries and an in-memory store, so it has its own handler. */
+async function cmdbResponse(request: Request): Promise<Response | undefined> {
+  const url = new URL(request.url);
+  const hasBody = request.method !== "GET" && request.method !== "DELETE";
+  const body = hasBody && !request.headers.get("content-type")?.includes("multipart") ? await request.json().catch(() => ({})) : undefined;
+  const out = resolveCmdb(demoCmdb, request.method, url.pathname, body, url.searchParams);
+  if (!out) return undefined;
+  return out.status === 204 ? new HttpResponse(null, { status: 204 }) : HttpResponse.json(out.body as never, { status: out.status });
+}
+
 /** The wallboard answers from the same demo store; the secret comes in its own header. */
 function kioskResponse(request: Request): Response | undefined {
   const out = resolveKiosk(demoDashboards, request.method, new URL(request.url).pathname, request.headers.get("X-Tiqora-Kiosk"));
@@ -115,6 +126,9 @@ function kioskResponse(request: Request): Response | undefined {
 }
 
 export const handlers = [
+  http.all("*/api/portal/config-items*", async ({ request }) => (await cmdbResponse(request)) ?? HttpResponse.json({}, { status: 404 })),
+  http.all("*/api/v1/admin/cmdb/*", async ({ request }) => (await cmdbResponse(request)) ?? HttpResponse.json([])),
+  http.all("*/api/v1/cmdb/*", async ({ request }) => (await cmdbResponse(request)) ?? HttpResponse.json([])),
   http.all("*/api/v1/report-schedules*", async ({ request }) => (await schedulesResponse(request)) ?? HttpResponse.json([])),
   http.get("*/api/v1/report-runs/*", async ({ request }) => (await schedulesResponse(request)) ?? new HttpResponse(null, { status: 404 })),
   http.all("*/api/v1/reports/import/znuny*", async ({ request }) => (await schedulesResponse(request)) ?? HttpResponse.json({})),

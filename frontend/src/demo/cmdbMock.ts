@@ -1,0 +1,545 @@
+/**
+ * Demo / e2e mock of the CMDB API (`/api/v1/cmdb/*`, `/api/v1/admin/cmdb/*`, `/api/portal/config-items*`).
+ * Pure and framework-free like `dashboardsMock.ts`: `resolveCmdb(store, method, path, body, query)` answers
+ * with `{status, body}` or `undefined` for a route it does not know. Two classes (Server, Standort), six
+ * CIs, one `DependsOn` chain with a CI in incident (so the badges and the graph show something) and one
+ * link to a CI the caller may not see. Names use example.org only.
+ */
+import type {
+  Affected,
+  AttributeDef,
+  CatalogItem,
+  Ci,
+  CiHistoryPage,
+  CiListItem,
+  CiPage,
+  CiTicket,
+  CiVersion,
+  CiVersionSummary,
+  CmdbClass,
+  CmdbDefinition,
+  CmdbStatus,
+  FilterField,
+  FormOptions,
+  ImpactGraph,
+  LinkOut,
+  LinkType,
+  RenderedAttr,
+} from "@/lib/cmdbApi";
+import type { CmdbAdminStatus } from "@/lib/cmdbAdminApi";
+import type { PortalCiDetail, PortalCiPage } from "@/lib/portalCmdbApi";
+import { demoItsmMode } from "./itsmMode";
+
+export type DemoCmdbResponse = { status: number; body: unknown };
+
+type AttrEntry = { v: string | number | null };
+type DemoCi = {
+  id: number;
+  number: string;
+  classId: number;
+  name: string;
+  deployment: number;
+  incidentOwn: number;
+  incidentCurrent: number;
+  attrs: Record<string, AttrEntry[]>;
+  lockVersion: number;
+};
+type DemoLink = { id: number; type: string; source: number; target: number };
+
+export const DEMO_CATALOG_DEPLOYMENT = "ITSM::ConfigItem::DeploymentState";
+export const DEMO_CATALOG_INCIDENT = "ITSM::Core::IncidentState";
+const CATALOG_OS = "CMDB::OS";
+const AT = "2026-10-08T09:30:00";
+const HIDDEN_CI_ID = 99;
+
+const CATALOG: CatalogItem[] = [
+  { id: 1, catalog_class: DEMO_CATALOG_DEPLOYMENT, item_key: "planned", name: "Geplant", functionality: "preproductive", position: 1, valid: true },
+  { id: 2, catalog_class: DEMO_CATALOG_DEPLOYMENT, item_key: "production", name: "Produktiv", functionality: "productive", position: 2, valid: true },
+  { id: 3, catalog_class: DEMO_CATALOG_DEPLOYMENT, item_key: "retired", name: "Außer Betrieb", functionality: "postproductive", position: 3, valid: true },
+  { id: 11, catalog_class: DEMO_CATALOG_INCIDENT, item_key: "operational", name: "Betriebsbereit", functionality: "operational", position: 1, valid: true },
+  { id: 12, catalog_class: DEMO_CATALOG_INCIDENT, item_key: "warning", name: "Warnung", functionality: "warning", position: 2, valid: true },
+  { id: 13, catalog_class: DEMO_CATALOG_INCIDENT, item_key: "incident", name: "Vorfall", functionality: "incident", position: 3, valid: true },
+  { id: 21, catalog_class: CATALOG_OS, item_key: "debian", name: "Debian", functionality: null, position: 1, valid: true },
+  { id: 22, catalog_class: CATALOG_OS, item_key: "ubuntu", name: "Ubuntu", functionality: null, position: 2, valid: true },
+];
+const catalogItem = (id: number): CatalogItem => CATALOG.find((c) => c.id === id) ?? CATALOG[0];
+
+type AttrInit = Omit<Partial<AttributeDef>, "options"> & Pick<AttributeDef, "key" | "name" | "type"> & { options?: Partial<NonNullable<AttributeDef["options"]>> };
+/** Fills the defaults the API always sends, so the sketches below stay short. */
+const attr = (a: AttrInit): AttributeDef => ({
+  count_min: 0,
+  count_max: 1,
+  count_default: 1,
+  required: false,
+  searchable: false,
+  portal: false,
+  ...a,
+  options: { multiline: false, ...a.options },
+});
+
+const SERVER_DEF: CmdbDefinition = {
+  id: 1,
+  class_id: 1,
+  version: 1,
+  comment: "Ausgangsversion",
+  created_at: AT,
+  created_by: 1,
+  attributes: [
+    attr({ key: "hostname", name: "Hostname", type: "text", required: true, searchable: true, portal: true }),
+    attr({ key: "ip", name: "IP-Adresse", type: "ip", count_min: 0, count_max: 3, count_default: 1, portal: true }),
+    attr({ key: "os", name: "Betriebssystem", type: "catalog", options: { catalog_class: CATALOG_OS } }),
+    attr({ key: "location", name: "Standort", type: "ci_ref", options: { class_keys: ["site"] } }),
+  ],
+};
+const SITE_DEF: CmdbDefinition = {
+  id: 2,
+  class_id: 2,
+  version: 1,
+  comment: "Ausgangsversion",
+  created_at: AT,
+  created_by: 1,
+  attributes: [
+    attr({ key: "address", name: "Adresse", type: "text", searchable: true, portal: true }),
+    attr({ key: "contact", name: "Ansprechperson", type: "text" }),
+  ],
+};
+
+const CLASSES: CmdbClass[] = [
+  { id: 1, class_key: "server", name: "Server", icon: "server", number_prefix: "SRV", group_id: 1, group_name: "users", portal_visible: true, valid: true, position: 1, lock_version: 1, can_write: true, current_definition_version: 1, definition: SERVER_DEF },
+  { id: 2, class_key: "site", name: "Standort", icon: "building", number_prefix: "LOC", group_id: 1, group_name: "users", portal_visible: false, valid: true, position: 2, lock_version: 1, can_write: true, current_definition_version: 1, definition: SITE_DEF },
+];
+const classOf = (id: number): CmdbClass => CLASSES.find((c) => c.id === id) ?? CLASSES[0];
+
+const LINK_TYPES: LinkType[] = [
+  { name: "DependsOn", pointed: true, propagation: "source", source_label: "hängt ab von", target_label: "wird benötigt von", position: 1, offer_ci_ci: true, offer_ci_service: true, offer_ticket_ci: false },
+  { name: "ConnectedTo", pointed: false, propagation: "none", source_label: "verbunden mit", target_label: "verbunden mit", position: 2, offer_ci_ci: true, offer_ci_service: false, offer_ticket_ci: false },
+  { name: "RelevantTo", pointed: true, propagation: "none", source_label: "betrifft", target_label: "betroffen von", position: 3, offer_ci_ci: false, offer_ci_service: false, offer_ticket_ci: true },
+];
+
+function seedCis(): DemoCi[] {
+  const host = (id: number, name: string, own: number, cur: number, ip: string, os: number): DemoCi => ({
+    id,
+    number: `SRV-${String(id).padStart(4, "0")}`,
+    classId: 1,
+    name,
+    deployment: 2,
+    incidentOwn: own,
+    incidentCurrent: cur,
+    lockVersion: 2,
+    attrs: { hostname: [{ v: name }], ip: [{ v: ip }], os: [{ v: os }], location: [{ v: 5 }] },
+  });
+  const site = (id: number, name: string, address: string): DemoCi => ({
+    id,
+    number: `LOC-${String(id).padStart(4, "0")}`,
+    classId: 2,
+    name,
+    deployment: 2,
+    incidentOwn: 11,
+    incidentCurrent: 11,
+    lockVersion: 1,
+    attrs: { address: [{ v: address }], contact: [{ v: "Erika Beispiel" }] },
+  });
+  return [
+    host(1, "web-01.example.org", 11, 12, "192.0.2.11", 21),
+    host(2, "web-02.example.org", 11, 12, "192.0.2.12", 21),
+    host(3, "db-01.example.org", 13, 13, "192.0.2.21", 22),
+    host(4, "lb-01.example.org", 11, 11, "192.0.2.5", 22),
+    site(5, "Rechenzentrum Nord", "Musterweg 1, 12345 Beispielstadt"),
+    site(6, "Büro Bonn", "Beispielallee 2, 53111 Bonn"),
+  ];
+}
+
+export type DemoCmdb = { cis: DemoCi[]; links: DemoLink[]; nextCiId: number; nextLinkId: number };
+
+export function createDemoCmdb(): DemoCmdb {
+  return {
+    cis: seedCis(),
+    links: [
+      { id: 1, type: "DependsOn", source: 1, target: 3 },
+      { id: 2, type: "DependsOn", source: 2, target: 3 },
+      { id: 3, type: "DependsOn", source: 1, target: 4 },
+      { id: 4, type: "DependsOn", source: 3, target: HIDDEN_CI_ID }, // the one the caller may not see
+    ],
+    nextCiId: 7,
+    nextLinkId: 5,
+  };
+}
+
+/** Shared store of the running demo; e2e fixtures create their own. */
+export const demoCmdb: DemoCmdb = createDemoCmdb();
+
+function renderAttrs(store: DemoCmdb, ci: DemoCi): RenderedAttr[] {
+  const def = classOf(ci.classId).definition?.attributes ?? [];
+  return def.map((a) => {
+    const raw = ci.attrs[a.key]?.[0]?.v ?? null;
+    const display =
+      a.type === "catalog" && typeof raw === "number"
+        ? catalogItem(raw).name
+        : a.type === "ci_ref" && typeof raw === "number"
+          ? (store.cis.find((c) => c.id === raw)?.name ?? String(raw))
+          : raw === null
+            ? null
+            : String(raw);
+    return {
+      key: a.key,
+      label: a.name,
+      path: a.key,
+      type: a.type,
+      portal: a.portal ?? false,
+      display,
+      children: [],
+      ref: a.type === "ci_ref" && typeof raw === "number" ? { kind: "ci", key: String(raw) } : null,
+    };
+  });
+}
+
+function listItem(ci: DemoCi): CiListItem {
+  const dep = catalogItem(ci.deployment);
+  const inc = catalogItem(ci.incidentCurrent);
+  return {
+    id: ci.id,
+    number: ci.number,
+    name: ci.name,
+    class_key: classOf(ci.classId).class_key,
+    class_name: classOf(ci.classId).name,
+    deployment_state: dep.name,
+    deployment_functionality: dep.functionality,
+    incident_state: inc.name,
+    incident_functionality: inc.functionality,
+    changed_at: AT,
+  };
+}
+
+function versionOut(store: DemoCmdb, ci: DemoCi, id: number): CiVersion {
+  return {
+    id,
+    ci_id: ci.id,
+    definition_id: classOf(ci.classId).definition?.id ?? 1,
+    definition_version: 1,
+    name: ci.name,
+    deployment_state_id: ci.deployment,
+    incident_state_id: ci.incidentOwn,
+    attributes: ci.attrs,
+    rendered: renderAttrs(store, ci),
+    change_note: null,
+    created_by: 1,
+    created_at: AT,
+    archived: false,
+  };
+}
+const versionIds = (ci: DemoCi): number[] => (ci.lockVersion > 1 ? [ci.id * 10 + 1, ci.id * 10 + 2] : [ci.id * 10 + 1]);
+
+function ciOut(store: DemoCmdb, ci: DemoCi): Ci {
+  const ids = versionIds(ci);
+  const cls = classOf(ci.classId);
+  return {
+    id: ci.id,
+    number: ci.number,
+    name: ci.name,
+    class: { id: cls.id, class_key: cls.class_key, name: cls.name, icon: cls.icon, group_id: cls.group_id },
+    deployment_state_id: ci.deployment,
+    incident_state_id: ci.incidentOwn,
+    states: { deployment: catalogItem(ci.deployment), incident_own: catalogItem(ci.incidentOwn), incident_current: catalogItem(ci.incidentCurrent) },
+    version_count: ids.length,
+    lock_version: ci.lockVersion,
+    current_version: versionOut(store, ci, ids[ids.length - 1]),
+    rendered: renderAttrs(store, ci),
+    unknown_keys: [],
+    can_write: true,
+    created_at: AT,
+    created_by: 1,
+    changed_at: AT,
+    changed_by: 1,
+  };
+}
+
+function linkOut(store: DemoCmdb, link: DemoLink, ciId: number): LinkOut {
+  const outgoing = link.source === ciId;
+  const otherId = outgoing ? link.target : link.source;
+  const other = store.cis.find((c) => c.id === otherId);
+  const type = LINK_TYPES.find((t) => t.name === link.type) ?? LINK_TYPES[0];
+  const label = (outgoing ? type.source_label : type.target_label) ?? link.type;
+  return {
+    id: link.id,
+    link_type: link.type,
+    link_type_label: label,
+    direction: type.pointed ? (outgoing ? "outgoing" : "incoming") : "undirected",
+    created_at: AT,
+    created_by: "agent",
+    other: other
+      ? { kind: "ci", key: String(other.id), label: `${other.number} – ${other.name}`, hidden: false, url: `/agent/cmdb/${other.id}` }
+      : { kind: "ci", key: String(otherId), label: "Kein Zugriff", hidden: true, url: null },
+  };
+}
+
+function impact(store: DemoCmdb, rootId: number): ImpactGraph {
+  const seen = new Map<number, number>([[rootId, 0]]);
+  const edges: ImpactGraph["edges"] = [];
+  const queue = [rootId];
+  while (queue.length) {
+    const cur = queue.shift() as number;
+    for (const l of store.links.filter((x) => x.source === cur || x.target === cur)) {
+      const other = l.source === cur ? l.target : l.source;
+      edges.push({ source: `ci:${l.source}`, target: `ci:${l.target}`, link_type: l.type, propagates: l.type === "DependsOn" });
+      if (!seen.has(other)) {
+        seen.set(other, (seen.get(cur) ?? 0) + 1);
+        queue.push(other);
+      }
+    }
+  }
+  const uniq = edges.filter((e, i) => edges.findIndex((x) => x.source === e.source && x.target === e.target && x.link_type === e.link_type) === i);
+  return {
+    root: `ci:${rootId}`,
+    truncated: false,
+    edges: uniq,
+    nodes: [...seen.entries()].map(([id, depth]) => {
+      const ci = store.cis.find((c) => c.id === id);
+      return ci
+        ? { id: `ci:${id}`, kind: "ci" as const, ci_id: id, number: ci.number, name: ci.name, class_key: classOf(ci.classId).class_key, incident_functionality: catalogItem(ci.incidentCurrent).functionality, depth, hidden: false }
+        : { id: `ci:${id}`, kind: "ci" as const, ci_id: null, depth, hidden: true };
+    }),
+  };
+}
+
+const matches = (ci: DemoCi, q: string): boolean => {
+  const needle = q.trim().toLowerCase();
+  if (!needle) return true;
+  const hay = [ci.number, ci.name, ...Object.values(ci.attrs).flatMap((es) => es.map((e) => String(e.v ?? "")))];
+  return needle.split(/\s+/).every((tok) => hay.some((h) => h.toLowerCase().includes(tok)));
+};
+
+const SORTS: Record<string, (c: DemoCi) => string> = {
+  number: (c) => c.number,
+  name: (c) => c.name.toLowerCase(),
+  class: (c) => classOf(c.classId).name,
+  changed_at: () => AT,
+  deployment_state: (c) => catalogItem(c.deployment).name,
+  incident_state: (c) => catalogItem(c.incidentCurrent).name,
+};
+
+type SearchBody = { class_ids?: number[]; q?: string | null; sort?: string; order?: string; offset?: number; limit?: number };
+
+function search(store: DemoCmdb, body: SearchBody): CiPage {
+  let rows = store.cis.filter((c) => (body.class_ids?.length ? body.class_ids.includes(c.classId) : true) && matches(c, body.q ?? ""));
+  const key = SORTS[body.sort ?? "number"] ?? SORTS.number;
+  rows = [...rows].sort((a, b) => key(a).localeCompare(key(b)) * (body.order === "desc" ? -1 : 1));
+  const offset = body.offset ?? 0;
+  return { items: rows.slice(offset, offset + (body.limit ?? 50)).map(listItem), total: rows.length, total_capped: false };
+}
+
+const FILTER_FIELDS: FilterField[] = [
+  { key: "name", label: "Name", label_key: null, type: "string", ops: ["contains", "eq"], enum_values: [], options_source: null },
+  { key: "incident_state", label: "Vorfallsstatus", label_key: null, type: "enum", ops: ["eq", "in"], enum_values: ["operational", "warning", "incident"], options_source: null },
+];
+
+const FORM_OPTIONS: FormOptions = {
+  catalog: { [CATALOG_OS]: CATALOG.filter((c) => c.catalog_class === CATALOG_OS).map((c) => ({ value: String(c.id), label: c.name })) },
+};
+
+const TICKETS: CiTicket[] = [
+  { ticket_id: 1, number: "2026100801", title: "Datenbank antwortet nicht", state_name: "open", state_type: "open", queue_id: 1, queue_name: "Raw", link_type: "RelevantTo", open: true },
+];
+
+const adminStatus = (store: DemoCmdb): CmdbAdminStatus => ({
+  mode: demoItsmMode(),
+  views_present: true,
+  catalog_seeded: true,
+  class_count: CLASSES.length,
+  ci_count: store.cis.length,
+  archived_version_count: 0,
+});
+
+export function resolveCmdb(
+  store: DemoCmdb,
+  method: string,
+  pathname: string,
+  body?: unknown,
+  query: URLSearchParams = new URLSearchParams(),
+): DemoCmdbResponse | undefined {
+  const ok = (b: unknown, status = 200): DemoCmdbResponse => ({ status, body: b });
+  const none = (): DemoCmdbResponse => ({ status: 204, body: null });
+  const notFound = (): DemoCmdbResponse => ({ status: 404, body: { detail: "Nicht gefunden." } });
+
+  // Customer portal: only portal-visible classes, portal attributes only.
+  const portal = /\/api\/portal\/config-items(?:\/(\d+))?$/.exec(pathname);
+  if (portal) {
+    if (demoItsmMode() !== "tiqora") return notFound();
+    const visible = store.cis.filter((c) => classOf(c.classId).portal_visible);
+    if (portal[1]) {
+      const ci = visible.find((c) => c.id === Number(portal[1]));
+      if (!ci) return notFound();
+      const out: PortalCiDetail = {
+        id: ci.id,
+        number: ci.number,
+        name: ci.name,
+        class_name: classOf(ci.classId).name,
+        deployment_state: catalogItem(ci.deployment).name,
+        incident_state: catalogItem(ci.incidentCurrent).name,
+        incident_functionality: catalogItem(ci.incidentCurrent).functionality,
+        rendered: renderAttrs(store, ci).filter((r) => r.portal),
+      };
+      return ok(out);
+    }
+    const rows = visible.filter((c) => matches(c, query.get("q") ?? ""));
+    const page: PortalCiPage = {
+      total: rows.length,
+      items: rows.map((ci) => ({
+        id: ci.id,
+        number: ci.number,
+        name: ci.name,
+        class_name: classOf(ci.classId).name,
+        deployment_state: catalogItem(ci.deployment).name,
+        incident_state: catalogItem(ci.incidentCurrent).name,
+        incident_functionality: catalogItem(ci.incidentCurrent).functionality,
+      })),
+    };
+    return ok(page);
+  }
+
+  const admin = /\/api\/v1\/admin\/cmdb(\/.*)?$/.exec(pathname);
+  if (admin) {
+    const sub = admin[1] ?? "";
+    if (sub === "/status" || sub === "/seed-defaults") return ok(adminStatus(store));
+    if (sub === "/classes" && method === "GET") return ok(CLASSES);
+    if (sub === "/catalog-classes") return ok([DEMO_CATALOG_DEPLOYMENT, DEMO_CATALOG_INCIDENT, CATALOG_OS]);
+    if (sub === "/catalog" && method === "GET") {
+      const cls = query.get("catalog_class");
+      return ok(cls ? CATALOG.filter((c) => c.catalog_class === cls) : CATALOG);
+    }
+    if (sub === "/class-templates") return ok([]);
+    if (sub === "/propagation/recompute") return ok({ job_id: 9301, status: "queued" }, 202);
+    return undefined;
+  }
+
+  const m = /\/api\/v1\/cmdb(\/.*)?$/.exec(pathname);
+  if (!m) return undefined;
+  const sub = m[1] ?? "";
+  const seg = sub.split("/").filter(Boolean);
+
+  if (sub === "/status") {
+    const status: CmdbStatus = { mode: demoItsmMode(), readable_class_count: CLASSES.length, can_admin: true, views_present: true };
+    return ok(status);
+  }
+  if (sub === "/classes") return ok(CLASSES);
+  if (seg[0] === "classes" && seg[2] === "definitions") {
+    const c = CLASSES.find((x) => x.id === Number(seg[1]));
+    return c?.definition ? ok(c.definition) : notFound();
+  }
+  if (sub === "/catalog") {
+    const cls = query.get("catalog_class");
+    return ok(cls ? CATALOG.filter((c) => c.catalog_class === cls) : CATALOG);
+  }
+  if (sub === "/form-options") return ok(FORM_OPTIONS);
+  if (sub === "/filter-fields") return ok(FILTER_FIELDS);
+  if (sub === "/companies/lookup") return ok([{ id: "beispiel", label: "Beispiel GmbH" }]);
+  if (sub === "/link-types") return ok(LINK_TYPES);
+  if (sub === "/saved-searches" || sub === "/import-templates") return ok([]);
+  if (sub === "/cis/search" && method === "POST") return ok(search(store, (body ?? {}) as SearchBody));
+  if (sub === "/cis/lookup") {
+    const rows = store.cis.filter((c) => matches(c, query.get("q") ?? ""));
+    return ok(rows.map((c) => ({ id: c.id, number: c.number, name: c.name, class_key: classOf(c.classId).class_key, class_name: classOf(c.classId).name })));
+  }
+  if (sub === "/cis" && method === "POST") {
+    const b = (body ?? {}) as { class_id: number; name: string; deployment_state_id: number; incident_state_id: number; attributes?: Record<string, AttrEntry[]> };
+    const cls = classOf(b.class_id);
+    const id = store.nextCiId++;
+    const ci: DemoCi = {
+      id,
+      number: `${cls.number_prefix}-${String(id).padStart(4, "0")}`,
+      classId: cls.id,
+      name: b.name,
+      deployment: b.deployment_state_id,
+      incidentOwn: b.incident_state_id,
+      incidentCurrent: b.incident_state_id,
+      attrs: b.attributes ?? {},
+      lockVersion: 1,
+    };
+    store.cis.push(ci);
+    return ok(ciOut(store, ci), 201);
+  }
+  if (sub === "/links" && method === "POST") {
+    const b = (body ?? {}) as { source_key: string; target_key: string; link_type: string };
+    const link: DemoLink = { id: store.nextLinkId++, type: b.link_type, source: Number(b.source_key), target: Number(b.target_key) };
+    store.links.push(link);
+    return ok(linkOut(store, link, link.source), 201);
+  }
+  if (seg[0] === "links" && seg[1] && method === "DELETE") {
+    store.links = store.links.filter((l) => l.id !== Number(seg[1]));
+    return none();
+  }
+
+  if (seg[0] === "cis" && seg[1] && /^\d+$/.test(seg[1])) {
+    const ci = store.cis.find((c) => c.id === Number(seg[1]));
+    if (!ci) return notFound();
+    const part = seg[2];
+    if (!part) {
+      if (method === "DELETE") {
+        store.cis = store.cis.filter((c) => c.id !== ci.id);
+        return none();
+      }
+      if (method === "PUT") {
+        const b = (body ?? {}) as { name?: string; deployment_state_id?: number; incident_state_id?: number; attributes?: Record<string, AttrEntry[]> };
+        ci.name = b.name ?? ci.name;
+        ci.deployment = b.deployment_state_id ?? ci.deployment;
+        ci.incidentOwn = b.incident_state_id ?? ci.incidentOwn;
+        ci.attrs = b.attributes ?? ci.attrs;
+        ci.lockVersion += 1;
+        return ok({ ci: ciOut(store, ci), changed: true });
+      }
+      return ok(ciOut(store, ci));
+    }
+    if (part === "versions" && seg[3]) {
+      const vid = Number(seg[3]);
+      return versionIds(ci).includes(vid) ? ok(versionOut(store, ci, vid)) : notFound();
+    }
+    if (part === "versions") {
+      const items: CiVersionSummary[] = versionIds(ci)
+        .map((id) => ({
+          id,
+          definition_id: classOf(ci.classId).definition?.id ?? 1,
+          definition_version: 1,
+          name: ci.name,
+          deployment_state_id: ci.deployment,
+          incident_state_id: ci.incidentOwn,
+          deployment_state: catalogItem(ci.deployment).name,
+          incident_state: catalogItem(ci.incidentOwn).name,
+          change_note: null,
+          created_by: 1,
+          created_by_name: "Ada Agent",
+          created_at: AT,
+          archived: false,
+        }))
+        .reverse();
+      return ok({ items, has_more: false, archived_count: 0 });
+    }
+    if (part === "diff") {
+      const ids = versionIds(ci);
+      return ok({
+        from_version_id: ids[0],
+        to_version_id: ids[ids.length - 1],
+        rows: ids.length > 1 ? [{ kind: "changed", path: "ip", label: "IP-Adresse", old: "192.0.2.10", new: String(ci.attrs.ip?.[0]?.v ?? "") }] : [],
+      });
+    }
+    if (part === "history") {
+      const page: CiHistoryPage = {
+        has_more: false,
+        items: versionIds(ci)
+          .map((vid, i) => ({ id: vid, event: i === 0 ? "created" : "updated", detail: i === 0 ? "CI angelegt" : "Attribute geändert", version_id: vid, created_by: 1, created_by_name: "Ada Agent", created_at: AT }))
+          .reverse(),
+      };
+      return ok(page);
+    }
+    if (part === "links") return ok(store.links.filter((l) => l.source === ci.id || l.target === ci.id).map((l) => linkOut(store, l, ci.id)));
+    if (part === "tickets") return ok(ci.id === 3 ? TICKETS : []);
+    if (part === "impact") return ok(impact(store, ci.id));
+    if (part === "affected") {
+      const affected: Affected =
+        ci.id === 3
+          ? { ci_count: 2, service_count: 0, customer_count: 1, open_ticket_count: 1, truncated: false, services: [], customers: [{ id: "beispiel", label: "Beispiel GmbH" }], open_tickets: TICKETS }
+          : { ci_count: 0, service_count: 0, customer_count: 0, open_ticket_count: 0, truncated: false, services: [], customers: [], open_tickets: [] };
+      return ok(affected);
+    }
+    if (part === "attachments") return ok([]);
+  }
+  return undefined;
+}

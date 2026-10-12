@@ -1,3 +1,5 @@
+import { CmdbComingSoon } from "@/components/cmdb/CmdbComingSoon";
+import { CmdbListPage } from "@/routes/agent/cmdb/CmdbListPage";
 import { PluginRoutePage } from "@/routes/agent/PluginRoutePage";
 import {
   Outlet,
@@ -1291,6 +1293,71 @@ const catchAllRoute = createRoute({
   },
 });
 
+// CMDB (wave 4): pages not built yet render CmdbComingSoon; later tasks replace them one by one.
+const agentCmdbRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/cmdb",
+  component: CmdbListPage,
+});
+
+const agentCmdbNewRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/cmdb/new",
+  validateSearch: (s: Record<string, unknown>): { class?: number } => {
+    const n = Number(s.class);
+    return Number.isInteger(n) && n > 0 ? { class: n } : {};
+  },
+  component: CmdbComingSoon,
+});
+
+const agentCmdbImportRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/cmdb/import",
+  component: CmdbComingSoon,
+});
+
+const agentCmdbCiRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/cmdb/$ciId",
+  component: CmdbComingSoon,
+});
+
+const agentCmdbCiEditRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/cmdb/$ciId/edit",
+  component: CmdbComingSoon,
+});
+
+const adminCmdbClassesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/cmdb/classes",
+  component: CmdbComingSoon,
+});
+
+const adminCmdbClassRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/cmdb/classes/$classId",
+  component: CmdbComingSoon,
+});
+
+const adminCmdbCatalogRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/cmdb/catalog",
+  component: CmdbComingSoon,
+});
+
+const portalCmdbListRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/config-items",
+  component: CmdbComingSoon,
+});
+
+const portalCmdbDetailRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/config-items/$ciId",
+  component: CmdbComingSoon,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
@@ -1331,6 +1398,11 @@ const routeTree = rootRoute.addChildren([
     agentCustomerRoute,
     agentDialRoute,
     agentPluginRoute,
+    agentCmdbRoute,
+    agentCmdbNewRoute,
+    agentCmdbImportRoute,
+    agentCmdbCiRoute,
+    agentCmdbCiEditRoute,
   ]),
   portalLoginRoute,
   portalLayoutRoute.addChildren([
@@ -1342,6 +1414,8 @@ const routeTree = rootRoute.addChildren([
     portalKbArticleRoute,
     portalPreferencesRoute,
     portalSecurityRoute,
+    portalCmdbListRoute,
+    portalCmdbDetailRoute,
   ]),
   adminLayoutRoute.addChildren([
     adminIndexRoute,
@@ -1418,6 +1492,9 @@ const routeTree = rootRoute.addChildren([
     adminAiQueueEditRoute,
     adminAiAuditRoute,
     adminAiAclRoute,
+    adminCmdbClassesRoute,
+    adminCmdbClassRoute,
+    adminCmdbCatalogRoute,
   ]),
   catchAllRoute,
 ]);
