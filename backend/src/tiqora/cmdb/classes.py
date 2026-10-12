@@ -245,18 +245,27 @@ class ClassService:
         cache: dict[int, DefinitionRecord] = self._s.info.setdefault(_DEF_CACHE, {})
         return cache
 
-    async def _validate(
-        self, attrs: builtins.list[AttributeDef], *, extra_class_keys: frozenset[str]
-    ) -> None:
+    async def check(
+        self,
+        attrs: builtins.list[AttributeDef],
+        *,
+        extra_class_keys: frozenset[str] = frozenset(),
+    ) -> builtins.list[DefinitionIssue]:
+        """The validation issues of a definition (empty list = valid); never raises."""
         catalog_classes = set(await CatalogService(self._s).list_classes())
         class_keys = {
             str(k) for k in (await self._s.execute(select(TiqoraCmdbClass.class_key))).scalars()
         }
-        issues = validate_definition(
+        return validate_definition(
             attrs,
             known_catalog_classes=catalog_classes,
             known_class_keys=class_keys | extra_class_keys,
         )
+
+    async def _validate(
+        self, attrs: builtins.list[AttributeDef], *, extra_class_keys: frozenset[str]
+    ) -> None:
+        issues = await self.check(attrs, extra_class_keys=extra_class_keys)
         if issues:
             raise DefinitionInvalid(issues)
 

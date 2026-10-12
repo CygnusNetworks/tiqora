@@ -1,0 +1,179 @@
+"""API DTOs of the CMDB class/catalog/definition surface (D10).
+
+Later tasks append their DTOs here (CIs, links, search, ...). Datetimes use
+:data:`tiqora.domain.schemas.UtcDateTime`; definitions use the typed :class:`AttributeDef`.
+"""
+
+from __future__ import annotations
+
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+from tiqora.cmdb.definition import AttributeDef
+from tiqora.domain.schemas import UtcDateTime
+
+ItsmModeOut = Literal["off", "znuny_readthrough", "tiqora"]
+
+
+class CmdbStatusOut(BaseModel):
+    mode: ItsmModeOut
+    readable_class_count: int
+    can_admin: bool
+    views_present: bool
+
+
+class CmdbAdminStatusOut(BaseModel):
+    mode: ItsmModeOut
+    views_present: bool
+    catalog_seeded: bool
+    class_count: int
+    ci_count: int
+    archived_version_count: int
+
+
+class CatalogItemOut(BaseModel):
+    id: int
+    catalog_class: str
+    item_key: str
+    name: str
+    functionality: str | None
+    position: int
+    valid: bool
+
+
+class CatalogItemIn(BaseModel):
+    """``catalog_class`` and ``item_key`` are fixed after creation (a PUT must repeat them)."""
+
+    catalog_class: str = Field(min_length=1, max_length=100)
+    item_key: str = Field(pattern=r"^[A-Za-z0-9_]{1,100}$")
+    name: str = Field(min_length=1, max_length=200)
+    functionality: str | None = Field(None, max_length=50)
+    position: int = Field(0, ge=0, le=100000)
+    valid: bool = True
+
+
+class DefinitionIssueOut(BaseModel):
+    path: str
+    code: str
+    message: str
+
+
+class DefinitionChangeOut(BaseModel):
+    path: str
+    kind: Literal[
+        "added", "removed", "type_changed", "count_changed", "renamed_label", "flags_changed"
+    ]
+    detail: str
+
+
+class CmdbDefinitionOut(BaseModel):
+    id: int
+    class_id: int
+    version: int
+    attributes: list[AttributeDef]
+    comment: str | None
+    created_by: int
+    created_at: UtcDateTime
+
+
+class CmdbDefinitionIn(BaseModel):
+    attributes: list[AttributeDef] = Field(max_length=500)
+    comment: str | None = Field(None, max_length=250)
+
+
+class DefinitionValidateIn(BaseModel):
+    class_id: int | None = Field(None, ge=1)
+    attributes: list[AttributeDef] = Field(max_length=500)
+
+
+class DefinitionImportIn(BaseModel):
+    format: Literal["znuny_yaml", "znuny_perl", "tiqora_json"]
+    text: str = Field(max_length=1024 * 1024)
+
+
+class DefinitionImportOut(BaseModel):
+    attributes: list[AttributeDef]
+    warnings: list[str]
+    missing_catalog_classes: list[str]
+
+
+class CmdbClassOut(BaseModel):
+    id: int
+    class_key: str
+    name: str
+    icon: str | None
+    number_prefix: str
+    group_id: int
+    group_name: str | None
+    portal_visible: bool
+    valid: bool
+    position: int
+    lock_version: int
+    current_definition_version: int | None
+    definition: CmdbDefinitionOut | None
+    can_write: bool
+
+
+class CmdbClassIn(BaseModel):
+    """``class_key`` is immutable after create (a PUT must repeat it)."""
+
+    class_key: str = Field(pattern=r"^[a-z][a-z0-9_]{1,49}$")
+    name: str = Field(min_length=1, max_length=200)
+    icon: str | None = Field(None, max_length=50)
+    number_prefix: str | None = Field(None, max_length=20)
+    group_id: int = Field(ge=1)
+    portal_visible: bool = False
+    valid: bool = True
+    position: int = Field(0, ge=0, le=100000)
+
+
+class CmdbClassUpdateIn(CmdbClassIn):
+    expected_lock_version: int = Field(ge=1)
+
+
+class ClassTemplateOut(BaseModel):
+    key: str
+    name: str
+    icon: str
+    attribute_count: int
+
+
+class ClassTemplateApplyIn(BaseModel):
+    group_id: int = Field(ge=1)
+
+
+class LinkTypeOut(BaseModel):
+    """Read model of a valid link type offered between CIs (route: Task 11)."""
+
+    name: str
+    source_label: str | None
+    target_label: str | None
+    pointed: bool
+    propagation: Literal["none", "source", "target", "both"]
+    offer_ci_ci: bool
+    offer_ci_service: bool
+    offer_ticket_ci: bool
+    position: int
+
+
+__all__ = [
+    "CatalogItemIn",
+    "CatalogItemOut",
+    "ClassTemplateApplyIn",
+    "ClassTemplateOut",
+    "CmdbAdminStatusOut",
+    "CmdbClassIn",
+    "CmdbClassOut",
+    "CmdbClassUpdateIn",
+    "CmdbDefinitionIn",
+    "CmdbDefinitionOut",
+    "CmdbStatusOut",
+    "DefinitionChangeOut",
+    "DefinitionImportIn",
+    "DefinitionImportOut",
+    "DefinitionIssueOut",
+    "DefinitionValidateIn",
+    "ItsmModeOut",
+    "LinkTypeOut",
+]

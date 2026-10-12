@@ -21,6 +21,7 @@ from tiqora.api.v1.admin import (
     avatars,
     channels,
     chat_configs,
+    cmdb,
     crypto_keys,
     crypto_settings,
     customer_links,
@@ -118,6 +119,8 @@ admin_router.include_router(avatars.router)
 admin_router.include_router(extensions.router)
 admin_router.include_router(settings_sections.router)
 admin_router.include_router(identity_providers.router)
+admin_router.include_router(cmdb.status_router)
+admin_router.include_router(cmdb.router)
 admin_router.include_router(reporting.router)
 admin_router.include_router(dashboard_templates.router)
 admin_router.include_router(dashboard_kiosk_links.router)

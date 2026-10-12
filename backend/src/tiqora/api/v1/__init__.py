@@ -43,6 +43,7 @@ from tiqora.api.v1 import (
     vcard_import,
 )
 from tiqora.api.v1.admin import admin_router
+from tiqora.api.v1.cmdb import router as cmdb_router
 
 api_v1_router = APIRouter()
 api_v1_router.include_router(auth.router)
@@ -91,6 +92,7 @@ api_v1_router.include_router(kiosk.router)
 api_v1_router.include_router(integrations.router)
 api_v1_router.include_router(jobs.router)
 api_v1_router.include_router(plugins.router)
+api_v1_router.include_router(cmdb_router)
 api_v1_router.include_router(admin_router)
 
 __all__ = ["api_v1_router"]
