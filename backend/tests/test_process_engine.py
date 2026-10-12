@@ -639,12 +639,12 @@ Permission: ''
 
 UNSUP_TRANSITION_CONFIG_YAML = _TITLE_NONEMPTY_CONDITION
 
-# ExecuteInvoker remains deferred (no GenericInterface invoker runtime) —
-# used here to assert skip-and-report behaviour for unknown modules.
+# ConfigItemUpdate stays unsupported (it needs the CMDB) — used here to assert
+# skip-and-report behaviour for modules without a Tiqora handler.
 UNSUP_TRANSITION_ACTION_CONFIG_YAML = """
 Config:
-  Invoker: deferred
-Module: Kernel::System::ProcessManagement::TransitionAction::ExecuteInvoker
+  ConfigItemID: '1'
+Module: Kernel::System::ProcessManagement::TransitionAction::ConfigItemUpdate
 """
 
 
@@ -714,7 +714,7 @@ async def test_unsupported_transition_action_module_is_skipped_and_reported(
     mariadb_znuny_url: str,
 ) -> None:
     """A TransitionAction whose Module is not one of the implemented handlers
-    (e.g. ExecuteInvoker) is skipped — logged, not applied, and its short
+    (e.g. ConfigItemUpdate) is skipped — logged, not applied, and its short
     module name is collected into ``unsupported_actions`` — while the
     transition itself still fires and the activity still advances (an
     unsupported action does not abort the whole submission).
@@ -751,7 +751,7 @@ async def test_unsupported_transition_action_module_is_skipped_and_reported(
 
     assert result.activity_changed is True
     assert result.new_activity_entity_id == UNSUP_ACTIVITY_B
-    assert result.unsupported_actions == ["ExecuteInvoker"]
+    assert result.unsupported_actions == ["ConfigItemUpdate"]
 
 
 # ---------------------------------------------------------------------------

@@ -2963,6 +2963,7 @@
         },
         "unsupported": "only effective in Znuny",
         "tiqoraOnly": "only effective in Tiqora",
+        "alwaysInBackground": "always runs in the background",
         "unknownModule": "Unknown module: {{module}}. Only raw parameters can be edited.",
         "oneOf": "Name or ID",
         "byName": "Name",

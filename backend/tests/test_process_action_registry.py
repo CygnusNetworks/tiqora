@@ -79,6 +79,7 @@ IMPLEMENTED = frozenset(
         "AppointmentCreate",
         "AppointmentUpdate",
         "AppointmentRemove",
+        "ExecuteInvoker",  # handler from tiqora.gi.process_action (process merge, Task 31)
     }
 )
 
@@ -113,7 +114,7 @@ def test_core_list_runs_exactly_the_implemented_handlers() -> None:
     assert len({m.name for m in modules}) == len(modules)
     assert {m.name for m in modules if m.run is not None} == IMPLEMENTED
     unsupported = {m.name for m in modules if m.run is None}
-    assert unsupported == {"ExecuteInvoker", "ConfigItemUpdate"}
+    assert unsupported == {"ConfigItemUpdate"}
     assert not any(m.tiqora_only for m in modules)
 
 

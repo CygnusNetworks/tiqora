@@ -1,7 +1,7 @@
 """``ExecuteInvoker`` process action (G14) on both dialects.
 
-The action is dispatched through ``execute_transition_action`` with the handler registered the
-way the process merge wires it (``_ACTION_HANDLERS``). Seed band 51390-51409: webservice
+The action is dispatched through ``execute_transition_action``, which resolves the handler from
+the ``TRANSITION_ACTIONS`` registry (wired in the process merge). Seed band 51390-51409: webservice
 51390, ticket 51391. Jobs the module creates are removed with ``snapshot_marks`` /
 ``delete_above_marks``.
 """
@@ -27,8 +27,6 @@ from tests._row_cleanup import delete_above_marks, snapshot_marks
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.domain.settings_store import KEY_GI_REQUESTER_ENABLED
-from tiqora.gi.process_action import execute_invoker_action
-from tiqora.process import engine as process_engine
 from tiqora.process.config import TransitionActionConfig
 from tiqora.process.engine import execute_transition_action
 from tiqora.znuny.sysconfig import SysConfig
@@ -99,11 +97,6 @@ def url_fixture(request: pytest.FixtureRequest) -> str:
     url: str = request.getfixturevalue(request.param)
     _seed(url)
     return url
-
-
-@pytest.fixture(autouse=True)
-def _wired(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setitem(process_engine._ACTION_HANDLERS, "ExecuteInvoker", execute_invoker_action)
 
 
 def _jobs(sync_url: str) -> list[dict[str, Any]]:

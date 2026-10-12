@@ -44,9 +44,10 @@ Deferred/unsupported scope (documented, not silently missing)
   ``TransitionValidation::Base``.
 - TransitionAction modules are dispatched through the registry
   ``tiqora.process.actions.TRANSITION_ACTIONS`` (:func:`resolve_action`); every
-  Znuny module is listed there, but these have no Tiqora handler yet (``run is
-  None``): ``ExecuteInvoker`` (handler owned by the GI requester plan),
-  ``Appointment*`` (Create/Update/Remove), ``ConfigItemUpdate``. Unsupported and
+  Znuny module is listed there. Only ``ConfigItemUpdate`` has no Tiqora handler
+  (``run is None``, it needs the CMDB). ``ExecuteInvoker`` runs the GenericInterface
+  requester's handler (``tiqora.gi.process_action``), which always queues the call as
+  a background job. Unsupported and
   unknown modules are logged and no-op'd, and collected into
   ``ActivityDialogSubmitResult.unsupported_actions``.
 - Activity Dialog ``PendingTimeDiff`` is not a dialog field (a transition action's own

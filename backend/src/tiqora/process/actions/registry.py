@@ -293,7 +293,9 @@ _APPOINTMENT_UPDATE = (
 )
 # AppointmentRemove.pm:96 (AppointmentID required).
 _APPOINTMENT_REMOVE = (ActionParam("AppointmentID", "text", required=True),)
-# ExecuteInvoker.pm POD + :109-122 (Webservice is a name, not an id).
+# ExecuteInvoker.pm POD + :109-122 (Webservice is a name, not an id). ``Asynchronous`` is
+# accepted and ignored: the GI handler always queues the call (cross-plan ruling H1); the
+# designer says so next to the field. ``UserID`` comes from the catalogue (ruling F18).
 _EXECUTE_INVOKER = (
     ActionParam("Webservice", "text", required=True),
     ActionParam("Invoker", "text", required=True),
@@ -314,6 +316,7 @@ _CONFIG_ITEM_UPDATE = (
 
 def core_transition_actions() -> list[TransitionActionModule]:
     """Every Znuny transition action module, with Tiqora's handler where one exists."""
+    from tiqora.gi.process_action import execute_invoker_action
     from tiqora.process import engine
     from tiqora.process.actions import appointments
 
@@ -362,10 +365,10 @@ def core_transition_actions() -> list[TransitionActionModule]:
         m("AppointmentCreate", appointments.action_appointment_create, _APPOINTMENT_CREATE),
         m("AppointmentUpdate", appointments.action_appointment_update, _APPOINTMENT_UPDATE),
         m("AppointmentRemove", appointments.action_appointment_remove, _APPOINTMENT_REMOVE),
-        # ExecuteInvoker: the handler is owned by the GI plan
-        # (``tiqora/gi/process_action.py``, not on this branch yet); the process merge sets
-        # ``run`` here (cross-plan ruling). No own implementation in tiqora.process.
-        m("ExecuteInvoker", None, _EXECUTE_INVOKER),
+        # ExecuteInvoker: the handler is owned by the GI requester (``tiqora/gi/process_action``,
+        # imported lazily above: it must not import tiqora.process, ruling H1). It queues the
+        # invoker call as a job in the caller's transaction; no own implementation here.
+        m("ExecuteInvoker", execute_invoker_action, _EXECUTE_INVOKER),
         m("ConfigItemUpdate", None, _CONFIG_ITEM_UPDATE),
     ]
 

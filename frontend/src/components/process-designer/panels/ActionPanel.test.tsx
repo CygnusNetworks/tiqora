@@ -35,7 +35,19 @@ const catalog = {
         { name: "StateID", kind: "state", required: true, one_of: ["State", "StateID"], list_value: false },
       ],
     },
-    { name: "ExecuteInvoker", module: MOD + "ExecuteInvoker", supported: false, tiqora_only: false, params: [] },
+    {
+      name: "ExecuteInvoker",
+      module: MOD + "ExecuteInvoker",
+      supported: true,
+      tiqora_only: false,
+      params: [
+        { name: "Webservice", kind: "text", required: true, one_of: [], list_value: false },
+        { name: "Invoker", kind: "text", required: true, one_of: [], list_value: false },
+        { name: "Asynchronous", kind: "bool", required: false, one_of: [], list_value: false },
+        { name: "UserID", kind: "user", required: false, one_of: [], list_value: false },
+      ],
+    },
+    { name: "ConfigItemUpdate", module: MOD + "ConfigItemUpdate", supported: false, tiqora_only: false, params: [] },
     { name: "AppointmentCreate", module: MOD + "AppointmentCreate", supported: true, tiqora_only: false, params: [] },
   ],
   fields: [{ name: "State", label: "State", kind: "select", dialog: true, condition: true, options: [{ value: "open", label: "open" }] }],
@@ -128,8 +140,15 @@ describe("ActionPanel", () => {
   });
 
   it("badges modules Znuny-only", () => {
-    renderPanel(entity("TA-3", "Invoker", { Module: MOD + "ExecuteInvoker", Config: {} }));
+    renderPanel(entity("TA-3", "CMDB", { Module: MOD + "ConfigItemUpdate", Config: {} }));
     expect(screen.getByTestId("action-panel-badge")).toHaveTextContent("nur in Znuny wirksam");
+  });
+
+  it("runs ExecuteInvoker and notes that Asynchronous is always background", () => {
+    renderPanel(entity("TA-4", "Invoker", { Module: MOD + "ExecuteInvoker", Config: { Webservice: "CRM", Invoker: "SendTicket" } }));
+    expect(screen.queryByTestId("action-panel-badge")).toBeNull();
+    expect(screen.getByTestId("action-field-Asynchronous-note")).toHaveTextContent("läuft immer im Hintergrund");
+    expect(screen.queryByTestId("action-field-Webservice-note")).toBeNull();
   });
 });
 

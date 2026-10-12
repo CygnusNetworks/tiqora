@@ -242,6 +242,12 @@ export function ActionPanel({
               testId={`action-field-${d.key}-input`}
               ariaLabel={f.key}
             />
+            {currentShort === "ExecuteInvoker" && d.key === "Asynchronous" ? (
+              // Tiqora always queues the invoker call; the value is kept for Znuny (ruling H1)
+              <p className="text-xs text-muted" data-testid="action-field-Asynchronous-note">
+                {t("admin.processDesigner.action.alwaysInBackground")}
+              </p>
+            ) : null}
           </div>
         );
       })}

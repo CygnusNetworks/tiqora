@@ -526,8 +526,8 @@ with its Znuny source lines.
 
 | Supported | Deferred (logged, no-op — collected into `unsupported_actions`) |
 |---|---|
-| `TicketStateSet` | `ExecuteInvoker` (the handler belongs to the GenericInterface work; registered without a handler until that is merged) |
-| `TicketQueueSet` | `ConfigItemUpdate` (needs the CMDB) |
+| `TicketStateSet` | `ConfigItemUpdate` (needs the CMDB) |
+| `TicketQueueSet` | |
 | `TicketOwnerSet` | |
 | `TicketPrioritySet` | |
 | `TicketTitleSet` | |
@@ -547,6 +547,7 @@ with its Znuny source lines.
 | `LinkAdd` | |
 | `AppointmentCreate` / `AppointmentUpdate` / `AppointmentRemove` | |
 | `TicketCreate` | (Title/Queue/State/Priority/…; optional `LinkAs` to parent) |
+| `ExecuteInvoker` | Handler of the GenericInterface requester (`tiqora/gi/process_action.py`): queues the invoker call as a background job in the dialog submit's transaction. `Webservice` is the webservice **name**; `Asynchronous` is accepted and ignored (the designer notes "läuft immer im Hintergrund"). Works without the requester takeover flag; see [compatibility.md](compatibility.md#deviations-from-znuny), deviation 8 |
 
 An unsupported action does not abort the submission: the transition still
 fires and the activity still advances, but that one action is skipped and

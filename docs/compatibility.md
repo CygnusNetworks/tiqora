@@ -423,7 +423,7 @@ the ticket, so a slow or dead remote system cannot block an agent.
 | Retries | `ErrorHandling` of type `RequestRetry` (interval, factor, maximum interval, maximum count, maximum period, `ScheduleRetry`) |
 | Conditions | Znuny's condition syntax (`Type`, `Fields`, `Fields->Match`, `Any`/`All`/`None`/`Only`, `and`/`or`/`xor`, regex `[Rr][Ee]#` and plain compare); evaluated with the ticket data at the time the worker processes the event |
 | Response actions | `OTRS_TicketTitleUpdate`, `OTRS_TicketServiceSet`, `OTRS_TicketTypeSet`, `OTRS_TicketQueueSet`, `OTRS_TicketSLASet`, `OTRS_TicketStateSet`, `OTRS_TicketPrioritySet`, `OTRS_TicketCustomerSet`, `OTRS_TicketOwnerSet`, `OTRS_TicketResponsibleSet`, `OTRS_TicketHistoryAdd`, `OTRS_TicketArticleAdd`, `OTRS_TicketCreate`, `OTRS_TicketDynamicFieldSet_<Name>`, `OTRS_AsynchronousInvokerExecution`. All writes go through the normal ticket services (history, escalation, events), as user 1 like Znuny |
-| `ExecuteInvoker` process action | Handler in `gi/process_action.py`, registered by the process merge; see deviation 8 |
+| `ExecuteInvoker` process action | Handler in `gi/process_action.py`, registered in the process `TRANSITION_ACTIONS` registry; see deviation 8 |
 
 ### Authentication matrix
 
@@ -935,7 +935,8 @@ narrower than Znuny), **by design** (deliberate platform choice).
 | Smart tags in actions and conditions | yes | `<OTRS_TICKET_*>`, dynamic fields, first/last article, template placeholders; conditions of the Base types only, like Znuny |
 | `Module` conditions | partial | Python re-implementations registered by Perl module path (`ValidateDemo`); unknown modules never match and the designer warns |
 | Appointment actions (`AppointmentCreate/Update/Remove`) | yes | `Custom*` recurrence, `RecurrenceFrequency`, `RecurrenceExclude`, notification keys and `TicketAppointmentRuleID` are ignored |
-| `ExecuteInvoker` / `ConfigItemUpdate` actions | missing | Logged as unsupported (`ExecuteInvoker` follows with the GenericInterface requester, `ConfigItemUpdate` needs the CMDB) |
+| `ExecuteInvoker` action | yes | Always queued as a background job; `Asynchronous` is accepted and ignored (see [Requester](#requester-and-invokers-tiqora-calls-external-systems), deviation 8) |
+| `ConfigItemUpdate` action | missing | Logged as unsupported (needs the CMDB) |
 | Dialog attachments and time units | yes | Article uploads, `TimeUnits`, Znuny's existing-attachment selection (`Attachments` field, `AttachmentsReuse`), option refresh when a field changes |
 | Transitions after every ticket change | missing | Evaluated after process dialogs and new process tickets only |
 | Znuny 7.x process YAML | verified | Same format as 6.5 (no renamed keys); `pm_process_preferences` (7.2+) is snapshotted. Golden tests passed on Znuny 6.5 and on 7.3.5 |
