@@ -22,7 +22,6 @@ tests so ``make_class(key="cmdb4srv")`` works in every test.
 from __future__ import annotations
 
 import asyncio
-import json
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
@@ -30,21 +29,26 @@ from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db, get_session_factory_dep
+from tiqora.cmdb.classes import ClassData, ClassService
 from tiqora.cmdb.definition import AttributeDef, parse_attrs
-from tiqora.cmdb.seed import DEFAULT_CATALOG_ROWS, seed_defaults
+from tiqora.cmdb.seed import (
+    DEFAULT_CATALOG_ROWS,
+    DEPLOYMENT_STATE,
+    INCIDENT_STATE,
+    seed_defaults,
+)
 from tiqora.cmdb.views import create_cmdb_views, drop_cmdb_views
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
-from tiqora.db.tiqora.models import TiqoraCmdbClass, TiqoraCmdbClassDefinition
+from tiqora.db.tiqora.models import TiqoraCmdbCatalog
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.itsm.link_type_defaults import DEFAULT_LINK_TYPES
-from tiqora.jobs.service import utc_now
 
 __all__ = [
     "ATTRS",
@@ -64,6 +68,8 @@ __all__ = [
     "USER_B",
     "CmdbWorld",
     "_cmdb_rows_reset",
+    "_dep",
+    "_inc",
     "cleanup_world",
     "client_for",
     "cmdb_db",
@@ -435,33 +441,40 @@ async def make_class(
     attributes: list[dict[str, Any]] | None = None,
     portal_visible: bool = False,
 ) -> int:
-    """Insert a class with one definition (direct ORM rows; Task 4 switches to ClassService)."""
-    now = utc_now()
-    cls = TiqoraCmdbClass(
-        class_key=key,
-        name=key,
-        number_prefix=key[:3].upper(),
-        group_id=group_id,
-        portal_visible=portal_visible,
-        created_by=USER_ADMIN,
-        created_at=now,
-        changed_by=USER_ADMIN,
-        changed_at=now,
+    """Create a class with definition 1 through ``ClassService`` and commit; returns its id."""
+    svc = ClassService(session)
+    cls = await svc.create(
+        ClassData(class_key=key, name=key, group_id=group_id, portal_visible=portal_visible),
+        user_id=USER_ADMIN,
     )
-    session.add(cls)
-    await session.flush()
-    definition = TiqoraCmdbClassDefinition(
-        class_id=cls.id,
-        version=1,
-        attributes=json.dumps(SERVER_ATTRS if attributes is None else attributes),
-        created_by=USER_ADMIN,
-        created_at=now,
+    await svc.add_definition(
+        cls.id,
+        parse_attrs(SERVER_ATTRS if attributes is None else attributes),
+        comment=None,
+        user_id=USER_ADMIN,
     )
-    session.add(definition)
-    await session.flush()
-    cls.current_definition_id = definition.id
     await session.commit()
-    return int(cls.id)
+    return cls.id
+
+
+async def _dep(session: AsyncSession, key: str) -> int:
+    """Catalog id of the deployment state with ``item_key == key``."""
+    return await _catalog_id(session, DEPLOYMENT_STATE, key)
+
+
+async def _inc(session: AsyncSession, key: str) -> int:
+    """Catalog id of the incident state with ``item_key == key``."""
+    return await _catalog_id(session, INCIDENT_STATE, key)
+
+
+async def _catalog_id(session: AsyncSession, catalog_class: str, key: str) -> int:
+    row = await session.execute(
+        select(TiqoraCmdbCatalog.id).where(
+            TiqoraCmdbCatalog.catalog_class == catalog_class,
+            TiqoraCmdbCatalog.item_key == key,
+        )
+    )
+    return int(row.scalar_one())
 
 
 def _agent(uid: int) -> AuthenticatedUser:
