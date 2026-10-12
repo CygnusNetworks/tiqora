@@ -185,6 +185,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chat/v1/sessions/{session_id}/handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Chat Handoff
+         * @description The visitor asks for a human while the AI answers.
+         *
+         *     204 and the chat is ``waiting`` (the agents ring) or, when nobody is available, ended as
+         *     ``no_agent`` (the e-mail prompt follows). 409 ``not_bot`` when the AI is not answering
+         *     (any other status, or an agent took over first). A running AI turn does not block it.
+         */
+        post: operations["post_chat_handoff_api_chat_v1_sessions__session_id__handoff_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chat/v1/sessions/{session_id}/identify": {
         parameters: {
             query?: never;
@@ -6258,7 +6282,8 @@ export interface paths {
         };
         /**
          * Get Chat Inbox
-         * @description Waiting chats the agent may accept and the agent's own active chats.
+         * @description Waiting chats the agent may accept, the agent's own active chats and the chats the AI
+         *     is answering (section ``bot``, no ring).
          */
         get: operations["get_chat_inbox_api_v1_chat_inbox_get"];
         put?: never;
@@ -6280,7 +6305,8 @@ export interface paths {
         put?: never;
         /**
          * Post Chat Accept
-         * @description Take a waiting chat (first accept wins; owner + lock like Znuny).
+         * @description Take a waiting chat or one the AI is answering (first accept wins; owner + lock like
+         *     Znuny).
          */
         post: operations["post_chat_accept_api_v1_chat_sessions__session_id__accept_post"];
         delete?: never;
@@ -13169,6 +13195,8 @@ export interface components {
         };
         /** ChatInboxOut */
         ChatInboxOut: {
+            /** Bot */
+            bot?: components["schemas"]["ChatInboxItemOut"][];
             /** Mine */
             mine: components["schemas"]["ChatInboxItemOut"][];
             /** Waiting */
@@ -13417,6 +13445,13 @@ export interface components {
         ChatSessionOut: {
             /** Agent Name */
             agent_name: string | null;
+            /** Bot Name */
+            bot_name?: string | null;
+            /**
+             * Can Handoff
+             * @default false
+             */
+            can_handoff: boolean;
             /** Can Send */
             can_send: boolean;
             /** Identified As */
@@ -20772,10 +20807,16 @@ export interface components {
             assigned_name: string | null;
             /** Assigned User Id */
             assigned_user_id: number | null;
+            /** Bot Name */
+            bot_name?: string | null;
             /** End Reason */
             end_reason: string | null;
             /** Ended At */
             ended_at: string | null;
+            /** Handoff At */
+            handoff_at?: string | null;
+            /** Handoff Reason */
+            handoff_reason?: string | null;
             /** Identity Source */
             identity_source?: string | null;
             /** Language */
@@ -22735,6 +22776,70 @@ export interface operations {
             };
             /** @description Unknown, switched off or not yours */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Rate limited (Retry-After) */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Chat temporarily unavailable (Retry-After) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_chat_handoff_api_chat_v1_sessions__session_id__handoff_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cross-origin request or website not allowed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown, switched off or not yours */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `not_bot`: the AI is not answering this chat */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -386,6 +386,8 @@ async def test_session_flow_and_shapes(env: Env) -> None:
             "needs_contact": False,
             "last_seq": 2,
             "identified_as": None,
+            "bot_name": None,
+            "can_handoff": False,
         }
         # Agent bus: chat_waiting + chat_message with the ticket's queue, ids only.
         events = [json.loads(m) for c, m in env.redis.published if c == TIQORA_EVENTS_CHANNEL]

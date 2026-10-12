@@ -8534,6 +8534,13 @@
       },
       "ChatInboxOut": {
         "properties": {
+          "bot": {
+            "items": {
+              "$ref": "#/components/schemas/ChatInboxItemOut"
+            },
+            "title": "Bot",
+            "type": "array"
+          },
           "mine": {
             "items": {
               "$ref": "#/components/schemas/ChatInboxItemOut"
@@ -9231,6 +9238,22 @@
               }
             ],
             "title": "Agent Name"
+          },
+          "bot_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bot Name"
+          },
+          "can_handoff": {
+            "default": false,
+            "title": "Can Handoff",
+            "type": "boolean"
           },
           "can_send": {
             "title": "Can Send",
@@ -31571,6 +31594,17 @@
             ],
             "title": "Assigned User Id"
           },
+          "bot_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bot Name"
+          },
           "end_reason": {
             "anyOf": [
               {
@@ -31593,6 +31627,29 @@
               }
             ],
             "title": "Ended At"
+          },
+          "handoff_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handoff At"
+          },
+          "handoff_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handoff Reason"
           },
           "identity_source": {
             "anyOf": [
@@ -36063,6 +36120,57 @@
           }
         },
         "summary": "Post Chat End",
+        "tags": [
+          "webchat-public"
+        ]
+      }
+    },
+    "/api/chat/v1/sessions/{session_id}/handoff": {
+      "post": {
+        "description": "The visitor asks for a human while the AI answers.\n\n204 and the chat is ``waiting`` (the agents ring) or, when nobody is available, ended as\n``no_agent`` (the e-mail prompt follows). 409 ``not_bot`` when the AI is not answering\n(any other status, or an agent took over first). A running AI turn does not block it.",
+        "operationId": "post_chat_handoff_api_chat_v1_sessions__session_id__handoff_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "description": "Cross-origin request or website not allowed"
+          },
+          "404": {
+            "description": "Unknown, switched off or not yours"
+          },
+          "409": {
+            "description": "`not_bot`: the AI is not answering this chat"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Rate limited (Retry-After)"
+          },
+          "503": {
+            "description": "Chat temporarily unavailable (Retry-After)"
+          }
+        },
+        "summary": "Post Chat Handoff",
         "tags": [
           "webchat-public"
         ]
@@ -70959,7 +71067,7 @@
     },
     "/api/v1/chat/inbox": {
       "get": {
-        "description": "Waiting chats the agent may accept and the agent's own active chats.",
+        "description": "Waiting chats the agent may accept, the agent's own active chats and the chats the AI\nis answering (section ``bot``, no ring).",
         "operationId": "get_chat_inbox_api_v1_chat_inbox_get",
         "parameters": [
           {
@@ -71025,7 +71133,7 @@
     },
     "/api/v1/chat/sessions/{session_id}/accept": {
       "post": {
-        "description": "Take a waiting chat (first accept wins; owner + lock like Znuny).",
+        "description": "Take a waiting chat or one the AI is answering (first accept wins; owner + lock like\nZnuny).",
         "operationId": "post_chat_accept_api_v1_chat_sessions__session_id__accept_post",
         "parameters": [
           {

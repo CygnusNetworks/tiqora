@@ -55,7 +55,7 @@ from tiqora.jobs.service import utc_now
 from tiqora.security.ratelimit import client_ip
 from tiqora.storage.backend import DbMimeStorage
 from tiqora.webchat.availability import VISITOR_TYPING_PREFIX, config_availability
-from tiqora.webchat.bot import bot_availability
+from tiqora.webchat.bot import bot_availability, hand_off_chat
 from tiqora.webchat.config_cache import CachedConfig, public_config_cache
 from tiqora.webchat.hub import ChatHub, StreamLimitReached, get_chat_hub
 from tiqora.webchat.identity import IdentityError
@@ -158,6 +158,10 @@ UPLOAD_BYTES_PER_CONFIG_DAY: Final = 500 * 1024 * 1024
 #: R-UPLOAD-BUDGET-IP: one address may use at most a quarter of the config budget, ≤ 100 MiB.
 UPLOAD_BYTES_PER_IP_DAY: Final = min(100 * 1024 * 1024, UPLOAD_BYTES_PER_CONFIG_DAY // 4)
 END_PER_SESSION_MINUTE: Final = 10
+#: "Mit einem Menschen sprechen" presses per session and minute (own bucket, C8).
+HANDOFF_PER_SESSION_MINUTE: Final = 3
+#: The internal note on the ticket after a visitor's handoff press.
+VISITOR_HANDOFF_NOTE: Final = "Der Besucher möchte mit einem Menschen sprechen."
 #: Failed identity verifications per IP hash (checked before verifying, spent on failure).
 IDENTITY_FAIL_SCOPE: Final = "identity_fail"
 IDENTITY_FAIL_LIMIT: Final = 30
@@ -485,6 +489,9 @@ async def session_out(
         last_seq=int(chat.last_seq),
         # the display name only: never the login or the e-mail address
         identified_as=chat.visitor_name if chat.identity_source is not None else None,
+        # Only while the AI answers: afterwards the transcript lines carry their own names.
+        bot_name=values.bot_name if chat.status == "bot" else None,
+        can_handoff=chat.status == "bot",
     )
 
 
@@ -1149,6 +1156,54 @@ async def post_chat_end(
         # Own small bucket: a visitor at the message limit can still close the chat.
         await limiter.hit("end", chat.id, limit=END_PER_SESSION_MINUTE, window_seconds=60)
         await end_by_visitor(db, chat=chat, now=utc_now(), sysconfig=SysConfig(db))
+        await _commit_and_flush(db, redis_client)
+    except (ChatError, RateLimited, ChatBackendUnavailable) as exc:
+        return await _refused(db, exc)
+    return Response(status_code=204)
+
+
+@router.post(
+    "/sessions/{session_id}/handoff",
+    status_code=204,
+    responses={**_ERRORS, 409: {"description": "`not_bot`: the AI is not answering this chat"}},
+)
+async def post_chat_handoff(
+    session_id: SessionId,
+    request: Request,
+    db: DbSession,
+    redis_client: RedisDep,
+    settings: AppSettings,
+) -> Response:
+    """The visitor asks for a human while the AI answers.
+
+    204 and the chat is ``waiting`` (the agents ring) or, when nobody is available, ended as
+    ``no_agent`` (the e-mail prompt follows). 409 ``not_bot`` when the AI is not answering
+    (any other status, or an agent took over first). A running AI turn does not block it.
+    """
+    limiter = ChatRateLimiter(redis_client)
+    try:
+        chat, cached = await authorised_session(
+            session_id, request, db, limiter, settings, write=True
+        )
+        await _message_limits(limiter, cached.values, chat.id, request_ip_hash(request, settings))
+        await limiter.hit("handoff", chat.id, limit=HANDOFF_PER_SESSION_MINUTE, window_seconds=60)
+        if chat.status != "bot":
+            raise ChatError("not_bot", 409)
+        await touch_visitor_last_seen(db, chat, utc_now())
+        # R-TX: the pre-checks end their transaction; the handoff runs in a fresh one so the
+        # session row lock comes before every ticket write (R-LOCK-ORDER).
+        await db.commit()
+        outcome = await hand_off_chat(
+            db,
+            SysConfig(db),
+            redis_client,
+            session_id=chat.id,
+            reason="visitor",
+            note=VISITOR_HANDOFF_NOTE,
+            now=utc_now(),
+        )
+        if outcome == "noop":  # an agent (or the bot's own handoff) was faster
+            raise ChatError("not_bot", 409)
         await _commit_and_flush(db, redis_client)
     except (ChatError, RateLimited, ChatBackendUnavailable) as exc:
         return await _refused(db, exc)

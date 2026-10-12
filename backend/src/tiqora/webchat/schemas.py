@@ -155,6 +155,10 @@ class ChatSessionOut(BaseModel):
     needs_contact: bool
     last_seq: int
     identified_as: str | None = None
+    # The assistant's display name while the AI answers (``bot``), else ``None``.
+    bot_name: str | None = None
+    # The visitor may press "talk to a human": true exactly while the AI answers.
+    can_handoff: bool = False
 
 
 class ChatOfflineOut(BaseModel):
@@ -203,6 +207,8 @@ class ChatInboxItemOut(BaseModel):
 class ChatInboxOut(BaseModel):
     waiting: list[ChatInboxItemOut]
     mine: list[ChatInboxItemOut]
+    # Chats the AI is answering on queues the agent holds ``rw`` on (newest first); no ring.
+    bot: list[ChatInboxItemOut] = Field(default_factory=list)
 
 
 class ChatAcceptOut(BaseModel):
@@ -228,6 +234,12 @@ class TicketChatOut(BaseModel):
     visitor_email: str | None
     visitor_email_verified: bool = False
     identity_source: str | None = None
+    # ``visitor`` | ``ai`` | ``limit`` | ``error`` | ``unavailable`` | ``takeover``; the AI's own
+    # handoff summary is the internal note on the ticket, never part of this response.
+    handoff_reason: str | None = None
+    handoff_at: UtcDateTime | None = None
+    # The assistant's name when the AI took part in this chat, else ``None``.
+    bot_name: str | None = None
     topic_label: str | None
     page_url: str | None
     language: str | None

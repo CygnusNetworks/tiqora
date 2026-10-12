@@ -11,6 +11,8 @@ tickets and articles stay as they are — and loads keys first (no JOIN with Znu
 * ``abandoned``: the visitor is gone (no ``tiqora:chat:seen:<sid>`` marker AND a stale
   ``visitor_last_seen``; R-LASTSEEN: a brief marker gap with a fresh ``visitor_last_seen``
   keeps the chat) -> ``abandoned`` / ``idle`` + system line ``idle_closed``.
+  A chat the AI still answers (``bot``) goes with the ``active`` cutoff and, when the AI had
+  answered it alone, parks its ticket like a visitor's goodbye (``close_bot_resolved_ticket``).
 * ``purged``: ``ended_at`` older than the config's ``retention_days`` -> messages deleted,
   visitor data (name, email, page, user agent, IP hash, visitor id, token hash) cleared,
   ``purged_at`` set (the row stays as a tombstone for the ticket link).
@@ -32,10 +34,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.db.tiqora.models import TiqoraChatMessage, TiqoraChatSession
 from tiqora.jobs.service import utc_now
 from tiqora.webchat.availability import VISITOR_SEEN_PREFIX
+from tiqora.webchat.bot import close_bot_resolved_ticket
 from tiqora.webchat.models import ChatConfigValues
 from tiqora.webchat.notify import flush_chat_notifications, queue_agent_event
 from tiqora.webchat.sessions import _agent_event, add_system_message, current_queue_id
 from tiqora.webchat.store import config_values, get_chat_session, load_config
+from tiqora.znuny.sysconfig import SysConfig
 
 __all__ = [
     "ACTIVE_IDLE_SECONDS",
@@ -209,7 +213,7 @@ async def _abandon_idle(
                         & (TiqoraChatSession.visitor_last_seen < _idle_cutoff("waiting", now))
                     )
                     | (
-                        (TiqoraChatSession.status == "active")
+                        TiqoraChatSession.status.in_(("active", "bot"))
                         & (TiqoraChatSession.visitor_last_seen < _idle_cutoff("active", now))
                     )
                 )
@@ -220,14 +224,18 @@ async def _abandon_idle(
         ids = [str(i) for i in candidates]
 
     async def work(db: AsyncSession, chat: TiqoraChatSession) -> bool:
-        if chat.status not in ("waiting", "active"):
+        if chat.status not in ("waiting", "active", "bot"):
             return False
         if chat.visitor_last_seen >= _idle_cutoff(str(chat.status), now):
             return False
+        was_bot = chat.status == "bot"
         chat.status = "abandoned"
         chat.end_reason = "idle"
         chat.ended_at = now
         await db.flush([chat])
+        if was_bot:
+            # A chat the AI answered alone and the visitor left: park the ticket like a goodbye.
+            await close_bot_resolved_ticket(db, SysConfig(db), chat=chat)
         await add_system_message(db, chat=chat, code="idle_closed", params={}, now=now)
         await _end_event(db, chat)
         return True

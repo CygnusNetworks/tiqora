@@ -378,6 +378,7 @@ async def test_inbox_lists_waiting_in_rw_queues_and_mine(env: Env) -> None:
         assert res.status_code == 200
         body = res.json()
         assert body["mine"] == []
+        assert body["bot"] == []
         assert [i["session_id"] for i in body["waiting"]] == [first.id]
         item = body["waiting"][0]
         assert item["ticket_id"] == first.ticket_id
@@ -400,7 +401,11 @@ async def test_inbox_lists_waiting_in_rw_queues_and_mine(env: Env) -> None:
         assert body["mine"][0]["accepted_at"] is not None
 
     async with _client(env, AGENT_B) as client:
-        assert (await client.get("/api/v1/chat/inbox")).json() == {"waiting": [], "mine": []}
+        assert (await client.get("/api/v1/chat/inbox")).json() == {
+            "waiting": [],
+            "mine": [],
+            "bot": [],
+        }
 
 
 # -- first accept wins ----------------------------------------------------------------------

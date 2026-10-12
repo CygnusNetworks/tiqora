@@ -288,6 +288,25 @@ async def test_idle_visitor_abandoned(env: Env) -> None:
 
 @pytest.mark.asyncio
 @parametrize_db
+async def test_idle_bot_session_abandoned_with_the_active_cutoff(env: Env) -> None:
+    gone = await _start(env, 15)
+    fresh = await _start(env, 16)
+    for sid in (gone, fresh):
+        await _set(env, sid, status="bot")
+    await _set(env, gone, visitor_last_seen=NOW - timedelta(seconds=901))
+    await _set(env, fresh, visitor_last_seen=NOW - timedelta(seconds=300))  # waiting cutoff is 120
+
+    res = await _tick(env)
+
+    assert res == {"timed_out": 0, "abandoned": 1, "purged": 0}
+    row = await _row(env, gone)
+    assert (row["status"], row["end_reason"], row["ended_at"]) == ("abandoned", "idle", NOW)
+    assert (await _messages(env, gone))[-1] == ("system", "idle_closed", {})
+    assert (await _row(env, fresh))["status"] == "bot"
+
+
+@pytest.mark.asyncio
+@parametrize_db
 async def test_fresh_last_seen_without_marker_keeps_chat(env: Env) -> None:
     sid = await _start(env, 20)
     await _set(env, sid, status="active", assigned_user_id=AGENT, accepted_at=NOW)
