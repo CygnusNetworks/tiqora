@@ -144,6 +144,16 @@ async function json(route: Route, status: number, body: unknown) {
   });
 }
 
+const portalCi = {
+  id: 7,
+  number: "SRV-0007",
+  name: "mail.example.org",
+  class_name: "Server",
+  deployment_state: "Production",
+  incident_state: "Operational",
+  incident_functionality: "operational",
+};
+
 /** Intercept all /api/portal/* calls with deterministic fixtures. */
 export async function mockPortalApi(page: Page) {
   authenticated = false;
@@ -247,6 +257,20 @@ export async function mockPortalApi(page: Page) {
     }
     if (path.endsWith("/api/portal/tickets") && method === "POST") {
       await json(route, 201, { ticket_id: 300 });
+      return;
+    }
+
+    if (path.endsWith("/api/portal/config-items") && method === "GET") {
+      await json(route, 200, { items: [portalCi], total: 1 });
+      return;
+    }
+    if (path.endsWith("/api/portal/config-items/7") && method === "GET") {
+      await json(route, 200, {
+        ...portalCi,
+        rendered: [
+          { path: "hostname", label: "Hostname", type: "text", display: "mail.example.org", ref: null, children: [], portal: true },
+        ],
+      });
       return;
     }
 

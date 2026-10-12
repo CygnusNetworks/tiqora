@@ -1346,7 +1346,8 @@
       "myTickets": "Meine Tickets",
       "newTicket": "Neues Ticket",
       "kb": "Hilfeartikel",
-      "preferences": "Einstellungen"
+      "preferences": "Einstellungen",
+      "cmdb": "Meine Geräte und Systeme"
     },
     "login": {
       "subtitle": "Bei Ihrem Support-Konto anmelden",
@@ -1439,6 +1440,26 @@
       "chooseProcess": "Prozess wählen",
       "loadError": "Prozesse konnten nicht geladen werden.",
       "submitError": "Die Anfrage konnte nicht gesendet werden."
+    },
+    "cmdb": {
+      "title": "Meine Geräte und Systeme",
+      "searchPlaceholder": "Nach Name oder Nummer suchen",
+      "empty": "Keine Geräte oder Systeme gefunden.",
+      "loadError": "Die Liste konnte nicht geladen werden.",
+      "notFound": "Dieses Gerät oder System wurde nicht gefunden.",
+      "number": "Nummer",
+      "class": "Art",
+      "deployment": "Status",
+      "back": "Zurück zu Geräten und Systemen",
+      "createTicket": "Ticket zu diesem System erstellen",
+      "noAttributes": "Keine Details verfügbar.",
+      "picker": {
+        "label": "Betroffenes Gerät oder System",
+        "hint": "Optional, bis zu {{max}}.",
+        "add": "Gerät oder System hinzufügen",
+        "remove": "{{name}} entfernen",
+        "max": "Sie können bis zu {{max}} auswählen."
+      }
     }
   },
   "admin": {

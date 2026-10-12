@@ -1346,7 +1346,8 @@
       "myTickets": "Mine billetter",
       "newTicket": "Ny billet",
       "kb": "Hjælpeartikler",
-      "preferences": "Indstillinger"
+      "preferences": "Indstillinger",
+      "cmdb": "Devices and systems"
     },
     "login": {
       "subtitle": "Log ind på din supportkonto",
@@ -1439,6 +1440,26 @@
       "chooseProcess": "Choose a process",
       "loadError": "Processes could not be loaded.",
       "submitError": "The request could not be sent."
+    },
+    "cmdb": {
+      "title": "Devices and systems",
+      "searchPlaceholder": "Search by name or number",
+      "empty": "No devices or systems found.",
+      "loadError": "The list could not be loaded.",
+      "notFound": "This device or system was not found.",
+      "number": "Number",
+      "class": "Type",
+      "deployment": "Status",
+      "back": "Back to devices and systems",
+      "createTicket": "Create a ticket for this system",
+      "noAttributes": "No details available.",
+      "picker": {
+        "label": "Affected device or system",
+        "hint": "Optional, up to {{max}}.",
+        "add": "Add a device or system",
+        "remove": "Remove {{name}}",
+        "max": "You can select up to {{max}}."
+      }
     }
   },
   "admin": {

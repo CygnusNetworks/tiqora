@@ -1,4 +1,3 @@
-import { CmdbComingSoon } from "@/components/cmdb/CmdbComingSoon";
 import { validateCmdbListSearch } from "@/components/cmdb/ciFilterModel";
 import { validateCiDetailSearch } from "@/components/cmdb/ciDetailModel";
 import { CiDetailPage } from "@/routes/agent/cmdb/CiDetailPage";
@@ -83,7 +82,9 @@ import {
   TicketListPage,
   type PortalTicketListSearch,
 } from "@/routes/portal/TicketListPage";
-import { NewTicketPage } from "@/routes/portal/NewTicketPage";
+import { NewTicketPage, type PortalNewTicketSearch } from "@/routes/portal/NewTicketPage";
+import { PortalCisPage } from "@/routes/portal/PortalCisPage";
+import { PortalCiPage } from "@/routes/portal/PortalCiPage";
 import {
   NewProcessTicketPage as PortalNewProcessTicketPage,
   type PortalNewProcessTicketSearch,
@@ -767,6 +768,10 @@ const portalIndexRoute = createRoute({
 const portalNewTicketRoute = createRoute({
   getParentRoute: () => portalLayoutRoute,
   path: "/tickets/new",
+  validateSearch: (s: Record<string, unknown>): PortalNewTicketSearch => {
+    const n = Number(s.ci);
+    return { ci: Number.isInteger(n) && n > 0 ? n : undefined };
+  },
   component: NewTicketPage,
 });
 
@@ -1301,7 +1306,7 @@ const catchAllRoute = createRoute({
   },
 });
 
-// CMDB (wave 4): pages not built yet render CmdbComingSoon; later tasks replace them one by one.
+// CMDB (wave 4).
 const agentCmdbRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/cmdb",
@@ -1363,13 +1368,13 @@ const adminCmdbCatalogRoute = createRoute({
 const portalCmdbListRoute = createRoute({
   getParentRoute: () => portalLayoutRoute,
   path: "/config-items",
-  component: CmdbComingSoon,
+  component: PortalCisPage,
 });
 
 const portalCmdbDetailRoute = createRoute({
   getParentRoute: () => portalLayoutRoute,
   path: "/config-items/$ciId",
-  component: CmdbComingSoon,
+  component: PortalCiPage,
 });
 
 const routeTree = rootRoute.addChildren([
