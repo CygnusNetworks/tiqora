@@ -73,6 +73,7 @@ __all__ = [
     "cleanup_world",
     "client_for",
     "cmdb_db",
+    "make_ci",
     "make_class",
     "parse_attrs",
     "set_mode",
@@ -455,6 +456,32 @@ async def make_class(
     )
     await session.commit()
     return cls.id
+
+
+async def make_ci(
+    session: AsyncSession,
+    class_id: int,
+    name: str,
+    *,
+    user_id: int = USER_A,
+    attributes: dict[str, Any] | None = None,
+    deployment: str = "production",
+    incident: str = "operational",
+) -> int:
+    """Create a CI through ``CiService`` (system access, no permission checks) and commit."""
+    from tiqora.cmdb.service import CiService, system_access
+
+    rec = await CiService(session).create(
+        system_access(user_id),
+        class_id=class_id,
+        name=name,
+        deployment_state_id=await _dep(session, deployment),
+        incident_state_id=await _inc(session, incident),
+        attributes=attributes or {},
+        enforce_permissions=False,
+    )
+    await session.commit()
+    return rec.id
 
 
 async def _dep(session: AsyncSession, key: str) -> int:

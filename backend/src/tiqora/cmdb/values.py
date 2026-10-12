@@ -2,7 +2,7 @@
 
 Value document: every attribute key maps to a list of entries ``{"v": scalar | None}``, plus
 ``"s"`` (sub attributes, same shape) when the definition has ``sub``. ``check_references``
-(database lookups) is added by the write path (Task 6).
+(database lookups) is at the end of this module and used by the write path.
 
 Order of the empty-entry rules (F18, binding for ``attributeModel.validateValues`` /
 ``pruneEmpty`` in the frontend): an empty entry of a ``required`` attribute is a ``required``
@@ -20,11 +20,24 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, Final
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from sqlalchemy import or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from tiqora.cmdb.definition import INT_ID_TYPES, AttributeDef
+from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
+from tiqora.db.legacy.queue import Queue, Service, Sla
+from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketType
+from tiqora.db.legacy.user import Users
+from tiqora.db.tiqora.models import (
+    TiqoraCmdbAttachment,
+    TiqoraCmdbCatalog,
+    TiqoraCmdbCi,
+    TiqoraCmdbClass,
+)
 
 #: types whose stored value is an id or a login (what ``check_references`` resolves)
 REF_TYPES: frozenset[str] = frozenset(INT_ID_TYPES | {"customer_user", "customer_company"})
@@ -320,3 +333,170 @@ def collect_references(
 
     walk(attrs, values)
     return refs
+
+
+def collect_reference_paths(
+    attrs: list[AttributeDef], values: Mapping[str, Any]
+) -> dict[str, dict[int | str, str]]:
+    """Referenced ids/logins per attribute **path** (``NIC.Peer``): value -> entry path of its
+    first occurrence (``NIC[2].Peer[1]``), which is what an issue should point at."""
+    refs: dict[str, dict[int | str, str]] = {}
+
+    def walk(items: list[AttributeDef], vals: Mapping[str, Any], dpre: str, epre: str) -> None:
+        for a in items:
+            entries = vals.get(a.key)
+            if not isinstance(entries, list):
+                continue
+            for idx, entry in enumerate(entries, start=1):
+                if not isinstance(entry, Mapping):
+                    continue
+                v = entry.get("v")
+                if a.type in REF_TYPES and isinstance(v, int | str) and not isinstance(v, bool):
+                    refs.setdefault(f"{dpre}{a.key}", {}).setdefault(v, f"{epre}{a.key}[{idx}]")
+                if a.sub and isinstance(entry.get("s"), Mapping):
+                    walk(a.sub, entry["s"], f"{dpre}{a.key}.", f"{epre}{a.key}[{idx}].")
+
+    walk(attrs, values, "", "")
+    return refs
+
+
+_INT32: Final = 2**31 - 1
+_CHUNK: Final = 500
+#: Znuny id tables the reference types point at (one IN-list query each)
+_ZNUNY_ID_TABLES: Final[dict[str, Any]] = {
+    "agent": Users.id,
+    "service": Service.id,
+    "sla": Sla.id,
+    "queue": Queue.id,
+    "priority": TicketPriority.id,
+    "ticket_type": TicketType.id,
+    "state": TicketState.id,
+}
+
+
+def _chunks(items: list[Any]) -> list[list[Any]]:
+    return [items[i : i + _CHUNK] for i in range(0, len(items), _CHUNK)]
+
+
+async def check_references(
+    session: AsyncSession,
+    refs: Mapping[str, Mapping[int | str, str]],
+    *,
+    attrs_by_path: Mapping[str, AttributeDef],
+    ci_id: int | None,
+    user_id: int,
+) -> list[ValueIssue]:
+    """Do the referenced rows exist (and fit the attribute's class filter)?
+
+    ``refs`` is what :func:`collect_reference_paths` returns. Codes: ``unknown_reference`` and
+    ``wrong_class`` (a catalog item of another catalog class, a CI of a class outside
+    ``options.class_keys``). One IN-list query per reference type, Znuny and Tiqora tables are
+    never joined. Attachments count when bound to ``ci_id`` or staged (unbound) by ``user_id``.
+    """
+    by_type: dict[str, set[int | str]] = {}
+    for path, found in refs.items():
+        a = attrs_by_path.get(path)
+        if a is not None and a.type in REF_TYPES:
+            by_type.setdefault(a.type, set()).update(found)
+
+    # type -> value -> extra info (catalog class / CI class id) or None; absent = unknown
+    known: dict[str, dict[int | str, Any]] = {}
+    for t, values in by_type.items():
+        if t in ("customer_user", "customer_company"):
+            strs = sorted(v for v in values if isinstance(v, str))
+            col = CustomerUser.login if t == "customer_user" else CustomerCompany.customer_id
+            got: dict[int | str, Any] = {}
+            for part in _chunks(strs):
+                for (val,) in (await session.execute(select(col).where(col.in_(part)))).all():
+                    got[str(val).casefold()] = None
+            known[t] = got
+            continue
+        ids = sorted(v for v in values if isinstance(v, int))
+        if t in _ZNUNY_ID_TABLES or t == "catalog":
+            ids = [i for i in ids if 0 <= i <= _INT32]
+        elif any(abs(i) > 2**63 - 1 for i in ids):  # pragma: no cover - normalize bounds this
+            ids = [i for i in ids if abs(i) <= 2**63 - 1]
+        got = {}
+        for part in _chunks(ids):
+            if t in _ZNUNY_ID_TABLES:
+                col = _ZNUNY_ID_TABLES[t]
+                for (val,) in (await session.execute(select(col).where(col.in_(part)))).all():
+                    got[int(val)] = None
+            elif t == "catalog":
+                for val, cls in (
+                    await session.execute(
+                        select(TiqoraCmdbCatalog.id, TiqoraCmdbCatalog.catalog_class).where(
+                            TiqoraCmdbCatalog.id.in_(part)
+                        )
+                    )
+                ).all():
+                    got[int(val)] = str(cls)
+            elif t == "ci_ref":
+                for val, cid in (
+                    await session.execute(
+                        select(TiqoraCmdbCi.id, TiqoraCmdbCi.class_id).where(
+                            TiqoraCmdbCi.id.in_(part)
+                        )
+                    )
+                ).all():
+                    got[int(val)] = int(cid)
+            elif t == "attachment":
+                mine = TiqoraCmdbAttachment.created_by == user_id
+                bound: Any = TiqoraCmdbAttachment.ci_id.is_(None) & mine
+                if ci_id is not None:
+                    bound = or_(bound, TiqoraCmdbAttachment.ci_id == ci_id)
+                for (val,) in (
+                    await session.execute(
+                        select(TiqoraCmdbAttachment.id).where(
+                            TiqoraCmdbAttachment.id.in_(part), bound
+                        )
+                    )
+                ).all():
+                    got[int(val)] = None
+        known[t] = got
+
+    class_keys: dict[int, str] = {}
+    class_ids = sorted({c for m in known.get("ci_ref", {}).values() for c in [m] if c is not None})
+    if class_ids:
+        class_keys = {
+            int(i): str(k)
+            for i, k in (
+                await session.execute(
+                    select(TiqoraCmdbClass.id, TiqoraCmdbClass.class_key).where(
+                        TiqoraCmdbClass.id.in_(class_ids)
+                    )
+                )
+            ).all()
+        }
+
+    issues: list[ValueIssue] = []
+    for path in sorted(refs):
+        a = attrs_by_path.get(path)
+        if a is None or a.type not in REF_TYPES:
+            continue
+        found = known.get(a.type, {})
+        for value, entry_path in refs[path].items():
+            key: int | str = value.casefold() if isinstance(value, str) else value
+            if key not in found:
+                issues.append(
+                    ValueIssue(entry_path, "unknown_reference", "Der Verweis existiert nicht.")
+                )
+                continue
+            extra = found[key]
+            if a.type == "catalog" and a.options.catalog_class and extra != a.options.catalog_class:
+                issues.append(
+                    ValueIssue(
+                        entry_path, "wrong_class", "Der Eintrag gehört zu einem anderen Katalog."
+                    )
+                )
+            elif (
+                a.type == "ci_ref"
+                and a.options.class_keys
+                and class_keys.get(int(extra)) not in a.options.class_keys
+            ):
+                issues.append(
+                    ValueIssue(
+                        entry_path, "wrong_class", "Die Klasse des CI ist hier nicht erlaubt."
+                    )
+                )
+    return issues
