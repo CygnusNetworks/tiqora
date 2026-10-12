@@ -17,6 +17,7 @@ from tiqora_sdk.hooks import (
     TicketCreatePatch,
 )
 from tiqora_sdk.process import ActionContext
+from tiqora_sdk.templates import PlaceholderRequest
 
 from . import behaviour
 
@@ -97,11 +98,46 @@ def _register_process(registry: PluginRegistry) -> None:
     registry.condition_module("IsVip", _is_vip)
 
 
+async def _greeting(req: PlaceholderRequest) -> str:
+    behaviour.CALLS.append(("placeholder.GREETING", req))
+    return f"Hallo aus Ticket {req.ticket_id}"
+
+
+async def _slow(req: PlaceholderRequest) -> str:
+    behaviour.CALLS.append(("placeholder.SLOW", req))
+    await asyncio.sleep(5)
+    return "spät"
+
+
+async def _broken(req: PlaceholderRequest) -> str:
+    behaviour.CALLS.append(("placeholder.BROKEN", req))
+    raise RuntimeError("kaputt")
+
+
+async def _htmlish(req: PlaceholderRequest) -> str:
+    return "<b>&</b>"
+
+
+async def _whoami(req: PlaceholderRequest) -> str:
+    behaviour.CALLS.append(("placeholder.WHOAMI", req))
+    return f"{req.recipient.get('useremail', '-')}|{req.bracket}|{req.time_zone}"
+
+
+def _register_placeholders(registry: PluginRegistry) -> None:
+    """``GREETING``, ``SLOW`` (sleeps 5 s), ``BROKEN`` (raises), ``HTMLISH``, ``WHOAMI``."""
+    registry.placeholder("GREETING", _greeting)
+    registry.placeholder("SLOW", _slow, timeout_ms=100)
+    registry.placeholder("BROKEN", _broken)
+    registry.placeholder("HTMLISH", _htmlish)
+    registry.placeholder("WHOAMI", _whoami)
+
+
 class PointsPlugin:
     def register(self, registry: PluginRegistry) -> None:
         # Each task of the plugin-points plan adds its ``_register_<point>(registry)`` call here.
         _register_sync_hooks(registry)
         _register_process(registry)
+        _register_placeholders(registry)
 
 
 plugin = PointsPlugin()

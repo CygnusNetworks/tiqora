@@ -33,6 +33,7 @@ if _t.TYPE_CHECKING:
     from fastapi import APIRouter
     from pydantic import BaseModel
 
+    from tiqora.plugins.placeholders import PlaceholderResolve
     from tiqora.plugins.process_points import ConditionRun, TransitionActionRun
     from tiqora.plugins.sync_hooks import SyncHandler, SyncOperation
     from tiqora.process.actions.registry import ActionParam
@@ -132,6 +133,10 @@ class PluginRegistry(_t.Protocol):
     ) -> str: ...
 
     def condition_module(self, name: str, run: ConditionRun) -> str: ...
+
+    def placeholder(
+        self, name: str, resolve: PlaceholderResolve, *, timeout_ms: int = 500
+    ) -> str: ...
 
 
 class Plugin(_t.Protocol):

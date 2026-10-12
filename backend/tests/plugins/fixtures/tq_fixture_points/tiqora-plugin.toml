@@ -18,4 +18,5 @@ extension_points = [
   "core.events.sync_hooks",
   "core.process.transition_actions",
   "core.process.condition_modules",
+  "core.templates.placeholders",
 ]

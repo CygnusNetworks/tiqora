@@ -7,6 +7,7 @@ from tiqora.channels.registry import CHANNELS
 from tiqora.jobs.registry import JOB_HANDLERS
 from tiqora.plugins.events import EVENT_SUBSCRIBERS
 from tiqora.plugins.mcp import MCP_TOOLS
+from tiqora.plugins.placeholders import PLACEHOLDERS
 from tiqora.plugins.routes import PLUGIN_ROUTES
 from tiqora.plugins.sync_hooks import SYNC_HOOKS
 from tiqora.plugins.tasks import SCHEDULED_TASKS
@@ -69,6 +70,8 @@ SUBMODULES: dict[str, set[str]] = {
         "SyncHandler",
     },
     "tiqora_sdk.process": {"ActionContext", "ActionParam", "ConditionRun", "TransitionActionRun"},
+    # NumberRequest and NumberBuild join in Task 8
+    "tiqora_sdk.templates": {"PlaceholderRequest", "PlaceholderResolve"},
 }
 
 
@@ -104,6 +107,7 @@ def test_registry_protocol_matches_registrar() -> None:
             "before",
             "transition_action",
             "condition_module",
+            "placeholder",
         }
     )
 
@@ -127,6 +131,7 @@ def test_phase1_points_are_sdk_stable() -> None:
             SYNC_HOOKS,
             TRANSITION_ACTIONS,
             CONDITION_MODULES,
+            PLACEHOLDERS,
         )
     )
     assert CHANNELS.sdk_stable is False

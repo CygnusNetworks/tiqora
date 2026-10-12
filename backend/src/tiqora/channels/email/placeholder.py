@@ -32,6 +32,8 @@ from tiqora.domain.dynamic_field_values import (
 )
 from tiqora.domain.settings_store import get_setting_bool
 from tiqora.domain.timezones import format_in_zone, resolve_user_time_zone
+from tiqora.plugins.calls import PluginCallBudget
+from tiqora.plugins.placeholders import EXPAND_BUDGET_SECONDS, current_scope_budget
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -129,6 +131,12 @@ class PlaceholderContext:
     # gate) or ``CURRENT_``.
     customer_article: dict[str, str] = field(default_factory=dict)
     agent_article: dict[str, str] = field(default_factory=dict)
+    # Plugin placeholders (<TIQORA_PLUGIN_…>): the ticket / acting agent the context was loaded
+    # for, a per-context memo keyed by (tag, bracket) and the budget of the running expansion.
+    ticket_id: int | None = None
+    user_id: int | None = None
+    plugin_memo: dict[tuple[str, str | None], str] = field(default_factory=dict)
+    plugin_budget: PluginCallBudget | None = None
 
 
 def _as_str(value: Any, zone: str = "UTC") -> str:
@@ -429,6 +437,8 @@ async def load_placeholder_context(
         customer_subject=customer_subject or "",
         customer_email_lines=list(customer_email_lines or []),
         time_zone=time_zone,
+        ticket_id=ticket_id,
+        user_id=user_id,
     )
     # Seed with any caller-provided ticket vars (autoresponse / notifications).
     if ticket:
@@ -563,6 +573,11 @@ async def _resolve_tag_raw(
     """Resolve one OTRS tag (without angle brackets / OTRS_ prefix already stripped)."""
     # Preserve original case for CONFIG_ keys (sysconfig names use :: from _).
     tag_u = tag.upper()
+
+    if tag_u.startswith("PLUGIN_"):
+        from tiqora.plugins.placeholders import resolve_plugin_placeholder
+
+        return await resolve_plugin_placeholder(tag_u, bracket, ctx)
 
     if tag_u.startswith("NOTIFICATION_RECIPIENT_"):
         return _lookup(ctx.notification_recipient, tag[len("NOTIFICATION_RECIPIENT_") :]) or ""
@@ -822,12 +837,26 @@ async def _expand_placeholders_inner(
                 customer_subject=customer_subject or "",
                 customer_email_lines=list(customer_email_lines or []),
                 time_zone=zone,
+                ticket_id=ticket_id,
+                user_id=user_id,
             )
             if queue_name and "queue" not in ctx.ticket:
                 ctx.ticket["queue"] = queue_name
             if session is not None and user_id is not None:
                 ctx.current_user = _agent_maps_from_row(await _fetch_user_row(session, user_id))
 
+    # One budget for all plugin tags of this call, unless the caller scopes a wider one.
+    owns_budget = ctx.plugin_budget is None and current_scope_budget() is None
+    if owns_budget:
+        ctx.plugin_budget = PluginCallBudget(EXPAND_BUDGET_SECONDS)
+    try:
+        return await _replace_tags(text, ctx=ctx, sysconfig=sysconfig)
+    finally:
+        if owns_budget:
+            ctx.plugin_budget = None
+
+
+async def _replace_tags(text: str, *, ctx: PlaceholderContext, sysconfig: SysConfig) -> str:
     result = text
     offset = 0
     for match in list(_TAG_RE.finditer(text)):

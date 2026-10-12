@@ -112,6 +112,7 @@ from tiqora.domain.subject_hook import SubjectHookConfig, load_subject_config
 from tiqora.domain.ticket_write_service import ArticleIn, add_article
 from tiqora.domain.timezones import USER_TIME_ZONE_KEY, default_time_zone, valid_time_zone
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.plugins.placeholders import placeholder_budget_scope
 from tiqora.webchat.text import normalize_email
 from tiqora.worker.notification_templates import (
     configure_notification_context,
@@ -143,6 +144,8 @@ NOTIFICATIONS_ERRORS = Counter(
 KEY_NOTIFICATIONS_WATERMARK = "daemon.notifications.outbox_watermark"
 
 _BATCH_SIZE = 500
+# plugin placeholders of one rendered message (subject and body together)
+MESSAGE_PLUGIN_BUDGET_SECONDS = 3.0
 _TICKET_ATTRIBUTE_FILTER_KEYS: dict[str, str] = {
     "StateID": "ticket_state_id",
     "QueueID": "queue_id",
@@ -534,6 +537,7 @@ async def _build_notification_context(
     context = await load_placeholder_context(
         session, ticket_id=_as_int(ticket["id"]), time_zone=time_zone
     )
+    context.ticket_id = _as_int(ticket["id"])  # plugin placeholders read it
     # An absent/deleted article must not silently quote a later ticket message.
     context.customer_realname = ""
     context.customer_body = ""
@@ -652,22 +656,27 @@ async def _render_message(
         return None
     subject_tpl, body_tpl, content_type = str(row[0]), str(row[1]), str(row[2])
 
+    # The memo is per recipient (plugin placeholders may read the recipient map), shared by
+    # subject and body; the budget is one per rendered message.
     context = replace(
         base_context,
         notification_recipient=await _recipient_maps(session, base_context, recipient),
+        plugin_memo={},
+        plugin_budget=None,
     )
-    subject = await expand_placeholders(
-        session,
-        sysconfig,
-        normalize_notification_template(subject_tpl),
-        context=context,
-    )
-    body = await expand_placeholders(
-        session,
-        sysconfig,
-        normalize_notification_template(body_tpl),
-        context=replace(context, escape_html=content_type.lower().startswith("text/html")),
-    )
+    with placeholder_budget_scope(MESSAGE_PLUGIN_BUDGET_SECONDS):
+        subject = await expand_placeholders(
+            session,
+            sysconfig,
+            normalize_notification_template(subject_tpl),
+            context=context,
+        )
+        body = await expand_placeholders(
+            session,
+            sysconfig,
+            normalize_notification_template(body_tpl),
+            context=replace(context, escape_html=content_type.lower().startswith("text/html")),
+        )
     subject = _hooked_subject(subject, hook_cfg=hook_cfg, tn=tn)
     if has_untranslated_legacy_link(body) or has_untranslated_legacy_link(subject):
         # The template's ticket URL is a variant we do not translate, so it now

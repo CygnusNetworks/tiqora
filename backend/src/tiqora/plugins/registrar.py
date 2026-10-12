@@ -24,7 +24,14 @@ from tiqora.plugins.context import PluginContext
 from tiqora.plugins.events import EVENT_SUBSCRIBERS, EventHandler, EventSubscriber
 from tiqora.plugins.manifest import PluginManifest
 from tiqora.plugins.mcp import CORE_MCP_TOOL_NAMES, MCP_TOOLS, McpTool
-from tiqora.plugins.naming import CAMEL_NAME_RE, qualified
+from tiqora.plugins.naming import CAMEL_NAME_RE, TAG_NAME_RE, qualified
+from tiqora.plugins.placeholders import (
+    MAX_TIMEOUT_MS,
+    MIN_TIMEOUT_MS,
+    PLACEHOLDERS,
+    Placeholder,
+    PlaceholderResolve,
+)
 from tiqora.plugins.process_points import (
     MAX_ACTION_TIMEOUT,
     MIN_ACTION_TIMEOUT,
@@ -473,3 +480,46 @@ class PluginRegistrar:
             check=check,
         )
         return match
+
+    def placeholder(self, name: str, resolve: PlaceholderResolve, *, timeout_ms: int = 500) -> str:
+        """Stage ``PLUGIN_<SHORT_ID>_<name>`` as a template tag (D6).
+
+        Returns the tag; templates write ``<TIQORA_PLUGIN_<SHORT_ID>_<name>>`` (or ``<OTRS_…>``).
+        """
+        short = self._manifest.short_id.upper()
+        tag = f"PLUGIN_{short}_{name}"
+
+        def check() -> None:
+            from tiqora.channels.email.placeholder import _PASSWORD_RE, _SECRET_RE
+
+            if not isinstance(name, str) or not TAG_NAME_RE.fullmatch(name):
+                raise RegistrationRejected(
+                    f"Ungültiger Platzhaltername „{name}“: 2 bis 41 Zeichen, "
+                    "Großbuchstaben, Ziffern und Unterstrich, beginnt mit einem Großbuchstaben"
+                )
+            if _SECRET_RE.search(f"PLUGIN_{short}_") or _PASSWORD_RE.search(f"PLUGIN_{short}_"):
+                raise RegistrationRejected(
+                    f"Der Kurzname „{self._manifest.short_id}“ der Erweiterung enthält ein Wort, "
+                    "bei dem Platzhalterwerte als geheim maskiert werden (sie erschienen als „xxx“)"
+                )
+            if _SECRET_RE.search(tag) or _PASSWORD_RE.search(tag):
+                raise RegistrationRejected(
+                    f"Platzhaltername „{name}“ würde als geheim maskiert "
+                    "(Namen mit config, secret, passw, userpw, auth, token oder pw-Endung)"
+                )
+            _require_async(resolve, f"Der Platzhalter „{name}“")
+            if isinstance(timeout_ms, bool) or not MIN_TIMEOUT_MS <= timeout_ms <= MAX_TIMEOUT_MS:
+                raise RegistrationRejected(
+                    f"Zeitlimit eines Platzhalters muss zwischen {MIN_TIMEOUT_MS} "
+                    f"und {MAX_TIMEOUT_MS} Millisekunden liegen"
+                )
+
+        item = Placeholder(
+            tag=tag,
+            plugin_id=self.plugin_id,
+            resolve=resolve,
+            timeout_ms=timeout_ms,
+            context=self._context,
+        )
+        self._stage(PLACEHOLDERS, item, check=check)
+        return tag
