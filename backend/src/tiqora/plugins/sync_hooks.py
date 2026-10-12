@@ -420,6 +420,18 @@ def _denied(hook: SyncHook, why: str) -> OperationVetoed:
     return OperationVetoed(message, plugin_id=hook.plugin_id)
 
 
+def _hooks_for(operation: SyncOperation, reg: Registry) -> list[SyncHook]:
+    return sorted(
+        (h for h in reg.items(SYNC_HOOKS) if h.operation == operation and is_active(h.plugin_id)),
+        key=lambda h: (h.order, h.key),
+    )
+
+
+def has_sync_hooks(operation: SyncOperation, registry: Registry | None = None) -> bool:
+    """True when an active plugin hooks ``operation`` (callers skip building the op otherwise)."""
+    return bool(_hooks_for(operation, registry if registry is not None else get_registry()))
+
+
 async def run_sync_hooks(
     operation: SyncOperation,
     op: Any,
@@ -435,10 +447,7 @@ async def run_sync_hooks(
     ``ticket.create`` patch introduces, so they are looked up in the same transaction.
     """
     reg = registry if registry is not None else get_registry()
-    hooks = sorted(
-        (h for h in reg.items(SYNC_HOOKS) if h.operation == operation and is_active(h.plugin_id)),
-        key=lambda h: (h.order, h.key),
-    )
+    hooks = _hooks_for(operation, reg)
     if not hooks:
         return op
     lookup = name_exists or _db_name_exists(session)

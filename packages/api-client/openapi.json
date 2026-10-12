@@ -24360,7 +24360,8 @@
           "kind": {
             "enum": [
               "event",
-              "task"
+              "task",
+              "sync"
             ],
             "title": "Kind",
             "type": "string"

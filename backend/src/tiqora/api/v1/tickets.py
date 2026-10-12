@@ -1784,8 +1784,14 @@ async def create_article(
     try:
         async with session.begin():
             if body.state_id is not None:
+                # run_hooks: plugin veto of the state change must come before the send
+                # (email/Telegram are send-then-store); change_state below skips them.
                 await svc.validate_state_change(
-                    user.id, ticket_id, body.state_id, pending_time=body.pending_time
+                    user.id,
+                    ticket_id,
+                    body.state_id,
+                    pending_time=body.pending_time,
+                    run_hooks=True,
                 )
             aid = await svc.add_article(
                 user.id,
@@ -1814,7 +1820,11 @@ async def create_article(
             )
             if body.state_id is not None:
                 await svc.change_state(
-                    user.id, ticket_id, body.state_id, pending_time=body.pending_time
+                    user.id,
+                    ticket_id,
+                    body.state_id,
+                    pending_time=body.pending_time,
+                    hooks_checked=True,
                 )
     except (
         WriteAccessDenied,

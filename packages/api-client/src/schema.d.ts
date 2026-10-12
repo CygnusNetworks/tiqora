@@ -19448,7 +19448,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "event" | "task";
+            kind: "event" | "task" | "sync";
             /** Last Error */
             last_error: string | null;
             /** Last Error At */
@@ -19476,7 +19476,7 @@ export interface components {
              * Role
              * @enum {string}
              */
-            role: "api" | "worker" | "mcp";
+            role: "api" | "worker" | "mcp" | "ai-worker";
             /** State */
             state: string;
             /**

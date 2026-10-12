@@ -25,6 +25,7 @@ from tiqora.plugins import store
 from tiqora.plugins.compat import check_compat, release_core_version
 from tiqora.plugins.discovery import DiscoveredPlugin, discovered_plugins
 from tiqora.plugins.state import PLUGIN_ROLES, PluginStatus, RuntimeState, summarize_status
+from tiqora.plugins.sync_hooks import SYNC_HOOKS
 from tiqora.plugins.tasks import SCHEDULED_TASKS
 from tiqora.settings_sections.section import SETTINGS_SECTIONS
 
@@ -58,7 +59,7 @@ class PluginRuntimeOut(BaseModel):
 
 class PluginHookOut(BaseModel):
     key: str
-    kind: Literal["event", "task"]
+    kind: Literal["event", "task", "sync"]
     name: str
     schedule: str | None
     tripped: bool
@@ -152,7 +153,7 @@ def _hook_out(hook: TiqoraPluginHook, schedule: str | None) -> PluginHookOut:
     name = hook.hook_key.removeprefix(prefix)
     return PluginHookOut(
         key=hook.hook_key,
-        kind="task" if hook.kind == "task" else "event",
+        kind="task" if hook.kind == "task" else "sync" if hook.kind == "sync" else "event",
         name=name,
         schedule=schedule,
         tripped=hook.tripped_at is not None,
@@ -232,6 +233,9 @@ def _build_one(
         if hook.kind == "task":
             task = registry.get(SCHEDULED_TASKS, hook.hook_key.removeprefix("task:"))
             schedule = task.schedule.describe() if task is not None else None
+        elif hook.kind == "sync":  # the "schedule" of a sync hook is its operation
+            sync = registry.get(SYNC_HOOKS, hook.hook_key.removeprefix("sync:"))
+            schedule = sync.operation if sync is not None else None
         hook_rows.append(_hook_out(hook, schedule))
 
     return PluginAdminOut(

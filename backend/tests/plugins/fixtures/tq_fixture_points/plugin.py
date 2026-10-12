@@ -37,6 +37,10 @@ def _sync_handler(operation: SyncOperation) -> SyncHandler:
             raise RuntimeError("kaputt")
         if mode == "enrich":
             return TicketCreatePatch(title="Angereichert")
+        if mode == "enrich_df":  # title prefix + a dynamic field, built from the op
+            return TicketCreatePatch(
+                title=f"[geprüft] {op.title}", dynamic_fields={"PP55Flag": ["1"]}
+            )
         if mode == "bad_priority":
             return TicketCreatePatch(priority="gibt-es-nicht")
         if mode == "bad_shape_scalar":
