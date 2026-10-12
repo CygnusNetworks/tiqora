@@ -19,8 +19,8 @@ vi.mock("@tanstack/react-router", () => ({
   useParams: () => routeParams,
   useSearch: () => searchParams,
   useNavigate: () => navigate,
-  Link: ({ children, to, className, ...rest }: { children: ReactNode; to: string; className?: string; [k: string]: unknown }) => (
-    <a href={to} className={className} data-testid={rest["data-testid"] as string | undefined}>
+  Link: ({ children, to, className, search, ...rest }: { children: ReactNode; to: string; className?: string; search?: Record<string, string>; [k: string]: unknown }) => (
+    <a href={search ? `${to}?${new URLSearchParams(search)}` : to} className={className} data-testid={rest["data-testid"] as string | undefined}>
       {children}
     </a>
   ),
@@ -363,6 +363,21 @@ describe("ReportViewPage", () => {
       await screen.findByTestId("report-view-download");
       expect(screen.queryByTestId("report-view-edit")).toBeNull();
       expect(screen.queryByTestId("report-view-copy")).toBeNull();
+    });
+
+    it("links 'Zeitplan anlegen' with the report key, only with the create right", async () => {
+      authFlags.canCreate = true;
+      const first = renderPage();
+      expect(await screen.findByTestId("report-view-schedule")).toHaveAttribute(
+        "href",
+        "/agent/reports/schedules/new?report=builtin.volume",
+      );
+      expect(screen.getByTestId("report-view-schedule")).toHaveTextContent("Zeitplan anlegen");
+      first.unmount();
+      authFlags.canCreate = false;
+      renderPage();
+      await screen.findByTestId("report-view-chart");
+      expect(screen.queryByTestId("report-view-schedule")).toBeNull();
     });
 
     it("has no saved-report actions on a built-in report", async () => {

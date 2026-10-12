@@ -182,6 +182,16 @@ function ReportViewPageContent() {
                   </MenuItem>
                 </Menu>
               )}
+              {canCreate && (
+                <Link
+                  to="/agent/reports/schedules/new"
+                  search={{ report: reportKey }}
+                  className={actionCls}
+                  data-testid="report-view-schedule"
+                >
+                  {t("reports.schedules.create")}
+                </Link>
+              )}
               {body && <ReportExportButton runIn={body} result={result} title={title} infoLines={infoLines} />}
             </div>
           </div>

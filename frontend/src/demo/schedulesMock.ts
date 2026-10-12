@@ -85,7 +85,7 @@ function seedSchedules(): ReportSchedule[] {
       version: 5,
       changed_at: "2026-10-09T06:05:00Z",
       items: [
-        { report_key: "builtin.sla", title: null, title_key: "reports.builtin.sla.title", available: true, problem: null, overrides: {} },
+        { report_key: "builtin.sla_compliance", title: null, title_key: "reports.builtin.sla_compliance.title", available: true, problem: null, overrides: {} },
       ],
       recipients: [{ kind: "email", id: null, email: "teamleitung@example.org", label: "teamleitung@example.org", problem: null }],
     },
@@ -113,7 +113,7 @@ function seedSchedules(): ReportSchedule[] {
       changed_at: "2026-09-15T10:00:00Z",
       items: [
         { report_key: "builtin.volume", title: null, title_key: "reports.builtin.volume.title", available: true, problem: null, overrides: {} },
-        { report_key: "builtin.sla", title: null, title_key: "reports.builtin.sla.title", available: true, problem: null, overrides: {} },
+        { report_key: "builtin.sla_compliance", title: null, title_key: "reports.builtin.sla_compliance.title", available: true, problem: null, overrides: {} },
         { report_key: "41", title: "Alte Auswertung", title_key: null, available: false, problem: "Nicht mehr verfügbar.", overrides: {} },
       ],
       recipients: [

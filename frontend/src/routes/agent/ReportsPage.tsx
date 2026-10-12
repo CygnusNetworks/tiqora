@@ -409,11 +409,9 @@ function ReportsPageContent() {
               {t("reports.saved.allAdmin")}
             </label>
           )}
-          {/* "$reportKey" resolves to the static schedules route (it is matched first) */}
           {canCreate && (
             <Link
-              to="/agent/reports/$reportKey"
-              params={{ reportKey: "schedules" }}
+              to="/agent/reports/schedules"
               className={headerBtnCls}
               data-testid="reports-schedules-link"
             >

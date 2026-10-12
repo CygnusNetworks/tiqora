@@ -13,6 +13,9 @@ import { ReportsPage, type ReportsSearch } from "@/routes/agent/ReportsPage";
 import { ReportBuilderPage } from "@/routes/agent/ReportBuilderPage";
 import { validateReportBuilderSearch } from "@/routes/agent/reportBuilderSearch";
 import { ReportViewPage } from "@/routes/agent/ReportViewPage";
+import { ReportSchedulesPage } from "@/routes/agent/ReportSchedulesPage";
+import { ReportScheduleEditorPage } from "@/routes/agent/ReportScheduleEditorPage";
+import { validateScheduleNewSearch } from "@/routes/agent/reportScheduleSearch";
 import { validateReportViewSearch } from "@/routes/agent/reportViewSearch";
 import { SavedSearchPage } from "@/routes/agent/SavedSearchPage";
 import { SavedSearchEditorPage } from "@/routes/agent/SavedSearchEditorPage";
@@ -511,6 +514,26 @@ const agentReportEditRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/reports/$reportKey/edit",
   component: ReportBuilderPage,
+});
+
+// Static segments before "$reportKey": "schedules" is never read as a report key.
+const agentReportSchedulesRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/reports/schedules",
+  component: ReportSchedulesPage,
+});
+
+const agentReportScheduleNewRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/reports/schedules/new",
+  validateSearch: validateScheduleNewSearch,
+  component: ReportScheduleEditorPage,
+});
+
+const agentReportScheduleRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/reports/schedules/$scheduleId",
+  component: ReportScheduleEditorPage,
 });
 
 const agentReportViewRoute = createRoute({
@@ -1232,6 +1255,9 @@ const routeTree = rootRoute.addChildren([
     agentReportsRoute,
     agentReportNewRoute,
     agentReportEditRoute,
+    agentReportSchedulesRoute,
+    agentReportScheduleNewRoute,
+    agentReportScheduleRoute,
     agentReportViewRoute,
     agentSearchNewRoute,
     agentSearchEditRoute,
