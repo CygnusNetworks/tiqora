@@ -26,6 +26,7 @@ from tiqora.identity.metadata_refresh import run_identity_metadata_refresh_tick
 from tiqora.jobs.runner import JobRunner
 from tiqora.logging_setup import configure_logging
 from tiqora.worker.ai_audit_cleanup import run_ai_audit_cleanup_tick
+from tiqora.worker.cmdb_version_archive import run_cmdb_version_archive_tick
 from tiqora.worker.escalation import run_escalation_tick
 from tiqora.worker.gdpr_erasure_purge import run_gdpr_erasure_purge_tick
 from tiqora.worker.gdpr_retention import run_gdpr_retention_tick
@@ -352,6 +353,7 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
         ),
         _daily_loop("gdpr_retention", run_gdpr_retention_tick, "03:00", stop),
         _daily_loop("gdpr_erasure_purge", run_gdpr_erasure_purge_tick, "03:30", stop),
+        _daily_loop("cmdb_version_archive", run_cmdb_version_archive_tick, "03:20", stop),
         _daily_loop("ai_audit_cleanup", run_ai_audit_cleanup_tick, "04:00", stop),
         _daily_loop("gi_debug_cleanup", run_gi_debug_cleanup, "03:02", stop),
         _daily_loop("smime_customer_renew", run_smime_customer_renew_tick, "02:02", stop),

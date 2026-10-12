@@ -5639,7 +5639,8 @@
         "cmdb_propagation": "CMDB-Vorfallstatus neu berechnen",
         "cmdb_import": "CMDB-Import",
         "cmdb_export": "CMDB-Export",
-        "cmdb_bulk": "CMDB-Sammelbearbeitung"
+        "cmdb_bulk": "CMDB-Sammelbearbeitung",
+        "cmdb_archive": "Alte CMDB-Versionen archivieren"
       },
       "gi_mail": "E-Mail aus einer Webservice-Anfrage versenden"
     },

@@ -5639,7 +5639,8 @@
         "cmdb_propagation": "Recalculate CMDB incident states",
         "cmdb_import": "Import CMDB items",
         "cmdb_export": "Export CMDB items",
-        "cmdb_bulk": "Edit CMDB items in bulk"
+        "cmdb_bulk": "Edit CMDB items in bulk",
+        "cmdb_archive": "Archive old CMDB versions"
       },
       "gi_mail": "Send email from a web service request"
     },

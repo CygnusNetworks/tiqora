@@ -34,6 +34,7 @@ def register_core(registry: Registry) -> None:
         validate_section_schema(section)
         registry.add(SETTINGS_SECTIONS, section)
 
+    from tiqora.cmdb.archive import CMDB_ARCHIVE_JOB
     from tiqora.cmdb.propagation import CMDB_PROPAGATION_JOB
     from tiqora.cmdb.transfer.bulk_job import CMDB_BULK_JOB
     from tiqora.cmdb.transfer.export_job import CMDB_EXPORT_JOB
@@ -58,6 +59,7 @@ def register_core(registry: Registry) -> None:
     registry.add(JOB_HANDLERS, CMDB_IMPORT_JOB)
     registry.add(JOB_HANDLERS, CMDB_EXPORT_JOB)
     registry.add(JOB_HANDLERS, CMDB_BULK_JOB)
+    registry.add(JOB_HANDLERS, CMDB_ARCHIVE_JOB)
 
     from tiqora.reporting.semantic import REPORT_SOURCES
     from tiqora.reporting.sources import core_report_sources
