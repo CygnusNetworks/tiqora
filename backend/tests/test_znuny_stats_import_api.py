@@ -46,7 +46,8 @@ LOGINS = {
     VIEWONLY: "rep52.viewonly",
     OUTSIDER: "rep52.outsider",
 }
-BASE = "[1]{'otrs_stats'}[1]"
+# Znuny stores a statistic at ``$XMLHash[0]`` (``Stats.pm`` ``StatsGet``/``StatsAdd``)
+BASE = "[0]{'otrs_stats'}[1]"
 _BAND = {"lo": LO, "hi": HI}
 _OWNED_REPORTS = (
     "SELECT id FROM tiqora_report WHERE owner_user_id BETWEEN :lo AND :hi"

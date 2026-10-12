@@ -8,14 +8,16 @@ Storage format (``Kernel/System/XML.pm``)
 written verbatim by ``_XMLHash2D`` (``{'$tag'}``, tags are XML names and never contain quotes);
 the tokenizer still accepts ``\\'`` and ``\\\\`` inside a key. Nothing is ever evaluated here.
 
-The shape is ``@XMLHash``: index 0 is ``undef``, ``[1]`` is the root hash
-(``{'otrs_stats'}``), every tag maps to a list (index 0 ``undef``) of hashes with the key
-``Content`` plus the XML attributes of that occurrence plus child tags. ``Kernel/System/Stats.pm``
-``StatsGet`` reads the string keys ``Title Object File Description SumRow SumCol StatNumber
-Cache StatType Valid ObjectModule`` and ``TimeZone`` from ``[1]{key}[1]{Content}``, the list keys
-``Permission`` / ``Format`` from every ``[n]{Content}``, and the element lists ``UseAsXvalue``,
-``UseAsValueSeries`` and ``UseAsRestriction`` (attributes ``Element``, ``Fixed`` and the time
-keys, ``SelectedValues[n]{Content}``).
+The shape is ``@XMLHash``. A parsed export file has ``undef`` at index 0 and the root hash
+(``{'otrs_stats'}``) at ``[1]``; a statistic stored by Znuny (``StatsAdd``/``Import``) has the root
+at ``[0]`` (``[0]{'otrs_stats'}[1]{...}``, ``StatsGet`` reads ``$XMLHash[0]``), and
+``build_xml_hash`` keeps whatever index the keys name. Every tag maps to a list (index 0 ``undef``)
+of hashes with the key ``Content`` plus the XML attributes of that occurrence plus child tags.
+``Kernel/System/Stats.pm`` ``StatsGet`` reads the string keys ``Title Object File Description
+SumRow SumCol StatNumber Cache StatType Valid ObjectModule`` and ``TimeZone`` from
+``[1]{key}[1]{Content}``, the list keys ``Permission`` / ``Format`` from every ``[n]{Content}``,
+and the element lists ``UseAsXvalue``, ``UseAsValueSeries`` and ``UseAsRestriction`` (attributes
+``Element``, ``Fixed`` and the time keys, ``SelectedValues[n]{Content}``).
 """
 
 from __future__ import annotations

@@ -94,8 +94,16 @@ def _flag(node: Mapping[str, Any], key: str, *, default: bool = False) -> bool:
 def stat_from_xml_hash(
     xml_hash: list[Any], *, origin: Literal["db", "file"], stat_id: int | None
 ) -> ZnunyStat:
-    """Read a statistic like ``StatsGet`` does; missing otrs_stats/Title/ObjectModule raise."""
-    root = xml_hash[1] if len(xml_hash) > 1 and isinstance(xml_hash[1], dict) else None
+    """Read a statistic like ``StatsGet`` does; missing otrs_stats/Title/ObjectModule raise.
+
+    Znuny stores a statistic with its root hash at ``$XMLHash[0]`` (``StatsGet`` reads
+    ``$XMLHash[0]->{otrs_stats}->[1]``, so ``xml_storage`` keys start ``[0]{'otrs_stats'}``),
+    while an export file parsed by ``xml_file_to_hash`` has it at ``[1]``. The first of the two
+    that carries ``otrs_stats`` is the root."""
+    root = next(
+        (node for node in xml_hash[:2] if isinstance(node, dict) and _items(node, "otrs_stats")),
+        None,
+    )
     items = _items(root, "otrs_stats") if root is not None else []
     if not items:
         raise XmlHashError("Die Statistik ist beschädigt (otrs_stats fehlt).")

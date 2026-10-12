@@ -25,7 +25,8 @@ from tiqora.reporting.znuny_stats.xml_hash import (
 )
 
 FIX = Path(__file__).parent / "fixtures" / "znuny_stats"
-BASE = "[1]{'otrs_stats'}[1]"
+# Znuny stores a statistic at ``$XMLHash[0]`` (``Stats.pm`` ``StatsGet``/``StatsAdd``)
+BASE = "[0]{'otrs_stats'}[1]"
 
 
 def _file_stat(name: str):
@@ -63,6 +64,25 @@ def test_values_with_quotes_backslashes_newlines() -> None:
     assert stat.title == 'It\'s a \\ "test"\nline 2'
     assert stat.description == ""
     assert stat.import_key == "znuny.stat.52020"
+
+
+def test_db_rows_as_znuny_stores_them_root_at_index_0() -> None:
+    """Rows exactly as Znuny 6.5 ``Stats->Import`` wrote them (golden peer): the root hash is
+    ``$XMLHash[0]``, with a stray root-level ``TagKey`` leaf next to ``otrs_stats``."""
+    rows = [
+        ("[0]{'TagKey'}", "[0]"),
+        ("[0]{'otrs_stats'}[1]{'TagKey'}", "[0]{'otrs_stats'}[1]"),
+        ("[0]{'otrs_stats'}[1]{'Title'}[1]{'Content'}", "Accounted time"),
+        ("[0]{'otrs_stats'}[1]{'Title'}[1]{'TagKey'}", "[0]{'otrs_stats'}[1]{'Title'}[1]"),
+        (
+            "[0]{'otrs_stats'}[1]{'ObjectModule'}[1]{'Content'}",
+            "Kernel::System::Stats::Dynamic::TicketAccountedTime",
+        ),
+        ("[0]{'otrs_stats'}[1]{'StatType'}[1]{'Content'}", "dynamic"),
+    ]
+    stat = stat_from_xml_hash(build_xml_hash(rows), origin="db", stat_id=52021)
+    assert stat.title == "Accounted time"
+    assert stat.object_module == "Kernel::System::Stats::Dynamic::TicketAccountedTime"
 
 
 def test_elements_from_db_rows() -> None:
