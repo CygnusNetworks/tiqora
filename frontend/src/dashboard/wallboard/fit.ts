@@ -1,5 +1,3 @@
-import type { EditWidget } from "../model";
-
 /** Gap between wallboard tiles (px at the design size). */
 export const WALLBOARD_GAP = 24;
 /** Above this many rows the link dialog warns "zu hoch für ein Wallboard". */
@@ -35,7 +33,7 @@ export function wallboardRowHeight(viewport: { width: number; height: number }, 
 }
 
 /** Rows the board needs: `max(y + h)` over the `lg` rects (at least 1). */
-export function wallboardRows(widgets: EditWidget[]): number {
+export function wallboardRows(widgets: readonly { layout: { lg: { y: number; h: number } } }[]): number {
   let rows = 1;
   for (const w of widgets) rows = Math.max(rows, w.layout.lg.y + w.layout.lg.h);
   return rows;

@@ -17,6 +17,7 @@ import { DashboardFiltersProvider } from "../filters/filtersContext";
 import { ReportSettingsEditor } from "../settings/editors/ReportSettings";
 import { registerCoreWidgets } from "./index";
 import type { ReportTileData } from "./ReportWidget";
+import { capJobRows } from "./capJobRows";
 
 const REPORT = demoReport("builtin.volume_by_queue")!;
 
@@ -160,12 +161,31 @@ describe("ReportWidget", () => {
     expect(start).not.toHaveBeenCalled();
   });
 
-  it("on a wallboard a deferred report says so and starts no job", async () => {
+  it("on a wallboard link (kiosk) a deferred report says so and starts no job", async () => {
     const start = vi.spyOn(dashboardsApi, "startReportJob");
-    mount({ state: { status: "ok", data: deferredTile() }, mode: "wallboard" });
+    mount({ state: { status: "ok", data: { ...deferredTile(), kiosk: true } }, mode: "wallboard" });
     expect(screen.getByText("Dieser Bericht ist für das Wallboard zu umfangreich.")).toBeInTheDocument();
     await act(async () => {});
     expect(start).not.toHaveBeenCalled();
+  });
+
+  it("the logged-in TV mode runs a deferred report as a background job like the view", async () => {
+    const start = vi.spyOn(dashboardsApi, "startReportJob").mockResolvedValue({ job_id: 7, status: "queued" } as never);
+    vi.spyOn(jobsApi, "get").mockResolvedValue(job({ status: "running" }));
+    mount({ state: { status: "ok", data: deferredTile() }, mode: "wallboard" });
+    expect(await screen.findByText("Wird im Hintergrund berechnet …")).toBeInTheDocument();
+    await waitFor(() => expect(start).toHaveBeenCalledWith(1, "w-report"));
+    expect(screen.queryByText("Dieser Bericht ist für das Wallboard zu umfangreich.")).toBeNull();
+  });
+
+  it("draws the job's result with the deferred answer's definition (no stored-report fetch) and caps it at row_cap", async () => {
+    vi.spyOn(dashboardsApi, "startReportJob").mockResolvedValue({ job_id: 7, status: "queued" } as never);
+    const result = tile().result!;
+    vi.spyOn(jobsApi, "get").mockResolvedValue(job({ status: "succeeded", result: result as never }));
+    const get = vi.spyOn(reportsApi, "get");
+    mount({ state: { status: "ok", data: { ...deferredTile(), definition: REPORT.definition, row_cap: 2 } }, settings: { report_key: REPORT.key, max_rows: 10 } });
+    expect(await screen.findByTestId("report-widget-view", undefined, { timeout: 4000 })).toBeInTheDocument();
+    expect(get).not.toHaveBeenCalled();
   });
 
   it("with the result cache off the job's own result is shown while the widget still answers deferred", async () => {
@@ -182,6 +202,18 @@ describe("ReportWidget", () => {
     expect(def.category).toBe("reports");
     expect(canUseWidget(def, { is_admin: false, can_view_reports: false })).toBe(false);
     expect(canUseWidget(def, { is_admin: false, can_view_reports: true })).toBe(true);
+  });
+});
+
+describe("capJobRows", () => {
+  it("cuts the job's rows to the cap and marks the result truncated", () => {
+    const result = tile().result!;
+    const rows = [...result.rows, ...result.rows, ...result.rows];
+    const capped = capJobRows({ ...result, rows }, 2);
+    expect(capped.rows).toHaveLength(2);
+    expect(capped.truncated).toBe(true);
+    expect(capJobRows({ ...result, rows }, 200).rows).toHaveLength(rows.length);
+    expect(capJobRows({ ...result, rows }, undefined).rows).toHaveLength(rows.length);
   });
 });
 

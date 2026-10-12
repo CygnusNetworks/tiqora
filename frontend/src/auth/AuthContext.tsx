@@ -19,6 +19,7 @@ import { clearLoginMethod, rememberLoginMethod } from "@/lib/loginMethod";
 import { submitSsoLogout } from "@/lib/ssoLogout";
 import { setDisplayTimeZone } from "@/lib/timeZone";
 import { resolveLocaleCode, setAppLanguage } from "@/i18n";
+import { isPublicWallboardPath } from "@/dashboard/wallboard/kioskToken";
 
 type AuthContextValue = {
   user: UserMe | null;
@@ -84,6 +85,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     retry: false,
     staleTime: 60_000,
+    // The public wallboard has no login and sends no cookie-bearing request (it reads /api/v1/kiosk only).
+    enabled: typeof window === "undefined" || !isPublicWallboardPath(window.location.pathname),
   });
 
   // Agent's Znuny UserTimeZone (null → browser zone) for every date the UI

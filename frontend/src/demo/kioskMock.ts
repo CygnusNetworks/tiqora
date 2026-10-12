@@ -1,7 +1,8 @@
 /**
  * Demo / e2e mock of the public wallboard API (`/api/v1/kiosk/board`, `/kiosk/dashboards/{id}/data`).
  * Pure and framework-free like `dashboardsMock.ts`, which it reads the boards from. It mirrors the
- * backend's redaction in shape only: widget settings are cut to the per-type whitelist, widgets
+ * backend's redaction in shape only: widget settings are cut to the per-type whitelist (plus the
+ * derived preset name of counters and ticket lists), widgets
  * without a wallboard rule answer `forbidden`, and the secret travels in `X-Tiqora-Kiosk`.
  */
 import type { KioskBoard, KioskWidget } from "@/lib/kioskApi";
@@ -25,6 +26,22 @@ export const KIOSK_SETTINGS_WHITELIST: Record<string, readonly string[]> = {
   "core.ai-status": [],
 };
 
+/** Mirrors `KIOSK_DERIVED_SETTINGS` of the backend: settings the server computes for the wallboard. */
+export const KIOSK_DERIVED_SETTINGS: Record<string, readonly string[]> = {
+  "core.counter": ["preset"],
+  "core.ticket-list": ["preset"],
+};
+const PRESET_NAMES: readonly string[] = ["mine_open", "mine_new", "unowned_new", "escalated", "ai_escalated"];
+
+/** The preset name of a preset source (the default source is "mine_open"), like the backend's `redact_settings`. */
+function derivedPreset(typeKey: string, settings: Record<string, unknown>): { preset?: string } {
+  if (!KIOSK_DERIVED_SETTINGS[typeKey]?.includes("preset")) return {};
+  const src = settings.source;
+  if (!src || typeof src !== "object") return {};
+  const { kind = "preset", preset = "mine_open" } = src as { kind?: unknown; preset?: unknown };
+  return kind === "preset" && typeof preset === "string" && PRESET_NAMES.includes(preset) ? { preset } : {};
+}
+
 /** Token the demo and the e2e fixture treat as a revoked or unknown link. */
 export const INVALID_KIOSK_TOKEN = "invalid-token";
 export const MSG_INVALID_LINK = "Wallboard-Link nicht gefunden.";
@@ -41,7 +58,10 @@ function widgetView(
   showDetails = false,
 ): KioskWidget {
   const allowed = KIOSK_SETTINGS_WHITELIST[row.type_key] ?? [];
-  const settings = Object.fromEntries(Object.entries(row.settings ?? {}).filter(([k]) => allowed.includes(k)));
+  const settings = {
+    ...Object.fromEntries(Object.entries(row.settings ?? {}).filter(([k]) => allowed.includes(k))),
+    ...derivedPreset(row.type_key, row.settings ?? {}),
+  };
   // A custom title may name a customer, so it only leaves with details (like the backend's `kiosk_title`).
   const title = showDetails && row.title_override ? { title_override: row.title_override } : {};
   return { id: row.id, type_key: row.type_key, type_version: row.type_version, layout: row.layout, settings, ...title };

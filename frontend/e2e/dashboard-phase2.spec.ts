@@ -98,6 +98,8 @@ test("the public wallboard shows the four KPI tiles without any link", async ({ 
   const tiles = board.locator('[data-type="core.counter"]');
   await expect(tiles).toHaveCount(4);
   for (let i = 0; i < 4; i++) await expect(tiles.nth(i)).toHaveCSS("grid-column-end", "span 3");
+  // details off (the default): the tiles are titled from the derived preset, not the generic type name
+  await expect(board).not.toContainText("Kennzahl");
   await expect(page.locator("a")).toHaveCount(0);
   await page.screenshot({ path: test.info().outputPath("wallboard-kiosk-1920.png") });
 });

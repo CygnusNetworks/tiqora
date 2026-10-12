@@ -640,9 +640,10 @@ export async function mockApi(page: Page) {
     const path = url.pathname;
     const method = req.method();
 
-    // Wallboard (public, header-authenticated): redacted view of the same per-test store.
+    // Wallboard (public, header-authenticated): redacted view of the same per-test store, with the
+    // default link setting (details off), so the derived-preset titles are what the e2e sees.
     if (path.includes("/api/v1/kiosk/")) {
-      const out = resolveKiosk(dashboardStore(), method, path, req.headers()["x-tiqora-kiosk"], { showDetails: true });
+      const out = resolveKiosk(dashboardStore(), method, path, req.headers()["x-tiqora-kiosk"]);
       if (out) {
         await json(route, out.status, out.body);
         return;

@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import type { WidgetProps } from "@/plugins/dashboardWidgets";
 import { humanDuration } from "@/lib/status";
 import { TicketLink } from "../chrome/TicketLink";
+import { useIsKiosk } from "../wallboard/kioskContext";
 import { WidgetFrame } from "../chrome/WidgetFrame";
 import { WidgetDataBody, WidgetEmpty } from "../chrome/WidgetDataBody";
 
@@ -23,7 +24,8 @@ export interface ChatQueueData {
   /** Counted up to the inbox cap (200). */
   waiting: number;
   oldest_waiting_since: string | null;
-  mine: number;
+  /** The viewer's own chats; never sent to a wallboard link (it would be the link creator's). */
+  mine?: number;
   /** Absent on a wallboard without details. */
   items?: ChatQueueItem[];
 }
@@ -40,12 +42,12 @@ function secondsSince(iso: string | null | undefined): number | null {
 /** Web chats waiting for an agent, how long the oldest one has waited, and how many are mine. */
 export function ChatQueueWidget({ settings, size, mode }: WidgetProps<ChatQueueSettings>) {
   const { t } = useTranslation();
+  const kiosk = useIsKiosk();
   return (
     <WidgetFrame title={t("dashboards.widgets.chatQueue.title")} mode={mode} testId="chat-queue-widget">
       <WidgetDataBody<ChatQueueData> h={size.h}>
         {(d) => {
-          if (!d) return <WidgetEmpty>{t("dashboards.widgets.chatQueue.disabled")}</WidgetEmpty>;
-          if (!d.enabled) return <WidgetEmpty>{t("dashboards.widgets.chatQueue.disabled")}</WidgetEmpty>;
+          if (!d?.enabled) return <WidgetEmpty>{t("dashboards.widgets.chatQueue.disabled")}</WidgetEmpty>;
           const oldest = secondsSince(d.oldest_waiting_since);
           const items = Array.isArray(d.items) ? d.items.slice(0, settings.limit) : [];
           const waitingText = d.waiting >= CHAT_WAITING_CAP ? `${CHAT_WAITING_CAP}+` : String(d.waiting);
@@ -58,12 +60,14 @@ export function ChatQueueWidget({ settings, size, mode }: WidgetProps<ChatQueueS
                   </div>
                   <div className="text-xs text-muted">{t("dashboards.widgets.chatQueue.waiting")}</div>
                 </div>
-                <div>
-                  <div className="font-mono text-xl font-semibold tabular-nums text-ink" data-testid="chat-mine">
-                    {d.mine}
+                {typeof d.mine === "number" && !kiosk && (
+                  <div>
+                    <div className="font-mono text-xl font-semibold tabular-nums text-ink" data-testid="chat-mine">
+                      {d.mine}
+                    </div>
+                    <div className="text-xs text-muted">{t("dashboards.widgets.chatQueue.mine")}</div>
                   </div>
-                  <div className="text-xs text-muted">{t("dashboards.widgets.chatQueue.mine")}</div>
-                </div>
+                )}
               </div>
               {d.waiting > 0 && oldest !== null && (
                 <p className="text-xs text-muted" data-testid="chat-oldest">

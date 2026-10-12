@@ -68,6 +68,7 @@ const CORE_FORM_NAMES: Record<string, string> = {
   "core.sla-gauge": "slaGauge",
   "core.backlog-aging": "backlogAging",
   "core.heatmap": "heatmap",
+  "core.chat-queue": "chatQueue",
 };
 
 const identity = {

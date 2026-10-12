@@ -101,6 +101,19 @@ describe("core.sla-gauge", () => {
     expect(await screen.findByText("Wird im Hintergrund berechnet …")).toBeInTheDocument();
     await waitFor(() => expect(start).toHaveBeenCalledWith(1, "w-1"));
   });
+
+  it("draws the job's own result although the inline gauge has no report key (cache off)", async () => {
+    vi.spyOn(dashboardsApi, "startReportJob").mockResolvedValue({ job_id: 9, status: "queued" } as never);
+    const result = { columns: [{ key: "sla_met_rate", role: "measure" }, { key: "tickets", role: "measure" }], rows: [[0.875, 40]], totals: null, truncated: false };
+    vi.spyOn(jobsApi, "get").mockResolvedValue({ id: 9, status: "succeeded", result } as unknown as Job);
+    const get = vi.spyOn(reportsApi, "get");
+    const definition = { source: "tickets", dimensions: [], measures: [{ key: "sla_met_rate" }, { key: "tickets" }], visualization: { type: "kpi" } };
+    mount("core.sla-gauge", { status: "ok", data: { deferred: true, reason: "estimate", report: { key: null }, definition, row_cap: 1 } } as State, {
+      settings: { target_percent: 90 },
+    });
+    expect(await screen.findByTestId("sla-gauge-svg", undefined, { timeout: 4000 })).toHaveTextContent("87,5 %");
+    expect(get).not.toHaveBeenCalled();
+  });
 });
 
 describe("core.backlog-aging", () => {

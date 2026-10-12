@@ -6,6 +6,7 @@ import i18n from "@/i18n";
 import { DASHBOARD_WIDGETS } from "@/plugins/dashboardWidgets";
 import { registerCoreWidgets } from "@/dashboard/widgets";
 import type { KioskBoard } from "@/lib/kioskApi";
+import { reportsApi } from "@/lib/reportsApi";
 import { readKioskToken } from "@/dashboard/wallboard/kioskToken";
 import { KioskWallboardPage } from "./KioskWallboardPage";
 
@@ -238,6 +239,42 @@ describe("KioskWallboardPage", () => {
     // a kiosk never starts a background job
     expect(kioskCalls().every((u) => u.startsWith("/api/v1/kiosk/"))).toBe(true);
     expect(fetchMock.mock.calls.every((c) => String(c[0]).startsWith("/api/v1/kiosk/"))).toBe(true);
+  });
+
+  it("a report tile with a result sends no request outside /api/v1/kiosk (no cookies, no /reporting/sources)", async () => {
+    const result = {
+      columns: [
+        { key: "channel", role: "dimension" },
+        { key: "tickets", role: "measure" },
+      ],
+      rows: [
+        ["email", 3],
+        ["phone", 2],
+      ],
+      totals: null,
+      truncated: false,
+    };
+    const definition = { source: "tickets", dimensions: [{ key: "channel" }], measures: [{ key: "tickets" }], visualization: { type: "table" } };
+    // the shared `api` client bound `fetch` at import time: watch the authenticated helper directly
+    const sources = vi.spyOn(reportsApi, "sources");
+    serve((path) =>
+      path.endsWith("/board")
+        ? json(200, board([REPORT]))
+        : json(200, {
+            generated_at: "2026-10-12T08:00:01Z",
+            widgets: { rep1: { status: "ok", data: { deferred: false, display: "auto", report: { key: null, kind: "saved", name: null }, definition, result } } },
+          }),
+    );
+    await mount();
+    await waitFor(() => expect(screen.getByTestId("report-widget-view")).toBeInTheDocument());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const urls = fetchMock.mock.calls.map((c) => String(c[0]));
+    expect(urls.length).toBeGreaterThan(0);
+    expect(urls.filter((u) => !u.startsWith("/api/v1/kiosk/"))).toEqual([]);
+    for (const c of fetchMock.mock.calls as [string, RequestInit][]) expect(c[1]?.credentials).toBe("omit");
+    expect(sources).not.toHaveBeenCalled();
   });
 
   it("no element is a link on the kiosk", async () => {

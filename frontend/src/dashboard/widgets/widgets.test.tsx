@@ -192,6 +192,8 @@ describe("registerCoreWidgets", () => {
     expect(get("core.links").dataEndpoint).toBeNull();
     for (const k of DATA_WIDGET_KEYS) expect(get(k).dataEndpoint).toBe(k);
     expect(get("core.escalations").refreshOn).toEqual(["ticket_changed", "interval:60"]);
+    // the server-backed queue overview also counts brand-new tickets (E10: TICKET_EVENTS)
+    expect(get("core.queue-overview").refreshOn).toEqual(["ticket_changed", "ticket_new_in_queue"]);
     expect(get("core.team-presence").refreshOn).toEqual(["interval:30"]);
     expect(get("core.chat-queue").refreshOn).toEqual(["chat_waiting", "chat_assigned", "chat_ended", "interval:30"]);
     expect(get("core.chat-queue").category).toBe("team");
@@ -719,10 +721,21 @@ describe("core.chat-queue", () => {
     expect(screen.queryByTestId("chat-item-2")).toBeNull();
   });
 
-  it("shows counts only on a wallboard without details (no items)", async () => {
-    await renderWidget("core.chat-queue", {}, { status: "ok", data: { enabled: true, waiting: 3, oldest_waiting_since: minutesAgo(2), mine: 0 } });
+  it("shows counts only on a wallboard without details (no items, no 'Meine Chats')", async () => {
+    await renderWidget("core.chat-queue", {}, { status: "ok", data: { enabled: true, waiting: 3, oldest_waiting_since: minutesAgo(2) } }, "wallboard", {}, () => {}, {
+      kiosk: true,
+    });
     expect(screen.getByTestId("chat-waiting")).toHaveTextContent("3");
     expect(screen.queryByTestId(/^chat-item-/)).toBeNull();
+    expect(screen.queryByTestId("chat-mine")).toBeNull();
+    expect(screen.queryByText("Meine Chats")).toBeNull();
+  });
+
+  it("never shows 'Meine Chats' on a wallboard link, even if an older server sent the count", async () => {
+    await renderWidget("core.chat-queue", {}, { status: "ok", data: { enabled: true, waiting: 1, oldest_waiting_since: minutesAgo(2), mine: 4 } }, "wallboard", {}, () => {}, {
+      kiosk: true,
+    });
+    expect(screen.queryByTestId("chat-mine")).toBeNull();
   });
 
   it("says so when the web chat is not set up", async () => {

@@ -98,7 +98,7 @@ export const CORE_WIDGETS: WidgetDefinition<any>[] = [
     size: { default: [12, 3], min: [4, 2], max: [12, 6] },
     settings: object({ limit: int(1, 12, 8), only_with_work: { type: "boolean", default: true } }),
     data: { endpoint: "core.queue-overview" },
-    refreshOn: ["ticket_changed"],
+    refreshOn: TICKET_EVENTS,
     component: QueueOverviewWidget,
   }),
   defineCoreWidget<EscalationsSettings>({

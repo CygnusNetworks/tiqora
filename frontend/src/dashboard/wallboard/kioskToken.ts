@@ -10,3 +10,8 @@ export function readKioskToken(hash: string): string | null {
   token = token.trim();
   return token === "" ? null : token;
 }
+
+/** The public wallboard page (`/wallboard`, not the logged-in TV mode `/agent/wallboard`): no login, no cookies. */
+export function isPublicWallboardPath(pathname: string): boolean {
+  return pathname === "/wallboard" || pathname.startsWith("/wallboard/");
+}

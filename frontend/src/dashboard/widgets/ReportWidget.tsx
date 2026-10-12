@@ -17,6 +17,7 @@ import { WidgetError } from "../chrome/WidgetError";
 import { WidgetSkeleton } from "../chrome/WidgetSkeleton";
 import { skeletonRows } from "../chrome/mode";
 import { ChooseSourceAction } from "./SourceAction";
+import { capJobRows } from "./capJobRows";
 
 export interface ReportWidgetSettings {
   report_key?: string;
@@ -34,7 +35,10 @@ export interface ReportTileData {
   reason?: string;
   /** The server renders a wallboard: no job is ever started. */
   kiosk?: boolean;
+  /** Also on a deferred answer (not on a kiosk): the effective definition the background job runs. */
   definition?: ReportDefinition;
+  /** Deferred answer: the rows the tile shows of the job's own result (200 for pivot/heatmap, else `max_rows`). */
+  row_cap?: number;
   result?: ReportResult;
   ignored_filters?: string[];
   drillable_dimensions?: string[];
@@ -161,7 +165,10 @@ function shownDefinition(definition: ReportDefinition, display: "auto" | "table"
   return { ...definition, visualization: { ...(definition.visualization ?? {}), type: "table" } } as ReportDefinition;
 }
 
-/** How a tile draws a finished result; `fromJob` marks the background job's own (uncapped) result. */
+/** Modes in which a deferred report runs as a background job (view and the logged-in TV mode). */
+const jobModes: ReadonlySet<WidgetMode> = new Set<WidgetMode>(["view", "wallboard"]);
+
+/** How a tile draws a finished result; `fromJob` marks the background job's own result (rows already capped). */
 export type TileRender = (args: TileRenderArgs) => ReactNode;
 
 type TileRenderArgs = {
@@ -184,6 +191,7 @@ function ReportBody({
   refetch,
   bg,
   jobDefinition,
+  rowCap,
   dashboardId,
   onSelectPoint,
 }: {
@@ -195,6 +203,8 @@ function ReportBody({
   refetch: () => void;
   bg: ReturnType<typeof useBackgroundRun>;
   jobDefinition: ReportDefinition | undefined;
+  /** Fallback row cap of the job's result when the deferred answer carries none. */
+  rowCap: number | undefined;
   dashboardId: number | undefined;
   onSelectPoint: TileRenderArgs["onSelectPoint"];
 }) {
@@ -206,12 +216,14 @@ function ReportBody({
   }
 
   if (data.deferred === true) {
-    if (mode === "wallboard" || data.kiosk === true) return <Waiting>{t("dashboards.widgets.report.tooLargeWallboard")}</Waiting>;
-    if (mode !== "view" || dashboardId === undefined) {
+    // Only a wallboard opened with a link never computes; the logged-in TV mode runs the job like the view.
+    if (data.kiosk === true) return <Waiting>{t("dashboards.widgets.report.tooLargeWallboard")}</Waiting>;
+    if (!jobModes.has(mode) || dashboardId === undefined) {
       return <Waiting>{t("dashboards.widgets.report.tooLargePreview")}</Waiting>;
     }
-    if (bg.jobResult && jobDefinition) {
-      return <>{render({ definition: jobDefinition, result: bg.jobResult, tile: data, fromJob: true })}</>;
+    const definition = data.definition ?? jobDefinition;
+    if (bg.jobResult && definition) {
+      return <>{render({ definition, result: capJobRows(bg.jobResult, data.row_cap ?? rowCap), tile: data, fromJob: true })}</>;
     }
     if (bg.run?.error) {
       return (
@@ -288,7 +300,7 @@ export function ReportTileWidget({
   const deferred = tile?.deferred === true;
   // The job state lives here, above the data gate: refetching after the job swaps the body for a skeleton.
   const bg = useBackgroundRun({
-    active: deferred && mode === "view" && tile?.kiosk !== true && chrome.dashboardId !== undefined,
+    active: deferred && jobModes.has(mode) && tile?.kiosk !== true && chrome.dashboardId !== undefined,
     dashboardId: chrome.dashboardId,
     widgetId: instanceId,
     guardKey: settingsHash({ settings, filters }),
@@ -296,11 +308,12 @@ export function ReportTileWidget({
     refetch,
   });
   const reportKey = tile?.report?.key ?? settings.report_key ?? null;
-  // The job's own result needs the report's definition (a deferred answer carries none).
+  // The job's own result is drawn with the deferred answer's definition; an older server sent none,
+  // then the report's stored definition is the fallback.
   const reportQ = useQuery({
     queryKey: ["reports", "get", reportKey],
     queryFn: ({ signal }) => reportsApi.get(reportKey as string, signal),
-    enabled: deferred && bg.jobResult !== undefined && reportKey !== null,
+    enabled: deferred && bg.jobResult !== undefined && reportKey !== null && tile?.definition === undefined,
     retry: false,
   });
   return (
@@ -316,6 +329,7 @@ export function ReportTileWidget({
             refetch={refetch}
             bg={bg}
             jobDefinition={reportQ.data?.definition ?? undefined}
+            rowCap={typeof settings.max_rows === "number" ? settings.max_rows : undefined}
             dashboardId={chrome.dashboardId}
             onSelectPoint={onSelectPoint}
           />
@@ -328,10 +342,10 @@ export function ReportTileWidget({
 /** A report on the dashboard: the report's own visualisation (compact) or a table; large reports run as a background job. */
 export function ReportWidget({ instanceId, settings, size, mode }: WidgetProps<ReportWidgetSettings>) {
   const { t } = useTranslation();
-  const render: TileRender = ({ definition, result, tile, fromJob, onSelectPoint, drillableDimensions }) => (
+  const render: TileRender = ({ definition, result, tile, onSelectPoint, drillableDimensions }) => (
     <ReportView
       report={{ key: tile?.report?.key ?? settings.report_key ?? null, definition: shownDefinition(definition, settings.display) }}
-      result={fromJob ? { ...result, rows: result.rows.slice(0, settings.max_rows) } : result}
+      result={result}
       compact
       testId="report-widget-view"
       onSelectPoint={onSelectPoint}

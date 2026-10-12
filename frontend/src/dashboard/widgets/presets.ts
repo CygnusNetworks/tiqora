@@ -21,9 +21,6 @@ export interface FilterSource {
 
 export type TicketSource = PresetSource | SavedSearchSource | FilterSource;
 
-/** Znuny's "nobody" owner (backend `UNASSIGNED_OWNER_ID`): unowned tickets belong to user 1. */
-export const UNASSIGNED_OWNER_ID = 1;
-
 export const DEFAULT_SOURCE: PresetSource = { kind: "preset", preset: "mine_open" };
 
 /** The id of the saved search a `source` names, or null. */

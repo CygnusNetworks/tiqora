@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { Switch } from "@/components/ui/Switch";
 import { dashboardKeys, dashboardsApi, type DashboardTab, type KioskLinkIn } from "@/lib/dashboardsApi";
-import { dashboardRows, hasMineWidget, WALLBOARD_MAX_ROWS } from "./kioskLinks";
+import { WALLBOARD_MAX_ROWS } from "../wallboard/fit";
+import { dashboardRows, hasMineWidget } from "./kioskLinks";
 
 const NAME_MAX = 120;
 const MAX_DASHBOARDS = 10;

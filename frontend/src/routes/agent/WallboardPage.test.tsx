@@ -39,6 +39,7 @@ const DASHBOARDS: Record<number, Dashboard> = {
 };
 
 let failData: Set<number>;
+let holdData: Set<number>;
 let failGet: Set<number>;
 let client: QueryClient;
 
@@ -88,6 +89,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
   vi.setSystemTime(new Date("2026-10-10T10:00:00Z"));
   failData = new Set();
+  holdData = new Set();
   failGet = new Set();
   window.scrollTo = vi.fn() as never;
   vi.spyOn(dashboardsApi, "list").mockResolvedValue(Object.values(DASHBOARDS).map(({ widgets: _w, ...tab }) => demoTab(tab)));
@@ -97,6 +99,7 @@ beforeEach(() => {
   });
   vi.spyOn(dashboardsApi, "data").mockImplementation(async (id: number) => {
     if (failData.has(id)) throw new Error("offline");
+    if (holdData.has(id)) return new Promise(() => {}); // a slow batch: never answers in the test
     const out: Record<string, WidgetResult> = {};
     for (const w of DASHBOARDS[id].widgets) {
       const r = demoWidgetData(w.type_key, w.settings ?? {});
@@ -176,6 +179,32 @@ describe("WallboardPage (TV mode)", () => {
     failData.delete(1);
     await flush(30_000);
     expect(screen.getByTestId("wallboard-status")).not.toHaveAttribute("data-stale");
+  });
+
+  it("coming back to a dashboard with an old cached picture is not stale while its refetch runs", async () => {
+    // cycle 160 s: the cached batch of "Leitstand" is ~100 s old when its turn comes back
+    await mount("/agent/wallboard?ids=1,2&rotate=80");
+    await flush();
+    expect(heading()).toBe("Leitstand");
+    await flush(80_000);
+    expect(heading()).toBe("Support");
+    holdData.add(1);
+    await flush(80_000);
+    expect(heading()).toBe("Leitstand");
+    expect(screen.getByTestId("wallboard-status")).not.toHaveAttribute("data-stale");
+    await flush(20_000); // the mount refetch still runs (up to the 20 s batch deadline)
+    expect(screen.getByTestId("wallboard-status")).not.toHaveAttribute("data-stale");
+    expect(screen.getByTestId("counter-wallboard")).toBeInTheDocument();
+  });
+
+  it("a failed refetch after coming back marks the old picture stale", async () => {
+    await mount("/agent/wallboard?ids=1,2&rotate=80");
+    await flush();
+    await flush(80_000);
+    failData.add(1);
+    await flush(80_000);
+    expect(heading()).toBe("Leitstand");
+    expect(screen.getByTestId("wallboard-status")).toHaveAttribute("data-stale", "true");
   });
 
   it("controls appear on pointer move only and 'Beenden' returns to the dashboard", async () => {

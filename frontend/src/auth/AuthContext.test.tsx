@@ -106,6 +106,19 @@ describe("AuthContext", () => {
     expect(result.current.user).toBeNull();
   });
 
+  it("never asks /me on the public wallboard (no cookie-bearing request there)", async () => {
+    const before = window.location.pathname;
+    window.history.replaceState(null, "", "/wallboard#secret");
+    try {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(meMock).not.toHaveBeenCalled();
+      expect(result.current.isAuthenticated).toBe(false);
+    } finally {
+      window.history.replaceState(null, "", before);
+    }
+  });
+
   it("resolves to authenticated when /me succeeds", async () => {
     meMock.mockResolvedValue(authedUser);
     const { result } = renderHook(() => useAuth(), { wrapper });

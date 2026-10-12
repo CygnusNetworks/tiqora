@@ -117,6 +117,51 @@ describe("useKioskData", () => {
     expect(callsFor2()).toBe(2);
   });
 
+  it("a failure of one dashboard does not mark the next, freshly prefetched one stale", async () => {
+    let calls1 = 0;
+    vi.spyOn(kioskApi, "data").mockImplementation(async (_t, id) => {
+      if (id === 1 && ++calls1 > 1) throw new Error("offline");
+      return dataOf(id);
+    });
+    const { result, rerender } = renderHook(({ cur, next }) => useKioskData("tok", BOARD, cur, next), { initialProps: { cur: 1, next: 2 } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000); // the refresh of 1 fails
+    });
+    expect(result.current.stale).toBe(true);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(26_000); // t = 56 s: 2 is prefetched
+    });
+    rerender({ cur: 2, next: 1 });
+    expect(result.current.stale).toBe(false);
+  });
+
+  it("an old cached picture is not stale while the refetch after the switch runs", async () => {
+    let calls1 = 0;
+    vi.spyOn(kioskApi, "data").mockImplementation((_t, id) => {
+      if (id === 1 && ++calls1 > 1) return new Promise<KioskData>(() => {}); // slow from now on
+      return Promise.resolve(dataOf(id));
+    });
+    const board = { ...BOARD, rotate_seconds: 300 };
+    const { result, rerender } = renderHook(({ cur, next }) => useKioskData("tok", board, cur, next), { initialProps: { cur: 1, next: 2 } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    rerender({ cur: 2, next: 1 });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100_000);
+    });
+    rerender({ cur: 1, next: 2 }); // the picture of 1 is ~100 s old, its refetch hangs
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(result.current.byDashboard[1]).toBeDefined();
+    expect(result.current.stale).toBe(false);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(85_000); // the refetch takes longer than the threshold itself
+    });
+    expect(result.current.stale).toBe(true);
+  });
+
   it("a 404 marks the link invalid and stops the polling", async () => {
     const data = vi.spyOn(kioskApi, "data").mockRejectedValue(new KioskLinkInvalidError("weg"));
     const { result } = renderHook(() => useKioskData("tok", BOARD, 1, null));

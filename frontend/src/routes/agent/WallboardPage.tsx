@@ -55,11 +55,17 @@ function WallboardDashboard({ id, position }: { id: number; position?: { index: 
   }, [qc, id, hasData]);
 
   const [now, setNow] = useState(() => Date.now());
+  const [mountedAt] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 5000);
     return () => clearInterval(timer);
   }, []);
-  const stale = updatedAt !== null && now - updatedAt > WALLBOARD_STALE_INTERVALS * WALLBOARD_REFRESH_SECONDS * 1000;
+  // The rotation remounts this view with the dashboard's cached batch, which may be older than the
+  // threshold when the cycle is long. It only counts as stale once a fetch after the mount settled
+  // (a failure keeps the old picture), or when that fetch takes longer than the threshold itself.
+  const staleAfterMs = WALLBOARD_STALE_INTERVALS * WALLBOARD_REFRESH_SECONDS * 1000;
+  const stale =
+    updatedAt !== null && now - updatedAt > staleAfterMs && (batch.isFetchedAfterMount || now - mountedAt > staleAfterMs);
 
   if (!dashboard) {
     return (

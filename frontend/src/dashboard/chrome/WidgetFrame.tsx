@@ -41,17 +41,9 @@ export function useWidgetChrome(): WidgetChrome {
   return useContext(ChromeContext);
 }
 
-/** Search params of the queue view a header link may open. */
-export interface QueueLinkSearch {
-  queue_id?: number;
-  owner_id?: number;
-  state_type?: "new";
-  escalated?: true;
-}
-
 /** The accent link right of the title ("Alle 12 anzeigen"). */
 export type FrameLink =
-  | { label: string; to: "/agent/queues"; search?: QueueLinkSearch }
+  | { label: string; to: "/agent/queues" }
   | { label: string; to: "/agent/calendar" }
   | { label: string; to: typeof DRILL_PATH; search: DrillSearch }
   | { label: string; to: "/agent/searches/$searchId"; params: { searchId: string } };
@@ -83,7 +75,7 @@ function HeaderLink({ link, mode }: { link: FrameLink; mode: WidgetMode }) {
       </Link>
     );
   return (
-    <Link to="/agent/queues" search={link.search ?? {}} tabIndex={tabIndex} className={cn(LINK_CLASS, inert)}>
+    <Link to="/agent/queues" tabIndex={tabIndex} className={cn(LINK_CLASS, inert)}>
       {link.label}
     </Link>
   );

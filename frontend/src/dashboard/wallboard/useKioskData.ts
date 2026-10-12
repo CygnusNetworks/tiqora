@@ -126,7 +126,10 @@ export function useKioskData(
   nextId: number | null,
 ): KioskDataState {
   const [byDashboard, setByDashboard] = useState<Record<number, KioskDashboardData>>({});
-  const [failing, setFailing] = useState(false);
+  // Per dashboard: a failure of one never marks the next (freshly prefetched) one stale.
+  const [failingId, setFailingId] = useState<number | null>(null);
+  // The dashboard whose fetch after the rotation switched to it has settled (or ran too long).
+  const [settledId, setSettledId] = useState<number | null>(null);
   const [invalid, setInvalid] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const refreshSeconds = board?.refresh_seconds ?? 30;
@@ -138,6 +141,7 @@ export function useKioskData(
   const store = useCallback((id: number, fresh: KioskData) => {
     fetchedAt.current.set(id, Date.now());
     setByDashboard((all) => ({ ...all, [id]: mergeKioskData(all[id], fresh) }));
+    setFailingId((f) => (f === id ? null : f));
   }, []);
 
   const fetchOne = useCallback(
@@ -156,7 +160,7 @@ export function useKioskData(
         }
         failures.current += 1;
         failures.current = Math.min(failures.current, 10);
-        setFailing(true);
+        setFailingId(id);
         retryAfter.current = retryAfterOf(err);
         return "retry";
       }
@@ -176,9 +180,9 @@ export function useKioskData(
       }
       const out = await fetchOne(currentId, life.signal);
       if (out === "stop") return;
+      setSettledId(currentId);
       if (out === "ok") {
         failures.current = 0;
-        setFailing(false);
         timer = setTimeout(() => void run(), refreshSeconds * 1000);
       } else {
         timer = setTimeout(() => void run(), backoffSeconds(failures.current, retryAfter.current) * 1000);
@@ -192,9 +196,12 @@ export function useKioskData(
     const age = Date.now() - (fetchedAt.current.get(currentId) ?? -Infinity);
     if (age < PREFETCH_LEAD_SECONDS * 2000) timer = setTimeout(() => void run(), refreshSeconds * 1000 - age);
     else void run();
+    // A fetch that runs longer than the stale threshold counts as settled: the old picture is stale.
+    const slow = setTimeout(() => setSettledId(currentId), STALE_INTERVALS * refreshSeconds * 1000);
     return () => {
       life.abort();
       if (timer) clearTimeout(timer);
+      clearTimeout(slow);
       kick.current = null;
     };
   }, [token, currentId, refreshSeconds, fetchOne]);
@@ -229,7 +236,10 @@ export function useKioskData(
   }, []);
 
   const current = currentId === null ? undefined : byDashboard[currentId];
-  const tooOld = current !== undefined && now - current.fetchedAt > STALE_INTERVALS * refreshSeconds * 1000;
+  // A cached picture the rotation comes back to may be old: it counts only once the fetch after the switch settled.
+  const tooOld =
+    current !== undefined && settledId === currentId && now - current.fetchedAt > STALE_INTERVALS * refreshSeconds * 1000;
+  const failing = currentId !== null && failingId === currentId;
   const refresh = useCallback(() => kick.current?.(), []);
   return { byDashboard, stale: failing || tooOld, invalid, refresh };
 }

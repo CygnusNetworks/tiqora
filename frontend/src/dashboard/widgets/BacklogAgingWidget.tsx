@@ -10,10 +10,10 @@ export interface BacklogAgingSettings {
 /** Open tickets per queue, stacked by age bucket (a snapshot: the dashboard's time range does not apply). */
 export function BacklogAgingWidget({ instanceId, settings, size, mode }: WidgetProps<BacklogAgingSettings>) {
   const { t } = useTranslation();
-  const render: TileRender = ({ definition, result, tile, fromJob, onSelectPoint, drillableDimensions }) => (
+  const render: TileRender = ({ definition, result, tile, onSelectPoint, drillableDimensions }) => (
     <ReportView
       report={{ key: tile?.report?.key ?? "builtin.backlog_aging", definition }}
-      result={fromJob ? { ...result, rows: result.rows.slice(0, settings.max_rows) } : result}
+      result={result}
       compact
       onSelectPoint={onSelectPoint}
       drillableDimensions={drillableDimensions}

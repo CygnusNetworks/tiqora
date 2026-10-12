@@ -1,15 +1,13 @@
 import type { Dashboard, KioskLink } from "@/lib/dashboardsApi";
-
-/** Rows above which a dashboard is too tall to be readable on a wallboard (matches the TV fit). */
-export const WALLBOARD_MAX_ROWS = 14;
+import { wallboardRows } from "../wallboard/fit";
 
 export const kioskLinkKeys = {
   all: ["admin", "dashboard-kiosk-links"] as const,
 };
 
-/** Number of grid rows a dashboard occupies on the large layout. */
+/** Number of grid rows a dashboard occupies on the large layout (the TV fit's count; 0 for an empty one). */
 export function dashboardRows(d: Pick<Dashboard, "widgets">): number {
-  return d.widgets.reduce((max, w) => Math.max(max, w.layout.lg.y + w.layout.lg.h), 0);
+  return d.widgets.length === 0 ? 0 : wallboardRows(d.widgets);
 }
 
 /** True if a counter or ticket list shows a "mine_*" preset: on a wallboard that is the link creator's queue. */
