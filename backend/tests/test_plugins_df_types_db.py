@@ -7,7 +7,7 @@ so ``dynamic_field`` / ``dynamic_field_value`` rows are removed above their mark
 from __future__ import annotations
 
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -16,6 +16,7 @@ import pytest
 import structlog
 import yaml
 from httpx import ASGITransport, AsyncClient
+from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -200,7 +201,10 @@ async def test_admin_creates_plugin_field_as_base_type(env: Env, admin: AsyncCli
     out = await _create(admin)
     assert out["field_type"] == "Text"
     assert out["plugin_type"] == TYPE
-    assert out["config"] == {"TiqoraPluginType": TYPE, "TiqoraPluginConfig": {"prefix": "V-"}}
+    assert out["config"] == {
+        "TiqoraPluginType": TYPE,
+        "TiqoraPluginConfig": {"prefix": "V-", "style": "plain"},
+    }
     engine = create_engine(env.sync_url)
     with engine.begin() as conn:
         row = conn.execute(
@@ -217,7 +221,7 @@ async def test_create_without_plugin_settings_stores_the_defaults(
     env: Env, admin: AsyncClient
 ) -> None:
     out = await _create(admin, config={})
-    assert out["config"]["TiqoraPluginConfig"] == {"prefix": "V-"}
+    assert out["config"]["TiqoraPluginConfig"] == {"prefix": "V-", "style": "plain"}
 
 
 async def test_create_rejects_mismatched_base_type_and_bad_config(
@@ -265,7 +269,7 @@ async def test_update_cannot_change_plugin_type(env: Env, admin: AsyncClient) ->
     assert kept.status_code == 200, kept.text
     assert kept.json()["plugin_type"] == TYPE
     assert kept.json()["config"]["TiqoraPluginType"] == TYPE
-    assert kept.json()["config"]["TiqoraPluginConfig"] == {"prefix": "V-"}
+    assert kept.json()["config"]["TiqoraPluginConfig"] == {"prefix": "V-", "style": "plain"}
     assert kept.json()["config"]["DefaultValue"] == "V-1"
     changed = await admin.patch(
         url, json={"config": {"TiqoraPluginType": "Plugin_points_Other", "DefaultValue": "x"}}
@@ -276,7 +280,10 @@ async def test_update_cannot_change_plugin_type(env: Env, admin: AsyncClient) ->
     good_settings = await admin.patch(
         url, json={"config": {"TiqoraPluginConfig": {"prefix": "W-"}}}
     )
-    assert good_settings.json()["config"]["TiqoraPluginConfig"] == {"prefix": "W-"}
+    assert good_settings.json()["config"]["TiqoraPluginConfig"] == {
+        "prefix": "W-",
+        "style": "plain",
+    }
     assert good_settings.json()["config"]["TiqoraPluginType"] == TYPE
     still = (await admin.get(url)).json()
     assert still["plugin_type"] == TYPE
@@ -303,7 +310,10 @@ async def test_validate_normalizes_and_rejects(env: Env, admin: AsyncClient) -> 
     assert str(raised.value) == f"{FIELD}: Vertragsnummer muss wie V-123 aussehen"
     assert env.stored() == ["V-12"]  # nothing was written
     calls = [c for c in points_behaviour().CALLS if c[0] == "df.validate"]
-    assert calls[0][1] == (["v-12"], {"prefix": "V-"})  # the plugin's settings come with defaults
+    values, settings = calls[0][1]
+    assert values == ["v-12"]
+    assert settings["prefix"] == "V-"  # the plugin's settings come with defaults
+    assert settings["style"].name == "PLAIN"  # typed Enum, not its text
 
 
 @pytest.mark.parametrize("mode", ["raise", "hang", "badresult"])
@@ -355,12 +365,12 @@ async def test_display_and_reference(
 ) -> None:
     created = await _create(admin)
     config = created["config"]
-    assert df_display_value("Text", config, ["V-12"]) == "Vertrag V-12"
+    assert df_display_value("Text", config, ["V-12"], plugin=True) == "Vertrag V-12"
     assert await display_value_bounded("Text", config, ["V-12"]) == "Vertrag V-12"
     assert df_display_value("Text", {}, ["V-12"]) == "V-12"  # a core field is unchanged
     # a failing display falls back to the core display
     points_behaviour().MODE["df.display"] = "raise"
-    assert df_display_value("Text", config, ["V-12"]) == "V-12"
+    assert df_display_value("Text", config, ["V-12"], plugin=True) == "V-12"
     assert await display_value_bounded("Text", config, ["V-12"]) == "V-12"
     points_behaviour().MODE.pop("df.display")
 
@@ -392,6 +402,62 @@ async def test_error_text_is_capped(env: Env, admin: AsyncClient) -> None:
         await validate_plugin_values(field, ["nope"])
 
 
+async def test_enum_settings_are_stored_as_json_and_reach_the_plugin_typed(
+    env: Env, admin: AsyncClient
+) -> None:
+    out = await _create(admin, config={"TiqoraPluginConfig": {"prefix": "V-", "style": "bold"}})
+    assert out["config"]["TiqoraPluginConfig"] == {"prefix": "V-", "style": "bold"}
+    engine = create_engine(env.sync_url)
+    with engine.begin() as conn:
+        raw = conn.execute(
+            text("SELECT config FROM dynamic_field WHERE name = :n"), {"n": FIELD}
+        ).scalar_one()
+    engine.dispose()
+    assert yaml.safe_load(raw)["TiqoraPluginConfig"] == {"prefix": "V-", "style": "bold"}
+    patched = await admin.patch(
+        f"{BASE}/{out['id']}", json={"config": {"TiqoraPluginConfig": {"style": "plain"}}}
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["config"]["TiqoraPluginConfig"]["style"] == "plain"
+    bad = await admin.patch(
+        f"{BASE}/{out['id']}", json={"config": {"TiqoraPluginConfig": {"style": "loud"}}}
+    )
+    assert bad.status_code == 422
+    await admin.patch(
+        f"{BASE}/{out['id']}", json={"config": {"TiqoraPluginConfig": {"style": "bold"}}}
+    )
+    await env.set_values(["v-12"])
+    calls = [c for c in points_behaviour().CALLS if c[0] == "df.validate"]
+    assert calls[-1][1][1]["style"].name == "BOLD"  # re-validation restores the Enum
+
+
+async def test_hanging_display_is_bounded_across_a_chain(env: Env, admin: AsyncClient) -> None:
+    from tiqora.channels.email.placeholder import expand_placeholders
+    from tiqora.plugins.placeholders import placeholder_budget_scope
+
+    await _create(admin)
+    await env.set_values(["V-12"])
+    points_behaviour().MODE["df.display"] = "hang"
+    points_behaviour().CALLS.clear()
+    started = time.monotonic()
+    outs: list[str] = []
+    async with env.factory() as session:
+        with placeholder_budget_scope(1.2):
+            for _ in range(20):
+                outs.append(
+                    await expand_placeholders(
+                        session,
+                        SysConfig(session),
+                        f"<OTRS_TICKET_DynamicField_{FIELD}_Value>",
+                        ticket_id=TICKET,
+                        user_id=1,
+                    )
+                )
+    assert time.monotonic() - started < 3.5  # 20 x 1 s without the shared budget
+    assert len([c for c in points_behaviour().CALLS if c[0] == "df.display"]) <= 3
+    assert set(outs) == {"V-12"}  # the core display once the budget is used up
+
+
 # -- registration --------------------------------------------------------------------------------
 
 
@@ -403,6 +469,10 @@ def _boot_registrar(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     boot_points_plugin(tmp_path, monkeypatch)
     (discovered,) = [d for d in discover_plugins() if d.plugin_id == "org.example.points"]
     return import_and_register(discovered, make_plugin_context(discovered))
+
+
+class _Unschematic(BaseModel):
+    callback: Callable[[], int]
 
 
 def _sync(values: list[str], config: Any) -> list[str]:
@@ -430,6 +500,7 @@ def test_registration_rules(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     reject("gewöhnliche Funktion", validate=_async)
     reject("gewöhnliche Funktion", display=_async)
     reject("Pydantic", config_model=dict)
+    reject("JSON-Schema", config_model=_Unschematic)
     # a core-sounding name is qualified, never shadowed
     assert registrar.dynamic_field_type("Text", validate=_sync, **ok) == "Plugin_points_Text"
     staged = [i.key for p, i in registrar.staged if p is DYNAMIC_FIELD_TYPES]

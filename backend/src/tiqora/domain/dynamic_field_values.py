@@ -295,9 +295,12 @@ def df_display_value(
     config: Mapping[str, Any],
     stored: str | Sequence[str] | None,
     *,
-    plugin: bool = True,
+    plugin: bool = False,
 ) -> str:
     """Display value of a stored dynamic-field value (``..._Value`` smart tags, templates).
+
+    ``plugin=True`` runs a plugin type's display inline with no time limit: for tests and
+    synchronous contexts only. Async callers use ``plugins.df_types.display_value_bounded``.
 
     ``Backend->ValueLookup`` followed by ``ReadableValueRender``, without a language object:
     Dropdown / Multiselect keys map through ``PossibleValues`` (``BaseSelect.pm:806-836``,

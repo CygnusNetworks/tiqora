@@ -698,6 +698,14 @@ class PluginRegistrar:
                 raise RegistrationRejected(
                     f"Das config_model des Feldtyps „{name}“ muss eine Pydantic-Modellklasse sein"
                 )
+            if config_model is not None:
+                try:  # the admin listing renders this schema; one broken model must not break it
+                    config_model.model_json_schema()
+                except Exception as exc:
+                    raise RegistrationRejected(
+                        f"Das config_model des Feldtyps „{name}“ lässt sich nicht als "
+                        f"JSON-Schema beschreiben ({type(exc).__name__})"
+                    ) from exc
 
         self._stage(DYNAMIC_FIELD_TYPES, item, check=check)
         return qname

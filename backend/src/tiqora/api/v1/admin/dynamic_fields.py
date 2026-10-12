@@ -128,7 +128,8 @@ def _validated_plugin_settings(item: DynamicFieldType, raw: Any) -> dict[str, An
             )
         return {}
     try:
-        return item.config_model.model_validate(raw).model_dump()
+        # JSON mode: the settings go to YAML, which cannot hold Enum/Decimal/UUID/SecretStr
+        return item.config_model.model_validate(raw).model_dump(mode="json")
     except ValidationError as exc:
         problems = "; ".join(
             f"{'.'.join(str(p) for p in err['loc']) or 'Wert'}: {err['msg']}"

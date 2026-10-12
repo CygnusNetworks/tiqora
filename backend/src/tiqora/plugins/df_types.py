@@ -21,7 +21,7 @@ from pydantic import BaseModel
 
 from tiqora.extensions.core import get_registry
 from tiqora.extensions.registry import ExtensionPoint
-from tiqora.plugins.calls import call_plugin, call_plugin_sync
+from tiqora.plugins.calls import PluginCallBudget, call_plugin, call_plugin_sync
 from tiqora.plugins.context import PluginContext
 from tiqora.plugins.state import is_active
 
@@ -171,14 +171,31 @@ def display_plugin_value(config: Mapping[str, Any], values: list[str]) -> str | 
 
 
 async def display_value_bounded(
-    field_type: str, config: Mapping[str, Any], stored: str | list[str] | None
+    field_type: str,
+    config: Mapping[str, Any],
+    stored: str | list[str] | None,
+    *,
+    budget: PluginCallBudget | None = None,
 ) -> str:
     """:func:`~tiqora.domain.dynamic_field_values.df_display_value` for async callers: a plugin
-    display runs in a worker thread with a 1 s limit (F24)."""
+    display runs in a worker thread with a 1 s limit (F24).
+
+    The limit shrinks with the ambient chain budget (``budget`` or the enclosing
+    ``placeholder_budget_scope``); once that is used up the core display is returned without
+    calling the plugin, so a template list or a notification run stays bounded.
+    """
     from tiqora.domain.dynamic_field_values import df_display_value
+    from tiqora.plugins.placeholders import current_scope_budget
 
     item = plugin_type_of(config)
     if item is None or item.display is None:
+        return df_display_value(field_type, config, stored, plugin=False)
+    timeout = CALL_TIMEOUT_SECONDS
+    chain = budget or current_scope_budget()
+    if chain is not None:
+        timeout = chain.timeout_for(timeout)
+    if timeout <= 0:
+        logger.warning("plugin_df_display_skipped", plugin=item.plugin_id, type=item.key)
         return df_display_value(field_type, config, stored, plugin=False)
     keys = [stored] if isinstance(stored, str) else [str(v) for v in (stored or [])]
     display = item.display
@@ -187,7 +204,7 @@ async def display_value_bounded(
         item.plugin_id,
         f"dynamic field display {item.key}",
         lambda: asyncio.to_thread(display, keys, settings),
-        timeout=CALL_TIMEOUT_SECONDS,
+        timeout=timeout,
     )
     if outcome.ok and isinstance(outcome.value, str):
         return outcome.value

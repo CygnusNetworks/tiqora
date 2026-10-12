@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import re
 from collections.abc import Mapping
+from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel
@@ -183,8 +184,14 @@ def _register_number_generators(registry: PluginRegistry) -> None:
     )
 
 
+class ContractStyle(Enum):
+    PLAIN = "plain"
+    BOLD = "bold"
+
+
 class ContractConfig(BaseModel):
     prefix: str = "V-"
+    style: ContractStyle = ContractStyle.PLAIN
 
 
 _CONTRACT_RE = re.compile(r"V-\d{1,6}")
@@ -212,8 +219,14 @@ def _validate_contract(values: list[str], config: Mapping[str, Any]) -> list[str
 
 
 def _display_contract(values: list[str], config: Mapping[str, Any]) -> str:
-    if behaviour.MODE.get("df.display") == "raise":
+    behaviour.CALLS.append(("df.display", (list(values), dict(config))))
+    mode = behaviour.MODE.get("df.display")
+    if mode == "raise":
         raise RuntimeError("kaputt")
+    if mode == "hang":
+        import time
+
+        time.sleep(3)
     return ", ".join(f"Vertrag {v}" for v in values)
 
 
