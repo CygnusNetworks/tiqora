@@ -8097,30 +8097,15 @@
         "title": "ChatAgentStateOut",
         "type": "object"
       },
-      "ChatAiStatusOut": {
-        "properties": {
-          "topics": {
-            "items": {
-              "$ref": "#/components/schemas/ChatAiTopicStatusOut"
-            },
-            "title": "Topics",
-            "type": "array"
-          }
-        },
-        "required": [
-          "topics"
-        ],
-        "title": "ChatAiStatusOut",
-        "type": "object"
-      },
       "ChatAiTopicStatusOut": {
+        "description": "Plan C8/C9: one entry per topic (``topic_key``, queue incl. name, verdict).",
         "properties": {
           "ai_mode": {
+            "enum": [
+              "off",
+              "first_line"
+            ],
             "title": "Ai Mode",
-            "type": "string"
-          },
-          "key": {
-            "title": "Key",
             "type": "string"
           },
           "label": {
@@ -8135,6 +8120,17 @@
             "title": "Queue Id",
             "type": "integer"
           },
+          "queue_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Name"
+          },
           "reason": {
             "anyOf": [
               {
@@ -8145,12 +8141,17 @@
               }
             ],
             "title": "Reason"
+          },
+          "topic_key": {
+            "title": "Topic Key",
+            "type": "string"
           }
         },
         "required": [
-          "key",
+          "topic_key",
           "label",
           "queue_id",
+          "queue_name",
           "ai_mode",
           "ok",
           "reason"
@@ -46517,7 +46518,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ChatAiStatusOut"
+                  "items": {
+                    "$ref": "#/components/schemas/ChatAiTopicStatusOut"
+                  },
+                  "title": "Response Chat Ai Status Api V1 Admin Chat Configs  Config Id  Ai Status Get",
+                  "type": "array"
                 }
               }
             },

@@ -33,7 +33,6 @@ from tiqora.webchat.identity import new_identity_secret
 from tiqora.webchat.models import DF_KINDS_FOR_PRECHAT, ChatConfigValues
 from tiqora.webchat.origins import OriginError, own_origin
 from tiqora.webchat.schemas import (
-    ChatAiStatusOut,
     ChatAiTopicStatusOut,
     ChatConfigCreateIn,
     ChatConfigOut,
@@ -116,6 +115,16 @@ async def _existing_ids(db: AsyncSession, table: str, ids: set[int]) -> set[int]
     return {int(r[0]) for r in (await db.execute(stmt, {"ids": sorted(ids)})).all()}
 
 
+async def _queue_names(db: AsyncSession, ids: set[int]) -> dict[int, str]:
+    """Queue names for an id set: one IN-list read, no JOIN (collation rule)."""
+    if not ids:
+        return {}
+    stmt = text("SELECT id, name FROM queue WHERE id IN :ids").bindparams(
+        bindparam("ids", expanding=True)
+    )
+    return {int(r[0]): str(r[1]) for r in (await db.execute(stmt, {"ids": sorted(ids)})).all()}
+
+
 async def _check_values(db: AsyncSession, values: ChatConfigValues) -> dict[str, str]:
     """Znuny-side existence checks; keys are dotted paths below ``values``."""
     errors: dict[str, str] = {}
@@ -154,6 +163,8 @@ async def _check_values(db: AsyncSession, values: ChatConfigValues) -> dict[str,
     return errors
 
 
+# NOTE: check-then-write, no DB backstop; two concurrent admin saves could both pass. Admin-only
+# and rare, and the portal lookup picks one config anyway.
 async def _portal_conflict(
     db: AsyncSession, values: ChatConfigValues, *, valid: bool, exclude_id: int | None
 ) -> dict[str, str]:
@@ -391,15 +402,17 @@ async def delete_identity_secret(config_id: int, admin: AdminUser, db: DbSession
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/{config_id}/ai-status", response_model=ChatAiStatusOut)
+@router.get("/{config_id}/ai-status", response_model=list[ChatAiTopicStatusOut])
 async def chat_ai_status(
     config_id: int, admin: AdminUser, db: DbSession, settings: AppSettings, redis_client: RedisDep
-) -> ChatAiStatusOut:
+) -> list[ChatAiTopicStatusOut]:
     """Per topic: whether the chat assistant would answer there right now, else why not."""
     _ = admin
     row = await _get(db, config_id)
+    all_topics = config_values(row).topics
+    names = await _queue_names(db, {t.queue_id for t in all_topics})
     topics: list[ChatAiTopicStatusOut] = []
-    for topic in config_values(row).topics:
+    for topic in all_topics:
         avail = await bot_availability(
             db,
             redis_client,
@@ -411,12 +424,13 @@ async def chat_ai_status(
         )
         topics.append(
             ChatAiTopicStatusOut(
-                key=topic.key,
+                topic_key=topic.key,
                 label=topic.label,
                 queue_id=topic.queue_id,
+                queue_name=names.get(topic.queue_id),
                 ai_mode=topic.ai_mode,
                 ok=avail.ok,
                 reason=avail.reason,
             )
         )
-    return ChatAiStatusOut(topics=topics)
+    return topics

@@ -401,11 +401,18 @@ async def test_ai_status_reports_reasons(env: Env) -> None:
     async with _client(env) as client:
         res = await client.get(f"{BASE}/{STATUS_CONFIG}/ai-status")
         assert res.status_code == 200, res.text
-        alive = {t["key"]: (t["ok"], t["reason"]) for t in res.json()["topics"]}
+        body = res.json()
+        assert isinstance(body, list)
+        assert {t["topic_key"]: t["queue_name"] for t in body} == {
+            "ok": f"wc48-queue-{QUEUE}",
+            "off": f"wc48-queue-{QUEUE2}",
+            "human": f"wc48-queue-{QUEUE}",
+        }
+        alive = {t["topic_key"]: (t["ok"], t["reason"]) for t in body}
         await env.redis.delete(BOT_ALIVE_KEY)
         down = {
-            t["key"]: (t["ok"], t["reason"])
-            for t in (await client.get(f"{BASE}/{STATUS_CONFIG}/ai-status")).json()["topics"]
+            t["topic_key"]: (t["ok"], t["reason"])
+            for t in (await client.get(f"{BASE}/{STATUS_CONFIG}/ai-status")).json()
         }
         missing = await client.get(f"{BASE}/999999/ai-status")
     assert alive == {
@@ -426,12 +433,15 @@ async def test_ai_status_reports_reasons(env: Env) -> None:
 async def test_admin_only(env: Env) -> None:
     async with _client(env) as admin:
         out = await _create(admin)
-    async with _client(env, PLAIN_ID) as plain:
-        calls = [
-            await plain.post(f"{BASE}/{out['id']}/identity-secret"),
-            await plain.delete(f"{BASE}/{out['id']}/identity-secret"),
-            await plain.get(f"{BASE}/{out['id']}/ai-status"),
-        ]
-    assert [c.status_code for c in calls] == [403, 403, 403]
+    calls = []
+    # AGENT holds rw on the queue group: queue rights must not grant admin.
+    for uid in (PLAIN_ID, AGENT):
+        async with _client(env, uid) as plain:
+            calls += [
+                await plain.post(f"{BASE}/{out['id']}/identity-secret"),
+                await plain.delete(f"{BASE}/{out['id']}/identity-secret"),
+                await plain.get(f"{BASE}/{out['id']}/ai-status"),
+            ]
+    assert [c.status_code for c in calls] == [403] * 6
     stored = env.sql("SELECT identity_secret FROM tiqora_chat_config WHERE id = :i", i=out["id"])
     assert stored[0][0] is None

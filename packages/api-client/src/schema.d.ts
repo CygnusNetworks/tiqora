@@ -13073,25 +13073,28 @@ export interface components {
             /** Topics */
             topics: string[];
         };
-        /** ChatAiStatusOut */
-        ChatAiStatusOut: {
-            /** Topics */
-            topics: components["schemas"]["ChatAiTopicStatusOut"][];
-        };
-        /** ChatAiTopicStatusOut */
+        /**
+         * ChatAiTopicStatusOut
+         * @description Plan C8/C9: one entry per topic (``topic_key``, queue incl. name, verdict).
+         */
         ChatAiTopicStatusOut: {
-            /** Ai Mode */
-            ai_mode: string;
-            /** Key */
-            key: string;
+            /**
+             * Ai Mode
+             * @enum {string}
+             */
+            ai_mode: "off" | "first_line";
             /** Label */
             label: string;
             /** Ok */
             ok: boolean;
             /** Queue Id */
             queue_id: number;
+            /** Queue Name */
+            queue_name: string | null;
             /** Reason */
             reason: string | null;
+            /** Topic Key */
+            topic_key: string;
         };
         /** ChatAttachmentOut */
         ChatAttachmentOut: {
@@ -28064,7 +28067,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ChatAiStatusOut"];
+                    "application/json": components["schemas"]["ChatAiTopicStatusOut"][];
                 };
             };
             /** @description Validation Error */

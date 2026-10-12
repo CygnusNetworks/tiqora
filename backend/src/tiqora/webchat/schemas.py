@@ -276,17 +276,16 @@ class ChatIdentitySecretOut(BaseModel):
 
 
 class ChatAiTopicStatusOut(BaseModel):
-    key: str
+    """Plan C8/C9: one entry per topic (``topic_key``, queue incl. name, verdict)."""
+
+    topic_key: str
     label: str
     queue_id: int
-    ai_mode: str
+    queue_name: str | None
+    ai_mode: Literal["off", "first_line"]
     ok: bool
     # ``BotAvailability.reason``: why the assistant would not answer on this topic right now.
     reason: str | None
-
-
-class ChatAiStatusOut(BaseModel):
-    topics: list[ChatAiTopicStatusOut]
 
 
 class ChatConfigCreateIn(BaseModel):
