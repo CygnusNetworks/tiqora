@@ -670,6 +670,8 @@ class PortalTicketCreateRequest(BaseModel):
     title: str
     body: str
     queue_id: int | None = None
+    #: configuration items to link (Mode B only; each must be visible to the customer)
+    config_item_ids: list[int] = Field(default_factory=list, max_length=10)
 
 
 class PortalTicketCreateResponse(BaseModel):

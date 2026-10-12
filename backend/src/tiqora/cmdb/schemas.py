@@ -583,7 +583,32 @@ class CmdbImportRequestIn(BaseModel):
     time_zone: str = Field("UTC", max_length=64)
 
 
+class PortalCiOut(BaseModel):
+    """A configuration item as the customer portal shows it (no agent-only data)."""
+
+    id: int
+    number: str
+    name: str
+    class_name: str
+    deployment_state: str
+    incident_state: str
+    incident_functionality: str | None
+
+
+class PortalCiPage(BaseModel):
+    items: list[PortalCiOut]
+    total: int
+
+
+class PortalCiDetailOut(PortalCiOut):
+    #: only attributes flagged ``portal``, without links into the agent UI
+    rendered: list[RenderedAttrOut]
+
+
 __all__ = [
+    "PortalCiDetailOut",
+    "PortalCiOut",
+    "PortalCiPage",
     "CmdbImportRequestIn",
     "ImportOptions",
     "ImportTemplateIn",

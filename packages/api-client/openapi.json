@@ -27861,6 +27861,136 @@
         "title": "PortalAuthMethodsOut",
         "type": "object"
       },
+      "PortalCiDetailOut": {
+        "properties": {
+          "class_name": {
+            "title": "Class Name",
+            "type": "string"
+          },
+          "deployment_state": {
+            "title": "Deployment State",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "incident_functionality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incident Functionality"
+          },
+          "incident_state": {
+            "title": "Incident State",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          },
+          "rendered": {
+            "items": {
+              "$ref": "#/components/schemas/RenderedAttrOut"
+            },
+            "title": "Rendered",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "name",
+          "class_name",
+          "deployment_state",
+          "incident_state",
+          "incident_functionality",
+          "rendered"
+        ],
+        "title": "PortalCiDetailOut",
+        "type": "object"
+      },
+      "PortalCiOut": {
+        "description": "A configuration item as the customer portal shows it (no agent-only data).",
+        "properties": {
+          "class_name": {
+            "title": "Class Name",
+            "type": "string"
+          },
+          "deployment_state": {
+            "title": "Deployment State",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "incident_functionality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incident Functionality"
+          },
+          "incident_state": {
+            "title": "Incident State",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "name",
+          "class_name",
+          "deployment_state",
+          "incident_state",
+          "incident_functionality"
+        ],
+        "title": "PortalCiOut",
+        "type": "object"
+      },
+      "PortalCiPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PortalCiOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "PortalCiPage",
+        "type": "object"
+      },
       "PortalLanguageIn": {
         "properties": {
           "language": {
@@ -27988,6 +28118,14 @@
           "body": {
             "title": "Body",
             "type": "string"
+          },
+          "config_item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 10,
+            "title": "Config Item Ids",
+            "type": "array"
           },
           "queue_id": {
             "anyOf": [
@@ -44712,6 +44850,153 @@
         "summary": "Totp Verify",
         "tags": [
           "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/config-items": {
+      "get": {
+        "operationId": "list_config_items_api_portal_config_items_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalCiPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Config Items",
+        "tags": [
+          "portal-cmdb"
+        ]
+      }
+    },
+    "/api/portal/config-items/{ci_id}": {
+      "get": {
+        "operationId": "get_config_item_api_portal_config_items__ci_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ci_id",
+            "required": true,
+            "schema": {
+              "title": "Ci Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalCiDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Config Item",
+        "tags": [
+          "portal-cmdb"
         ]
       }
     },

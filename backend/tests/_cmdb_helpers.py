@@ -25,9 +25,10 @@ import asyncio
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 
 import pytest
+from fastapi import Depends
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -80,6 +81,7 @@ __all__ = [
     "cmdb_db",
     "make_ci",
     "make_class",
+    "portal_client_for",
     "parse_attrs",
     "run_jobs_until_idle",
     "set_mode",
@@ -569,6 +571,49 @@ def client_for(world: CmdbWorld, user_id: int) -> AsyncClient:
     app.dependency_overrides[get_db] = _db
     app.dependency_overrides[get_session_factory_dep] = lambda: factory
     app.dependency_overrides[get_current_user] = lambda: _agent(user_id)
+    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+
+
+_CUSTOMER_COMPANY = {CUSTOMER_A: "cmdb4-co-a", CUSTOMER_B: "cmdb4-co-b"}
+
+
+def portal_client_for(world: CmdbWorld, login: str) -> AsyncClient:
+    """An ``AsyncClient`` on the customer portal acting as ``login`` (portal switched on)."""
+    from tiqora.api.portal.deps import (
+        get_current_customer,
+        get_portal_ticket_service,
+        require_portal_enabled,
+    )
+    from tiqora.domain.customer_auth import AuthenticatedCustomer
+    from tiqora.domain.portal_ticket_service import PortalTicketService
+    from tiqora.znuny.sysconfig import SysConfig
+
+    factory = world.factory
+
+    async def _db() -> Any:
+        async with factory() as session:
+            yield session
+
+    async def _fetch(name: str) -> Any:
+        return None
+
+    async def _svc(session: Annotated[AsyncSession, Depends(get_db)]) -> PortalTicketService:
+        return PortalTicketService(session, factory, SysConfig(fetch=_fetch))
+
+    customer = AuthenticatedCustomer(
+        id=1,
+        login=login,
+        email=login,
+        customer_id=_CUSTOMER_COMPANY[login],
+        first_name="Cora",
+        last_name="Customer",
+    )
+    app = create_app(Settings(environment="test"))
+    app.dependency_overrides[get_db] = _db
+    app.dependency_overrides[get_session_factory_dep] = lambda: factory
+    app.dependency_overrides[require_portal_enabled] = lambda: None
+    app.dependency_overrides[get_current_customer] = lambda: customer
+    app.dependency_overrides[get_portal_ticket_service] = _svc
     return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
 
 

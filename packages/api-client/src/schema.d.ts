@@ -686,6 +686,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portal/config-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Config Items */
+        get: operations["list_config_items_api_portal_config_items_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/config-items/{ci_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Config Item */
+        get: operations["get_config_item_api_portal_config_items__ci_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portal/kb/articles/{slug_or_id}": {
         parameters: {
             query?: never;
@@ -21567,6 +21601,52 @@ export interface components {
              */
             webauthn: boolean;
         };
+        /** PortalCiDetailOut */
+        PortalCiDetailOut: {
+            /** Class Name */
+            class_name: string;
+            /** Deployment State */
+            deployment_state: string;
+            /** Id */
+            id: number;
+            /** Incident Functionality */
+            incident_functionality: string | null;
+            /** Incident State */
+            incident_state: string;
+            /** Name */
+            name: string;
+            /** Number */
+            number: string;
+            /** Rendered */
+            rendered: components["schemas"]["RenderedAttrOut"][];
+        };
+        /**
+         * PortalCiOut
+         * @description A configuration item as the customer portal shows it (no agent-only data).
+         */
+        PortalCiOut: {
+            /** Class Name */
+            class_name: string;
+            /** Deployment State */
+            deployment_state: string;
+            /** Id */
+            id: number;
+            /** Incident Functionality */
+            incident_functionality: string | null;
+            /** Incident State */
+            incident_state: string;
+            /** Name */
+            name: string;
+            /** Number */
+            number: string;
+        };
+        /** PortalCiPage */
+        PortalCiPage: {
+            /** Items */
+            items: components["schemas"]["PortalCiOut"][];
+            /** Total */
+            total: number;
+        };
         /** PortalLanguageIn */
         PortalLanguageIn: {
             /** Language */
@@ -21614,6 +21694,8 @@ export interface components {
         PortalTicketCreateRequest: {
             /** Body */
             body: string;
+            /** Config Item Ids */
+            config_item_ids?: number[];
             /** Queue Id */
             queue_id?: number | null;
             /** Title */
@@ -28137,6 +28219,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerLoginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_config_items_api_portal_config_items_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalCiPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_config_item_api_portal_config_items__ci_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ci_id: number;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalCiDetailOut"];
                 };
             };
             /** @description Validation Error */
