@@ -21896,6 +21896,91 @@
         "title": "NotificationMessageIn",
         "type": "object"
       },
+      "NumberGeneratorIn": {
+        "properties": {
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          }
+        },
+        "title": "NumberGeneratorIn",
+        "type": "object"
+      },
+      "NumberGeneratorOut": {
+        "properties": {
+          "example": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Example"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "plugin_id",
+          "example"
+        ],
+        "title": "NumberGeneratorOut",
+        "type": "object"
+      },
+      "NumberGeneratorsOut": {
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active"
+          },
+          "available": {
+            "items": {
+              "$ref": "#/components/schemas/NumberGeneratorOut"
+            },
+            "title": "Available",
+            "type": "array"
+          },
+          "znuny_generator": {
+            "title": "Znuny Generator",
+            "type": "string"
+          }
+        },
+        "required": [
+          "active",
+          "znuny_generator",
+          "available"
+        ],
+        "title": "NumberGeneratorsOut",
+        "type": "object"
+      },
       "OAuth2TokenConfigCreate": {
         "properties": {
           "client_id": {
@@ -60989,6 +61074,144 @@
         ]
       }
     },
+    "/api/v1/admin/plugins/number-generators": {
+      "get": {
+        "operationId": "get_number_generators_api_v1_admin_plugins_number_generators_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumberGeneratorsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Number Generators",
+        "tags": [
+          "admin:plugins"
+        ]
+      },
+      "put": {
+        "operationId": "put_number_generator_api_v1_admin_plugins_number_generators_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NumberGeneratorIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumberGeneratorsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Number Generator",
+        "tags": [
+          "admin:plugins"
+        ]
+      }
+    },
     "/api/v1/admin/plugins/{plugin_id}/enabled": {
       "put": {
         "operationId": "set_plugin_enabled_api_v1_admin_plugins__plugin_id__enabled_put",
@@ -95671,7 +95894,7 @@
         ]
       },
       "post": {
-        "description": "Add an article to a ticket. Requires ``rw`` permission.\n\nAgent email replies (``channel=email``, ``sender_type=agent``) are SMTP-\ndelivered then stored (send-then-store). Delivery failure returns HTTP 502\nand does not leave a silent no-op 201.\n\nTelegram replies may carry ``attachments``, ``telegram_buttons`` and\n``telegram_reply_to_article_id`` (422 on any other channel); a failed\nTelegram send returns 409 with nothing stored. Outgoing agent email may\ncarry ``attachments`` as well (413 over the upload limit).\n\nWith ``state_id`` the ticket's state is changed after the article, in the\nsame transaction (PATCH semantics). The state change is validated before\nthe article is created, so an invalid one returns 403/404/422 without\nsending or storing anything.\n\nWeb chat (``channel=webchat``, agent, visible for the customer): the reply is also posted\ninto the ticket's live chat. A chat nobody accepted yet is accepted first, in its own\ntransaction (R-REPLY-ACCEPT-FIRST); a refused accept refuses the reply (409\n``at_capacity`` / ``already_taken``, 403 ``forbidden``). No live chat \u2192 409\n``chat_not_live``; nothing is stored in either case. The text and ``state_id`` are\nvalidated before the implicit accept. ``attachments`` are allowed.",
+        "description": "Add an article to a ticket. Requires ``rw`` permission.\n\nAgent email replies (``channel=email``, ``sender_type=agent``) are SMTP-\ndelivered then stored (send-then-store). Delivery failure returns HTTP 502\nand does not leave a silent no-op 201.\n\nTelegram replies may carry ``attachments``, ``telegram_buttons`` and\n``telegram_reply_to_article_id`` (422 on any other channel); a failed\nTelegram send returns 409 with nothing stored. Outgoing agent email may\ncarry ``attachments`` as well (413 over the upload limit).\n\nWith ``state_id`` the ticket's state is changed after the article, in the\nsame transaction (PATCH semantics). The state change is validated before\nthe article is created, so an invalid one returns 403/404/422 without\nsending or storing anything.\n\nWeb chat (``channel=webchat``, agent, visible for the customer): the reply is also posted\ninto the ticket's live chat. A chat nobody accepted yet is accepted first, in its own\ntransaction (R-REPLY-ACCEPT-FIRST); a refused accept refuses the reply (409\n``at_capacity`` / ``already_taken``, 403 ``forbidden``). No live chat \u2192 409\n``chat_not_live``; nothing is stored in either case. The text and ``state_id`` (including\nthe plugins' ``ticket.state_change`` before-hooks) are validated before the implicit accept;\nan ``article.create`` veto can only come after it. ``attachments`` are allowed.",
         "operationId": "create_article_api_v1_tickets__ticket_id__articles_post",
         "parameters": [
           {

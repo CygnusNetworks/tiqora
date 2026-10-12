@@ -17,7 +17,7 @@ from tiqora_sdk.hooks import (
     TicketCreatePatch,
 )
 from tiqora_sdk.process import ActionContext
-from tiqora_sdk.templates import PlaceholderRequest
+from tiqora_sdk.templates import NumberRequest, PlaceholderRequest
 
 from . import behaviour
 
@@ -132,12 +132,61 @@ def _register_placeholders(registry: PluginRegistry) -> None:
     registry.placeholder("WHOAMI", _whoami)
 
 
+def _yearly(req: NumberRequest) -> str:
+    behaviour.CALLS.append(("number.Yearly", req))
+    return f"{req.now_local:%Y}-{req.counter:06d}"
+
+
+def _daily(req: NumberRequest) -> str:
+    return f"{req.now_local:%Y%m%d}-{req.counter:04d}"
+
+
+def _broken_number(req: NumberRequest) -> str:
+    """``MODE["tn"]``: raise | empty | long | nomatch | hang | same (``MODE["tn.same"]``)."""
+    behaviour.CALLS.append(("number.Broken", req))
+    mode = behaviour.MODE.get("tn", "ok")
+    if mode == "raise":
+        raise RuntimeError("kaputt")
+    if mode == "empty":
+        return ""
+    if mode == "long":
+        return "BRK-" + "9" * 56
+    if mode == "nomatch":
+        return "NOPE-1"
+    if mode == "same":
+        return behaviour.MODE["tn.same"]
+    if mode == "hang":
+        import time
+
+        time.sleep(3)
+    return f"BRK-{req.offset + 1:06d}"
+
+
+def _register_number_generators(registry: PluginRegistry) -> None:
+    """``Yearly`` (counter, no date reset), ``Daily`` (counter, resets daily), ``Broken``."""
+    registry.number_generator(
+        "Yearly", _yearly, label="Jahresnummer", pattern=r"\d{4}-\d{6}", uses_counter=True
+    )
+    registry.number_generator(
+        "Daily",
+        _daily,
+        label="Tagesnummer",
+        pattern=r"\d{8}-\d{4}",
+        uses_counter=True,
+        date_based=True,
+    )
+    registry.number_generator(
+        "Broken", _broken_number, label="Defekt", pattern=r"BRK-\d{6}", uses_counter=False
+    )
+
+
 class PointsPlugin:
     def register(self, registry: PluginRegistry) -> None:
         # Each task of the plugin-points plan adds its ``_register_<point>(registry)`` call here.
         _register_sync_hooks(registry)
         _register_process(registry)
         _register_placeholders(registry)
+        _register_number_generators(registry)
 
 
 plugin = PointsPlugin()

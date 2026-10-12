@@ -33,6 +33,7 @@ if _t.TYPE_CHECKING:
     from fastapi import APIRouter
     from pydantic import BaseModel
 
+    from tiqora.plugins.number_generators import NumberBuild
     from tiqora.plugins.placeholders import PlaceholderResolve
     from tiqora.plugins.process_points import ConditionRun, TransitionActionRun
     from tiqora.plugins.sync_hooks import SyncHandler, SyncOperation
@@ -136,6 +137,17 @@ class PluginRegistry(_t.Protocol):
 
     def placeholder(
         self, name: str, resolve: PlaceholderResolve, *, timeout_ms: int = 500
+    ) -> str: ...
+
+    def number_generator(
+        self,
+        name: str,
+        build: NumberBuild,
+        *,
+        label: str,
+        pattern: str,
+        uses_counter: bool = True,
+        date_based: bool = False,
     ) -> str: ...
 
 

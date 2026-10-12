@@ -3954,6 +3954,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/plugins/number-generators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Number Generators */
+        get: operations["get_number_generators_api_v1_admin_plugins_number_generators_get"];
+        /** Put Number Generator */
+        put: operations["put_number_generator_api_v1_admin_plugins_number_generators_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/plugins/{plugin_id}/enabled": {
         parameters: {
             query?: never;
@@ -10158,8 +10176,9 @@ export interface paths {
          *     into the ticket's live chat. A chat nobody accepted yet is accepted first, in its own
          *     transaction (R-REPLY-ACCEPT-FIRST); a refused accept refuses the reply (409
          *     ``at_capacity`` / ``already_taken``, 403 ``forbidden``). No live chat → 409
-         *     ``chat_not_live``; nothing is stored in either case. The text and ``state_id`` are
-         *     validated before the implicit accept. ``attachments`` are allowed.
+         *     ``chat_not_live``; nothing is stored in either case. The text and ``state_id`` (including
+         *     the plugins' ``ticket.state_change`` before-hooks) are validated before the implicit accept;
+         *     an ``article.create`` veto can only come after it. ``attachments`` are allowed.
          */
         post: operations["create_article_api_v1_tickets__ticket_id__articles_post"];
         delete?: never;
@@ -18574,6 +18593,31 @@ export interface components {
             subject: string;
             /** Text */
             text: string;
+        };
+        /** NumberGeneratorIn */
+        NumberGeneratorIn: {
+            /** Key */
+            key?: string | null;
+        };
+        /** NumberGeneratorOut */
+        NumberGeneratorOut: {
+            /** Example */
+            example: string | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Plugin Id */
+            plugin_id: string;
+        };
+        /** NumberGeneratorsOut */
+        NumberGeneratorsOut: {
+            /** Active */
+            active: string | null;
+            /** Available */
+            available: components["schemas"]["NumberGeneratorOut"][];
+            /** Znuny Generator */
+            znuny_generator: string;
         };
         /** OAuth2TokenConfigCreate */
         OAuth2TokenConfigCreate: {
@@ -35043,6 +35087,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PluginAdminListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_number_generators_api_v1_admin_plugins_number_generators_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NumberGeneratorsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_number_generator_api_v1_admin_plugins_number_generators_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NumberGeneratorIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NumberGeneratorsOut"];
                 };
             };
             /** @description Validation Error */

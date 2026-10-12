@@ -7,6 +7,7 @@ from tiqora.channels.registry import CHANNELS
 from tiqora.jobs.registry import JOB_HANDLERS
 from tiqora.plugins.events import EVENT_SUBSCRIBERS
 from tiqora.plugins.mcp import MCP_TOOLS
+from tiqora.plugins.number_generators import TICKET_NUMBER_GENERATORS
 from tiqora.plugins.placeholders import PLACEHOLDERS
 from tiqora.plugins.routes import PLUGIN_ROUTES
 from tiqora.plugins.sync_hooks import SYNC_HOOKS
@@ -70,8 +71,12 @@ SUBMODULES: dict[str, set[str]] = {
         "SyncHandler",
     },
     "tiqora_sdk.process": {"ActionContext", "ActionParam", "ConditionRun", "TransitionActionRun"},
-    # NumberRequest and NumberBuild join in Task 8
-    "tiqora_sdk.templates": {"PlaceholderRequest", "PlaceholderResolve"},
+    "tiqora_sdk.templates": {
+        "PlaceholderRequest",
+        "PlaceholderResolve",
+        "NumberRequest",
+        "NumberBuild",
+    },
 }
 
 
@@ -108,6 +113,7 @@ def test_registry_protocol_matches_registrar() -> None:
             "transition_action",
             "condition_module",
             "placeholder",
+            "number_generator",
         }
     )
 
@@ -132,6 +138,7 @@ def test_phase1_points_are_sdk_stable() -> None:
             TRANSITION_ACTIONS,
             CONDITION_MODULES,
             PLACEHOLDERS,
+            TICKET_NUMBER_GENERATORS,
         )
     )
     assert CHANNELS.sdk_stable is False

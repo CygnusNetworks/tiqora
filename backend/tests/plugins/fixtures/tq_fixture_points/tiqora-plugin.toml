@@ -19,4 +19,5 @@ extension_points = [
   "core.process.transition_actions",
   "core.process.condition_modules",
   "core.templates.placeholders",
+  "core.tickets.number_generators",
 ]

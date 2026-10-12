@@ -12,6 +12,7 @@ import functools
 import inspect
 import re
 from collections.abc import Awaitable, Callable, Iterable
+from datetime import UTC, datetime
 from typing import Any, Final, Literal
 
 from fastapi import APIRouter
@@ -25,6 +26,14 @@ from tiqora.plugins.events import EVENT_SUBSCRIBERS, EventHandler, EventSubscrib
 from tiqora.plugins.manifest import PluginManifest
 from tiqora.plugins.mcp import CORE_MCP_TOOL_NAMES, MCP_TOOLS, McpTool
 from tiqora.plugins.naming import CAMEL_NAME_RE, TAG_NAME_RE, qualified
+from tiqora.plugins.number_generators import (
+    MAX_PATTERN_LEN,
+    TICKET_NUMBER_GENERATORS,
+    NumberBuild,
+    NumberRequest,
+    TicketNumberGenerator,
+    check_number,
+)
 from tiqora.plugins.placeholders import (
     MAX_TIMEOUT_MS,
     MIN_TIMEOUT_MS,
@@ -523,3 +532,103 @@ class PluginRegistrar:
         )
         self._stage(PLACEHOLDERS, item, check=check)
         return tag
+
+    def number_generator(
+        self,
+        name: str,
+        build: NumberBuild,
+        *,
+        label: str,
+        pattern: str,
+        uses_counter: bool = True,
+        date_based: bool = False,
+    ) -> str:
+        """Stage ``Plugin_<short_id>_<name>`` as a ticket number scheme (D7).
+
+        Returns the qualified name an admin selects. ``build`` is a plain, fast ``def`` (it runs
+        in a worker thread with a 1 s limit); ``pattern`` is a regex for the WHOLE number without
+        capturing groups, used to recognise the number in a reply's subject.
+        """
+        qname = qualified(self._manifest.short_id, name)
+        item = TicketNumberGenerator(
+            key=qname,
+            plugin_id=self.plugin_id,
+            label=label,
+            build=build,
+            pattern=pattern,
+            uses_counter=uses_counter,
+            date_based=date_based,
+            context=self._context,
+        )
+
+        def check() -> None:
+            if not isinstance(name, str) or not CAMEL_NAME_RE.fullmatch(name):
+                raise RegistrationRejected(
+                    f"Ungültiger Name „{name}“ für das Ticketnummer-Schema: "
+                    "2 bis 41 Zeichen, A-Z, a-z und 0-9, beginnt mit einem Großbuchstaben"
+                )
+            if not isinstance(label, str) or not label.strip() or len(label) > 100:
+                raise RegistrationRejected(
+                    f"Das Ticketnummer-Schema „{name}“ braucht eine Bezeichnung "
+                    "(höchstens 100 Zeichen)"
+                )
+            if not callable(build) or is_async_callable(build):
+                raise RegistrationRejected(
+                    f"Das Ticketnummer-Schema „{name}“ muss eine gewöhnliche Funktion sein "
+                    "(def, nicht async def): sie läuft in einem Hilfsthread und muss schnell sein"
+                )
+            if not isinstance(uses_counter, bool) or not isinstance(date_based, bool):
+                raise RegistrationRejected(
+                    f"uses_counter und date_based des Schemas „{name}“ müssen True oder False sein"
+                )
+            if not isinstance(pattern, str) or not pattern or len(pattern) > MAX_PATTERN_LEN:
+                raise RegistrationRejected(
+                    f"Das Muster des Ticketnummer-Schemas „{name}“ muss ein regulärer Ausdruck "
+                    f"mit 1 bis {MAX_PATTERN_LEN} Zeichen sein"
+                )
+            try:
+                compiled = re.compile(pattern)
+            except re.error as exc:
+                raise RegistrationRejected(
+                    f"Das Muster des Ticketnummer-Schemas „{name}“ ist kein gültiger "
+                    f"regulärer Ausdruck: {exc}"
+                ) from exc
+            if compiled.groups:
+                raise RegistrationRejected(
+                    f"Das Muster des Ticketnummer-Schemas „{name}“ darf keine Gruppen "
+                    "enthalten (nur (?:…) ist erlaubt)"
+                )
+            now = datetime.now(UTC)
+            try:
+                example = build(
+                    NumberRequest(
+                        counter=1 if uses_counter else None,
+                        system_id="10",
+                        now_local=now,
+                        offset=0,
+                    )
+                )
+            except Exception as exc:  # the plugin's own code
+                raise RegistrationRejected(
+                    f"Das Ticketnummer-Schema „{name}“ konnte keine Beispielnummer bilden: "
+                    f"{type(exc).__name__}"
+                ) from exc
+            if (reason := check_number(item, example)) is not None:
+                raise RegistrationRejected(
+                    f"Die Beispielnummer des Ticketnummer-Schemas „{name}“ ist ungültig "
+                    f"({_NUMBER_REASONS.get(reason, reason)}): erlaubt sind 1 bis 50 Zeichen aus "
+                    "A-Z, a-z, 0-9, Punkt, Unterstrich, Schrägstrich und Bindestrich, "
+                    "passend zum Muster"
+                )
+
+        self._stage(TICKET_NUMBER_GENERATORS, item, check=check)
+        return qname
+
+
+_NUMBER_REASONS: Final = {
+    "not_a_string": "keine Zeichenkette",
+    "empty": "leer",
+    "too_long": "länger als 50 Zeichen",
+    "bad_characters": "unzulässige Zeichen",
+    "pattern_mismatch": "passt nicht zum Muster",
+}
