@@ -374,6 +374,163 @@ YAML) der Einstellungen mit den Präfixen `ITSM`, `LinkObject::`, `Ticket::Front
 (497 Einträge in 6.5, 543 in 7.3). Tiqora liest solche Werte nur aus `sysconfig_*` (siehe
 `SysConfig.get_prefix`), nie aus `Config.pm`.
 
+## Behaviour: Znuny-Regeln als Vektoren
+
+Die Schema-Vermessung oben sagt, **was** Znuny speichert; dieser Abschnitt hält fest, **wie** sich die
+ITSM-Pakete verhalten. Jede Antwort ist als Vektor in `backend/tests/fixtures/znuny-itsm/behaviour/<profil>.json`
+festgehalten: `source` (Datei:Zeile, je Profil), `answer`, `expected` (der Wert, gegen den spätere Tasks
+testen) und `consequence`. Die Szenarien laufen auf den echten Golden-Peers
+(`tests/golden/itsm_survey.py <peer> --behaviour --out backend/tests/fixtures/znuny-itsm/behaviour/`, Skript
+`tests/golden/itsm_behaviour.pl`, frischer Peer); `peer.results` im Vektor sind deren Ergebnisse, und
+`test_itsm_behaviour_vectors.py` prüft Vektor und Peer gegeneinander. **Beide Profile verhalten sich
+in allen zehn Punkten gleich** (6.5.22 und 7.3.5 liefern identische Szenarioergebnisse); nur die
+Zeilennummern der Quellen unterscheiden sich. Die Quellenangaben nennen den Pfad im Paketbaum
+(`ITSMCore-6.5.5/...`, `tests/golden/itsm-packages/src/`) oder im Znuny-Kern (`znuny-6.5.22/Kernel/...`).
+
+**1. Prioritätsmatrix (`PriorityAllocationGet`).** Exakter Treffer: `SELECT priority_id FROM cip_allocate
+WHERE criticality = ? AND impact = ? LIMIT 1` (`ITSMCore-6.5.5/Kernel/System/ITSMCIPAllocate.pm:187-215`).
+Beide Argumente sind Pflicht (leer oder fehlend: Fehlerprotokoll, kein Ergebnis); ein unbekanntes Paar liefert
+`undef`, es gibt keine Rückfallzelle. Die Schlüssel sind die Auswahlschlüssel der Dynamischen Felder
+`ITSMCriticality`/`ITSMImpact` (`1 very low` bis `5 very high`), der Wert ist eine Prioritäts-ID (1 bis 5).
+Die 25 Zellen stehen nach der Installation in `cip_allocate` (`initial_insert.sql:157-181`); auf der
+MariaDB-Instanz des Peers ist der Vergleich groß-/kleinschreibungsabhängig (`3 NORMAL` findet nichts).
+*Folge für Tiqora:* `priority_for(criticality, impact) -> int | None` mit exakten Schlüsseln; `None` lässt die
+Priorität unverändert. Die 25 Zellen sind der erwartete Wert des vorab geprüften Vektors.
+
+**2. Vorfallstatus eines Services.** Es gibt keine Überschreibung von `Service.pm` in den Paketen; die Logik steht
+im Kern (`znuny-6.5.22/Kernel/System/Service.pm:1523-1739`, `_ServiceGetCurrentIncidentState`, aktiv sobald ITSM
+installiert ist) und in `ITSMConfigItem::CurInciStateRecalc`
+(`ITSMConfigurationManagement-6.5.4/Kernel/System/ITSMConfigItem.pm:1543-1799`, `_FindInciConfigItems`,
+`_FindWarnConfigItems`). Es zählen nur Verknüpfungstypen aus `ITSM::Core::IncidentLinkTypeDirection`
+(Vorgabe `{DependsOn: Both}`); die Richtung gilt aus Sicht des CI und wird aus Sicht des Service vertauscht
+(Source und Target, `Both` bleibt). Es zählen nur CIs mit Einsatzstatus-Typ `productive`; ein Incident-CI im Status
+"Planned" wird ignoriert. Ein CI, das nicht selbst Incident ist, wird `warning`, wenn es von einem Incident-CI
+über die gezählten Verknüpfungen erreichbar ist (beliebig weit, mit `Both` in beide Richtungen). Der Service
+übernimmt die schlechteste Funktionalität seiner CIs: `incident` vor `warning` vor `operational`. Nur wenn der
+Service dadurch `operational` bleibt, macht ihn ein nicht-operationaler gültiger Kind-Service (`Eltern::Kind`) zu
+`warning` (nie zu `incident`). Das Ergebnis liegt in der Service-Einstellung `CurInciStateTypeFromCIs` und wird
+nach Verknüpfen, Lösen und neuer CI-Version neu berechnet; `ServiceGet(IncidentState => 1)` liest sie zuerst.
+Sechzehn Prüfungen aus zehn Szenarien (u. a. Incident-CI, Warnung über Abhängigkeit in beide Richtungen und über
+zwei Schritte, nicht produktives CI, Rangfolge, `RelevantTo` zählt nicht, Kind-Service, Erholung nach Lösen der
+Verknüpfung und nach neuer Betriebsversion) sind als erwartete Werte festgehalten. *Folge:* bestätigt und
+verfeinert die Übergangsregel R12 ("schlechteste Funktionalität gewinnt, Incident eingeschlossen"); neu sind
+die Beschränkung auf produktive CIs, die Kind-Service-Regel, die transitive Warnung und dass nur Typen mit
+Weitergabe-Einstellung zählen. **Gelöst: R12 (Vorfallstatus).**
+
+**3. Kritikalität vom Service ins Ticketfeld.** Serverseitig in den Kern-Ticketmasken, weder ein Ereignismodul noch
+JavaScript der Pakete (dessen JS zeigt nur den Vorfallstatus). `AgentTicketPhone`/`AgentTicketEmail`: bei
+`ElementChanged = ServiceID` wird die Kritikalität des Formulars zur Service-Kritikalität
+(`znuny-6.5.22/Kernel/Modules/AgentTicketPhone.pm:224-225`); beim Anlegen mit Service, der eine Kritikalität
+hat, und ohne übermittelte `ITSMCriticality` wird das Feld auf den Schlüssel gesetzt, dessen Text der
+Service-Kritikalität entspricht (`AgentTicketPhone.pm:1427-1451`). `AgentTicketActionCommon` (Service-Wechsel an
+einem vorhandenen Ticket) setzt das Feld nach dem Speichern (`AgentTicketActionCommon.pm:1383`). Tickets aus
+anderen Wegen (Generic Interface, Prozesse, Mail) bekommen keine Kopie, und spätere Änderungen der Service-
+Kritikalität erreichen bestehende Tickets nicht. *Folge:* Tiqora kopiert beim Anlegen und beim Service-Wechsel im
+eigenen Pfad mit derselben Text-Schlüssel-Zuordnung und folgt späteren Service-Änderungen nicht. **Gelöst:
+offene Frage 9.**
+
+**4. Prioritätsneuberechnung bei Auswirkung/Kritikalität.** In den Formular-Controllern des Kerns, nicht in einem
+Ereignismodul (`AgentTicketPhone.pm:204-246`, `AgentTicketEmail.pm:336-377`, `AgentTicketActionCommon.pm:398-457`):
+Bei `ElementChanged` = `ServiceID`, `DynamicField_ITSMImpact` oder `DynamicField_ITSMCriticality` (oder wenn eine
+leere Auswirkung mit dem Vorgabewert des Feldes gefüllt wird) setzt Znuny `PriorityRC`; ist ein Service gewählt
+und die Auswirkung bekannt, wird die in der Maske vorgewählte Priorität
+`PriorityAllocationGet(Kritikalität aus dem Formular oder vom Service, Auswirkung)`. `ActionCommon` tut das nur,
+wenn die Maske die Priorität anbietet. Gespeichert wird, was das Formular übermittelt
+(`AgentTicketActionCommon.pm:1120-1123`); die Matrix ändert nur die Vorauswahl, es gibt keine Durchsetzung auf
+dem Server, in der API oder im Generic Interface. *Folge:* Tiqora wendet die Matrix bei Änderung von Service,
+Auswirkung oder Kritikalität in der Ticketoberfläche an (Task 16, PATCH-Pfad), nur mit Service und Auswirkung; eine
+ausdrückliche Priorität in derselben Anfrage gewinnt; keine Hintergrundberechnung.
+
+**5. Nebenwirkungen von `LinkAdd`/`LinkDelete` bei CIs.** Der Kern ruft die Backends beider Enden (`Pre` vor,
+`Post` nach der Änderung der Zeile). `LinkObject::ITSMConfigItem` tut nichts für `State = Temporary`; sonst je
+CI-Ende (`ITSMConfigurationManagement-6.5.4/Kernel/System/LinkObject/ITSMConfigItem.pm:386-437` und `511-561`):
+(1) `CurInciStateRecalc` beim Verknüpfen **und** beim Lösen, (2) CI-Ereignis `LinkAdd`/`LinkDelete`, das
+`DoHistory` in `configitem_history` schreibt (Typ `LinkAdd`/`LinkDelete`, Inhalt `<andere ID>%%<anderes Objekt>`,
+z. B. `2%%Ticket`), (3) ist das andere Ende ein Ticket, eine Ticket-Historie `CILinkAdd`/`CILinkDelete` mit dem Namen
+`%%<CI-ID>%%<Typ>`. Danach löst der Kern `LinkObjectLinkAdd`/`LinkObjectLinkDelete` aus (wirkt nur mit
+konfiguriertem Generic-Interface-Invoker). Nicht erlaubte Paare oder Typen (`Normal` und `ConnectedTo` zwischen
+Ticket und CI), ein zweiter Typ derselben Typgruppe (`Normal` und `ParentChild`) und Selbstverknüpfungen werden
+abgelehnt; dieselbe Verknüpfung noch einmal anlegen ist erfolgreich und legt keine zweite Zeile an. Davon
+getrennt berechnet das Ticket-Ereignismodul `TicketStatusLink` Vorfallstände neu, wenn sich der Ticketstatus ändert.
+*Folge:* Die CI-Verknüpfungen von Tiqora (Task 11, 16) lehnen Paare und Typen außerhalb der Angebotstabelle ab,
+berechnen Vorfallstände nach Anlegen **und** Löschen neu, schreiben die Ticket-Historie `CILinkAdd`/`CILinkDelete`
+und die CI-Historie `LinkAdd`/`LinkDelete` und überspringen alles bei temporären Verknüpfungen. Welche
+Nebenwirkungen den Tiqora-Verknüpfungen gegenüber Znuny fehlen (z. B. kein `TicketStatusLink`), steht in
+`docs/itsm.md` Kapitel 5 (F32). **Gelöst: offene Frage 1.**
+
+**6. Verknüpfung Ticket mit CI aus `AgentLinkObject`.** Der Dialog wird von einem Objekt aus geöffnet (hier dem
+Ticket) und verknüpft einen gewählten Partner (hier ein CI) im Zustand `Valid` (`Temporary` nur beim Anlegen
+eines neuen Tickets). Zur Auswahl stehen `<Typ>::Source` und, nur für gerichtete Typen, `<Typ>::Target`
+(`znuny-6.5.22/Kernel/Modules/AgentLinkObject.pm:703-728`; Vorgabe `Normal::Source`). Bei `::Source` wird das
+**gewählte** Objekt zur Quelle (`link_relation.source`) und das Dialogobjekt zum Ziel, bei `::Target` ist das
+Dialogobjekt die Quelle (`AgentLinkObject.pm:388-475`). Für Ticket und CI bietet Znuny genau `AlternativeTo`,
+`DependsOn` und `RelevantTo` an (`PossibleLink` 3220 bis 3222, `ITSMCore.xml:192-225`; die Reihenfolge des
+Objektpaars ist gleichgültig); gerichtet ist nur `DependsOn` (`SourceName ne TargetName`, `LinkObject.pm`
+`TypeGet`). Berechtigungen in Znuny: `ro` auf dem Dialogobjekt und `ro` auf dem Objekt, das zum Ziel der
+Verknüpfung wird (`AgentLinkObject.pm:146-158`, `489-499`), nie `rw`; Löschen braucht `ro` auf dem anderen
+Objekt. Ticket: `TicketPermission` `ro`. CI: `ITSMConfigItem::Permission` (Typ `ro` aus
+`ITSMConfigItem::Frontend::AgentITSMConfigItemZoom###Permission`), erteilt vom Modul `ItemClassGroupCheck`: Der
+Agent braucht `ro` (`rw` zählt als `ro`) auf der Gruppe aus der Klassenvorgabe `Permission` im Allgemeinen Katalog
+(`itsm-configitem`, ID 6, bei allen fünf Klassen); ohne diese Gruppe ist ein CI unsichtbar und nicht
+verknüpfbar. Die Gruppe `itsm-configitem` in `Frontend::Module` schützt dagegen nur Anlegen, Bearbeiten und
+Löschen. *Entscheidung für beide Modi (R12, cmdb übernimmt sie in Task 30):* Verknüpfen und Lösen zwischen Ticket
+und CI verlangen `rw` auf dem Ticket und `ro` auf dem CI, geprüft in `link_ticket`. Das ist **bewusst strenger
+als Znuny** (`ro` auf beiden Seiten): Tiqora verlangt schon für Ticket-Ticket-Verknüpfungen `rw` auf beiden, und
+eine Verknüpfung schreibt in die Ticket-Historie; die Übergangsregel bleibt damit bestehen. Die Angebotstabelle
+in `link_type_defaults.py` ist nach der Vermessung korrigiert (Ticket und CI: drei Typen, CI und CI: alle fünf,
+CI und Service: drei Typen, Weitergabe von `DependsOn`: `both` statt `source`). **Gelöst: offene Frage 4.**
+
+**7. Definitionen.** YAML in **beiden** Profilen (`ITSMConfigurationManagement-6.5.4/Kernel/System/ITSMConfigItem/Definition.pm:148-210`;
+ein gespeichertes Format ohne Präfix `---` ist das alte Perl-Format und wird als leere Definition `--- []`
+gelesen). `_DefinitionPrepare` (`Definition.pm:548-598`) wirkt je Attribut rekursiv: `CountMin` ist 1, wenn es
+fehlt (0 bleibt 0); `CountMax` ist 1, wenn es fehlt oder 0 ist; `CountMin` wird auf `CountMax` gekürzt;
+`CountDefault` ist 1, wenn es fehlt, und wird in `[CountMin, CountMax]` begrenzt. `Sub` ist die Liste der
+Unterattribute (je Elterninstanz wiederholt, Pfad `Eltern::Kind` in `DefinitionAttributeInfo`); ist `Sub` keine
+Liste, wird es entfernt (eine leere Liste bleibt). `DefinitionCheck` (`Definition.pm:343-450`) verlangt eine Liste
+von Hashes mit `Key` ohne Leerzeichen und ohne Nicht-ASCII-Zeichen, auch in `Sub`. Eingabetypen sind die 20 Module
+unter `XML/Type` (ohne die Basisklasse `BaseSelectable`): `CI`, `CIAttachment`, `CISimple`, `Customer`,
+`CustomerCompany`, `Date`, `DateTime`, `Dummy`, `GeneralCatalog`, `Integer`, `Priority`, `Queue`, `SLA`, `Service`,
+`State`, `Text`, `TextArea`, `TextLink`, `Type`, `User`; in 6.5.4 und 7.3.5 identisch. Die fünf ausgelieferten
+Klassen benutzen nur `Text`, `TextArea`, `GeneralCatalog`, `CustomerCompany`, `Customer`, `Date` und `Integer`.
+Elf Beispiele für `_DefinitionPrepare` und sieben für `DefinitionCheck` stehen mit den Ergebnissen des Peers im Vektor.
+*Folge:* Adapter (Mode A) und Importer teilen eine Aufbereitungsfunktion mit diesen Regeln und lesen die 20 Typen.
+
+**8. Ticket-Typen, Status und Dynamische Felder je Maske.** Auf 6.5 und 7.3 gleich: Die Pakete stellen die
+Ticket-Typen `Incident`, `Incident::Major` (Name des Major-Incident-Typs, **kein** Unterschied zwischen den Linien),
+`ServiceRequest`, `Problem` und `RfC` gültig bereit (der Peer hat dazu `Unclassified` aus dem Kern) und legen den Ticket-Status
+"closed with workaround" an (Statustyp `closed`, `type_id` 3; 7.3 speichert zusätzlich eine Farbe). Acht
+Dynamische Felder (Objekt `Ticket`, intern): `ITSMCriticality` und `ITSMImpact` (Dropdown `1 very low` bis
+`5 very high`; Auswirkung standardmäßig `3 normal`, Kritikalität leer), `ITSMReviewRequired` (Dropdown No/Yes),
+`ITSMDecisionResult` (Approved, Pending (Vorgabe), Postponed, Pre-approved, Rejected), `ITSMRepairStartTime`,
+`ITSMRecoveryStartTime`, `ITSMDecisionDate` (DateTime, ohne Vorgabe) und `ITSMDueDate` (DateTime, Vorgabe 3 Tage =
+259200 s). Masken: `AgentTicketAddtlITSMField` zeigt `ITSMRepairStartTime`, `ITSMRecoveryStartTime`, `ITSMDueDate`
+(`ITSMIncidentProblemManagement-6.5.2/Kernel/Config/Files/XML/ITSMTicket.xml:315-330`);
+`AgentTicketDecision` zeigt `ITSMDecisionResult` und `ITSMDecisionDate` (`ITSMTicket.xml:546-560`); Phone und Email
+zeigen `ITSMImpact` und `ITSMDueDate`, Priority zeigt `ITSMImpact`, Close und Compose `ITSMReviewRequired`, Zoom
+alle acht, die Suche alle außer `ITSMCriticality`, Kundenansichten Kritikalität und Auswirkung
+(`TicketITSMTicket.xml:10-24` ff.). *Folge:* Die Einrichtung (Task 15) erzeugt dieselben Felder mit denselben
+Werten; die Typ-Namen gelten ohne Versionsabbildung.
+
+**9. `LinkDelete`.** Das Paar wird in beiden Reihenfolgen und mit dem Typ gesucht; es gibt **keinen**
+Zustandsfilter, ein `Valid`- und ein `Temporary`-Link werden gleich gelöscht; ein fehlender Link ist kein Fehler
+(Rückgabe 1) (`znuny-6.5.22/Kernel/System/LinkObject.pm:683-894`). Die `Post`-Aufrufe überspringen `Temporary`.
+Ticket mit Ticket: Jedes Ticket bekommt die Historie `TicketLinkDelete` mit dem Namen
+`%%<Nummer des anderen Tickets>%%<ID des anderen Tickets>%%<eigene ID>` (gleiche Form wie `TicketLinkAdd`,
+`LinkObject/Ticket.pm:545-603`); Ticket mit CI siehe Punkt 5. Cache: Typ `LinkObject`, Schlüssel
+`Cache::LinkListRaw::Direction<Source|Target>::ObjectID<id>::StateID<id>::Key<key>` für beide Objekte, beide
+Richtungen und **alle** Zustände (das Anlegen löscht nur den Zustand der neuen Verknüpfung). Danach folgt das
+Ereignis `LinkObjectLinkDelete`. *Folge:* Die Lösch-Route (Task 16, F11) löscht das Paar unabhängig vom Zustand,
+antwortet bei fehlendem Link mit Erfolg, schreibt die Historie auf beiden Tickets (bei CIs `CILinkDelete`) außer
+bei temporären Verknüpfungen und leert den Znuny-Cache-Typ `LinkObject` über `cache_invalidation`.
+
+**10. Aktionsnamen für Deep Links.** Auf 6.5 und 7.3 gleich: Zoom `index.pl?Action=AgentITSMConfigItemZoom;ConfigItemID=<id>`
+(optional `VersionID`), Bearbeiten `Action=AgentITSMConfigItemEdit;ConfigItemID=<id>`, Neu mit Klasse
+`Action=AgentITSMConfigItemEdit;ClassID=<Klassen-ID>` (die Klassenauswahl ist `Action=AgentITSMConfigItemAdd`),
+Historie `Action=AgentITSMConfigItemHistory;ConfigItemID=<id>`, Druck `Action=AgentITSMConfigItemPrint;ConfigItemID=<id>`,
+Service `Action=AgentITSMServiceZoom;ServiceID=<id>`. Anlegen, Bearbeiten und Löschen verlangen die Gruppe
+`itsm-configitem`, Zoom, Suche und Historie nicht (dort gilt die Klassengruppe je CI). *Folge:*
+`ItsmSettings.znuny_agent_url` (leer oder `http(s)`) plus `index.pl?` plus das Muster ergibt den Deep Link in Mode A.
+
 ## Vermessung wiederholen
 
 Siehe `backend/tests/fixtures/znuny-itsm/README.md`: `itsm_survey.py <peer> --out <ordner> --verify`

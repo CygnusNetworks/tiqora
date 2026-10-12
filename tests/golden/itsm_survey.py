@@ -20,6 +20,14 @@ generates, never by hand:
 * ``packages.json``: package names, versions and the installation order;
 * ``tables.md``: the column/index listing of every package table (input for docs/itsm-import.md).
 
+``--behaviour`` (Task 3) does not generate fixtures: it copies ``itsm_behaviour.pl`` into a *fresh*
+peer, runs the scenarios (CIP matrix, service incident state, link side effects, permissions) and
+merges the result into ``<out>/<profile>.json`` under the key ``"peer"``. The pinned answers
+(``"questions"``) stay hand-maintained; ``test_itsm_behaviour_vectors.py`` compares both.
+
+    python tests/golden/itsm_survey.py znuny-6.5-itsm --behaviour \\
+        --out backend/tests/fixtures/znuny-itsm/behaviour/
+
 ``--verify`` loads the generated DDL once into a throw-away MariaDB and PostgreSQL container, on
 top of the peer's own core schema, and compares the resulting table list with the peer.
 """
@@ -31,6 +39,7 @@ import datetime as dt
 import decimal
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -51,6 +60,10 @@ from peer_env import resolve as resolve_peer  # noqa: E402
 DIALECTS = ("mysql", "postgresql")
 NORMALISED_TIME = "2000-01-01 00:00:00"
 REMOTE_DIR = "/tmp/itsm_survey"  # noqa: S108 - inside the throw-away peer container
+BEHAVIOUR_SCRIPT = GOLDEN_DIR / "itsm_behaviour.pl"
+BEHAVIOUR_REMOTE = "/tmp/itsm_behaviour.pl"  # noqa: S108 - inside the throw-away peer container
+# peer id -> fixture profile (backend/tests/fixtures/znuny-itsm/<profile>/)
+PEER_PROFILES = {"znuny-6.5-itsm": "itsm-6", "znuny-7.3-itsm": "itsm-7"}
 
 # Core tables the packages add rows to (create_time >= first package install).
 CORE_ROW_TABLES = (
@@ -475,6 +488,39 @@ def verify(out: Path, peer_tables: list[str]) -> None:
 # --- main --------------------------------------------------------------------------------------
 
 
+# --- behaviour vectors (Task 3) ------------------------------------------------------------------
+
+
+def capture_behaviour(peer: str, env: dict[str, str], out: Path) -> Path:
+    """Run ``itsm_behaviour.pl`` in the (fresh) peer and merge the result into ``<profile>.json``."""
+    profile = PEER_PROFILES.get(peer)
+    if profile is None:
+        raise SystemExit(f"no behaviour profile for peer {peer}")
+    _helpers.znuny_copy_in(BEHAVIOUR_SCRIPT, BEHAVIOUR_REMOTE)
+    raw = _helpers.znuny_perl_eval(f"do '{BEHAVIOUR_REMOTE}' or die $@ || $!;")
+    match = re.search(r"GOLDEN_ITSM_BEHAVIOUR_BEGIN\n(.*?)\nGOLDEN_ITSM_BEHAVIOUR_END", raw, re.S)
+    if not match:
+        raise SystemExit(f"behaviour script produced no result block: {raw!r}")
+    results = json.loads(match.group(1))
+    if results.get("already_run"):
+        raise SystemExit("the behaviour scenarios already ran on this peer: use a fresh one")
+    out.mkdir(parents=True, exist_ok=True)
+    target = out / f"{profile}.json"
+    document = json.loads(target.read_text(encoding="utf-8")) if target.exists() else {}
+    document["profile"] = profile
+    document["peer"] = {
+        "peer": peer,
+        "znuny_version": env.get("GOLDEN_VERSION", ""),
+        "captured_with": "tests/golden/itsm_survey.py --behaviour (tests/golden/itsm_behaviour.pl)",
+        "results": results,
+    }
+    target.write_text(
+        json.dumps(document, indent=1, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    log(f"behaviour results -> {target}")
+    return target
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
@@ -482,11 +528,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("peer")
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--verify", action="store_true", help="load the DDL into throw-away DBs")
+    parser.add_argument(
+        "--behaviour",
+        action="store_true",
+        help="run itsm_behaviour.pl on a fresh peer and merge the results into <out>/<profile>.json",
+    )
     args = parser.parse_args(argv)
 
     env = peer_env(args.peer)
     if env.get("GOLDEN_ITSM") != "1":
         raise SystemExit(f"{args.peer} is not an ITSM peer")
+    if args.behaviour:
+        capture_behaviour(args.peer, env, args.out)
+        return 0
     args.out.mkdir(parents=True, exist_ok=True)
     conn = db_connect(env)
     cur = conn.cursor()

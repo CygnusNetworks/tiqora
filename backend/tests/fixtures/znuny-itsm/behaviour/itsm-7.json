@@ -1,0 +1,1471 @@
+{
+ "packages": {
+  "cmdb": "ITSMConfigurationManagement-7.3.5",
+  "core": "ITSMCore-7.3.3",
+  "ipm": "ITSMIncidentProblemManagement-7.3.2"
+ },
+ "peer": {
+  "captured_with": "tests/golden/itsm_survey.py --behaviour (tests/golden/itsm_behaviour.pl)",
+  "peer": "znuny-7.3-itsm",
+  "results": {
+   "cip": {
+    "cells": [
+     {
+      "criticality": "1 very low",
+      "impact": "1 very low",
+      "priority_id": 1
+     },
+     {
+      "criticality": "2 low",
+      "impact": "1 very low",
+      "priority_id": 1
+     },
+     {
+      "criticality": "3 normal",
+      "impact": "1 very low",
+      "priority_id": 2
+     },
+     {
+      "criticality": "4 high",
+      "impact": "1 very low",
+      "priority_id": 2
+     },
+     {
+      "criticality": "5 very high",
+      "impact": "1 very low",
+      "priority_id": 3
+     },
+     {
+      "criticality": "1 very low",
+      "impact": "2 low",
+      "priority_id": 1
+     },
+     {
+      "criticality": "2 low",
+      "impact": "2 low",
+      "priority_id": 2
+     },
+     {
+      "criticality": "3 normal",
+      "impact": "2 low",
+      "priority_id": 2
+     },
+     {
+      "criticality": "4 high",
+      "impact": "2 low",
+      "priority_id": 3
+     },
+     {
+      "criticality": "5 very high",
+      "impact": "2 low",
+      "priority_id": 4
+     },
+     {
+      "criticality": "1 very low",
+      "impact": "3 normal",
+      "priority_id": 2
+     },
+     {
+      "criticality": "2 low",
+      "impact": "3 normal",
+      "priority_id": 2
+     },
+     {
+      "criticality": "3 normal",
+      "impact": "3 normal",
+      "priority_id": 3
+     },
+     {
+      "criticality": "4 high",
+      "impact": "3 normal",
+      "priority_id": 4
+     },
+     {
+      "criticality": "5 very high",
+      "impact": "3 normal",
+      "priority_id": 4
+     },
+     {
+      "criticality": "1 very low",
+      "impact": "4 high",
+      "priority_id": 2
+     },
+     {
+      "criticality": "2 low",
+      "impact": "4 high",
+      "priority_id": 3
+     },
+     {
+      "criticality": "3 normal",
+      "impact": "4 high",
+      "priority_id": 4
+     },
+     {
+      "criticality": "4 high",
+      "impact": "4 high",
+      "priority_id": 4
+     },
+     {
+      "criticality": "5 very high",
+      "impact": "4 high",
+      "priority_id": 5
+     },
+     {
+      "criticality": "1 very low",
+      "impact": "5 very high",
+      "priority_id": 3
+     },
+     {
+      "criticality": "2 low",
+      "impact": "5 very high",
+      "priority_id": 4
+     },
+     {
+      "criticality": "3 normal",
+      "impact": "5 very high",
+      "priority_id": 4
+     },
+     {
+      "criticality": "4 high",
+      "impact": "5 very high",
+      "priority_id": 5
+     },
+     {
+      "criticality": "5 very high",
+      "impact": "5 very high",
+      "priority_id": 5
+     }
+    ],
+    "criticality_values": {
+     "1 very low": "1 very low",
+     "2 low": "2 low",
+     "3 normal": "3 normal",
+     "4 high": "4 high",
+     "5 very high": "5 very high"
+    },
+    "empty_impact": null,
+    "impact_values": {
+     "1 very low": "1 very low",
+     "2 low": "2 low",
+     "3 normal": "3 normal",
+     "4 high": "4 high",
+     "5 very high": "5 very high"
+    },
+    "missing_argument": null,
+    "other_case_returns": null,
+    "unknown_value": null
+   },
+   "closed_with_workaround": {
+    "id": 10,
+    "type": "closed",
+    "type_id": 3,
+    "valid_id": 1
+   },
+   "definition_rules": {
+    "check": {
+     "key_non_ascii": 0,
+     "key_with_space": 0,
+     "legacy_perl": 0,
+     "not_a_list": 0,
+     "sub_key_space": 0,
+     "sub_valid": 1,
+     "valid_yaml": 1
+    },
+    "input_type_modules": [
+     "BaseSelectable",
+     "CI",
+     "CIAttachment",
+     "CISimple",
+     "Customer",
+     "CustomerCompany",
+     "Date",
+     "DateTime",
+     "Dummy",
+     "GeneralCatalog",
+     "Integer",
+     "Priority",
+     "Queue",
+     "SLA",
+     "Service",
+     "State",
+     "Text",
+     "TextArea",
+     "TextLink",
+     "Type",
+     "User"
+    ],
+    "prepare": {
+     "default_above_max": {
+      "CountDefault": 2,
+      "CountMax": 2,
+      "CountMin": 1,
+      "has_sub": 0
+     },
+     "default_below_min": {
+      "CountDefault": 1,
+      "CountMax": 3,
+      "CountMin": 1,
+      "has_sub": 0
+     },
+     "default_zero_ok": {
+      "CountDefault": 0,
+      "CountMax": 10,
+      "CountMin": 0,
+      "has_sub": 0
+     },
+     "empty": {
+      "CountDefault": 1,
+      "CountMax": 1,
+      "CountMin": 1,
+      "has_sub": 0
+     },
+     "max0": {
+      "CountDefault": 1,
+      "CountMax": 1,
+      "CountMin": 1,
+      "has_sub": 0
+     },
+     "min0_max10": {
+      "CountDefault": 1,
+      "CountMax": 10,
+      "CountMin": 0,
+      "has_sub": 0
+     },
+     "min2_only": {
+      "CountDefault": 1,
+      "CountMax": 1,
+      "CountMin": 1,
+      "has_sub": 0
+     },
+     "min_above_max": {
+      "CountDefault": 2,
+      "CountMax": 2,
+      "CountMin": 2,
+      "has_sub": 0
+     },
+     "sub_child_defaults": {
+      "CountDefault": 1,
+      "CountMax": 1,
+      "CountMin": 1,
+      "has_sub": 1,
+      "sub_child": {
+       "CountDefault": 1,
+       "CountMax": 1,
+       "CountMin": 1
+      }
+     },
+     "sub_empty_array": {
+      "CountDefault": 1,
+      "CountMax": 1,
+      "CountMin": 1,
+      "has_sub": 1
+     },
+     "sub_not_array": {
+      "CountDefault": 1,
+      "CountMax": 1,
+      "CountMin": 1,
+      "has_sub": 0
+     }
+    }
+   },
+   "incident_link_type_direction": {
+    "DependsOn": "Both"
+   },
+   "link_side_effects": {
+    "delete_missing_link_returns": 1,
+    "temporary_add": {
+     "ok": 1,
+     "ticket_history_rows_added": 0
+    },
+    "temporary_delete": {
+     "ok": 1,
+     "relations": 0,
+     "ticket_history_rows_added": 0
+    },
+    "ticket_numbers": {
+     "t1": "2026101210000016",
+     "t2": "2026101210000025"
+    },
+    "ticket_ticket_add": {
+     "ok": 1,
+     "t1_history": [
+      [
+       "CILinkAdd",
+       "%%15%%RelevantTo"
+      ],
+      [
+       "CILinkDelete",
+       "%%15%%RelevantTo"
+      ],
+      [
+       "TicketLinkAdd",
+       "%%2026101210000025%%3%%2"
+      ]
+     ],
+     "t2_history": [
+      [
+       "TicketLinkAdd",
+       "%%2026101210000016%%2%%3"
+      ]
+     ]
+    },
+    "ticket_ticket_delete": {
+     "ok": 1,
+     "t1_history": [
+      [
+       "CILinkAdd",
+       "%%15%%RelevantTo"
+      ],
+      [
+       "CILinkDelete",
+       "%%15%%RelevantTo"
+      ],
+      [
+       "TicketLinkAdd",
+       "%%2026101210000025%%3%%2"
+      ],
+      [
+       "TicketLinkDelete",
+       "%%2026101210000025%%3%%2"
+      ]
+     ],
+     "t2_history": [
+      [
+       "TicketLinkAdd",
+       "%%2026101210000016%%2%%3"
+      ],
+      [
+       "TicketLinkDelete",
+       "%%2026101210000016%%2%%3"
+      ]
+     ]
+    },
+    "ticket_ticket_type_group_conflict": {
+     "ok": 0
+    },
+    "ticket_to_ci_add": {
+     "ci_history": [
+      [
+       "LinkAdd",
+       "2%%Ticket"
+      ]
+     ],
+     "link_row": [
+      [
+       "Ticket",
+       "2",
+       "ITSMConfigItem",
+       "15",
+       "RelevantTo",
+       "Valid"
+      ]
+     ],
+     "ok": 1,
+     "ticket_history": [
+      [
+       "CILinkAdd",
+       "%%15%%RelevantTo"
+      ]
+     ]
+    },
+    "ticket_to_ci_add_again": {
+     "ok": 1,
+     "relations": 1
+    },
+    "ticket_to_ci_delete": {
+     "ci_history": [
+      [
+       "LinkAdd",
+       "2%%Ticket"
+      ],
+      [
+       "LinkDelete",
+       "2%%Ticket"
+      ]
+     ],
+     "ok": 1,
+     "relations": 0,
+     "ticket_history": [
+      [
+       "CILinkAdd",
+       "%%15%%RelevantTo"
+      ],
+      [
+       "CILinkDelete",
+       "%%15%%RelevantTo"
+      ]
+     ]
+    },
+    "ticket_to_ci_normal_type": {
+     "ok": 0
+    },
+    "ticket_to_ci_not_possible_type": {
+     "ok": 0
+    }
+   },
+   "link_types": {
+    "possible": {
+     "ITSMConfigItem/ITSMConfigItem": [
+      "AlternativeTo",
+      "ConnectedTo",
+      "DependsOn",
+      "Includes",
+      "RelevantTo"
+     ],
+     "ITSMConfigItem/Service": [
+      "AlternativeTo",
+      "DependsOn",
+      "RelevantTo"
+     ],
+     "Service/Ticket": [],
+     "Ticket/ITSMConfigItem": [
+      "AlternativeTo",
+      "DependsOn",
+      "RelevantTo"
+     ],
+     "Ticket/Ticket": [
+      "Normal",
+      "ParentChild"
+     ]
+    },
+    "possible_reverse_order_ci_ticket": [
+     "AlternativeTo",
+     "DependsOn",
+     "RelevantTo"
+    ],
+    "types": {
+     "AlternativeTo": {
+      "pointed": 0,
+      "source_name": "Alternative to",
+      "target_name": "Alternative to"
+     },
+     "ConnectedTo": {
+      "pointed": 0,
+      "source_name": "Connected to",
+      "target_name": "Connected to"
+     },
+     "DependsOn": {
+      "pointed": 1,
+      "source_name": "Depends on",
+      "target_name": "Required for"
+     },
+     "Includes": {
+      "pointed": 1,
+      "source_name": "Includes",
+      "target_name": "Part of"
+     },
+     "Normal": {
+      "pointed": 0,
+      "source_name": "Normal",
+      "target_name": "Normal"
+     },
+     "ParentChild": {
+      "pointed": 1,
+      "source_name": "Parent",
+      "target_name": "Child"
+     },
+     "RelevantTo": {
+      "pointed": 0,
+      "source_name": "Relevant to",
+      "target_name": "Relevant to"
+     }
+    }
+   },
+   "permissions": {
+    "class_permission_group_id": 6,
+    "itsm_configitem_group_id": 6,
+    "no_groups": {
+     "ci": 0,
+     "ticket": 0
+    },
+    "users_ro": {
+     "ci": 0,
+     "ticket": 1
+    },
+    "users_ro_cigroup_ro_only": {
+     "ci": 1,
+     "ticket": 1
+    },
+    "users_ro_cigroup_rw_only": {
+     "ci": 1,
+     "ticket": 1
+    },
+    "users_rw_only_cigroup_ro": {
+     "ci": 1,
+     "ticket": 1
+    },
+    "zoom_permission_type": "ro"
+   },
+   "service_incident": {
+    "s1_incident_ci": {
+     "ci": "incident",
+     "preference": "incident",
+     "service": {
+      "state": "Incident",
+      "type": "incident"
+     }
+    },
+    "s2_warning_via_dependency": {
+     "ci_incident": "incident",
+     "ci_neighbour": "warning",
+     "service": {
+      "state": "Warning",
+      "type": "warning"
+     }
+    },
+    "s2b_warning_opposite_direction": {
+     "ci_neighbour": "warning",
+     "service": {
+      "state": "Warning",
+      "type": "warning"
+     }
+    },
+    "s2c_transitive_two_hops": {
+     "hop1": "warning",
+     "hop2": "warning"
+    },
+    "s3_non_productive_ignored": {
+     "ci": "incident",
+     "ci_deployment_type": "preproductive",
+     "service": {
+      "state": "Operational",
+      "type": "operational"
+     }
+    },
+    "s4_incident_beats_warning": {
+     "service_only_warning_ci": {
+      "state": "Warning",
+      "type": "warning"
+     },
+     "service_with_incident_ci": {
+      "state": "Incident",
+      "type": "incident"
+     }
+    },
+    "s5_relevant_to_not_counted": {
+     "ci": "incident",
+     "service": {
+      "state": "Operational",
+      "type": "operational"
+     }
+    },
+    "s6_child_service_makes_parent_warning": {
+     "child": {
+      "state": "Incident",
+      "type": "incident"
+     },
+     "parent": {
+      "state": "Warning",
+      "type": "warning"
+     }
+    },
+    "s7_unlink_recovers": {
+     "ci_neighbour": "operational",
+     "service": {
+      "state": "Operational",
+      "type": "operational"
+     }
+    },
+    "s8_new_operational_version_recovers": {
+     "ci": "operational",
+     "preference": "operational",
+     "service": {
+      "state": "Operational",
+      "type": "operational"
+     }
+    }
+   },
+   "ticket_types": [
+    "Incident",
+    "Incident::Major",
+    "Problem",
+    "RfC",
+    "ServiceRequest",
+    "Unclassified"
+   ]
+  },
+  "znuny_version": "7.3.5"
+ },
+ "profile": "itsm-7",
+ "questions": {
+  "1": {
+   "answer": "PriorityAllocationGet(Criticality, Impact) is an exact string lookup: SELECT priority_id FROM cip_allocate WHERE criticality = ? AND impact = ? LIMIT 1. Both arguments are required (missing or empty: error log, undef). A pair without a row returns undef: there is no fallback to a neighbouring cell. The keys are the dropdown keys of the dynamic fields ITSMCriticality / ITSMImpact ('1 very low' .. '5 very high', the general catalog classes ITSM::Core::Criticality/Impact are empty), the value is a core priority id (1..5). The matrix has 5 x 5 = 25 cells, all present after installation (ids 1..25); AdminITSMCIPAllocate rewrites it completely (DELETE + INSERT). On the MariaDB peer the comparison is case sensitive ('3 NORMAL' finds nothing).",
+   "consequence": "Tiqora keeps the 25 cells as data (Mode A reads cip_allocate, Mode B its own table) and exposes priority_for(criticality, impact) -> int | None with exact, case sensitive keys; None means: leave the priority as it is. The default cells are the vector's expected value.",
+   "expected": {
+    "case_sensitive_on_mariadb": true,
+    "cells": [
+     {
+      "criticality": "1 very low",
+      "impact": "1 very low",
+      "priority_id": 1
+     },
+     {
+      "criticality": "2 low",
+      "impact": "1 very low",
+      "priority_id": 1
+     },
+     {
+      "criticality": "3 normal",
+      "impact": "1 very low",
+      "priority_id": 2
+     },
+     {
+      "criticality": "4 high",
+      "impact": "1 very low",
+      "priority_id": 2
+     },
+     {
+      "criticality": "5 very high",
+      "impact": "1 very low",
+      "priority_id": 3
+     },
+     {
+      "criticality": "1 very low",
+      "impact": "2 low",
+      "priority_id": 1
+     },
+     {
+      "criticality": "2 low",
+      "impact": "2 low",
+      "priority_id": 2
+     },
+     {
+      "criticality": "3 normal",
+      "impact": "2 low",
+      "priority_id": 2
+     },
+     {
+      "criticality": "4 high",
+      "impact": "2 low",
+      "priority_id": 3
+     },
+     {
+      "criticality": "5 very high",
+      "impact": "2 low",
+      "priority_id": 4
+     },
+     {
+      "criticality": "1 very low",
+      "impact": "3 normal",
+      "priority_id": 2
+     },
+     {
+      "criticality": "2 low",
+      "impact": "3 normal",
+      "priority_id": 2
+     },
+     {
+      "criticality": "3 normal",
+      "impact": "3 normal",
+      "priority_id": 3
+     },
+     {
+      "criticality": "4 high",
+      "impact": "3 normal",
+      "priority_id": 4
+     },
+     {
+      "criticality": "5 very high",
+      "impact": "3 normal",
+      "priority_id": 4
+     },
+     {
+      "criticality": "1 very low",
+      "impact": "4 high",
+      "priority_id": 2
+     },
+     {
+      "criticality": "2 low",
+      "impact": "4 high",
+      "priority_id": 3
+     },
+     {
+      "criticality": "3 normal",
+      "impact": "4 high",
+      "priority_id": 4
+     },
+     {
+      "criticality": "4 high",
+      "impact": "4 high",
+      "priority_id": 4
+     },
+     {
+      "criticality": "5 very high",
+      "impact": "4 high",
+      "priority_id": 5
+     },
+     {
+      "criticality": "1 very low",
+      "impact": "5 very high",
+      "priority_id": 3
+     },
+     {
+      "criticality": "2 low",
+      "impact": "5 very high",
+      "priority_id": 4
+     },
+     {
+      "criticality": "3 normal",
+      "impact": "5 very high",
+      "priority_id": 4
+     },
+     {
+      "criticality": "4 high",
+      "impact": "5 very high",
+      "priority_id": 5
+     },
+     {
+      "criticality": "5 very high",
+      "impact": "5 very high",
+      "priority_id": 5
+     }
+    ],
+    "empty_argument": null,
+    "missing_argument": null,
+    "unknown_pair": null
+   },
+   "resolves": [],
+   "source": [
+    "ITSMCore-7.3.3/Kernel/System/ITSMCIPAllocate.pm:187-215",
+    "backend/tests/fixtures/znuny-itsm/itsm-7/initial_insert.sql:157-181",
+    "ITSMCore-7.3.3/Kernel/Modules/AdminITSMCIPAllocate.pm:37-61"
+   ],
+   "title": "ITSMCIPAllocate::PriorityAllocationGet lookup semantics and the 25 default cells"
+  },
+  "10": {
+   "answer": "The action names are the same on 6.5 and 7.3: zoom 'index.pl?Action=AgentITSMConfigItemZoom;ConfigItemID=<id>' (optional VersionID), edit 'Action=AgentITSMConfigItemEdit;ConfigItemID=<id>', new CI 'Action=AgentITSMConfigItemEdit;ClassID=<class id>' (the class picker is 'Action=AgentITSMConfigItemAdd'), history 'Action=AgentITSMConfigItemHistory;ConfigItemID=<id>', print 'Action=AgentITSMConfigItemPrint;ConfigItemID=<id>', service zoom 'Action=AgentITSMServiceZoom;ServiceID=<id>'. Add, Edit and Delete are restricted to the group itsm-configitem (rw); zoom, search and history need no group in Frontend::Module (the class group applies per CI).",
+   "consequence": "ItsmSettings.znuny_agent_url (empty or http(s)) + 'index.pl?' + the pattern above builds the deep link in Mode A; the same pattern serves both Znuny lines.",
+   "expected": {
+    "add_with_class": "Action=AgentITSMConfigItemEdit;ClassID={class_id}",
+    "edit": "Action=AgentITSMConfigItemEdit;ConfigItemID={id}",
+    "history": "Action=AgentITSMConfigItemHistory;ConfigItemID={id}",
+    "print": "Action=AgentITSMConfigItemPrint;ConfigItemID={id}",
+    "same_on_both_versions": true,
+    "service_zoom": "Action=AgentITSMServiceZoom;ServiceID={id}",
+    "zoom": "Action=AgentITSMConfigItemZoom;ConfigItemID={id}"
+   },
+   "resolves": [],
+   "source": [
+    "ITSMConfigurationManagement-7.3.5/Kernel/Config/Files/XML/ITSMConfigItem.xml:157-178",
+    "ITSMConfigurationManagement-7.3.5/Kernel/Config/Files/XML/ITSMConfigItem.xml:207-228",
+    "ITSMConfigurationManagement-7.3.5/Kernel/Modules/AgentITSMConfigItemZoom.pm:38",
+    "ITSMConfigurationManagement-7.3.5/Kernel/Modules/AgentITSMConfigItemEdit.pm:38",
+    "ITSMConfigurationManagement-7.3.5/Kernel/Output/HTML/Templates/Standard/AgentITSMConfigItemAdd.tt:54",
+    "ITSMCore-7.3.3/Kernel/Modules/AgentITSMServiceZoom.pm:33"
+   ],
+   "title": "Znuny agent action names for CI zoom/edit (deep links)"
+  },
+  "2": {
+   "answer": "There is no ITSMCore Service.pm override in the packages: the logic is core Service.pm (_ServiceGetCurrentIncidentState, active when ITSM is installed) plus ITSMConfigItem::CurInciStateRecalc. (1) Only link types listed in ITSM::Core::IncidentLinkTypeDirection count (default {DependsOn: Both}); the value Source/Target/Both is the direction followed from the CI's point of view and is reversed (Source<->Target, Both unchanged) when read from the service. (2) Only CIs whose deployment state type is 'productive' count; an incident CI in Planned/Test is ignored. (3) Per CI the incident state type (operational/warning/incident) is its own incident state; a CI that is not itself incident becomes 'warning' when it is reachable from an incident CI along the counted link types (transitively, any distance, in the configured direction; with Both in either direction). (4) The service takes the worst functionality of its counted CIs: incident > warning > operational. (5) Only if the service is operational by its CIs, a valid direct child service (name 'Parent::Child') that is not operational makes it 'warning' (children never make a parent 'incident'). (6) The result of (1)-(4) is cached in the service preference CurInciStateTypeFromCIs and recomputed by CurInciStateRecalc after link add/delete and after a new CI version; ServiceGet(IncidentState => 1) reads the preference first. A CI in warning returns to its own state when the incident CI recovers or the link is deleted.",
+   "consequence": "Confirms and refines cross ruling R12 (worst functionality wins, incident included): add (a) only productive CIs count, (b) child services only raise the parent to warning and only while it is operational, (c) a CI turns warning transitively along the counted link types, (d) only types with a propagation setting count. Mode A reads the same inputs through Znuny's own recalculation (the preference); Mode B recomputes on link and version changes. The scenarios are the expected values for Tasks 13, 17 and the CMDB plan.",
+   "expected": {
+    "child_services_make_parent": "warning",
+    "counted_deployment_state_type": "productive",
+    "counted_link_types": {
+     "DependsOn": "both"
+    },
+    "ranking": [
+     "operational",
+     "warning",
+     "incident"
+    ],
+    "scenarios": [
+     {
+      "path": "service.type",
+      "scenario": "s1_incident_ci",
+      "value": "incident"
+     },
+     {
+      "path": "ci",
+      "scenario": "s1_incident_ci",
+      "value": "incident"
+     },
+     {
+      "path": "service.type",
+      "scenario": "s2_warning_via_dependency",
+      "value": "warning"
+     },
+     {
+      "path": "ci_neighbour",
+      "scenario": "s2_warning_via_dependency",
+      "value": "warning"
+     },
+     {
+      "path": "service.type",
+      "scenario": "s2b_warning_opposite_direction",
+      "value": "warning"
+     },
+     {
+      "path": "hop1",
+      "scenario": "s2c_transitive_two_hops",
+      "value": "warning"
+     },
+     {
+      "path": "hop2",
+      "scenario": "s2c_transitive_two_hops",
+      "value": "warning"
+     },
+     {
+      "path": "service.type",
+      "scenario": "s3_non_productive_ignored",
+      "value": "operational"
+     },
+     {
+      "path": "service_only_warning_ci.type",
+      "scenario": "s4_incident_beats_warning",
+      "value": "warning"
+     },
+     {
+      "path": "service_with_incident_ci.type",
+      "scenario": "s4_incident_beats_warning",
+      "value": "incident"
+     },
+     {
+      "path": "service.type",
+      "scenario": "s5_relevant_to_not_counted",
+      "value": "operational"
+     },
+     {
+      "path": "parent.type",
+      "scenario": "s6_child_service_makes_parent_warning",
+      "value": "warning"
+     },
+     {
+      "path": "child.type",
+      "scenario": "s6_child_service_makes_parent_warning",
+      "value": "incident"
+     },
+     {
+      "path": "service.type",
+      "scenario": "s7_unlink_recovers",
+      "value": "operational"
+     },
+     {
+      "path": "ci_neighbour",
+      "scenario": "s7_unlink_recovers",
+      "value": "operational"
+     },
+     {
+      "path": "service.type",
+      "scenario": "s8_new_operational_version_recovers",
+      "value": "operational"
+     }
+    ]
+   },
+   "resolves": [
+    "R12 (service incident state)"
+   ],
+   "source": [
+    "znuny-7.3.5/Kernel/System/Service.pm:1525-1741",
+    "znuny-7.3.5/Kernel/System/Service.pm:557-563",
+    "ITSMConfigurationManagement-7.3.5/Kernel/System/ITSMConfigItem.pm:1543-1799",
+    "ITSMConfigurationManagement-7.3.5/Kernel/System/ITSMConfigItem.pm:1816-1878",
+    "ITSMConfigurationManagement-7.3.5/Kernel/System/ITSMConfigItem.pm:1894-1957",
+    "ITSMCore-7.3.3/Kernel/Config/Files/XML/ITSMCore.xml:73-86"
+   ],
+   "title": "Service incident state: link types and directions, functionality ranking"
+  },
+  "3": {
+   "answer": "Server side, in the core ticket frontends, not in an event module and not in package JavaScript (the package JS only shows the service incident state). (a) AgentTicketPhone/Email: on ElementChanged = ServiceID (AJAX) the form's criticality becomes the service's criticality text; when the ticket is created with a service that has a criticality and no ITSMCriticality was submitted, the field is set to the dropdown key whose text equals the service criticality (reverse lookup in the field's possible values). Phone/Email do not show ITSMCriticality, so in practice it is always copied on creation. (b) AgentTicketActionCommon (service change on an existing ticket): after the store the field is set from the submitted value if the screen shows ITSMCriticality, otherwise from the service. Tickets created through other paths (generic interface, process tickets, mail) do not get the copy, and later changes of the service's criticality never touch existing tickets.",
+   "consequence": "Tiqora copies in its own ticket create/patch path when a service is set (and criticality empty), using the same text-to-key mapping; it does not follow later service edits. Mode B stores criticality text on the service row, Mode A reads service.criticality. Resolves open question 9 of the plan.",
+   "expected": {
+    "copied_on": [
+     "ticket_create_with_service_without_criticality",
+     "service_changed_in_form"
+    ],
+    "event_module": false,
+    "existing_tickets_follow_service_changes": false,
+    "mechanism": "core_frontend_modules",
+    "other_paths_copy": false,
+    "value": "service criticality text equals the key of the dynamic field ITSMCriticality"
+   },
+   "resolves": [
+    "open question 9"
+   ],
+   "source": [
+    "znuny-7.3.5/Kernel/Modules/AgentTicketPhone.pm:225-226",
+    "znuny-7.3.5/Kernel/Modules/AgentTicketPhone.pm:1404-1428",
+    "znuny-7.3.5/Kernel/Modules/AgentTicketEmail.pm:1770",
+    "znuny-7.3.5/Kernel/Modules/AgentTicketActionCommon.pm:1478",
+    "ITSMIncidentProblemManagement-7.3.2/Kernel/Modules/AgentITSMIncidentProblemManagement.pm:37-51"
+   ],
+   "title": "Copy of the service criticality into the ticket field ITSMCriticality"
+  },
+  "4": {
+   "answer": "In the core ticket form controllers (Phone, Email, ActionCommon screens such as AgentTicketPriority), not in an event module: when the form posts ElementChanged = ServiceID, DynamicField_ITSMImpact or DynamicField_ITSMCriticality (or an empty impact is filled from the field's default value), PriorityRC is set and, if a service is selected and an impact is known, the priority preselected in the form is PriorityAllocationGet(criticality submitted or the service's, impact). ActionCommon does this only if the screen offers the priority (Config Priority). What is stored is the priority the form submits (Phone: PriorityID, ActionCommon: NewPriorityID); the matrix only changes the preselection. There is no recalculation on the API, in the generic interface or when a ticket field changes elsewhere.",
+   "consequence": "Tiqora applies the matrix when impact, criticality or service change in the ticket UI (frontend preselect plus the PATCH path for ticket field changes, Task 16), and only when a service and an impact exist; an explicit priority in the same request wins. No background recalculation.",
+   "expected": {
+    "event_module": false,
+    "lookup": "cip_allocate(criticality, impact)",
+    "mechanism": "form_controller",
+    "needs_impact": true,
+    "needs_service": true,
+    "server_enforcement": false,
+    "stored_priority": "submitted form value",
+    "trigger_elements": [
+     "ServiceID",
+     "DynamicField_ITSMImpact",
+     "DynamicField_ITSMCriticality"
+    ]
+   },
+   "resolves": [],
+   "source": [
+    "znuny-7.3.5/Kernel/Modules/AgentTicketPhone.pm:205-247",
+    "znuny-7.3.5/Kernel/Modules/AgentTicketEmail.pm:336-377",
+    "znuny-7.3.5/Kernel/Modules/AgentTicketActionCommon.pm:465-524",
+    "znuny-7.3.5/Kernel/Modules/AgentTicketActionCommon.pm:1215-1218"
+   ],
+   "title": "Priority recalculation on impact / criticality change"
+  },
+  "5": {
+   "answer": "Both ends of every link are asked: LinkObject::LinkAdd/LinkDelete call the backend of the source and of the target object (Pre before, Post after the row change). The ITSMConfigItem backend does nothing for State = Temporary. Otherwise, for each CI end (Key = that CI): (1) CurInciStateRecalc(ConfigItemID => Key) (on add and on delete, so a CI/service state can change in both directions); (2) CI event LinkAdd or LinkDelete -> DoHistory writes configitem_history (type LinkAdd / LinkDelete, content '<other id>%%<other object>', e.g. '2%%Ticket'); (3) if the other end is a Ticket, a ticket history row CILinkAdd / CILinkDelete with name '%%<CI id>%%<link type>'. The core then raises LinkObjectLinkAdd / LinkObjectLinkDelete (consumed only if a generic-interface invoker is configured). Type or pair not allowed (PossibleLink), a different link in the same type group and self links are refused; creating the same link again returns success without a second row. Separately, the registered ticket event module TicketStatusLink recalculates incident states when a ticket's state changes (Ticket events), which the ticket-side link code does not do.",
+   "consequence": "Tiqora's CI link writes (Tasks 11, 16) must, in both modes, (a) refuse pairs and types outside the offer table, (b) recompute the affected CI and service incident states after add AND delete, (c) write the ticket history CILinkAdd/CILinkDelete with the CI id and type and the CI-side LinkAdd/LinkDelete history, (d) skip all of it for temporary links. Znuny users should know: the ticket status event (TicketStatusLink) is the one recalculation hook tied to tickets rather than links (documented in docs/itsm.md chapter 5, F32). Resolves open question 1.",
+   "expected": {
+    "ci_history_add": {
+     "content": "<ticket_id>%%Ticket",
+     "type": "LinkAdd"
+    },
+    "ci_history_delete": {
+     "content": "<ticket_id>%%Ticket",
+     "type": "LinkDelete"
+    },
+    "duplicate_add_returns_success_without_second_row": true,
+    "peer_checks": [
+     {
+      "path": "link_side_effects.ticket_to_ci_add.ok",
+      "value": 1
+     },
+     {
+      "path": "link_side_effects.ticket_to_ci_add.ticket_history",
+      "value": [
+       [
+        "CILinkAdd",
+        "%%15%%RelevantTo"
+       ]
+      ]
+     },
+     {
+      "path": "link_side_effects.ticket_to_ci_add.ci_history",
+      "value": [
+       [
+        "LinkAdd",
+        "2%%Ticket"
+       ]
+      ]
+     },
+     {
+      "path": "link_side_effects.ticket_to_ci_add_again.relations",
+      "value": 1
+     },
+     {
+      "path": "link_side_effects.ticket_to_ci_not_possible_type.ok",
+      "value": 0
+     },
+     {
+      "path": "link_side_effects.ticket_to_ci_normal_type.ok",
+      "value": 0
+     },
+     {
+      "path": "link_side_effects.ticket_to_ci_delete.relations",
+      "value": 0
+     },
+     {
+      "path": "link_side_effects.temporary_add.ticket_history_rows_added",
+      "value": 0
+     },
+     {
+      "path": "link_side_effects.temporary_delete.ticket_history_rows_added",
+      "value": 0
+     }
+    ],
+    "recalculate_incident_state_on_add": true,
+    "recalculate_incident_state_on_delete": true,
+    "temporary_links": {
+     "history_rows": 0
+    },
+    "ticket_history_add": {
+     "name": "%%<ci_id>%%<type>",
+     "type": "CILinkAdd"
+    },
+    "ticket_history_delete": {
+     "name": "%%<ci_id>%%<type>",
+     "type": "CILinkDelete"
+    },
+    "type_not_possible_for_pair_refused": true
+   },
+   "resolves": [
+    "open question 1",
+    "F32"
+   ],
+   "source": [
+    "ITSMConfigurationManagement-7.3.5/Kernel/System/LinkObject/ITSMConfigItem.pm:386-437",
+    "ITSMConfigurationManagement-7.3.5/Kernel/System/LinkObject/ITSMConfigItem.pm:511-561",
+    "ITSMConfigurationManagement-7.3.5/Kernel/System/ITSMConfigItem/Event/DoHistory.pm:89-90",
+    "znuny-7.3.5/Kernel/System/LinkObject.pm:573-595",
+    "znuny-7.3.5/Kernel/System/LinkObject.pm:863-885",
+    "ITSMConfigurationManagement-7.3.5/Kernel/Config/Files/XML/ITSMConfigItem.xml:1660-1669"
+   ],
+   "title": "LinkObject::ITSMConfigItem side effects of LinkAdd / LinkDelete"
+  },
+  "6": {
+   "answer": "AgentLinkObject is opened from one object (the dialog object, here the ticket) and links a selected partner (here a CI). The state is Valid (Temporary only while a new ticket is being created). The type selection offers '<Type>::Source' (label = source name) and, for pointed types only, '<Type>::Target' (default 'Normal::Source'). With '<Type>::Source' the SELECTED object becomes link_relation.source and the dialog object the target; with '<Type>::Target' the dialog object is the source. The types Znuny offers for ticket <-> CI are exactly AlternativeTo, DependsOn and RelevantTo (PossibleLink 3220-3222; 'Normal' and 'ConnectedTo' are refused; the order of the object pair does not matter); only DependsOn is pointed. Permissions in Znuny: 'ro' on the dialog object and 'ro' on the object that ends up as link target (the add loop) - never 'rw'; deleting needs 'ro' on the other object (instant delete: ro on both). Ticket: TicketPermission ro. CI: ITSMConfigItem::Permission (scope Item, type from ITSMConfigItem::Frontend::AgentITSMConfigItemZoom###Permission = 'ro') granted by the module ItemClassGroupCheck: the user needs ro (rw counts as ro) on the group stored in the CI class's general catalog preference 'Permission' (default group itsm-configitem, id 6, for all five classes); without that group a CI is invisible and cannot be linked. The groups named in Frontend::Module (itsm-configitem for Add/Edit/Delete) gate those screens, not linking.",
+   "consequence": "Decision for R12 (both modes, cmdb mirrors it at Task 30): linking and unlinking a ticket and a CI need rw on the ticket and ro on the CI, checked inside link_ticket. This deliberately differs from Znuny, which accepts ro on both: Tiqora already requires rw on both for ticket-ticket links and a link changes the ticket's history, so the interim ruling stays. Offer table: AlternativeTo, DependsOn, RelevantTo for ticket-CI (link_type_defaults corrected accordingly); the link row stores the direction (ticket as source unless the type/identifier says otherwise). Resolves open question 4.",
+   "expected": {
+    "ci_permission": {
+     "default_group": "itsm-configitem",
+     "group_source": "class preference Permission",
+     "rw_implies_ro": true,
+     "type": "ro"
+    },
+    "identifier_source": "selected object is link source, dialog object is target",
+    "identifier_target": "dialog object is link source (pointed types only)",
+    "peer_checks": [
+     {
+      "path": "permissions.no_groups",
+      "value": {
+       "ci": 0,
+       "ticket": 0
+      }
+     },
+     {
+      "path": "permissions.users_ro",
+      "value": {
+       "ci": 0,
+       "ticket": 1
+      }
+     },
+     {
+      "path": "permissions.users_ro_cigroup_ro_only",
+      "value": {
+       "ci": 1,
+       "ticket": 1
+      }
+     },
+     {
+      "path": "permissions.users_ro_cigroup_rw_only",
+      "value": {
+       "ci": 1,
+       "ticket": 1
+      }
+     },
+     {
+      "path": "permissions.zoom_permission_type",
+      "value": "ro"
+     },
+     {
+      "path": "permissions.class_permission_group_id",
+      "value": 6
+     },
+     {
+      "path": "link_types.possible.Ticket/ITSMConfigItem",
+      "value": [
+       "AlternativeTo",
+       "DependsOn",
+       "RelevantTo"
+      ]
+     },
+     {
+      "path": "link_types.possible_reverse_order_ci_ticket",
+      "value": [
+       "AlternativeTo",
+       "DependsOn",
+       "RelevantTo"
+      ]
+     }
+    ],
+    "pointed_among_them": [
+     "DependsOn"
+    ],
+    "state": "Valid",
+    "tiqora_decision": {
+     "deviation_from_znuny": "stricter: ro-only agents cannot link in Tiqora",
+     "link_ticket_ci": {
+      "ci": "ro",
+      "ticket": "rw"
+     },
+     "reason": "same rule as the existing ticket-ticket link route (rw on both); Znuny's ro/ro is looser than Tiqora's model",
+     "unlink_ticket_ci": {
+      "ci": "ro",
+      "ticket": "rw"
+     }
+    },
+    "types_offered_ticket_ci": [
+     "AlternativeTo",
+     "DependsOn",
+     "RelevantTo"
+    ],
+    "znuny_permission": {
+     "delete": "ro on the other object",
+     "dialog_object": "ro",
+     "link_target": "ro"
+    }
+   },
+   "resolves": [
+    "open question 4",
+    "R12 (ticket-CI permission)"
+   ],
+   "source": [
+    "znuny-7.3.5/Kernel/Modules/AgentLinkObject.pm:146-158",
+    "znuny-7.3.5/Kernel/Modules/AgentLinkObject.pm:388-475",
+    "znuny-7.3.5/Kernel/Modules/AgentLinkObject.pm:489-499",
+    "znuny-7.3.5/Kernel/Modules/AgentLinkObject.pm:242-248",
+    "znuny-7.3.5/Kernel/Modules/AgentLinkObject.pm:703-728",
+    "znuny-7.3.5/Kernel/System/LinkObject/Ticket.pm:149-168",
+    "ITSMConfigurationManagement-7.3.5/Kernel/System/LinkObject/ITSMConfigItem.pm:121-146",
+    "ITSMConfigurationManagement-7.3.5/Kernel/System/ITSMConfigItem/Permission/ItemClassGroupCheck.pm:64-74",
+    "ITSMConfigurationManagement-7.3.5/Kernel/Config/Files/XML/ITSMConfigItem.xml:731-741",
+    "ITSMCore-7.3.3/Kernel/Config/Files/XML/ITSMCore.xml:192-225"
+   ],
+   "title": "Ticket-CI link from AgentLinkObject: source, type, state, possible links, permissions"
+  },
+  "7": {
+   "answer": "Definitions are YAML in BOTH profiles (6.5.4 and 7.3.5 share the code; a stored definition not starting with '---' is the legacy Perl format and is read as the empty definition '--- []'). _DefinitionPrepare applies per attribute, recursively: CountMin defaults to 1 when absent (0 is kept), CountMax defaults to 1 when absent or 0, CountMin is cut down to CountMax, CountDefault defaults to 1 and is clamped into [CountMin, CountMax]. Sub is a list of child attributes (repeated per parent instance, addressed by the path Parent::Child in DefinitionAttributeInfo); a Sub that is not an array is removed (an empty array is kept). DefinitionCheck additionally requires a list of hashes with Key values without whitespace and without non-ASCII characters (checked recursively). Input types are the modules under XML/Type, minus the base class BaseSelectable: CI, CIAttachment, CISimple, Customer, CustomerCompany, Date, DateTime, Dummy, GeneralCatalog, Integer, Priority, Queue, SLA, Service, State, Text, TextArea, TextLink, Type, User (20; identical in 6.5.4 and 7.3.5). The five shipped class definitions use only Text, TextArea, GeneralCatalog, CustomerCompany, Customer, Date and Integer.",
+   "consequence": "The Mode A reader and the Mode B importer share one prepare function with these rules (Task 9/13 and the import plan) and read exactly the 20 input types; unknown types render as plain text and are reported by the importer. Both profiles take the YAML path; the legacy Perl format is not parsed.",
+   "expected": {
+    "check_examples": {
+     "key_non_ascii": false,
+     "key_with_space": false,
+     "legacy_perl": false,
+     "not_a_list": false,
+     "sub_key_space": false,
+     "sub_valid": true,
+     "valid_yaml": true
+    },
+    "count_default_default": 1,
+    "count_max_default": 1,
+    "count_min_default": 1,
+    "format": "yaml",
+    "input_types": [
+     "CI",
+     "CIAttachment",
+     "CISimple",
+     "Customer",
+     "CustomerCompany",
+     "Date",
+     "DateTime",
+     "Dummy",
+     "GeneralCatalog",
+     "Integer",
+     "Priority",
+     "Queue",
+     "SLA",
+     "Service",
+     "State",
+     "Text",
+     "TextArea",
+     "TextLink",
+     "Type",
+     "User"
+    ],
+    "legacy_perl_definition_reads_as": [],
+    "prepare_examples": [
+     {
+      "in": {},
+      "name": "empty",
+      "out": {
+       "CountDefault": 1,
+       "CountMax": 1,
+       "CountMin": 1,
+       "has_sub": 0
+      }
+     },
+     {
+      "in": {
+       "CountMax": 10,
+       "CountMin": 0
+      },
+      "name": "min0_max10",
+      "out": {
+       "CountDefault": 1,
+       "CountMax": 10,
+       "CountMin": 0,
+       "has_sub": 0
+      }
+     },
+     {
+      "in": {
+       "CountMax": 0
+      },
+      "name": "max0",
+      "out": {
+       "CountDefault": 1,
+       "CountMax": 1,
+       "CountMin": 1,
+       "has_sub": 0
+      }
+     },
+     {
+      "in": {
+       "CountMax": 2,
+       "CountMin": 5
+      },
+      "name": "min_above_max",
+      "out": {
+       "CountDefault": 2,
+       "CountMax": 2,
+       "CountMin": 2,
+       "has_sub": 0
+      }
+     },
+     {
+      "in": {
+       "CountMin": 2
+      },
+      "name": "min2_only",
+      "out": {
+       "CountDefault": 1,
+       "CountMax": 1,
+       "CountMin": 1,
+       "has_sub": 0
+      }
+     },
+     {
+      "in": {
+       "CountDefault": 0,
+       "CountMax": 3
+      },
+      "name": "default_below_min",
+      "out": {
+       "CountDefault": 1,
+       "CountMax": 3,
+       "CountMin": 1,
+       "has_sub": 0
+      }
+     },
+     {
+      "in": {
+       "CountDefault": 9,
+       "CountMax": 2
+      },
+      "name": "default_above_max",
+      "out": {
+       "CountDefault": 2,
+       "CountMax": 2,
+       "CountMin": 1,
+       "has_sub": 0
+      }
+     },
+     {
+      "in": {
+       "CountDefault": 0,
+       "CountMax": 10,
+       "CountMin": 0
+      },
+      "name": "default_zero_ok",
+      "out": {
+       "CountDefault": 0,
+       "CountMax": 10,
+       "CountMin": 0,
+       "has_sub": 0
+      }
+     },
+     {
+      "in": {
+       "Sub": "x"
+      },
+      "name": "sub_not_array",
+      "out": {
+       "CountDefault": 1,
+       "CountMax": 1,
+       "CountMin": 1,
+       "has_sub": 0
+      }
+     },
+     {
+      "in": {
+       "Sub": []
+      },
+      "name": "sub_empty_array",
+      "out": {
+       "CountDefault": 1,
+       "CountMax": 1,
+       "CountMin": 1,
+       "has_sub": 1
+      }
+     },
+     {
+      "in": {
+       "Sub": [
+        {}
+       ]
+      },
+      "name": "sub_child_defaults",
+      "out": {
+       "CountDefault": 1,
+       "CountMax": 1,
+       "CountMin": 1,
+       "has_sub": 1,
+       "sub_child": {
+        "CountDefault": 1,
+        "CountMax": 1,
+        "CountMin": 1
+       }
+      }
+     }
+    ],
+    "rules": [
+     "count_min is kept when 0, set to 1 when absent",
+     "count_max is 1 when absent or 0",
+     "count_min is clamped to count_max",
+     "count_default defaults to 1 and is clamped into [count_min, count_max]",
+     "sub is dropped unless it is a list (an empty list is kept); children are prepared recursively",
+     "keys must not contain whitespace or non-ASCII characters"
+    ],
+    "shipped_definitions_use": [
+     "Customer",
+     "CustomerCompany",
+     "Date",
+     "GeneralCatalog",
+     "Integer",
+     "Text",
+     "TextArea"
+    ]
+   },
+   "resolves": [],
+   "source": [
+    "ITSMConfigurationManagement-7.3.5/Kernel/System/ITSMConfigItem/Definition.pm:548-598",
+    "ITSMConfigurationManagement-7.3.5/Kernel/System/ITSMConfigItem/Definition.pm:343-450",
+    "ITSMConfigurationManagement-7.3.5/Kernel/System/ITSMConfigItem/Definition.pm:148-210",
+    "ITSMConfigurationManagement-7.3.5/Kernel/System/ITSMConfigItem/Definition.pm:506-533",
+    "backend/tests/fixtures/znuny-itsm/itsm-7/initial_insert.sql:183-576"
+   ],
+   "title": "Definition defaults (CountMin/Max/Default), Sub semantics, input types"
+  },
+  "8": {
+   "answer": "The ticket types are the same on 6.5 and 7.3: Incident, Incident::Major (the major-incident type name), ServiceRequest, Problem and RfC (plus the core's Unclassified); the packages provide them as valid types. One ticket state is added: 'closed with workaround' (type 'closed', state type id 3; 7.3 additionally stores a colour). Eight dynamic fields (object Ticket, internal): ITSMCriticality and ITSMImpact (Dropdown '1 very low' .. '5 very high'; impact defaults to '3 normal', criticality to empty), ITSMReviewRequired (Dropdown No/Yes), ITSMDecisionResult (Dropdown Approved, Pending (default), Postponed, Pre-approved, Rejected), ITSMRepairStartTime, ITSMRecoveryStartTime, ITSMDecisionDate (DateTime, default none) and ITSMDueDate (DateTime, default +3 days = 259200 s). Screens: AgentTicketAddtlITSMField shows ITSMRepairStartTime, ITSMRecoveryStartTime and ITSMDueDate; AgentTicketDecision shows ITSMDecisionResult and ITSMDecisionDate; Phone and Email show ITSMImpact and ITSMDueDate; Priority shows ITSMImpact; Close and Compose show ITSMReviewRequired; Zoom shows all eight; Search offers all but ITSMCriticality; the customer zoom/print screens show criticality and impact. These lists are the same on both profiles.",
+   "consequence": "The ITSM setup and the major-incident feature use the type name 'Incident::Major' on both lines (no per-version mapping); setup creates the same eight fields with the same possible values, and the screen assignment above is what the ticket forms offer for Znuny parity.",
+   "expected": {
+    "dynamic_fields": {
+     "ITSMCriticality": "Dropdown",
+     "ITSMDecisionDate": "DateTime",
+     "ITSMDecisionResult": "Dropdown",
+     "ITSMDueDate": "DateTime",
+     "ITSMImpact": "Dropdown",
+     "ITSMRecoveryStartTime": "DateTime",
+     "ITSMRepairStartTime": "DateTime",
+     "ITSMReviewRequired": "Dropdown"
+    },
+    "dynamic_fields_per_screen": {
+     "AgentTicketAddtlITSMField": [
+      "ITSMRepairStartTime",
+      "ITSMRecoveryStartTime",
+      "ITSMDueDate"
+     ],
+     "AgentTicketClose": [
+      "ITSMReviewRequired"
+     ],
+     "AgentTicketCompose": [
+      "ITSMReviewRequired"
+     ],
+     "AgentTicketDecision": [
+      "ITSMDecisionResult",
+      "ITSMDecisionDate"
+     ],
+     "AgentTicketEmail": [
+      "ITSMImpact",
+      "ITSMDueDate"
+     ],
+     "AgentTicketPhone": [
+      "ITSMImpact",
+      "ITSMDueDate"
+     ],
+     "AgentTicketPriority": [
+      "ITSMImpact"
+     ]
+    },
+    "major_incident_type": "Incident::Major",
+    "peer_checks": [
+     {
+      "path": "ticket_types",
+      "value": [
+       "Incident",
+       "Incident::Major",
+       "Problem",
+       "RfC",
+       "ServiceRequest",
+       "Unclassified"
+      ]
+     },
+     {
+      "path": "closed_with_workaround.type_id",
+      "value": 3
+     },
+     {
+      "path": "closed_with_workaround.type",
+      "value": "closed"
+     }
+    ],
+    "ticket_states_added": [
+     {
+      "name": "closed with workaround",
+      "type": "closed",
+      "type_id": 3
+     }
+    ],
+    "ticket_types": [
+     "Incident",
+     "Incident::Major",
+     "Problem",
+     "RfC",
+     "ServiceRequest",
+     "Unclassified"
+    ]
+   },
+   "resolves": [],
+   "source": [
+    "ITSMIncidentProblemManagement-7.3.2/var/packagesetup/ITSMIncidentProblemManagement.pm:93-102",
+    "ITSMIncidentProblemManagement-7.3.2/var/packagesetup/ITSMIncidentProblemManagement.pm:106-118",
+    "backend/tests/fixtures/znuny-itsm/itsm-7/initial_insert.sql:3092-3096",
+    "backend/tests/fixtures/znuny-itsm/itsm-7/initial_insert.sql:3103",
+    "ITSMIncidentProblemManagement-7.3.2/Kernel/Config/Files/XML/ITSMTicket.xml:315-330",
+    "ITSMIncidentProblemManagement-7.3.2/Kernel/Config/Files/XML/ITSMTicket.xml:546-560",
+    "ITSMIncidentProblemManagement-7.3.2/Kernel/Config/Files/XML/TicketITSMTicket.xml:10-24"
+   ],
+   "title": "Ticket types, states and dynamic fields per screen created by the packages"
+  },
+  "9": {
+   "answer": "LinkDelete(Object1, Key1, Object2, Key2, Type, UserID) matches the pair in either order and the type; it has NO state filter, so a Valid and a Temporary link are deleted alike. A missing link is not an error (returns 1). Pre and Post backend hooks of both objects run with the existing row's state; the Post hooks skip State = Temporary. Ticket <-> ticket links: each ticket gets a history row TicketLinkDelete with name '%%<other ticket number>%%<other ticket id>%%<own ticket id>' (same shape as TicketLinkAdd). Ticket <-> CI links: CILinkDelete '%%<CI id>%%<type>' on the ticket (see 5). Cache: type LinkObject, key 'Cache::LinkListRaw::Direction<Source|Target>::ObjectID<id>::StateID<id>::Key<key>' for both objects, both directions and ALL link states (add clears only the state of the new link); afterwards the core event LinkObjectLinkDelete is raised.",
+   "consequence": "Tiqora's delete route (Task 16, F11) deletes the pair whatever its state, answers success for a missing link, writes TicketLinkDelete history on both tickets (CILinkDelete for CIs) except for temporary links and invalidates the Znuny cache type LinkObject through cache_invalidation.",
+   "expected": {
+    "cache_cleared_states": "all",
+    "cache_key": "Cache::LinkListRaw::Direction<Source|Target>::ObjectID<n>::StateID<n>::Key<k>",
+    "cache_type": "LinkObject",
+    "deletes_states": [
+     "Valid",
+     "Temporary"
+    ],
+    "missing_link_returns": 1,
+    "peer_checks": [
+     {
+      "path": "link_side_effects.delete_missing_link_returns",
+      "value": 1
+     },
+     {
+      "path": "link_side_effects.temporary_delete.ok",
+      "value": 1
+     },
+     {
+      "path": "link_side_effects.temporary_delete.relations",
+      "value": 0
+     },
+     {
+      "path": "link_side_effects.ticket_ticket_type_group_conflict.ok",
+      "value": 0
+     }
+    ],
+    "state_filter": null,
+    "ticket_history_name": "%%<other ticket number>%%<other ticket id>%%<own ticket id>",
+    "ticket_history_type": "TicketLinkDelete"
+   },
+   "resolves": [],
+   "source": [
+    "znuny-7.3.5/Kernel/System/LinkObject.pm:687-898",
+    "znuny-7.3.5/Kernel/System/LinkObject/Ticket.pm:546-604",
+    "znuny-7.3.5/Kernel/System/LinkObject.pm:840-861",
+    "znuny-7.3.5/Kernel/System/LinkObject.pm:2409-2424"
+   ],
+   "title": "LinkObject LinkDelete: states, history format, cache keys"
+  }
+ },
+ "znuny_core": "znuny-7.3.5"
+}

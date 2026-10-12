@@ -43,6 +43,23 @@ PostgreSQL 16 containers and checks that every package table exists. Same for `z
 `itsm-7`. Only made-up data may end up here: the packages ship no customer data; the test
 `test_fixtures_have_no_real_data` guards that.
 
+## Behaviour vectors (`behaviour/`)
+
+`behaviour/<profile>.json` pins how the packages *behave* (priority matrix lookup, service incident
+state, link side effects, permissions, definition rules, ...): ten answers per profile with
+`source` (file:line), `answer`, `expected` and `consequence`, documented in `docs/itsm-import.md`
+("Behaviour"). The `questions` part is maintained by hand from the sources; the `peer` part (the
+results of `tests/golden/itsm_behaviour.pl` on the real peer) is generated and never edited:
+
+```sh
+just golden-itsm-fetch znuny-6.5-itsm
+GOLDEN_PEER=znuny-6.5-itsm just golden-up          # a FRESH peer (no seed): the scenarios run once
+cd backend && GOLDEN_PEER=znuny-6.5-itsm uv run python ../tests/golden/itsm_survey.py znuny-6.5-itsm \
+    --behaviour --out tests/fixtures/znuny-itsm/behaviour/
+```
+
+Same for `znuny-7.3-itsm`. `test_itsm_behaviour_vectors.py` compares both halves.
+
 ## Origin and licence (NOTICE)
 
 - **Upstream:** the Znuny ITSM packages (`https://download.znuny.org/releases/itsm/`), installed on a
