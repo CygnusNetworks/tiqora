@@ -101,7 +101,303 @@ let queues = initialQueues();
 let dynamicFields = initialDynamicFields();
 let nextId = 1000;
 
+// --- Process designer: a small stateful stand-in for /admin/process-designer, /admin/deploy*. ---
+
+type DesignerEntity = {
+  entity_type: string;
+  entity_id: string;
+  id: number;
+  name: string;
+  config: Record<string, unknown>;
+  version: string;
+  sync_state: "synced" | "not_sync";
+  changed_at: string;
+  changed_by: number;
+};
+type DesignerProcess = {
+  process: DesignerEntity;
+  state_entity_id: string;
+  layout: Record<string, Record<string, string | number>>;
+};
+/** Union of the request bodies the mock reads (process create/update, entity create/update). */
+type DesignerBody = {
+  name: string;
+  description: string;
+  expected_version: string;
+  config: Record<string, unknown>;
+  path: Record<string, unknown>;
+  layout: Record<string, Record<string, string | number>>;
+  start_activity: string;
+  start_activity_dialog: string;
+  state_entity_id: string;
+};
+type SyncState = "not_needed" | "pending" | "ok";
+
+const STATE_NAMES: Record<string, string> = { S1: "Active", S2: "Inactive", S3: "FadeAway" };
+/** Znuny applies a deployment a moment after the signal; the mock reports "ok" after this long. */
+const ADDON_DELAY_MS = 3000;
+
+const designerEntity = (
+  entity_type: string,
+  entity_id: string,
+  id: number,
+  name: string,
+  config: Record<string, unknown>,
+): DesignerEntity => ({
+  entity_type,
+  entity_id,
+  id,
+  name,
+  config,
+  version: `v${id}.0`,
+  sync_state: "synced",
+  changed_at: "2026-10-09T09:00:00Z",
+  changed_by: 1,
+});
+
+function initialDesigner() {
+  return {
+    seq: 100,
+    processes: new Map<string, DesignerProcess>([
+      [
+        "Process-1",
+        {
+          process: designerEntity("Process", "Process-1", 1, "Onboarding", {
+            Description: "",
+            StartActivity: "Activity-a",
+            StartActivityDialog: "ActivityDialog-1",
+            Path: { "Activity-a": { "Transition-1": { ActivityEntityID: "Activity-b" } }, "Activity-b": {} },
+          }),
+          state_entity_id: "S1",
+          layout: { "Activity-a": { left: "40", top: "40" }, "Activity-b": { left: "300", top: "40" } },
+        },
+      ],
+    ]),
+    entities: {
+      Activity: [designerEntity("Activity", "Activity-a", 1, "Collect info", {}), designerEntity("Activity", "Activity-b", 2, "Done", {})],
+      ActivityDialog: [] as DesignerEntity[],
+      Transition: [designerEntity("Transition", "Transition-1", 1, "Go on", {})],
+      TransitionAction: [] as DesignerEntity[],
+    } as Record<string, DesignerEntity[]>,
+    pending: 0,
+    revision: null as null | { id: number; source: string; entity_count: number; deployed_at: string; deployed_by: number },
+    sync: "not_needed" as SyncState,
+    deployedAt: 0,
+  };
+}
+
+let designer = initialDesigner();
+
+const designerCatalog = {
+  actions: [
+    {
+      name: "TicketStateSet",
+      module: "Kernel::System::ProcessManagement::TransitionAction::TicketStateSet",
+      supported: true,
+      tiqora_only: false,
+      params: [
+        { name: "State", kind: "state", required: true, one_of: ["State", "StateID"], list_value: false },
+        { name: "StateID", kind: "state", required: true, one_of: ["State", "StateID"], list_value: false },
+      ],
+    },
+  ],
+  condition_types: ["String", "Regexp"],
+  condition_modules: [],
+  fields: [
+    { name: "Title", label: "Title", kind: "text", dialog: true, condition: true, options: [] },
+    {
+      name: "Queue",
+      label: "Queue",
+      kind: "select",
+      dialog: true,
+      condition: true,
+      options: [
+        { value: "Raw", label: "Raw" },
+        { value: "Support", label: "Support" },
+      ],
+    },
+  ],
+  interfaces: ["AgentInterface"],
+  permissions: [""],
+  account_time: false,
+};
+
+function draftOf(eid: string) {
+  const p = designer.processes.get(eid);
+  if (!p) return null;
+  const e = designer.entities;
+  return {
+    process: p.process,
+    state_entity_id: p.state_entity_id,
+    state_name: STATE_NAMES[p.state_entity_id] ?? "",
+    layout: p.layout,
+    activities: e.Activity,
+    activity_dialogs: e.ActivityDialog,
+    transitions: e.Transition,
+    transition_actions: e.TransitionAction,
+    missing_references: [],
+    pending_changes: designer.pending,
+  };
+}
+
+function summaryOf(p: DesignerProcess) {
+  return {
+    entity_type: "Process",
+    entity_id: p.process.entity_id,
+    name: p.process.name,
+    used_by: [],
+    sync_state: p.process.sync_state,
+    state_entity_id: p.state_entity_id,
+    state_name: STATE_NAMES[p.state_entity_id] ?? "",
+  };
+}
+
+function deployStatus(): DeployStatus {
+  // Znuny's daemon picks the signal up after a short delay.
+  if (designer.sync === "pending" && Date.now() - designer.deployedAt >= ADDON_DELAY_MS) designer.sync = "ok";
+  const idle = { pending_changes: 0, revision: null, running_live: true, deploy_mode: null, znuny_sync: { state: "not_needed" as const } };
+  return {
+    acl: idle,
+    process: {
+      pending_changes: designer.pending,
+      revision: designer.revision,
+      running_live: designer.revision === null,
+      deploy_mode: "signal",
+      znuny_sync: { state: designer.sync, overdue: false, message: "" },
+    },
+    can_deploy_from_tiqora: false,
+    ownership_active: false,
+  };
+}
+
+/** Routes of the designer and the deploy status; returns false for anything else. */
+async function handleProcessDesigner(route: Route, path: string, method: string): Promise<boolean> {
+  const req = route.request();
+  const send = async (status: number, payload: unknown) => {
+    await json(route, status, payload);
+    return true;
+  };
+  if (path.endsWith("/api/v1/admin/deploy-status") && method === "GET") {
+    return send(200, deployStatus());
+  }
+  if (path.endsWith("/api/v1/admin/deploy") && method === "POST") {
+    const processes = [...designer.processes.values()];
+    for (const p of processes) p.process.sync_state = "synced";
+    for (const list of Object.values(designer.entities)) for (const x of list) x.sync_state = "synced";
+    designer.pending = 0;
+    designer.sync = "pending";
+    designer.deployedAt = Date.now();
+    designer.revision = {
+      id: designer.seq++,
+      source: "tiqora",
+      entity_count: processes.length + Object.values(designer.entities).flat().length,
+      deployed_at: new Date().toISOString(),
+      deployed_by: 1,
+    };
+    return send(200, {
+      kind: "process",
+      revision_id: designer.revision.id,
+      checksum: "e2e",
+      action: "recorded",
+      mode: "signal",
+    });
+  }
+  const base = "/api/v1/admin/process-designer/";
+  if (!path.includes(base)) return false;
+  const rest = path.slice(path.indexOf(base) + base.length);
+  const seg = rest.split("/").map(decodeURIComponent);
+  const body = () => req.postDataJSON() as DesignerBody;
+  const touch = (x: DesignerEntity) => {
+    x.version = `v${x.id}.${++designer.seq}`;
+    x.sync_state = "not_sync";
+    designer.pending += 1;
+  };
+
+  if (seg[0] === "catalog") return send(200, designerCatalog);
+  if (seg[0] === "revisions") return send(200, []);
+  if (seg[0] === "entities" && method === "GET") {
+    return send(200, (designer.entities[seg[1]] ?? []).map((x) => ({ ...x, used_by: [] })));
+  }
+
+  if (seg[0] === "processes") {
+    const eid = seg[1];
+    if (!eid) {
+      if (method === "GET") return send(200, [...designer.processes.values()].map(summaryOf));
+      const b = body();
+      const id = ++designer.seq;
+      const p: DesignerProcess = {
+        process: designerEntity("Process", `Process-${id}`, id, b.name, {
+          Description: b.description ?? "",
+          StartActivity: "",
+          StartActivityDialog: "",
+          Path: {},
+        }),
+        state_entity_id: "S2",
+        layout: {},
+      };
+      touch(p.process);
+      designer.processes.set(p.process.entity_id, p);
+      return send(201, draftOf(p.process.entity_id));
+    }
+    const p = designer.processes.get(eid);
+    if (!p) return send(404, { detail: "Prozess nicht gefunden" });
+    if (seg[2] === "validation") return send(200, []);
+    if (seg[2] === "export") {
+      await route.fulfill({
+        status: 200,
+        contentType: "text/yaml",
+        headers: { "content-disposition": `attachment; filename="${eid}.yml"` },
+        body: `---\nProcess:\n- EntityID: ${eid}\n  Name: ${p.process.name}\n`,
+      });
+      return true;
+    }
+    if (method === "GET") return send(200, draftOf(eid));
+    if (method === "PUT") {
+      const b = body();
+      if (b.expected_version !== p.process.version) {
+        return send(409, { detail: "Der Prozess wurde inzwischen geändert." });
+      }
+      p.process.name = b.name;
+      p.process.config = {
+        ...p.process.config,
+        Description: b.description,
+        Path: b.path,
+        StartActivity: b.start_activity,
+        StartActivityDialog: b.start_activity_dialog,
+      };
+      p.layout = b.layout;
+      p.state_entity_id = b.state_entity_id;
+      touch(p.process);
+      return send(200, draftOf(eid));
+    }
+  }
+
+  if (seg[0] === "entities" && designer.entities[seg[1]]) {
+    const list = designer.entities[seg[1]];
+    if (method === "POST") {
+      const b = body();
+      const id = ++designer.seq;
+      const x = designerEntity(seg[1], `${seg[1]}-${id}`, id, b.name, b.config);
+      touch(x);
+      list.push(x);
+      return send(201, x);
+    }
+    const x = list.find((e) => e.entity_id === seg[2]);
+    if (!x) return send(404, { detail: "Eintrag nicht gefunden" });
+    if (method === "PUT") {
+      const b = body();
+      if (b.expected_version !== x.version) return send(409, { detail: "Geändert." });
+      x.name = b.name;
+      x.config = b.config;
+      touch(x);
+      return send(200, x);
+    }
+  }
+  return send(404, { detail: `No designer mock for ${method} ${path}` });
+}
+
 function resetAdminState() {
+  designer = initialDesigner();
   users = initialUsers();
   groups = initialGroups();
   queues = initialQueues();
@@ -124,47 +420,7 @@ export async function mockAdminApi(page: Page) {
     const path = url.pathname;
     const method = req.method();
 
-    // Deployed-revision banner of the ProcessManagement / ACL admin pages
-    if (path.endsWith("/api/v1/admin/deploy-status") && method === "GET") {
-      const idle = { pending_changes: 0, revision: null, running_live: true };
-      const status: DeployStatus = { acl: idle, process: idle, can_deploy_from_tiqora: false, ownership_active: false };
-      await json(route, 200, status);
-      return;
-    }
-
-    // Process designer: one draft process with two steps (ProcessDraftOut) and the catalogue.
-    if (path.includes("/api/v1/admin/process-designer/") && method === "GET") {
-      const ent = (entity_type: string, entity_id: string, id: number, name: string, config: Record<string, unknown>) => ({
-        entity_type, entity_id, id, name, config, version: `v-${entity_id}`, sync_state: "synced",
-        changed_at: "2026-10-09T09:00:00Z", changed_by: 1,
-      });
-      if (path.endsWith("/catalog")) {
-        await json(route, 200, { actions: [], condition_types: [], condition_modules: [], fields: [], interfaces: ["AgentInterface"], permissions: [""], account_time: false });
-        return;
-      }
-      if (path.endsWith("/process-designer/processes/Process-1")) {
-        await json(route, 200, {
-          process: ent("Process", "Process-1", 1, "Onboarding", {
-            Description: "",
-            StartActivity: "Activity-a",
-            StartActivityDialog: "ActivityDialog-1",
-            Path: { "Activity-a": { "Transition-1": { ActivityEntityID: "Activity-b" } }, "Activity-b": {} },
-          }),
-          state_entity_id: "S1",
-          state_name: "Active",
-          layout: { "Activity-a": { left: "40", top: "40" }, "Activity-b": { left: "300", top: "40" } },
-          activities: [ent("Activity", "Activity-a", 1, "Collect info", {}), ent("Activity", "Activity-b", 2, "Done", {})],
-          activity_dialogs: [],
-          transitions: [ent("Transition", "Transition-1", 1, "Go on", {})],
-          transition_actions: [],
-          missing_references: [],
-          pending_changes: 0,
-        });
-        return;
-      }
-      await json(route, 200, []);
-      return;
-    }
+    if (await handleProcessDesigner(route, path, method)) return;
 
     // ProcessManagement overview (read-only)
     if (path.endsWith("/api/v1/admin/processes") && method === "GET") {

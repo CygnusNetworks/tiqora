@@ -45,10 +45,12 @@ vi.mock("@/components/process-designer/DesignerCanvas", () => ({
   DesignerCanvas: ({
     shape,
     onShapeChange,
+    onSelect,
     issues,
   }: {
     shape: ProcessShape;
     onShapeChange: (s: ProcessShape) => void;
+    onSelect: (s: { kind: "activity"; id: string }) => void;
     issues?: unknown[];
   }) => (
     <div data-testid="process-designer-canvas" data-issues={issues?.length ?? 0}>
@@ -57,6 +59,9 @@ vi.mock("@/components/process-designer/DesignerCanvas", () => ({
         onClick={() => onShapeChange({ ...shape, layout: { ...shape.layout, "Activity-a": { left: "10", top: "20" } } })}
       >
         mock-move
+      </button>
+      <button type="button" onClick={() => onSelect({ kind: "activity", id: "Activity-a" })}>
+        mock-select
       </button>
     </div>
   ),
@@ -148,6 +153,23 @@ describe("ProcessDesignerPage", () => {
     expect(screen.getByTestId("process-designer-panel")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Bestellung" })).toBeInTheDocument();
     expect(getProcess.mock.calls[0][0]).toBe("Process-1");
+  });
+
+  it("opens the form panel of a step's form and keeps it apart from the step panel", async () => {
+    setViewport(false);
+    const form = { ...entity("AD-1", "Antrag", { Interface: ["AgentInterface"], Fields: {}, FieldOrder: [] }), entity_type: "ActivityDialog" as const };
+    getProcess.mockResolvedValue({
+      ...draft,
+      activities: [entity("Activity-a", "Antrag erfassen", { ActivityDialog: { "1": "AD-1" } }), entity("Activity-b", "Genehmigung")],
+      activity_dialogs: [form],
+    });
+    renderPage();
+    fireEvent.click(await screen.findByText("mock-select"));
+    expect(await screen.findByTestId("activity-panel")).toBeInTheDocument();
+    expect(screen.queryByTestId("dialog-panel")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("activity-panel-open-AD-1"));
+    expect(await screen.findByTestId("dialog-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("dialog-panel-name")).toHaveValue("Antrag");
   });
 
   it("phone width renders the read-only list", async () => {

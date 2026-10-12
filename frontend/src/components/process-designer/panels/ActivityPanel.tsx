@@ -20,6 +20,8 @@ export function ActivityPanel({
   createDialog,
   onSaved,
   onReload,
+  onOpenForm,
+  openFormId,
 }: {
   activity: DesignerEntity;
   dialogs: DesignerEntity[];
@@ -27,6 +29,9 @@ export function ActivityPanel({
   createDialog: () => Promise<string>;
   onSaved: (saved: DesignerEntity) => void;
   onReload: () => void;
+  /** Opens the form's own panel (name, fields, defaults) below this one. */
+  onOpenForm?: (id: string) => void;
+  openFormId?: string | null;
 }) {
   const { t } = useTranslation();
   const storedIds = dialogIdsOf(activity.config);
@@ -111,7 +116,19 @@ export function ActivityPanel({
                   data-testid={`activity-panel-form-${id}`}
                   className="flex items-center gap-1 rounded-md border border-hairline px-2 py-1 text-sm text-ink"
                 >
-                  <span className="min-w-0 flex-1 truncate">{label}</span>
+                  {onOpenForm ? (
+                    <button
+                      type="button"
+                      onClick={() => onOpenForm(id)}
+                      aria-pressed={openFormId === id}
+                      data-testid={`activity-panel-open-${id}`}
+                      className="min-w-0 flex-1 truncate text-left text-accent hover:underline"
+                    >
+                      {label}
+                    </button>
+                  ) : (
+                    <span className="min-w-0 flex-1 truncate">{label}</span>
+                  )}
                   <Button
                     size="sm"
                     variant="ghost"

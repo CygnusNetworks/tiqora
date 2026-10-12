@@ -15,6 +15,7 @@ import { ActivityPanel } from "@/components/process-designer/panels/ActivityPane
 import { NEW_DIALOG_CONFIG } from "@/components/process-designer/panels/activityModel";
 import { TransitionPanel } from "@/components/process-designer/panels/TransitionPanel";
 import { TransitionActions } from "@/components/process-designer/panels/TransitionActions";
+import { DialogPanel } from "@/components/process-designer/panels/DialogPanel";
 import { ActionPanel } from "@/components/process-designer/panels/ActionPanel";
 import { MODULE_PREFIX } from "@/components/process-designer/panels/actionForm";
 import { setActions } from "@/components/process-designer/canvasModel";
@@ -158,7 +159,9 @@ export function ProcessDesignerPage() {
             ? { ...cur, activities: [...cur.activities, created] }
             : type === "ActivityDialog"
               ? { ...cur, activity_dialogs: [...cur.activity_dialogs, created] }
-              : { ...cur, transitions: [...cur.transitions, created] }
+              : type === "TransitionAction"
+                ? { ...cur, transition_actions: [...cur.transition_actions, created] }
+                : { ...cur, transitions: [...cur.transitions, created] }
           : cur,
       );
       return created.entity_id;
@@ -183,6 +186,23 @@ export function ProcessDesignerPage() {
     [createEntity, t],
   );
   const [actionId, setActionId] = useState<string | null>(null);
+  // The form whose panel is open below the step panel (its own entity, saved on its own).
+  const [dialogId, setDialogId] = useState<string | null>(null);
+  const selectedDialog = useMemo(
+    () => (draft && dialogId ? draft.activity_dialogs.find((d) => d.entity_id === dialogId) : undefined),
+    [draft, dialogId],
+  );
+  const onDialogSaved = useCallback(
+    (saved: DesignerEntity) => {
+      qc.setQueryData<ProcessDraft>(draftKey, (cur) =>
+        cur
+          ? { ...cur, activity_dialogs: cur.activity_dialogs.map((x) => (x.entity_id === saved.entity_id ? saved : x)) }
+          : cur,
+      );
+      refreshValidation();
+    },
+    [qc, draftKey, refreshValidation],
+  );
   const selectedTransition = useMemo(
     () => (draft && selection?.kind === "transition" ? draft.transitions.find((x) => x.entity_id === selection.transitionId) : undefined),
     [draft, selection],
@@ -378,6 +398,7 @@ export function ProcessDesignerPage() {
                     onSelect={(sel) => {
                       setSelection(sel);
                       setActionId(null);
+                      setDialogId(null);
                     }}
                     onShapeChange={setEdited}
                     createActivity={createActivity}
@@ -392,14 +413,27 @@ export function ProcessDesignerPage() {
                 </h2>
                 <div className="mt-2">
                   {selectedActivity ? (
-                    <ActivityPanel
-                      key={`${selectedActivity.entity_id}:${selectedActivity.version}`}
-                      activity={selectedActivity}
-                      dialogs={draft.activity_dialogs}
-                      createDialog={createDialog}
-                      onSaved={onActivitySaved}
-                      onReload={() => void draftQ.refetch()}
-                    />
+                    <div className="space-y-4">
+                      <ActivityPanel
+                        key={`${selectedActivity.entity_id}:${selectedActivity.version}`}
+                        activity={selectedActivity}
+                        dialogs={draft.activity_dialogs}
+                        createDialog={createDialog}
+                        onSaved={onActivitySaved}
+                        onReload={() => void draftQ.refetch()}
+                        onOpenForm={setDialogId}
+                        openFormId={dialogId}
+                      />
+                      {selectedDialog && catalogQ.data ? (
+                        <DialogPanel
+                          key={`${selectedDialog.entity_id}:${selectedDialog.version}`}
+                          dialog={selectedDialog}
+                          catalog={catalogQ.data}
+                          onSaved={onDialogSaved}
+                          onReload={() => void draftQ.refetch()}
+                        />
+                      ) : null}
+                    </div>
                   ) : selectedTransition && shape && catalogQ.data && selection?.kind === "transition" ? (
                     <div className="space-y-4">
                       <TransitionPanel
