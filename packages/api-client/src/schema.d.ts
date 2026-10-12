@@ -2205,6 +2205,50 @@ export interface paths {
         patch: operations["update_chat_config_api_v1_admin_chat_configs__config_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/chat-configs/{config_id}/ai-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Chat Ai Status
+         * @description Per topic: whether the chat assistant would answer there right now, else why not.
+         */
+        get: operations["chat_ai_status_api_v1_admin_chat_configs__config_id__ai_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/chat-configs/{config_id}/identity-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Identity Secret
+         * @description Create or rotate the website sign-in secret; the plain value is in this response only.
+         *
+         *     Tokens signed with the previous secret stop working at once on this replica and within the
+         *     config cache TTL (10 s) on the others.
+         */
+        post: operations["create_identity_secret_api_v1_admin_chat_configs__config_id__identity_secret_post"];
+        /** Delete Identity Secret */
+        delete: operations["delete_identity_secret_api_v1_admin_chat_configs__config_id__identity_secret_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/chat-configs/{config_id}/rotate-key": {
         parameters: {
             query?: never;
@@ -13029,6 +13073,26 @@ export interface components {
             /** Topics */
             topics: string[];
         };
+        /** ChatAiStatusOut */
+        ChatAiStatusOut: {
+            /** Topics */
+            topics: components["schemas"]["ChatAiTopicStatusOut"][];
+        };
+        /** ChatAiTopicStatusOut */
+        ChatAiTopicStatusOut: {
+            /** Ai Mode */
+            ai_mode: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Ok */
+            ok: boolean;
+            /** Queue Id */
+            queue_id: number;
+            /** Reason */
+            reason: string | null;
+        };
         /** ChatAttachmentOut */
         ChatAttachmentOut: {
             /** Content Type */
@@ -13067,6 +13131,8 @@ export interface components {
             embed_snippet: string;
             /** Id */
             id: number;
+            /** Identity Secret Set */
+            identity_secret_set: boolean;
             /** Name */
             name: string;
             /** Public Key */
@@ -13168,6 +13234,14 @@ export interface components {
         ChatIdentifyIn: {
             /** Identity */
             identity: string;
+        };
+        /**
+         * ChatIdentitySecretOut
+         * @description The plain website sign-in secret; only ever returned by the 201 that creates it.
+         */
+        ChatIdentitySecretOut: {
+            /** Secret */
+            secret: string;
         };
         /** ChatInboxItemOut */
         ChatInboxItemOut: {
@@ -27957,6 +28031,109 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ChatConfigOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    chat_ai_status_api_v1_admin_chat_configs__config_id__ai_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatAiStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_identity_secret_api_v1_admin_chat_configs__config_id__identity_secret_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatIdentitySecretOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_identity_secret_api_v1_admin_chat_configs__config_id__identity_secret_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                config_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

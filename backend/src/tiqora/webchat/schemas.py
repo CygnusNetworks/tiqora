@@ -261,10 +261,32 @@ class ChatConfigOut(BaseModel):
     public_key: str
     valid: bool
     values: ChatConfigValues
+    # The website sign-in secret is shown once (``ChatIdentitySecretOut``) and never read back.
+    identity_secret_set: bool
     embed_snippet: str
     session_count: int
     created: UtcDateTime
     changed: UtcDateTime
+
+
+class ChatIdentitySecretOut(BaseModel):
+    """The plain website sign-in secret; only ever returned by the 201 that creates it."""
+
+    secret: str
+
+
+class ChatAiTopicStatusOut(BaseModel):
+    key: str
+    label: str
+    queue_id: int
+    ai_mode: str
+    ok: bool
+    # ``BotAvailability.reason``: why the assistant would not answer on this topic right now.
+    reason: str | None
+
+
+class ChatAiStatusOut(BaseModel):
+    topics: list[ChatAiTopicStatusOut]
 
 
 class ChatConfigCreateIn(BaseModel):

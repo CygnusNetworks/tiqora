@@ -8097,6 +8097,67 @@
         "title": "ChatAgentStateOut",
         "type": "object"
       },
+      "ChatAiStatusOut": {
+        "properties": {
+          "topics": {
+            "items": {
+              "$ref": "#/components/schemas/ChatAiTopicStatusOut"
+            },
+            "title": "Topics",
+            "type": "array"
+          }
+        },
+        "required": [
+          "topics"
+        ],
+        "title": "ChatAiStatusOut",
+        "type": "object"
+      },
+      "ChatAiTopicStatusOut": {
+        "properties": {
+          "ai_mode": {
+            "title": "Ai Mode",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "queue_id": {
+            "title": "Queue Id",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "queue_id",
+          "ai_mode",
+          "ok",
+          "reason"
+        ],
+        "title": "ChatAiTopicStatusOut",
+        "type": "object"
+      },
       "ChatAttachmentOut": {
         "properties": {
           "content_type": {
@@ -8169,6 +8230,10 @@
             "title": "Id",
             "type": "integer"
           },
+          "identity_secret_set": {
+            "title": "Identity Secret Set",
+            "type": "boolean"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -8195,6 +8260,7 @@
           "public_key",
           "valid",
           "values",
+          "identity_secret_set",
           "embed_snippet",
           "session_count",
           "created",
@@ -8442,6 +8508,20 @@
           "identity"
         ],
         "title": "ChatIdentifyIn",
+        "type": "object"
+      },
+      "ChatIdentitySecretOut": {
+        "description": "The plain website sign-in secret; only ever returned by the 201 that creates it.",
+        "properties": {
+          "secret": {
+            "title": "Secret",
+            "type": "string"
+          }
+        },
+        "required": [
+          "secret"
+        ],
+        "title": "ChatIdentitySecretOut",
         "type": "object"
       },
       "ChatInboxItemOut": {
@@ -46380,6 +46460,221 @@
           }
         },
         "summary": "Update Chat Config",
+        "tags": [
+          "admin:chat-configs"
+        ]
+      }
+    },
+    "/api/v1/admin/chat-configs/{config_id}/ai-status": {
+      "get": {
+        "description": "Per topic: whether the chat assistant would answer there right now, else why not.",
+        "operationId": "chat_ai_status_api_v1_admin_chat_configs__config_id__ai_status_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatAiStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Chat Ai Status",
+        "tags": [
+          "admin:chat-configs"
+        ]
+      }
+    },
+    "/api/v1/admin/chat-configs/{config_id}/identity-secret": {
+      "delete": {
+        "operationId": "delete_identity_secret_api_v1_admin_chat_configs__config_id__identity_secret_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Identity Secret",
+        "tags": [
+          "admin:chat-configs"
+        ]
+      },
+      "post": {
+        "description": "Create or rotate the website sign-in secret; the plain value is in this response only.\n\nTokens signed with the previous secret stop working at once on this replica and within the\nconfig cache TTL (10 s) on the others.",
+        "operationId": "create_identity_secret_api_v1_admin_chat_configs__config_id__identity_secret_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_id",
+            "required": true,
+            "schema": {
+              "title": "Config Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatIdentitySecretOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Identity Secret",
         "tags": [
           "admin:chat-configs"
         ]

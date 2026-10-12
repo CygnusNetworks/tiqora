@@ -13,6 +13,7 @@ import json
 import secrets
 from typing import Any, Final
 
+import structlog
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
@@ -20,21 +21,37 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy import bindparam, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.api.deps import AppSettings, DbSession
+from tiqora.api.deps import AppSettings, DbSession, RedisDep
 from tiqora.api.v1.admin.deps import AdminUser
+from tiqora.crypto.secret import encrypt_secret
 from tiqora.db.tiqora.models import TiqoraChatConfig, TiqoraChatSession
 from tiqora.domain.dynamic_field_values import load_ticket_dynamic_field
 from tiqora.jobs.service import utc_now
+from tiqora.webchat.bot import bot_availability
 from tiqora.webchat.config_cache import clear_config_cache
+from tiqora.webchat.identity import new_identity_secret
 from tiqora.webchat.models import DF_KINDS_FOR_PRECHAT, ChatConfigValues
 from tiqora.webchat.origins import OriginError, own_origin
-from tiqora.webchat.schemas import ChatConfigCreateIn, ChatConfigOut, ChatConfigUpdateIn
+from tiqora.webchat.schemas import (
+    ChatAiStatusOut,
+    ChatAiTopicStatusOut,
+    ChatConfigCreateIn,
+    ChatConfigOut,
+    ChatConfigUpdateIn,
+    ChatIdentitySecretOut,
+)
 from tiqora.webchat.store import _JSON_COLUMNS, _SCALAR_COLUMNS, config_values
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/chat-configs", tags=["admin:chat-configs"])
 
 ADMIN_PATH_SUFFIX: Final = "/admin/chat-configs"
 _VALUE_ERROR_PREFIX: Final = "Value error, "
+_ONE_PORTAL_CHAT: Final = "Es kann nur ein Chat im Kundenportal angezeigt werden."
+_OFFLINE_AI_NEEDS_TOPIC: Final = (
+    "„KI antwortet allein“ braucht mindestens ein Thema mit „KI antwortet zuerst“."
+)
 
 
 def new_public_key() -> str:
@@ -132,7 +149,25 @@ async def _check_values(db: AsyncSession, values: ChatConfigValues) -> dict[str,
         ).first()
         if found is None:
             errors["default_customer_user"] = "Diesen Kundenbenutzer gibt es nicht."
+    if values.offline_mode == "ai" and not any(t.ai_mode == "first_line" for t in values.topics):
+        errors["offline_mode"] = _OFFLINE_AI_NEEDS_TOPIC
     return errors
+
+
+async def _portal_conflict(
+    db: AsyncSession, values: ChatConfigValues, *, valid: bool, exclude_id: int | None
+) -> dict[str, str]:
+    """Only one valid chat may sit in the customer portal."""
+    if not (values.show_on_portal and valid):
+        return {}
+    stmt = select(TiqoraChatConfig.id).where(
+        TiqoraChatConfig.show_on_portal.is_(True), TiqoraChatConfig.valid.is_(True)
+    )
+    if exclude_id is not None:
+        stmt = stmt.where(TiqoraChatConfig.id != exclude_id)
+    if (await db.execute(stmt.limit(1))).first() is not None:
+        return {"show_on_portal": _ONE_PORTAL_CHAT}
+    return {}
 
 
 def _apply_values(row: TiqoraChatConfig, values: ChatConfigValues) -> None:
@@ -173,6 +208,7 @@ def _to_out(
         public_key=row.public_key,
         valid=row.valid,
         values=config_values(row),
+        identity_secret_set=bool(row.identity_secret),
         embed_snippet=_snippet(request, settings, row.public_key),
         session_count=session_count,
         created=row.created,
@@ -230,6 +266,7 @@ async def create_chat_config(
     settings: AppSettings,
 ) -> ChatConfigOut:
     errors = await _check_values(db, body.values)
+    errors.update(await _portal_conflict(db, body.values, valid=body.valid, exclude_id=None))
     if await _name_taken(db, body.name):
         errors["name"] = "Dieser Name ist bereits vergeben."
     if errors:
@@ -265,6 +302,15 @@ async def update_chat_config(
     errors: dict[str, str] = {}
     if body.values is not None:
         errors = await _check_values(db, body.values)
+    if body.values is not None or body.valid is not None:
+        errors.update(
+            await _portal_conflict(
+                db,
+                body.values if body.values is not None else config_values(row),
+                valid=body.valid if body.valid is not None else row.valid,
+                exclude_id=config_id,
+            )
+        )
     if body.name is not None and await _name_taken(db, body.name, exclude_id=config_id):
         errors["name"] = "Dieser Name ist bereits vergeben."
     if errors:
@@ -307,3 +353,70 @@ async def rotate_chat_config_key(
     clear_config_cache()
     await db.refresh(row)
     return await _out(request, settings, db, row)
+
+
+@router.post(
+    "/{config_id}/identity-secret",
+    response_model=ChatIdentitySecretOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_identity_secret(
+    config_id: int, admin: AdminUser, db: DbSession, settings: AppSettings
+) -> ChatIdentitySecretOut:
+    """Create or rotate the website sign-in secret; the plain value is in this response only.
+
+    Tokens signed with the previous secret stop working at once on this replica and within the
+    config cache TTL (10 s) on the others.
+    """
+    row = await _get(db, config_id)
+    secret = new_identity_secret()
+    row.identity_secret = encrypt_secret(settings.secret_key, secret)
+    row.changed = utc_now()
+    row.changed_by = admin.id
+    await db.commit()
+    clear_config_cache()
+    logger.info("webchat_identity_secret_rotated", config_id=config_id)
+    return ChatIdentitySecretOut(secret=secret)
+
+
+@router.delete("/{config_id}/identity-secret", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_identity_secret(config_id: int, admin: AdminUser, db: DbSession) -> Response:
+    row = await _get(db, config_id)
+    row.identity_secret = None
+    row.changed = utc_now()
+    row.changed_by = admin.id
+    await db.commit()
+    clear_config_cache()
+    logger.info("webchat_identity_secret_removed", config_id=config_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/{config_id}/ai-status", response_model=ChatAiStatusOut)
+async def chat_ai_status(
+    config_id: int, admin: AdminUser, db: DbSession, settings: AppSettings, redis_client: RedisDep
+) -> ChatAiStatusOut:
+    """Per topic: whether the chat assistant would answer there right now, else why not."""
+    _ = admin
+    row = await _get(db, config_id)
+    topics: list[ChatAiTopicStatusOut] = []
+    for topic in config_values(row).topics:
+        avail = await bot_availability(
+            db,
+            redis_client,
+            settings,
+            config_id=config_id,
+            topic=topic,
+            queue_id=topic.queue_id,
+            use_cache=False,
+        )
+        topics.append(
+            ChatAiTopicStatusOut(
+                key=topic.key,
+                label=topic.label,
+                queue_id=topic.queue_id,
+                ai_mode=topic.ai_mode,
+                ok=avail.ok,
+                reason=avail.reason,
+            )
+        )
+    return ChatAiStatusOut(topics=topics)
