@@ -211,6 +211,30 @@ describe("ProcessWidget", () => {
     await waitFor(() => expect(screen.queryByTestId("process-dialog-form")).not.toBeInTheDocument());
   });
 
+  it("refetches an expanded path after a dialog submit", async () => {
+    ticketState.mockResolvedValue(activeState);
+    dialogForm.mockResolvedValue(dialogDetail);
+    path.mockResolvedValue({ process_entity_id: "Process-1", steps: [] });
+    submit.mockResolvedValue({
+      activity_changed: true,
+      new_activity_entity_id: null,
+      transition_entity_id: null,
+      unsupported_actions: [],
+      state: activeState,
+    });
+    wrap(<ProcessWidget ticketId={42} />);
+
+    fireEvent.click(await screen.findByTestId("process-path-toggle"));
+    await waitFor(() => expect(path).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(await screen.findByTestId("process-dialog-button-ActivityDialog-1"));
+    fireEvent.change(await screen.findByTestId("process-field-Title"), { target: { value: "New title" } });
+    fireEvent.click(screen.getByTestId("process-dialog-submit"));
+
+    await waitFor(() => expect(submit).toHaveBeenCalled());
+    await waitFor(() => expect(path).toHaveBeenCalledTimes(2));
+  });
+
   it("hides the start button when the ticket cannot start a process", async () => {
     ticketState.mockResolvedValue({ ...notInProcessState, can_start: false });
     wrap(<ProcessWidget ticketId={42} />);

@@ -4673,8 +4673,6 @@
     },
     "path": {
       "title": "Path so far",
-      "show": "Show path so far",
-      "hide": "Hide path so far",
       "loading": "Loading path...",
       "loadError": "Could not load the path.",
       "empty": "No steps recorded yet.",

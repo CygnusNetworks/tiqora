@@ -41,6 +41,7 @@ export function StartProcessDialog({
       processApi.enroll(ticketId, { process_entity_id: selected, field_values: fieldValues }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["process", "ticket", ticketId, "state"] });
+      void queryClient.invalidateQueries({ queryKey: ["process", "ticket", ticketId, "path"] });
       void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId] });
       onClose();
     },

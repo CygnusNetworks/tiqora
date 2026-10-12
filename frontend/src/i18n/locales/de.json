@@ -4681,8 +4681,6 @@
     },
     "path": {
       "title": "Bisheriger Weg",
-      "show": "Bisherigen Weg anzeigen",
-      "hide": "Bisherigen Weg ausblenden",
       "loading": "Weg wird geladen ...",
       "loadError": "Der Weg konnte nicht geladen werden.",
       "empty": "Noch keine Schritte aufgezeichnet.",

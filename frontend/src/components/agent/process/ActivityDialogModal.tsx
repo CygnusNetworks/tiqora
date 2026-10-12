@@ -35,6 +35,7 @@ export function ActivityDialogModal({
       processApi.submit(ticketId, { activity_dialog_entity_id: activityDialogEntityId, field_values: fieldValues }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["process", "ticket", ticketId, "state"] });
+      void queryClient.invalidateQueries({ queryKey: ["process", "ticket", ticketId, "path"] });
       // Everything under ["tickets", id] (ticket, acl-actions, scoped owner/responsible options): a dialog can
       // move the queue or change the state.
       void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId] });
