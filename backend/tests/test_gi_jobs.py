@@ -496,3 +496,29 @@ async def test_response_action_enqueue_creates_follow_up_job(env: Env, mock: Moc
     assert first["status"] == "succeeded"
     assert second["status"] == "queued" and second["kind"] == GI_INVOKE_KIND
     assert second["payload"]["origin"] == "response_action" and second["dedupe_key"] is None
+    assert first["payload"]["chain_depth"] == 0 and second["payload"]["chain_depth"] == 1
+
+
+async def test_response_action_chain_stops_at_depth_limit(env: Env, mock: Mock) -> None:
+    """Ruling F13: a remote that answers every call with a call to itself gets two hops, then
+    the queued call is refused (debugger error) and the chain ends."""
+    _install(env.sync_url)
+    mock.handler = lambda request: httpx.Response(
+        200,
+        json={
+            "OTRS_AsynchronousInvokerExecution": [
+                {"WebserviceID": WS, "Invoker": "SendTicket", "Data": {"TicketID": TICKET}}
+            ]
+        },
+    )
+    job_id = await env.enqueue(_payload())
+    for _ in range(4):
+        await env.run(job_id)
+        queued = [j for j in env.jobs() if j["status"] == "queued"]
+        if not queued:
+            break
+        job_id = queued[0]["id"]
+    jobs = env.jobs()
+    assert [j["payload"]["chain_depth"] for j in jobs] == [0, 1, 2]
+    assert {j["status"] for j in jobs} == {"succeeded"}
+    assert len(mock.seen) == 3

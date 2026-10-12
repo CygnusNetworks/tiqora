@@ -285,6 +285,14 @@ _CREATE_KEYS: Final = frozenset(
 
 Enqueue = Callable[..., Awaitable[None]]
 
+#: ``OTRS_AsynchronousInvokerExecution`` guards (Tiqora deviation, ruling F13): at most this
+#: many calls are queued per response (the rest is dropped with a debugger error) ...
+MAX_ASYNC_ITEMS: Final = 10
+#: ... and a call queued by a response action is one level deeper than the call whose response
+#: queued it (event, transition, resend: depth 0). Items that would land at this depth or
+#: deeper are refused, so a remote can never build an endless A -> A chain.
+MAX_CHAIN_DEPTH: Final = 3
+
 
 class _ActionError(Exception):
     """A response action failed; the text goes into the debugger line's content."""
@@ -580,11 +588,32 @@ async def _create_ticket_action(
 
 
 async def _enqueue_invocations(
-    key: str, value: Any, enqueue: Enqueue, debugger: GiDebugger
+    key: str, value: Any, enqueue: Enqueue, debugger: GiDebugger, *, chain_depth: int
 ) -> dict[str, Any] | None:
-    """``OTRS_AsynchronousInvokerExecution``; returns a failure dict or ``None``."""
+    """``OTRS_AsynchronousInvokerExecution``; returns a failure dict or ``None``.
+
+    The remote chooses webservice, invoker and data of every item, so two guards apply
+    (:data:`MAX_CHAIN_DEPTH`, :data:`MAX_ASYNC_ITEMS`). Both write a debugger error but do not
+    fail the response: a failure would let ``RequestRetry`` repeat the call, and the repeated
+    answer would be refused again. ``PastExecutionData``/``Asynchronous`` of an item are never
+    taken from the remote (always a first, asynchronous run).
+    """
     if not isinstance(value, list) or not value:
         return await debugger.error(f"Parameter '{key}' needs to be an array with data.")
+    depth = chain_depth + 1
+    if depth >= MAX_CHAIN_DEPTH:
+        await debugger.error(
+            f"Action '{key}' abgelehnt: Aufrufe, die von Antworten ausgelöst werden, dürfen"
+            f" höchstens {MAX_CHAIN_DEPTH - 1} Stufen tief verkettet sein.",
+            f"{len(value)} Aufruf(e) nicht eingereiht.",
+        )
+        return None
+    if len(value) > MAX_ASYNC_ITEMS:
+        await debugger.error(
+            f"Action '{key}': Tiqora reiht höchstens {MAX_ASYNC_ITEMS} Aufrufe pro Antwort ein.",
+            f"{len(value) - MAX_ASYNC_ITEMS} weitere Aufruf(e) verworfen.",
+        )
+        value = value[:MAX_ASYNC_ITEMS]
     for item in value:
         if not isinstance(item, dict) or not item:
             return await debugger.error(
@@ -608,6 +637,7 @@ async def _enqueue_invocations(
                     "data": payload_data,
                     "asynchronous": True,
                     "origin": "response_action",
+                    "chain_depth": depth,
                 }
             )
         except Exception:
@@ -776,6 +806,7 @@ async def handle_response(
     enqueue: Enqueue,
     session_factory: async_sessionmaker[AsyncSession],
     sysconfig: SysConfig,
+    chain_depth: int = 0,
 ) -> dict[str, Any]:
     """``Generic.pm`` ``HandleResponse``: execute the ``OTRS_*`` actions in *data*, then forward
     a response error. Returns the Znuny result shape (``Success`` plus ``Data`` or
@@ -784,8 +815,9 @@ async def handle_response(
     Everything runs in *session* as user 1: one ``commit()`` at the end (also when the response
     itself was an error - Znuny runs the actions in that case, too), ``rollback()`` of the whole
     response on the first failing action. *enqueue* receives a plain dict (``webservice_id``,
-    ``invoker``, ``data``, ``asynchronous=True``, ``origin="response_action"``) per
-    ``OTRS_AsynchronousInvokerExecution`` item; the caller adapts it to ``GiInvokePayload``.
+    ``invoker``, ``data``, ``asynchronous=True``, ``origin="response_action"``,
+    ``chain_depth=chain_depth + 1``) per ``OTRS_AsynchronousInvokerExecution`` item; the caller
+    adapts it to ``GiInvokePayload``. *chain_depth* is the depth of the current call.
     Znuny's ``MaximumParallelInstances`` is not honoured (the GI job lanes limit concurrency).
     """
     if not isinstance(data, dict) or not data:
@@ -796,7 +828,9 @@ async def handle_response(
         failure: dict[str, Any] | None = None
         try:
             if key == _ASYNC_KEY:
-                failure = await _enqueue_invocations(key, value, enqueue, debugger)
+                failure = await _enqueue_invocations(
+                    key, value, enqueue, debugger, chain_depth=chain_depth
+                )
             elif key == _ARTICLE_EVENT_KEY:
                 failure = await debugger.error(f"Action '{key}' wird von Tiqora nicht unterstützt.")
             elif key == "OTRS_TicketHistoryAdd":
@@ -884,6 +918,7 @@ async def handle_error(
     enqueue: Enqueue,
     session_factory: async_sessionmaker[AsyncSession],
     sysconfig: SysConfig,
+    chain_depth: int = 0,
 ) -> dict[str, Any]:
     """``Generic.pm`` ``HandleError``: ``handle_response`` with ``success=False`` and no message.
 
@@ -900,4 +935,5 @@ async def handle_error(
         enqueue=enqueue,
         session_factory=session_factory,
         sysconfig=sysconfig,
+        chain_depth=chain_depth,
     )

@@ -209,6 +209,7 @@ async def _respond(
     error_message: str | None = None,
     error_variant: bool = False,
     commit_after: bool = False,
+    chain_depth: int = 0,
 ) -> _Run:
     run = _Run()
     engine = create_async_engine(_async_url(sync_url))
@@ -229,6 +230,7 @@ async def _respond(
                 "enqueue": run.enqueue,
                 "session_factory": factory,
                 "sysconfig": SysConfig(session),
+                "chain_depth": chain_depth,
             }
             if error_variant:
                 run.result = await handle_error(session, **common)
@@ -588,6 +590,7 @@ async def test_async_invoker_execution_enqueues(url_fixture: str) -> None:
             "data": {"TicketID": 51166},
             "asynchronous": True,
             "origin": "response_action",
+            "chain_depth": 1,
         }
     ]
 
@@ -605,6 +608,37 @@ async def test_async_invoker_execution_enqueues(url_fixture: str) -> None:
     assert run.result["ErrorMessage"] == (
         "Error executing asynchronous call of Kernel::GenericInterface::Requester::Run()."
     )
+
+
+async def test_async_invoker_execution_caps_items_per_response(url_fixture: str) -> None:
+    """Ruling F13: at most 10 calls per response; the rest is dropped with a debugger error,
+    and the response still succeeds (a failure would make RequestRetry repeat the call)."""
+    items = [
+        {"WebserviceID": 51160, "Invoker": "SendTicket", "Data": {"TicketID": 51166, "N": n}}
+        for n in range(25)
+    ]
+    run = await _respond(url_fixture, 51166, {"OTRS_AsynchronousInvokerExecution": items})
+    assert run.result["Success"] == 1
+    assert [q["data"]["N"] for q in run.enqueued] == list(range(10))
+    assert {q["chain_depth"] for q in run.enqueued} == {1}
+    assert len(run.sink.errors()) == 1 and "höchstens 10" in run.sink.errors()[0]
+
+
+async def test_async_invoker_execution_refused_at_chain_depth(url_fixture: str) -> None:
+    """Ruling F13: a call two hops down may not queue further calls (A -> A loops stop)."""
+    item = {"WebserviceID": 51160, "Invoker": "SendTicket", "Data": {"TicketID": 51166}}
+    data = {"OTRS_AsynchronousInvokerExecution": [item]}
+    run = await _respond(url_fixture, 51166, data, chain_depth=1)
+    assert [q["chain_depth"] for q in run.enqueued] == [2] and run.sink.errors() == []
+
+    run = await _respond(url_fixture, 51166, data, chain_depth=2)
+    assert run.result["Success"] == 1
+    assert run.enqueued == []
+    assert len(run.sink.errors()) == 1 and "abgelehnt" in run.sink.errors()[0]
+
+    # HandleError (fault mapped to actions) carries the depth as well
+    run = await _respond(url_fixture, 51166, data, chain_depth=2, error_variant=True)
+    assert run.enqueued == []
 
 
 async def _respond_failing_enqueue(sync_url: str, item: dict[str, Any]) -> _Run:

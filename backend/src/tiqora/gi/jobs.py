@@ -25,7 +25,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Final, Literal
 
 import structlog
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -70,6 +70,9 @@ class GiInvokePayload(BaseModel):
     history_id: int | None = None  # source ticket_history.id (idempotency key, debugger)
     past_execution: dict[str, Any] | None = None  # PastExecutionData.to_json()
     dry_run: bool = False
+    # How many OTRS_AsynchronousInvokerExecution hops led to this call (ruling F13; the
+    # invoker refuses items at MAX_CHAIN_DEPTH). Reschedules keep it, resends start at 0.
+    chain_depth: int = Field(default=0, ge=0)
 
 
 def _dedupe_key(payload: GiInvokePayload) -> str | None:
@@ -163,6 +166,7 @@ async def run_gi_invoke(ctx: JobContext, payload: GiInvokePayload) -> dict[str, 
         before_send=before_send,
         dry_run=payload.dry_run,
         enqueue=enqueue,
+        chain_depth=payload.chain_depth,
         **_requester_extras(),
     )
     if outcome.success:

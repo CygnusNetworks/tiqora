@@ -123,10 +123,12 @@ async def run_requester(
     policy: EgressPolicy | None = None,
     enqueue: Enqueue | None = None,
     now: datetime | None = None,
+    chain_depth: int = 0,
 ) -> RequesterOutcome:
     """``Requester::Run``. *enqueue* receives the ``OTRS_AsynchronousInvokerExecution`` items
     (the job layer adapts them); *policy* overrides the stored egress settings; *now* is the
-    clock for error handling (naive UTC)."""
+    clock for error handling (naive UTC); *chain_depth* is how many response actions queued
+    this call (0 for event, transition and resend calls)."""
     debugger_config = (
         DebuggerConfig(threshold=ws.debugger.threshold, test_mode=True) if dry_run else ws.debugger
     )
@@ -224,6 +226,7 @@ async def run_requester(
                 enqueue=enqueue_fn,
                 session_factory=session_factory,
                 sysconfig=sysconfig_factory(session),
+                chain_depth=chain_depth,
             )
         if not handled.get("Success"):
             await debugger.error(
@@ -347,6 +350,7 @@ async def run_requester(
             enqueue=enqueue_fn,
             session_factory=session_factory,
             sysconfig=sysconfig_factory(session),
+            chain_depth=chain_depth,
         )
     if not handled.get("Success"):
         summary = (
