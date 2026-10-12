@@ -14,7 +14,8 @@ Deliberate differences from Znuny:
   reschedule data (``Data=undef``), so Znuny never retries asynchronous Ticket::Generic
   transport failures; Tiqora deliberately does.
 * ``dry_run`` builds the request and returns it (masked); nothing is sent, nothing is written
-  to the debugger, no response action runs.
+  to the debugger, no response action runs - not even the invoker's ``HandleError`` after a
+  failed prepare or mapping step.
 * The egress policy can be injected (tests); otherwise it is loaded per webservice.
 * Secrets never leave this module unmasked: every debugger line passes the debugger's
   redaction, the outcome only holds mapped response data and masked error texts.
@@ -188,6 +189,10 @@ async def run_requester(
             else None
         )
         outcome = failure(result.error_message or summary, decision)
+        if dry_run:
+            # A dry run never acts: the invoker's HandleError may map the fault to OTRS_*
+            # response actions (ticket writes, queued calls), so it is skipped entirely.
+            return outcome
 
         fault: Any = (
             error_data

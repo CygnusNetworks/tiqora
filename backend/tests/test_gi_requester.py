@@ -415,6 +415,40 @@ async def test_dry_run_sends_nothing_and_masks(url_fixture: str) -> None:
     assert json.loads(request["body"])["Event"]["Event"] == "TicketCreate"
 
 
+async def test_dry_run_mapping_failure_runs_no_handle_error_actions(url_fixture: str) -> None:
+    """A failed outbound mapping in a dry run must not reach the invoker's HandleError: the
+    usual inbound mapping turns ``Fault`` into ``OTRS_*`` actions that would write the ticket
+    or queue a real call."""
+    queued: list[dict[str, Any]] = []
+
+    async def enqueue(payload: dict[str, Any]) -> None:
+        queued.append(payload)
+
+    invoker = {
+        **GENERIC,
+        "MappingOutbound": {"Type": "XSLT", "Config": {"Template": "this is no xsl"}},
+        "MappingInbound": {
+            "Type": "Simple",
+            "Config": {
+                "KeyMapExact": {"Fault": "OTRS_TicketTitleUpdate"},
+                "KeyMapDefault": {"MapType": "Keep"},
+                "ValueMapDefault": {"MapType": "Keep"},
+            },
+        },
+    }
+    # control: outside a dry run HandleError runs the mapped action (Znuny parity)
+    real, mock, _ = await _run(url_fixture, _cfg(invoker), enqueue=enqueue)
+    assert not real.success and mock.seen == []
+    assert _title(url_fixture) != "GI52 Start"
+    with create_engine(url_fixture).begin() as conn:
+        conn.execute(text("UPDATE ticket SET title = 'GI52 Start' WHERE id = :t"), {"t": TICKET})
+
+    out, mock, sink = await _run(url_fixture, _cfg(invoker), dry_run=True, enqueue=enqueue)
+    assert not out.success and mock.seen == []
+    assert _title(url_fixture) == "GI52 Start"
+    assert queued == [] and sink.rows == []
+
+
 async def test_soap_dry_run_sends_nothing_and_masks(url_fixture: str) -> None:
     proxy_password = "example-proxy-secret-three"
     template = (
