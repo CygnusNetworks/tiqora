@@ -1544,6 +1544,8 @@ class DaemonServiceOut(BaseModel):
     last_ok_at: UtcDateTime | None = None
     last_error: str | None = None
     last_result: dict[str, Any] | None = None
+    # i18n keys of warnings for this row (only "gi_requester" fills them)
+    notices: list[str] = []
 
 
 class DaemonListOut(BaseModel):

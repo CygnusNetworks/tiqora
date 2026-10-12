@@ -24,6 +24,7 @@ from tiqora.api.v1.admin.schemas import (
 from tiqora.config import Settings
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
 from tiqora.db.legacy.ticket import Ticket
+from tiqora.db.tiqora.models import TiqoraGiDebugContent, TiqoraGiDebugEntry
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.domain.dev_anonymize import ValueMapper
 from tiqora.domain.ticket_write_service import SEARCH_REINDEX_EVENT
@@ -2316,6 +2317,26 @@ async def test_erasure_removes_report_facts_and_marks_dirty(
             text("DELETE FROM tiqora_report_dirty_ticket WHERE ticket_id = :t"), {"t": tid}
         )
         await rebuild_ticket_facts(session, [tid])
+        # A GenericInterface debugger entry of this ticket (payloads carry customer data).
+        gi_entry = TiqoraGiDebugEntry(
+            communication_id=f"gi51030{tag}"[:32],
+            communication_type="Requester",
+            webservice_id=51030,
+            create_time=NOW,
+            ticket_id=tid,
+        )
+        session.add(gi_entry)
+        await session.flush()
+        gi_entry_id = int(gi_entry.id)
+        session.add(
+            TiqoraGiDebugContent(
+                entry_id=gi_entry_id,
+                debug_level="error",
+                subject="payload",
+                content=b"customer data",
+                create_time=NOW,
+            )
+        )
         await session.commit()
     async with factory() as session:
         fact, events, dirty = await report_rows(session, tid)
@@ -2340,6 +2361,23 @@ async def test_erasure_removes_report_facts_and_marks_dirty(
     )
     assert purged == [Settings().redis_url]  # once per erasure, after the commit
     async with factory() as session:
+        # Debug logs are deleted in every mode, irreversibly (no backup, rollback keeps them gone).
+        assert (
+            await _count(
+                session,
+                "SELECT COUNT(*) FROM tiqora_gi_debug_entry WHERE ticket_id = :t",
+                {"t": tid},
+            )
+            == 0
+        )
+        assert (
+            await _count(
+                session,
+                "SELECT COUNT(*) FROM tiqora_gi_debug_content WHERE entry_id = :e",
+                {"e": gi_entry_id},
+            )
+            == 0
+        )
         assert await report_rows(session, tid) == (0, 0, 1)
         await session.execute(
             text("DELETE FROM tiqora_report_dirty_ticket WHERE ticket_id = :t"), {"t": tid}

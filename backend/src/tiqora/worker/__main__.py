@@ -16,6 +16,7 @@ from tiqora.config import get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.deployed.watcher import run_deploy_watch_tick
 from tiqora.domain.settings_store import (
+    KEY_GI_REQUESTER_INTERVAL_SECONDS,
     KEY_REPORT_FACTS_INTERVAL_SECONDS,
     KEY_REPORT_SCHEDULER_INTERVAL_SECONDS,
     KEY_WEBCHAT_SWEEP_INTERVAL_SECONDS,
@@ -29,6 +30,7 @@ from tiqora.worker.escalation import run_escalation_tick
 from tiqora.worker.gdpr_erasure_purge import run_gdpr_erasure_purge_tick
 from tiqora.worker.gdpr_retention import run_gdpr_retention_tick
 from tiqora.worker.generic_agent import run_generic_agent_tick
+from tiqora.worker.gi_debug_cleanup import run_gi_debug_cleanup
 from tiqora.worker.notifications import run_notifications_tick
 from tiqora.worker.outbox_drain import drain_outbox
 from tiqora.worker.pending_check import run_pending_check_tick
@@ -191,7 +193,25 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
         return await run_webchat_worker_tick(settings)
 
     from tiqora.extensions import get_registry
+    from tiqora.gi.follower import make_gap_tracker, run_gi_requester_tick
+    from tiqora.gi.loader import GiWebservices
     from tiqora.plugins.event_dispatch import run_plugin_events_tick
+    from tiqora.plugins.events import GapTracker
+
+    # process-level state of the GenericInterface follower: the webservice snapshot and the
+    # tracker that remembers which holes in the history ids it is still holding back
+    gi_webservices = GiWebservices()
+    gi_tracker: list[GapTracker] = []
+
+    async def gi_requester_tick() -> dict[str, int]:
+        if not gi_tracker:
+            gi_tracker.append(await make_gap_tracker(settings, get_session_factory()))
+        return await run_gi_requester_tick(
+            settings=settings,
+            session_factory=get_session_factory(),
+            webservices=gi_webservices,
+            tracker=gi_tracker[0],
+        )
 
     async def plugin_events_tick() -> dict[str, int]:
         # the registry object is read every tick: a late plugin boot swaps its contents
@@ -310,6 +330,13 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             stop,
         ),
         _interval_loop(
+            "gi_requester",
+            gi_requester_tick,
+            settings.gi_requester_interval_seconds,
+            KEY_GI_REQUESTER_INTERVAL_SECONDS,
+            stop,
+        ),
+        _interval_loop(
             "plugin_events",
             plugin_events_tick,
             settings.plugin_events_interval_seconds,
@@ -326,6 +353,7 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
         _daily_loop("gdpr_retention", run_gdpr_retention_tick, "03:00", stop),
         _daily_loop("gdpr_erasure_purge", run_gdpr_erasure_purge_tick, "03:30", stop),
         _daily_loop("ai_audit_cleanup", run_ai_audit_cleanup_tick, "04:00", stop),
+        _daily_loop("gi_debug_cleanup", run_gi_debug_cleanup, "03:02", stop),
         _daily_loop("smime_customer_renew", run_smime_customer_renew_tick, "02:02", stop),
         _daily_loop("identity_metadata", run_identity_metadata_refresh_tick, "04:30", stop),
         _daily_loop("report_runs_purge", run_report_runs_purge_tick, "03:45", stop),

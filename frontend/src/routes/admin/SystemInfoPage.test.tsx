@@ -47,6 +47,7 @@ function sysinfo(overrides: Partial<SystemInfoOut> = {}): SystemInfoOut {
         last_ok_at: recentIso,
         last_error: null,
         last_result: null,
+        notices: [],
       },
     ],
     datastores: {

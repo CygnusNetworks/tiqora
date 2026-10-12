@@ -44,41 +44,87 @@ def _is_scalar(value: Any) -> bool:
     return value is None or isinstance(value, (str, int, float))
 
 
-def _value_to_xml(value: Any, name: str, indent: str) -> str:
+def _value_to_xml(value: Any, name: str, indent: str, no_attr: bool = True) -> str:
+    """``value_to_xml``; *name* ``""`` means "no root element" (``RootName => undef``).
+
+    With ``no_attr`` false (``NoAttr => 0``) the scalar members of a hash become attributes,
+    one per line after the first (``AttrIndent => 1``); the key ``content`` is the text content.
+    """
+    named = name != ""
     if _is_scalar(value):
-        return f"{indent}<{name}>{_escape(value)}</{name}>\n"
+        if named:
+            return f"{indent}<{name}>{_escape(value)}</{name}>\n"
+        return f"{_escape(value)}\n"
     if isinstance(value, dict):
+        head: list[str] = [f"{indent}<{name}"] if named else []
         nested: list[str] = []
-        text_empty = not value  # empty hash -> text_content = ''
-        for key in sorted(value, key=str):
-            skey = str(key)
-            if skey.startswith("-"):
-                continue
-            nested.append(_value_to_xml(value[key], skey, indent + "  "))
-        if not nested and not text_empty:
-            return f"{indent}<{name} />\n"
-        if text_empty:
-            return f"{indent}<{name}></{name}>\n"
-        return f"{indent}<{name}>\n{''.join(nested)}{indent}</{name}>\n"
+        text_content: str | None = None
+        if value:
+            first_arg = True
+            for key in sorted(value, key=str):
+                skey = str(key)
+                item = value[key]
+                if skey.startswith("-"):
+                    continue
+                if item is None:
+                    if skey == _CONTENT:
+                        text_content = ""
+                    item = ""
+                if isinstance(item, (dict, list, tuple)) or no_attr:
+                    nested.append(_value_to_xml(item, skey, indent + "  ", no_attr))
+                elif skey == _CONTENT:
+                    text_content = _escape(item)
+                else:
+                    if not first_arg:
+                        head.append("\n" + indent + " " + " " * len(name))
+                    head.append(f' {skey}="{_escape(item)}"')
+                    first_arg = False
+        else:
+            text_content = ""
+        if nested or text_content is not None:
+            if not named:
+                return "".join(nested)  # special case: no root element
+            head.append(">")
+            if text_content is not None:
+                head.append(text_content)
+                if nested:
+                    nested[0] = nested[0].lstrip()
+            else:
+                head.append("\n")
+            if nested:
+                head.extend(nested)
+                head.append(indent)
+            head.append(f"</{name}>\n")
+        else:
+            head.append(" />\n")
+        return "".join(head)
     if isinstance(value, (list, tuple)):
         parts: list[str] = []
         for item in value:
             if _is_scalar(item):
                 parts.append(f"{indent}<{name}>{_escape(item)}</{name}>\n")
             elif isinstance(item, dict):
-                parts.append(_value_to_xml(item, name, indent))
+                parts.append(_value_to_xml(item, name, indent, no_attr))
             else:
-                inner = _value_to_xml(item, "anon", indent + "  ")
+                inner = _value_to_xml(item, "anon", indent + "  ", no_attr)
                 parts.append(f"{indent}<{name}>\n{inner}{indent}</{name}>\n")
         return "".join(parts)
     raise XmlSimpleError(f"Can't encode a value of type: {type(value).__name__}")
 
 
-def xml_out(data: Any, *, root_name: str = "RootElement") -> str:
+def xml_out(data: Any, *, no_attr: bool = True, root_name: str | None = "RootElement") -> str:
+    """``XMLout(..., NoAttr => no_attr, RootName => root_name)``; ``root_name=None`` drops the root.
+
+    Without a root element Perl first wraps every top-level scalar into a one-element list, so
+    even with ``no_attr=False`` the top level never produces attributes.
+    """
     if not isinstance(data, dict):
         raise XmlSimpleError(_OUT_ERROR)
+    name = root_name or ""
+    if not name:
+        data = {k: (v if isinstance(v, (dict, list, tuple)) else [v]) for k, v in data.items()}
     try:
-        return _value_to_xml(data, root_name, "")
+        return _value_to_xml(data, name, "", no_attr)
     except RecursionError as exc:
         raise XmlSimpleError(_OUT_ERROR) from exc
 

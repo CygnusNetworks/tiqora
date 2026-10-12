@@ -34,6 +34,12 @@ describe("apiErrorMessage (422 shapes)", () => {
     expect(apiErrorMessage(err422({ detail: [{ msg: "zu kurz" }, { msg: "x" }] }), "fb")).toBe("zu kurz");
   });
 
+  it("drops Pydantic's English 'Value error, ' prefix", () => {
+    expect(
+      apiErrorMessage(err422({ detail: [{ msg: "Value error, Ungültiger Eintrag 'x'" }] }), "fb"),
+    ).toBe("Ungültiger Eintrag 'x'");
+  });
+
   it("reads {message}, {message, path} and {message, errors}", () => {
     expect(apiErrorMessage(err422({ detail: { message: "Schon beendet." } }), "fb")).toBe("Schon beendet.");
     expect(

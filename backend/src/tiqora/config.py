@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Self
+from typing import Annotated, Self
 
-from pydantic import Field, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # Public constant so tests and startup guards share one source of truth.
 DEFAULT_SECRET_KEY = "change-me-in-production-use-openssl-rand"
@@ -392,6 +392,38 @@ class Settings(BaseSettings):
     compat_session_write_znuny: bool = Field(
         default=True, validation_alias="TIQORA_COMPAT_SESSION_WRITE_ZNUNY"
     )
+
+    # GenericInterface debugger: longest content a single debugger line keeps (bytes; Znuny
+    # ResponseLoggingMaxSize). Longer content is cut with a note.
+    gi_debug_max_content_bytes: int = Field(
+        default=200 * 1024, ge=1024, validation_alias="TIQORA_GI_DEBUG_MAX_CONTENT_BYTES"
+    )
+
+    # GenericInterface requester egress. Client certificates / CA files named in a webservice
+    # config are read only from these directories (colon-separated; empty = client certs off).
+    gi_cert_dirs: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="TIQORA_GI_CERT_DIRS"
+    )
+    gi_max_timeout_seconds: int = Field(
+        default=300, ge=1, le=900, validation_alias="TIQORA_GI_MAX_TIMEOUT_SECONDS"
+    )
+    gi_max_response_bytes: int = Field(
+        default=20 * 1024 * 1024, ge=1024, validation_alias="TIQORA_GI_MAX_RESPONSE_BYTES"
+    )
+    # Requester worker tick and how long a gap in the job sequence is held back.
+    gi_requester_interval_seconds: int = Field(
+        default=5, ge=1, validation_alias="TIQORA_GI_REQUESTER_INTERVAL"
+    )
+    gi_requester_gap_hold_seconds: int = Field(
+        default=30, ge=0, validation_alias="TIQORA_GI_REQUESTER_GAP_HOLD_SECONDS"
+    )
+
+    @field_validator("gi_cert_dirs", mode="before")
+    @classmethod
+    def _split_gi_cert_dirs(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [p.strip() for p in value.split(":") if p.strip()]
+        return value
 
     # How often every API process polls gi_webservice_config for changes made in
     # Znuny (rename / disable / edit) so compat webservices reload without a restart.

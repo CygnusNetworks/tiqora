@@ -12,6 +12,7 @@ import {
   demoZnunyPreview,
 } from "../../src/demo/savedMock";
 import { createDemoSchedules, demoZnunyApply, resolveSchedules, type DemoSchedules } from "../../src/demo/schedulesMock";
+import { filterDebugEntries, resolveGiData } from "../../src/demo/giMock";
 import type { ProcessDialogFormData, TicketProcessState } from "../../src/lib/processApi";
 import type { ReportItem, SavedReportIn, SavedReportUpdateIn } from "../../src/lib/reportsApi";
 import type {
@@ -1152,6 +1153,19 @@ export async function mockApi(page: Page) {
     if (path.endsWith("/api/v1/reporting/status") && method === "GET") {
       await json(route, 200, DEMO_FACTS);
       return;
+    }
+
+    if (/\/api\/v1\/admin\/webservices\/\d+\/debugger$/.test(path) && method === "GET") {
+      await json(route, 200, filterDebugEntries(url.searchParams));
+      return;
+    }
+    // GenericInterface webservices (list, detail, egress settings, dry run + its job)
+    if (path.includes("/api/v1/admin/webservices") || path.endsWith("/api/v1/jobs/9390")) {
+      const gi = resolveGiData(path, method);
+      if (gi !== undefined) {
+        await json(route, method === "POST" ? 202 : 200, gi);
+        return;
+      }
     }
 
     // Calendar

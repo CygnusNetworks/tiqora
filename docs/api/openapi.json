@@ -12430,6 +12430,14 @@
             ],
             "title": "Last Run At"
           },
+          "notices": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Notices",
+            "type": "array"
+          },
           "schedule": {
             "enum": [
               "interval",
@@ -13320,6 +13328,177 @@
         "title": "DbStatusOut",
         "type": "object"
       },
+      "DebugContentOut": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "debug_level": {
+            "title": "Debug Level",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "masked": {
+            "title": "Masked",
+            "type": "boolean"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "debug_level",
+          "subject",
+          "content",
+          "created",
+          "masked"
+        ],
+        "title": "DebugContentOut",
+        "type": "object"
+      },
+      "DebugEntryDetailOut": {
+        "properties": {
+          "contents": {
+            "items": {
+              "$ref": "#/components/schemas/DebugContentOut"
+            },
+            "title": "Contents",
+            "type": "array"
+          },
+          "entry": {
+            "$ref": "#/components/schemas/DebugEntryOut"
+          }
+        },
+        "required": [
+          "entry",
+          "contents"
+        ],
+        "title": "DebugEntryDetailOut",
+        "type": "object"
+      },
+      "DebugEntryListOut": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DebugEntryOut"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "next_before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Before"
+          }
+        },
+        "required": [
+          "entries",
+          "next_before"
+        ],
+        "title": "DebugEntryListOut",
+        "type": "object"
+      },
+      "DebugEntryOut": {
+        "properties": {
+          "can_resend": {
+            "title": "Can Resend",
+            "type": "boolean"
+          },
+          "communication_id": {
+            "title": "Communication Id",
+            "type": "string"
+          },
+          "communication_type": {
+            "title": "Communication Type",
+            "type": "string"
+          },
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "max_level": {
+            "title": "Max Level",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "remote_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remote Ip"
+          },
+          "source": {
+            "enum": [
+              "tiqora",
+              "znuny"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "ticket_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Id"
+          }
+        },
+        "required": [
+          "source",
+          "id",
+          "communication_id",
+          "communication_type",
+          "name",
+          "remote_ip",
+          "ticket_id",
+          "created",
+          "max_level",
+          "can_resend"
+        ],
+        "title": "DebugEntryOut",
+        "type": "object"
+      },
       "DeployIn": {
         "properties": {
           "kind": {
@@ -13734,6 +13913,39 @@
           "total"
         ],
         "title": "DrillPageOut",
+        "type": "object"
+      },
+      "DryRunIn": {
+        "properties": {
+          "article_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Article Id"
+          },
+          "event": {
+            "default": "TicketCreate",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Event",
+            "type": "string"
+          },
+          "ticket_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Ticket Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ticket_id"
+        ],
+        "title": "DryRunIn",
         "type": "object"
       },
       "DynamicFieldCreate": {
@@ -14319,6 +14531,76 @@
           }
         },
         "title": "ErasureSelectorIn",
+        "type": "object"
+      },
+      "ErrorHandlingOut": {
+        "properties": {
+          "error_message_content_filter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message Content Filter"
+          },
+          "error_stage_filter": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Error Stage Filter",
+            "type": "array"
+          },
+          "invoker_filter": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Invoker Filter",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "retry_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry Summary"
+          },
+          "stop_after_match": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop After Match"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "type",
+          "invoker_filter",
+          "error_stage_filter",
+          "error_message_content_filter",
+          "stop_after_match",
+          "retry_summary"
+        ],
+        "title": "ErrorHandlingOut",
         "type": "object"
       },
       "EscalationHitOut": {
@@ -16841,6 +17123,101 @@
         "title": "ImportedStatOut",
         "type": "object"
       },
+      "InvokerEventOut": {
+        "properties": {
+          "asynchronous": {
+            "title": "Asynchronous",
+            "type": "boolean"
+          },
+          "event": {
+            "title": "Event",
+            "type": "string"
+          },
+          "fired_by_tiqora": {
+            "title": "Fired By Tiqora",
+            "type": "boolean"
+          },
+          "has_condition": {
+            "title": "Has Condition",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "event",
+          "asynchronous",
+          "has_condition",
+          "fired_by_tiqora"
+        ],
+        "title": "InvokerEventOut",
+        "type": "object"
+      },
+      "InvokerOut": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/InvokerEventOut"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "mapping_inbound": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mapping Inbound"
+          },
+          "mapping_outbound": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mapping Outbound"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          },
+          "supported": {
+            "title": "Supported",
+            "type": "boolean"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "supported",
+          "events",
+          "mapping_outbound",
+          "mapping_inbound",
+          "problem"
+        ],
+        "title": "InvokerOut",
+        "type": "object"
+      },
       "JitDefaults": {
         "properties": {
           "allowed_email_domains": {
@@ -17082,6 +17459,29 @@
           "finished_at"
         ],
         "title": "JobOut",
+        "type": "object"
+      },
+      "JobRefOut": {
+        "description": "202 body of resend and dry run: poll ``GET /api/v1/jobs/{job_id}``.",
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status"
+        ],
+        "title": "JobRefOut",
         "type": "object"
       },
       "KbSearchHit": {
@@ -28018,6 +28418,58 @@
         "title": "ReportingStatusOut",
         "type": "object"
       },
+      "RequesterTransportOut": {
+        "properties": {
+          "auth_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auth Type"
+          },
+          "endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint"
+          },
+          "has_proxy": {
+            "title": "Has Proxy",
+            "type": "boolean"
+          },
+          "insecure_tls_requested": {
+            "title": "Insecure Tls Requested",
+            "type": "boolean"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "uses_client_certificate": {
+            "title": "Uses Client Certificate",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "type",
+          "endpoint",
+          "auth_type",
+          "has_proxy",
+          "uses_client_certificate",
+          "insecure_tls_requested"
+        ],
+        "title": "RequesterTransportOut",
+        "type": "object"
+      },
       "ResolvedCustomerLink": {
         "properties": {
           "label": {
@@ -36884,6 +37336,202 @@
           }
         },
         "title": "WebhookUpdate",
+        "type": "object"
+      },
+      "WebserviceDetailOut": {
+        "properties": {
+          "debug_threshold": {
+            "title": "Debug Threshold",
+            "type": "string"
+          },
+          "egress": {
+            "$ref": "#/components/schemas/WebserviceEgressOut"
+          },
+          "error_handling": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorHandlingOut"
+            },
+            "title": "Error Handling",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "invokers": {
+            "items": {
+              "$ref": "#/components/schemas/InvokerOut"
+            },
+            "title": "Invokers",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          },
+          "requester_transport": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequesterTransportOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "valid",
+          "problem",
+          "requester_transport",
+          "invokers",
+          "error_handling",
+          "debug_threshold",
+          "egress",
+          "warnings"
+        ],
+        "title": "WebserviceDetailOut",
+        "type": "object"
+      },
+      "WebserviceEgressIn": {
+        "properties": {
+          "allow_insecure_tls": {
+            "default": false,
+            "title": "Allow Insecure Tls",
+            "type": "boolean"
+          },
+          "allowed_targets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Targets",
+            "type": "array"
+          }
+        },
+        "title": "WebserviceEgressIn",
+        "type": "object"
+      },
+      "WebserviceEgressOut": {
+        "properties": {
+          "allow_insecure_tls": {
+            "title": "Allow Insecure Tls",
+            "type": "boolean"
+          },
+          "allowed_targets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Targets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "allowed_targets",
+          "allow_insecure_tls"
+        ],
+        "title": "WebserviceEgressOut",
+        "type": "object"
+      },
+      "WebserviceListItemOut": {
+        "properties": {
+          "event_invoker_count": {
+            "title": "Event Invoker Count",
+            "type": "integer"
+          },
+          "has_provider": {
+            "title": "Has Provider",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "invoker_count": {
+            "title": "Invoker Count",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          },
+          "transport": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transport"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "valid",
+          "has_provider",
+          "invoker_count",
+          "event_invoker_count",
+          "transport",
+          "problem"
+        ],
+        "title": "WebserviceListItemOut",
+        "type": "object"
+      },
+      "WebserviceListOut": {
+        "properties": {
+          "webservices": {
+            "items": {
+              "$ref": "#/components/schemas/WebserviceListItemOut"
+            },
+            "title": "Webservices",
+            "type": "array"
+          }
+        },
+        "required": [
+          "webservices"
+        ],
+        "title": "WebserviceListOut",
         "type": "object"
       },
       "WhatsAppSendResponse": {
@@ -68894,6 +69542,698 @@
         "summary": "Update Webhook",
         "tags": [
           "admin:webhooks"
+        ]
+      }
+    },
+    "/api/v1/admin/webservices": {
+      "get": {
+        "description": "All webservices, including invalid ones (``valid`` false) and broken configurations.",
+        "operationId": "list_webservices_api_v1_admin_webservices_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebserviceListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Webservices",
+        "tags": [
+          "admin:webservices"
+        ]
+      }
+    },
+    "/api/v1/admin/webservices/{ws_id}": {
+      "get": {
+        "operationId": "get_webservice_api_v1_admin_webservices__ws_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ws_id",
+            "required": true,
+            "schema": {
+              "title": "Ws Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebserviceDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Webservice",
+        "tags": [
+          "admin:webservices"
+        ]
+      }
+    },
+    "/api/v1/admin/webservices/{ws_id}/debugger": {
+      "get": {
+        "operationId": "list_debugger_api_v1_admin_webservices__ws_id__debugger_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ws_id",
+            "required": true,
+            "schema": {
+              "title": "Ws Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "Provider",
+                    "Requester"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "tiqora",
+                    "znuny"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "remote_ip",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 50,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Remote Ip"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 300,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DebugEntryListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Debugger",
+        "tags": [
+          "admin:webservices"
+        ]
+      }
+    },
+    "/api/v1/admin/webservices/{ws_id}/debugger/tiqora/{entry_id}/resend": {
+      "post": {
+        "description": "Run the recorded call again with the stored event data and the CURRENT ticket data.",
+        "operationId": "resend_api_v1_admin_webservices__ws_id__debugger_tiqora__entry_id__resend_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ws_id",
+            "required": true,
+            "schema": {
+              "title": "Ws Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "title": "Entry Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRefOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resend",
+        "tags": [
+          "admin:webservices"
+        ]
+      }
+    },
+    "/api/v1/admin/webservices/{ws_id}/debugger/{source}/{entry_id}": {
+      "get": {
+        "operationId": "get_debugger_entry_api_v1_admin_webservices__ws_id__debugger__source___entry_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ws_id",
+            "required": true,
+            "schema": {
+              "title": "Ws Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "source",
+            "required": true,
+            "schema": {
+              "enum": [
+                "tiqora",
+                "znuny"
+              ],
+              "title": "Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "title": "Entry Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DebugEntryDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Debugger Entry",
+        "tags": [
+          "admin:webservices"
+        ]
+      }
+    },
+    "/api/v1/admin/webservices/{ws_id}/egress": {
+      "put": {
+        "operationId": "put_egress_api_v1_admin_webservices__ws_id__egress_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ws_id",
+            "required": true,
+            "schema": {
+              "title": "Ws Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebserviceEgressIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebserviceEgressOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Egress",
+        "tags": [
+          "admin:webservices"
+        ]
+      }
+    },
+    "/api/v1/admin/webservices/{ws_id}/invokers/{invoker}/dry-run": {
+      "post": {
+        "description": "Build the request exactly as a real call would and show it masked; nothing is sent.",
+        "operationId": "dry_run_api_v1_admin_webservices__ws_id__invokers__invoker__dry_run_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ws_id",
+            "required": true,
+            "schema": {
+              "title": "Ws Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "invoker",
+            "required": true,
+            "schema": {
+              "title": "Invoker",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DryRunIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRefOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dry Run",
+        "tags": [
+          "admin:webservices"
         ]
       }
     },

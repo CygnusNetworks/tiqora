@@ -130,7 +130,8 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
   }
   if (Array.isArray(inner)) {
     const msg = (inner[0] as { msg?: unknown } | undefined)?.msg;
-    if (typeof msg === "string" && msg) return msg;
+    // A field_validator's ValueError arrives as "Value error, <our text>".
+    if (typeof msg === "string" && msg) return msg.replace(/^Value error,\s*/, "") || fallback;
   } else if (inner && typeof inner === "object") {
     const msg = (inner as { message?: unknown }).message;
     if (typeof msg === "string" && msg) return msg;

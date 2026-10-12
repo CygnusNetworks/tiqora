@@ -1,0 +1,48 @@
+---
+Debugger:
+  DebugThreshold: debug
+  TestMode: '0'
+Description: Golden requester webservice (SOAP, Ticket::Generic)
+FrameworkVersion: 6.5
+Provider:
+  Transport:
+    Type: ''
+RemoteSystem: ''
+Requester:
+  ErrorHandling: {}
+  ErrorHandlingPriority: []
+  Invoker:
+    SendSoap:
+      Description: Ticket::Generic sent as a SOAP operation
+      Type: Ticket::Generic
+      MappingOutbound:
+        Type: XSLT
+        Config:
+          Template: |
+            <?xml version="1.0" encoding="UTF-8"?>
+            <xsl:stylesheet version="1.0"
+              xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+            <xsl:output method="xml" encoding="utf-8" indent="yes"/>
+            <xsl:template match="/RootElement">
+              <RootElement>
+                <Subject><xsl:value-of select="Ticket/Title"/></Subject>
+                <TicketID><xsl:value-of select="Ticket/TicketID"/></TicketID>
+                <Event><xsl:value-of select="Event/Event"/></Event>
+                <Queue><xsl:value-of select="Ticket/Queue"/></Queue>
+              </RootElement>
+            </xsl:template>
+            </xsl:stylesheet>
+  Transport:
+    Type: HTTP::SOAP
+    Config:
+      Endpoint: http://gisink:8080/soap
+      NameSpace: http://ws.example.org/Golden
+      SOAPAction: 'Yes'
+      SOAPActionSeparator: '/'
+      Encoding: utf-8
+      Timeout: '30'
+      Sort:
+        - Subject:
+        - TicketID:
+        - Event:
+        - Queue:

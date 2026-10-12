@@ -24,7 +24,8 @@ Before starting *any* stage below:
       `docs/parallel-operation.md` → "Taking over ..." sections):
       `daemon.postmaster.enabled`, `daemon.escalation.enabled`,
       `daemon.notifications.enabled`, `daemon.generic_agent.enabled`,
-      `daemon.unlock_timeout.enabled`, `daemon.pending_check.enabled` — all
+      `daemon.unlock_timeout.enabled`, `daemon.pending_check.enabled`,
+      `daemon.gi_requester.enabled` (outbound webservice calls) — all
       `1` in `tiqora_settings`.
 - [ ] Relevant DB integration and compatibility tests pass on the deployed
       revision (`cd backend && uv run pytest -m db`). Run the separate
@@ -158,7 +159,8 @@ duty before the Znuny daemon is stopped.
    ```
    Expect `daemon.postmaster.enabled`, `daemon.escalation.enabled`,
    `daemon.notifications.enabled`, `daemon.generic_agent.enabled`,
-   `daemon.unlock_timeout.enabled`, `daemon.pending_check.enabled` all `1`.
+   `daemon.unlock_timeout.enabled`, `daemon.pending_check.enabled`,
+   `daemon.gi_requester.enabled` all `1`.
    Disable each corresponding peer executor **before** enabling its Tiqora
    flag; the flags do not control Znuny's scheduler.
 2. Confirm fresh successful `daemon.<slug>.status.last_ok` timestamps and

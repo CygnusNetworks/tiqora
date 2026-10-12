@@ -18,7 +18,12 @@ import yaml
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from tests._row_cleanup import delete_rows_above, snapshot_max_ids
+from tests._row_cleanup import (
+    delete_above_marks,
+    delete_rows_above,
+    snapshot_marks,
+    snapshot_max_ids,
+)
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.znuny.password import hash_password
 
@@ -202,6 +207,9 @@ def _seed_statements() -> tuple[tuple[str, dict[str, Any]], ...]:
 _SEEDED: list[str] = []
 _COUNTER_TABLES = ("tiqora_event_outbox", "tiqora_cache_invalidation", "ticket_number_counter")
 _SNAPSHOTS: dict[str, dict[str, int]] = {}
+# provider requests of the webservices above write debugger rows (default threshold)
+_DEBUG_TABLES = ("tiqora_gi_debug_content", "tiqora_gi_debug_entry")
+_DEBUG_MARKS: dict[str, dict[str, int]] = {}
 
 
 def _cleanup(sync_url: str) -> None:
@@ -218,6 +226,7 @@ def _delete_seeded_rows() -> Generator[None, None, None]:
     for sync_url in set(_SEEDED):
         _cleanup(sync_url)
         delete_rows_above(sync_url, _SNAPSHOTS[sync_url])
+        delete_above_marks(sync_url, _DEBUG_MARKS[sync_url])
     _SEEDED.clear()
 
 
@@ -238,6 +247,7 @@ def _seed(sync_url: str) -> None:
         TiqoraBase.metadata.create_all(conn)
     _cleanup(sync_url)
     _SNAPSHOTS[sync_url] = snapshot_max_ids(sync_url, _COUNTER_TABLES)
+    _DEBUG_MARKS[sync_url] = snapshot_marks(sync_url, _DEBUG_TABLES)
     with engine.begin() as conn:
         conn.execute(
             text(

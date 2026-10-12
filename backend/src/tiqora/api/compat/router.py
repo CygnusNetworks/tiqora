@@ -48,6 +48,7 @@ from tiqora.api.compat.provider import (
     OperationFault,
     ProviderOutcome,
     error_status_code,
+    provider_log,
     render_rest,
     rest_fault_body,
     run_provider,
@@ -77,6 +78,10 @@ from tiqora.api.compat.webservices import (
 from tiqora.api.deps import DbSession, get_session_store
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.domain.auth import SessionStore
+from tiqora.gi.config import parse_debugger
+from tiqora.gi.debug_store import BufferedDebugSink
+from tiqora.gi.debugger import GiDebugger
+from tiqora.security.ratelimit import client_ip
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -87,6 +92,63 @@ _OPERATION_ALIASES: dict[str, str] = {"SessionDelete": "SessionRemove"}
 _CANONICAL_OPS: frozenset[str] = frozenset(OPERATION_TYPES.values()) | frozenset(_OPERATION_ALIASES)
 
 compat_router = APIRouter(prefix="/znuny-compat", tags=["znuny-compat"])
+
+
+async def _open_debugger(
+    request: Request, webservice: Webservice, *, name: str | None
+) -> GiDebugger:
+    """The provider debugger of one webservice request (Provider.pm: ``Debugger->new`` with
+    the webservice's ``Debugger`` config) plus its ``Communication sequence started`` line.
+
+    Lines are buffered per request (:class:`BufferedDebugSink`) and written by
+    :func:`_flush_debugger` after the request session released its connection, in their own
+    session, so a rolled-back operation keeps its trail. The remote IP honours
+    ``TIQORA_TRUSTED_PROXIES``.
+    """
+    sink: BufferedDebugSink | None = getattr(request.state, "gi_debug_sink", None)
+    if sink is None:
+        factory = getattr(request.app.state, "session_factory", None)
+        if factory is None:
+            from tiqora.db.engine import get_session_factory
+
+            factory = get_session_factory()
+        sink = BufferedDebugSink(factory)
+        request.state.gi_debug_sink = sink
+    settings = getattr(request.app.state, "settings", None)
+    debugger = GiDebugger(
+        sink=sink,
+        config=parse_debugger(webservice.config),
+        webservice_id=webservice.id,
+        communication_type="Provider",
+        remote_ip=client_ip(request, getattr(settings, "trusted_proxies", None)),
+        name=name,
+    )
+    # Znuny logs %ENV here; the request line is what matters (no query string, no headers:
+    # both may carry credentials)
+    await provider_log(
+        debugger,
+        "debug",
+        "Communication sequence started",
+        {"RequestMethod": request.method, "RequestURI": request.url.path},
+    )
+    return debugger
+
+
+async def _flush_debugger(request: Request, session: AsyncSession) -> None:
+    """Write the buffered provider debugger lines of this request; never raises.
+
+    The request session is closed first (it holds no uncommitted work the response needs:
+    ``get_db`` would only roll it back later), so the flush never waits for a second pooled
+    connection while the request still holds one.
+    """
+    sink: BufferedDebugSink | None = getattr(request.state, "gi_debug_sink", None)
+    if sink is None or not sink.pending:
+        return
+    try:
+        await session.close()
+        await sink.flush()
+    except Exception:  # noqa: BLE001
+        logger.warning("gi_provider_debugger_failed", summary="flush", exc_info=True)
 
 
 async def _merge_params(request: Request) -> dict[str, Any]:
@@ -407,6 +469,9 @@ async def _handle_soap_request(
     try:
         parsed = parse_soap_request(body_bytes, soap_action)
     except SoapCodecError as exc:
+        if webservice is not None:
+            debugger = await _open_debugger(request, webservice, name=None)
+            await provider_log(debugger, "error", str(exc))
         fault = build_soap_fault(str(exc), fault_code="Client")
         return _soap_response(fault, "1.1", status.HTTP_400_BAD_REQUEST)
 
@@ -417,7 +482,10 @@ async def _handle_soap_request(
                 handler, data, session, session_store, request, operation_config=op
             )
 
-        outcome = await run_provider(webservice, parsed.operation, parsed.data, run_operation=_run)
+        debugger = await _open_debugger(request, webservice, name=parsed.operation)
+        outcome = await run_provider(
+            webservice, parsed.operation, parsed.data, run_operation=_run, debugger=debugger
+        )
         return _render_soap(outcome, parsed.operation, parsed.version, namespace)
 
     if parsed.operation not in _CANONICAL_OPS:
@@ -500,6 +568,22 @@ async def _serve_webservice(
     ws_name: str | None,
     ws_id: int | None,
 ) -> Response:
+    try:
+        return await _serve_webservice_inner(
+            request, session, session_store, ws_name=ws_name, ws_id=ws_id
+        )
+    finally:
+        await _flush_debugger(request, session)
+
+
+async def _serve_webservice_inner(
+    request: Request,
+    session: AsyncSession,
+    session_store: SessionStore,
+    *,
+    ws_name: str | None,
+    ws_id: int | None,
+) -> Response:
     registry = get_registry(request.app)
     await registry.ensure_loaded(session)
     ws = registry.by_id(ws_id) if ws_id is not None else registry.by_name(ws_name or "")
@@ -526,15 +610,19 @@ async def _serve_webservice(
     try:
         matched = match_rest_route(ws, path, request.method)
     except RouteMatchError as exc:
-        return _text_error(500, f"HTTP::REST Error while determine Operation: {exc}")
+        message = f"HTTP::REST Error while determine Operation: {exc}"
+        await provider_log(await _open_debugger(request, ws, name=None), "error", message)
+        return _text_error(500, message)
     if matched is None:
-        return _text_error(
-            500, f"HTTP::REST Error while determine Operation for request URI '{path}'."
-        )
+        message = f"HTTP::REST Error while determine Operation for request URI '{path}'."
+        await provider_log(await _open_debugger(request, ws, name=None), "error", message)
+        return _text_error(500, message)
     operation, uri_data = matched
+    debugger = await _open_debugger(request, ws, name=operation)
     try:
         data = await build_rest_request_data(request, ws, uri_data)
     except RestRequestError as exc:
+        await provider_log(debugger, "error", exc.message)
         return _text_error(exc.status, exc.message)
 
     async def _run(handler: str, op_data: dict[str, Any], op: OperationConfig) -> dict[str, Any]:
@@ -542,7 +630,7 @@ async def _serve_webservice(
             handler, op_data, session, session_store, request, operation_config=op
         )
 
-    outcome = await run_provider(ws, operation, data, run_operation=_run)
+    outcome = await run_provider(ws, operation, data, run_operation=_run, debugger=debugger)
     return render_rest(outcome)
 
 

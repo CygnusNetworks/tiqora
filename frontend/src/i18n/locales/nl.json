@@ -2184,6 +2184,7 @@
       "webchat": "Web chat",
       "plugins": "Extensions",
       "dashboardTemplates": "Dashboard templates",
+      "webservices": "Web services",
       "dashboardKioskLinks": "Wallboard links"
     },
     "table": {
@@ -3135,11 +3136,23 @@
         "plugin_tasks": {
           "name": "Extensions: scheduled tasks",
           "description": "Starts the regular tasks of the extensions."
+        },
+        "gi_requester": {
+          "name": "Outgoing web service calls",
+          "description": "Sends ticket events to the web services (GenericInterface)."
+        },
+        "gi_debug_cleanup": {
+          "name": "Clean up web service log",
+          "description": "Deletes old entries of the web service log."
         }
       },
       "takeoverBadge": "Overname",
       "settingsLink": "Settings",
-      "deployLive": "No deployment detected yet: Tiqora runs the drafts directly. Please deploy once in Znuny."
+      "deployLive": "No deployment detected yet: Tiqora runs the drafts directly. Please deploy once in Znuny.",
+      "notices": {
+        "giRequesterOff": "Tiqora does not trigger the event calls of the web services while this service is switched off. Only changes made in Znuny lead to calls.",
+        "giRequesterDouble": "This service is switched on, but Znuny's own event handler is still active. Every call is sent twice. Switch the handler off in Znuny."
+      }
     },
     "mailLog": {
       "title": "E-mailcommunicatielogboek",
@@ -3515,6 +3528,7 @@
       "webchat": "Set up chats for websites, adjust the look and get the embed code.",
       "plugins": "Switch installed extensions on or off, check their state and configure them.",
       "dashboardTemplates": "Define home page dashboards per role, optionally binding.",
+      "webservices": "View web services (GenericInterface), check outgoing calls and manage allowed targets.",
       "dashboardKioskLinks": "Create, check and revoke links for wallboards without sign-in."
     },
     "types": {
@@ -4542,6 +4556,132 @@
       "deleteMessage": "Dashboards that users already received from this template are kept.",
       "deleteFailed": "The template could not be deleted."
     },
+    "webservices": {
+      "title": "Web services",
+      "description": "Web services are created in Znuny and shown here. Editing follows in a later version. An \"invoker\" is an outgoing call to another system that ticket events can trigger.",
+      "loadError": "The web services could not be loaded.",
+      "detailLoadError": "The web service could not be loaded.",
+      "empty": "No web services are set up.",
+      "back": "← All web services",
+      "noticeLink": "Go to services",
+      "valid": "valid",
+      "invalid": "invalid",
+      "yes": "yes",
+      "no": "no",
+      "columns": {
+        "name": "Name",
+        "status": "Status",
+        "incoming": "Incoming",
+        "invokers": "Outgoing calls",
+        "byEvents": "Triggered by events",
+        "note": "Note"
+      },
+      "tabs": {
+        "overview": "Overview",
+        "invokers": "Outgoing calls",
+        "debugger": "Log (debugger)",
+        "settings": "Settings"
+      },
+      "overview": {
+        "transport": "Connection for outgoing calls",
+        "type": "Transport",
+        "endpoint": "Address",
+        "auth": "Authentication",
+        "noAuth": "none",
+        "proxy": "Proxy",
+        "clientCert": "Client certificate",
+        "insecureTls": "Insecure TLS requested",
+        "noTransport": "This web service has no connection for outgoing calls.",
+        "errorHandling": "Error handling",
+        "noErrorHandling": "No error handling set up.",
+        "debugThreshold": "Log level: {{level}}"
+      },
+      "invokers": {
+        "description": "Outgoing calls (invokers) send ticket data to the other system as soon as the matching event happens.",
+        "none": "This web service has no outgoing calls.",
+        "noEvents": "Not connected to any event.",
+        "mappings": "Mapping outgoing: {{outbound}} · incoming: {{inbound}}",
+        "immediate": "immediate",
+        "background": "in the background",
+        "condition": "Condition",
+        "notFired": "not yet triggered by Tiqora",
+        "dryRun": "Dry run"
+      },
+      "dryRun": {
+        "title": "Dry run: {{invoker}}",
+        "description": "Builds the request for a ticket exactly like a real call and shows it.",
+        "ticketId": "Ticket ID",
+        "articleId": "Article ID (optional)",
+        "event": "Event",
+        "nothingSent": "Nothing is sent to the other system.",
+        "start": "Start dry run",
+        "startFailed": "The dry run could not be started.",
+        "headers": "Headers",
+        "masked": "Credentials are masked.",
+        "body": "Body"
+      },
+      "settings": {
+        "targetsTitle": "Allow internal targets",
+        "targets": "Allowed targets (one entry per line)",
+        "targetsHelp": "By default Tiqora does not send to internal addresses. Enter host names or networks (e.g. 198.51.100.0/24) this web service may reach.",
+        "tlsTitle": "Certificate check",
+        "insecureTls": "Allow insecure TLS connection",
+        "insecureTlsWarning": "Warning: without a certificate check someone on the network can read or change the traffic. Only enable this for test systems.",
+        "save": "Save",
+        "saved": "Saved.",
+        "saveFailed": "The settings could not be saved."
+      },
+      "debugger": {
+        "description": "All outgoing and incoming calls of this web service, including those from Znuny. Tiqora masks credentials.",
+        "filters": "Filters",
+        "direction": "Direction",
+        "directionAll": "All",
+        "directionIn": "Incoming",
+        "directionOut": "Outgoing",
+        "source": "Source",
+        "sourceAll": "All",
+        "sourceTiqora": "Tiqora",
+        "sourceZnuny": "Znuny",
+        "from": "From",
+        "to": "To",
+        "ip": "IP address",
+        "ipPlaceholder": "e.g. 198.51.100.7",
+        "empty": "No log entries for these filters.",
+        "loadError": "The log could not be loaded.",
+        "loadMore": "Load more",
+        "loadingMore": "Loading …",
+        "ticket": "Ticket {{id}}",
+        "levels": {
+          "debug": "Debug",
+          "info": "Info",
+          "notice": "Notice",
+          "error": "Error"
+        },
+        "open": "Open entry {{id}}",
+        "drawerTitle": "Log entry",
+        "entryLoadError": "The log entry could not be loaded.",
+        "noContents": "This entry has no lines.",
+        "masked": "Masked by Tiqora",
+        "copy": "Copy",
+        "copied": "Copied",
+        "copyFailed": "Could not copy",
+        "expand": "Expand",
+        "collapse": "Collapse",
+        "resend": "Send again",
+        "resendTitle": "Send call again",
+        "resendConfirm": "The call is sent again with the current ticket data. Continue?",
+        "resendFailed": "The call could not be sent again.",
+        "resendDone": "The call was sent again. The new entry is at the top of the log.",
+        "resendJobFailed": "Sending again failed.",
+        "showLog": "Back to the log",
+        "resendRescheduled": "The remote system rejected the call. The next attempt follows at {{time}}.",
+        "resendDoneQuiet": "The call was sent again. At this log level a successful call writes no log entry."
+      },
+      "notices": {
+        "giRequesterOff": "The service “Outgoing web service calls” is switched off, so Tiqora does not trigger the event calls of the web services. Only changes made in Znuny lead to calls.",
+        "giRequesterDouble": "The service “Outgoing web service calls” is switched on, but Znuny's own event handler is still active. Every call is sent twice. Switch the handler off in Znuny."
+      }
+    },
     "kioskLinks": {
       "title": "Wallboard links",
       "subtitle": "Links that run dashboards on a screen without signing in.",
@@ -5178,6 +5318,8 @@
         "report_run": "Report",
         "report_export": "Report export",
         "report_backfill": "Build report data",
+        "gi_invoke": "Web service call",
+        "gi_invoke_sync": "Web service call",
         "report_delivery": "Report delivery"
       },
       "gi_mail": "Send email from a web service request"

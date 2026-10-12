@@ -1,0 +1,103 @@
+---
+Debugger:
+  DebugThreshold: debug
+  TestMode: '0'
+Description: Golden requester webservice (REST, Ticket::Generic, retry)
+FrameworkVersion: 6.5
+Provider:
+  Transport:
+    Type: ''
+RemoteSystem: ''
+Requester:
+  ErrorHandling:
+    GoldenRetry:
+      Type: RequestRetry
+      ErrorStageFilter:
+        - RequesterRequestPerform
+      ErrorCodeFilter: []
+      InvokerFilter: []
+      Description: Retry 503 answers
+      ScheduleRetry: '1'
+      RetryIntervalStart: '60'
+      RetryIntervalFactor: '2'
+      RetryIntervalMax: ''
+      RetryCountMax: '3'
+      RetryPeriodMax: ''
+      ScheduleRetryOnError: '1'
+  ErrorHandlingPriority:
+    - GoldenRetry
+  Invoker:
+    SendTicket:
+      Description: Ticket::Generic, identity copy with Ticket/Title renamed to Subject, all attachments
+      Type: Ticket::Generic
+      GetAllArticleAttachments: '1'
+      MappingOutbound:
+        Type: XSLT
+        Config:
+          Template: |
+            <?xml version="1.0" encoding="UTF-8"?>
+            <xsl:stylesheet version="1.0"
+              xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+            <xsl:output method="xml" encoding="utf-8" indent="yes"/>
+            <xsl:template match="@*|node()">
+              <xsl:copy><xsl:apply-templates select="@*|node()"/></xsl:copy>
+            </xsl:template>
+            <xsl:template match="/RootElement/Ticket/Title">
+              <Subject><xsl:apply-templates select="node()"/></Subject>
+            </xsl:template>
+            </xsl:stylesheet>
+      MappingInbound:
+        Type: Simple
+        Config:
+          KeyMapDefault:
+            MapType: Keep
+            MapTo: ''
+          ValueMapDefault:
+            MapType: Keep
+            MapTo: ''
+    GetStatus:
+      Description: Ticket::Generic as a GET with query parameters
+      Type: Ticket::Generic
+      MappingOutbound:
+        Type: XSLT
+        Config:
+          Template: |
+            <?xml version="1.0" encoding="UTF-8"?>
+            <xsl:stylesheet version="1.0"
+              xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+            <xsl:output method="xml" encoding="utf-8" indent="yes"/>
+            <xsl:template match="/RootElement">
+              <RootElement>
+                <TicketID><xsl:value-of select="Ticket/TicketID"/></TicketID>
+                <State><xsl:value-of select="Ticket/State"/></State>
+              </RootElement>
+            </xsl:template>
+            </xsl:stylesheet>
+      MappingInbound:
+        Type: Simple
+        Config:
+          KeyMapDefault:
+            MapType: Keep
+            MapTo: ''
+          ValueMapDefault:
+            MapType: Keep
+            MapTo: ''
+  Transport:
+    Type: HTTP::REST
+    Config:
+      Host: http://gisink:8080
+      DefaultCommand: POST
+      Timeout: '30'
+      Authentication:
+        AuthType: BasicAuth
+        BasicAuthUser: golden-user
+        BasicAuthPassword: example-golden-password
+      AdditionalHeaders:
+        X-Golden-Token: example-golden-header-value
+      InvokerControllerMapping:
+        SendTicket:
+          Command: POST
+          Controller: /Ticket/:TicketID
+        GetStatus:
+          Command: GET
+          Controller: /Status/:TicketID?State=:State

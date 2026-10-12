@@ -5,9 +5,12 @@ Uses GOLDEN_COMPOSE_PROJECT / GOLDEN_PEER so multi-peer stacks stay isolated.
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
+import urllib.request
 from pathlib import Path
+from typing import Any
 
 GOLDEN_DIR = Path(__file__).resolve().parent
 
@@ -84,6 +87,85 @@ def znuny_copy_in(local: Path, remote: str) -> None:
         )
 
 
+# --- GenericInterface requester: recording sink + Znuny requester ------------------------------
+
+# The sink listens on host port 8199 (docker-compose.golden.yml, service ``gisink``); Znuny
+# reaches the same server as ``http://gisink:8080`` on the compose network.
+GISINK_URL = "http://127.0.0.1:8199"
+
+
+def _sink_call(method: str, path: str, body: bytes | None = None) -> Any:
+    request = urllib.request.Request(  # noqa: S310 - fixed local http URL
+        f"{GISINK_URL}{path}", data=body, method=method
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
+        return json.loads(response.read() or b"{}")
+
+
+def gisink_requests() -> list[dict[str, Any]]:
+    """Every request the sink recorded since the last :func:`gisink_clear`."""
+    result: list[dict[str, Any]] = _sink_call("GET", "/_requests")
+    return result
+
+
+def gisink_clear() -> None:
+    """Forget the recorded requests and reset the canned response."""
+    _sink_call("DELETE", "/_requests")
+
+
+def gisink_respond(body: str, content_type: str = "application/json") -> None:
+    """Make the sink answer every later (non ``/status/<code>``) request with *body*."""
+    _sink_call(
+        "PUT", "/_response", json.dumps({"body": body, "content_type": content_type}).encode()
+    )
+
+
+_REQUESTER_RUN_PERL = r"""
+use lib qw(/opt/otrs /opt/otrs/Kernel/cpan-lib /opt/otrs/Custom);
+use Kernel::System::ObjectManager;
+local $Kernel::OM = Kernel::System::ObjectManager->new(
+    'Kernel::System::Log' => {LogPrefix => 'golden-gi-requester'},
+);
+my $JSON = $Kernel::OM->Get('Kernel::System::JSON');
+my $Input = $JSON->Decode(Data => <<'GOLDEN_JSON_END');
+__INPUT__
+GOLDEN_JSON_END
+my $Webservice = $Kernel::OM->Get('Kernel::System::GenericInterface::Webservice')
+    ->WebserviceGet(Name => $Input->{Webservice});
+die "webservice not found" if !$Webservice;
+my %Extra;
+$Extra{PastExecutionData} = $Input->{PastExecutionData} if $Input->{PastExecutionData};
+my $Result = $Kernel::OM->Get('Kernel::GenericInterface::Requester')->Run(
+    WebserviceID => $Webservice->{ID},
+    Invoker      => $Input->{Invoker},
+    Data         => $Input->{Data},
+    %Extra,
+);
+print "GOLDEN_RESULT_BEGIN\n" . $JSON->Encode(Data => $Result) . "\nGOLDEN_RESULT_END\n";
+"""
+
+
+def znuny_requester_run(
+    ws_name: str,
+    invoker: str,
+    data: dict[str, Any],
+    past: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """``Kernel::GenericInterface::Requester->Run`` in the peer for the named webservice.
+
+    Returns Znuny's result hash (``Success``, ``ErrorMessage``, ``Data``). *past* is the
+    ``PastExecutionData`` of an earlier failed run (retry chain).
+    """
+    payload = json.dumps(
+        {"Webservice": ws_name, "Invoker": invoker, "Data": data, "PastExecutionData": past}
+    )
+    out = znuny_perl_eval(_REQUESTER_RUN_PERL.replace("__INPUT__", payload))
+    begin = out.index("GOLDEN_RESULT_BEGIN")
+    end = out.index("GOLDEN_RESULT_END")
+    result: dict[str, Any] = json.loads(out[begin:end].split("\n", 1)[1])
+    return result
+
+
 class _FakeRedis:
     """Minimal in-memory Redis stand-in for the Tiqora session store."""
 
@@ -136,4 +218,14 @@ def tiqora_http_client(session_factory):  # type: ignore[no-untyped-def]
     )
 
 
-__all__ = ["tiqora_http_client", "znuny_console", "znuny_copy_in", "znuny_perl_eval"]
+__all__ = [
+    "GISINK_URL",
+    "gisink_clear",
+    "gisink_requests",
+    "gisink_respond",
+    "tiqora_http_client",
+    "znuny_console",
+    "znuny_copy_in",
+    "znuny_perl_eval",
+    "znuny_requester_run",
+]

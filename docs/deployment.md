@@ -347,6 +347,38 @@ When co-running with Znuny:
 5. Terminate TLS at a reverse proxy; route `/api`, `/mcp`, and static UI paths
    to Tiqora; leave Znuny paths as needed during migration.
 
+## GenericInterface requester
+
+Outgoing webservice calls (see [compatibility.md](compatibility.md#requester-and-invokers-tiqora-calls-external-systems))
+run in the **worker**. They are off until the takeover flag is set
+([parallel-operation.md](parallel-operation.md#taking-over-genericinterface-invokers)).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `TIQORA_GI_CERT_DIRS` | *(empty)* | Colon-separated directories from which client certificates, keys and CA files named in a webservice config (`SSLCertificate`, `SSLKey`, `SSLCAFile`, `SSLCADir`, and for REST `X509CertFile`, `X509KeyFile`, `X509CAFile`) may be read. Empty = client certificates are refused. |
+| `TIQORA_GI_MAX_TIMEOUT_SECONDS` | `300` | Upper limit (1-900) for a webservice's `Timeout`; a larger value in the YAML is cut to it. |
+| `TIQORA_GI_MAX_RESPONSE_BYTES` | `20971520` | Largest response body (bytes) the requester reads; more is an error. |
+| `TIQORA_GI_REQUESTER_INTERVAL` | `5` | Seconds between two ticks of the event follower (the Dienste page can override it). |
+
+Further knobs: `TIQORA_GI_REQUESTER_GAP_HOLD_SECONDS` (default 30, how long a gap in the history
+ids is held back) and `TIQORA_GI_DEBUG_MAX_CONTENT_BYTES` (default 204800, longest debugger
+line). Set the variables on the **worker**.
+
+**Mounting Znuny's certificate directory.** If the webservice YAML points at files below
+Znuny's directories (for example `/opt/znuny/var/certificates/`), mount that directory
+**read-only** into the worker container and list it in `TIQORA_GI_CERT_DIRS`:
+
+```yaml
+worker:
+  environment:
+    TIQORA_GI_CERT_DIRS: /znuny-certs
+  volumes:
+    - /opt/znuny/var/certificates:/znuny-certs:ro
+```
+
+The path in the YAML must then be the path inside the container (or be re-written to it); a
+file outside the listed directories is refused with a plain error message in the debugger.
+
 ## Reporting data
 
 The worker service `report_facts` (loop interval `TIQORA_REPORT_FACTS_INTERVAL`

@@ -25,6 +25,8 @@ from tiqora.domain.settings_store import (
     KEY_GDPR_RETENTION_ENABLED,
     KEY_GENERIC_AGENT_ENABLED,
     KEY_GENERIC_AGENT_INTERVAL_SECONDS,
+    KEY_GI_REQUESTER_ENABLED,
+    KEY_GI_REQUESTER_INTERVAL_SECONDS,
     KEY_IDENTITY_METADATA_REFRESH_ENABLED,
     KEY_NOTIFICATIONS_ENABLED,
     KEY_NOTIFICATIONS_INTERVAL_SECONDS,
@@ -195,6 +197,27 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         toggleable=True,
         schedule_kind="daily",
         daily_at="04:00",
+    ),
+    # Fires GenericInterface invokers for ticket events (tiqora.gi.follower). Off by default:
+    # Znuny's own event handler stays the sender until an admin switches over (takeover flag).
+    DaemonService(
+        slug="gi_requester",
+        enabled_key=KEY_GI_REQUESTER_ENABLED,
+        default_enabled=False,
+        toggleable=True,
+        schedule_kind="interval",
+        interval_key=KEY_GI_REQUESTER_INTERVAL_SECONDS,
+        interval_settings_attr="gi_requester_interval_seconds",
+        tick_timeout_seconds=60,
+    ),
+    # Deletes GenericInterface debugger rows past gi.debugger.retention_days (always on).
+    DaemonService(
+        slug="gi_debug_cleanup",
+        enabled_key=None,
+        default_enabled=True,
+        toggleable=False,
+        schedule_kind="daily",
+        daily_at="03:02",
     ),
     # Job runner (tiqora.jobs.runner): always on; records its status at most every
     # STATUS_EVERY_SECONDS, which the "stale" threshold has to allow for.

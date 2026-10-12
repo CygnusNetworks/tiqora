@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.dialects import mysql, postgresql
 from sqlalchemy.schema import CreateTable
 
@@ -222,3 +223,29 @@ def test_report_schedule_ddl() -> None:
     assert not TiqoraReportRun.__table__.c["schedule_id"].foreign_keys
     for table in (item, TiqoraReportScheduleRecipient.__table__, run_file):
         assert [fk.ondelete for fk in table.foreign_keys] == ["CASCADE"]
+
+
+def test_gi_debug_ddl() -> None:
+    """``communication_id`` is Znuny's 32-char id and unique; content rows go with their entry
+    (``ON DELETE CASCADE``), same as migration ``20261010_0076``."""
+    from tiqora.db.tiqora.models import TiqoraGiDebugContent, TiqoraGiDebugEntry
+
+    assert "VARCHAR(32)" in _column_ddl(
+        TiqoraGiDebugEntry.__table__, "communication_id", mysql.dialect()
+    )
+    uniques = {
+        tuple(c.name for c in ix.columns)
+        for ix in TiqoraGiDebugEntry.__table__.indexes
+        if ix.unique
+    }
+    uniques |= {
+        tuple(c.name for c in uc.columns)
+        for uc in TiqoraGiDebugEntry.__table__.constraints
+        if isinstance(uc, UniqueConstraint)
+    }
+    assert ("communication_id",) in uniques
+    fk = next(iter(TiqoraGiDebugContent.__table__.c.entry_id.foreign_keys))
+    assert fk.ondelete == "CASCADE"
+    assert "LONGBLOB" in _column_ddl(TiqoraGiDebugContent.__table__, "content", mysql.dialect())
+    assert "BYTEA" in _column_ddl(TiqoraGiDebugContent.__table__, "content", postgresql.dialect())
+    assert "MEDIUMTEXT" in _column_ddl(TiqoraGiDebugEntry.__table__, "replay", mysql.dialect())

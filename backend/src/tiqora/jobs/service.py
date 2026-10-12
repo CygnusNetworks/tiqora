@@ -42,7 +42,16 @@ async def enqueue_job(
     created_by: int | None,
     dedupe_key: str | None = None,
     registry: Registry | None = None,
+    due_at: datetime | None = None,
 ) -> TiqoraJob:
+    """Queue a job (flushes, never commits).
+
+    ``due_at`` delays the first claim: the runner leaves a queued job alone until then.
+    A naive value is taken as UTC; a timezone-aware one is converted to naive UTC (the
+    column holds app-written naive UTC, like every ``tiqora_job`` timestamp).
+    """
+    if due_at is not None and due_at.tzinfo is not None:
+        due_at = due_at.astimezone(UTC).replace(tzinfo=None)
     reg = registry if registry is not None else get_registry()
     handler = reg.get(JOB_HANDLERS, kind)
     if handler is None:
@@ -79,6 +88,7 @@ async def enqueue_job(
         dedupe_key=dedupe_key,
         created_by=created_by,
         created_at=utc_now(),
+        due_at=due_at,
     )
     session.add(job)
     await session.flush()
