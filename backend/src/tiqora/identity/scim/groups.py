@@ -9,15 +9,17 @@ Every function flushes and never commits (the router commits once and writes the
 Only ``tiqora_*`` tables are touched; members are SCIM user rows of the same tenant, resolved with
 IN-lists of at most 1000 ids and written with bulk inserts / IN-list deletes, so a 5000-member
 push stays far below the request budget. Unknown member ids are ignored and counted
-(``ignored_members``). Write paths lock the group row (``FOR UPDATE``) and read the member list
-with a locking read, so parallel pushes of the same group serialise instead of colliding on the
-member primary key.
+(``ignored_members``). Write paths lock the group row (``FOR UPDATE``) as their first statement,
+so parallel pushes of the same group serialise instead of colliding on the member primary key.
+Everything after that lock (member list, user resolution) is a plain read; the member range is
+never locked, because its next-key/gap locks deadlock parallel pushes to adjacent groups.
 
-R-TX precondition: ``_resolve`` and ``_render`` are plain reads. On InnoDB REPEATABLE READ a plain
-read returns the snapshot of the transaction's first consistent read, so a write service must be
-called on a transaction without an open consistent read: the router rolls back (or commits) after
-``authenticate_token`` and before calling create/replace/patch/delete. Only the group row and the
-member list are read with locks, which makes the diff itself independent of that snapshot.
+R-TX precondition: the group-row lock is a current read and does not open the InnoDB
+REPEATABLE READ view; the first plain read after it does, i.e. after the lock was granted and any
+competing push of the same group has committed. The member diff is therefore fresh if and only if
+no consistent read ran earlier in the transaction: the router must roll back (or commit) after
+``authenticate_token`` and before calling create/replace/patch/delete. This is the correctness
+guarantee for group writes, not a belt-and-braces measure.
 """
 
 from __future__ import annotations
@@ -160,33 +162,20 @@ async def _get_row(
 
 
 async def _current_members(session: AsyncSession, group_id: int) -> _Members:
-    """Stored members of a group, read with locks (a current read, never the tx snapshot).
+    """Stored members of a group (plain read; fresh because the group row is locked first).
 
-    InnoDB serves plain SELECTs from the snapshot of the first consistent read, which can predate
-    a push that committed while this transaction waited for the group lock; locking reads see the
-    latest committed rows. The user rows are read with a shared lock for the same reason.
+    Deliberately no locking read here: a ``FOR UPDATE`` on the member range takes InnoDB
+    next-key/gap locks that two pushes to adjacent groups share, and their inserts then deadlock
+    (1213). See the R-TX note in the module docstring for why the plain read is current.
     """
-    member_ids = [
-        int(r)
-        for r in (
-            await session.execute(
-                select(TiqoraScimGroupMember.member_id)
-                .where(TiqoraScimGroupMember.group_id == group_id)
-                .with_for_update()
-            )
-        ).scalars()
-    ]
-    found: _Members = {}
-    for chunk in _chunked(member_ids):
-        rows = (
-            await session.execute(
-                select(TiqoraScimUser.scim_id, TiqoraScimUser.id, TiqoraScimUser.user_id)
-                .where(TiqoraScimUser.id.in_(list(chunk)))
-                .with_for_update(read=True)
-            )
-        ).all()
-        found.update({str(sid): (int(rid), int(uid)) for sid, rid, uid in rows})
-    return found
+    rows = (
+        await session.execute(
+            select(TiqoraScimUser.scim_id, TiqoraScimUser.id, TiqoraScimUser.user_id)
+            .join(TiqoraScimGroupMember, TiqoraScimGroupMember.member_id == TiqoraScimUser.id)
+            .where(TiqoraScimGroupMember.group_id == group_id)
+        )
+    ).all()
+    return {str(sid): (int(rid), int(uid)) for sid, rid, uid in rows}
 
 
 async def _resolve(session: AsyncSession, tenant: ScimTenant, scim_ids: Sequence[str]) -> _Members:

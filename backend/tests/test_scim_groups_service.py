@@ -8,6 +8,7 @@ rows); they are removed with the provider's other SCIM rows.
 
 from __future__ import annotations
 
+import asyncio
 import time
 import uuid
 from collections.abc import AsyncIterator, Iterator
@@ -591,13 +592,15 @@ async def _fresh_members(db: AsyncSession, group_scim_id: str) -> set[str]:
 
 @pytest.mark.asyncio
 async def test_parallel_patch_adding_same_member_does_not_collide(db: AsyncSession) -> None:
-    """B holds a stale snapshot (plain read first, like authenticate_token), A commits, B writes."""
+    """B authenticates (plain read), rolls back per R-TX, A commits, B writes on fresh data."""
     tenant, users, gid = await _commit_state(db)
     x = users["x"][0]
     assert db.bind is not None
     maker = async_sessionmaker(db.bind, expire_on_commit=False)
     async with maker() as a, maker() as b:
         await b.execute(text("SELECT COUNT(*) FROM tiqora_scim_token"))
+        # Router contract (R-TX): roll back after authenticate_token, before the write service.
+        await b.rollback()
         ops = _ops({"op": "Add", "path": "members", "value": _members(x)})
         await patch_group(a, tenant, gid, ops, base=BASE, max_members=MAXM)
         await a.commit()
@@ -616,6 +619,8 @@ async def test_put_after_concurrent_add_removes_the_added_member(db: AsyncSessio
     maker = async_sessionmaker(db.bind, expire_on_commit=False)
     async with maker() as a, maker() as b:
         await b.execute(text("SELECT COUNT(*) FROM tiqora_scim_token"))
+        # Router contract (R-TX): roll back after authenticate_token, before the write service.
+        await b.rollback()
         add_y = _ops({"op": "Add", "path": "members", "value": _members(y)})
         await patch_group(a, tenant, gid, add_y, base=BASE, max_members=MAXM)
         await a.commit()
@@ -624,3 +629,33 @@ async def test_put_after_concurrent_add_removes_the_added_member(db: AsyncSessio
     assert y_uid in r.affected_user_ids
     assert {m["value"] for m in r.resource["members"]} == {x}
     assert await _fresh_members(db, gid) == {x}
+
+
+@pytest.mark.asyncio
+async def test_parallel_adds_to_adjacent_groups_do_not_deadlock(db: AsyncSession) -> None:
+    """Initial IdP sync: members pushed in parallel to freshly created (adjacent, empty) groups.
+
+    A member-range locking read (next-key/gap lock on ``tiqora_scim_group_member``) deadlocks
+    here on InnoDB (1213), because both inserts land in the gap the other transaction locked.
+    """
+    tenant = await _tenant(db)
+    users = {n: await _agent(db, tenant, n) for n in ("x", "y")}
+    await db.commit()
+    x, y = users["x"][0], users["y"][0]
+    assert db.bind is not None
+    maker = async_sessionmaker(db.bind, expire_on_commit=False)
+
+    async def push(group_scim_id: str, member: str) -> None:
+        async with maker() as s:
+            ops = _ops({"op": "Add", "path": "members", "value": _members(member)})
+            await patch_group(s, tenant, group_scim_id, ops, base=BASE, max_members=MAXM)
+            await s.commit()
+
+    for i in range(5):
+        g1 = (await _group(db, tenant, f"Adj {i} a"))["id"]
+        g2 = (await _group(db, tenant, f"Adj {i} b"))["id"]
+        await db.commit()
+        outcome = await asyncio.gather(push(g1, x), push(g2, y), return_exceptions=True)
+        assert [repr(e) for e in outcome if e is not None] == []
+        assert await _fresh_members(db, g1) == {x}
+        assert await _fresh_members(db, g2) == {y}
