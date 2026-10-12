@@ -205,3 +205,50 @@ class DashboardTemplateIn(BaseModel):
 class DashboardTemplateOut(DashboardTabOut):
     role_ids: list[int]
     widget_count: int
+
+
+class KioskLinkIn(BaseModel):
+    """Admin request for a new wallboard link."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: _Name
+    dashboard_ids: list[DashboardIdIn] = Field(min_length=1, max_length=10)
+    rotate_seconds: int = Field(60, ge=15, le=900)
+    show_details: bool = False
+    expires_in_days: int = Field(90, ge=1, le=365)
+
+    @model_validator(mode="after")
+    def _unique_dashboards(self) -> KioskLinkIn:
+        if len(set(self.dashboard_ids)) != len(self.dashboard_ids):
+            raise ValueError("Jedes Dashboard darf nur einmal vorkommen.")
+        return self
+
+
+class KioskDashboardRef(BaseModel):
+    id: int
+    name: str
+    #: False once the link's creator can no longer see the dashboard
+    visible: bool
+
+
+class KioskLinkOut(BaseModel):
+    id: int
+    name: str
+    dashboards: list[KioskDashboardRef]
+    rotate_seconds: int
+    show_details: bool
+    token_hint: str
+    created_by: int
+    created_by_name: str | None
+    created_at: UtcDateTime
+    expires_at: UtcDateTime
+    revoked_at: UtcDateTime | None
+    last_used_at: UtcDateTime | None
+    #: not revoked and not expired
+    active: bool
+
+
+class KioskLinkCreatedOut(KioskLinkOut):
+    #: the secret; the only response that ever carries it
+    token: str

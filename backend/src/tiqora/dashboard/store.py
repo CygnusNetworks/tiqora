@@ -195,6 +195,17 @@ async def _visible_row(
     raise DashboardNotFound(dashboard_id)
 
 
+async def is_visible(
+    session: AsyncSession, dashboard_id: int, user_id: int, *, admin: bool
+) -> bool:
+    """True when ``user_id`` can open the dashboard (same rule as :func:`get_dashboard`)."""
+    try:
+        await _visible_row(session, dashboard_id, user_id, admin=admin)
+    except DashboardNotFound:
+        return False
+    return True
+
+
 def _can_edit(row: TiqoraDashboard, user_id: int, *, admin: bool) -> bool:
     if row.kind == "template":
         return admin

@@ -259,6 +259,8 @@ def test_dashboards_stay_unknown_so_only_sessions_and_unrestricted_keys_get_in()
         assert path_to_areas(path) == ("_unknown",), path
     # the admin templates keep their admin area by prefix
     assert path_to_area("/api/v1/admin/dashboard-templates") == "admin"
+    assert path_to_area("/api/v1/admin/dashboard-kiosk-links") == "admin"
+    assert path_to_area("/api/v1/admin/dashboard-kiosk-links/1/revoke") == "admin"
     for scopes in (
         frozenset({"tickets:rw"}),
         frozenset({"tickets:ro"}),
