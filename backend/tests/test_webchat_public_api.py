@@ -386,6 +386,7 @@ async def test_session_flow_and_shapes(env: Env) -> None:
             "needs_contact": False,
             "last_seq": 2,
             "identified_as": None,
+            "identified": False,
             "bot_name": None,
             "can_handoff": False,
         }
