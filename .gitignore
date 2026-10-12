@@ -102,3 +102,4 @@ mailpit-data/
 playwright-report/
 test-results/
 .playwright/
+tests/golden/itsm-packages/

@@ -98,3 +98,17 @@ peers:
     install_home: /opt/otrs
     schema_profile: znuny-7.3
     notes: Newest 7.x golden target.
+
+  # ITSM variants (wave 4): the base peer plus the official Znuny ITSM packages, installed by
+  # znuny-entrypoint.sh from /opt/itsm-packages. Own compose project and DB volume, so the plain
+  # peers stay ITSM-free. Package list: itsm-packages.yaml (keyed by the base id);
+  # `just golden-itsm-fetch <peer>` downloads it. Same host ports as every peer: one at a time.
+  znuny-6.5-itsm:
+    base: znuny-6.5
+    itsm: true
+    notes: Znuny 6.5 + ITSM bundle 6.5.3 (ITSM peer for the itsm-core plan).
+
+  znuny-7.3-itsm:
+    base: znuny-7.3
+    itsm: true
+    notes: Znuny 7.3 + ITSM 7.3.x packages (ITSM peer for the itsm-core plan).

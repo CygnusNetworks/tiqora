@@ -78,6 +78,13 @@ def resolve(peer_id: str | None = None) -> dict:
         known = ", ".join(peer_ids(data))
         raise SystemExit(f"Unknown GOLDEN_PEER={pid!r}. Known: {known}")
     meta = dict(peers[pid])
+    base_id = str(meta.get("base") or pid)
+    if base_id != pid:
+        if base_id not in peers:
+            raise SystemExit(f"peer {pid!r}: unknown base {base_id!r}")
+        # ITSM variants inherit tree, schema profile and image from the base peer.
+        meta = {**peers[base_id], **meta}
+    itsm = str(meta.get("itsm") or "").lower() in ("1", "true", "yes")
     source_dir = meta.get("source_dir") or pid
     source_path = REPO_ROOT / source_dir
     return {
@@ -99,6 +106,13 @@ def resolve(peer_id: str | None = None) -> dict:
             "GOLDEN_DB_ASYNC_URL", "mysql+aiomysql://znuny:znuny@127.0.0.1:3307/znuny"
         ),
         "GOLDEN_NOTES": meta.get("notes") or "",
+        # Image tag of the (cached) base peer; ITSM variants reuse it, state lives in the volume.
+        "GOLDEN_IMAGE_PEER": base_id,
+        "GOLDEN_BASE_PEER": base_id,
+        "GOLDEN_ITSM": "1" if itsm else "0",
+        # Read-only mount for Admin::Package::Install; /dev/null for plain peers.
+        "GOLDEN_START_PERIOD": "900s" if itsm else "90s",
+        "GOLDEN_ITSM_DIR": str(GOLDEN_DIR / "itsm-packages" / base_id) if itsm else "/dev/null",
     }
 
 
@@ -149,7 +163,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.list_ready:
         for pid in peer_ids(data):
             env = resolve(pid)
-            if env["GOLDEN_SOURCE_OK"] == "1":
+            # ITSM variants need fetched packages and run via `just golden-itsm-fetch`; keep
+            # them out of the plain-peer matrix.
+            if env["GOLDEN_SOURCE_OK"] == "1" and env["GOLDEN_ITSM"] != "1":
                 print(pid)
         return 0
 

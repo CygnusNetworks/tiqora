@@ -1,0 +1,69 @@
+# Znuny ITSM packages for the golden ITSM peers (I15, wave-4 itsm-core).
+#
+# One list per BASE peer (peers.yaml `base:`). Order matters: dependencies first.
+# `sha256` is recorded with `fetch_itsm_packages.py <peer> --record` on first fetch and is
+# verified on every later fetch (a mismatch fails). Official download location:
+# https://download.znuny.org/releases/itsm/ (7.x: latest/, bundle7/; 6.x: bundle6x/).
+#
+# Znuny publishes no individual 6.5 packages any more, only the ITSM bundle
+# (`ITSM-6.5.3.opm` embeds GeneralCatalog, ITSMCore, ITSMIncidentProblemManagement,
+# ITSMConfigurationManagement, ImportExport, ITSMChangeManagement and
+# ITSMServiceLevelManagement under var/packagesetup/ITSM/ and installs them itself).
+# `provides` lists what `Admin::Package::List` must show as installed afterwards.
+#
+# Fallback if a download disappears: build the .opm from the github.com/znuny/<Package>
+# tag with `Dev::Package::Build` inside the base peer (see README-multi-peer.md, "ITSM peers").
+
+znuny-6.5:
+  provides:
+    - GeneralCatalog
+    - ITSMCore
+    - ITSMIncidentProblemManagement
+    - ITSMConfigurationManagement
+    - ImportExport
+    - ITSMChangeManagement
+    - ITSMServiceLevelManagement
+  packages:
+    - name: ITSM
+      version: 6.5.3
+      url: https://download.znuny.org/releases/itsm/bundle6x/ITSM-6.5.3.opm
+      sha256: "2f011e2dc307829eb5804881d04bab8d41b9ec63f2320351959a8f1957c5aa20"
+
+znuny-7.3:
+  provides:
+    - GeneralCatalog
+    - ITSMCore
+    - ITSMIncidentProblemManagement
+    - ITSMConfigurationManagement
+    - ImportExport
+    - ITSMChangeManagement
+    - ITSMServiceLevelManagement
+  packages:
+    - name: GeneralCatalog
+      version: 7.3.1
+      url: https://download.znuny.org/releases/itsm/latest/GeneralCatalog-7.3.1.opm
+      sha256: "e1e95fb704345a9117e1e0caf9d3a1ec62d8da95b867874be51b9ece588325f5"
+    - name: ITSMCore
+      version: 7.3.3
+      url: https://download.znuny.org/releases/itsm/latest/ITSMCore-7.3.3.opm
+      sha256: "b419f92c6673ed6f2ec6d9f0ad7bc4897089b5424f40c76331977e2c42751e94"
+    - name: ITSMIncidentProblemManagement
+      version: 7.3.2
+      url: https://download.znuny.org/releases/itsm/latest/ITSMIncidentProblemManagement-7.3.2.opm
+      sha256: "0707a664ee9a5c1aeff9314dab22827abe6fc4007ff2d6dac9c0ff2fd50bb4c4"
+    - name: ITSMConfigurationManagement
+      version: 7.3.5
+      url: https://download.znuny.org/releases/itsm/latest/ITSMConfigurationManagement-7.3.5.opm
+      sha256: "887bfc9cf881aea1c65adaecda4a98c77778a519204a39dccf70cddfbcbe1a02"
+    - name: ImportExport
+      version: 7.3.3
+      url: https://download.znuny.org/releases/itsm/latest/ImportExport-7.3.3.opm
+      sha256: "91639ec2c483f0ab798de5a6eb054bd52616adc0cb5379bea5091fd663c21024"
+    - name: ITSMChangeManagement
+      version: 7.3.4
+      url: https://download.znuny.org/releases/itsm/latest/ITSMChangeManagement-7.3.4.opm
+      sha256: "ff6b1c6130804e843db51bd34160d3d2778e9e620b8267fa27670b0b380b61bd"
+    - name: ITSMServiceLevelManagement
+      version: 7.3.1
+      url: https://download.znuny.org/releases/itsm/latest/ITSMServiceLevelManagement-7.3.1.opm
+      sha256: "4246744cacf84c7746385d8b56d9f6036acbd38a1b61b13f8aab6b2f6993d12c"
