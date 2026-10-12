@@ -151,7 +151,7 @@ class AuthenticatedUser:
     login: str
     first_name: str
     last_name: str
-    auth_method: str  # "session" | "api_key" | "sso" | "ldap" | "spnego"
+    auth_method: str  # "session" | "api_key" | "sso" | "ldap" | "plugin" | "spnego"
     email: str | None = None
     avatar_url: str | None = None
     # None = unrestricted (session or unscoped API key). Non-empty frozenset

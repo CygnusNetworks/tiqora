@@ -25,6 +25,7 @@ extension_points = [
   "core.mail.outbound_filters",
   "core.notifications.transports",
   "core.channels.drivers",
+  "core.auth.password_providers",
   "core.http.routes",
   "core.http.public_routes",
 ]

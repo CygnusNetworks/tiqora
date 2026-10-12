@@ -33,6 +33,7 @@ if _t.TYPE_CHECKING:
     from fastapi import APIRouter
     from pydantic import BaseModel
 
+    from tiqora.plugins.auth_providers import PasswordAuthenticate
     from tiqora.plugins.channels import ChannelCapabilities, ChannelSend
     from tiqora.plugins.df_types import DfBaseType, DfDisplay, DfValidate
     from tiqora.plugins.mail_filters import MailFilterStage
@@ -188,6 +189,16 @@ class PluginRegistry(_t.Protocol):
         send: ChannelSend | None = None,
         timeout_seconds: int = 20,
     ) -> str: ...
+
+    def password_provider(
+        self,
+        name: str,
+        authenticate: PasswordAuthenticate,
+        *,
+        audience: _t.Literal["agent", "customer", "both"] = "both",
+        order: int = 100,
+        timeout_seconds: int = 5,
+    ) -> None: ...
 
 
 class Plugin(_t.Protocol):

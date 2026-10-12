@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from tiqora_sdk import PluginRegistry
+from tiqora_sdk.auth import AuthContext, PasswordCheck
 from tiqora_sdk.channels import (
     ChannelCapabilities,
     ChannelContext,
@@ -416,6 +417,51 @@ def _register_channels(registry: PluginRegistry) -> None:
     registry.route(router, public=True)
 
 
+async def _directory(ctx: AuthContext, check: PasswordCheck) -> str | None:
+    """Provider ``directory`` (both audiences): password ``richtig-<login>`` is right.
+
+    ``MODE["auth"]``: raise | raise_with_password | hang | other_login | unknown_login |
+    invalid_login. The call log never holds the password.
+    """
+    behaviour.CALLS.append(("auth.directory", (check.login, check.user_kind, check.client_ip)))
+    mode = behaviour.MODE.get("auth", "ok")
+    if mode == "raise":
+        raise RuntimeError("kaputt")
+    if mode == "raise_with_password":
+        raise RuntimeError(f"Verzeichnis lehnt {check.password} ab")
+    if mode == "hang":
+        await asyncio.sleep(30)
+    if mode == "other_login":
+        return "pp55-agent2"
+    if mode == "unknown_login":
+        return "gibt-es-nicht"
+    if mode == "invalid_login":
+        return "pp55-invalid"
+    return check.login if check.password == f"richtig-{check.login}" else None
+
+
+async def _backup(ctx: AuthContext, check: PasswordCheck) -> str | None:
+    """Second provider (both): says no; hangs when ``MODE["auth.backup"] == "hang"``."""
+    behaviour.CALLS.append(("auth.backup", (check.login, check.user_kind)))
+    if behaviour.MODE.get("auth.backup") == "hang":
+        await asyncio.sleep(30)
+    return None
+
+
+async def _customers_only(ctx: AuthContext, check: PasswordCheck) -> str | None:
+    """Customer-only provider: must never be asked on the agent login."""
+    behaviour.CALLS.append(("auth.customers_only", (check.login, check.user_kind)))
+    return None
+
+
+def _register_auth(registry: PluginRegistry) -> None:
+    registry.password_provider("directory", _directory, order=100, timeout_seconds=1)
+    registry.password_provider("backup", _backup, order=110, timeout_seconds=1)
+    registry.password_provider(
+        "customers_only", _customers_only, audience="customer", order=120, timeout_seconds=1
+    )
+
+
 class PointsPlugin:
     def register(self, registry: PluginRegistry) -> None:
         # Each task of the plugin-points plan adds its ``_register_<point>(registry)`` call here.
@@ -428,6 +474,7 @@ class PointsPlugin:
         _register_outbound(registry)
         _register_transports(registry)
         _register_channels(registry)
+        _register_auth(registry)
 
 
 plugin = PointsPlugin()

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from tiqora.channels.registry import CHANNELS
 from tiqora.jobs.registry import JOB_HANDLERS
+from tiqora.plugins.auth_providers import AUTH_PROVIDERS
 from tiqora.plugins.channels import CHANNEL_DRIVERS
 from tiqora.plugins.df_types import DYNAMIC_FIELD_TYPES
 from tiqora.plugins.events import EVENT_SUBSCRIBERS
@@ -105,6 +106,7 @@ SUBMODULES: dict[str, set[str]] = {
         "ChannelSend",
         "verify_shared_secret",
     },
+    "tiqora_sdk.auth": {"AuthContext", "PasswordCheck", "PasswordAuthenticate"},
 }
 
 
@@ -146,6 +148,7 @@ def test_registry_protocol_matches_registrar() -> None:
             "mail_filter",
             "notification_transport",
             "channel",
+            "password_provider",
         }
     )
 
@@ -175,6 +178,7 @@ def test_phase1_points_are_sdk_stable() -> None:
             INBOUND_MAIL_FILTERS,
             OUTBOUND_MAIL_FILTERS,
             CHANNEL_DRIVERS,
+            AUTH_PROVIDERS,
         )
     )
     assert CHANNELS.sdk_stable is False

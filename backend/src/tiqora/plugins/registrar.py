@@ -21,6 +21,11 @@ from pydantic import BaseModel
 
 from tiqora.extensions.registry import ExtensionPoint
 from tiqora.jobs.registry import JOB_HANDLERS, JobHandler
+from tiqora.plugins.auth_providers import (
+    AUTH_PROVIDERS,
+    PasswordAuthenticate,
+    PasswordAuthProvider,
+)
 from tiqora.plugins.channels import (
     CHANNEL_DRIVERS,
     MAX_CHANNEL_TIMEOUT,
@@ -825,6 +830,54 @@ class PluginRegistrar:
         )
         self._stage(NOTIFICATION_TRANSPORTS, item, check=check)
         return qname
+
+    def password_provider(
+        self,
+        name: str,
+        authenticate: PasswordAuthenticate,
+        *,
+        audience: Literal["agent", "customer", "both"] = "both",
+        order: int = 100,
+        timeout_seconds: int = 5,
+    ) -> None:
+        """Stage a password auth provider (D12) for the agent and/or customer login.
+
+        ``authenticate`` is ``async def (ctx: AuthContext, check: PasswordCheck) -> str | None``
+        and returns the login of an existing, valid account or ``None``. It runs only after the
+        local password and the LDAP chain said no; two-factor authentication still applies.
+        """
+
+        def check() -> None:
+            self._check_name(name, "den Anmeldeanbieter")
+            _require_async(authenticate, f"Der Anmeldeanbieter „{name}“")
+            if audience not in ("agent", "customer", "both"):
+                raise RegistrationRejected(
+                    f"Unbekannte Zielgruppe „{audience}“ für einen Anmeldeanbieter; "
+                    "erlaubt: agent, customer, both"
+                )
+            if (
+                isinstance(timeout_seconds, bool)
+                or not isinstance(timeout_seconds, int)
+                or not 1 <= timeout_seconds <= 15
+            ):
+                raise RegistrationRejected(
+                    "Zeitlimit eines Anmeldeanbieters muss zwischen 1 und 15 Sekunden liegen"
+                )
+            if isinstance(order, bool) or not isinstance(order, int) or not 0 <= order <= 1000:
+                raise RegistrationRejected(
+                    "Reihenfolge eines Anmeldeanbieters muss zwischen 0 und 1000 liegen"
+                )
+
+        item = PasswordAuthProvider(
+            key=f"{self.plugin_id}:{name}",
+            plugin_id=self.plugin_id,
+            audience=audience,
+            authenticate=authenticate,
+            order=order,
+            timeout_seconds=timeout_seconds,
+            context=self._context,
+        )
+        self._stage(AUTH_PROVIDERS, item, check=check)
 
     def channel(
         self,
