@@ -274,3 +274,52 @@ async def test_retry_is_delayed(env: Env, monkeypatch: pytest.MonkeyPatch) -> No
     await _until(lambda: mock.await_count == 2)
     assert mock.await_args_list[1].kwargs["session_id"] == "sid-retry"
     await _stop(stop, task)
+
+
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+@pytest.mark.asyncio
+async def test_requeue_during_turn_is_not_dropped(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The turn's own requeue (follow-up line) is popped before the turn task returns."""
+    calls: list[str] = []
+
+    async def turn_fn(_f: Any, _s: Any, redis: Any, *, session_id: str, **_kw: Any) -> str:
+        calls.append(session_id)
+        if len(calls) == 1:
+            await redis.rpush(BOT_QUEUE_KEY, session_id)  # bot._release_claim
+            await _until(lambda: env_queue_empty(env))  # the feeder pops it mid-turn
+            await asyncio.sleep(0.05)
+        return "replied"
+
+    monkeypatch.setattr(chat_bot_loop, "run_chat_bot_turn", turn_fn)
+    await env.redis.rpush(BOT_QUEUE_KEY, "sid-follow")
+    stop, task = _start(env)
+    await _until(lambda: len(calls) == 2)
+    assert calls == ["sid-follow", "sid-follow"]
+    await _stop(stop, task)
+
+
+def env_queue_empty(env: Env) -> bool:
+    return not env.redis._lists.get(BOT_QUEUE_KEY)
+
+
+@pytest.mark.parametrize("env", _URLS, indirect=True)
+@pytest.mark.asyncio
+async def test_hanging_blpop_does_not_stall_rescan(
+    env: Env, turn: AsyncMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(chat_bot_loop, "BOT_BLPOP_TIMEOUT", 0.01)
+    monkeypatch.setattr(chat_bot_loop, "BOT_BLPOP_GRACE_SECONDS", 0.05)
+    monkeypatch.setattr(chat_bot_loop, "BOT_REDIS_ERROR_SLEEP_SECONDS", 0.01)
+
+    async def hang(*_a: Any, **_k: Any) -> None:
+        await asyncio.sleep(3600)
+
+    monkeypatch.setattr(env.redis, "blpop", hang)
+    sid = env.add_session(1)
+    stop, task = _start(env)
+    await _until(lambda: turn.await_count >= 1)
+    assert turn.await_args is not None
+    assert turn.await_args.kwargs["session_id"] == sid
+    await _stop(stop, task)

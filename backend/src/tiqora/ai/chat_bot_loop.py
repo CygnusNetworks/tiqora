@@ -46,6 +46,7 @@ BOT_ALIVE_REFRESH_SECONDS: Final = 10
 BOT_ALIVE_TTL_SECONDS: Final = 30
 BOT_RESCAN_SECONDS: Final = 15
 BOT_BLPOP_TIMEOUT: Final = 5
+BOT_BLPOP_GRACE_SECONDS: Final = 2.0  # a half-open connection must not stall the rescan
 BOT_RETRY_DELAY_SECONDS: Final = 5
 BOT_ENABLED_CHECK_SECONDS: Final = 5
 BOT_REDIS_ERROR_SLEEP_SECONDS: Final = 1.0
@@ -96,7 +97,11 @@ class _BotLoop:
         self.redis = redis_client
         self.clock = clock
         self.todo: asyncio.Queue[str] = asyncio.Queue()
-        self.known: set[str] = set()  # queued or running; a duplicate offer is dropped
+        self.known: set[str] = set()  # queued, not yet running; a duplicate offer is dropped
+        self.active: set[str] = set()  # running right now
+        # Offered while its turn was running (the turn's own requeue for a follow-up line, see
+        # bot._release_claim): run once more after the turn, never drop it.
+        self.rerun: set[str] = set()
         self.retry_at: dict[str, float] = {}
         self.running: set[asyncio.Task[None]] = set()
         self.sem = asyncio.Semaphore(settings.chat_bot_concurrency)
@@ -117,6 +122,9 @@ class _BotLoop:
 
     # -- producers -------------------------------------------------------------------------
     def offer(self, session_id: str) -> None:
+        if session_id in self.active:
+            self.rerun.add(session_id)
+            return
         if session_id in self.known or session_id in self.retry_at:
             return
         self.known.add(session_id)
@@ -151,7 +159,10 @@ class _BotLoop:
                     logger.warning("webchat_bot_rescan_failed")
             try:
                 popped_id = _decode_pop(
-                    await self.redis.blpop(BOT_QUEUE_KEY, timeout=BOT_BLPOP_TIMEOUT)
+                    await asyncio.wait_for(
+                        self.redis.blpop(BOT_QUEUE_KEY, timeout=BOT_BLPOP_TIMEOUT),
+                        timeout=BOT_BLPOP_TIMEOUT + BOT_BLPOP_GRACE_SECONDS,
+                    )
                 )
             except Exception:  # noqa: BLE001 - Redis down: the database rescan carries on
                 logger.warning("webchat_bot_queue_pop_failed")
@@ -166,6 +177,8 @@ class _BotLoop:
         while True:
             session_id = await self.todo.get()
             await self.sem.acquire()
+            self.known.discard(session_id)
+            self.active.add(session_id)
             task = asyncio.create_task(self._turn(session_id))
             self.running.add(task)
             task.add_done_callback(self.running.discard)
@@ -185,10 +198,14 @@ class _BotLoop:
         except Exception:  # noqa: BLE001 - one bad turn must not stop the loop
             logger.exception("webchat_bot_turn_crashed", session_id=session_id)
         finally:
-            self.known.discard(session_id)
+            self.active.discard(session_id)
             self.sem.release()
+        rerun = session_id in self.rerun
+        self.rerun.discard(session_id)
         if outcome == "retry":
             self.retry_at[session_id] = self.clock() + BOT_RETRY_DELAY_SECONDS
+        elif rerun:
+            self.offer(session_id)  # claim_bot_turn answers "skipped" if nothing is pending
 
 
 async def run_chat_bot_loop(
@@ -226,5 +243,6 @@ async def run_chat_bot_loop(
                 task.cancel()
             await asyncio.gather(*pending, return_exceptions=True)
         with contextlib.suppress(Exception):
+            # Single ai-worker assumed: with replicas this would flash worker_down for <=10 s.
             await loop.redis.delete(BOT_ALIVE_KEY)
         logger.info("webchat_bot_loop_stopped")
