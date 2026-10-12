@@ -76,11 +76,29 @@ describe("webchat demo data", () => {
   it("is path-scoped: other paths fall through", () => {
     expect(resolveWebchatData("/api/v1/tickets/100", "GET")).toBeUndefined();
     expect(resolveWebchatData("/api/v1/reports/run", "POST")).toBeUndefined();
-    expect(resolveWebchatData("/api/v1/chat/inbox", "GET")).toMatchObject({ waiting: [{}], mine: [{ ticket_id: 116 }] });
+    expect(resolveWebchatData("/api/v1/chat/inbox", "GET")).toMatchObject({ waiting: [{ ticket_id: 119 }, { ticket_id: 117 }], bot: [{ ticket_id: 118 }], mine: [{ ticket_id: 116 }] });
   });
 
   it("serves ticket 117 with a visitor article", () => {
     expect(resolveData("/api/v1/tickets/117/articles", "GET") as unknown[]).toHaveLength(1);
+  });
+
+  it("serves the bot chat (118) and the handed-over chat (119) as WebChat tickets", () => {
+    for (const id of [118, 119]) {
+      const arts = resolveData(`/api/v1/tickets/${id}/articles`, "GET") as { communication_channel_name: string }[];
+      expect(arts.length).toBeGreaterThan(0);
+      expect(arts.every((a) => a.communication_channel_name === "WebChat")).toBe(true);
+      expect(resolveData(`/api/v1/tickets/${id}`, "GET")).toMatchObject({ id });
+    }
+    expect(resolveData("/api/v1/tickets/118/chat", "GET")).toMatchObject({ status: "bot", bot_name: "Mia" });
+    expect(resolveData("/api/v1/tickets/119/chat", "GET")).toMatchObject({ status: "waiting", handoff_reason: "ai" });
+  });
+
+  it("demo accept returns the ticket of the accepted session", () => {
+    const accept = (sid: string) => resolveData(`/api/v1/chat/sessions/${sid}/accept`, "POST");
+    expect(accept("c4a1f0d2-7e63-4b85-9a2c-1d3e5f708b93")).toEqual({ ticket_id: 118 });
+    expect(accept("e2b7a9c1-4d58-4a36-8f0e-9c1b2a3d4e64")).toEqual({ ticket_id: 119 });
+    expect(accept("9f3c2a40-5b1e-4d7a-8c2e-0a1b2c3d4e51")).toEqual({ ticket_id: 117 });
   });
 
   it("serves ticket 116 as a webchat ticket with three WebChat articles", () => {

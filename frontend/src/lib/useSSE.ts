@@ -138,6 +138,8 @@ export function handleSSEMessage(queryClient: QueryClient, raw: string): void {
     }
     void queryClient.invalidateQueries({ queryKey: chatInboxKey });
     if (message.type === "chat_waiting") {
+      // A bot chat handed off while an agent watches it: refresh the header (handoff line).
+      void queryClient.invalidateQueries({ queryKey: ticketChatKey(message.ticket_id) });
       receiveChatWaiting(message);
     } else {
       void queryClient.invalidateQueries({ queryKey: ["tickets", message.ticket_id] });

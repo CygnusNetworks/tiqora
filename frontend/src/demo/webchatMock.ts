@@ -9,6 +9,10 @@ const MINE_SESSION = "5d8e7b12-3a4c-4f60-9b1d-6e7f8a9b0c22";
 const BOT_SESSION = "c4a1f0d2-7e63-4b85-9a2c-1d3e5f708b93";
 const HANDED_SESSION = "e2b7a9c1-4d58-4a36-8f0e-9c1b2a3d4e64";
 
+const TICKET_BY_SESSION: Record<string, number> = {
+  [WAITING_SESSION]: 117, [MINE_SESSION]: 116, [BOT_SESSION]: 118, [HANDED_SESSION]: 119,
+};
+
 const topics = [{ ref: "1:support", label: "Support", queue_id: 1, config_name: "Website" }];
 
 const waitingItem = {
@@ -26,6 +30,11 @@ const botItem = {
   session_id: BOT_SESSION, ticket_id: 118, tn: "20260701018", title: "Chat: Rechnung nicht erhalten",
   status: "bot" as const, visitor_name: "Jana Beispiel", topic_label: "Support",
   waiting_since: null, accepted_at: null,
+};
+const handedItem = {
+  session_id: HANDED_SESSION, ticket_id: 119, tn: "20260701019", title: "Chat: Vertrag kündigen",
+  status: "waiting" as const, visitor_name: "Paul Muster", topic_label: "Support",
+  waiting_since: new Date(Date.now() - 30_000).toISOString(), accepted_at: null,
 };
 const ticketChat118 = {
   session_id: BOT_SESSION, status: "bot", visitor_name: "Jana Beispiel",
@@ -100,8 +109,11 @@ export function resolveWebchatData(p: string, method: string): unknown | undefin
   if (p.includes("/api/v1/chat/")) {
     if (p.endsWith("/agent-state")) return { available: true, max_concurrent: 3, active_count: 1, topics: [] };
     if (p.endsWith("/topics")) return topics;
-    if (p.endsWith("/inbox")) return { waiting: [waitingItem], bot: [botItem], mine: [mineItem] };
-    if (p.endsWith("/accept")) return { ticket_id: 117 };
+    if (p.endsWith("/inbox")) return { waiting: [handedItem, waitingItem], bot: [botItem], mine: [mineItem] };
+    if (p.endsWith("/accept")) {
+      const sid = p.match(/\/sessions\/([^/]+)\/accept$/)?.[1];
+      return { ticket_id: (sid && TICKET_BY_SESSION[sid]) || 117 };
+    }
     return {};
   }
   if (p.endsWith("/api/v1/admin/channels/webchat")) return { channel: "webchat", enabled: true, config: {} };

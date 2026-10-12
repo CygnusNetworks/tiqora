@@ -191,9 +191,16 @@ describe("WebchatSessionHeader", () => {
     expect(screen.queryByTestId("webchat-email-unverified")).toBeNull();
   });
 
-  it("portal identity names the customer portal; phase 1 stays unverified", async () => {
+  it("portal identity names the customer portal", async () => {
     ticketChat.mockResolvedValue({ ...base, identity_source: "portal", visitor_email_verified: true });
     mount();
     expect(await screen.findByTestId("webchat-identity-confirmed")).toHaveTextContent("Kundenportal");
+  });
+
+  it("an unknown identity source is not shown as confirmed", async () => {
+    ticketChat.mockResolvedValue({ ...base, identity_source: "future", visitor_email_verified: true });
+    mount();
+    await screen.findByTestId("webchat-visitor-email");
+    expect(screen.queryByTestId("webchat-identity-confirmed")).toBeNull();
   });
 });

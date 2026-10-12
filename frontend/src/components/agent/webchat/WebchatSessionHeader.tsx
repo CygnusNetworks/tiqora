@@ -104,11 +104,14 @@ export function WebchatSessionHeader({ ticketId }: { ticketId: number }) {
       ? chat.handoff_reason
       : null
     : null;
-  const identityConfirmed = chat.visitor_email_verified && !!chat.identity_source;
-  const identityLabel =
+  const identityKey =
     chat.identity_source === "portal"
-      ? t("webchat.agent.identity.portal")
-      : t("webchat.agent.identity.website");
+      ? "webchat.agent.identity.portal"
+      : chat.identity_source === "website"
+        ? "webchat.agent.identity.website"
+        : null;
+  const identityConfirmed = chat.visitor_email_verified && identityKey !== null;
+  const identityLabel = identityKey ? t(identityKey) : "";
   const statusLabel = isBot
     ? botName
       ? t("webchat.agent.bot.statusNamed", { name: botName })
