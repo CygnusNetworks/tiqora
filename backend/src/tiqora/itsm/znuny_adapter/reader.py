@@ -90,6 +90,59 @@ class VersionRow:
 
 
 @dataclass(frozen=True, slots=True)
+class GeneralCatalogRow:
+    id: int
+    catalog_class: str
+    name: str
+    valid_id: int
+    comments: str | None
+    preferences: Mapping[str, str]
+
+
+@dataclass(frozen=True, slots=True)
+class LinkRow:
+    """One ``link_relation`` row with the object, type and state names resolved.
+
+    ``cursor`` is the row's ``(source_object_id, source_key, target_object_id, target_key,
+    type_id)``: pass the last row's value as ``after`` of :meth:`ZnunyItsmReader.iter_ci_links`.
+    It follows the eight contract fields (additive, C3).
+    """
+
+    source_object: str
+    source_key: str
+    target_object: str
+    target_key: str
+    link_type: str
+    state: str
+    created_at: datetime | None
+    created_by: int | None
+    cursor: tuple[int, str, int, str, int] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CipRow:
+    criticality: str
+    impact: str
+    priority_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class ServiceItsmRow:
+    service_id: int
+    type_id: int | None
+    type_name: str | None
+    criticality: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class SlaItsmRow:
+    sla_id: int
+    type_id: int | None
+    type_name: str | None
+    min_time_bet_incidents: int | None
+
+
+@dataclass(frozen=True, slots=True)
 class SearchOutcome:
     rows: list[CiRow]
     total: int
@@ -246,6 +299,227 @@ class ZnunyItsmReader:
             created_at=r[4],
             created_by=_opt_int(r[5]),
         )
+
+    # ------------------------------------------------------------------ versions + bulk readers
+
+    async def versions(
+        self, session: AsyncSession, ci_id: int, *, limit: int, offset: int
+    ) -> tuple[list[VersionRow], int]:
+        """The versions of one CI, newest first, and their total number."""
+        limit = max(1, min(limit, MAX_PAGE))
+        total = int(
+            (
+                await session.execute(
+                    text("SELECT COUNT(*) FROM configitem_version WHERE configitem_id = :ci"),
+                    {"ci": ci_id},
+                )
+            ).scalar_one()
+        )
+        rows = (
+            await session.execute(
+                text(
+                    f"SELECT {_VERSION_COLS} FROM configitem_version WHERE configitem_id = :ci"
+                    " ORDER BY id DESC LIMIT :limit OFFSET :offset"
+                ),
+                {"ci": ci_id, "limit": limit, "offset": max(0, offset)},
+            )
+        ).all()
+        return [_version_row(r) for r in rows], total
+
+    async def version_xml_data(
+        self, session: AsyncSession, version_rows: Sequence[VersionRow]
+    ) -> dict[int, list[Any]]:
+        """Znuny's raw ``@XMLHash`` per version id, before decoding (import contract, R10).
+
+        Versions whose definition is missing or whose stored rows are unreadable are absent.
+        """
+        definitions = await self.definitions(session, {v.definition_id for v in version_rows})
+        return await self._xml_hashes(session, version_rows, definitions)
+
+    async def iter_general_catalog(self, session: AsyncSession) -> list[GeneralCatalogRow]:
+        """Every ``general_catalog`` row (valid or not) with its preferences, id order."""
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT id, general_catalog_class, name, valid_id, comments"
+                    " FROM general_catalog ORDER BY id"
+                )
+            )
+        ).all()
+        prefs: dict[int, dict[str, str]] = {}
+        stmt = _expanding(
+            "SELECT general_catalog_id, pref_key, pref_value FROM general_catalog_preferences"
+            " WHERE general_catalog_id IN :ids ORDER BY general_catalog_id, pref_key",
+            "ids",
+        )
+        for part in chunks([int(r[0]) for r in rows]):
+            for cid, key, value in (await session.execute(stmt, {"ids": list(part)})).all():
+                prefs.setdefault(int(cid), {})[str(key)] = "" if value is None else str(value)
+        return [
+            GeneralCatalogRow(
+                id=int(r[0]),
+                catalog_class=str(r[1]),
+                name=str(r[2]),
+                valid_id=int(r[3]),
+                comments=None if r[4] is None else str(r[4]),
+                preferences=prefs.get(int(r[0]), {}),
+            )
+            for r in rows
+        ]
+
+    async def iter_class_definitions(self, session: AsyncSession) -> list[DefinitionRow]:
+        """Every definition version of every class, ordered by class and version."""
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT id, class_id, version, configitem_definition, create_time, create_by"
+                    " FROM configitem_definition ORDER BY class_id, version, id"
+                )
+            )
+        ).all()
+        return [self._definition_row(r) for r in rows]
+
+    async def iter_config_items(
+        self, session: AsyncSession, *, after_id: int, limit: int
+    ) -> list[CiRow]:
+        """Keyset paging over ``configitem`` by id: the next ``limit`` rows after ``after_id``."""
+        rows = (
+            await session.execute(
+                text(
+                    f"SELECT {_CI_COLS} FROM configitem WHERE id > :after ORDER BY id LIMIT :limit"
+                ),
+                {"after": after_id, "limit": max(1, limit)},
+            )
+        ).all()
+        return [_ci_row(r) for r in rows]
+
+    async def versions_for(
+        self, session: AsyncSession, ci_ids: Sequence[int]
+    ) -> dict[int, list[VersionRow]]:
+        """All versions of the given CIs, oldest first (id order); CIs without any are absent."""
+        stmt = _expanding(
+            f"SELECT {_VERSION_COLS} FROM configitem_version WHERE configitem_id IN :ids"
+            " ORDER BY id",
+            "ids",
+        )
+        out: dict[int, list[VersionRow]] = {}
+        for part in chunks(sorted(set(ci_ids))):
+            for r in (await session.execute(stmt, {"ids": list(part)})).all():
+                row = _version_row(r)
+                out.setdefault(row.ci_id, []).append(row)
+        for versions in out.values():
+            versions.sort(key=lambda v: v.id)
+        return out
+
+    async def iter_ci_links(
+        self,
+        session: AsyncSession,
+        *,
+        after: tuple[int, str, int, str, int] | None,
+        limit: int,
+    ) -> list[LinkRow]:
+        """Links with a CI at either end, in key order, after the ``cursor`` of the last row.
+
+        Every state is returned (``Valid`` and ``Temporary``); the caller decides. Joins stay
+        inside Znuny's own link tables.
+        """
+        where = (
+            "(r.source_object_id = (SELECT id FROM link_object WHERE name = :obj)"
+            " OR r.target_object_id = (SELECT id FROM link_object WHERE name = :obj))"
+        )
+        params: dict[str, Any] = {"obj": self.profile.ci_link_object, "limit": max(1, limit)}
+        if after is not None:
+            where += (
+                " AND (r.source_object_id, r.source_key, r.target_object_id, r.target_key,"
+                " r.type_id) > (:a0, :a1, :a2, :a3, :a4)"
+            )
+            params.update({f"a{i}": value for i, value in enumerate(after)})
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT so.name, r.source_key, tobj.name, r.target_key, lt.name, ls.name,"
+                    " r.create_time, r.create_by, r.source_object_id, r.target_object_id,"
+                    " r.type_id FROM link_relation r"
+                    " JOIN link_object so ON so.id = r.source_object_id"
+                    " JOIN link_object tobj ON tobj.id = r.target_object_id"
+                    " JOIN link_type lt ON lt.id = r.type_id"
+                    " JOIN link_state ls ON ls.id = r.state_id"
+                    f" WHERE {where}"
+                    " ORDER BY r.source_object_id, r.source_key, r.target_object_id,"
+                    " r.target_key, r.type_id LIMIT :limit"
+                ),
+                params,
+            )
+        ).all()
+        return [
+            LinkRow(
+                source_object=str(r[0]),
+                source_key=str(r[1]),
+                target_object=str(r[2]),
+                target_key=str(r[3]),
+                link_type=str(r[4]),
+                state=str(r[5]),
+                created_at=r[6],
+                created_by=_opt_int(r[7]),
+                cursor=(int(r[8]), str(r[1]), int(r[9]), str(r[3]), int(r[10])),
+            )
+            for r in rows
+        ]
+
+    async def cip_allocate(self, session: AsyncSession) -> list[CipRow]:
+        """The criticality x impact -> priority matrix, in table order."""
+        rows = (
+            await session.execute(
+                text("SELECT criticality, impact, priority_id FROM cip_allocate ORDER BY id")
+            )
+        ).all()
+        return [CipRow(str(r[0]), str(r[1]), int(r[2])) for r in rows]
+
+    async def _itsm_columns(
+        self, session: AsyncSession, table: str, columns: Sequence[str]
+    ) -> list[Any]:
+        wanted = list(columns)  # the profile lists only columns its schema has
+        select = ", ".join(["id", *wanted])
+        rows = (await session.execute(text(f"SELECT {select} FROM {table} ORDER BY id"))).all()
+        return [dict(zip(["id", *wanted], r, strict=True)) for r in rows]
+
+    async def service_itsm_columns(self, session: AsyncSession) -> dict[int, ServiceItsmRow]:
+        """The ITSM columns of every ``service`` row; a column the profile lacks is ``None``."""
+        rows = await self._itsm_columns(session, "service", self.profile.service_itsm_columns)
+        names = await self._type_names(session, [r.get("type_id") for r in rows])
+        return {
+            int(r["id"]): ServiceItsmRow(
+                service_id=int(r["id"]),
+                type_id=_opt_int(r.get("type_id")),
+                type_name=names.get(_opt_int(r.get("type_id")) or 0),
+                criticality=None if r.get("criticality") is None else str(r["criticality"]),
+            )
+            for r in rows
+        }
+
+    async def sla_itsm_columns(self, session: AsyncSession) -> dict[int, SlaItsmRow]:
+        """The ITSM columns of every ``sla`` row; a column the profile lacks is ``None``."""
+        rows = await self._itsm_columns(session, "sla", self.profile.sla_itsm_columns)
+        names = await self._type_names(session, [r.get("type_id") for r in rows])
+        return {
+            int(r["id"]): SlaItsmRow(
+                sla_id=int(r["id"]),
+                type_id=_opt_int(r.get("type_id")),
+                type_name=names.get(_opt_int(r.get("type_id")) or 0),
+                min_time_bet_incidents=_opt_int(r.get("min_time_bet_incidents")),
+            )
+            for r in rows
+        }
+
+    @staticmethod
+    async def _type_names(session: AsyncSession, ids: Sequence[object]) -> dict[int, str]:
+        wanted = {int(i) for i in ids if i is not None}  # type: ignore[call-overload]
+        out: dict[int, str] = {}
+        stmt = _expanding("SELECT id, name FROM general_catalog WHERE id IN :ids", "ids")
+        for part in chunks(sorted(wanted)):
+            for cid, name in (await session.execute(stmt, {"ids": list(part)})).all():
+                out[int(cid)] = str(name)
+        return out
 
     # ------------------------------------------------------------------ attributes
 
