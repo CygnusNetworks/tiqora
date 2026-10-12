@@ -19,11 +19,18 @@ def register_core(registry: Registry) -> None:
 
     from tiqora.avatars.settings import AVATARS_SECTION
     from tiqora.deployed.settings import PROCESS_DEPLOY_SECTION
+    from tiqora.itsm.settings import ITSM_SECTION
     from tiqora.jobs.settings import JOBS_SECTION
     from tiqora.reporting.settings import REPORTING_SECTION
     from tiqora.settings_sections.section import SETTINGS_SECTIONS, validate_section_schema
 
-    for section in (JOBS_SECTION, AVATARS_SECTION, PROCESS_DEPLOY_SECTION, REPORTING_SECTION):
+    for section in (
+        JOBS_SECTION,
+        AVATARS_SECTION,
+        PROCESS_DEPLOY_SECTION,
+        REPORTING_SECTION,
+        ITSM_SECTION,
+    ):
         validate_section_schema(section)
         registry.add(SETTINGS_SECTIONS, section)
 

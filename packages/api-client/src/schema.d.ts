@@ -3700,6 +3700,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/itsm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Itsm Admin */
+        get: operations["get_itsm_admin_api_v1_admin_itsm_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/mode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Itsm Mode */
+        put: operations["put_itsm_mode_api_v1_admin_itsm_mode_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/mail-accounts": {
         parameters: {
             query?: never;
@@ -17234,6 +17268,74 @@ export interface components {
             supported: boolean;
             /** Type */
             type: string;
+        };
+        /** ItsmAdminOut */
+        ItsmAdminOut: {
+            /** Allowed Transitions */
+            allowed_transitions: ("off" | "znuny_readthrough" | "tiqora")[];
+            /** Changed At */
+            changed_at: string | null;
+            /** Changed By */
+            changed_by: number | null;
+            /** Cmdb Empty */
+            cmdb_empty: boolean;
+            detected: components["schemas"]["ItsmDetectedOut"];
+            /** Import Run Id */
+            import_run_id: number | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "off" | "znuny_readthrough" | "tiqora";
+            /** Previous Mode */
+            previous_mode: ("off" | "znuny_readthrough" | "tiqora") | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "auto" | "admin" | "importer";
+            /** Stored */
+            stored: boolean;
+            switch: components["schemas"]["ItsmSwitchOut"] | null;
+            /** Switched */
+            switched: boolean;
+        };
+        /**
+         * ItsmDetectedOut
+         * @description What of Znuny's ITSM is installed in the Znuny database.
+         */
+        ItsmDetectedOut: {
+            /** Change Installed */
+            change_installed: boolean;
+            /** Cmdb Installed */
+            cmdb_installed: boolean;
+            /** Core Installed */
+            core_installed: boolean;
+            /** Packages */
+            packages: {
+                [key: string]: string;
+            };
+            /** Profile */
+            profile: string | null;
+            /** Unsupported Reason */
+            unsupported_reason: string | null;
+        };
+        /** ItsmModeIn */
+        ItsmModeIn: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "off" | "znuny_readthrough" | "tiqora";
+        };
+        /** ItsmSwitchOut */
+        ItsmSwitchOut: {
+            /** By */
+            by: number | null;
+            /** Run Id */
+            run_id: number | null;
+            /** Switched At */
+            switched_at: string | null;
         };
         /** JitDefaults */
         JitDefaults: {
@@ -34181,6 +34283,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IdentityTestResultOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_itsm_admin_api_v1_admin_itsm_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItsmAdminOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_itsm_mode_api_v1_admin_itsm_mode_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ItsmModeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItsmAdminOut"];
                 };
             };
             /** @description Validation Error */

@@ -17883,6 +17883,249 @@
         "title": "InvokerOut",
         "type": "object"
       },
+      "ItsmAdminOut": {
+        "properties": {
+          "allowed_transitions": {
+            "items": {
+              "enum": [
+                "off",
+                "znuny_readthrough",
+                "tiqora"
+              ],
+              "type": "string"
+            },
+            "title": "Allowed Transitions",
+            "type": "array"
+          },
+          "changed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed At"
+          },
+          "changed_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed By"
+          },
+          "cmdb_empty": {
+            "title": "Cmdb Empty",
+            "type": "boolean"
+          },
+          "detected": {
+            "$ref": "#/components/schemas/ItsmDetectedOut"
+          },
+          "import_run_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Import Run Id"
+          },
+          "mode": {
+            "enum": [
+              "off",
+              "znuny_readthrough",
+              "tiqora"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "previous_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "off",
+                  "znuny_readthrough",
+                  "tiqora"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Mode"
+          },
+          "source": {
+            "enum": [
+              "auto",
+              "admin",
+              "importer"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "stored": {
+            "title": "Stored",
+            "type": "boolean"
+          },
+          "switch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ItsmSwitchOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "switched": {
+            "title": "Switched",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "mode",
+          "source",
+          "stored",
+          "changed_at",
+          "changed_by",
+          "import_run_id",
+          "previous_mode",
+          "switched",
+          "switch",
+          "detected",
+          "cmdb_empty",
+          "allowed_transitions"
+        ],
+        "title": "ItsmAdminOut",
+        "type": "object"
+      },
+      "ItsmDetectedOut": {
+        "description": "What of Znuny's ITSM is installed in the Znuny database.",
+        "properties": {
+          "change_installed": {
+            "title": "Change Installed",
+            "type": "boolean"
+          },
+          "cmdb_installed": {
+            "title": "Cmdb Installed",
+            "type": "boolean"
+          },
+          "core_installed": {
+            "title": "Core Installed",
+            "type": "boolean"
+          },
+          "packages": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Packages",
+            "type": "object"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "unsupported_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unsupported Reason"
+          }
+        },
+        "required": [
+          "packages",
+          "core_installed",
+          "cmdb_installed",
+          "change_installed",
+          "profile",
+          "unsupported_reason"
+        ],
+        "title": "ItsmDetectedOut",
+        "type": "object"
+      },
+      "ItsmModeIn": {
+        "properties": {
+          "mode": {
+            "enum": [
+              "off",
+              "znuny_readthrough",
+              "tiqora"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "ItsmModeIn",
+        "type": "object"
+      },
+      "ItsmSwitchOut": {
+        "properties": {
+          "by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "switched_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Switched At"
+          }
+        },
+        "required": [
+          "switched_at",
+          "by",
+          "run_id"
+        ],
+        "title": "ItsmSwitchOut",
+        "type": "object"
+      },
       "JitDefaults": {
         "properties": {
           "allowed_email_domains": {
@@ -59015,6 +59258,146 @@
         "summary": "Get Identity Test",
         "tags": [
           "admin:identity"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm": {
+      "get": {
+        "operationId": "get_itsm_admin_api_v1_admin_itsm_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItsmAdminOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Itsm Admin",
+        "tags": [
+          "admin:itsm"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/mode": {
+      "put": {
+        "operationId": "put_itsm_mode_api_v1_admin_itsm_mode_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ItsmModeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItsmAdminOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Itsm Mode",
+        "tags": [
+          "admin:itsm"
         ]
       }
     },

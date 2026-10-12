@@ -161,7 +161,8 @@ def test_ci_providers_extension_point() -> None:
     reg.add(CI_PROVIDERS, factory)
     assert reg.get(CI_PROVIDERS, "tiqora") is factory
     assert reg.get(CI_PROVIDERS, "znuny_readthrough") is None
-    assert not hasattr(providers, "get_ci_provider")  # itsm1 Task 7
+    # the lookups moved here from Task 7 (ruling F6): both are defined in providers.py
+    assert callable(providers.get_ci_provider) and callable(providers.tiqora_cmdb_empty)
 
 
 def test_mode_keys() -> None:
