@@ -11,7 +11,7 @@ from collections.abc import Iterator
 from datetime import datetime
 
 import pytest
-from sqlalchemy import create_engine, delete, func, select
+from sqlalchemy import create_engine, delete, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -188,8 +188,18 @@ def _add_provider(session: Session, suffix: str) -> int:
     return p.id
 
 
-def _members(session: Session) -> int:
-    return session.scalar(select(func.count()).select_from(TiqoraScimGroupMember)) or 0
+def _members(session: Session, group_ids: list[int], member_ids: list[int]) -> int:
+    return (
+        session.scalar(
+            select(func.count())
+            .select_from(TiqoraScimGroupMember)
+            .where(
+                TiqoraScimGroupMember.group_id.in_(group_ids),
+                TiqoraScimGroupMember.member_id.in_(member_ids),
+            )
+        )
+        or 0
+    )
 
 
 def test_provider_new_columns_default(session: Session) -> None:
@@ -203,6 +213,33 @@ def test_provider_new_columns_default(session: Session) -> None:
     assert row.session_absolute_seconds is None
     assert row.scim_enabled is False
     assert row.scim_adopt_existing is False
+
+
+def test_provider_server_defaults_fill_omitted_columns(session: Session) -> None:
+    """Raw INSERT without the new columns: the server defaults (not the ORM's) must fill them."""
+    pid = _add_provider(session, "rawdef")
+    session.execute(delete(TiqoraIdentityProvider).where(TiqoraIdentityProvider.id == pid))
+    session.commit()
+    session.execute(
+        text(
+            "INSERT INTO tiqora_identity_provider (slug, kind, source, name, audience, enabled,"
+            " sort, config, match_by, require_sso_opt_in, attribute_map, jit_enabled,"
+            " jit_defaults, role_rules, sync_mode, create_by, create_time, change_by,"
+            " change_time) VALUES (:slug, 'oidc', 'db', 'raw', 'both', :f, 10, '{}', 'login',"
+            " :f, '{}', :f, '{}', '[]', 'managed', 1, :t, 1, :t)"
+        ),
+        {"slug": f"{SLUG}rawdef", "f": False, "t": NOW},
+    )
+    session.commit()
+    row = session.scalars(
+        select(TiqoraIdentityProvider).where(TiqoraIdentityProvider.slug == f"{SLUG}rawdef")
+    ).one()
+    assert row.require_mfa_claim is False
+    assert row.scim_enabled is False
+    assert row.scim_adopt_existing is False
+    assert row.mfa_policy is None
+    assert row.session_idle_seconds is None
+    assert row.session_absolute_seconds is None
 
 
 def test_scim_user_unique_per_account(session: Session) -> None:
@@ -235,21 +272,21 @@ def test_scim_member_cascades_with_group_and_user(session: Session) -> None:
     session.commit()
     session.add(TiqoraScimGroupMember(group_id=group.id, member_id=user.id))
     session.commit()
-    assert _members(session) == 1
+    assert _members(session, [group.id], [user.id]) == 1
 
     session.execute(delete(TiqoraScimGroup).where(TiqoraScimGroup.id == group.id))
     session.commit()
-    assert _members(session) == 0
+    assert _members(session, [group.id], [user.id]) == 0
 
     group2 = _group(pid, "00000000-0000-4000-8000-000000063006")
     session.add(group2)
     session.commit()
     session.add(TiqoraScimGroupMember(group_id=group2.id, member_id=user.id))
     session.commit()
-    assert _members(session) == 1
+    assert _members(session, [group2.id], [user.id]) == 1
     session.execute(delete(TiqoraScimUser).where(TiqoraScimUser.id == user.id))
     session.commit()
-    assert _members(session) == 0
+    assert _members(session, [group2.id], [user.id]) == 0
 
 
 def test_provider_delete_cascades_scim_rows_not_events(session: Session) -> None:
@@ -259,6 +296,7 @@ def test_provider_delete_cascades_scim_rows_not_events(session: Session) -> None
     session.add_all([_token(pid, _h("cascade-token")), user, group])
     session.commit()
     session.add(TiqoraScimGroupMember(group_id=group.id, member_id=user.id))
+    group_id, user_pk = group.id, user.id
     session.add(TiqoraScimPendingSync(provider_id=pid, user_id=63007, queued_at=NOW, generation=1))
     session.add(
         TiqoraScimEvent(
@@ -281,7 +319,7 @@ def test_provider_delete_cascades_scim_rows_not_events(session: Session) -> None
             select(func.count()).select_from(model).where(model.provider_id == pid)
         )
         assert count == 0, model.__tablename__
-    assert _members(session) == 0
+    assert _members(session, [group_id], [user_pk]) == 0
     events = session.scalar(
         select(func.count())
         .select_from(TiqoraScimEvent)

@@ -17,6 +17,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from tiqora.crypto.secret import decrypt_secret, encrypt_secret
 from tiqora.db.tiqora.base import TiqoraBase
+from tiqora.db.tiqora.models import (
+    TiqoraScimEvent,
+    TiqoraScimGroup,
+    TiqoraScimGroupMember,
+    TiqoraScimPendingSync,
+    TiqoraScimToken,
+    TiqoraScimUser,
+)
 from tiqora.identity.config_models import (
     JitDefaults,
     OidcProviderConfig,
@@ -60,6 +68,20 @@ def _to_async_url(sync_url: str) -> str:
 
 def _cleanup_statements() -> tuple[tuple[str, dict[str, Any]], ...]:
     return (
+        *(
+            (
+                f"DELETE FROM {table} WHERE provider_id IN"  # noqa: S608
+                " (SELECT id FROM tiqora_identity_provider WHERE slug LIKE 'idptest-%')",
+                {},
+            )
+            for table in (
+                "tiqora_scim_pending_sync",
+                "tiqora_scim_group",
+                "tiqora_scim_user",
+                "tiqora_scim_token",
+            )
+        ),
+        ("DELETE FROM tiqora_scim_event WHERE detail = 'idptest-event'", {}),
         (
             "DELETE FROM tiqora_identity_link WHERE provider_id IN"
             " (SELECT id FROM tiqora_identity_provider WHERE slug LIKE 'idptest-%')",
@@ -380,6 +402,113 @@ async def test_list_enabled_and_delete(session: AsyncSession) -> None:
     await delete_provider(session, c.id)
     await session.commit()
     assert await get_provider(session, c.id, secret_key=KEY) is None
+
+
+@pytest.mark.asyncio
+async def test_delete_provider_removes_scim_children_explicitly(session: AsyncSession) -> None:
+    """Ruling F6: explicit child-first deletes (FK cascade is only the backstop)."""
+    from sqlalchemy import event, func, select
+
+    rec = await _create(session, "generic_oidc", "idptest-scimdel")
+    pid = rec.id
+    name = "Erika.Muster@example.test"
+    user = TiqoraScimUser(
+        provider_id=pid,
+        user_kind="agent",
+        scim_id="00000000-0000-4000-8000-000000047001",
+        user_id=47003,
+        user_name=name,
+        user_name_fold=name.casefold(),
+        user_name_fold_hash="a" * 64,
+        created=NOW,
+        changed=NOW,
+    )
+    group = TiqoraScimGroup(
+        provider_id=pid,
+        scim_id="00000000-0000-4000-8000-000000047002",
+        display_name="Support",
+        display_name_fold="support",
+        display_name_fold_hash="b" * 64,
+        created=NOW,
+        changed=NOW,
+    )
+    session.add_all(
+        [
+            TiqoraScimToken(
+                provider_id=pid,
+                user_kind="agent",
+                name="Entra",
+                token_hash="c" * 64,
+                token_hint="abcd",
+                created_by=1,
+                created_at=NOW,
+                expires_at=NOW,
+            ),
+            user,
+            group,
+        ]
+    )
+    await session.commit()
+    session.add(TiqoraScimGroupMember(group_id=group.id, member_id=user.id))
+    session.add(TiqoraScimPendingSync(provider_id=pid, user_id=47003, queued_at=NOW, generation=1))
+    session.add(
+        TiqoraScimEvent(
+            provider_id=pid,
+            created=NOW,
+            method="POST",
+            resource="User",
+            operation="create",
+            status=201,
+            detail="idptest-event",
+        )
+    )
+    await session.commit()
+    member_ids = (user.id, group.id)
+
+    statements: list[str] = []
+
+    def _record(conn: Any, cursor: Any, statement: str, *args: Any) -> None:
+        statements.append(statement)
+
+    sync_engine = session.bind.sync_engine  # type: ignore[union-attr]
+    event.listen(sync_engine, "before_cursor_execute", _record)
+    try:
+        await delete_provider(session, pid)
+        await session.commit()
+    finally:
+        event.remove(sync_engine, "before_cursor_execute", _record)
+
+    deletes = [s.split()[2] for s in statements if s.lstrip().upper().startswith("DELETE")]
+    for table in (
+        "tiqora_scim_pending_sync",
+        "tiqora_scim_group_member",
+        "tiqora_scim_group",
+        "tiqora_scim_user",
+        "tiqora_scim_token",
+    ):
+        assert table in [d.strip('`"') for d in deletes], table
+    assert "tiqora_scim_event" not in [d.strip('`"') for d in deletes]
+
+    for model in (TiqoraScimToken, TiqoraScimUser, TiqoraScimGroup, TiqoraScimPendingSync):
+        count = await session.scalar(
+            select(func.count()).select_from(model).where(model.provider_id == pid)
+        )
+        assert count == 0, model.__tablename__
+    members = await session.scalar(
+        select(func.count())
+        .select_from(TiqoraScimGroupMember)
+        .where(
+            TiqoraScimGroupMember.group_id == member_ids[1],
+            TiqoraScimGroupMember.member_id == member_ids[0],
+        )
+    )
+    assert members == 0
+    events = await session.scalar(
+        select(func.count())
+        .select_from(TiqoraScimEvent)
+        .where(TiqoraScimEvent.provider_id == pid, TiqoraScimEvent.detail == "idptest-event")
+    )
+    assert events == 1
 
 
 @pytest.mark.asyncio

@@ -27,6 +27,11 @@ from tiqora.db.tiqora.models import (
     TiqoraIdentityLink,
     TiqoraIdentityManagedAssignment,
     TiqoraIdentityProvider,
+    TiqoraScimGroup,
+    TiqoraScimGroupMember,
+    TiqoraScimPendingSync,
+    TiqoraScimToken,
+    TiqoraScimUser,
 )
 from tiqora.identity.config_models import (
     CONFIG_MODELS,
@@ -651,7 +656,21 @@ async def delete_provider(session: AsyncSession, provider_id: int) -> None:
         raise ProviderNotFound(provider_id)
     if row.source == "env":
         raise ProviderReadOnly(row.slug)
-    # Explicit child deletes: do not rely on FK cascade enforcement.
+    # Explicit child deletes (children first): do not rely on FK cascade enforcement; the FKs
+    # stay as a backstop. Otherwise a later provider reusing this id would inherit SCIM tokens
+    # and ownership rows. ``tiqora_scim_event`` is the audit log and is kept on purpose.
+    await session.execute(
+        delete(TiqoraScimPendingSync).where(TiqoraScimPendingSync.provider_id == provider_id)
+    )
+    await session.execute(
+        delete(TiqoraScimGroupMember).where(
+            TiqoraScimGroupMember.group_id.in_(
+                select(TiqoraScimGroup.id).where(TiqoraScimGroup.provider_id == provider_id)
+            )
+        )
+    )
+    for scim_model in (TiqoraScimGroup, TiqoraScimUser, TiqoraScimToken):
+        await session.execute(delete(scim_model).where(scim_model.provider_id == provider_id))
     await session.execute(
         delete(TiqoraIdentityLink).where(TiqoraIdentityLink.provider_id == provider_id)
     )
