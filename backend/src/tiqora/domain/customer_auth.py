@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.config import Settings
 from tiqora.db.legacy.customer import CustomerUser
+from tiqora.identity.session_lifetime import born_value, idle_from_born
 from tiqora.identity.sso_sessions import SsoSessionInfo, drop_sso, load_sso, store_sso
 from tiqora.znuny.password import hash_password, is_weak_scheme, needs_rehash, verify_password
 
@@ -79,20 +80,26 @@ class CustomerSessionStore:
     ) -> str:
         token = secrets.token_urlsafe(32)
         payload = f"{customer_id}:{login}"
-        await self._client.set(self._key(token), payload, ex=self._ttl)
-        # Absolute-lifetime marker, never renewed by touch() (security review L-2).
-        await self._client.set(self._born_key(token), "1", ex=self._absolute_ttl)
-        # Authentication timestamp for step-up checks, same fixed TTL.
-        await self._client.set(
-            self._auth_at_key(token), str(int(time.time())), ex=self._absolute_ttl
+        # A provider can only shorten the global lifetimes (S10).
+        idle = min(sso.idle_ttl or self._ttl, self._ttl) if sso is not None else self._ttl
+        absolute = (
+            min(sso.absolute_ttl or self._absolute_ttl, self._absolute_ttl)
+            if sso is not None
+            else self._absolute_ttl
         )
+        await self._client.set(self._key(token), payload, ex=idle)
+        # Absolute-lifetime marker, never renewed by touch() (security review L-2); the
+        # value carries the idle TTL that touch() renews with.
+        await self._client.set(self._born_key(token), born_value(idle), ex=absolute)
+        # Authentication timestamp for step-up checks, same fixed TTL.
+        await self._client.set(self._auth_at_key(token), str(int(time.time())), ex=absolute)
         # Per-customer reverse index for revoke_customer_sessions().
         with contextlib.suppress(Exception):
             index_key = self._user_index_key(customer_id)
             await self._client.sadd(index_key, token)
             await self._client.expire(index_key, self._absolute_ttl)
         if sso is not None:
-            await store_sso(self._client, "c", token, sso, self._absolute_ttl)
+            await store_sso(self._client, "c", token, sso, absolute)
         return token
 
     async def get_sso(self, token: str) -> SsoSessionInfo | None:
@@ -206,7 +213,8 @@ class CustomerSessionStore:
 
     async def touch(self, token: str) -> None:
         """Sliding renewal: reset TTL if the session still exists."""
-        await self._client.expire(self._key(token), self._ttl)
+        idle = idle_from_born(await self._client.get(self._born_key(token)), self._ttl)
+        await self._client.expire(self._key(token), idle)
 
     async def delete(self, token: str) -> None:
         await self._client.delete(self._key(token), self._born_key(token), self._auth_at_key(token))

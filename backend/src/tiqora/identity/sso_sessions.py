@@ -31,6 +31,7 @@ _OPTIONAL_FIELDS = (
     "sid",
     "id_token_hint",
 )
+_TTL_FIELDS = ("idle_ttl", "absolute_ttl")
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +47,8 @@ class SsoSessionInfo:
     sp_name_qualifier: str | None = None
     sid: str | None = None
     id_token_hint: str | None = field(default=None, repr=False)
+    idle_ttl: int | None = None  # seconds; already capped to the global value
+    absolute_ttl: int | None = None  # seconds; already capped (global, provider, SAML)
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), separators=(",", ":"))
@@ -75,6 +78,13 @@ class SsoSessionInfo:
                 if value is not None and not isinstance(value, str):
                     return None
                 optional[name] = value
+            for name in _TTL_FIELDS:
+                ttl = data.get(name)
+                if ttl is not None and (
+                    not isinstance(ttl, int) or isinstance(ttl, bool) or ttl <= 0
+                ):
+                    return None
+                optional[name] = ttl
             return cls(
                 provider_id=provider_id,
                 slug=slug,

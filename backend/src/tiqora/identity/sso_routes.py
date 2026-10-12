@@ -78,6 +78,7 @@ from tiqora.identity.saml_sp import (
     SamlServiceProvider,
     decode_saml_b64,
 )
+from tiqora.identity.session_lifetime import effective_lifetime
 from tiqora.identity.sso_sessions import SsoSessionInfo, load_sso, revoke_sso_sessions
 from tiqora.identity.step_up import (
     OIDC_ACR_ATTR,
@@ -820,6 +821,12 @@ async def _complete_login(
         raise _reject_fail(exc.reject_code, value=plan.profile.login or identity.subject) from exc
 
     draft = identity.sso or SsoSessionDraft()
+    idle, absolute = effective_lifetime(
+        record,
+        settings,
+        not_on_or_after=draft.session_not_on_or_after,
+        now=datetime.now(UTC),
+    )
     sso = SsoSessionInfo(
         provider_id=record.id,
         slug=record.slug,
@@ -832,6 +839,8 @@ async def _complete_login(
         sp_name_qualifier=draft.sp_name_qualifier,
         sid=draft.sid,
         id_token_hint=draft.id_token_hint,
+        idle_ttl=idle,
+        absolute_ttl=absolute,
     )
     agent_user = None
     if user_kind == "agent":
