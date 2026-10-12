@@ -112,6 +112,14 @@ from tiqora.domain.subject_hook import SubjectHookConfig, load_subject_config
 from tiqora.domain.ticket_write_service import ArticleIn, add_article
 from tiqora.domain.timezones import USER_TIME_ZONE_KEY, default_time_zone, valid_time_zone
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.plugins.context import PluginTickets, TicketSummary
+from tiqora.plugins.notification_transports import (
+    NotificationMessage,
+    NotificationRecipient,
+    NotificationTransport,
+    active_transports,
+    send_via_plugin_transport,
+)
 from tiqora.plugins.placeholders import placeholder_budget_scope
 from tiqora.webchat.text import normalize_email
 from tiqora.worker.notification_templates import (
@@ -169,6 +177,9 @@ class _Recipient:
     language: str = "en"
     # The agent's own ``UserTimeZone`` preference (raw); None for customers.
     time_zone: str | None = None
+    # Taken from rows the resolution loads anyway (no extra query per recipient).
+    full_name: str = ""
+    customer_login: str | None = None
 
 
 @dataclass
@@ -297,6 +308,10 @@ def _passes_article_filter(
     return True
 
 
+def _full_name(first: object, last: object) -> str:
+    return " ".join(str(part).strip() for part in (first, last) if part and str(part).strip())
+
+
 def _as_int(value: object) -> int:
     """Narrow a ``dict[str, object]`` row value (from ``.mappings()``/JSON) to int."""
     if isinstance(value, bool):
@@ -369,7 +384,7 @@ async def _resolve_recipients(
         # Only valid agents (mirrors Znuny: invalid users never receive mail).
         valid_row = (
             await session.execute(
-                text("SELECT 1 FROM users WHERE id = :uid AND valid_id = 1"),
+                text("SELECT first_name, last_name FROM users WHERE id = :uid AND valid_id = 1"),
                 {"uid": user_id},
             )
         ).first()
@@ -400,6 +415,7 @@ async def _resolve_recipients(
                 user_id=user_id,
                 language=prefs.get("UserLanguage") or "en",
                 time_zone=prefs.get(USER_TIME_ZONE_KEY) or None,
+                full_name=_full_name(valid_row[0], valid_row[1]),
             )
         )
 
@@ -471,6 +487,7 @@ async def _resolve_recipients(
 
     if "Customer" in recipient_kinds:
         email = None
+        customer_name = ""
         customer_login = ticket.get("customer_user_id")
         just_real = await (sysconfig or SysConfig(session)).get_bool(
             "CustomerNotifyJustToRealCustomer", False
@@ -478,12 +495,16 @@ async def _resolve_recipients(
         if customer_login:
             row = (
                 await session.execute(
-                    text("SELECT email FROM customer_user WHERE login = :login"),
+                    text(
+                        "SELECT email, first_name, last_name FROM customer_user"
+                        " WHERE login = :login"
+                    ),
                     {"login": str(customer_login)},
                 )
             ).first()
             if row is not None:
                 email = str(row[0])
+                customer_name = _full_name(row[1], row[2])
             elif not just_real:
                 # NotificationEvent.pm (6.5, ~817-833): a CustomerUserID that is no
                 # customer_user but an e-mail address (unknown sender, chat contact) is
@@ -510,7 +531,14 @@ async def _resolve_recipients(
             key = ("Customer", email.lower())
             if key not in seen:
                 seen.add(key)
-                recipients.append(_Recipient(kind="Customer", email=email))
+                recipients.append(
+                    _Recipient(
+                        kind="Customer",
+                        email=email,
+                        full_name=customer_name,
+                        customer_login=str(customer_login) if customer_login else None,
+                    )
+                )
 
     return recipients
 
@@ -885,6 +913,88 @@ async def _send_to_recipient(
     return True
 
 
+_warned_transports: set[tuple[int, str]] = set()
+
+
+def _warn_unknown_transports(
+    notification: _NotificationRow,
+    transports: set[str],
+    known: Sequence[NotificationTransport],
+) -> None:
+    """Unknown transport keys are ignored; each one is logged once per process."""
+    for key in sorted(transports - {"Email"} - {t.key for t in known}):
+        if (notification.id, key) not in _warned_transports:
+            _warned_transports.add((notification.id, key))
+            logger.warning(
+                "notification_transport_unknown", notification_id=notification.id, transport=key
+            )
+
+
+def _plugin_recipient(recipient: _Recipient) -> NotificationRecipient:
+    agent = recipient.kind == "Agent"
+    return NotificationRecipient(
+        kind="agent" if agent else "customer",
+        user_id=recipient.user_id if agent else None,
+        customer_login=None if agent else recipient.customer_login,
+        email=recipient.email,
+        full_name=recipient.full_name,
+        language=recipient.language,
+    )
+
+
+async def _send_via_plugins(
+    session: AsyncSession,
+    sysconfig: SysConfig,
+    transports: Sequence[NotificationTransport],
+    *,
+    event_type: str,
+    ticket: dict[str, object],
+    ticket_summary: TicketSummary,
+    notification: _NotificationRow,
+    recipient: _Recipient,
+    base_context: PlaceholderContext,
+    hook_cfg: SubjectHookConfig | None,
+) -> tuple[int, int]:
+    """Render once for *recipient*, hand the message to each plugin transport.
+
+    Returns ``(sent, failed)``. No ticket history is written for plugin transports.
+    """
+    rendered = await _render_message(
+        session,
+        sysconfig,
+        notification,
+        recipient.language,
+        recipient=recipient,
+        base_context=base_context,
+        ticket_id=_as_int(ticket["id"]),
+        hook_cfg=hook_cfg,
+        tn=str(ticket.get("tn") or ""),
+    )
+    if rendered is None:
+        logger.info("notification_no_message_for_language", notification_id=notification.id)
+        return 0, 0
+    subject, body, content_type = rendered
+    message = NotificationMessage(
+        notification_id=notification.id,
+        notification_name=notification.name,
+        event=event_type,
+        ticket=ticket_summary,
+        recipient=_plugin_recipient(recipient),
+        subject=subject,
+        body=body,
+        content_type=content_type,
+    )
+    sent = failed = 0
+    for transport in transports:
+        if await send_via_plugin_transport(transport, message):
+            sent += 1
+            NOTIFICATIONS_SENT.labels(recipient_type=recipient.kind.lower()).inc()
+        else:
+            failed += 1
+            NOTIFICATIONS_ERRORS.inc()
+    return sent, failed
+
+
 async def process_event(
     session: AsyncSession,
     sysconfig: SysConfig,
@@ -944,8 +1054,18 @@ async def process_event(
         if not _passes_article_filter(notification, event_type, article):
             continue
         transports = set(notification.items.get("Transports", []))
-        if transports and "Email" not in transports:
+        email_on = not transports or "Email" in transports
+        plugin_transports = active_transports(transports)
+        _warn_unknown_transports(notification, transports, plugin_transports)
+        if not email_on and not plugin_transports:
             continue
+        ticket_summary: TicketSummary | None = None
+        if plugin_transports:
+            ticket_summary = await PluginTickets().get(ticket_id, session=session)
+            if ticket_summary is None:
+                plugin_transports = []
+                if not email_on:
+                    continue
 
         recipients = await _resolve_recipients(
             session, notification, ticket, skip_user_ids, extra_user_ids, sysconfig
@@ -965,7 +1085,7 @@ async def process_event(
                         time_zone=zone,
                     )
                     contexts[(recipient.kind, zone)] = base_context
-                if await _send_to_recipient(
+                if email_on and await _send_to_recipient(
                     session,
                     sysconfig,
                     mail_sender,
@@ -986,6 +1106,35 @@ async def process_event(
                     recipient=recipient.email,
                 )
                 failed += 1
+                NOTIFICATIONS_ERRORS.inc()
+                continue
+            if not plugin_transports or ticket_summary is None:
+                continue
+            # Plugin transports run after the mail: a failed mail never keeps the chat message
+            # from going out, and a failing plugin never counts the mail as failed.
+            try:
+                plugin_sent, plugin_failed = await _send_via_plugins(
+                    session,
+                    sysconfig,
+                    plugin_transports,
+                    event_type=event_type,
+                    ticket=ticket,
+                    ticket_summary=ticket_summary,
+                    notification=notification,
+                    recipient=recipient,
+                    base_context=base_context,
+                    hook_cfg=hook_cfg,
+                )
+                sent += plugin_sent
+                failed += plugin_failed
+            except Exception:  # noqa: BLE001 — rendering failed; other recipients go on
+                logger.exception(
+                    "notification_plugin_render_failed",
+                    notification_id=notification.id,
+                    ticket_id=ticket_id,
+                    recipient=recipient.email,
+                )
+                failed += len(plugin_transports)
                 NOTIFICATIONS_ERRORS.inc()
 
     return sent, failed

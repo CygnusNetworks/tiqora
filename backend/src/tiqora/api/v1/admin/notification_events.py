@@ -6,6 +6,7 @@ from collections import defaultdict
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy import text
 
 from tiqora.api.deps import DbSession
@@ -22,6 +23,9 @@ from tiqora.api.v1.admin.schemas import (
     NotificationMessageIn,
 )
 from tiqora.crypto.notification import validate_security_items
+from tiqora.extensions.core import get_registry
+from tiqora.plugins.notification_transports import NOTIFICATION_TRANSPORTS
+from tiqora.plugins.state import is_active
 
 router = APIRouter(prefix="/notification-events", tags=["admin:notification-events"])
 
@@ -132,6 +136,31 @@ async def _replace_messages(
                 "lang": msg.language,
             },
         )
+
+
+class NotificationTransportOut(BaseModel):
+    key: str
+    label: str
+    plugin_id: str | None
+
+
+# Registered before ``/{notification_id}``: Starlette matches in order, so "transports" would
+# otherwise be parsed as an id (422).
+@router.get("/transports", response_model=list[NotificationTransportOut])
+async def list_notification_transports(admin: AdminUser) -> list[NotificationTransportOut]:
+    """The ways a notification can be delivered: ``Email`` plus the loaded plugins' transports."""
+    _ = admin
+    plugin = sorted(
+        (t for t in get_registry().items(NOTIFICATION_TRANSPORTS) if is_active(t.plugin_id)),
+        key=lambda t: (t.label.lower(), t.key),
+    )
+    return [
+        NotificationTransportOut(key="Email", label="E-Mail", plugin_id=None),
+        *(
+            NotificationTransportOut(key=t.key, label=t.label, plugin_id=t.plugin_id)
+            for t in plugin
+        ),
+    ]
 
 
 @router.get("", response_model=list[NotificationEventOut])

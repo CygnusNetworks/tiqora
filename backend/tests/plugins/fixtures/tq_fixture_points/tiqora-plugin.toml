@@ -23,4 +23,5 @@ extension_points = [
   "core.dynamic_fields.types",
   "core.mail.inbound_filters",
   "core.mail.outbound_filters",
+  "core.notifications.transports",
 ]

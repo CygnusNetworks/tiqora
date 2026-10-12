@@ -88,6 +88,12 @@ SUBMODULES: dict[str, set[str]] = {
         "MailFilterStage",
         "MailFilterContext",
     },
+    "tiqora_sdk.notifications": {
+        "NotificationRecipient",
+        "NotificationMessage",
+        "TransportContext",
+        "TransportSend",
+    },
 }
 
 
@@ -127,6 +133,7 @@ def test_registry_protocol_matches_registrar() -> None:
             "number_generator",
             "dynamic_field_type",
             "mail_filter",
+            "notification_transport",
         }
     )
 

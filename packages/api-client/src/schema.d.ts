@@ -3850,6 +3850,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/notification-events/transports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Notification Transports
+         * @description The ways a notification can be delivered: ``Email`` plus the loaded plugins' transports.
+         */
+        get: operations["list_notification_transports_api_v1_admin_notification_events_transports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/notification-events/{notification_id}": {
         parameters: {
             query?: never;
@@ -18634,6 +18654,15 @@ export interface components {
             subject: string;
             /** Text */
             text: string;
+        };
+        /** NotificationTransportOut */
+        NotificationTransportOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Plugin Id */
+            plugin_id: string | null;
         };
         /** NumberGeneratorIn */
         NumberGeneratorIn: {
@@ -34735,6 +34764,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NotificationEventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notification_transports_api_v1_admin_notification_events_transports_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationTransportOut"][];
                 };
             };
             /** @description Validation Error */

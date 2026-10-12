@@ -27,6 +27,7 @@ from tiqora_sdk.mail import (
     MailVetoed,
     OutboundMail,
 )
+from tiqora_sdk.notifications import NotificationMessage, TransportContext
 from tiqora_sdk.process import ActionContext
 from tiqora_sdk.templates import NumberRequest, PlaceholderRequest
 
@@ -332,6 +333,23 @@ def _register_outbound(registry: PluginRegistry) -> None:
     registry.mail_filter("broken_late", "outbound", _broken_out_late, order=130, timeout_seconds=2)
 
 
+async def _chat(ctx: TransportContext, message: NotificationMessage) -> None:
+    """``MODE["transport"]``: raise | hang."""
+    behaviour.CALLS.append(
+        ("transport.Chat", (message.recipient.kind, message.recipient.email, message.subject))
+    )
+    behaviour.CALLS.append(("transport.Chat.message", message))
+    mode = behaviour.MODE.get("transport", "ok")
+    if mode == "raise":
+        raise RuntimeError("kaputt")
+    if mode == "hang":
+        await asyncio.sleep(30)
+
+
+def _register_transports(registry: PluginRegistry) -> None:
+    registry.notification_transport("Chat", _chat, label="Chat (Test)", timeout_seconds=1)
+
+
 class PointsPlugin:
     def register(self, registry: PluginRegistry) -> None:
         # Each task of the plugin-points plan adds its ``_register_<point>(registry)`` call here.
@@ -342,6 +360,7 @@ class PointsPlugin:
         _register_df_types(registry)
         _register_mail_filters(registry)
         _register_outbound(registry)
+        _register_transports(registry)
 
 
 plugin = PointsPlugin()

@@ -40,6 +40,13 @@ from tiqora.plugins.mail_filters import (
 from tiqora.plugins.manifest import PluginManifest
 from tiqora.plugins.mcp import CORE_MCP_TOOL_NAMES, MCP_TOOLS, McpTool
 from tiqora.plugins.naming import CAMEL_NAME_RE, TAG_NAME_RE, qualified
+from tiqora.plugins.notification_transports import (
+    MAX_TRANSPORT_TIMEOUT,
+    MIN_TRANSPORT_TIMEOUT,
+    NOTIFICATION_TRANSPORTS,
+    NotificationTransport,
+    TransportSend,
+)
 from tiqora.plugins.number_generators import (
     MAX_PATTERN_LEN,
     TICKET_NUMBER_GENERATORS,
@@ -762,6 +769,54 @@ class PluginRegistrar:
             context=self._context,
         )
         self._stage(point, item, check=check)
+
+    def notification_transport(
+        self,
+        name: str,
+        send: TransportSend,
+        *,
+        label: str,
+        timeout_seconds: int = 15,
+    ) -> str:
+        """Stage ``Plugin_<short_id>_<name>`` as a notification transport (D10).
+
+        Returns the qualified name an admin lists in a notification's ``Transports``.
+        ``send`` is ``async def (ctx: TransportContext, message: NotificationMessage)`` and
+        runs once per recipient; raising (or exceeding the time limit) counts as a failed send.
+        """
+        qname = qualified(self._manifest.short_id, name)
+
+        def check() -> None:
+            if not isinstance(name, str) or not CAMEL_NAME_RE.fullmatch(name):
+                raise RegistrationRejected(
+                    f"Ungültiger Name „{name}“ für den Versandweg: "
+                    "2 bis 41 Zeichen, A-Z, a-z und 0-9, beginnt mit einem Großbuchstaben"
+                )
+            if not isinstance(label, str) or not label.strip() or len(label) > 100:
+                raise RegistrationRejected(
+                    f"Der Versandweg „{name}“ braucht eine Bezeichnung (höchstens 100 Zeichen)"
+                )
+            _require_async(send, f"Der Versandweg „{name}“")
+            if (
+                isinstance(timeout_seconds, bool)
+                or not isinstance(timeout_seconds, int)
+                or not MIN_TRANSPORT_TIMEOUT <= timeout_seconds <= MAX_TRANSPORT_TIMEOUT
+            ):
+                raise RegistrationRejected(
+                    f"Das Zeitlimit des Versandwegs „{name}“ muss zwischen "
+                    f"{MIN_TRANSPORT_TIMEOUT} und {MAX_TRANSPORT_TIMEOUT} Sekunden liegen"
+                )
+
+        item = NotificationTransport(
+            key=qname,
+            plugin_id=self.plugin_id,
+            label=label,
+            send=send,
+            timeout_seconds=timeout_seconds,
+            context=self._context,
+        )
+        self._stage(NOTIFICATION_TRANSPORTS, item, check=check)
+        return qname
 
 
 _NUMBER_REASONS: Final = {

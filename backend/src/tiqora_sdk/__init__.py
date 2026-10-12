@@ -35,6 +35,7 @@ if _t.TYPE_CHECKING:
 
     from tiqora.plugins.df_types import DfBaseType, DfDisplay, DfValidate
     from tiqora.plugins.mail_filters import MailFilterStage
+    from tiqora.plugins.notification_transports import TransportSend
     from tiqora.plugins.number_generators import NumberBuild
     from tiqora.plugins.placeholders import PlaceholderResolve
     from tiqora.plugins.process_points import ConditionRun, TransitionActionRun
@@ -172,6 +173,10 @@ class PluginRegistry(_t.Protocol):
         order: int = 100,
         timeout_seconds: int = 5,
     ) -> None: ...
+
+    def notification_transport(
+        self, name: str, send: TransportSend, *, label: str, timeout_seconds: int = 15
+    ) -> str: ...
 
 
 class Plugin(_t.Protocol):
