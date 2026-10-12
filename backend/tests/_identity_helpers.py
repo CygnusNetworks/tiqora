@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import fnmatch
 import time
 import warnings
+from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
 
@@ -84,6 +86,11 @@ class FakeRedis:
 
     async def exists(self, *keys: str) -> int:
         return sum(1 for k in keys if k in self.store or k in self.sets)
+
+    async def scan_iter(self, match: str = "*", count: int | None = None) -> AsyncIterator[str]:
+        for key in list(self.store) + list(self.sets):
+            if fnmatch.fnmatchcase(key, match):
+                yield key
 
     async def ttl(self, key: str) -> int:
         if key not in self.store and key not in self.sets:

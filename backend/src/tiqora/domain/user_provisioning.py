@@ -228,6 +228,46 @@ async def update_agent_profile(
     return changed
 
 
+async def set_agent_validity(
+    session: AsyncSession, user: Users, *, valid_id: int, actor_id: int
+) -> bool:
+    """Set ``users.valid_id`` like the admin routes do; ``False`` (no write) if unchanged.
+
+    Flushes, the caller commits. Ending the sessions is :mod:`tiqora.domain.session_revocation`.
+    """
+    if user.valid_id == valid_id:
+        return False
+    user.valid_id = valid_id
+    user.change_time = now()
+    user.change_by = actor_id
+    await invalidate_znuny_cache_types(session, USER_CACHE_TYPES)
+    await session.flush()
+    return True
+
+
+async def set_customer_validity(
+    session: AsyncSession,
+    cu: CustomerUser,
+    *,
+    valid_id: int,
+    actor_id: int,
+    invalidate: bool = True,
+) -> bool:
+    """Set ``customer_user.valid_id``; ``False`` (no write) if unchanged.
+
+    ``invalidate=False`` lets a bulk caller enqueue the cache signal once itself.
+    """
+    if cu.valid_id == valid_id:
+        return False
+    cu.valid_id = valid_id
+    cu.change_time = now()
+    cu.change_by = actor_id
+    if invalidate:
+        await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
+    await session.flush()
+    return True
+
+
 async def grant_role(session: AsyncSession, *, user_id: int, role_id: int, actor_id: int) -> bool:
     """Add a ``role_user`` row. False (and no invalidation) when it already exists."""
     present = (

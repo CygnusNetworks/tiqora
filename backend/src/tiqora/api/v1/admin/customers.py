@@ -44,11 +44,11 @@ from tiqora.db.legacy.customer import CustomerCompany, CustomerUser, CustomerUse
 from tiqora.db.legacy.user import GroupCustomerUser, PermissionGroups
 from tiqora.db.tiqora.models import TiqoraCustomerPasskey
 from tiqora.domain import user_provisioning as provisioning
-from tiqora.domain.customer_auth import CustomerSessionStore, revoke_customer_redis_sessions
+from tiqora.domain.customer_auth import CustomerSessionStore
+from tiqora.domain.session_revocation import end_customer_sessions
 from tiqora.domain.totp import TOTPService
 from tiqora.domain.two_factor_subject import CUSTOMER_2FA
 from tiqora.znuny.password import hash_password
-from tiqora.znuny.sessions import delete_customer_sessions
 
 router = APIRouter(tags=["admin:customers"])
 logger = structlog.get_logger(__name__)
@@ -189,7 +189,9 @@ async def bulk_update_customer_users(
     ts = now()
     for cu in rows:
         if body.valid_id is not None:
-            cu.valid_id = body.valid_id
+            await provisioning.set_customer_validity(
+                session, cu, valid_id=body.valid_id, actor_id=admin.id, invalidate=False
+            )
         if body.customer_id is not None:
             cu.customer_id = body.customer_id
         cu.change_time = ts
@@ -200,8 +202,12 @@ async def bulk_update_customer_users(
     updated = len(rows)
     if body.valid_id is not None and body.valid_id != 1:
         # disabled accounts: their sessions end (Znuny rows, then Redis)
-        await _revoke_customer_sessions(
-            session, request, settings, list(rows), reason="account_disabled"
+        await end_customer_sessions(
+            session,
+            await get_redis(request),
+            settings,
+            [cu.login for cu in rows],
+            reason="account_disabled",
         )
     return CustomerUserBulkUpdateResult(updated=updated)
 
@@ -258,33 +264,6 @@ async def create_customer_user(
     return cu
 
 
-async def _revoke_customer_sessions(
-    session: DbSession,
-    request: Request,
-    settings: AppSettings,
-    customers: list[CustomerUser],
-    *,
-    reason: str,
-) -> None:
-    """End every session of *customers*: Znuny ``sessions`` rows first (own try +
-    rollback), then Redis (portal sessions and GI customer tokens) - like the agent path."""
-    logins = [cu.login for cu in customers]
-    try:
-        for login in logins:
-            await delete_customer_sessions(session, login)
-        await session.commit()
-    except Exception as exc:  # noqa: BLE001 — the account change already committed
-        await session.rollback()
-        for cu in customers:
-            await session.refresh(cu)  # rollback expires loaded attributes
-        logger.warning("admin.customers.znuny_session_revoke_failed", error=str(exc))
-    try:
-        revoked = await revoke_customer_redis_sessions(await get_redis(request), settings, logins)
-        logger.info("admin.customers.sessions_revoked", revoked=revoked, reason=reason)
-    except Exception as exc:  # noqa: BLE001 — the account change already committed
-        logger.warning("admin.customers.session_revoke_failed", error=str(exc))
-
-
 @router.patch("/customer-users/{customer_user_id}", response_model=CustomerUserAdminOut)
 async def update_customer_user(
     customer_user_id: int,
@@ -304,6 +283,11 @@ async def update_customer_user(
         if password:
             cu.pw = hash_password(password)
             password_changed = True
+    valid_set = "valid_id" in data
+    if valid_set:
+        await provisioning.set_customer_validity(
+            session, cu, valid_id=data.pop("valid_id"), actor_id=admin.id, invalidate=False
+        )
     for field, value in data.items():
         setattr(cu, field, value)
     cu.change_time = now()
@@ -313,9 +297,15 @@ async def update_customer_user(
     await session.refresh(cu)
     # A password reset (incident response) or a disabled account ends every session.
     if password_changed:
-        await _revoke_customer_sessions(session, request, settings, [cu], reason="password_changed")
-    elif "valid_id" in data and cu.valid_id != 1:
-        await _revoke_customer_sessions(session, request, settings, [cu], reason="account_disabled")
+        await end_customer_sessions(
+            session, await get_redis(request), settings, [cu.login], reason="password_changed"
+        )
+        await session.refresh(cu)
+    elif valid_set and cu.valid_id != 1:
+        await end_customer_sessions(
+            session, await get_redis(request), settings, [cu.login], reason="account_disabled"
+        )
+        await session.refresh(cu)
     return cu
 
 
@@ -330,12 +320,12 @@ async def deactivate_customer_user(
     cu = await session.get(CustomerUser, customer_user_id)
     if cu is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer user not found")
-    cu.valid_id = 2
-    cu.change_time = now()
-    cu.change_by = admin.id
-    await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
+    login = cu.login
+    await provisioning.set_customer_validity(session, cu, valid_id=2, actor_id=admin.id)
     await session.commit()
-    await _revoke_customer_sessions(session, request, settings, [cu], reason="account_disabled")
+    await end_customer_sessions(
+        session, await get_redis(request), settings, [login], reason="account_disabled"
+    )
 
 
 @router.post("/customer-users/{customer_user_id}/reset-2fa", status_code=status.HTTP_204_NO_CONTENT)
