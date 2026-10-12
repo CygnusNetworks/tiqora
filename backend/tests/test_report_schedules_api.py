@@ -488,6 +488,73 @@ async def test_update_reactivation_clears_pause_state(env: Env) -> None:
     assert out["failure_count"] == 0 and out["next_run_at"] is not None
 
 
+async def test_saving_while_paused_keeps_the_pause_reason(env: Env) -> None:
+    env.user = user(OWNER)
+    s = await env.create(recipients={"user_ids": [OWNER]})
+    env.sql(
+        f"UPDATE tiqora_report_schedule SET active = false, next_run_at = NULL,"
+        f" failure_count = 3, paused_reason = 'Mehrfach fehlgeschlagen' WHERE id = {s['id']}"
+    )
+    upd = body(recipients={"user_ids": [OWNER]}, name="rep52 neu", active=False, version=1)
+    resp = await env.client.put(f"/api/v1/report-schedules/{s['id']}", json=upd)
+    assert resp.status_code == 200, resp.text
+    out = resp.json()
+    assert out["active"] is False and out["name"] == "rep52 neu"
+    assert out["paused_reason"] == "Mehrfach fehlgeschlagen" and out["failure_count"] == 3
+
+
+async def test_pausing_works_when_a_stored_recipient_became_invalid(env: Env) -> None:
+    await env.setting(schedule_external_recipients=True)
+    env.user = user(SHARER)
+    s = await env.create(recipients={"user_ids": [SHARER], "emails": ["boss@example.org"]})
+    await env.setting(schedule_external_recipients=False)
+    full = (await env.client.get(f"/api/v1/report-schedules/{s['id']}")).json()
+    stored = {
+        "user_ids": [r["id"] for r in full["recipients"] if r["kind"] == "user"],
+        "emails": [r["email"] for r in full["recipients"] if r["kind"] == "email"],
+    }
+    pause = body(recipients=stored, active=False, version=full["version"])
+    paused = await env.client.put(f"/api/v1/report-schedules/{s['id']}", json=pause)
+    assert paused.status_code == 200, paused.text
+    assert paused.json()["active"] is False and paused.json()["next_run_at"] is None
+    assert [r["email"] for r in paused.json()["recipients"] if r["kind"] == "email"] == [
+        "boss@example.org"
+    ]
+    # resuming, or changing the recipients while paused, is checked as before
+    resume = body(recipients=stored, active=True, version=paused.json()["version"])
+    refused = await env.client.put(f"/api/v1/report-schedules/{s['id']}", json=resume)
+    assert refused.status_code == 422 and refused.json()["detail"]["path"] == "recipients.emails"
+    widen = body(
+        recipients={**stored, "emails": ["boss@example.org", "other@example.org"]},
+        active=False,
+        version=paused.json()["version"],
+    )
+    refused = await env.client.put(f"/api/v1/report-schedules/{s['id']}", json=widen)
+    assert refused.status_code == 422
+
+
+async def test_huge_ids_and_versions_are_422(env: Env) -> None:
+    env.user = user(SHARER)
+    for field in ("user_ids", "group_ids", "role_ids"):
+        resp = await env.client.post(
+            "/api/v1/report-schedules", json=body(recipients={field: [2**31]})
+        )
+        assert resp.status_code == 422, (field, resp.text)
+    s = await env.create(recipients={"user_ids": [SHARER]})
+    resp = await env.client.put(
+        f"/api/v1/report-schedules/{s['id']}",
+        json=body(recipients={"user_ids": [SHARER]}, version=2**31),
+    )
+    assert resp.status_code == 422, resp.text
+
+
+async def test_list_rows_carry_the_time_zone(env: Env) -> None:
+    env.user = user(OWNER)
+    s = await env.create(recipients={"user_ids": [OWNER]}, time_zone="America/New_York")
+    rows = (await env.client.get("/api/v1/report-schedules")).json()
+    assert [r["time_zone"] for r in rows if r["id"] == s["id"]] == ["America/New_York"]
+
+
 async def test_admin_edit_is_judged_by_the_owners_rights(env: Env) -> None:
     env.user = user(OWNER)
     s = await env.create(recipients={"user_ids": [OWNER]})
@@ -536,6 +603,12 @@ async def test_preview_recurrence(env: Env) -> None:
     ).json()
     assert len(out["next_runs"]) == 5 and out["text"] == "Täglich um 07:00"
     assert out["next_runs"] == sorted(out["next_runs"])
+    english = await env.client.post(
+        "/api/v1/report-schedules/preview-recurrence",
+        json={"recurrence": {"kind": "daily", "time": "07:00"}, "language": "en"},
+    )
+    assert english.status_code == 200, english.text
+    assert english.json()["text"] == "Daily at 07:00"
     bad = await env.client.post(
         "/api/v1/report-schedules/preview-recurrence",
         json={"recurrence": {"kind": "daily", "time": "07:00"}, "time_zone": "Mars/Base"},

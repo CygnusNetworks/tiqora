@@ -88,7 +88,8 @@ def export_slug(title: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", title.lower().translate(_UMLAUTS)).strip("-") or "bericht"
 
 
-def _local_now(zone: str) -> datetime:
+def local_now(zone: str) -> datetime:
+    """Wall-clock "now" in ``zone`` (naive); UTC when the zone is unknown."""
     try:
         return datetime.now(ZoneInfo(zone)).replace(tzinfo=None)
     except (ZoneInfoNotFoundError, ValueError):
@@ -152,10 +153,6 @@ async def until_cancelled[R](ctx: JobContext, work: Awaitable[R]) -> R:
                 await task
 
 
-#: the old private name (kept for existing callers and tests)
-_until_cancelled = until_cancelled
-
-
 async def _run(
     session: AsyncSession,
     ctx: JobContext,
@@ -169,7 +166,7 @@ async def _run(
     **kwargs: Any,
 ) -> ReportResultOut:
     try:
-        return await _until_cancelled(
+        return await until_cancelled(
             ctx,
             run_report(
                 session,
@@ -237,7 +234,7 @@ async def run_export_job(ctx: JobContext, payload: ReportExportPayload) -> dict[
             use_cache=False,
             compare_previous=body.compare_previous,
         )
-        generated_at = _local_now(params.time_zone)
+        generated_at = local_now(params.time_zone)
     rows = len(result.rows)
     await ctx.progress(rows, rows, "Datei wird gespeichert …")
     slug = export_slug(body.title)

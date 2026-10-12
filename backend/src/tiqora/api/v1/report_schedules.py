@@ -152,7 +152,7 @@ async def create_report_schedule(
 async def preview_recurrence(
     body: RecurrencePreviewIn, user: CurrentUser, session: DbSession, settings: AppSettings
 ) -> RecurrencePreviewOut:
-    """The next five occurrences and the German sentence (pure, bounded)."""
+    """The next five occurrences and the sentence in ``body.language`` (pure, bounded)."""
     await _access(session, user, settings)
     if body.time_zone is None or not body.time_zone.strip():
         zone = await resolve_user_time_zone(session, SysConfig(session), user.id)
@@ -168,7 +168,7 @@ async def preview_recurrence(
             )
     return RecurrencePreviewOut(
         next_runs=upcoming(body.recurrence, zone, utc_now(), 5),
-        text=describe(body.recurrence, load_texts("de")),
+        text=describe(body.recurrence, load_texts(body.language)),
     )
 
 

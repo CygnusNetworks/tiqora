@@ -16,7 +16,8 @@ best-effort basis. Free text that reaches ``detail`` / ``error`` / ``paused_reas
 Retry: a temporary SMTP error before the last attempt raises :class:`JobRetry`. The run
 stays ``running`` and its files stay stored, so the next attempt sends them without
 rendering again. After the ``sending`` checkpoint an interrupted job is never sent a second
-time (it may have reached the relay): :func:`on_delivery_interrupted` marks the run failed.
+time (it may have reached the relay); that case, and a timeout or restart on the last attempt,
+end in :func:`on_delivery_interrupted`, which records the failure like any other.
 """
 
 from __future__ import annotations
@@ -28,9 +29,8 @@ import re
 import zipfile
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from typing import Any, Final, Literal
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import structlog
 from pydantic import BaseModel
@@ -67,6 +67,7 @@ from tiqora.reporting.jobs import (
     PDF_UNAVAILABLE_MESSAGE,
     XLSX_CONTENT_TYPE,
     export_slug,
+    local_now,
     until_cancelled,
 )
 from tiqora.reporting.pdf import PdfMeta, PdfUnavailable, ReportSection, write_report_pdf
@@ -121,6 +122,15 @@ CANCELLED_MESSAGE: Final = "Der Versand wurde abgebrochen."
 INTERRUPTED_MESSAGE: Final = (
     "Der Versand wurde unterbrochen; die E-Mail ist möglicherweise nicht angekommen."
 )
+#: cut off by the job timeout before anything was sent
+TIMED_OUT_MESSAGE: Final = (
+    "Der Versand hat zu lange gedauert und wurde abgebrochen; es wurde nichts versendet. "
+    "Bitte wählen Sie weniger Berichte oder einen kürzeren Zeitraum."
+)
+#: interrupted (worker restart) on the last attempt, before anything was sent
+ABORTED_MESSAGE: Final = (
+    "Der Versand wurde wiederholt unterbrochen und abgebrochen; es wurde nichts versendet."
+)
 PAUSED_MISSING_MESSAGE: Final = "Zeitplan pausiert."
 NOTHING_TO_SEND_MESSAGE: Final = "Keine Daten – nichts versendet."
 ALREADY_ACTIVE_MESSAGE: Final = "Ein Versand läuft bereits."
@@ -172,13 +182,6 @@ async def resolve_report_sender(session: AsyncSession) -> str | None:
             if address:
                 return address
     return None
-
-
-def _local_now(zone: str) -> datetime:
-    try:
-        return datetime.now(ZoneInfo(zone)).replace(tzinfo=None)
-    except (ZoneInfoNotFoundError, ValueError):
-        return datetime.now(UTC).replace(tzinfo=None)
 
 
 def _day(value: date, texts: ReportTexts) -> str:
@@ -402,10 +405,20 @@ async def _owner_mail(
 
 
 async def _record_failure(
-    ctx: JobContext, run_id: int, message: str, *, detail: str | None = None
+    ctx: JobContext,
+    run_id: int,
+    message: str,
+    *,
+    detail: str | None = None,
+    count: bool = True,
+    only_open: bool = False,
 ) -> None:
     """Mark the run failed, count it on the schedule (scheduled runs), pause after three in a
-    row, and tell the owner. Never raises."""
+    row, and tell the owner. Never raises.
+
+    ``count=False`` (a deliberate cancel) only ends the run: no failure count, no auto-pause,
+    no owner mail. ``only_open`` leaves a run alone that already finished (interrupt hook).
+    """
     text = scrub_text(message, _ERROR_MAX)
     owner_id: int | None = None
     schedule_id: int | None = None
@@ -415,7 +428,7 @@ async def _record_failure(
     try:
         async with ctx.session_factory() as session:
             run = await session.get(TiqoraReportRun, run_id)
-            if run is None:
+            if run is None or (only_open and run.status not in ("queued", "running")):
                 return
             now = utc_now()
             run.status = "failed"
@@ -433,7 +446,7 @@ async def _record_failure(
             )
             if schedule is not None:
                 language = schedule.language
-                if run.run_kind == "schedule":
+                if count and run.run_kind == "schedule":
                     schedule.failure_count = int(schedule.failure_count) + 1
                     schedule.last_status = "failed"
                     schedule.last_run_at = now
@@ -449,7 +462,7 @@ async def _record_failure(
     except Exception:  # noqa: BLE001 - the job ends failed either way
         logger.exception("report_delivery_failure_not_recorded", run_id=run_id)
         return
-    if owner_id is not None:
+    if count and owner_id is not None:
         await _owner_mail(
             ctx,
             owner_id=owner_id,
@@ -469,17 +482,20 @@ async def _fail(
 
 
 async def on_delivery_interrupted(ctx: JobContext, payload: ReportDeliveryPayload) -> None:
-    """The job was cut off after its ``sending`` checkpoint (or ran out of attempts)."""
+    """The job was cut off after its ``sending`` checkpoint, or before it on the last attempt
+    (job timeout or worker restart). Ends the run like any other failure (count, auto-pause,
+    owner mail); the message says whether the mail may have left."""
     async with ctx.session_factory() as session:
-        await session.execute(
-            update(TiqoraReportRun)
-            .where(
-                TiqoraReportRun.id == payload.run_id,
-                TiqoraReportRun.status.in_(("queued", "running")),
-            )
-            .values(status="failed", error=INTERRUPTED_MESSAGE, finished_at=utc_now())
-        )
-        await session.commit()
+        checkpoint = (
+            await session.execute(select(TiqoraJob.checkpoint).where(TiqoraJob.id == ctx.job_id))
+        ).scalar_one_or_none()
+    if checkpoint == CHECKPOINT_SENDING:
+        message = INTERRUPTED_MESSAGE
+    elif ctx.interrupted_by == "timeout":
+        message = TIMED_OUT_MESSAGE
+    else:
+        message = ABORTED_MESSAGE
+    await _record_failure(ctx, payload.run_id, message, only_open=True)
 
 
 # ------------------------------------------------------------------ the job
@@ -639,7 +655,7 @@ def _period(rendered: list[_Rendered], plan: _Plan) -> str:
         window = entry.result.time_window
         if window is not None:
             return f"{_day(window.start_date, plan.texts)} – {_day(window.end_date, plan.texts)}"
-    return _day(_local_now(plan.schedule.time_zone).date(), plan.texts)
+    return _day(local_now(plan.schedule.time_zone).date(), plan.texts)
 
 
 def _info_lines(entry: _Rendered, texts: ReportTexts) -> tuple[str, ...]:
@@ -673,7 +689,7 @@ async def _render(rendered: list[_Rendered], plan: _Plan, stamp: str) -> tuple[l
         ]
         meta = PdfMeta(
             title=schedule.name,
-            generated_at_local=_local_now(schedule.time_zone),
+            generated_at_local=local_now(schedule.time_zone),
             owner_line=texts.fixed("pdf.owner", owner=plan.owner_name),
         )
         # CPU bound: keep the event loop (heartbeats, cancel polling) running
@@ -785,7 +801,7 @@ def _compose(
     values = {
         "schedule": clean_line(schedule.name),
         "period": clean_line(period),
-        "date": _day(_local_now(schedule.time_zone).date(), texts),
+        "date": _day(local_now(schedule.time_zone).date(), texts),
         "reports": clean_line(", ".join(titles)),
         "owner": clean_line(plan.owner_name),
     }
@@ -886,7 +902,7 @@ async def _deliver(ctx: JobContext, run_id: int) -> dict[str, Any]:
         return planned
     plan = planned
     schedule = plan.schedule
-    stamp = _local_now(schedule.time_zone).date().isoformat()
+    stamp = local_now(schedule.time_zone).date().isoformat()
     titles: list[str] = []
     period = ""
     if not plan.existing_files:
@@ -900,21 +916,31 @@ async def _deliver(ctx: JobContext, run_id: int) -> dict[str, Any]:
             files, rows = await _render(rendered, plan, stamp)
         except PdfUnavailable as exc:
             raise await _fail(ctx, run_id, PDF_UNAVAILABLE_MESSAGE) from exc
-        await _store_files(run_id, ctx, files, rows)
         limit = plan.reporting.delivery_max_attachment_mb
         if sum(len(f.data) for f in files) > limit * 1024 * 1024:
+            # kept for the owner when the database takes it (max_allowed_packet); the run
+            # fails with the size message either way
+            try:
+                await _store_files(run_id, ctx, files, rows)
+            except Exception as exc:  # noqa: BLE001 - the size message is the real reason
+                logger.warning(
+                    "report_delivery_oversized_file_not_stored",
+                    run_id=run_id,
+                    error=scrub_text(str(exc), 300),
+                )
             raise await _fail(
                 ctx,
                 run_id,
                 f"Der Anhang ist größer als {limit} MB. "
                 "Bitte wählen Sie weniger Berichte oder einen kürzeren Zeitraum.",
             )
+        await _store_files(run_id, ctx, files, rows)
     else:
         files = await _load_files(ctx, run_id)
         async with ctx.session_factory() as session:
             for item in schedule.items:
                 titles.append(await _item_title(session, item.report_key, plan.texts))
-        period = _day(_local_now(schedule.time_zone).date(), plan.texts)
+        period = _day(local_now(schedule.time_zone).date(), plan.texts)
     async with ctx.session_factory() as session:
         resolved = await resolve_recipients(
             session, schedule, plan.reporting, owner_only=plan.owner_only
@@ -947,7 +973,8 @@ async def run_delivery_job(ctx: JobContext, payload: ReportDeliveryPayload) -> d
     except (JobFailed, JobRetry):
         raise
     except JobCancelled:
-        await _record_failure(ctx, payload.run_id, CANCELLED_MESSAGE)
+        # a deliberate cancel: the run ends, but it is no failure of the schedule
+        await _record_failure(ctx, payload.run_id, CANCELLED_MESSAGE, count=False)
         raise
     except Exception:
         # A CancelledError (runner timeout, shutdown) is deliberately not caught: before the

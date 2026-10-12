@@ -514,6 +514,20 @@ async def create_schedule(
     return loaded
 
 
+def _same_children(current: ReportSchedule, body: ReportScheduleUpdateIn) -> bool:
+    """The body keeps the stored reports (with overrides) and recipients unchanged."""
+    items = [(i.report_key, i.overrides.model_dump()) for i in current.items]
+    if items != [(i.report_key, i.overrides.model_dump()) for i in body.items]:
+        return False
+    stored, sent = current.recipients, body.recipients
+    return (
+        set(stored.user_ids) == set(sent.user_ids)
+        and set(stored.group_ids) == set(sent.group_ids)
+        and set(stored.role_ids) == set(sent.role_ids)
+        and {e.lower() for e in stored.emails} == {e.strip().lower() for e in sent.emails}
+    )
+
+
 async def update_schedule(
     session: AsyncSession,
     schedule_id: int,
@@ -536,8 +550,17 @@ async def update_schedule(
     )
     name = _clean_name(body.name)
     zone = await _resolve_zone(session, owner_id, body.time_zone)
-    await check_items(session, owner_id, body.items)
-    recipients = await check_recipients(session, owner_id, owner_rights, body.recipients, reporting)
+    # Pausing must work even when a stored report or recipient became invalid meanwhile
+    # (externals switched off, share right lost): an inactive schedule with unchanged reports
+    # and recipients sends nothing, so they are not checked again (the run re-checks anyway).
+    pausing_only = not body.active and _same_children(current, body)
+    if pausing_only:
+        recipients = current.recipients
+    else:
+        await check_items(session, owner_id, body.items)
+        recipients = await check_recipients(
+            session, owner_id, owner_rights, body.recipients, reporting
+        )
     schedule_changed = (
         current.recurrence != body.recurrence
         or current.time_zone != zone
@@ -564,8 +587,9 @@ async def update_schedule(
         "changed_at": now,
     }
     if body.active:
+        # resumed: the reason of an auto-pause is history now
         values["failure_count"] = 0
-    values["paused_reason"] = None
+        values["paused_reason"] = None
     result = await session.execute(
         update(TiqoraReportSchedule)
         .where(
@@ -931,6 +955,7 @@ async def schedule_list_out(
                 items=summaries,
                 format=cast("Literal['pdf', 'xlsx', 'csv']", schedule.format),
                 recurrence_text=_recurrence_text(schedule),
+                time_zone=schedule.time_zone,
                 active=schedule.active,
                 paused_reason=schedule.paused_reason,
                 next_run_at=schedule.next_run_at,

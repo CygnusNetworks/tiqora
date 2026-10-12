@@ -836,7 +836,9 @@ async def test_unexpected_error_marks_the_run_failed(
     assert mail.sent[-1]["To"] == "rep52.owner@example.org"
 
 
-async def test_cancel_marks_the_run_failed(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_cancel_marks_the_run_failed(
+    env: Env, mail: CapturingMailSender, monkeypatch: pytest.MonkeyPatch
+) -> None:
     sid = await env.schedule()
     run_id, _job_id = await env.queue_run(sid, owner_only=True)
 
@@ -849,6 +851,28 @@ async def test_cancel_marks_the_run_failed(env: Env, monkeypatch: pytest.MonkeyP
         await run_delivery_job(ctx, ReportDeliveryPayload(run_id=run_id))
     run = (await env.load_runs(sid))[0]
     assert run.status == "failed" and "abgebrochen" in (run.error or "")
+    # a deliberate cancel is no failure of the schedule: no count, no pause, no owner mail
+    sched = await env.load_schedule(sid)
+    assert sched.failure_count == 0 and sched.last_status is None and sched.active
+    assert mail.sent == []
+
+
+async def test_oversized_attachment_keeps_the_size_message_when_storing_fails(
+    env: Env, mail: CapturingMailSender, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await env.setting(delivery_max_attachment_mb=1)
+    monkeypatch.setattr(delivery, "write_report_csv", lambda *a, **k: b"x" * (1024 * 1024 + 1))
+
+    async def packet_too_big(*a: Any, **k: Any) -> None:
+        raise RuntimeError("Got a packet bigger than 'max_allowed_packet' bytes")
+
+    monkeypatch.setattr(delivery, "_store_files", packet_too_big)
+    sid = await env.schedule()
+    _run_id, job_id = await env.queue_run(sid, owner_only=True)
+    await env.run_job(job_id, expect="failed")
+    run = (await env.load_runs(sid))[0]
+    assert run.status == "failed" and "größer als 1 MB" in (run.error or "")
+    assert all(not m["Bcc"] for m in mail.sent)
 
 
 def _ctx(env: Env, *, job_id: int = 0) -> JobContext:
@@ -861,19 +885,27 @@ def _ctx(env: Env, *, job_id: int = 0) -> JobContext:
     )
 
 
-async def test_interrupted_after_checkpoint_marks_failed(env: Env) -> None:
+async def test_interrupted_after_checkpoint_marks_failed(
+    env: Env, mail: CapturingMailSender
+) -> None:
     assert CHECKPOINT_SENDING == "sending"
     sid = await env.schedule()
-    run_id, _job_id = await env.queue_run(sid, owner_only=True)
+    run_id, job_id = await env.queue_run(sid, owner_only=True)
     async with env.factory() as s:
         run = await s.get(TiqoraReportRun, run_id)
         assert run is not None
         run.status = "running"
+        await s.execute(
+            update(TiqoraJob).where(TiqoraJob.id == job_id).values(checkpoint=CHECKPOINT_SENDING)
+        )
         await s.commit()
-    await on_delivery_interrupted(_ctx(env), ReportDeliveryPayload(run_id=run_id))
+    await on_delivery_interrupted(_ctx(env, job_id=job_id), ReportDeliveryPayload(run_id=run_id))
     row = (await env.load_runs(sid))[0]
     assert row.status == "failed" and "möglicherweise" in (row.error or "")
     assert row.finished_at is not None
+    sched = await env.load_schedule(sid)
+    assert sched.failure_count == 1 and sched.last_status == "failed"
+    assert [m["To"] for m in mail.sent] == ["rep52.owner@example.org"]
     # a run that already finished is not touched
     async with env.factory() as s:
         done = await s.get(TiqoraReportRun, run_id)
@@ -883,6 +915,89 @@ async def test_interrupted_after_checkpoint_marks_failed(env: Env) -> None:
         await s.commit()
     await on_delivery_interrupted(_ctx(env), ReportDeliveryPayload(run_id=run_id))
     assert (await env.load_runs(sid))[0].status == "succeeded"
+
+
+async def _interrupt(env: Env, job_id: int, *, attempts: int, how: str) -> bool:
+    """Claim the job, pretend it is on attempt ``attempts`` and settle it as interrupted."""
+    runner = JobRunner(
+        session_factory=env.factory,
+        settings=Settings(environment="test"),
+        registry=get_registry(),
+    )
+    assert await runner._claim(job_id)
+    async with env.factory() as s:
+        await s.execute(update(TiqoraJob).where(TiqoraJob.id == job_id).values(attempts=attempts))
+        await s.commit()
+        kind, payload, created_by, checkpoint = (
+            await s.execute(
+                select(
+                    TiqoraJob.kind, TiqoraJob.payload, TiqoraJob.created_by, TiqoraJob.checkpoint
+                ).where(TiqoraJob.id == job_id)
+            )
+        ).one()
+    row = (job_id, kind, payload, created_by, attempts, checkpoint)
+    return await runner._settle_interrupted(row, interrupted_by=how)  # type: ignore[arg-type]
+
+
+async def test_timeout_on_last_attempt_counts_pauses_and_mails(
+    env: Env, mail: CapturingMailSender
+) -> None:
+    """A delivery cut off by the job timeout on its last attempt (no checkpoint: nothing was
+    sent) is a failure of the schedule like any other, with a message that says so."""
+    sid = await env.schedule()
+    for attempt in range(1, FAILURES_BEFORE_PAUSE + 1):
+        run_id, job_id = await env.queue_run(sid, owner_only=True)
+        async with env.factory() as s:
+            await s.execute(
+                update(TiqoraReportRun)
+                .where(TiqoraReportRun.id == run_id)
+                .values(status="running", started_at=utc_now())
+            )
+            await s.commit()
+        assert await _interrupt(env, job_id, attempts=delivery.MAX_ATTEMPTS, how="timeout")
+        row = next(r for r in await env.load_runs(sid) if r.id == run_id)
+        assert row.status == "failed" and row.error == delivery.TIMED_OUT_MESSAGE
+        assert "möglicherweise" not in (row.error or "")
+        sched = await env.load_schedule(sid)
+        assert sched.failure_count == attempt and sched.last_status == "failed"
+        assert sched.last_run_at is not None
+    assert sched.active is False and (sched.paused_reason or "").startswith("Nach 3")
+    assert len(mail.sent) == FAILURES_BEFORE_PAUSE
+    assert all(m["To"] == "rep52.owner@example.org" for m in mail.sent)
+    async with env.factory() as s:
+        job = await s.get(TiqoraJob, job_id)
+        assert job is not None and job.status == "failed"
+
+
+async def test_restart_on_last_attempt_says_nothing_was_sent(
+    env: Env, mail: CapturingMailSender
+) -> None:
+    sid = await env.schedule()
+    run_id, job_id = await env.queue_run(sid, owner_only=True)
+    assert await _interrupt(env, job_id, attempts=delivery.MAX_ATTEMPTS, how="restart")
+    row = (await env.load_runs(sid))[0]
+    assert row.status == "failed" and row.error == delivery.ABORTED_MESSAGE
+    assert (await env.load_schedule(sid)).failure_count == 1
+
+
+async def test_timeout_before_last_attempt_requeues_and_keeps_the_run_open(
+    env: Env, mail: CapturingMailSender
+) -> None:
+    sid = await env.schedule()
+    run_id, job_id = await env.queue_run(sid, owner_only=True)
+    async with env.factory() as s:
+        await s.execute(
+            update(TiqoraReportRun).where(TiqoraReportRun.id == run_id).values(status="running")
+        )
+        await s.commit()
+    assert await _interrupt(env, job_id, attempts=1, how="timeout")
+    async with env.factory() as s:
+        job = await s.get(TiqoraJob, job_id)
+        assert job is not None and job.status == "queued"
+    row = (await env.load_runs(sid))[0]
+    assert row.status == "running" and row.error is None
+    assert (await env.load_schedule(sid)).failure_count == 0
+    assert mail.sent == []
 
 
 async def test_missing_and_finished_runs_are_skipped(env: Env) -> None:

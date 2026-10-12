@@ -355,6 +355,8 @@ async def test_full_erasure_flow_calls_both_and_rollback_restores_items(
 async def test_agent_delete_removes_schedules_and_runs(env: Env) -> None:
     own = env.insert_schedule(owner=52301, user_ids=[52301])
     other = env.insert_schedule(owner=52300, user_ids=[52300, 52301])
+    untouched = env.insert_schedule(owner=52300, user_ids=[52300])
+    version = env.load_schedule(other)[1]
     run_id = env.insert_run(owner=52301, schedule_id=own, file=b"%PDF-1.7")
     async with env.factory() as s:
         refs = await blocking_references(s, 52301)
@@ -365,3 +367,6 @@ async def test_agent_delete_removes_schedules_and_runs(env: Env) -> None:
     assert env.load_run(run_id) is None and env.count_run_files(run_id) == 0
     assert [r[1] for r in env.load_recipients(other)] == [52300]
     assert env.load_schedule(other) is not None
+    # an open editor of the other schedule must not save the removed recipient back
+    assert env.load_schedule(other)[1] == version + 1
+    assert env.load_schedule(untouched)[1] == version

@@ -193,3 +193,32 @@ def test_webchat_ddl() -> None:
         tuple(c.name for c in ix.columns) for ix in TiqoraChatMessage.__table__.indexes if ix.unique
     }
     assert ("session_id", "seq") in uniques and ("session_id", "client_id") in uniques
+
+
+def test_report_schedule_ddl() -> None:
+    """Report schedules (migration 0074): run files and mail bodies exceed 64 KiB on MariaDB;
+    the item's composite key mirrors the schedule id and must never generate ids."""
+    from tiqora.db.tiqora.models import (
+        TiqoraReportRun,
+        TiqoraReportRunFile,
+        TiqoraReportSchedule,
+        TiqoraReportScheduleItem,
+        TiqoraReportScheduleRecipient,
+    )
+
+    run_file = TiqoraReportRunFile.__table__
+    assert "LONGBLOB" in _column_ddl(run_file, "data", mysql.dialect())
+    assert "BYTEA" in _column_ddl(run_file, "data", postgresql.dialect())
+    schedule = TiqoraReportSchedule.__table__
+    assert "MEDIUMTEXT" in _column_ddl(schedule, "body", mysql.dialect())
+    assert "MEDIUMTEXT" not in _column_ddl(schedule, "body", postgresql.dialect())
+    item = TiqoraReportScheduleItem.__table__
+    for column in ("schedule_id", "position"):
+        assert item.c[column].autoincrement is False
+        assert "AUTO_INCREMENT" not in _column_ddl(item, column, mysql.dialect())
+        for marker in ("SERIAL", "GENERATED"):
+            assert marker not in _column_ddl(item, column, postgresql.dialect())
+    # the run outlives its schedule (no FK); items, recipients and files cascade
+    assert not TiqoraReportRun.__table__.c["schedule_id"].foreign_keys
+    for table in (item, TiqoraReportScheduleRecipient.__table__, run_file):
+        assert [fk.ondelete for fk in table.foreign_keys] == ["CASCADE"]

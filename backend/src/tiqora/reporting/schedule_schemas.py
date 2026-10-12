@@ -21,6 +21,10 @@ from tiqora.reporting.schemas import ParameterValue, ReportOwnerOut
 from tiqora.reporting.sql import Grain
 
 _CONTROL: Final = re.compile(r"[\r\n\t]+")
+#: largest value of an INTEGER column: bigger ids and versions are a 422, not a database error
+INT32_MAX: Final = 2**31 - 1
+#: agent / group / role id (Znuny INTEGER ids)
+RecipientRef = Annotated[int, Field(ge=1, le=INT32_MAX)]
 _FORBIDDEN_IN_ADDRESS: Final = re.compile(r"[\s,;<>\"()\[\]\\]")
 
 
@@ -64,9 +68,9 @@ class ScheduleItemIn(BaseModel):
 class ScheduleRecipientsIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    user_ids: list[int] = Field(default_factory=list, max_length=50)
-    group_ids: list[int] = Field(default_factory=list, max_length=20)
-    role_ids: list[int] = Field(default_factory=list, max_length=20)
+    user_ids: list[RecipientRef] = Field(default_factory=list, max_length=50)
+    group_ids: list[RecipientRef] = Field(default_factory=list, max_length=20)
+    role_ids: list[RecipientRef] = Field(default_factory=list, max_length=20)
     emails: list[Annotated[str, Field(max_length=250)]] = Field(default_factory=list, max_length=50)
 
     @field_validator("emails")
@@ -105,7 +109,7 @@ class ReportScheduleIn(BaseModel):
 
 
 class ReportScheduleUpdateIn(ReportScheduleIn):
-    version: int = Field(ge=1)
+    version: int = Field(ge=1, le=INT32_MAX)
 
 
 class ScheduleItemOut(BaseModel):
@@ -177,6 +181,8 @@ class ReportScheduleListItemOut(BaseModel):
     items: list[ScheduleItemSummaryOut]
     format: Literal["pdf", "xlsx", "csv"]
     recurrence_text: str
+    #: zone of ``recurrence_text`` (the UI adds it as a suffix when it differs from its own)
+    time_zone: str
     active: bool
     paused_reason: str | None
     next_run_at: UtcDateTime | None
@@ -191,6 +197,8 @@ class RecurrencePreviewIn(BaseModel):
 
     recurrence: Recurrence
     time_zone: str | None = Field(None, max_length=64)
+    #: language of the sentence (the schedule's mail language, like the list's text)
+    language: Literal["de", "en"] = "de"
 
 
 class RecurrencePreviewOut(BaseModel):

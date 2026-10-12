@@ -25443,6 +25443,15 @@
       "RecurrencePreviewIn": {
         "additionalProperties": false,
         "properties": {
+          "language": {
+            "default": "de",
+            "enum": [
+              "de",
+              "en"
+            ],
+            "title": "Language",
+            "type": "string"
+          },
           "recurrence": {
             "$ref": "#/components/schemas/Recurrence"
           },
@@ -26927,6 +26936,10 @@
             "title": "Recurrence Text",
             "type": "string"
           },
+          "time_zone": {
+            "title": "Time Zone",
+            "type": "string"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -26941,6 +26954,7 @@
           "items",
           "format",
           "recurrence_text",
+          "time_zone",
           "active",
           "paused_reason",
           "next_run_at",
@@ -27210,6 +27224,7 @@
             "title": "Time Zone"
           },
           "version": {
+            "maximum": 2147483647.0,
             "minimum": 1.0,
             "title": "Version",
             "type": "integer"
@@ -28799,6 +28814,8 @@
           },
           "group_ids": {
             "items": {
+              "maximum": 2147483647.0,
+              "minimum": 1.0,
               "type": "integer"
             },
             "maxItems": 20,
@@ -28807,6 +28824,8 @@
           },
           "role_ids": {
             "items": {
+              "maximum": 2147483647.0,
+              "minimum": 1.0,
               "type": "integer"
             },
             "maxItems": 20,
@@ -28815,6 +28834,8 @@
           },
           "user_ids": {
             "items": {
+              "maximum": 2147483647.0,
+              "minimum": 1.0,
               "type": "integer"
             },
             "maxItems": 50,
@@ -80945,7 +80966,7 @@
     },
     "/api/v1/report-schedules/preview-recurrence": {
       "post": {
-        "description": "The next five occurrences and the German sentence (pure, bounded).",
+        "description": "The next five occurrences and the sentence in ``body.language`` (pure, bounded).",
         "operationId": "preview_recurrence_api_v1_report_schedules_preview_recurrence_post",
         "parameters": [
           {
