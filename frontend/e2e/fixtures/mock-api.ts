@@ -10,6 +10,7 @@ import {
   demoTicketFilterFields,
   demoZnunyPreview,
 } from "../../src/demo/savedMock";
+import { createDemoSchedules, demoZnunyApply, resolveSchedules, type DemoSchedules } from "../../src/demo/schedulesMock";
 import type { ProcessDialogFormData, TicketProcessState } from "../../src/lib/processApi";
 import type { ReportItem, SavedReportIn, SavedReportUpdateIn } from "../../src/lib/reportsApi";
 import type {
@@ -514,6 +515,23 @@ let nextReportId = 103;
 let savedSearches: SavedSearch[] = [];
 let nextSearchId = 14;
 let znunyImported = new Set<string>();
+// Report schedules: the demo's pure store; runs of a manual send are flipped queued -> running -> succeeded on the polls.
+let scheduleStore: DemoSchedules = createDemoSchedules();
+const PDF_EXPORT_JOB_ID = 9201;
+
+/** The run list as a poll sees it: an active run advances one step per request (queued -> running -> succeeded). */
+function advanceActiveRuns(scheduleId: number): void {
+  for (const run of scheduleStore.runs(scheduleId)) {
+    if (run.status === "queued") run.status = "running";
+    else if (run.status === "running" && run.id > 15) {
+      run.status = "succeeded";
+      run.started_at = "2026-10-11T09:00:01Z";
+      run.finished_at = "2026-10-11T09:00:04Z";
+      run.recipient_count = 1;
+      run.row_count = 42;
+    }
+  }
+}
 
 /** Znuny preview of the e2e: the demo's two profiles plus one that maps to nothing. */
 function znunyPreview(): ZnunyImportPreview {
@@ -540,6 +558,7 @@ function resetSavedStore(): void {
   savedSearches = demoSavedSearches();
   nextSearchId = 14;
   znunyImported = new Set();
+  scheduleStore = createDemoSchedules();
 }
 
 function applyReportBody(r: ReportItem, body: SavedReportIn | SavedReportUpdateIn): ReportItem {
@@ -1020,8 +1039,52 @@ export async function mockApi(page: Page) {
     }
 
     if (path.endsWith("/api/v1/reports/export") && method === "POST") {
-      await json(route, 202, { job_id: 9201, status: "queued" });
+      await json(route, 202, { job_id: PDF_EXPORT_JOB_ID, status: "queued" });
       return;
+    }
+    if (path.endsWith(`/api/v1/jobs/${PDF_EXPORT_JOB_ID}`) && method === "GET") {
+      await json(route, 200, {
+        id: PDF_EXPORT_JOB_ID,
+        kind: "core.report_export",
+        title_key: "jobs.kinds.core.report_export",
+        status: "succeeded",
+        progress_done: 1,
+        progress_total: 1,
+        progress_message: null,
+        cancel_requested: false,
+        result: null,
+        error: null,
+        files: [{ id: 1, name: "bericht.pdf", content_type: "application/pdf", size_bytes: 20480 }],
+        created_by: 1,
+        created_at: "2026-10-11T09:00:00Z",
+        started_at: "2026-10-11T09:00:01Z",
+        finished_at: "2026-10-11T09:00:02Z",
+      });
+      return;
+    }
+
+    // Report schedules and the Znuny stats import (the demo's router; stateful per test).
+    if (/\/api\/v1\/(report-schedules|reports\/import\/znuny)/.test(path)) {
+      const hasBody = method !== "GET" && method !== "DELETE";
+      const runsAt = path.match(/\/report-schedules\/(\d+)\/runs$/);
+      if (runsAt && method === "GET") advanceActiveRuns(Number(runsAt[1]));
+      const out = resolveSchedules(scheduleStore, method, path, hasBody ? req.postDataJSON() : undefined, url.searchParams);
+      if (out) {
+        if (path.endsWith("/import/znuny/apply") && method === "POST") {
+          // The saved report the import made must be openable through the result link.
+          const ids = (req.postDataJSON() as { stat_ids?: number[] }).stat_ids ?? [];
+          for (const item of demoZnunyApply(ids).imported.filter((i) => i.target === "report")) {
+            if (savedReports.some((r) => r.key === String(item.id))) continue;
+            savedReports = [
+              ...savedReports,
+              { ...demoSavedReports()[0], key: String(item.id), id: item.id, name: item.title, owner: ME, version: 1, copied_from: null },
+            ];
+          }
+        }
+        if (out.status === 204) await route.fulfill({ status: 204 });
+        else await json(route, out.status, out.body);
+        return;
+      }
     }
     if (path.match(/\/api\/v1\/reports\/builtin\.[a-z_]+$/) && method === "GET") {
       const report = demoReport(decodeURIComponent(path.split("/").pop() as string));
