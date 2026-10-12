@@ -80,6 +80,8 @@ const deployKind = (pending: number) => ({
   pending_changes: pending,
   running_live: false,
   revision: { id: 3, source: "znuny", entity_count: 4, deployed_at: "2026-10-08T10:00:00Z", deployed_by: null },
+  znuny_sync: { state: "not_needed", revision_id: null, message: "", since: null, overdue: false },
+  deploy_mode: null,
 });
 const deployBody = (aclPending = 2) => ({
   process: deployKind(0),

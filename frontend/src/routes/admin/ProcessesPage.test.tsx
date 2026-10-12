@@ -44,8 +44,16 @@ describe("ProcessesPage", () => {
         pending_changes: 3,
         running_live: false,
         revision: { id: 1, source: "initial", entity_count: 3, deployed_at: "2026-10-08T10:00:00Z", deployed_by: null },
+        znuny_sync: { state: "not_needed", revision_id: null, message: "", since: null, overdue: false },
+        deploy_mode: null,
       },
-      acl: { pending_changes: 0, running_live: false, revision: null },
+      acl: {
+        pending_changes: 0,
+        running_live: false,
+        revision: null,
+        znuny_sync: { state: "not_needed", revision_id: null, message: "", since: null, overdue: false },
+        deploy_mode: null,
+      },
       ownership_active: false,
       can_deploy_from_tiqora: false,
     });

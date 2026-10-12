@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "@tanstack/react-router";
 import { ApiError } from "@/lib/api";
-import { processDesignerApi, type DesignerEntity, type ProcessDraft } from "@/lib/processDesignerApi";
+import { processDesignerApi, type DesignerEntity, type ProcessDraft, type ValidationIssue } from "@/lib/processDesignerApi";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
@@ -18,6 +18,10 @@ import { TransitionActions } from "@/components/process-designer/panels/Transiti
 import { ActionPanel } from "@/components/process-designer/panels/ActionPanel";
 import { MODULE_PREFIX } from "@/components/process-designer/panels/actionForm";
 import { setActions } from "@/components/process-designer/canvasModel";
+import { ValidationPanel } from "@/components/process-designer/ValidationPanel";
+import { RevisionsPanel } from "@/components/process-designer/RevisionsPanel";
+import { DeployBar } from "@/components/process-designer/DeployBar";
+import { targetOfIssue } from "@/components/process-designer/validationSelect";
 import { usePhoneWidth } from "@/components/process-designer/usePhoneWidth";
 
 /**
@@ -39,6 +43,15 @@ export function ProcessDesignerPage() {
   });
 
   const qc = useQueryClient();
+  const validationKey = useMemo(() => ["admin", "process-designer", "validation", processEntityId], [processEntityId]);
+  const validationQ = useQuery({
+    queryKey: validationKey,
+    queryFn: ({ signal }) => processDesignerApi.validation(processEntityId, signal),
+  });
+  const issues = validationQ.data;
+  // Which drawer is open below the editor: the check result or the deployed versions.
+  const [drawer, setDrawer] = useState<"validation" | "revisions" | null>(null);
+  const refreshValidation = useCallback(() => void qc.invalidateQueries({ queryKey: validationKey }), [qc, validationKey]);
   const draftKey = useMemo(() => ["admin", "process-designer", "draft", processEntityId], [processEntityId]);
   const draft = draftQ.data;
 
@@ -97,6 +110,7 @@ export function ProcessDesignerPage() {
         start_activity_dialog: shape.startActivityDialog,
       });
       qc.setQueryData(draftKey, next);
+      refreshValidation();
       setEdited(null);
       setEditedFields(null);
       setConflict(false);
@@ -106,7 +120,7 @@ export function ProcessDesignerPage() {
     } finally {
       setSaving(false);
     }
-  }, [draft, shape, fields, dirty, saving, processEntityId, qc, draftKey]);
+  }, [draft, shape, fields, dirty, saving, processEntityId, qc, draftKey, refreshValidation]);
 
   const reload = useCallback(async () => {
     discard();
@@ -183,20 +197,24 @@ export function ProcessDesignerPage() {
     [draft, actionId],
   );
   const onTransitionSaved = useCallback(
-    (saved: DesignerEntity) =>
+    (saved: DesignerEntity) => {
       qc.setQueryData<ProcessDraft>(draftKey, (cur) =>
         cur ? { ...cur, transitions: cur.transitions.map((x) => (x.entity_id === saved.entity_id ? saved : x)) } : cur,
-      ),
-    [qc, draftKey],
+      );
+      refreshValidation();
+    },
+    [qc, draftKey, refreshValidation],
   );
   const onActionSaved = useCallback(
-    (saved: DesignerEntity) =>
+    (saved: DesignerEntity) => {
       qc.setQueryData<ProcessDraft>(draftKey, (cur) =>
         cur
           ? { ...cur, transition_actions: cur.transition_actions.map((x) => (x.entity_id === saved.entity_id ? saved : x)) }
           : cur,
-      ),
-    [qc, draftKey],
+      );
+      refreshValidation();
+    },
+    [qc, draftKey, refreshValidation],
   );
 
   const selectedActivity = useMemo(
@@ -204,11 +222,32 @@ export function ProcessDesignerPage() {
     [draft, selection],
   );
   const onActivitySaved = useCallback(
-    (saved: DesignerEntity) =>
+    (saved: DesignerEntity) => {
       qc.setQueryData<ProcessDraft>(draftKey, (cur) =>
         cur ? { ...cur, activities: cur.activities.map((a) => (a.entity_id === saved.entity_id ? saved : a)) } : cur,
-      ),
-    [qc, draftKey],
+      );
+      refreshValidation();
+    },
+    [qc, draftKey, refreshValidation],
+  );
+
+  const selectIssue = useCallback(
+    (issue: ValidationIssue) => {
+      if (!draft || !shape) return;
+      const target = targetOfIssue(issue, draft, shape);
+      setSelection(target.selection);
+      setActionId(target.actionId);
+    },
+    [draft, shape],
+  );
+  const onRestored = useCallback(
+    (restored: ProcessDraft) => {
+      qc.setQueryData(draftKey, restored);
+      discard();
+      refreshValidation();
+      void qc.invalidateQueries({ queryKey: ["admin", "deploy-status"] });
+    },
+    [qc, draftKey, discard, refreshValidation],
   );
 
   const selectedName = useMemo(() => {
@@ -243,6 +282,25 @@ export function ProcessDesignerPage() {
               ) : null}
               {!phone ? (
                 <>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setDrawer("validation");
+                      void validationQ.refetch();
+                    }}
+                    disabled={validationQ.isFetching}
+                    data-testid="process-designer-check"
+                  >
+                    {validationQ.isFetching ? t("admin.processDesigner.checking") : t("admin.processDesigner.check")}
+                    {issues && issues.length > 0 ? ` (${issues.length})` : ""}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => setDrawer(drawer === "revisions" ? null : "revisions")}
+                    data-testid="process-designer-versions"
+                  >
+                    {t("admin.processDesigner.versions")}
+                  </Button>
                   <Button size="sm" onClick={discard} disabled={!dirty || saving} data-testid="process-designer-discard">
                     {t("admin.processDesigner.discard")}
                   </Button>
@@ -259,6 +317,14 @@ export function ProcessDesignerPage() {
               ) : null}
             </div>
           </div>
+
+          {!phone ? (
+            <DeployBar
+              processEntityId={processEntityId}
+              disabled={dirty}
+              onValidated={(fresh) => qc.setQueryData(validationKey, fresh)}
+            />
+          ) : null}
 
           {conflict ? (
             <div
@@ -316,6 +382,7 @@ export function ProcessDesignerPage() {
                     onShapeChange={setEdited}
                     createActivity={createActivity}
                     createTransition={createTransition}
+                    issues={issues}
                   />
                 ) : null}
               </section>
@@ -378,6 +445,24 @@ export function ProcessDesignerPage() {
               </aside>
             </div>
           )}
+          {!phone && drawer ? (
+            <section
+              className="max-h-80 overflow-auto rounded-lg border border-hairline bg-surface p-3"
+              data-testid="process-designer-drawer"
+            >
+              {drawer === "validation" ? (
+                <ValidationPanel
+                  issues={issues}
+                  loading={validationQ.isFetching}
+                  error={validationQ.isError}
+                  onSelect={selectIssue}
+                  onRecheck={() => void validationQ.refetch()}
+                />
+              ) : (
+                <RevisionsPanel processEntityId={processEntityId} onRestored={onRestored} />
+              )}
+            </section>
+          ) : null}
         </>
       )}
     </div>

@@ -2960,6 +2960,70 @@
         "moveUp": "Move “{{name}}” up",
         "moveDown": "Move “{{name}}” down",
         "remove": "Remove “{{name}}” from the transition"
+      },
+      "check": "Check",
+      "checking": "Checking …",
+      "versions": "Versions",
+      "validation": {
+        "title": "Check results",
+        "errors": "Errors",
+        "warnings": "Notes",
+        "none": "Nothing to report.",
+        "loadError": "Could not load the check.",
+        "recheck": "Check again",
+        "process": "Process",
+        "code": {
+          "start_activity_missing": "No start step is set.",
+          "start_dialog_missing": "No start form is set.",
+          "start_dialog_not_in_start_activity": "The start form {{id}} does not belong to the start step {{activity}}.",
+          "reference_missing": "{{id}} does not exist ({{kind}}).",
+          "transition_target_missing": "The transition {{transition}} has no target step.",
+          "activity_unreachable": "This step cannot be reached from the start.",
+          "activity_dead_end": "No transition leads on from this step.",
+          "dialog_no_interface": "The form is not enabled for any interface.",
+          "dialog_no_fields": "The form has no fields.",
+          "dialog_field_unknown": "The field {{field}} is unknown.",
+          "queue_required_display": "The field {{field}} has to be displayed.",
+          "condition_value_impossible": "The value {{value}} for {{field}} can never match ({{reason}}).",
+          "transition_without_condition": "The transition has no condition and always applies.",
+          "condition_type_unknown": "The condition type {{type}} is unknown.",
+          "condition_module_unknown": "The condition module {{module}} is unknown.",
+          "action_reference_missing": "{{key}}: {{value}} does not exist.",
+          "action_module_unsupported": "The module {{module}} is not supported by Tiqora.",
+          "tiqora_only_module_parallel": "The module {{module}} exists only in Tiqora; Znuny skips it.",
+          "action_required_param_missing": "The parameter {{param}} is missing."
+        }
+      },
+      "revisions": {
+        "title": "Versions",
+        "empty": "No deployed version yet.",
+        "loadError": "Could not load the versions.",
+        "by": "by user {{id}}",
+        "entities": "{{count}} entries",
+        "compare": "Compare",
+        "compareWith": "Compare with",
+        "previous": "Previous version",
+        "version": "Version {{id}}",
+        "empty_base": "Empty",
+        "restore": "Restore",
+        "restoreTitle": "Restore version",
+        "restoreConfirm": "The process is reset to the state of version {{id}}. Unsaved changes are lost; nothing is deployed until you deploy.",
+        "restoreError": "Could not restore the version.",
+        "diffTitle": "Version {{from}} → {{to}}",
+        "diffError": "Could not load the comparison.",
+        "noChanges": "No differences.",
+        "added": "Added",
+        "removed": "Removed",
+        "changed": "Changed",
+        "before": "Before",
+        "after": "After",
+        "close": "Close"
+      },
+      "deploy": {
+        "confirmTitle": "Deploy despite errors?",
+        "confirm_one": "The check reports {{count}} error. Deploy anyway?",
+        "confirm_other": "The check reports {{count}} errors. Deploy anyway?",
+        "checkFailed": "Could not run the check."
       }
     },
     "mailOutbound": {
@@ -4573,7 +4637,15 @@
       "runningLive": "No deployed revision yet – Tiqora runs the draft state.",
       "ownership": "Tiqora deploys changes itself (Znuny is switched off).",
       "deployNow": "Deploy",
-      "deployFailed": "Deployment failed."
+      "deployFailed": "Deployment failed.",
+      "sync": {
+        "pending": "Waiting for Znuny – the change is being applied …",
+        "ok": "Applied in Znuny",
+        "error": "Znuny could not apply the deployment.",
+        "errorHint": "Znuny still runs the previous version until the error is fixed and the change is deployed again.",
+        "addon_missing": "The Znuny package TiqoraSync is missing or too old (1.2.0 or later). Znuny will not apply this change.",
+        "overdue": "Znuny has not applied the change yet. Check that the Znuny daemon is running."
+      }
     },
     "plugins": {
       "description": "Extensions add functions to Tiqora. They ship with the Tiqora image; here you switch them on or off.",

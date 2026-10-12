@@ -2968,6 +2968,70 @@
         "moveUp": "„{{name}}“ nach oben",
         "moveDown": "„{{name}}“ nach unten",
         "remove": "„{{name}}“ vom Übergang entfernen"
+      },
+      "check": "Prüfen",
+      "checking": "Prüfe …",
+      "versions": "Versionen",
+      "validation": {
+        "title": "Prüfergebnis",
+        "errors": "Fehler",
+        "warnings": "Hinweise",
+        "none": "Keine Auffälligkeiten.",
+        "loadError": "Die Prüfung konnte nicht geladen werden.",
+        "recheck": "Erneut prüfen",
+        "process": "Prozess",
+        "code": {
+          "start_activity_missing": "Es ist kein Startschritt festgelegt.",
+          "start_dialog_missing": "Es ist kein Startformular festgelegt.",
+          "start_dialog_not_in_start_activity": "Das Startformular {{id}} gehört nicht zum Startschritt {{activity}}.",
+          "reference_missing": "{{id}} existiert nicht ({{kind}}).",
+          "transition_target_missing": "Der Übergang {{transition}} hat keinen Zielschritt.",
+          "activity_unreachable": "Dieser Schritt ist vom Start aus nicht erreichbar.",
+          "activity_dead_end": "Von diesem Schritt führt kein Übergang weiter.",
+          "dialog_no_interface": "Das Formular ist für keine Oberfläche freigegeben.",
+          "dialog_no_fields": "Das Formular hat keine Felder.",
+          "dialog_field_unknown": "Das Feld {{field}} ist unbekannt.",
+          "queue_required_display": "Das Feld {{field}} muss angezeigt werden.",
+          "condition_value_impossible": "Der Wert {{value}} für {{field}} kann nie zutreffen ({{reason}}).",
+          "transition_without_condition": "Der Übergang hat keine Bedingung und gilt immer.",
+          "condition_type_unknown": "Der Bedingungstyp {{type}} ist unbekannt.",
+          "condition_module_unknown": "Das Bedingungsmodul {{module}} ist unbekannt.",
+          "action_reference_missing": "{{key}}: {{value}} existiert nicht.",
+          "action_module_unsupported": "Das Modul {{module}} wird von Tiqora nicht unterstützt.",
+          "tiqora_only_module_parallel": "Das Modul {{module}} gibt es nur in Tiqora; Znuny überspringt es.",
+          "action_required_param_missing": "Der Parameter {{param}} fehlt."
+        }
+      },
+      "revisions": {
+        "title": "Versionen",
+        "empty": "Noch keine bereitgestellte Version.",
+        "loadError": "Die Versionen konnten nicht geladen werden.",
+        "by": "von Benutzer {{id}}",
+        "entities": "{{count}} Einträge",
+        "compare": "Vergleichen",
+        "compareWith": "Vergleichen mit",
+        "previous": "Vorherige Version",
+        "version": "Version {{id}}",
+        "empty_base": "Leer",
+        "restore": "Wiederherstellen",
+        "restoreTitle": "Version wiederherstellen",
+        "restoreConfirm": "Der Prozess wird auf den Stand von Version {{id}} zurückgesetzt. Ungespeicherte Änderungen gehen verloren; bereitgestellt wird erst danach.",
+        "restoreError": "Die Version konnte nicht wiederhergestellt werden.",
+        "diffTitle": "Version {{from}} → {{to}}",
+        "diffError": "Der Vergleich konnte nicht geladen werden.",
+        "noChanges": "Keine Unterschiede.",
+        "added": "Neu",
+        "removed": "Entfernt",
+        "changed": "Geändert",
+        "before": "Vorher",
+        "after": "Nachher",
+        "close": "Schließen"
+      },
+      "deploy": {
+        "confirmTitle": "Trotz Fehlern bereitstellen?",
+        "confirm_one": "Die Prüfung meldet {{count}} Fehler. Trotzdem bereitstellen?",
+        "confirm_other": "Die Prüfung meldet {{count}} Fehler. Trotzdem bereitstellen?",
+        "checkFailed": "Die Prüfung konnte nicht ausgeführt werden."
       }
     },
     "mailOutbound": {
@@ -4581,7 +4645,15 @@
       "runningLive": "Noch keine bereitgestellte Fassung – Tiqora nutzt den Entwurfsstand.",
       "ownership": "Tiqora stellt Änderungen selbst bereit (Znuny ist abgeschaltet).",
       "deployNow": "Bereitstellen",
-      "deployFailed": "Bereitstellen fehlgeschlagen."
+      "deployFailed": "Bereitstellen fehlgeschlagen.",
+      "sync": {
+        "pending": "Wartet auf Znuny – die Übernahme läuft …",
+        "ok": "In Znuny übernommen",
+        "error": "Znuny konnte die Bereitstellung nicht übernehmen.",
+        "errorHint": "Znuny läuft noch mit der vorigen Fassung, bis der Fehler behoben und erneut bereitgestellt ist.",
+        "addon_missing": "Das Znuny-Paket TiqoraSync fehlt oder ist zu alt (ab 1.2.0). Znuny übernimmt diese Änderung nicht.",
+        "overdue": "Znuny hat die Änderung noch nicht übernommen. Prüfen Sie, ob der Znuny-Daemon läuft."
+      }
     },
     "plugins": {
       "description": "Erweiterungen ergänzen Tiqora um zusätzliche Funktionen. Sie werden mit dem Tiqora-Image ausgeliefert; hier schalten Sie sie ein oder aus.",

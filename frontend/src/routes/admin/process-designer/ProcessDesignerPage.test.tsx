@@ -13,6 +13,9 @@ import { ProcessDesignerPage } from "./ProcessDesignerPage";
 const getProcess = vi.fn();
 const getCatalog = vi.fn();
 const updateProcess = vi.fn();
+const validation = vi.fn();
+const revisions = vi.fn();
+const deployStatus = vi.fn();
 
 vi.mock("@tanstack/react-router", () => ({
   useParams: () => ({ processEntityId: "Process-1" }),
@@ -29,13 +32,26 @@ vi.mock("@/lib/processDesignerApi", () => ({
     catalog: (...args: unknown[]) => getCatalog(...args),
     updateProcess: (...args: unknown[]) => updateProcess(...args),
     createEntity: vi.fn(),
+    validation: (...args: unknown[]) => validation(...args),
+    revisions: (...args: unknown[]) => revisions(...args),
   },
+}));
+vi.mock("@/lib/deployStatusApi", () => ({
+  deployStatusApi: { status: (...args: unknown[]) => deployStatus(...args), deploy: vi.fn() },
 }));
 
 // The canvas needs layout APIs jsdom lacks; its own rendering is covered by the e2e/demo check.
 vi.mock("@/components/process-designer/DesignerCanvas", () => ({
-  DesignerCanvas: ({ shape, onShapeChange }: { shape: ProcessShape; onShapeChange: (s: ProcessShape) => void }) => (
-    <div data-testid="process-designer-canvas">
+  DesignerCanvas: ({
+    shape,
+    onShapeChange,
+    issues,
+  }: {
+    shape: ProcessShape;
+    onShapeChange: (s: ProcessShape) => void;
+    issues?: unknown[];
+  }) => (
+    <div data-testid="process-designer-canvas" data-issues={issues?.length ?? 0}>
       <button
         type="button"
         onClick={() => onShapeChange({ ...shape, layout: { ...shape.layout, "Activity-a": { left: "10", top: "20" } } })}
@@ -95,6 +111,26 @@ describe("ProcessDesignerPage", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("de");
     getProcess.mockResolvedValue(draft);
+    validation.mockResolvedValue([]);
+    revisions.mockResolvedValue([]);
+    deployStatus.mockResolvedValue({
+      process: {
+        pending_changes: 0,
+        running_live: false,
+        revision: null,
+        znuny_sync: { state: "not_needed", revision_id: null, message: "", since: null, overdue: false },
+        deploy_mode: "local",
+      },
+      acl: {
+        pending_changes: 0,
+        running_live: false,
+        revision: null,
+        znuny_sync: { state: "not_needed", revision_id: null, message: "", since: null, overdue: false },
+        deploy_mode: null,
+      },
+      ownership_active: false,
+      can_deploy_from_tiqora: true,
+    });
     getCatalog.mockResolvedValue({ actions: [], condition_types: [], condition_modules: [], fields: [], interfaces: [], permissions: [], account_time: false });
   });
   afterEach(() => {
@@ -222,5 +258,48 @@ describe("ProcessDesignerPage", () => {
     const src = readFileSync(resolve(__dirname, "../../../router.tsx"), "utf8");
     expect(src).not.toMatch(/^import[^;]*ProcessDesignerPage[^;]*from/m);
     expect(src).toMatch(/lazyRouteComponent\(\s*\(\) => import\("@\/routes\/admin\/process-designer\/ProcessDesignerPage"\)/);
+  });
+
+  describe("checks, versions and deploy", () => {
+    beforeEach(() => setViewport(false));
+
+    it("passes the check result to the canvas for the badges", async () => {
+      validation.mockResolvedValue([
+        { code: "activity_dead_end", severity: "warning", entity_type: "Activity", entity_id: "Activity-a", field: "", params: { name: "Antrag erfassen" } },
+      ]);
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId("process-designer-canvas")).toHaveAttribute("data-issues", "1"));
+    });
+
+    it("Prüfen lists the issues and a click selects the entity", async () => {
+      validation.mockResolvedValue([
+        { code: "activity_dead_end", severity: "warning", entity_type: "Activity", entity_id: "Activity-a", field: "", params: { name: "Antrag erfassen" } },
+      ]);
+      renderPage();
+      fireEvent.click(await screen.findByTestId("process-designer-check"));
+      fireEvent.click(await screen.findByTestId("validation-issue"));
+      // the side panel now shows the selected step instead of the process panel
+      expect(await screen.findByTestId("activity-panel-name")).toHaveValue("Antrag erfassen");
+      expect(screen.queryByTestId("process-panel-name")).not.toBeInTheDocument();
+    });
+
+    it("Versionen opens the revision list", async () => {
+      renderPage();
+      fireEvent.click(await screen.findByTestId("process-designer-versions"));
+      expect(await screen.findByTestId("revisions-empty")).toBeInTheDocument();
+    });
+
+    it("offers Bereitstellen from the deploy bar", async () => {
+      renderPage();
+      expect(await screen.findByTestId("deploy-bar-deploy")).toBeInTheDocument();
+    });
+
+    it("has no check, versions or deploy on a phone", async () => {
+      setViewport(true);
+      renderPage();
+      await screen.findByTestId("process-designer-phone-list");
+      expect(screen.queryByTestId("process-designer-check")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("deploy-bar")).not.toBeInTheDocument();
+    });
   });
 });

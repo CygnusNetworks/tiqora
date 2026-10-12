@@ -29,6 +29,11 @@ export function TransitionEdge(props: EdgeProps<TransitionFlowEdge>) {
           )}
         >
           {data?.name}
+          {data?.issues ? (
+            <span className="ml-1 rounded-full bg-danger px-1.5 text-[10px] text-white" data-testid="process-designer-edge-issues">
+              {data.issues}
+            </span>
+          ) : null}
         </div>
       </EdgeLabelRenderer>
     </>

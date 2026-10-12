@@ -13,7 +13,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useTranslation } from "react-i18next";
-import type { ProcessDraft } from "@/lib/processDesignerApi";
+import type { ProcessDraft, ValidationIssue } from "@/lib/processDesignerApi";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Button } from "@/components/ui/Button";
 import { ActivityNode, type ActivityFlowNode } from "./ActivityNode";
@@ -62,6 +62,8 @@ export type DesignerCanvasProps = {
   createActivity: () => Promise<string>;
   /** Creates a new transition entity with that name and resolves to its entity id. */
   createTransition: (name: string) => Promise<string>;
+  /** Latest check result; the issue counts show as badges on steps and transitions. */
+  issues?: ValidationIssue[];
 };
 
 /** The draft as `toCanvas` expects it, with the local shape laid over the stored one. */
@@ -89,6 +91,7 @@ function Inner({
   onShapeChange,
   createActivity,
   createTransition,
+  issues,
 }: DesignerCanvasProps) {
   const { t } = useTranslation();
   const { screenToFlowPosition } = useReactFlow();
@@ -97,7 +100,7 @@ function Inner({
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const model = useMemo(() => toCanvas(withShape(draft, shape)), [draft, shape]);
+  const model = useMemo(() => toCanvas(withShape(draft, shape), issues ?? []), [draft, shape, issues]);
 
   const modelNodes = useMemo<ActivityFlowNode[]>(
     () =>
