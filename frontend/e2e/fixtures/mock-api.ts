@@ -10,7 +10,7 @@ import {
   demoTicketFilterFields,
   demoZnunyPreview,
 } from "../../src/demo/savedMock";
-import { resolveGiData } from "../../src/demo/giMock";
+import { filterDebugEntries, resolveGiData } from "../../src/demo/giMock";
 import type { ProcessDialogFormData, TicketProcessState } from "../../src/lib/processApi";
 import type { ReportItem, SavedReportIn, SavedReportUpdateIn } from "../../src/lib/reportsApi";
 import type {
@@ -1038,6 +1038,10 @@ export async function mockApi(page: Page) {
       return;
     }
 
+    if (/\/api\/v1\/admin\/webservices\/\d+\/debugger$/.test(path) && method === "GET") {
+      await json(route, 200, filterDebugEntries(url.searchParams));
+      return;
+    }
     // GenericInterface webservices (list, detail, egress settings, dry run + its job)
     if (path.includes("/api/v1/admin/webservices") || path.endsWith("/api/v1/jobs/9390")) {
       const gi = resolveGiData(path, method);

@@ -15,6 +15,7 @@ import {
   type WebserviceDetail,
   type WebserviceInvoker,
 } from "@/lib/webservicesApi";
+import { DebuggerList } from "./gi/DebuggerList";
 import { DryRunDialog } from "./gi/DryRunDialog";
 import { GiNoticeBanner } from "./WebservicesPage";
 
@@ -347,11 +348,7 @@ export function WebserviceDetailPage() {
       />
       {tab === "overview" && <OverviewTab ws={ws} />}
       {tab === "invokers" && <InvokersTab ws={ws} />}
-      {tab === "debugger" && (
-        <p className="text-sm text-muted" data-testid="ws-tab-debugger">
-          {t("admin.webservices.debugger.placeholder")}
-        </p>
-      )}
+      {tab === "debugger" && <DebuggerList wsId={wsId} />}
       {tab === "settings" && <SettingsTab ws={ws} />}
     </div>
   );
