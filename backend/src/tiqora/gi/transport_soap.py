@@ -68,6 +68,7 @@ async def soap_perform_request(
     policy: EgressPolicy,
     http_transport: httpx.AsyncBaseTransport | None = None,
     resolver: HostResolver | None = None,
+    dry_run: bool = False,
 ) -> TransportResult:
     """``operation`` is the invoker name, ``operation_name`` its ``OperationName`` (default:
     the invoker name); ``sort`` overrides the transport's ``Sort``."""
@@ -199,6 +200,24 @@ async def soap_perform_request(
         },
     )
     await debugger.debug("XML data sent to remote system", redact_text(xml_sent, secret_values))
+    if dry_run:
+        # Nothing is sent; the request is returned as it may be shown (masked).
+        return TransportResult(
+            True,
+            None,
+            {
+                "request": {
+                    "method": "POST",
+                    "url": redact_url(endpoint),
+                    "headers": redact_headers(headers, secret_values=secret_values),
+                    "body_bytes": len(envelope),
+                    "body": redact_text(xml_sent, secret_values),
+                }
+            },
+            False,
+            None,
+            secret_values,
+        )
 
     if pinned is not None:
         send_url = pinned.request_url
