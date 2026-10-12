@@ -19,6 +19,24 @@ vi.mock("@/lib/webservicesApi", async () => {
   };
 });
 
+// The drawer has its own tests; here only its callbacks matter.
+vi.mock("./DebuggerEntryDrawer", () => ({
+  DebuggerEntryDrawer: (props: {
+    onClose: () => void;
+    onResendStarted?: () => void;
+    debugThreshold?: string;
+  }) => (
+    <div data-testid="fake-drawer" data-threshold={props.debugThreshold}>
+      <button type="button" onClick={() => props.onResendStarted?.()}>
+        start-resend
+      </button>
+      <button type="button" onClick={props.onClose}>
+        close-drawer
+      </button>
+    </div>
+  ),
+}));
+
 function entry(over: Partial<DebugEntry> & { id: number }): DebugEntry {
   return {
     source: "tiqora",
@@ -38,12 +56,12 @@ function page(entries: DebugEntry[], next: string | null = null): DebugEntryList
   return { entries, next_before: next };
 }
 
-function renderList() {
+function renderList(debugThreshold?: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <I18nextProvider i18n={i18n}>
-        <DebuggerList wsId={7} />
+        <DebuggerList wsId={7} debugThreshold={debugThreshold} />
       </I18nextProvider>
     </QueryClientProvider>,
   );
@@ -123,6 +141,26 @@ describe("DebuggerList", () => {
     expect(znuny).toHaveTextContent("Znuny");
     expect(screen.queryByTestId("debug-resend-znuny-5")).toBeNull();
     expect(screen.getByTestId("debug-resend-tiqora-6")).toHaveTextContent("Erneut senden");
+  });
+
+  it("keeps the row's visible content in its accessible name", async () => {
+    renderList();
+    const row = await screen.findByTestId("debug-row-tiqora-1");
+    expect(row).not.toHaveAttribute("aria-label");
+    expect(screen.getByRole("button", { name: /Eintrag 1 öffnen.*Ausgehend.*SyncTicket/ })).toBe(row);
+  });
+
+  it("refreshes the list when the drawer closes after a resend", async () => {
+    renderList("error");
+    fireEvent.click(await screen.findByTestId("debug-row-tiqora-1"));
+    expect(screen.getByTestId("fake-drawer")).toHaveAttribute("data-threshold", "error");
+    fireEvent.click(screen.getByText("close-drawer"));
+    expect(debuggerList).toHaveBeenCalledTimes(1); // nothing changed: no refetch
+
+    fireEvent.click(screen.getByTestId("debug-row-tiqora-1"));
+    fireEvent.click(screen.getByText("start-resend"));
+    fireEvent.click(screen.getByText("close-drawer"));
+    await waitFor(() => expect(debuggerList).toHaveBeenCalledTimes(2));
   });
 
   it("shows an empty state and an error state", async () => {

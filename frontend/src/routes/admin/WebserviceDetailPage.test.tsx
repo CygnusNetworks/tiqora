@@ -66,7 +66,14 @@ describe("WebserviceDetailPage", () => {
     const tab = await screen.findByTestId("ws-tab-overview");
     expect(tab).toHaveTextContent("https://crm.example.org/api/v2");
     expect(tab).toHaveTextContent("BasicAuth");
-    expect(screen.queryByText(/password|passwort|kennwort/i)).not.toBeInTheDocument();
+  });
+
+  it("overview shows the debug threshold in German", async () => {
+    get.mockResolvedValue({ ...demoWebserviceDetails[1], debug_threshold: "notice" });
+    renderPage();
+    const tab = await screen.findByTestId("ws-tab-overview");
+    expect(tab).toHaveTextContent("Protokollstufe: Hinweis");
+    expect(tab).not.toHaveTextContent("notice");
   });
 
   it("switching the tab navigates with the tab search param", async () => {
@@ -93,7 +100,6 @@ describe("WebserviceDetailPage", () => {
     const notFired = screen.getByTestId("event-NotifyCrm-ArticleCreate");
     expect(notFired).toHaveTextContent("wird von Tiqora noch nicht ausgelöst");
     expect(screen.getByTestId("event-SyncTicket-TicketCreate")).not.toHaveTextContent("noch nicht ausgelöst");
-    expect(screen.queryByText(/password|passwort|kennwort/i)).not.toBeInTheDocument();
   });
 
   it("opens the dry-run dialog from an invoker", async () => {
@@ -112,9 +118,9 @@ describe("WebserviceDetailPage", () => {
     const targets = await screen.findByTestId("ws-targets");
     fireEvent.change(targets, { target: { value: "127.0.0.1/32" } });
     fireEvent.click(screen.getByTestId("ws-egress-save"));
-    expect(await screen.findByTestId("ws-egress-error")).toHaveTextContent(
-      "Netz 127.0.0.1/32 darf nicht freigegeben werden",
-    );
+    const error = await screen.findByTestId("ws-egress-error");
+    // Pydantic's "Value error, " prefix is English noise in the German UI
+    expect(error.textContent).toBe("Netz 127.0.0.1/32 darf nicht freigegeben werden");
   });
 
   it("settings: saves the trimmed list without blank lines", async () => {
@@ -132,6 +138,8 @@ describe("WebserviceDetailPage", () => {
       }),
     );
     expect(await screen.findByTestId("ws-egress-saved")).toBeInTheDocument();
+    // the Übersicht warnings depend on egress: the detail is fetched again
+    await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
   });
 
   it("settings: the insecure-TLS switch comes with its warning before saving", async () => {

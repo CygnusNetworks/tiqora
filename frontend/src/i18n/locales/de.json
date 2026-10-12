@@ -4610,7 +4610,6 @@
         "saveFailed": "Die Einstellungen konnten nicht gespeichert werden."
       },
       "debugger": {
-        "title": "Protokoll",
         "description": "Alle ausgehenden und eingehenden Aufrufe dieses Webservice, auch die aus Znuny. Zugangsdaten werden von Tiqora maskiert.",
         "filters": "Filter",
         "direction": "Richtung",
@@ -4629,13 +4628,6 @@
         "loadError": "Das Protokoll konnte nicht geladen werden.",
         "loadMore": "Weitere laden",
         "loadingMore": "Wird geladen …",
-        "colTime": "Zeit",
-        "colDirection": "Richtung",
-        "colSource": "Quelle",
-        "colName": "Aufruf",
-        "colIp": "IP",
-        "colTicket": "Ticket",
-        "colLevel": "Stufe",
         "ticket": "Ticket {{id}}",
         "levels": {
           "debug": "Debug",
@@ -4659,7 +4651,13 @@
         "resendFailed": "Der Aufruf konnte nicht erneut gesendet werden.",
         "resendDone": "Der Aufruf wurde erneut gesendet. Der neue Eintrag steht oben im Protokoll.",
         "resendJobFailed": "Das erneute Senden ist fehlgeschlagen.",
-        "showLog": "Zum Protokoll"
+        "showLog": "Zum Protokoll",
+        "resendRescheduled": "Das fremde System hat den Aufruf abgelehnt. Ein neuer Versuch folgt am {{time}}.",
+        "resendDoneQuiet": "Der Aufruf wurde erneut gesendet. Bei dieser Protokollstufe schreibt ein erfolgreicher Aufruf keinen Eintrag."
+      },
+      "notices": {
+        "giRequesterOff": "Der Dienst „Ausgehende Webservice-Aufrufe“ ist ausgeschaltet. Tiqora löst deshalb keine Ereignis-Aufrufe der Webservices aus; nur Änderungen in Znuny führen zu Aufrufen.",
+        "giRequesterDouble": "Der Dienst „Ausgehende Webservice-Aufrufe“ ist eingeschaltet, aber der Ereignis-Handler von Znuny ist noch aktiv. Jeder Aufruf wird doppelt gesendet. Schalten Sie den Handler in Znuny ab."
       }
     }
   },

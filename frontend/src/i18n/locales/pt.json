@@ -4602,7 +4602,6 @@
         "saveFailed": "The settings could not be saved."
       },
       "debugger": {
-        "title": "Log",
         "description": "All outgoing and incoming calls of this web service, including those from Znuny. Tiqora masks credentials.",
         "filters": "Filters",
         "direction": "Direction",
@@ -4621,13 +4620,6 @@
         "loadError": "The log could not be loaded.",
         "loadMore": "Load more",
         "loadingMore": "Loading …",
-        "colTime": "Time",
-        "colDirection": "Direction",
-        "colSource": "Source",
-        "colName": "Call",
-        "colIp": "IP",
-        "colTicket": "Ticket",
-        "colLevel": "Level",
         "ticket": "Ticket {{id}}",
         "levels": {
           "debug": "Debug",
@@ -4651,7 +4643,13 @@
         "resendFailed": "The call could not be sent again.",
         "resendDone": "The call was sent again. The new entry is at the top of the log.",
         "resendJobFailed": "Sending again failed.",
-        "showLog": "Back to the log"
+        "showLog": "Back to the log",
+        "resendRescheduled": "The remote system rejected the call. The next attempt follows at {{time}}.",
+        "resendDoneQuiet": "The call was sent again. At this log level a successful call writes no log entry."
+      },
+      "notices": {
+        "giRequesterOff": "The service “Outgoing web service calls” is switched off, so Tiqora does not trigger the event calls of the web services. Only changes made in Znuny lead to calls.",
+        "giRequesterDouble": "The service “Outgoing web service calls” is switched on, but Znuny's own event handler is still active. Every call is sent twice. Switch the handler off in Znuny."
       }
     }
   },

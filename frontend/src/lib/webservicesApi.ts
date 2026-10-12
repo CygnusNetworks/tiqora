@@ -46,6 +46,17 @@ export type DryRunResult = {
   };
 };
 
+/**
+ * What a finished resend job holds (`run_gi_invoke` result). A remote failure that
+ * `RequestRetry` takes over still ends as a *succeeded* job, with `status: "rescheduled"`
+ * and the naive-UTC time of the next attempt.
+ */
+export type ResendResult = {
+  communication_id?: string;
+  status?: "ok" | "rescheduled";
+  next_at?: string;
+};
+
 export const webservicesApi = {
   list(signal?: AbortSignal) {
     return api.request<WebserviceList>("GET", "/api/v1/admin/webservices", { signal });

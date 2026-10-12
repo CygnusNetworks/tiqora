@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Badge } from "@/components/ui/Badge";
@@ -27,7 +27,7 @@ const entryKey = (e: DebugEntry) => `${e.source}-${e.id}`;
  * webservice, newest first. Filters go to the server; "Weitere laden" walks
  * the opaque `next_before` cursor.
  */
-export function DebuggerList({ wsId }: { wsId: number }) {
+export function DebuggerList({ wsId, debugThreshold }: { wsId: number; debugThreshold?: string }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [direction, setDirection] = useState<Direction>("all");
@@ -37,6 +37,9 @@ export function DebuggerList({ wsId }: { wsId: number }) {
   const [ipDraft, setIpDraft] = useState("");
   const [ip, setIp] = useState("");
   const [selected, setSelected] = useState<{ entry: DebugEntry; resend: boolean } | null>(null);
+  const resendQueued = useRef(false);
+  const refreshList = () =>
+    void qc.invalidateQueries({ queryKey: ["admin", "webservices", wsId, "debugger", "list"] });
 
   const filters = useMemo<DebuggerQuery>(
     () => ({
@@ -179,10 +182,10 @@ export function DebuggerList({ wsId }: { wsId: number }) {
                 <button
                   type="button"
                   className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 rounded text-left hover:bg-surface-subtle"
-                  aria-label={t("admin.webservices.debugger.open", { id: e.id })}
                   onClick={() => setSelected({ entry: e, resend: false })}
                   data-testid={`debug-row-${key}`}
                 >
+                  <span className="sr-only">{t("admin.webservices.debugger.open", { id: e.id })}:</span>
                   <span className="font-mono text-xs text-muted">{new Date(e.created).toLocaleString()}</span>
                   <Badge tone="muted">
                     {e.communication_type === "Provider"
@@ -239,10 +242,21 @@ export function DebuggerList({ wsId }: { wsId: number }) {
           source={selected.entry.source}
           entryId={selected.entry.id}
           startResend={selected.resend}
-          onClose={() => setSelected(null)}
+          debugThreshold={debugThreshold}
+          onResendStarted={() => {
+            resendQueued.current = true;
+          }}
+          onClose={() => {
+            setSelected(null);
+            if (resendQueued.current) {
+              resendQueued.current = false;
+              refreshList();
+            }
+          }}
           onResent={() => {
             setSelected(null);
-            void qc.invalidateQueries({ queryKey: ["admin", "webservices", wsId, "debugger", "list"] });
+            resendQueued.current = false;
+            refreshList();
           }}
         />
       )}

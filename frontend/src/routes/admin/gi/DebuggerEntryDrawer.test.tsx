@@ -44,13 +44,24 @@ function detail(canResend: boolean): DebugEntryDetail {
 
 const onClose = vi.fn();
 const onResent = vi.fn();
-function renderDrawer(canResend = true) {
+function renderDrawer(
+  canResend = true,
+  opts: { startResend?: boolean; debugThreshold?: string } = {},
+) {
   debuggerEntry.mockResolvedValue(detail(canResend));
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <I18nextProvider i18n={i18n}>
-        <DebuggerEntryDrawer wsId={7} source="tiqora" entryId={11} onClose={onClose} onResent={onResent} />
+        <DebuggerEntryDrawer
+          wsId={7}
+          source="tiqora"
+          entryId={11}
+          onClose={onClose}
+          onResent={onResent}
+          startResend={opts.startResend}
+          debugThreshold={opts.debugThreshold}
+        />
       </I18nextProvider>
     </QueryClientProvider>,
   );
@@ -63,7 +74,11 @@ describe("DebuggerEntryDrawer", () => {
   beforeEach(() => {
     debuggerEntry.mockReset();
     resend.mockReset().mockResolvedValue({ job_id: 9390, status: "queued" });
-    getJob.mockReset().mockResolvedValue({ ...demoDryRunJob, status: "succeeded" });
+    getJob.mockReset().mockResolvedValue({
+      ...demoDryRunJob,
+      status: "succeeded",
+      result: { communication_id: "c1", status: "ok" },
+    });
     onClose.mockReset();
     onResent.mockReset();
   });
@@ -104,8 +119,55 @@ describe("DebuggerEntryDrawer", () => {
     await waitFor(() => expect(resend).toHaveBeenCalledWith(7, 11));
     expect(await screen.findByTestId("debug-resend-job")).toBeInTheDocument();
     expect(await screen.findByTestId("debug-resend-done", {}, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.getByTestId("debug-resend-sent")).toHaveTextContent("Der neue Eintrag steht oben im Protokoll.");
     fireEvent.click(screen.getByTestId("debug-resend-show-log"));
     expect(onResent).toHaveBeenCalled();
+  });
+
+  async function resendAndWait() {
+    fireEvent.click(await screen.findByTestId("debug-resend"));
+    fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
+    await screen.findByTestId("debug-resend-job", {}, { timeout: 3000 });
+  }
+
+  it("reports a rescheduled resend in amber, not as sent", async () => {
+    getJob.mockResolvedValue({
+      ...demoDryRunJob,
+      status: "succeeded",
+      result: { communication_id: "c1", status: "rescheduled", next_at: "2026-10-12T10:00:00" },
+    });
+    renderDrawer();
+    await resendAndWait();
+    const note = await screen.findByTestId("debug-resend-rescheduled", {}, { timeout: 3000 });
+    expect(note).toHaveTextContent("Das fremde System hat den Aufruf abgelehnt.");
+    expect(note).toHaveTextContent(new Date("2026-10-12T10:00:00Z").toLocaleString());
+    expect(note.className).toContain("text-amber");
+    expect(screen.queryByTestId("debug-resend-sent")).toBeNull();
+  });
+
+  it("does not promise a new entry when the threshold logs no successful call", async () => {
+    renderDrawer(true, { debugThreshold: "error" });
+    await resendAndWait();
+    const sent = await screen.findByTestId("debug-resend-sent", {}, { timeout: 3000 });
+    expect(sent).toHaveTextContent("schreibt ein erfolgreicher Aufruf keinen Eintrag");
+    expect(sent).not.toHaveTextContent("oben im Protokoll");
+  });
+
+  it("shows a failed job's error once and offers to send again", async () => {
+    getJob.mockResolvedValue({ ...demoDryRunJob, status: "failed", result: null, error: "Remote kaputt" });
+    renderDrawer();
+    await resendAndWait();
+    await waitFor(() => expect(screen.getAllByText("Remote kaputt")).toHaveLength(1), { timeout: 3000 });
+    expect(screen.queryByTestId("debug-resend-job-failed")).toBeNull();
+    expect(screen.getByTestId("debug-resend")).toBeInTheDocument();
+  });
+
+  it("Escape closes the drawer when the row's resend opened it for a non-resendable entry", async () => {
+    renderDrawer(false, { startResend: true });
+    await screen.findByTestId("debug-line-toggle-1");
+    expect(screen.queryByTestId("confirm-dialog")).toBeNull();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalled();
   });
 
   it("cancelling the confirmation sends nothing and keeps the drawer open", async () => {

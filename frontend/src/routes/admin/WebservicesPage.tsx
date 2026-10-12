@@ -1,10 +1,16 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import { GI_NOTICE_DOUBLE, GI_NOTICE_OFF, webservicesApi } from "@/lib/webservicesApi";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
+
+/** The Daemons notice keys, worded for the Webservices pages (they name the service). */
+const BANNER_TEXT: Record<string, string> = {
+  [GI_NOTICE_OFF]: "admin.webservices.notices.giRequesterOff",
+  [GI_NOTICE_DOUBLE]: "admin.webservices.notices.giRequesterDouble",
+};
 
 /** Warning shown under the page title when the Daemons API flags the `gi_requester` takeover. */
 export function GiNoticeBanner() {
@@ -23,7 +29,7 @@ export function GiNoticeBanner() {
       data-testid="webservices-notice"
     >
       {shown.map((key) => (
-        <p key={key}>{t(key)}</p>
+        <p key={key}>{t(BANNER_TEXT[key] ?? key)}</p>
       ))}
       <Link
         to="/admin/daemons"
@@ -38,7 +44,6 @@ export function GiNoticeBanner() {
 
 export function WebservicesPage() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const listQ = useQuery({
     queryKey: ["admin", "webservices"],
     queryFn: ({ signal }) => webservicesApi.list(signal),
@@ -59,9 +64,6 @@ export function WebservicesPage() {
     );
   }
   const rows = listQ.data?.webservices ?? [];
-
-  const open = (id: number) =>
-    void navigate({ to: "/admin/webservices/$wsId", params: { wsId: String(id) }, search: { tab: "overview" } });
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 p-4" data-testid="admin-webservices-page">
@@ -95,16 +97,20 @@ export function WebservicesPage() {
             {rows.map((ws) => (
               <tr
                 key={ws.id}
-                tabIndex={0}
-                role="link"
-                onClick={() => open(ws.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") open(ws.id);
-                }}
-                className="cursor-pointer border-b border-hairline last:border-0 hover:bg-surface-subtle/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                className="border-b border-hairline last:border-0 hover:bg-surface-subtle/60"
                 data-testid={`webservice-row-${ws.id}`}
               >
-                <td className="px-3 py-2.5 font-semibold text-ink">{ws.name}</td>
+                <td className="px-3 py-2.5 font-semibold text-ink">
+                  <Link
+                    to="/admin/webservices/$wsId"
+                    params={{ wsId: String(ws.id) }}
+                    search={{ tab: "overview" }}
+                    className="text-ink hover:text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                    data-testid={`webservice-link-${ws.id}`}
+                  >
+                    {ws.name}
+                  </Link>
+                </td>
                 <td className="px-3 py-2.5">
                   <Badge tone={ws.valid ? "success" : "danger"}>
                     {ws.valid ? t("admin.webservices.valid") : t("admin.webservices.invalid")}

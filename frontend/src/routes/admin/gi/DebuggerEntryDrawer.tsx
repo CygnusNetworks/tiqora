@@ -10,12 +10,24 @@ import { JobProgress } from "@/components/jobs/JobProgress";
 import { useJob } from "@/components/jobs/useJob";
 import { copyText } from "@/components/admin/identity/copyText";
 import { apiErrorMessage } from "@/lib/avatarApi";
-import { webservicesApi, type DebugContent, type DebugEntry } from "@/lib/webservicesApi";
+import {
+  webservicesApi,
+  type DebugContent,
+  type DebugEntry,
+  type ResendResult,
+} from "@/lib/webservicesApi";
 import { levelTone } from "./debugLevel";
 import { prettyBody } from "./prettyBody";
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleString();
+}
+
+/** The job result's `next_at` is naive UTC (no offset). */
+function formatNaiveUtc(iso: string): string {
+  const withZone = /[zZ]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`;
+  const d = new Date(withZone);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
 
 function ContentLine({ line }: { line: DebugContent }) {
@@ -86,13 +98,17 @@ function ContentLine({ line }: { line: DebugContent }) {
 function ResendFlow({
   wsId,
   entry,
+  debugThreshold,
   onResent,
+  onStarted,
   confirmOpen,
   setConfirmOpen,
 }: {
   wsId: number;
   entry: DebugEntry;
+  debugThreshold?: string;
   onResent: () => void;
+  onStarted?: () => void;
   confirmOpen: boolean;
   setConfirmOpen: (open: boolean) => void;
 }) {
@@ -104,12 +120,23 @@ function ResendFlow({
     mutationFn: () => webservicesApi.resend(wsId, entry.id),
     onSuccess: (ref) => {
       setJobId(ref.job_id);
+      onStarted?.();
     },
   });
 
+  const succeeded = isTerminal && job?.status === "succeeded";
+  const failed = isTerminal && job != null && job.status !== "succeeded";
+  const result = (succeeded ? job?.result : null) as ResendResult | null | undefined;
+  const rescheduled = result?.status === "rescheduled";
+  // Only the "debug" threshold logs a successful call; error lines are always written.
+  const doneKey =
+    debugThreshold == null || debugThreshold === "debug"
+      ? "admin.webservices.debugger.resendDone"
+      : "admin.webservices.debugger.resendDoneQuiet";
+
   return (
     <div className="space-y-2" data-testid="debug-resend-flow">
-      {jobId == null && (
+      {(jobId == null || failed) && (
         <Button
           variant="primary"
           size="sm"
@@ -140,19 +167,28 @@ function ResendFlow({
       {jobId != null && (
         <div className="space-y-2">
           {job ? <JobProgress job={job} testId="debug-resend-job" /> : <Spinner />}
-          {isTerminal && job?.status === "succeeded" && (
+          {succeeded && (
             <div className="space-y-2" data-testid="debug-resend-done">
-              <p className="text-sm text-green" role="status">
-                {t("admin.webservices.debugger.resendDone")}
-              </p>
+              {rescheduled ? (
+                <p className="text-sm text-amber" role="status" data-testid="debug-resend-rescheduled">
+                  {t("admin.webservices.debugger.resendRescheduled", {
+                    time: result?.next_at ? formatNaiveUtc(result.next_at) : "—",
+                  })}
+                </p>
+              ) : (
+                <p className="text-sm text-green" role="status" data-testid="debug-resend-sent">
+                  {t(doneKey)}
+                </p>
+              )}
               <Button size="sm" variant="secondary" onClick={onResent} data-testid="debug-resend-show-log">
                 {t("admin.webservices.debugger.showLog")}
               </Button>
             </div>
           )}
-          {isTerminal && job?.status !== "succeeded" && (
+          {/* JobProgress already shows job.error; only the fallback is added here. */}
+          {failed && !job?.error && (
             <p className="text-sm text-danger" role="alert" data-testid="debug-resend-job-failed">
-              {job?.error ?? t("admin.webservices.debugger.resendJobFailed")}
+              {t("admin.webservices.debugger.resendJobFailed")}
             </p>
           )}
         </div>
@@ -172,6 +208,8 @@ export function DebuggerEntryDrawer({
   entryId,
   onClose,
   onResent,
+  onResendStarted,
+  debugThreshold,
   startResend = false,
 }: {
   wsId: number;
@@ -180,6 +218,10 @@ export function DebuggerEntryDrawer({
   onClose: () => void;
   /** The resend job finished and the admin wants to see the log again. */
   onResent: () => void;
+  /** A resend job was queued (the list is stale once the drawer closes). */
+  onResendStarted?: () => void;
+  /** The webservice's debug threshold: below "debug" a successful call logs nothing. */
+  debugThreshold?: string;
   /** Open the confirmation straight away (the row's "Erneut senden" button). */
   startResend?: boolean;
 }) {
@@ -194,9 +236,10 @@ export function DebuggerEntryDrawer({
   return (
     <Dialog
       open
-      // Escape inside the confirmation must only dismiss the confirmation.
+      // Escape inside the confirmation must only dismiss the confirmation. The confirmation
+      // only exists for a loaded, resendable entry: otherwise Escape closes the drawer.
       onClose={() => {
-        if (!confirmOpen) onClose();
+        if (!(confirmOpen && data?.entry.can_resend)) onClose();
       }}
       title={t("admin.webservices.debugger.drawerTitle")}
       description={data ? `${data.entry.name ?? "—"} · ${formatTime(data.entry.created)}` : undefined}
@@ -221,7 +264,9 @@ export function DebuggerEntryDrawer({
               <ResendFlow
                 wsId={wsId}
                 entry={data.entry}
+                debugThreshold={debugThreshold}
                 onResent={onResent}
+                onStarted={onResendStarted}
                 confirmOpen={confirmOpen}
                 setConfirmOpen={setConfirmOpen}
               />

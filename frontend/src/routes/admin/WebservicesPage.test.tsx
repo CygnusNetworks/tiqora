@@ -1,17 +1,31 @@
 import type { ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { WebservicesPage } from "./WebservicesPage";
 import { demoWebserviceList } from "@/demo/giMock";
 
-const navigate = vi.fn();
 vi.mock("@tanstack/react-router", () => ({
-  useNavigate: () => navigate,
-  Link: ({ to, children, ...rest }: { to: string; children: ReactNode; [k: string]: unknown }) => (
-    <a href={to} {...rest}>
+  Link: ({
+    to,
+    params,
+    search,
+    children,
+    ...rest
+  }: {
+    to: string;
+    params?: Record<string, string>;
+    search?: Record<string, string>;
+    children: ReactNode;
+    [k: string]: unknown;
+  }) => (
+    <a
+      href={Object.entries(params ?? {}).reduce((h, [k, v]) => h.replace(`$${k}`, v), to)}
+      data-search={search ? JSON.stringify(search) : undefined}
+      {...rest}
+    >
       {children}
     </a>
   ),
@@ -45,7 +59,6 @@ describe("WebservicesPage", () => {
     await i18n.changeLanguage("de");
   });
   beforeEach(() => {
-    navigate.mockReset();
     list.mockReset().mockResolvedValue(demoWebserviceList);
     getDaemons.mockReset().mockResolvedValue(daemon([]));
   });
@@ -67,7 +80,10 @@ describe("WebservicesPage", () => {
     getDaemons.mockResolvedValue(daemon(["admin.daemons.notices.giRequesterOff"]));
     renderPage();
     const banner = await screen.findByTestId("webservices-notice");
-    expect(banner).toHaveTextContent(/Tiqora löst .* nicht aus/);
+    expect(banner).toHaveTextContent(/Tiqora löst deshalb keine Ereignis-Aufrufe/);
+    // the banner names the service; "dieser Dienst" has no referent on this page
+    expect(banner).toHaveTextContent("„Ausgehende Webservice-Aufrufe“ ist ausgeschaltet");
+    expect(banner).not.toHaveTextContent("dieser Dienst");
     expect(screen.getByTestId("webservices-notice-link")).toHaveAttribute("href", "/admin/daemons");
   });
 
@@ -77,13 +93,22 @@ describe("WebservicesPage", () => {
     expect(screen.queryByTestId("webservices-notice")).not.toBeInTheDocument();
   });
 
-  it("opens the detail page on a row click", async () => {
+  it("links the name to the detail page and keeps the table semantics", async () => {
     renderPage();
-    fireEvent.click(await screen.findByTestId("webservice-row-1"));
-    expect(navigate).toHaveBeenCalledWith({
-      to: "/admin/webservices/$wsId",
-      params: { wsId: "1" },
-      search: { tab: "overview" },
-    });
+    const row = await screen.findByTestId("webservice-row-1");
+    expect(row).not.toHaveAttribute("role");
+    expect(row).not.toHaveAttribute("tabindex");
+    const link = screen.getByRole("link", { name: "ExampleCRM" });
+    expect(link).toHaveAttribute("href", "/admin/webservices/1");
+    expect(link).toHaveAttribute("data-search", JSON.stringify({ tab: "overview" }));
+  });
+
+  it("explains the double-send case with the service name", async () => {
+    getDaemons.mockResolvedValue(daemon(["admin.daemons.notices.giRequesterDouble"]));
+    renderPage();
+    const banner = await screen.findByTestId("webservices-notice");
+    expect(banner).toHaveTextContent(
+      "Der Dienst „Ausgehende Webservice-Aufrufe“ ist eingeschaltet, aber der Ereignis-Handler von Znuny ist noch aktiv.",
+    );
   });
 });

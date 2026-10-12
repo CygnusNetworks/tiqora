@@ -84,7 +84,11 @@ function OverviewTab({ ws }: { ws: WebserviceDetail }) {
           </ul>
         )}
         <p className="mt-2 text-xs text-muted">
-          {t("admin.webservices.overview.debugThreshold", { level: ws.debug_threshold })}
+          {t("admin.webservices.overview.debugThreshold", {
+            level: t(`admin.webservices.debugger.levels.${ws.debug_threshold}`, {
+              defaultValue: ws.debug_threshold,
+            }),
+          })}
         </p>
       </Section>
     </div>
@@ -209,6 +213,8 @@ function SettingsTab({ ws }: { ws: WebserviceDetail }) {
       qc.setQueryData<WebserviceDetail>(["admin", "webservices", ws.id], (prev) =>
         prev ? { ...prev, egress } : prev,
       );
+      // The backend derives the Übersicht warnings (e.g. insecure TLS) from egress.
+      void qc.invalidateQueries({ queryKey: ["admin", "webservices", ws.id], exact: true });
       setTargets(null);
       setInsecure(null);
       setSaved(true);
@@ -348,7 +354,7 @@ export function WebserviceDetailPage() {
       />
       {tab === "overview" && <OverviewTab ws={ws} />}
       {tab === "invokers" && <InvokersTab ws={ws} />}
-      {tab === "debugger" && <DebuggerList wsId={wsId} />}
+      {tab === "debugger" && <DebuggerList wsId={wsId} debugThreshold={ws.debug_threshold} />}
       {tab === "settings" && <SettingsTab ws={ws} />}
     </div>
   );
