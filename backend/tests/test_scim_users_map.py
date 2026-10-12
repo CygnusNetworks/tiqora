@@ -67,24 +67,25 @@ def test_mobile_only_from_type_mobile() -> None:
 
 
 @pytest.mark.parametrize(
-    "doc",
+    ("doc", "scim_type"),
     [
-        {},
-        {"userName": ""},
-        {"userName": "   "},
-        {"userName": "a\x00b"},
-        {"userName": "x" * 201},
-        {"userName": "a", "active": "maybe"},
-        {"userName": 5},
-        {"userName": "a", "name": "x"},
-        {"userName": "a", "emails": "x@example.test"},
+        ({}, "invalidValue"),
+        ({"userName": ""}, "invalidValue"),
+        ({"userName": "   "}, "invalidValue"),
+        ({"userName": "a\x00b"}, "invalidValue"),
+        ({"userName": "x" * 201}, "invalidValue"),
+        ({"userName": "a", "active": "maybe"}, "invalidValue"),
+        ({"userName": 5}, "invalidSyntax"),
+        ({"userName": "a", "name": "x"}, "invalidSyntax"),
+        ({"userName": "a", "emails": "x@example.test"}, "invalidSyntax"),
+        ({"userName": "u\u202eevil"}, "invalidValue"),
     ],
 )
-def test_invalid_users(doc: dict[str, Any]) -> None:
+def test_invalid_users(doc: dict[str, Any], scim_type: str) -> None:
     with pytest.raises(ScimError) as exc:
         parse_user(doc)
     assert exc.value.status == 400
-    assert exc.value.scim_type in ("invalidValue", "invalidSyntax")
+    assert exc.value.scim_type == scim_type
 
 
 def test_password_and_readonly_ignored() -> None:
@@ -98,8 +99,8 @@ def test_password_and_readonly_ignored() -> None:
             "schemas": [SCHEMA_USER],
         }
     )
+    assert inp == parse_user({"userName": "u@example.test"})
     assert inp.sent == frozenset({"userName"})
-    assert inp.active is None and inp.email is None
 
 
 def test_names_strip_control_and_bidi() -> None:
@@ -188,3 +189,55 @@ def test_user_resource_optional_parts() -> None:
     )
     assert doc["externalId"] == "ext" and "emails" not in doc and doc["groups"] == []
     assert doc["phoneNumbers"] == [{"value": "+49 1", "type": "mobile"}]
+
+
+def test_names_keep_zwnj_zwj() -> None:
+    inp = parse_user({"userName": "u@example.test", "name": {"givenName": "می\u200cخواهم\u200d"}})
+    assert inp.given_name == "می\u200cخواهم\u200d"
+
+
+def _addr(n: int) -> str:
+    return "a" * (n - len("@example.test")) + "@example.test"
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda v: {"userName": "u", "name": {"givenName": v}},
+        lambda v: {"userName": "u", "name": {"familyName": v}},
+        lambda v: {"userName": "u", "displayName": v},
+    ],
+)
+def test_name_length_boundary(build: Any) -> None:
+    parse_user(build("x" * 100))
+    with pytest.raises(ScimError) as exc:
+        parse_user(build("x" * 101))
+    assert (exc.value.status, exc.value.scim_type) == (400, "invalidValue")
+
+
+def test_display_name_split_parts_fit_columns() -> None:
+    p = to_profile(parse_user({"userName": "u", "displayName": "a" * 49 + " " + "b" * 50}))
+    assert len(p.first_name or "") <= 100 and len(p.last_name or "") <= 100
+
+
+def test_email_length_boundary() -> None:
+    assert parse_user({"userName": "u", "emails": [{"value": _addr(150)}]}).email == _addr(150)
+    with pytest.raises(ScimError) as exc:
+        parse_user({"userName": "u", "emails": [{"value": _addr(151)}]})
+    assert (exc.value.status, exc.value.scim_type) == (400, "invalidValue")
+
+
+def test_mobile_length_boundary() -> None:
+    def doc(n: int) -> dict[str, Any]:
+        return {"userName": "u", "phoneNumbers": [{"type": "mobile", "value": "1" * n}]}
+
+    assert parse_user(doc(150)).mobile == "1" * 150
+    with pytest.raises(ScimError) as exc:
+        parse_user(doc(151))
+    assert exc.value.scim_type == "invalidValue"
+
+
+def test_user_name_fold_cannot_exceed_column() -> None:
+    parse_user({"userName": "a" * 200})
+    with pytest.raises(ScimError):
+        parse_user({"userName": "\ufb03" * 100})  # casefolds to 3 chars each -> 300

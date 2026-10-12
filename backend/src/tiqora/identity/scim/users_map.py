@@ -15,8 +15,15 @@ from tiqora.identity.scim.protocol import SCHEMA_ENTERPRISE, SCHEMA_USER, meta
 
 MAX_USER_NAME: Final = 200
 MAX_EXTERNAL_ID: Final = 255
-MAX_NAME: Final = 255
-MAX_EMAIL: Final = 254
+# Caps match the narrowest Znuny columns (users/customer_user first_name/last_name String(100),
+# customer_user.email String(150), customer_user.mobile String(150)); they are the only guard
+# against a DataError at insert time.
+MAX_NAME: Final = 100
+MAX_EMAIL: Final = 150
+MAX_MOBILE: Final = 150
+MAX_USER_NAME_FOLD: Final = 255
+# Bidi controls (Cf) that are stripped/rejected; ZWNJ/ZWJ stay (legitimate in Persian/Indic names).
+_BIDI: Final = frozenset("\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069")
 # Top-level keys that never count as "sent": read-only, ignored, or protocol framing.
 _NOT_SENT: Final = frozenset({"schemas", "id", "meta", "groups", "password"})
 _ENTERPRISE_KEY: Final = SCHEMA_ENTERPRISE.casefold()
@@ -44,12 +51,14 @@ def _syntax(detail: str) -> ScimError:
 
 
 def _has_control(value: str) -> bool:
-    return any(unicodedata.category(ch) == "Cc" for ch in value)
+    return any(unicodedata.category(ch) == "Cc" or ch in _BIDI for ch in value)
 
 
 def _clean_text(value: str) -> str:
-    """Drop control (Cc) and format/bidi (Cf) characters, then trim."""
-    return "".join(ch for ch in value if unicodedata.category(ch) not in ("Cc", "Cf")).strip()
+    """Drop control (Cc) and bidi characters, then trim."""
+    return "".join(
+        ch for ch in value if unicodedata.category(ch) != "Cc" and ch not in _BIDI
+    ).strip()
 
 
 def _bool(value: Any, what: str) -> bool:
@@ -125,7 +134,9 @@ def _checked_email(value: str) -> str:
 def _pick_mobile(doc: Mapping[str, Any]) -> str | None:
     for entry in _entries(doc, "phoneNumbers"):
         if _type_of(entry) == "mobile" and (value := _entry_value(entry)):
-            return value[:64]
+            if len(value) > MAX_MOBILE:
+                raise _invalid("phoneNumbers.value is too long")
+            return value
     return None
 
 
@@ -142,6 +153,8 @@ def parse_user(doc: Mapping[str, Any]) -> ScimUserInput:
         raise _invalid("userName is too long")
     if _has_control(user_name):
         raise _invalid("userName contains control characters")
+    if len(user_name.casefold()) > MAX_USER_NAME_FOLD:
+        raise _invalid("userName is too long")
 
     active = _bool(doc["active"], "active") if doc.get("active") is not None else None
 
@@ -197,6 +210,8 @@ def user_resource(
     version: int,
 ) -> dict[str, Any]:
     formatted = f"{first_name} {last_name}".strip()
+    # S6 has no ``base`` argument: the Groups base is derived from the Users location.
+    assert "/Users/" in location, location
     base = location.rsplit("/Users/", 1)[0]
     doc: dict[str, Any] = {"schemas": [SCHEMA_USER], "id": scim_id}
     if external_id:
