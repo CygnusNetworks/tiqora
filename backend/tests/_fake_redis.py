@@ -22,6 +22,7 @@ class FakeRedis:
         self._data: dict[str, str] = {}
         self._expires: dict[str, float] = {}
         self._pubsubs: list[FakePubSub] = []
+        self._lists: dict[str, list[str]] = {}
 
     # -- helpers ---------------------------------------------------------------------------
     def _check(self) -> None:
@@ -81,6 +82,26 @@ class FakeRedis:
             self._purge(key)
             n += key in self._data
         return n
+
+    async def rpush(self, key: str, *values: Any) -> int:
+        self._check()
+        items = self._lists.setdefault(key, [])
+        items.extend(str(v) for v in values)
+        return len(items)
+
+    async def lpop(self, key: str) -> str | None:
+        self._check()
+        items = self._lists.get(key)
+        return items.pop(0) if items else None
+
+    async def llen(self, key: str) -> int:
+        self._check()
+        return len(self._lists.get(key, []))
+
+    async def lrange(self, key: str, start: int, stop: int) -> list[str]:
+        self._check()
+        items = self._lists.get(key, [])
+        return items[start:] if stop == -1 else items[start : stop + 1]
 
     async def incr(self, key: str) -> int:
         self._check()

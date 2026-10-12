@@ -194,3 +194,67 @@ async def test_queue_serves_tiqora_only_channel_true_and_false(mariadb_znuny_url
             await session.commit()
     finally:
         await engine.dispose()
+
+
+async def test_webchat_is_tiqora_only_channel_in_parallel_mode(mariadb_znuny_url: str) -> None:
+    """The chat's AI first line may answer in ``parallel`` operation; the kill-switch still wins."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            assert await is_tiqora_primary(session) is False
+            await require_feature_allowed(session, FEATURE_AUTO_REPLY, source_channel="webchat")
+            await set_auto_reply_paused(session, True)
+            with pytest.raises(AiAutoReplyPausedError):
+                await require_feature_allowed(session, FEATURE_AUTO_REPLY, source_channel="webchat")
+            await set_auto_reply_paused(session, False)
+            # e-mail of the same install is still gated
+            with pytest.raises(AiGateError):
+                await require_feature_allowed(session, FEATURE_AUTO_REPLY, source_channel="email")
+    finally:
+        await engine.dispose()
+
+
+async def test_queue_of_first_line_topic_serves_tiqora_only_channel(
+    mariadb_znuny_url: str,
+) -> None:
+    from tests._webchat_fixtures import insert_config
+    from tiqora.webchat.models import ChatTopic
+
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    topics = [
+        ChatTopic(key="ai", label="KI", queue_id=2, ai_mode="first_line"),
+        ChatTopic(key="human", label="Mensch", queue_id=3),
+    ]
+    sync = create_engine(mariadb_znuny_url)
+    with sync.begin() as conn:
+        conn.execute(text("DELETE FROM tiqora_chat_config WHERE id = 54539"))
+        insert_config(
+            conn,
+            config_id=54539,
+            queue_id=2,
+            public_key="wc_" + "g" * 32,
+            origins=[],
+            topics=topics,
+        )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            assert await queue_serves_tiqora_only_channel(session, 2) is True
+            # a human-only topic does not count, nor an unknown queue
+            assert await queue_serves_tiqora_only_channel(session, 3) is False
+            assert await queue_serves_tiqora_only_channel(session, 999_999) is False
+        with sync.begin() as conn:
+            conn.execute(
+                text("UPDATE tiqora_chat_config SET valid = :v WHERE id = 54539"), {"v": False}
+            )
+        async with factory() as session:
+            # an invalid config does not open the queue
+            assert await queue_serves_tiqora_only_channel(session, 2) is False
+    finally:
+        await engine.dispose()
+        with sync.begin() as conn:
+            conn.execute(text("DELETE FROM tiqora_chat_config WHERE id = 54539"))
+        sync.dispose()

@@ -14,7 +14,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from tiqora.domain.schemas import UtcDateTime
-from tiqora.webchat.models import ChatConfigValues, ChatTheme, PrechatOption
+from tiqora.webchat.models import DEFAULT_BOT_NAME, ChatConfigValues, ChatTheme, PrechatOption
 from tiqora.webchat.text import MAX_EMAIL_LENGTH, MAX_PAGE_URL_LENGTH
 from tiqora.webchat.tokens import VISITOR_ID_RE
 
@@ -86,6 +86,8 @@ class ChatPublicTopicOut(BaseModel):
     key: str
     label: str
     online: bool
+    # The AI answers first on this topic right now (topic ``first_line`` and the bot is able to).
+    ai_first: bool = False
 
 
 class ChatPublicFieldOut(BaseModel):
@@ -110,11 +112,12 @@ class ChatPublicConfigOut(BaseModel):
     theme: ChatTheme
     topics: list[ChatPublicTopicOut]
     online: bool
-    offline_mode: Literal["form", "hide"]
+    offline_mode: Literal["form", "ai", "hide"]
     prechat_fields: list[ChatPublicFieldOut]
     upload: ChatPublicUploadOut
     max_message_length: int
     portal_identity: bool = False
+    bot_name: str = DEFAULT_BOT_NAME
 
 
 class ChatAttachmentOut(BaseModel):

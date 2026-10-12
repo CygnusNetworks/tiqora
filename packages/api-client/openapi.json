@@ -8848,6 +8848,11 @@
       "ChatPublicConfigOut": {
         "description": "What the widget needs to render; no admin name, ids or queue data.",
         "properties": {
+          "bot_name": {
+            "default": "KI-Assistent",
+            "title": "Bot Name",
+            "type": "string"
+          },
           "greeting": {
             "anyOf": [
               {
@@ -8866,6 +8871,7 @@
           "offline_mode": {
             "enum": [
               "form",
+              "ai",
               "hide"
             ],
             "title": "Offline Mode",
@@ -8971,6 +8977,11 @@
       },
       "ChatPublicTopicOut": {
         "properties": {
+          "ai_first": {
+            "default": false,
+            "title": "Ai First",
+            "type": "boolean"
+          },
           "key": {
             "title": "Key",
             "type": "string"

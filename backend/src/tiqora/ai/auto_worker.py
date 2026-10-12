@@ -37,14 +37,19 @@ uses, so the two paths never cross-charge each other).
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
-from sqlalchemy import func, select, text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.ai import summary as summary_service
+from tiqora.ai.auto_run import (
+    auto_replies_last_hour,
+    global_replies_per_hour_cap,
+    tokens_used_today,
+)
 from tiqora.ai.context import (
     TicketNotFoundError,
     article_from_address,
@@ -61,7 +66,6 @@ from tiqora.ai.gate import (
 )
 from tiqora.ai.handoff import consume_ai_grant, mark_ai_escalated
 from tiqora.ai.kb_wiring import kb_bundle, kb_get_article_fn, kb_search_fn
-from tiqora.ai.limits import queue_tokens_used_today
 from tiqora.ai.listfields import parse_str_list
 from tiqora.ai.llm_routing import (
     TASK_AGENT,
@@ -71,12 +75,10 @@ from tiqora.ai.llm_routing import (
     no_profile_error,
 )
 from tiqora.ai.models import (
-    FEATURE_AUTO_REPLY,
     TRIAGE_STATUS_OPEN,
     TiqoraAiQueuePolicy,
     TiqoraAiTicketState,
     TiqoraAiTriage,
-    TiqoraAiUsage,
 )
 from tiqora.ai.outbox import (
     OUTBOX_BATCH_SIZE,
@@ -98,7 +100,6 @@ from tiqora.ai.senders import matches_ignored
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.settings_store import (
-    KEY_AI_GLOBAL_REPLIES_PER_HOUR,
     KEY_AI_OUTBOX_WATERMARK,
     KEY_AI_TRIAGE_WATERMARK,
     get_setting,
@@ -127,40 +128,11 @@ _CUSTOMER_ARTICLE_EVENTS = frozenset({"ArticleCreate", AI_REPLY_REQUEST_EVENT})
 _TICKET_CAP_REASONS = frozenset({"max_clarifications", "max_auto_replies", "grant_used"})
 
 
-async def _global_replies_per_hour_cap(session: AsyncSession) -> int | None:
-    raw = await get_setting(session, KEY_AI_GLOBAL_REPLIES_PER_HOUR)
-    if raw is None or raw.strip() == "":
-        return None
-    try:
-        value = int(raw.strip())
-    except ValueError:
-        return None
-    return value if value > 0 else None
-
-
-async def _auto_replies_last_hour(session: AsyncSession, *, queue_id: int | None) -> int:
-    since = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=1)
-    filters = [
-        TiqoraAiUsage.feature == FEATURE_AUTO_REPLY,
-        TiqoraAiUsage.success.is_(True),
-        TiqoraAiUsage.ts >= since,
-    ]
-    if queue_id is not None:
-        filters.append(TiqoraAiUsage.queue_id == queue_id)
-    return int(
-        (
-            await session.execute(select(func.count()).select_from(TiqoraAiUsage).where(*filters))
-        ).scalar_one()
-    )
-
-
-async def _tokens_used_today(session: AsyncSession, queue_id: int) -> int:
-    """Tokens this queue has spent today against ``budget_tokens_day`` —
-    auto-reply and triage (see :func:`tiqora.ai.limits.queue_tokens_used_today`).
-    ``_auto_replies_last_hour`` deliberately stays auto-reply-only — that one
-    rate-limits *messages to customers*, which triage never sends.
-    """
-    return await queue_tokens_used_today(session, queue_id)
+# The queue counters moved to tiqora.ai.auto_run (the web-chat bot shares them); the private
+# names stay for this module's call sites and for tests that monkeypatch them.
+_global_replies_per_hour_cap = global_replies_per_hour_cap
+_auto_replies_last_hour = auto_replies_last_hour
+_tokens_used_today = tokens_used_today
 
 
 async def _record_skip(

@@ -95,9 +95,10 @@ def insert_config(
     origins: list[str],
     values_override: dict[str, Any] | None = None,
     valid: bool = True,
+    topics: list[ChatTopic] | None = None,
 ) -> None:
     values = ChatConfigValues(
-        topics=[ChatTopic(key="support", label="Support", queue_id=queue_id)],
+        topics=topics or [ChatTopic(key="support", label="Support", queue_id=queue_id)],
         allowed_origins=origins,
         **(values_override or {}),
     )

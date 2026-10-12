@@ -24,7 +24,7 @@ from tests._webchat_fixtures import (
     mark_cleanup_first,
     seed_queue_agent,
 )
-from tiqora.config import Settings
+from tiqora.config import Settings, get_settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.events.pubsub import TIQORA_EVENTS_CHANNEL
@@ -146,6 +146,7 @@ async def _start(
             ),
             ctx=CTX,
             now=NOW,
+            settings=get_settings(),
         )
         await db.commit()
         return chat.id

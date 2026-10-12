@@ -48,13 +48,14 @@ from tiqora.api.deps import AppSettings, DbSession, RedisDep
 from tiqora.api.uploads import MAX_ATTACHMENT_BYTES, read_upload_within_limit
 from tiqora.config import Settings
 from tiqora.db.engine import get_session_factory
-from tiqora.db.tiqora.models import TiqoraChatMessage, TiqoraChatSession
+from tiqora.db.tiqora.models import TiqoraChatConfig, TiqoraChatMessage, TiqoraChatSession
 from tiqora.domain.customer_auth import CustomerAuthService, CustomerSessionStore
 from tiqora.domain.portal_gate import portal_enabled
 from tiqora.jobs.service import utc_now
 from tiqora.security.ratelimit import client_ip
 from tiqora.storage.backend import DbMimeStorage
 from tiqora.webchat.availability import VISITOR_TYPING_PREFIX, config_availability
+from tiqora.webchat.bot import bot_availability
 from tiqora.webchat.config_cache import CachedConfig, public_config_cache
 from tiqora.webchat.hub import ChatHub, StreamLimitReached, get_chat_hub
 from tiqora.webchat.identity import IdentityError
@@ -487,11 +488,45 @@ async def session_out(
     )
 
 
+async def _ai_first_topics(
+    db: AsyncSession,
+    redis_client: Any,
+    settings: Settings,
+    config: TiqoraChatConfig,
+    values: ChatConfigValues,
+) -> set[str]:
+    """Keys of the ``first_line`` topics whose bot can answer right now (cached 10 s)."""
+    keys: set[str] = set()
+    for topic in values.topics:
+        if topic.ai_mode != "first_line":
+            continue
+        bot = await bot_availability(
+            db,
+            redis_client,
+            settings,
+            config_id=int(config.id),
+            topic=topic,
+            queue_id=topic.queue_id,
+        )
+        if bot.ok:
+            keys.add(topic.key)
+    return keys
+
+
 def _public_config(
-    values: ChatConfigValues, availability: dict[str, bool], *, portal_identity: bool = False
+    values: ChatConfigValues,
+    availability: dict[str, bool],
+    *,
+    portal_identity: bool = False,
+    ai_first: set[str] | frozenset[str] = frozenset(),
 ) -> ChatPublicConfigOut:
     topics = [
-        ChatPublicTopicOut(key=t.key, label=t.label, online=bool(availability.get(t.key)))
+        ChatPublicTopicOut(
+            key=t.key,
+            label=t.label,
+            online=bool(availability.get(t.key)),
+            ai_first=t.key in ai_first,
+        )
         for t in values.topics
     ]
     policy = values.upload_policy
@@ -501,8 +536,7 @@ def _public_config(
         theme=values.theme,
         topics=topics,
         online=any(t.online for t in topics),
-        # "ai" is exposed per topic by Task 5; until then the widget sees the form fallback
-        offline_mode="form" if values.offline_mode == "ai" else values.offline_mode,
+        offline_mode=values.offline_mode,
         prechat_fields=[
             ChatPublicFieldOut(
                 key=f.key, kind=f.kind, label=f.label, required=f.required, options=f.options
@@ -514,6 +548,7 @@ def _public_config(
         ),
         max_message_length=MAX_MESSAGE_LENGTH,
         portal_identity=portal_identity,
+        bot_name=values.bot_name,
     )
 
 
@@ -651,12 +686,19 @@ async def get_public_config(
                 raise ChatError("origin", 403)
         values = cached.values
         availability = await config_availability(
-            db, redis_client, SysConfig(db), config=cached.config, values=values, now=utc_now()
+            db,
+            redis_client,
+            SysConfig(db),
+            config=cached.config,
+            values=values,
+            now=utc_now(),
+            settings=settings,
         )
+        ai_first = await _ai_first_topics(db, redis_client, settings, cached.config, values)
         await db.rollback()
     except (ChatError, RateLimited, ChatBackendUnavailable) as exc:
         return await _refused(db, exc)
-    return _public_config(values, availability, portal_identity=portal_identity)
+    return _public_config(values, availability, portal_identity=portal_identity, ai_first=ai_first)
 
 
 @router.post("/sessions", status_code=201, response_model=ChatSessionCreatedOut, responses=_ERRORS)
@@ -714,6 +756,7 @@ async def create_chat_session(
             now=utc_now(),
             identity=resolved,
             own_origin=own,
+            settings=settings,
         )
         out = ChatSessionCreatedOut(
             session_id=chat.id, token=token, status=chat.status, message=message_out(first)

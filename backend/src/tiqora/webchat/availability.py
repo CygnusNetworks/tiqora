@@ -25,8 +25,10 @@ from sqlalchemy import func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.config import Settings
 from tiqora.db.tiqora.models import TiqoraChatAgentState, TiqoraChatConfig, TiqoraChatSession
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.webchat.bot import bot_availability
 from tiqora.webchat.models import ChatConfigValues, ChatTopic
 from tiqora.znuny.escalation import calendar_config, working_seconds_between
 from tiqora.znuny.sysconfig import SysConfig
@@ -287,8 +289,12 @@ async def config_availability(
     config: TiqoraChatConfig,
     values: ChatConfigValues,
     now: datetime,
+    settings: Settings,
 ) -> dict[str, bool]:
     """``{topic.key: online}``; all False outside business hours.
+
+    With ``offline_mode == "ai"`` a ``first_line`` topic whose bot is available stays online
+    without a human, also outside business hours (every other topic behaves like ``form``).
 
     Cached as JSON in Redis for ``AVAILABILITY_CACHE_SECONDS``; any Redis error computes
     uncached.
@@ -303,15 +309,18 @@ async def config_availability(
     except Exception:  # noqa: BLE001 — cache trouble must not hide the chat
         logger.warning("chat_availability_cache_read_failed", config_id=config.id)
 
-    if await within_business_hours(sysconfig, values.business_calendar, now):
-        result = {
-            topic.key: bool(
-                await eligible_agent_ids(db, client, config_id=int(config.id), topic=topic)
+    open_now = await within_business_hours(sysconfig, values.business_calendar, now)
+    result: dict[str, bool] = {}
+    for topic in values.topics:
+        humans = open_now and bool(
+            await eligible_agent_ids(db, client, config_id=int(config.id), topic=topic)
+        )
+        if not humans and values.offline_mode == "ai" and topic.ai_mode == "first_line":
+            bot = await bot_availability(
+                db, client, settings, config_id=int(config.id), topic=topic, queue_id=topic.queue_id
             )
-            for topic in values.topics
-        }
-    else:
-        result = {topic.key: False for topic in values.topics}
+            humans = bot.ok
+        result[topic.key] = humans
 
     try:
         await client.set(key, json.dumps(result), ex=AVAILABILITY_CACHE_SECONDS)

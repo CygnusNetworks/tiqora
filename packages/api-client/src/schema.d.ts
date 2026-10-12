@@ -13271,6 +13271,11 @@ export interface components {
          * @description What the widget needs to render; no admin name, ids or queue data.
          */
         ChatPublicConfigOut: {
+            /**
+             * Bot Name
+             * @default KI-Assistent
+             */
+            bot_name: string;
             /** Greeting */
             greeting: string | null;
             /** Max Message Length */
@@ -13279,7 +13284,7 @@ export interface components {
              * Offline Mode
              * @enum {string}
              */
-            offline_mode: "form" | "hide";
+            offline_mode: "form" | "ai" | "hide";
             /** Online */
             online: boolean;
             /**
@@ -13314,6 +13319,11 @@ export interface components {
         };
         /** ChatPublicTopicOut */
         ChatPublicTopicOut: {
+            /**
+             * Ai First
+             * @default false
+             */
+            ai_first: boolean;
             /** Key */
             key: string;
             /** Label */

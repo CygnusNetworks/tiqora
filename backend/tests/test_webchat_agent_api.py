@@ -31,7 +31,7 @@ from tests._webchat_fixtures import (
 )
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_redis
-from tiqora.config import Settings
+from tiqora.config import Settings, get_settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraChatSession
 from tiqora.domain.auth import AuthenticatedUser
@@ -214,6 +214,7 @@ async def _start(env: Env, n: int, message: str = "Mein Router blinkt rot") -> T
             ),
             ctx=CTX,
             now=NOW,
+            settings=get_settings(),
         )
         await db.commit()
         return chat

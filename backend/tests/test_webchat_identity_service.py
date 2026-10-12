@@ -24,7 +24,7 @@ from tests._webchat_fixtures import (
     mark_cleanup_first,
     seed_queue_agent,
 )
-from tiqora.config import Settings
+from tiqora.config import Settings, get_settings
 from tiqora.crypto.secret import encrypt_secret
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraChatConfig, TiqoraChatSession
@@ -264,6 +264,7 @@ async def _start(
             ctx=CTX,
             now=NOW,
             identity=identity,
+            settings=get_settings(),
         )
         await db.commit()
         return chat

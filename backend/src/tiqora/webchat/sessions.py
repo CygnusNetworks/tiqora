@@ -44,6 +44,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm.attributes import set_committed_value
 
+from tiqora.config import Settings
 from tiqora.db.tiqora.models import (
     TiqoraChatConfig,
     TiqoraChatMessage,
@@ -64,8 +65,9 @@ from tiqora.domain.ticket_write_service import (
 )
 from tiqora.jobs.service import utc_now
 from tiqora.webchat.availability import eligible_agent_ids, topic_ref, within_business_hours
+from tiqora.webchat.bot import bot_availability
 from tiqora.webchat.models import ChatConfigValues, ChatTopic, PrechatField
-from tiqora.webchat.notify import queue_agent_event, queue_wakeup
+from tiqora.webchat.notify import queue_agent_event, queue_bot_turn, queue_wakeup
 from tiqora.webchat.origins import effective_allowed_origins, origin_allowed
 from tiqora.webchat.prechat import (
     CHECKBOX_NO,
@@ -488,6 +490,7 @@ async def _open_ticket_and_session(
     offline: bool,
     now: datetime,
     identity: ResolvedIdentity | None = None,
+    bot: bool = False,
 ) -> tuple[TiqoraChatSession, str, int]:
     """Ticket (+ dynamic fields), first customer article, session row; ``(row, token, article)``.
 
@@ -546,7 +549,7 @@ async def _open_ticket_and_session(
         topic_key=topic.key,
         queue_id=topic.queue_id,
         ticket_id=ticket_id,
-        status="ended" if offline else "waiting",
+        status="ended" if offline else ("bot" if bot else "waiting"),
         end_reason="offline_form" if offline else None,
         token_hash=token_hash,
         visitor_id=visitor_id,
@@ -555,7 +558,7 @@ async def _open_ticket_and_session(
         identity_source=identity.source if identity is not None else None,
         customer_user_login=customer_user,
         last_seq=0,
-        waiting_since=None if offline else now,
+        waiting_since=None if offline or bot else now,
         ended_at=now if offline else None,
         visitor_last_seen=now,
         page_url=clean_page_url(ctx.page_url if ctx.page_url is not None else page_url),
@@ -580,6 +583,7 @@ async def create_session(
     payload: ChatSessionCreateIn,
     ctx: VisitorContext,
     now: datetime,
+    settings: Settings,
     identity: ResolvedIdentity | None = None,
     own_origin: str | None = None,
 ) -> tuple[TiqoraChatSession, str, TiqoraChatMessage]:
@@ -588,8 +592,14 @@ async def create_session(
     Returns ``(session, token, first_message)``; the token is shown to the visitor once,
     only its SHA-256 is stored. Refusals (all before any write): ``origin`` (page origin not
     allowed), ``invalid_topic``, ``message_rejected``, ``invalid_prechat``, ``offline``
-    (outside business hours or no eligible agent — checked live, not from the 10 s cache).
-    *factory* is needed for the ticket-number counter. Queues ``chat_waiting`` + a wake.
+    (neither a human nor the bot can take the chat — humans are checked live, not from the
+    10 s cache). *factory* is needed for the ticket-number counter, *settings* for the bot
+    check.
+
+    Routing (C5): a ``first_line`` topic whose bot is available, with a human available or
+    ``offline_mode == "ai"``, starts in ``bot`` (``bot_intro`` line, a ``chat_message`` event
+    — no ring — and a queued bot turn). Otherwise a human available starts ``waiting``
+    (queues ``chat_waiting`` + a wake), else ``offline``.
     """
     check_origin(payload.origin, values, own_origin)
     _check_visitor_id(payload.visitor_id)
@@ -602,9 +612,21 @@ async def create_session(
         identity_fields=identity is not None,
     )
     client_id = _clean_client_id(payload.client_id)
-    if not await within_business_hours(sysconfig, values.business_calendar, now):
-        raise ChatError("offline", 409)
-    if not await eligible_agent_ids(db, redis_client, config_id=int(config.id), topic=topic):
+    humans = await within_business_hours(sysconfig, values.business_calendar, now) and bool(
+        await eligible_agent_ids(db, redis_client, config_id=int(config.id), topic=topic)
+    )
+    use_bot = False
+    if topic.ai_mode == "first_line" and (humans or values.offline_mode == "ai"):
+        bot = await bot_availability(
+            db,
+            redis_client,
+            settings,
+            config_id=int(config.id),
+            topic=topic,
+            queue_id=topic.queue_id,
+        )
+        use_bot = bot.ok
+    if not (humans or use_bot):
         raise ChatError("offline", 409)
 
     chat, token, article_id = await _open_ticket_and_session(
@@ -624,6 +646,7 @@ async def create_session(
         offline=False,
         now=now,
         identity=identity,
+        bot=use_bot,
     )
     first = await insert_message(
         db,
@@ -634,10 +657,24 @@ async def create_session(
         client_id=client_id,
         now=now,
     )
-    queue_wakeup(db, chat.id)
-    event = _agent_event(chat, "chat_waiting", topic.queue_id)
-    event["topic_ref"] = topic_ref(int(config.id), topic.key)
-    queue_agent_event(db, event)
+    # This line bypasses ``_store_visitor_line``, so the pending marker is set here.
+    chat.last_visitor_seq = first.seq
+    if use_bot:
+        # The notice (the policy's AI disclosure text) joins the line with the bot delivery.
+        await add_system_message(
+            db,
+            chat=chat,
+            code="bot_intro",
+            params={"name": values.bot_name, "notice": None},
+            now=now,
+        )
+        queue_agent_event(db, _agent_event(chat, "chat_message", topic.queue_id))
+        queue_bot_turn(db, chat.id)
+    else:
+        queue_wakeup(db, chat.id)
+        event = _agent_event(chat, "chat_waiting", topic.queue_id)
+        event["topic_ref"] = topic_ref(int(config.id), topic.key)
+        queue_agent_event(db, event)
     return chat, token, first
 
 
