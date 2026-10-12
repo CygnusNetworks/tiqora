@@ -35,6 +35,7 @@ from tiqora.gi.error_handling import PastExecutionData, RetryDecision
 from tiqora.gi.jobs import (
     GI_INVOKE_KIND,
     GI_INVOKE_SYNC_KIND,
+    INTERRUPTED_AFTER_RESCHEDULE_MESSAGE,
     INTERRUPTED_AFTER_SEND_MESSAGE,
     WEBSERVICE_GONE_MESSAGE,
     GiInvokePayload,
@@ -439,12 +440,87 @@ async def test_future_task_time_diff_fallback(
     await env.run(job_id)
     first, second = env.jobs()
     assert first["result"]["status"] == "rescheduled"
-    # final review m2: the original is marked before its follow-up is committed, so a crash
-    # in between cannot requeue it into a second retry chain
+    # final review m2 / ruling GI-RESCHEDULED-CHECKPOINT: the original is marked in the same
+    # transaction that commits its follow-up, so a crash can neither requeue it into a second
+    # retry chain nor leave it marked without a retry
     assert first["checkpoint"] == "rescheduled"
     assert 295 <= (second["due_at"] - before).total_seconds() <= 305
     assert second["payload"]["past_execution"]["RetryCount"] == 1
     assert second["due_at"] - before < timedelta(seconds=310)
+
+
+async def test_interrupted_after_reschedule_says_a_retry_is_queued(env: Env, mock: Mock) -> None:
+    """Ruling GI-RESCHEDULED-CHECKPOINT: a job interrupted after its ``rescheduled`` mark is not
+    requeued (its follow-up exists) and says so, instead of the runner's generic text."""
+    _install(env.sync_url)
+    job_id = await env.enqueue(_payload())
+    attempt = await env.runner._claim(job_id)
+    async with env.factory() as session:
+        await session.execute(
+            text("UPDATE tiqora_job SET checkpoint = 'rescheduled' WHERE id = :i"), {"i": job_id}
+        )
+        await session.commit()
+        payload = (
+            await session.execute(
+                text("SELECT payload FROM tiqora_job WHERE id = :i"), {"i": job_id}
+            )
+        ).scalar_one()
+    row = (job_id, GI_INVOKE_KIND, payload, 7, attempt, "rescheduled")
+    assert await env.runner._settle_interrupted(row)
+    (job,) = env.jobs()
+    assert job["status"] == "failed" and job["error"] == INTERRUPTED_AFTER_RESCHEDULE_MESSAGE
+    assert mock.seen == [] and await env.runner._claim(job_id) == 0
+
+
+async def test_reschedule_mark_and_follow_up_commit_together(
+    env: Env, mock: Mock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ruling GI-RESCHEDULED-CHECKPOINT: when the follow-up job cannot be committed, the
+    original must not carry the ``rescheduled`` mark either - otherwise it is neither requeued
+    nor retried and the call is lost without a word."""
+    _install(env.sync_url)
+    past = PastExecutionData(_naive_now(), 1, None, None)
+
+    async def fake_requester(**kwargs: Any) -> RequesterOutcome:
+        return RequesterOutcome(False, "down", None, RetryDecision(True, None, past, {}), "c" * 32)
+
+    real_enqueue = gi_jobs.enqueue_invocation
+
+    async def failing_enqueue(session: Any, *, payload: GiInvokePayload, **kwargs: Any) -> Any:
+        if payload.past_execution is not None:
+            raise RuntimeError("database gone")
+        return await real_enqueue(session, payload=payload, **kwargs)
+
+    monkeypatch.setattr(gi_jobs, "run_requester", fake_requester)
+    monkeypatch.setattr(gi_jobs, "enqueue_invocation", failing_enqueue)
+    job_id = await env.enqueue(_payload())
+    await env.run(job_id)
+    (job,) = env.jobs()  # no follow-up job was committed
+    assert job["checkpoint"] is None  # so an interrupted run would still be requeued
+
+
+async def test_reschedule_after_lost_claim_commits_no_follow_up(
+    env: Env, mock: Mock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The job was reaped or requeued while it ran: the mark cannot be set, and the follow-up
+    rolls back with it (the requeued job decides again)."""
+    _install(env.sync_url)
+    past = PastExecutionData(_naive_now(), 1, None, None)
+
+    async def fake_requester(**kwargs: Any) -> RequesterOutcome:
+        engine = create_engine(env.sync_url)
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE tiqora_job SET status = 'queued' WHERE kind LIKE 'core.gi_invoke%'")
+            )
+        engine.dispose()
+        return RequesterOutcome(False, "down", None, RetryDecision(True, None, past, {}), "c" * 32)
+
+    monkeypatch.setattr(gi_jobs, "run_requester", fake_requester)
+    job_id = await env.enqueue(_payload())
+    await env.run(job_id)
+    (job,) = env.jobs()
+    assert job["status"] == "queued" and job["checkpoint"] is None
 
 
 async def test_dry_run_is_never_rescheduled(

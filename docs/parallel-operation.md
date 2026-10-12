@@ -794,8 +794,11 @@ webservice has an event invoker.
 
 Tiqora verhält sich so: switching the service on starts at the **current** end of
 `ticket_history`. History written while it was off is never replayed, including after a worker
-outage of more than a few minutes (the follower detects the gap and moves to the end instead of
-replaying).
+outage: when the follower has not run for 180 seconds (60 s plus three tick intervals if that is
+longer), it moves to the end instead of replaying, and the calls for changes made in between are
+not sent. The worker logs this as the warning `gi_requester_cursor_reset` with the number of
+skipped history rows; repeat important calls by hand ("Erneut senden" or "Probelauf" show what
+would be sent). Plan deploys so the worker is not down longer than that while the takeover is on.
 
 The Dienste page warns in the other direction too: flag on while Znuny's handler is still valid
 ("every call is sent twice"). The latest system-wide SysConfig row decides, including

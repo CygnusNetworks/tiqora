@@ -16,7 +16,9 @@ runner's own retry (``max_attempts``) is only for interruptions before the send 
 Interruption: the checkpoint ``sending`` is set right before the request leaves
 (``before_send``). A job interrupted before it is requeued; one interrupted after it is failed
 with :data:`INTERRUPTED_AFTER_SEND_MESSAGE` and never sent again automatically (the remote
-system may or may not have seen the request).
+system may or may not have seen the request). A call that failed before sending and is retried
+gets the checkpoint ``rescheduled`` in the transaction that commits its follow-up job; an
+interruption after that fails it with :data:`INTERRUPTED_AFTER_RESCHEDULE_MESSAGE`.
 """
 
 from __future__ import annotations
@@ -52,6 +54,10 @@ CHECKPOINT_RESCHEDULED: Final = "rescheduled"  # failed before sending, follow-u
 WEBSERVICE_GONE_MESSAGE: Final = "Der Webservice ist nicht mehr gültig."
 INTERRUPTED_AFTER_SEND_MESSAGE: Final = (
     "Der Aufruf wurde unterbrochen; ob er angekommen ist, ist unklar."
+)
+INTERRUPTED_AFTER_RESCHEDULE_MESSAGE: Final = (
+    "Der Aufruf ist fehlgeschlagen und wurde danach unterbrochen; ein neuer Versuch ist bereits"
+    " eingeplant."
 )
 FUTURE_TASK_TIME_DIFF_SETTING: Final = (
     "Daemon::SchedulerGenericInterfaceTaskManager::FutureTaskTimeDiff"
@@ -190,10 +196,6 @@ async def run_gi_invoke(ctx: JobContext, payload: GiInvokePayload) -> dict[str, 
         and decision.reschedule
         and decision.past is not None
     ):
-        if not sent:
-            # Without a checkpoint an interrupted job is requeued: if that happened after the
-            # follow-up below is committed, two retry chains would run (and send twice).
-            await ctx.checkpoint(CHECKPOINT_RESCHEDULED)
         async with ctx.session_factory() as session:
             next_at = decision.execution_time
             if next_at is None:
@@ -206,6 +208,12 @@ async def run_gi_invoke(ctx: JobContext, payload: GiInvokePayload) -> dict[str, 
                 created_by=ctx.created_by,
                 due_at=next_at,
             )
+            if not sent:
+                # Ruling GI-RESCHEDULED-CHECKPOINT: the mark and the follow-up commit in one
+                # transaction. Without the mark an interrupted job is requeued (a second retry
+                # chain, sent twice); a mark without the follow-up would lose the retry. A lost
+                # claim raises JobCancelled here and the follow-up rolls back with it.
+                await ctx.checkpoint(CHECKPOINT_RESCHEDULED, session=session)
             await session.commit()
         return {
             "communication_id": outcome.communication_id,
@@ -216,22 +224,30 @@ async def run_gi_invoke(ctx: JobContext, payload: GiInvokePayload) -> dict[str, 
 
 
 async def on_gi_invoke_interrupted(ctx: JobContext, payload: GiInvokePayload) -> None:
-    """The runner failed the job after an interruption: past the send checkpoint say that the
-    delivery is unclear (the generic text talks about restarting the job)."""
+    """The runner failed the job after an interruption (the generic text talks about restarting
+    the job). Past the send checkpoint say that the delivery is unclear; past the
+    ``rescheduled`` mark say that the retry is already queued (it committed with the mark)."""
+    messages = {
+        CHECKPOINT_SENDING: INTERRUPTED_AFTER_SEND_MESSAGE,
+        CHECKPOINT_RESCHEDULED: INTERRUPTED_AFTER_RESCHEDULE_MESSAGE,
+    }
     async with ctx.session_factory() as session:
         checkpoint = (
             await session.execute(select(TiqoraJob.checkpoint).where(TiqoraJob.id == ctx.job_id))
         ).scalar_one_or_none()
-        if checkpoint != CHECKPOINT_SENDING:
+        message = messages.get(checkpoint or "")
+        if message is None:
             return
         await session.execute(
             update(TiqoraJob)
             .where(TiqoraJob.id == ctx.job_id, TiqoraJob.status == "failed")
-            .values(error=INTERRUPTED_AFTER_SEND_MESSAGE)
+            .values(error=message)
         )
         await session.commit()
     logger.warning(
-        "gi_invoke_interrupted_after_send",
+        "gi_invoke_interrupted_after_send"
+        if checkpoint == CHECKPOINT_SENDING
+        else "gi_invoke_interrupted_after_reschedule",
         job_id=ctx.job_id,
         webservice_id=payload.webservice_id,
         invoker=payload.invoker,

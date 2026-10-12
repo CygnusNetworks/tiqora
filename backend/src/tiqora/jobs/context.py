@@ -73,12 +73,16 @@ class JobContext:
     def last_attempt(self) -> bool:
         return self.attempt >= self.max_attempts
 
-    async def checkpoint(self, name: str) -> None:
+    async def checkpoint(self, name: str, *, session: AsyncSession | None = None) -> None:
         """Mark the job as past the point of no return (call right before e.g. SMTP).
 
         An interrupted job is only requeued while it has no checkpoint. The write is
         conditional on the job still being this claim; when it was reaped or requeued
         meanwhile, :class:`JobCancelled` is raised and the step must not run.
+
+        With ``session`` the mark is written in the caller's transaction and not committed:
+        it becomes visible together with the caller's other writes (or not at all). On
+        :class:`JobCancelled` the caller must not commit that session.
         """
         conditions = [TiqoraJob.id == self.job_id, TiqoraJob.status == "running"]
         if self.worker_id is not None:
@@ -86,13 +90,17 @@ class JobContext:
                 TiqoraJob.worker_id == self.worker_id,
                 TiqoraJob.attempts == self.attempt,
             ]
-        async with self.session_factory() as session:
-            result = await session.execute(
-                update(TiqoraJob)
-                .where(*conditions)
-                .values(checkpoint=name[:50], heartbeat_at=utc_now())
-            )
-            await session.commit()
+        statement = (
+            update(TiqoraJob)
+            .where(*conditions)
+            .values(checkpoint=name[:50], heartbeat_at=utc_now())
+        )
+        if session is not None:
+            result = await session.execute(statement)
+        else:
+            async with self.session_factory() as own:
+                result = await own.execute(statement)
+                await own.commit()
         if result.rowcount != 1:  # type: ignore[attr-defined]
             raise JobCancelled
 
