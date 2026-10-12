@@ -6028,7 +6028,13 @@
         "empty": "Keine Queues mit offenen oder neuen Tickets.",
         "emptyNone": "Keine Queues sichtbar.",
         "all": "Alle Queues anzeigen",
-        "counts": "{{open}} offen · {{new}} neu"
+        "counts": "{{open}} offen · {{new}} neu",
+        "escalatedCount": " · {{count}} eskaliert",
+        "legend": {
+          "open": "offen",
+          "new": "neu",
+          "escalated": "eskaliert"
+        }
       },
       "escalations": {
         "title": "Eskalationen",
@@ -6075,7 +6081,12 @@
         "online_one": "{{count}} online",
         "online_other": "{{count}} online",
         "more_one": "und {{count}} weitere Person",
-        "more_other": "und {{count}} weitere"
+        "more_other": "und {{count}} weitere",
+        "inChat": "im Chat",
+        "countAvailable_one": "{{count}} verfügbar",
+        "countAvailable_other": "{{count}} verfügbar",
+        "countInChat_one": "{{count}} im Chat",
+        "countInChat_other": "{{count}} im Chat"
       },
       "notes": {
         "title": "Notizen",
@@ -6116,6 +6127,25 @@
         "title": "Eingang nach Zeit",
         "description": "Neue Tickets nach Wochentag und Uhrzeit",
         "empty": "Keine Tickets im Zeitraum."
+      },
+      "chatQueue": {
+        "title": "Web-Chat",
+        "description": "Wartende Chats und Ihre eigenen Chats",
+        "disabled": "Web-Chat ist nicht eingerichtet.",
+        "waiting": "warten",
+        "mine": "Meine Chats",
+        "oldest": "Der älteste wartet seit {{d}}",
+        "since": "wartet seit {{d}}",
+        "none": "Kein Chat wartet."
+      },
+      "aiStatus": {
+        "title": "KI-Status",
+        "description": "Übergaben an Menschen, KI-Läufe heute und Budgets",
+        "handover": "An Menschen übergeben",
+        "runsToday": "KI-Läufe heute",
+        "budget": "Budget",
+        "exhausted": "aufgebraucht",
+        "available": "{{left}} verfügbar"
       }
     },
     "tabs": {
@@ -6352,6 +6382,13 @@
                 "30d": "Letzte 30 Tage",
                 "90d": "Letzte 90 Tage"
               }
+            }
+          }
+        },
+        "chatQueue": {
+          "fields": {
+            "limit": {
+              "label": "Anzahl Chats"
             }
           }
         }

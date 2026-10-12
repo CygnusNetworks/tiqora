@@ -5,8 +5,10 @@
  */
 import { DASHBOARD_WIDGETS, type WidgetDefinition } from "@/plugins/dashboardWidgets";
 import { COLUMN_KEYS, TICKET_PRESETS, defineCoreWidget } from "../definitions";
+import { AiStatusWidget, type AiStatusSettings } from "./AiStatusWidget";
 import { BacklogAgingWidget, type BacklogAgingSettings } from "./BacklogAgingWidget";
 import { CalendarAgendaWidget, type CalendarAgendaSettings } from "./CalendarAgendaWidget";
+import { ChatQueueWidget, type ChatQueueSettings } from "./ChatQueueWidget";
 import { CounterWidget, type CounterSettings } from "./CounterWidget";
 import { EscalationsWidget, type EscalationsSettings } from "./EscalationsWidget";
 import { HeatmapWidget, type HeatmapSettings } from "./HeatmapWidget";
@@ -95,7 +97,7 @@ export const CORE_WIDGETS: WidgetDefinition<any>[] = [
     icon: "queue",
     size: { default: [12, 3], min: [4, 2], max: [12, 6] },
     settings: object({ limit: int(1, 12, 8), only_with_work: { type: "boolean", default: true } }),
-    data: null,
+    data: { endpoint: "core.queue-overview" },
     refreshOn: ["ticket_changed"],
     component: QueueOverviewWidget,
   }),
@@ -255,6 +257,30 @@ export const CORE_WIDGETS: WidgetDefinition<any>[] = [
     refreshOn: ["interval:900"],
     permission: "stats",
     component: HeatmapWidget,
+  }),
+  defineCoreWidget<ChatQueueSettings>({
+    key: "core.chat-queue",
+    version: 1,
+    ...texts("chatQueue"),
+    category: "team",
+    icon: "chat",
+    size: { default: [4, 3], min: [3, 2], max: [6, 6] },
+    settings: object({ limit: int(1, 10, 5) }),
+    data: { endpoint: "core.chat-queue" },
+    refreshOn: ["chat_waiting", "chat_assigned", "chat_ended", "interval:30"],
+    component: ChatQueueWidget,
+  }),
+  defineCoreWidget<AiStatusSettings>({
+    key: "core.ai-status",
+    version: 1,
+    ...texts("aiStatus"),
+    category: "ai",
+    icon: "spark",
+    size: { default: [4, 3], min: [3, 3], max: [6, 6] },
+    settings: object({}),
+    data: { endpoint: "core.ai-status" },
+    refreshOn: ["interval:300"],
+    component: AiStatusWidget,
   }),
 ];
 

@@ -497,9 +497,8 @@ describe("DashboardPage", () => {
     emitSSE({ type: "ticket_changed", ticket_id: 2, event: "x" });
     await flush(2100);
     expect(apiMock.data).toHaveBeenCalledTimes(2);
-    expect(apiMock.data).toHaveBeenLastCalledWith(1, expect.arrayContaining(["w-list", "w-counter", "w-esc"]), expect.anything());
+    expect(apiMock.data).toHaveBeenLastCalledWith(1, expect.arrayContaining(["w-list", "w-counter", "w-esc", "w-queues"]), expect.anything());
     expect(apiMock.data.mock.calls.at(-1)![1]).not.toContain("w-recent");
-    expect(apiMock.data.mock.calls.at(-1)![1]).not.toContain("w-queues");
   });
 
   it("interval:60 widgets refetch on their timer and pause while the tab is hidden", async () => {

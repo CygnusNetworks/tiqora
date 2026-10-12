@@ -6020,7 +6020,13 @@
         "empty": "No queues with open or new tickets.",
         "emptyNone": "No queues visible.",
         "all": "Show all queues",
-        "counts": "{{open}} open · {{new}} new"
+        "counts": "{{open}} open · {{new}} new",
+        "escalatedCount": " · {{count}} escalated",
+        "legend": {
+          "open": "open",
+          "new": "new",
+          "escalated": "escalated"
+        }
       },
       "escalations": {
         "title": "Escalations",
@@ -6067,7 +6073,12 @@
         "online_one": "{{count}} online",
         "online_other": "{{count}} online",
         "more_one": "and {{count}} more person",
-        "more_other": "and {{count}} more"
+        "more_other": "and {{count}} more",
+        "inChat": "in chat",
+        "countAvailable_one": "{{count}} available",
+        "countAvailable_other": "{{count}} available",
+        "countInChat_one": "{{count}} in chat",
+        "countInChat_other": "{{count}} in chat"
       },
       "notes": {
         "title": "Notes",
@@ -6108,6 +6119,25 @@
         "title": "Arrivals by time",
         "description": "New tickets by weekday and hour",
         "empty": "No tickets in this period."
+      },
+      "chatQueue": {
+        "title": "Web chat",
+        "description": "Waiting chats and your own chats",
+        "disabled": "Web chat is not set up.",
+        "waiting": "waiting",
+        "mine": "My chats",
+        "oldest": "The oldest has been waiting for {{d}}",
+        "since": "waiting for {{d}}",
+        "none": "No chat is waiting."
+      },
+      "aiStatus": {
+        "title": "AI status",
+        "description": "Handovers to humans, AI runs today and budgets",
+        "handover": "Handed over to humans",
+        "runsToday": "AI runs today",
+        "budget": "Budget",
+        "exhausted": "used up",
+        "available": "{{left}} available"
       }
     },
     "tabs": {
@@ -6344,6 +6374,13 @@
                 "30d": "Last 30 days",
                 "90d": "Last 90 days"
               }
+            }
+          }
+        },
+        "chatQueue": {
+          "fields": {
+            "limit": {
+              "label": "Number of chats"
             }
           }
         }

@@ -107,10 +107,10 @@ export function defineCoreWidget<S>(d: CoreWidgetSpec<S>): WidgetDefinition<any>
   });
 }
 
-/** Gallery groups: Tickets / Für mich / Team / Berichte. */
+/** Gallery groups: Tickets / Für mich / Team / Berichte (the AI status sits with the team). */
 export function galleryGroupOf(def: Pick<WidgetDefinition, "category">): "tickets" | "me" | "team" | "reports" {
   if (def.category === "tickets") return "tickets";
-  if (def.category === "team") return "team";
+  if (def.category === "team" || def.category === "ai") return "team";
   if (def.category === "reports") return "reports";
   return "me";
 }

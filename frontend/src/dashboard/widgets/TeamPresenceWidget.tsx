@@ -11,12 +11,16 @@ export interface TeamPresenceSettings {
   limit: number;
 }
 
+export type PresenceStatus = "available" | "in_chat";
+
 export interface TeamPresenceData {
-  online: OnlineAgentOut[];
+  online?: (OnlineAgentOut & { status?: PresenceStatus })[];
   total_online: number;
+  /** Wallboard without details: counts per status instead of people. */
+  by_status?: Partial<Record<PresenceStatus, number>>;
 }
 
-/** Who is online right now (presence has no "am Telefon"/"Pause" yet — Deviation 8). */
+/** Who is online right now, and who is in a web chat (no "am Telefon"/"Pause" source yet — Deviation 8). */
 export function TeamPresenceWidget({ size, mode }: WidgetProps<TeamPresenceSettings>) {
   const { t } = useTranslation();
   const { status, data } = useWidgetData<TeamPresenceData>();
@@ -35,6 +39,14 @@ export function TeamPresenceWidget({ size, mode }: WidgetProps<TeamPresenceSetti
       <WidgetDataBody<TeamPresenceData> h={size.h}>
         {(d) => {
           const online = Array.isArray(d?.online) ? d.online : [];
+          const byStatus = d?.by_status;
+          if (online.length === 0 && byStatus && (d?.total_online ?? 0) > 0)
+            return (
+              <ul className="flex flex-col gap-1.5 text-sm text-ink" data-testid="team-presence-counts">
+                <li>{t("dashboards.widgets.teamPresence.countAvailable", { count: byStatus.available ?? 0 })}</li>
+                <li>{t("dashboards.widgets.teamPresence.countInChat", { count: byStatus.in_chat ?? 0 })}</li>
+              </ul>
+            );
           if (online.length === 0) return <WidgetEmpty>{t("dashboards.widgets.teamPresence.empty")}</WidgetEmpty>;
           const more = (d?.total_online ?? online.length) - online.length;
           return (
@@ -49,6 +61,11 @@ export function TeamPresenceWidget({ size, mode }: WidgetProps<TeamPresenceSetti
                     />
                   </span>
                   <span className="min-w-0 flex-1 truncate text-ink">{a.full_name || a.login}</span>
+                  {a.status === "in_chat" && (
+                    <span className="shrink-0 text-xs text-muted" data-testid={`presence-in-chat-${a.id}`}>
+                      {t("dashboards.widgets.teamPresence.inChat")}
+                    </span>
+                  )}
                 </li>
               ))}
               {more > 0 && (

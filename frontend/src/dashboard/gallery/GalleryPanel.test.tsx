@@ -73,9 +73,9 @@ describe("GalleryPanel", () => {
     expect(screen.getByRole("button", { name: /Ticketliste/ })).toBeVisible();
   });
 
-  it("offers every phase-1 core widget to an ordinary agent", () => {
+  it("offers the ten phase-1 widgets plus chat queue and AI status to an ordinary agent (no report widgets)", () => {
     panel();
-    expect(screen.getAllByRole("listitem")).toHaveLength(10);
+    expect(screen.getAllByRole("listitem")).toHaveLength(12);
   });
 
   it("Escape and the close button call onClose", () => {

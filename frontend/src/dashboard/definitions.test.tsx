@@ -96,7 +96,7 @@ describe("galleryGroupOf", () => {
     expect(galleryGroupOf(anyDef({ category: "team" }))).toBe("team");
     expect(galleryGroupOf(anyDef({ category: "other" }))).toBe("me");
     expect(galleryGroupOf(anyDef({ category: "reports" }))).toBe("reports");
-    expect(galleryGroupOf(anyDef({ category: "ai" }))).toBe("me");
+    expect(galleryGroupOf(anyDef({ category: "ai" }))).toBe("team");
   });
 });
 
