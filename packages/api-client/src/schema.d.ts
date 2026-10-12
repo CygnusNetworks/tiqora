@@ -3717,6 +3717,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/itsm/link-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Link Types
+         * @description Read-only: rows plus the Znuny types that have no row yet.
+         */
+        get: operations["get_link_types_api_v1_admin_itsm_link_types_get"];
+        put?: never;
+        /** Post Link Type */
+        post: operations["post_link_type_api_v1_admin_itsm_link_types_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/link-types/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Link Types Sync
+         * @description "Aus Znuny aktualisieren": the only way the table changes besides the editor.
+         */
+        post: operations["post_link_types_sync_api_v1_admin_itsm_link_types_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/itsm/link-types/{link_type_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Link Type Route */
+        delete: operations["delete_link_type_route_api_v1_admin_itsm_link_types__link_type_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Link Type */
+        patch: operations["patch_link_type_api_v1_admin_itsm_link_types__link_type_id__patch"];
+        trace?: never;
+    };
     "/api/v1/admin/itsm/mode": {
         parameters: {
             query?: never;
@@ -7705,6 +7764,26 @@ export interface paths {
          *     ``summary`` is the stored AI summary (never generated here).
          */
         get: operations["customer_tickets_api_v1_integrations_customer_tickets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/itsm/link-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Offered Link Types
+         * @description The link types the picker offers for *pair* in the current ITSM mode.
+         */
+        get: operations["get_offered_link_types_api_v1_itsm_link_types_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -17718,6 +17797,155 @@ export interface components {
             state_priority_has_color: boolean;
             /** Supported */
             supported: boolean;
+        };
+        /** LinkTypeCreateIn */
+        LinkTypeCreateIn: {
+            /** Name */
+            name: string;
+            /**
+             * Offer Ci Ci
+             * @default true
+             */
+            offer_ci_ci: boolean;
+            /**
+             * Offer Ci Service
+             * @default false
+             */
+            offer_ci_service: boolean;
+            /**
+             * Offer Ticket Ci
+             * @default false
+             */
+            offer_ticket_ci: boolean;
+            /**
+             * Offer Ticket Ticket
+             * @default false
+             */
+            offer_ticket_ticket: boolean;
+            /**
+             * Pointed
+             * @default false
+             */
+            pointed: boolean;
+            /** Position */
+            position?: number | null;
+            /**
+             * Propagation
+             * @default none
+             * @enum {string}
+             */
+            propagation: "none" | "source" | "target" | "both";
+            /** Source Label */
+            source_label?: string | null;
+            /** Target Label */
+            target_label?: string | null;
+        };
+        /** LinkTypeListOut */
+        LinkTypeListOut: {
+            /** Items */
+            items: components["schemas"]["LinkTypeOut"][];
+            /** Missing From Table */
+            missing_from_table: string[];
+        };
+        /**
+         * LinkTypeOptionOut
+         * @description A link type offered for an object pair. Labels: override, else i18n, else Znuny's name.
+         */
+        LinkTypeOptionOut: {
+            /** Name */
+            name: string;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "znuny" | "tiqora";
+            /** Pointed */
+            pointed: boolean;
+            /**
+             * Propagation
+             * @enum {string}
+             */
+            propagation: "none" | "source" | "target" | "both";
+            /** Source Label */
+            source_label: string | null;
+            /** Source Name */
+            source_name: string | null;
+            /** Target Label */
+            target_label: string | null;
+            /** Target Name */
+            target_name: string | null;
+        };
+        /** LinkTypeOut */
+        LinkTypeOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Offer Ci Ci */
+            offer_ci_ci: boolean;
+            /** Offer Ci Service */
+            offer_ci_service: boolean;
+            /** Offer Ticket Ci */
+            offer_ticket_ci: boolean;
+            /** Offer Ticket Ticket */
+            offer_ticket_ticket: boolean;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "znuny" | "tiqora";
+            /** Pointed */
+            pointed: boolean;
+            /** Position */
+            position: number;
+            /**
+             * Propagation
+             * @enum {string}
+             */
+            propagation: "none" | "source" | "target" | "both";
+            /** Source Label */
+            source_label: string | null;
+            /** Target Label */
+            target_label: string | null;
+            /** Valid */
+            valid: boolean;
+            /** Znuny Source Name */
+            znuny_source_name?: string | null;
+            /** Znuny Target Name */
+            znuny_target_name?: string | null;
+        };
+        /**
+         * LinkTypePatchIn
+         * @description Only the keys sent are changed. ``name`` may be sent but never differ (immutable).
+         */
+        LinkTypePatchIn: {
+            /** Name */
+            name?: string | null;
+            /** Offer Ci Ci */
+            offer_ci_ci?: boolean | null;
+            /** Offer Ci Service */
+            offer_ci_service?: boolean | null;
+            /** Offer Ticket Ci */
+            offer_ticket_ci?: boolean | null;
+            /** Offer Ticket Ticket */
+            offer_ticket_ticket?: boolean | null;
+            /** Pointed */
+            pointed?: boolean | null;
+            /** Position */
+            position?: number | null;
+            /** Propagation */
+            propagation?: ("none" | "source" | "target" | "both") | null;
+            /** Source Label */
+            source_label?: string | null;
+            /** Target Label */
+            target_label?: string | null;
+            /** Valid */
+            valid?: boolean | null;
+        };
+        /** LinkTypeSyncOut */
+        LinkTypeSyncOut: {
+            /** Changed */
+            changed: number;
         };
         /**
          * LlmModelIn
@@ -34351,6 +34579,181 @@ export interface operations {
             };
         };
     };
+    get_link_types_api_v1_admin_itsm_link_types_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkTypeListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_link_type_api_v1_admin_itsm_link_types_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkTypeCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkTypeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_link_types_sync_api_v1_admin_itsm_link_types_sync_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkTypeSyncOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_link_type_route_api_v1_admin_itsm_link_types__link_type_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                link_type_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_link_type_api_v1_admin_itsm_link_types__link_type_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                link_type_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkTypePatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkTypeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     put_itsm_mode_api_v1_admin_itsm_mode_put: {
         parameters: {
             query?: never;
@@ -45063,6 +45466,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerTicketsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_offered_link_types_api_v1_itsm_link_types_get: {
+        parameters: {
+            query?: {
+                /** @description Object pair the link is created for */
+                pair?: "ticket_ticket" | "ticket_ci" | "ci_ci" | "ci_service";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkTypeOptionOut"][];
                 };
             };
             /** @description Validation Error */

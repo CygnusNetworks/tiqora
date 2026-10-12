@@ -7,6 +7,7 @@ The ITSM settings section is edited through the generic settings-sections API
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
+from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.deps import AdminUser
@@ -15,6 +16,21 @@ from tiqora.api.v1.admin.itsm_schemas import (
     ItsmDetectedOut,
     ItsmModeIn,
     ItsmSwitchOut,
+    LinkTypeCreateIn,
+    LinkTypeListOut,
+    LinkTypeOut,
+    LinkTypePatchIn,
+    LinkTypeSyncOut,
+)
+from tiqora.itsm.link_types import (
+    LinkTypeError,
+    ZnunyLinkType,
+    create_link_type,
+    delete_link_type,
+    list_link_types,
+    sync_link_type_rows,
+    update_link_type,
+    znuny_link_types,
 )
 from tiqora.itsm.mode import (
     ItsmModeState,
@@ -24,7 +40,9 @@ from tiqora.itsm.mode import (
     get_switch_info,
     set_itsm_mode,
 )
+from tiqora.itsm.models import TiqoraItsmLinkType
 from tiqora.itsm.providers import tiqora_cmdb_empty
+from tiqora.znuny.sysconfig import SysConfig
 
 router = APIRouter(prefix="/itsm", tags=["admin:itsm"])
 
@@ -96,3 +114,109 @@ async def put_itsm_mode(body: ItsmModeIn, admin: AdminUser, session: DbSession) 
     out = await _out(session, state)
     await session.commit()
     return out
+
+
+# --- link types (R2: itsm1 owns the one link-type editor) ---------------------------------
+
+_CONFLICT_CODES = frozenset({"link_type_exists", "link_type_in_use"})
+
+
+def _link_type_http(exc: LinkTypeError) -> HTTPException:
+    code = status.HTTP_409_CONFLICT if exc.code in _CONFLICT_CODES else 422
+    return HTTPException(code, detail={"code": exc.code, "message": str(exc)})
+
+
+def _link_type_out(row: TiqoraItsmLinkType, znuny: ZnunyLinkType | None) -> LinkTypeOut:
+    return LinkTypeOut(
+        id=row.id,
+        name=row.name,
+        origin="znuny" if row.origin == "znuny" else "tiqora",
+        source_label=row.source_label,
+        target_label=row.target_label,
+        pointed=znuny.pointed if znuny and row.origin == "znuny" else row.pointed,
+        propagation=row.propagation,  # type: ignore[arg-type]
+        offer_ticket_ticket=row.offer_ticket_ticket,
+        offer_ticket_ci=row.offer_ticket_ci,
+        offer_ci_ci=row.offer_ci_ci,
+        offer_ci_service=row.offer_ci_service,
+        position=row.position,
+        valid=row.valid,
+        znuny_source_name=znuny.source_name if znuny else None,
+        znuny_target_name=znuny.target_name if znuny else None,
+    )
+
+
+async def _get_row(session: DbSession, link_type_id: int) -> TiqoraItsmLinkType:
+    row = (
+        await session.execute(
+            select(TiqoraItsmLinkType).where(TiqoraItsmLinkType.id == link_type_id)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Link type not found")
+    return row
+
+
+@router.get("/link-types", response_model=LinkTypeListOut)
+async def get_link_types(admin: AdminUser, session: DbSession) -> LinkTypeListOut:
+    """Read-only: rows plus the Znuny types that have no row yet."""
+    _ = admin
+    catalogue = await znuny_link_types(SysConfig(session))
+    rows = await list_link_types(session)
+    return LinkTypeListOut(
+        items=[_link_type_out(r, catalogue.get(r.name)) for r in rows],
+        missing_from_table=sorted(set(catalogue) - {r.name for r in rows}),
+    )
+
+
+@router.post("/link-types/sync", response_model=LinkTypeSyncOut)
+async def post_link_types_sync(admin: AdminUser, session: DbSession) -> LinkTypeSyncOut:
+    """ "Aus Znuny aktualisieren": the only way the table changes besides the editor."""
+    changed = await sync_link_type_rows(session, user_id=admin.id)
+    await session.commit()
+    return LinkTypeSyncOut(changed=changed)
+
+
+@router.post("/link-types", response_model=LinkTypeOut, status_code=status.HTTP_201_CREATED)
+async def post_link_type(
+    body: LinkTypeCreateIn, admin: AdminUser, session: DbSession
+) -> LinkTypeOut:
+    fields = body.model_dump()
+    offers = {k: fields.pop(k) for k in list(fields) if k.startswith("offer_")}
+    try:
+        row = await create_link_type(session, offers=offers, user_id=admin.id, **fields)
+    except LinkTypeError as exc:
+        await session.rollback()
+        raise _link_type_http(exc) from exc
+    out = _link_type_out(row, None)
+    await session.commit()
+    return out
+
+
+@router.patch("/link-types/{link_type_id}", response_model=LinkTypeOut)
+async def patch_link_type(
+    link_type_id: int, body: LinkTypePatchIn, admin: AdminUser, session: DbSession
+) -> LinkTypeOut:
+    row = await _get_row(session, link_type_id)
+    changes = body.model_dump(exclude_unset=True)
+    try:
+        await update_link_type(session, row, changes, user_id=admin.id)
+    except LinkTypeError as exc:
+        await session.rollback()
+        raise _link_type_http(exc) from exc
+    catalogue = await znuny_link_types(SysConfig(session))
+    out = _link_type_out(row, catalogue.get(row.name))
+    await session.commit()
+    return out
+
+
+@router.delete("/link-types/{link_type_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_link_type_route(link_type_id: int, admin: AdminUser, session: DbSession) -> None:
+    _ = admin
+    row = await _get_row(session, link_type_id)
+    try:
+        await delete_link_type(session, row)
+    except LinkTypeError as exc:
+        await session.rollback()
+        raise _link_type_http(exc) from exc
+    await session.commit()

@@ -24,6 +24,7 @@ from tests._itsm_db import ITSM_FIXTURES, to_async_url
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.extensions import Registry, set_registry_for_tests
+from tiqora.itsm.models import TiqoraItsmLinkType
 from tiqora.itsm.providers import CI_PROVIDERS, CiProviderFactory
 from tiqora.itsm.znuny_adapter.detect import clear_detect_cache
 
@@ -38,6 +39,7 @@ def clean_rows(url: str) -> None:
         TiqoraBase.metadata.create_all(engine)
         with engine.begin() as conn:
             conn.execute(delete(TiqoraSettings).where(TiqoraSettings.key.like("itsm.%")))
+            conn.execute(delete(TiqoraItsmLinkType))  # ensure_itsm_mode_initialised syncs them
             if "package_repository" in _tables(conn):
                 conn.execute(text("DELETE FROM package_repository"))
     finally:

@@ -19038,6 +19038,476 @@
         "title": "LegacySchemaOut",
         "type": "object"
       },
+      "LinkTypeCreateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "pattern": "^[A-Za-z][A-Za-z0-9_]{0,49}$",
+            "title": "Name",
+            "type": "string"
+          },
+          "offer_ci_ci": {
+            "default": true,
+            "title": "Offer Ci Ci",
+            "type": "boolean"
+          },
+          "offer_ci_service": {
+            "default": false,
+            "title": "Offer Ci Service",
+            "type": "boolean"
+          },
+          "offer_ticket_ci": {
+            "default": false,
+            "title": "Offer Ticket Ci",
+            "type": "boolean"
+          },
+          "offer_ticket_ticket": {
+            "default": false,
+            "title": "Offer Ticket Ticket",
+            "type": "boolean"
+          },
+          "pointed": {
+            "default": false,
+            "title": "Pointed",
+            "type": "boolean"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "propagation": {
+            "default": "none",
+            "enum": [
+              "none",
+              "source",
+              "target",
+              "both"
+            ],
+            "title": "Propagation",
+            "type": "string"
+          },
+          "source_label": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Label"
+          },
+          "target_label": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Label"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "LinkTypeCreateIn",
+        "type": "object"
+      },
+      "LinkTypeListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LinkTypeOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "missing_from_table": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing From Table",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "missing_from_table"
+        ],
+        "title": "LinkTypeListOut",
+        "type": "object"
+      },
+      "LinkTypeOptionOut": {
+        "description": "A link type offered for an object pair. Labels: override, else i18n, else Znuny's name.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "origin": {
+            "enum": [
+              "znuny",
+              "tiqora"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "pointed": {
+            "title": "Pointed",
+            "type": "boolean"
+          },
+          "propagation": {
+            "enum": [
+              "none",
+              "source",
+              "target",
+              "both"
+            ],
+            "title": "Propagation",
+            "type": "string"
+          },
+          "source_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Label"
+          },
+          "source_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Name"
+          },
+          "target_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Label"
+          },
+          "target_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Name"
+          }
+        },
+        "required": [
+          "name",
+          "source_label",
+          "target_label",
+          "source_name",
+          "target_name",
+          "pointed",
+          "propagation",
+          "origin"
+        ],
+        "title": "LinkTypeOptionOut",
+        "type": "object"
+      },
+      "LinkTypeOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "offer_ci_ci": {
+            "title": "Offer Ci Ci",
+            "type": "boolean"
+          },
+          "offer_ci_service": {
+            "title": "Offer Ci Service",
+            "type": "boolean"
+          },
+          "offer_ticket_ci": {
+            "title": "Offer Ticket Ci",
+            "type": "boolean"
+          },
+          "offer_ticket_ticket": {
+            "title": "Offer Ticket Ticket",
+            "type": "boolean"
+          },
+          "origin": {
+            "enum": [
+              "znuny",
+              "tiqora"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "pointed": {
+            "title": "Pointed",
+            "type": "boolean"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "propagation": {
+            "enum": [
+              "none",
+              "source",
+              "target",
+              "both"
+            ],
+            "title": "Propagation",
+            "type": "string"
+          },
+          "source_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Label"
+          },
+          "target_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Label"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          },
+          "znuny_source_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Znuny Source Name"
+          },
+          "znuny_target_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Znuny Target Name"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "origin",
+          "source_label",
+          "target_label",
+          "pointed",
+          "propagation",
+          "offer_ticket_ticket",
+          "offer_ticket_ci",
+          "offer_ci_ci",
+          "offer_ci_service",
+          "position",
+          "valid"
+        ],
+        "title": "LinkTypeOut",
+        "type": "object"
+      },
+      "LinkTypePatchIn": {
+        "additionalProperties": false,
+        "description": "Only the keys sent are changed. ``name`` may be sent but never differ (immutable).",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "offer_ci_ci": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offer Ci Ci"
+          },
+          "offer_ci_service": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offer Ci Service"
+          },
+          "offer_ticket_ci": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offer Ticket Ci"
+          },
+          "offer_ticket_ticket": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offer Ticket Ticket"
+          },
+          "pointed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pointed"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "maximum": 100000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "propagation": {
+            "anyOf": [
+              {
+                "enum": [
+                  "none",
+                  "source",
+                  "target",
+                  "both"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Propagation"
+          },
+          "source_label": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Label"
+          },
+          "target_label": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Label"
+          },
+          "valid": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid"
+          }
+        },
+        "title": "LinkTypePatchIn",
+        "type": "object"
+      },
+      "LinkTypeSyncOut": {
+        "properties": {
+          "changed": {
+            "title": "Changed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "changed"
+        ],
+        "title": "LinkTypeSyncOut",
+        "type": "object"
+      },
       "LlmModelIn": {
         "description": "POST and PUT (full replace).",
         "properties": {
@@ -59326,6 +59796,360 @@
         ]
       }
     },
+    "/api/v1/admin/itsm/link-types": {
+      "get": {
+        "description": "Read-only: rows plus the Znuny types that have no row yet.",
+        "operationId": "get_link_types_api_v1_admin_itsm_link_types_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkTypeListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Link Types",
+        "tags": [
+          "admin:itsm"
+        ]
+      },
+      "post": {
+        "operationId": "post_link_type_api_v1_admin_itsm_link_types_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkTypeCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkTypeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Link Type",
+        "tags": [
+          "admin:itsm"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/link-types/sync": {
+      "post": {
+        "description": "\"Aus Znuny aktualisieren\": the only way the table changes besides the editor.",
+        "operationId": "post_link_types_sync_api_v1_admin_itsm_link_types_sync_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkTypeSyncOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Link Types Sync",
+        "tags": [
+          "admin:itsm"
+        ]
+      }
+    },
+    "/api/v1/admin/itsm/link-types/{link_type_id}": {
+      "delete": {
+        "operationId": "delete_link_type_route_api_v1_admin_itsm_link_types__link_type_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_type_id",
+            "required": true,
+            "schema": {
+              "title": "Link Type Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Link Type Route",
+        "tags": [
+          "admin:itsm"
+        ]
+      },
+      "patch": {
+        "operationId": "patch_link_type_api_v1_admin_itsm_link_types__link_type_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_type_id",
+            "required": true,
+            "schema": {
+              "title": "Link Type Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkTypePatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkTypeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Link Type",
+        "tags": [
+          "admin:itsm"
+        ]
+      }
+    },
     "/api/v1/admin/itsm/mode": {
       "put": {
         "operationId": "put_itsm_mode_api_v1_admin_itsm_mode_put",
@@ -82743,6 +83567,94 @@
         "summary": "Customer Tickets",
         "tags": [
           "integrations"
+        ]
+      }
+    },
+    "/api/v1/itsm/link-types": {
+      "get": {
+        "description": "The link types the picker offers for *pair* in the current ITSM mode.",
+        "operationId": "get_offered_link_types_api_v1_itsm_link_types_get",
+        "parameters": [
+          {
+            "description": "Object pair the link is created for",
+            "in": "query",
+            "name": "pair",
+            "required": false,
+            "schema": {
+              "default": "ticket_ticket",
+              "description": "Object pair the link is created for",
+              "enum": [
+                "ticket_ticket",
+                "ticket_ci",
+                "ci_ci",
+                "ci_service"
+              ],
+              "title": "Pair",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LinkTypeOptionOut"
+                  },
+                  "title": "Response Get Offered Link Types Api V1 Itsm Link Types Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Offered Link Types",
+        "tags": [
+          "itsm"
         ]
       }
     },

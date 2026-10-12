@@ -289,6 +289,7 @@ async def ensure_itsm_mode_initialised(
         )
         await session.commit()
         log.info("itsm_mode_initialised", mode=mode, source="auto")
+        await _sync_link_types_once(session)
         return ItsmModeState(
             mode=mode,
             source="auto",
@@ -298,6 +299,19 @@ async def ensure_itsm_mode_initialised(
             changed_by=None,
             import_run_id=None,
         )
+
+
+async def _sync_link_types_once(session: AsyncSession) -> None:
+    """F3/F31: the link-type rows are created once, with the mode. Never blocks startup."""
+    from tiqora.itsm.link_types import sync_link_type_rows
+
+    try:
+        changed = await sync_link_type_rows(session, user_id=1)
+        await session.commit()
+        log.info("itsm_link_types_synced", changed=changed)
+    except Exception as exc:  # noqa: BLE001 - a missing table or a racing sync must not block startup
+        await session.rollback()
+        log.warning("itsm_link_type_sync_failed", error=str(exc), error_type=type(exc).__name__)
 
 
 async def init_itsm_mode_at_startup(session_factory: async_sessionmaker[AsyncSession]) -> None:

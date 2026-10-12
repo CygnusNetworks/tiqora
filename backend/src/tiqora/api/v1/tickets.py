@@ -93,6 +93,7 @@ from tiqora.domain.timezones import format_in_zone, resolve_user_time_zone
 from tiqora.filters import Filter, FilterError
 from tiqora.filters.ticket_params import TicketListParams, filter_from_list_params
 from tiqora.filters.tickets import compile_ticket_filter, ticket_query_scope
+from tiqora.itsm.link_types import offered_link_types
 from tiqora.jobs.handlers.ticket_export import TICKET_EXPORT_JOB, TicketExportPayload
 from tiqora.jobs.schemas import JobAccepted
 from tiqora.jobs.service import (
@@ -2166,6 +2167,15 @@ async def create_ticket_link(
     svc = _write_service(session, settings)
     try:
         async with session.begin():
+            # Inside the transaction block: the read must not autobegin before it (F11).
+            offered = await offered_link_types(
+                session, pair="ticket_ticket", mode="znuny_readthrough"
+            )
+            if body.link_type not in {o.name for o in offered}:
+                raise HTTPException(
+                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail={"code": "link_type_not_offered", "link_type": body.link_type},
+                )
             await svc.link_tickets(
                 user.id, ticket_id, body.target_ticket_id, link_type=body.link_type
             )

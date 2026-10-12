@@ -301,7 +301,8 @@ async def test_create_api_reports_link_conflicts_as_409(env: Env) -> None:
         assert await _link(client, T1, T2, "ParentChild") == 201  # idempotent
         assert await _link(client, T2, T1, "ParentChild") == 409  # opposite direction
         assert await _link(client, T1, T2, "Normal") == 409  # same type group
-        assert await _link(client, T1, T2, "NoSuchLinkType") == 409  # not a possible link
+        # not a possible link: the type picker list (Task 12) refuses it before the service
+        assert await _link(client, T1, T2, "NoSuchLinkType") == 422
         assert await env.links(client, T1) == [(T2, "ParentChild")]
 
 
