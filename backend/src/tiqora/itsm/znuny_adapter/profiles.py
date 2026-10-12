@@ -61,6 +61,8 @@ _READONLY_TABLES: Final[tuple[str, ...]] = (
     "configitem_version",
     "configitem_definition",
     "configitem_history",
+    "configitem_history_type",
+    "configitem_counter",
     "general_catalog",
     "general_catalog_preferences",
     "xml_storage",

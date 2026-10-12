@@ -8,8 +8,10 @@ methods with defaults); a rename needs every implementing plan updated.
 Rules every implementation follows:
 
 * ``ref.source != provider.source`` → :class:`CiNotFound`.
-* Methods never commit; ``link_ticket``/``unlink_ticket`` assume the caller checked ``rw`` on the
-  ticket and check ``ro`` on the CI themselves.
+* Methods never commit; ``link_ticket``/``unlink_ticket`` check themselves (R12, before any write)
+  ``rw`` on the ticket's queue group and ``ro`` on the CI; a missing ticket is :class:`CiNotFound`,
+  missing ``rw`` on the ticket :class:`CiPermissionDenied`. Callers still filter by ticket ``ro``
+  when listing.
 * ``link_ticket`` is idempotent (``False`` when the link exists); ``unlink_ticket`` returns the
   number of removed links (0 = nothing).
 * ``search`` returns ``total`` exactly; ``limit`` > 100 is clamped to 100.

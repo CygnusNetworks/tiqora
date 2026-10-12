@@ -33,7 +33,14 @@ from tests._itsm_mode_helpers import (
 )
 from tests.itsm_provider_contract import CiProviderContract, SeededCis
 from tiqora.db.tiqora.models import TiqoraSettings
-from tiqora.itsm.ci_provider import CiError, CiNotFound, CiQuery, CiRef, CiUnavailable
+from tiqora.itsm.ci_provider import (
+    CiError,
+    CiNotFound,
+    CiPermissionDenied,
+    CiQuery,
+    CiRef,
+    CiUnavailable,
+)
 from tiqora.itsm.models import TiqoraItsmLinkType
 from tiqora.itsm.providers import get_ci_provider
 from tiqora.itsm.settings import ItsmSettings
@@ -134,6 +141,19 @@ async def _set_class_group(session: AsyncSession, class_name: str, group_id: int
         )
 
 
+async def _grant_ticket_rw(session: AsyncSession, user_id: int, ticket_id: int = TICKET) -> None:
+    """``rw`` on the group that owns the seeded ticket's queue (R12)."""
+    gid = (
+        await session.execute(
+            text(
+                "SELECT q.group_id FROM queue q JOIN ticket t ON t.queue_id = q.id WHERE t.id = :t"
+            ),
+            {"t": ticket_id},
+        )
+    ).scalar_one()
+    await _grant(session, user_id, int(gid), "rw")
+
+
 async def _seed_ticket(session: AsyncSession, ticket_id: int = TICKET) -> None:
     await session.execute(
         text(
@@ -188,6 +208,7 @@ async def seed_world(env: Env) -> SeededCis:
             target_object="ITSMConfigItem",
         )
     await _seed_ticket(session)
+    await _grant_ticket_rw(session, FULL)
     return SeededCis(
         user_id=FULL,
         restricted_user_id=RO,
@@ -293,6 +314,58 @@ async def _ticket_history(session: AsyncSession) -> list[tuple[str, str]]:
         {"t": TICKET},
     )
     return [(str(r[0]), str(r[1])) for r in rows.all()]
+
+
+async def test_link_ticket_needs_rw_on_the_ticket(env: Env) -> None:
+    """R12: ro on the CI is not enough, and a missing ticket never reaches a write."""
+    seeded = await seed_world(env)
+    p, s = env.provider, env.session
+    # RO reads the CI class (itsm-configitem) but holds no group on the ticket's queue
+    with pytest.raises(CiPermissionDenied):
+        await p.link_ticket(s, ticket_id=TICKET, ref=seeded.a, link_type="RelevantTo", user_id=RO)
+    # ro (not rw) on the ticket's queue group is still refused
+    gid = (await s.execute(text("SELECT group_id FROM queue WHERE id = 1"))).scalar_one()
+    await _grant(s, RO, int(gid), "ro")
+    with pytest.raises(CiPermissionDenied):
+        await p.link_ticket(s, ticket_id=TICKET, ref=seeded.a, link_type="RelevantTo", user_id=RO)
+    assert await _links(s) == [] and await _ticket_history(s) == []
+    # a nonexistent ticket is CiNotFound and writes nothing
+    with pytest.raises(CiNotFound):
+        await p.link_ticket(
+            s, ticket_id=TICKET + 1000, ref=seeded.a, link_type="RelevantTo", user_id=FULL
+        )
+    with pytest.raises(CiNotFound):
+        await p.unlink_ticket(
+            s, ticket_id=TICKET + 1000, ref=seeded.a, link_type=None, user_id=FULL
+        )
+    # an existing link survives an unlink attempt without rw, history untouched
+    assert await p.link_ticket(
+        s, ticket_id=TICKET, ref=seeded.a, link_type="RelevantTo", user_id=FULL
+    )
+    before = (await _links(s), await _ticket_history(s))
+    with pytest.raises(CiPermissionDenied):
+        await p.unlink_ticket(s, ticket_id=TICKET, ref=seeded.a, link_type=None, user_id=RO)
+    assert (await _links(s), await _ticket_history(s)) == before
+    # with rw it works
+    await _grant(s, RO, int(gid), "rw")
+    assert await p.unlink_ticket(s, ticket_id=TICKET, ref=seeded.a, link_type=None, user_id=RO) == 1
+
+
+async def test_unlink_temporary_link_writes_no_history(env: Env) -> None:
+    """Survey q5: Znuny writes no history for temporary links."""
+    seeded = await seed_world(env)
+    p, s = env.provider, env.session
+    await seed_ci_link(
+        s,
+        source_key=TICKET,
+        target_key=seeded.a.id,
+        link_type="RelevantTo",
+        source_object="Ticket",
+        target_object="ITSMConfigItem",
+        state="Temporary",
+    )
+    assert await p.unlink_ticket(s, ticket_id=TICKET, ref=seeded.a, link_type=None, user_id=FULL)
+    assert await _ticket_history(s) == []
 
 
 async def test_link_ticket_writes_link_relation_like_znuny(env: Env) -> None:
@@ -517,7 +590,7 @@ async def test_service_incident_state_vectors(env: Env) -> None:
     await link(s1, a)
     got[("s1_incident_ci", "service.type")] = await state(s1)
 
-    s2, w, i2 = await service("itsm94-s2", base + 2), await ci("Warning"), await ci("Incident")
+    s2, w = await service("itsm94-s2", base + 2), await ci("Warning")
     await link(s2, w)
     got[("s2_warning_via_dependency", "service.type")] = await state(s2)
 
@@ -561,9 +634,8 @@ async def test_service_incident_state_vectors(env: Env) -> None:
 
     expected = _expected_service_states(profile)
     service_level = {k: v for k, v in expected.items() if k[1].endswith(".type")}
-    assert len(service_level) == len(got) + 0  # every service answer of the vector is covered
+    assert len(service_level) == len(got)  # every service answer of the vector is covered
     assert got == service_level
-    assert i2 != w  # the incident neighbour exists in s2 (kept for readability of the scenario)
 
 
 async def test_service_state_counts_and_none(env: Env) -> None:

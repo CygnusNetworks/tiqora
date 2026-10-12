@@ -37,6 +37,7 @@ from tiqora.itsm.ci_provider import (
     CiError,
     CiNotFound,
     CiPage,
+    CiPermissionDenied,
     CiQuery,
     CiRef,
     CiSource,
@@ -396,6 +397,19 @@ class ZnunyCiProvider:
             for o in options
         ]
 
+    @staticmethod
+    async def _require_ticket_rw(session: AsyncSession, ticket_id: int, user_id: int) -> None:
+        """R12: linking needs ``rw`` on the ticket's queue group, checked before any write."""
+        queue_id = (
+            await session.execute(
+                text("SELECT queue_id FROM ticket WHERE id = :t"), {"t": ticket_id}
+            )
+        ).scalar_one_or_none()
+        if queue_id is None:
+            raise CiNotFound(f"ticket {ticket_id} does not exist")
+        if not await PermissionEngine(session).check(user_id, int(queue_id), "rw"):
+            raise CiPermissionDenied(f"rw on ticket {ticket_id} is required to link CIs")
+
     async def link_ticket(
         self,
         session: AsyncSession,
@@ -410,6 +424,7 @@ class ZnunyCiProvider:
         reader = await get_reader(session)
         readable = await self._readable_classes(session, reader, user_id)
         row = await self._readable_ci(session, reader, ref, readable)
+        await self._require_ticket_rw(session, ticket_id, user_id)
         offered = {
             o.name
             for o in await offered_link_types(session, pair="ticket_ci", mode="znuny_readthrough")
@@ -454,6 +469,7 @@ class ZnunyCiProvider:
         reader = await get_reader(session)
         readable = await self._readable_classes(session, reader, user_id)
         row = await self._readable_ci(session, reader, ref, readable)
+        await self._require_ticket_rw(session, ticket_id, user_id)
         existing = await reader.object_ci_links(
             session,
             object_name=TICKET_OBJECT,
@@ -462,6 +478,12 @@ class ZnunyCiProvider:
             valid_only=False,
         )
         types = sorted({lk.link_type for lk in existing if link_type in (None, lk.link_type)})
+        # Znuny writes no history for temporary links (survey q5)
+        temporary_only = {
+            name
+            for name in types
+            if all(lk.state == "Temporary" for lk in existing if lk.link_type == name)
+        }
         removed = 0
         for name in types:
             count = await unlink_objects(
@@ -475,6 +497,8 @@ class ZnunyCiProvider:
             )
             if count:
                 removed += count
+                if name in temporary_only:
+                    continue
                 await history_add(
                     session,
                     ticket_id=ticket_id,
