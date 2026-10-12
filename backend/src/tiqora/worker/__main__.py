@@ -19,11 +19,13 @@ from tiqora.domain.settings_store import (
     KEY_GI_REQUESTER_INTERVAL_SECONDS,
     KEY_REPORT_FACTS_INTERVAL_SECONDS,
     KEY_REPORT_SCHEDULER_INTERVAL_SECONDS,
+    KEY_SCIM_ROLE_SYNC_INTERVAL_SECONDS,
     KEY_WEBCHAT_SWEEP_INTERVAL_SECONDS,
     get_setting_int,
 )
 from tiqora.identity.metadata_refresh import run_identity_metadata_refresh_tick
 from tiqora.identity.scim.audit import run_scim_events_purge_tick
+from tiqora.identity.scim.role_sync import run_scim_role_sync_tick
 from tiqora.jobs.runner import JobRunner
 from tiqora.logging_setup import configure_logging
 from tiqora.worker.ai_audit_cleanup import run_ai_audit_cleanup_tick
@@ -314,6 +316,13 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             report_scheduler_tick,
             settings.report_scheduler_interval_seconds,
             KEY_REPORT_SCHEDULER_INTERVAL_SECONDS,
+            stop,
+        ),
+        _interval_loop(
+            "scim_role_sync",
+            run_scim_role_sync_tick,
+            settings.scim_role_sync_interval_seconds,
+            KEY_SCIM_ROLE_SYNC_INTERVAL_SECONDS,
             stop,
         ),
         _interval_loop(

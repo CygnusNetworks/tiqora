@@ -30,6 +30,8 @@ from tiqora.db.tiqora.models import TiqoraUserAuthConfig
 from tiqora.identity.config_models import OidcProviderConfig, SamlProviderConfig
 from tiqora.identity.links import LinkConflictError, find_link, upsert_link
 from tiqora.identity.mapping import (
+    SCIM_GROUP_IDS_ATTR,
+    SCIM_GROUPS_ATTR,
     AssignmentDiff,
     AssignmentState,
     MappedProfile,
@@ -37,6 +39,7 @@ from tiqora.identity.mapping import (
     diff_assignments,
     evaluate_rules,
     map_profile,
+    rules_use_scim,
 )
 from tiqora.identity.store import ProviderRecord
 from tiqora.identity.types import SSO_KINDS, SYSTEM_USER_ID, UserKind, audience_includes
@@ -363,8 +366,21 @@ async def _plan_assignments(
 
     if user_kind != "agent" or user_id == SYSTEM_USER_ID or not provider.role_rules:
         return AssignmentDiff()
+    attributes: Mapping[str, tuple[str, ...]] = identity.attributes
+    if rules_use_scim(provider.role_rules):
+        # Groups come from the provisioning mirror, not from the sign-in assertion (SAML
+        # attributes would not carry them and a login must not undo the worker's result).
+        # A copy: ``ExternalIdentity`` stays frozen. A not yet existing account has no groups.
+        from tiqora.identity.scim.role_sync import scim_attributes
+
+        injected = (
+            await scim_attributes(session, provider_id=provider.id, user_id=user_id)
+            if user_id is not None
+            else {SCIM_GROUPS_ATTR: (), SCIM_GROUP_IDS_ATTR: ()}
+        )
+        attributes = {**identity.attributes, **injected}
     for rule_attribute in {r.attribute.strip() for r in provider.role_rules}:
-        if not attribute_present(identity.attributes, rule_attribute):
+        if not attribute_present(attributes, rule_attribute):
             # Fail safe: Entra group overage or a broken attribute release must not strip
             # roles. A present but empty list still means "no groups".
             log.warning(
@@ -376,7 +392,7 @@ async def _plan_assignments(
     valid_roles = await valid_role_ids(session)
     valid_groups = await valid_group_ids(session)
     desired = evaluate_rules(
-        identity.attributes,
+        attributes,
         provider.role_rules,
         valid_role_ids=valid_roles,
         valid_group_ids=valid_groups,
