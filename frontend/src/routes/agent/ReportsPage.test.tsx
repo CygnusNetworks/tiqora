@@ -45,7 +45,7 @@ vi.mock("@tanstack/react-router", () => ({
 
 vi.mock("@/lib/reportsApi", async (orig) => ({
   ...(await orig<typeof import("@/lib/reportsApi")>()),
-  reportsApi: { catalogue: vi.fn(), run: vi.fn(), get: vi.fn(), export: vi.fn(), sources: vi.fn(), factsStatus: vi.fn(), remove: vi.fn() },
+  reportsApi: { znunyStatsPreview: vi.fn(async () => ({ stats: [], errors: [], truncated: false })), catalogue: vi.fn(), run: vi.fn(), get: vi.fn(), export: vi.fn(), sources: vi.fn(), factsStatus: vi.fn(), remove: vi.fn() },
 }));
 
 vi.mock("@/lib/api", async (orig) => ({
@@ -96,6 +96,20 @@ beforeEach(() => {
 });
 
 describe("ReportsPage", () => {
+  it("offers the Znuny import to everyone with report access and schedules to creators", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByTestId("reports-znuny-import"));
+    expect(await screen.findByTestId("znuny-import-dialog")).toBeInTheDocument();
+    expect(reportsApi.znunyStatsPreview).toHaveBeenCalled();
+    expect(screen.queryByTestId("reports-schedules-link")).not.toBeInTheDocument();
+  });
+
+  it("links to the schedules page for agents who may create reports", async () => {
+    authFlags.canCreate = true;
+    renderPage();
+    expect(await screen.findByTestId("reports-schedules-link")).toHaveAttribute("href", "/agent/reports/schedules");
+  });
+
   it("shows a notice and runs nothing for an agent without report access", async () => {
     authFlags.canViewReports = false;
     try {

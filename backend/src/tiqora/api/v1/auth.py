@@ -156,16 +156,17 @@ async def _user_me(
     try:
         # Same rule as ``require_report_access`` (``reporting.access``): drives the
         # agent "Berichte" nav item and the time-accounting reports link.
-        rights = await report_rights(
-            session, user.id, await load_reporting_settings(session, settings)
-        )
+        reporting = await load_reporting_settings(session, settings)
+        rights = await report_rights(session, user.id, reporting)
         data["can_view_reports"] = rights.view
         data["can_create_reports"] = rights.create
         data["can_share_reports"] = rights.share
+        data["report_external_recipients"] = reporting.schedule_external_recipients
     except Exception:  # noqa: BLE001 — same guard as above
         data["can_view_reports"] = False
         data["can_create_reports"] = False
         data["can_share_reports"] = False
+        data["report_external_recipients"] = False
         with contextlib.suppress(Exception):
             await session.rollback()
     return UserMe(**data)

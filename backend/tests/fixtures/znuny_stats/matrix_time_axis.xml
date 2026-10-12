@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<otrs_stats>
+<Cache>0</Cache>
+<Description>Neue Tickets pro Monat, nach Queue aufgeteilt.</Description>
+<Format>Print</Format>
+<Format>D3::LineChart</Format>
+<Object>Ticket</Object>
+<ObjectModule>Kernel::System::Stats::Dynamic::Ticket</ObjectModule>
+<Permission>stats</Permission>
+<ShowAsDashboardWidget>0</ShowAsDashboardWidget>
+<StatType>dynamic</StatType>
+<SumCol>1</SumCol>
+<SumRow>0</SumRow>
+<TimeZone>Europe/Berlin</TimeZone>
+<Title>rep52 Tickets pro Monat</Title>
+<UseAsRestriction Element="StateTypeIDs" Fixed="1">
+<SelectedValues>1</SelectedValues>
+<SelectedValues>2</SelectedValues>
+</UseAsRestriction>
+<UseAsValueSeries Element="QueueIDs" Fixed="0">
+<SelectedValues>4</SelectedValues>
+<SelectedValues>5</SelectedValues>
+</UseAsValueSeries>
+<UseAsXvalue Element="CreateTime" Fixed="1" TimeRelativeCount="12" TimeRelativeUnit="Month" TimeRelativeUpcomingCount="1" TimeScaleCount="1">
+<SelectedValues>Month</SelectedValues>
+</UseAsXvalue>
+<Valid>1</Valid>
+</otrs_stats>

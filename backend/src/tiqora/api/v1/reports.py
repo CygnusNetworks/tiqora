@@ -90,6 +90,19 @@ from tiqora.reporting.semantic import REPORT_SOURCES, ReportSource
 from tiqora.reporting.settings import ReportingSettings, load_reporting_settings
 from tiqora.reporting.sql import ReportQueryTimeout
 from tiqora.reporting.state import facts_status
+from tiqora.reporting.znuny_stats.schemas import (
+    ZnunyStatsApplyIn,
+    ZnunyStatsApplyOut,
+    ZnunyStatsFileIn,
+    ZnunyStatsPreviewOut,
+)
+from tiqora.reporting.znuny_stats.service import (
+    apply_import,
+    decode_file,
+    preview_db,
+    preview_file,
+)
+from tiqora.saved_searches.store import SavedSearchInvalid
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 sources_router = APIRouter(prefix="/reporting", tags=["reports"])
@@ -319,6 +332,68 @@ async def import_report_file(
     except DefinitionError as exc:
         _unprocessable(exc.message, exc.path)
     return parsed
+
+
+def _import_timeout() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+        detail={
+            "message": "Das Lesen der Znuny-Statistiken hat zu lange gedauert. "
+            "Bitte versuchen Sie es später erneut."
+        },
+    )
+
+
+@router.get("/import/znuny", response_model=ZnunyStatsPreviewOut)
+async def preview_znuny_stats(
+    user: CurrentUser, session: DbSession, settings: AppSettings
+) -> ZnunyStatsPreviewOut:
+    """Znuny statistics the agent may run, mapped to Tiqora reports; saves nothing."""
+    reporting = await _access(session, user, settings)
+    try:
+        return await preview_db(session, user.id, budget=QueryBudget.inline(reporting))
+    except ReportQueryTimeout:
+        raise _import_timeout() from None
+
+
+@router.post("/import/znuny/file", response_model=ZnunyStatsPreviewOut)
+async def preview_znuny_stats_file(
+    body: ZnunyStatsFileIn, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> ZnunyStatsPreviewOut:
+    """Map a Znuny statistics export file (XML); saves nothing."""
+    await _access(session, user, settings)
+    try:
+        raw = decode_file(body.content_base64, "content_base64")
+        return await preview_file(session, user.id, raw)
+    except RequestError as exc:
+        _unprocessable(exc.message, exc.path, exc.status_code)
+
+
+@router.post("/import/znuny/apply", response_model=ZnunyStatsApplyOut)
+async def apply_znuny_stats(
+    body: ZnunyStatsApplyIn, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> ZnunyStatsApplyOut:
+    """Save the chosen Znuny statistics as private reports / saved searches (re-import updates)."""
+    reporting = await _access(session, user, settings)
+    rights = await report_rights(session, user.id, reporting)
+    try:
+        return await apply_import(
+            session,
+            user.id,
+            rights,
+            body,
+            registry=get_registry(),
+            budget=QueryBudget.inline(reporting),
+        )
+    except ReportQueryTimeout:
+        await session.rollback()
+        raise _import_timeout() from None
+    except RequestError as exc:
+        _unprocessable(exc.message, exc.path, exc.status_code)
+    except SavedSearchInvalid as exc:
+        _unprocessable(exc.message, exc.path)
+    except _STORE_ERRORS as exc:
+        _store_error(exc)
 
 
 @router.post(

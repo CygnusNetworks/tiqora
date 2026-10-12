@@ -805,7 +805,7 @@ narrower than Znuny), **by design** (deliberate platform choice).
 | Configurable dashboard widgets | partial | Several dashboards per agent with drag/resize/keyboard layout, widget gallery and settings with live preview, sharing by group: ticket lists with filters, columns and limits (presets, saved searches, own filters), counters with sparkline, escalations, reminders, calendar agenda, queue overview, recent views, team presence, notes and links; admin role templates incl. mandatory ones; widgets from plugins. See [Dashboards](dashboards.md). **Missing**: stats/report widgets (phase 2), customer-info widget, RSS |
 | Link overview / link-type admin | missing | Ticket links can be listed and created; no delete, overview page or FAQ/appointment targets |
 | Note to linked tickets (`AgentTicketNoteToLinkedTicket`) | missing | |
-| Stats framework | partial | Report builder ("Bericht erstellen": rows, columns, values, filter, period) with saved reports, sharing by group, runtime parameters (Znuny "changeable at runtime"), JSON/YAML report files and the `stats` group rights; 25 built-in reports incl. Znuny `TicketAccountedTime`-style time accounting, SLA in working minutes from the Znuny calendars, XLSX/CSV export. Znuny stats import and scheduling are still missing (phase 3). See [Reporting differences](#reporting-differences-to-znuny-stats) |
+| Stats framework | partial | Report builder ("Bericht erstellen": rows, columns, values, filter, period) with saved reports, sharing by group, runtime parameters (Znuny "changeable at runtime"), JSON/YAML report files and the `stats` group rights; 25 built-in reports incl. Znuny `TicketAccountedTime`-style time accounting, SLA in working minutes from the Znuny calendars, XLSX/CSV/PDF export, import of Znuny statistics (from `xml_storage` or an exported XML file; the four dynamic objects and `StateAction`, with a list of what was approximated or dropped) and scheduled delivery by e-mail (daily to yearly, several reports per mail, PDF/XLSX/CSV, run history). Not taken over: ITSM stats, dynamic-field axes, cron expressions. See [Reporting differences](#reporting-differences-to-znuny-stats), [Importing Znuny statistics](#importing-znuny-statistics) and [Scheduled reports](#scheduled-reports-vs-the-statistic-reports-add-on) |
 | Ticket export | partial | `GET /tickets/export.csv` (synchronous) plus `POST /tickets/export-jobs` which runs the export as a background job with progress, cancel and download; no Znuny equivalent (Znuny has CSV via stats only) |
 | Bulk action | partial | State, priority, owner, queue, lock only |
 | Preferences | partial | Language, TOTP/passkeys; no queue favourites, ticket-list options or notification matrix |
@@ -1003,7 +1003,109 @@ figures differ from Znuny's `Kernel::System::Stats`:
   different numbers to different people. Cached results are kept per viewer scope.
 - **Report files.** Reports export to and import from JSON or YAML files
   (`GET /reports/{key}/file`, `POST /reports/import-file`). The import only fills the
-  builder; nothing is saved before "Speichern". Znuny stats XML is not read.
+  builder; nothing is saved before "Speichern". Znuny stats XML is read by the Znuny import (next section), not by this file import.
+
+### Importing Znuny statistics
+
+Agents with the save right (Berichte, "Statistiken aus Znuny übernehmen" = import
+statistics from Znuny) can copy Znuny statistics into Tiqora. Two origins exist:
+the Znuny database (`xml_storage`, read-only, the same data the Znuny stats module
+uses) and a Znuny export file (`Stats.*.xml`, up to 1 MB). A preview lists every
+statistic the agent may see with its target, the issues found and whether it was
+imported before; "Übernehmen" (apply) writes saved reports and saved searches only.
+The import is synchronous but bounded: 500 statistics, 200,000 stored values per
+read, a 75 s database budget (below the 90 s nginx limit); when the budget is spent
+the call answers 504 with a German message and rolls back. Non-admins see a count
+of unreadable statistics, admins the ids. Znuny's `Permission` groups of a statistic
+are honoured; re-importing a statistic updates name, description and definition but
+keeps sharing and sorting.
+
+Every mapping decision is reported per element as **dropped** ("Nicht übernommen")
+or **approximated** ("Angepasst"); nothing is silently ignored.
+
+| Znuny object | Target | Measures / notes |
+|---|---|---|
+| `Dynamic::Ticket` | report on `tickets` | count of tickets |
+| `Dynamic::TicketSolutionResponseTime` | report on `tickets` | `SolutionAverageAllOver` solution clock avg, `NumberOfTicketsAllOver` closed tickets, `SolutionWorkingTimeAverage` solution avg, `ResponseWorkingTimeAverage` first response avg; min/max kinds dropped (Tiqora offers P50/P90); escalation-dependent kinds dropped |
+| `Dynamic::TicketAccountedTime` | report on `accounted_time` | `TotalTime` time units, `NumberOfTickets` tickets; other kinds dropped |
+| `Dynamic::TicketList` | **saved search** | the list shows its fixed columns; column selection and `Limit` are approximated; `OrderBy`/`SortSequence` map to the search sort |
+| static `StateAction` | report on `ticket_events` | approximated: Tiqora counts the event kinds of the report data, not every Znuny history type |
+| any other static file or object | none | "Diese Art von Statistik kann Tiqora nicht übernehmen." |
+
+Elements (ticket and solution/response objects; `accounted_time` supports a subset):
+
+| Znuny element | Tiqora field |
+|---|---|
+| `QueueIDs`, `CreatedQueueIDs` | `queue`, `queue_at_create` |
+| `StateIDs`, `StateTypeIDs` | `state`, `state_type` (ids mapped through the lookups; unknown types dropped) |
+| `PriorityIDs`, `TypeIDs`, `ServiceIDs`, `SLAIDs` | `priority`, `type`, `service`, `sla` |
+| `OwnerIDs`, `ResponsibleIDs` | `owner`, `responsible` |
+| `CustomerID`, `CustomerIDRaw` / `CustomerUserLogin`, `CustomerUserLoginRaw`, `CustomerUserID` | `customer` / `customer_user` (`*` dropped) |
+| `CreateTime` | `created` |
+| `CloseTime`, `CloseTime2` | `closed` (`CloseTime2` is the period of the solution-time objects) |
+| `SearchInArchive` | nothing for "not archived"; archived tickets are not counted in reports, so other values are dropped |
+| `ChangeTime`, `LastChangeTime`, `PendingUntilTime`, `Escalation*Time` | dropped (no such time field in the report data) |
+| `LockIDs`, `Title`, `Created{State,Priority,User}IDs`, `MIMEBase_*` | dropped |
+| `DynamicField_*` | dropped (dynamic-field dimensions are not available in reports yet) |
+
+Axes and restrictions: `UseAsXvalue` becomes the first dimension, up to two
+`UseAsValueSeries` elements the next ones (a fourth dimension is dropped). Selected
+values become a fixed `in` filter; elements Znuny lets the viewer change at runtime
+become report parameters (time elements need none, the viewer can always change the
+period). Axis rows without tickets are not shown (approximated). Only one period per
+report; a second one is dropped. Time: absolute ranges are rounded to whole days,
+relative ranges keep year/quarter/month/week/day, half years become 6 months, hour,
+minute and second ranges are dropped, upcoming periods only keep the current one (approximated). Scales day to
+year map to the grain; "several units" scales are approximated and second/minute/
+hour/half-year scales dropped. Stat level: `SumCol`/`SumRow` become totals, `D3::BarChart`
+/ `LineChart` / `StackedAreaChart` become bar / line / area, otherwise pivot (two or
+more dimensions) or table; an invalid statistic is imported as a normal report
+(approximated); "show as dashboard widget" is dropped (add the report as a widget in the
+dashboard instead).
+
+Statistics from a file carry names instead of ids. Names are resolved through the
+lookups; an unknown name is dropped. Ids that only make sense in the exporting system
+(an `id` element outside the file-name elements) are approximated and turned into a
+runtime parameter instead of a fixed filter, so nothing silently counts the wrong
+queue.
+
+**Never taken over:** ITSM statistics (CI, change), dynamic-field axes, Znuny output
+formats and cache flags, per-statistic permission groups as such (Tiqora's report
+sharing applies instead), cron-based generation from the Znuny stats module.
+
+### Scheduled reports vs. the Statistic Reports add-on
+
+Znuny itself only generates statistics on demand or by `Maint::Stats::Generate` on
+cron; mailing scheduled reports is the job of third-party add-ons. Tiqora ships it:
+
+- **Bundles.** One schedule sends 1 to 10 reports (saved or built-in) in one e-mail;
+  each item may override the period and grain. PDF produces one document with a
+  section per report, XLSX one workbook (one sheet per report), CSV one file per
+  report, zipped when there is more than one.
+- **Recurrence presets, no cron.** Daily, weekly (weekdays), monthly (day 1 to 31, in
+  shorter months the last day; optional "Montag bis Freitag" only), yearly, at a time
+  of day in a chosen time zone; daylight-saving safe. A "Nächste Termine" preview
+  shows the next runs.
+- **Recipients.** Agents, groups, roles and (if the admin enabled
+  `reporting.schedule_external_recipients`) external e-mail addresses. Anything other
+  than the owner needs the share right (Znuny group `stats`, `rw`) and is checked again
+  at every run. All real recipients go in Bcc (`undisclosed-recipients:;` in To), so
+  nobody sees the others and nothing is sent to the system sender.
+- **Owner permissions.** A schedule runs with its owner's queue scope and rights; the
+  mail footer and the PDF say so. If the owner loses report access or the share right,
+  or an item is no longer available, the run fails whole, the owner gets a mail and
+  after 3 failed runs the schedule pauses itself ("Nach 3 Fehlversuchen angehalten").
+- **Options.** Subject and body with placeholders (`{{schedule}}`, `{{period}}`,
+  `{{date}}`, `{{reports}}`, `{{owner}}`), `only_if_nonempty` (nothing is sent when
+  every report is empty), "Jetzt senden" (send now: a test to the owner only, or to
+  all recipients).
+- **Run history** with status, row count, recipient count and the stored files
+  (download for owner and admins); retention `reporting.run_retention_days`
+  (default 90, max 365).
+- **Limits.** 50 schedules per agent, 50 recipients per delivery by default, 15 MB of
+  attachments by default, PDF capped at 1000 rows per report and 5000 per document
+  (a note marks the cut). Unattended runs use the server text bundle in German or
+  English only.
 
 ### Search profiles
 

@@ -3119,6 +3119,14 @@
           "name": "Berichtsdaten aktuell halten",
           "description": "Hält die Auswertungsdaten für Berichte (Ticketdaten und tägliche Bestände offener Tickets) laufend aktuell."
         },
+        "report_scheduler": {
+          "name": "Berichtszeitpläne versenden",
+          "description": "Versendet die geplanten Berichte per E-Mail, sobald sie fällig sind."
+        },
+        "report_runs_purge": {
+          "name": "Berichtsläufe aufräumen",
+          "description": "Löscht den Verlauf der geplanten Berichte samt erzeugter Dateien nach Ablauf der Aufbewahrungsfrist."
+        },
         "webchat_sweep": {
           "name": "Web-Chat aufräumen",
           "description": "Beendet Chats, die niemand rechtzeitig beantwortet hat, schließt Chats, deren Besucher gegangen ist, und löscht alte Chat-Verläufe nach Ablauf der Aufbewahrungsfrist."
@@ -3944,6 +3952,26 @@
           "query_timeout_seconds": {
             "label": "Zeitlimit pro Datenbankabfrage in Sekunden",
             "help": "Dauert eine einzelne Abfrage länger, wird sie abgebrochen und eine Meldung angezeigt."
+          },
+          "schedule_external_recipients": {
+            "label": "Externe Empfänger für geplante Berichte erlauben",
+            "help": "Aus: Geplante Berichte gehen nur an Tiqora-Agenten, Gruppen und Rollen. Ein: Wer Schreibrecht in der Gruppe „stats“ hat, darf auch externe E-Mail-Adressen eintragen."
+          },
+          "schedule_max_recipients": {
+            "label": "Höchstzahl Empfänger pro Versand",
+            "help": "Obergrenze der aufgelösten E-Mail-Adressen pro Versand eines geplanten Berichts."
+          },
+          "run_retention_days": {
+            "label": "Versandverlauf aufbewahren (Tage)",
+            "help": "Versandverlauf und die versendeten Anhänge werden nach dieser Zeit gelöscht (7 bis 365 Tage)."
+          },
+          "pdf_row_limit": {
+            "label": "Höchstzahl Zeilen pro Bericht im PDF",
+            "help": "Längere Tabellen werden im PDF abgeschnitten und entsprechend gekennzeichnet."
+          },
+          "delivery_max_attachment_mb": {
+            "label": "Höchste Anhangsgröße pro E-Mail in MB",
+            "help": "Sind alle Anhänge eines Versands zusammen größer, schlägt der Versand mit einer Meldung fehl."
           }
         }
       },
@@ -5123,7 +5151,8 @@
         "ticket_export": "Ticket-Export",
         "report_run": "Bericht",
         "report_export": "Berichtsexport",
-        "report_backfill": "Berichtsdaten aufbauen"
+        "report_backfill": "Berichtsdaten aufbauen",
+        "report_delivery": "Berichtsversand"
       },
       "gi_mail": "E-Mail aus einer Webservice-Anfrage versenden"
     },
@@ -5626,6 +5655,162 @@
       "defaultHint": "Ohne Auswahl gilt: {{values}}",
       "alwaysOn": "Immer an (Vorgabe des Berichts)",
       "privateOther": "Privat"
+    },
+    "exportPdf": "Als PDF-Datei",
+    "schedules": {
+      "title": "Zeitpläne",
+      "subtitle": "Berichte automatisch per E-Mail versenden",
+      "create": "Zeitplan anlegen",
+      "empty": "Es gibt noch keine Zeitpläne.",
+      "name": "Name",
+      "owner": "Ersteller",
+      "items": "Berichte",
+      "recurrence": "Wiederholung",
+      "nextRuns": "Nächste Termine",
+      "nextRun": "Nächster Versand",
+      "lastRun": "Letzter Versand",
+      "recipients": "Empfänger",
+      "users": "Agenten",
+      "groups": "Gruppen",
+      "roles": "Rollen",
+      "externalEmails": "Externe E-Mail-Adressen",
+      "format": "Format",
+      "language": "Sprache",
+      "subject": "Betreff",
+      "body": "Nachricht",
+      "onlyIfNonempty": "Nur senden, wenn Daten vorhanden sind",
+      "active": "Aktiv",
+      "paused": "Angehalten",
+      "pausedReason": "Angehalten: {{reason}}",
+      "resume": "Fortsetzen",
+      "runNow": "Jetzt senden",
+      "testSend": "Testversand an mich",
+      "testSendOwner": "Testversand an den Ersteller",
+      "sendToAll": "An alle Empfänger senden",
+      "runStarted": "Der Versand wurde gestartet.",
+      "runFailed": "Der Versand konnte nicht gestartet werden.",
+      "history": "Versandverlauf",
+      "noRuns": "Es gab noch keinen Versand.",
+      "download": "Datei herunterladen",
+      "save": "Speichern",
+      "saved": "Der Zeitplan wurde gespeichert.",
+      "saveFailed": "Der Zeitplan konnte nicht gespeichert werden.",
+      "delete": "Zeitplan löschen",
+      "deleteConfirm": "Soll der Zeitplan „{{name}}“ gelöscht werden?",
+      "loadFailed": "Die Zeitpläne konnten nicht geladen werden.",
+      "staleVersion": "Der Zeitplan wurde inzwischen geändert. Bitte laden Sie ihn neu.",
+      "unavailable": "Nicht mehr verfügbar",
+      "status": {
+        "queued": "Wartet",
+        "running": "Läuft",
+        "succeeded": "Versendet",
+        "partial": "Teilweise versendet",
+        "failed": "Fehlgeschlagen",
+        "skipped": "Übersprungen"
+      },
+      "kind": {
+        "schedule": "Zeitplan",
+        "manual": "Manuell"
+      },
+      "recurrenceKind": {
+        "daily": "Täglich",
+        "weekly": "Wöchentlich",
+        "monthly": "Monatlich",
+        "yearly": "Jährlich"
+      },
+      "time": "Uhrzeit",
+      "workdaysOnly": "Nur an Werktagen",
+      "timeZone": "Zeitzone",
+      "rows": "{{count}} Zeilen",
+      "rows_one": "{{count}} Zeile",
+      "recipientCount": "{{count}} Empfänger",
+      "recipientCount_one": "{{count}} Empfänger",
+      "general": "Allgemein",
+      "message": "Nachricht",
+      "weekdays": "Wochentage",
+      "month": "Monat",
+      "dayOfMonth": "Tag des Monats",
+      "dayOfMonthHint": "In kürzeren Monaten am letzten Tag.",
+      "previewFailed": "Die nächsten Termine konnten nicht berechnet werden.",
+      "toMe": "An mich",
+      "needShareRight": "Zum Versand an andere fehlt die Berechtigung.",
+      "onlyMe": "Nur an mich senden",
+      "remove": "{{name}} entfernen",
+      "emailPlaceholder": "name@example.org",
+      "add": "Hinzufügen",
+      "addReport": "Bericht hinzufügen",
+      "moveUp": "Nach oben",
+      "moveDown": "Nach unten",
+      "runBusy": "Ein Versand läuft bereits.",
+      "runTime": "Zeitpunkt",
+      "runStatus": "Status",
+      "runResult": "Ergebnis",
+      "files": "Dateien",
+      "reload": "Neu laden",
+      "notFound": "Dieser Zeitplan existiert nicht oder ist für Sie nicht sichtbar.",
+      "needsCreate": "Für Zeitpläne benötigen Sie die Berechtigung, Berichte anzulegen.",
+      "showAll": "Alle anzeigen",
+      "errors": {
+        "name": "Bitte geben Sie einen Namen ein.",
+        "items": "Bitte wählen Sie mindestens einen Bericht.",
+        "itemsMax": "Ein Zeitplan kann höchstens 10 Berichte enthalten.",
+        "time": "Bitte geben Sie eine gültige Uhrzeit ein.",
+        "weekdays": "Bitte wählen Sie mindestens einen Wochentag.",
+        "dayOfMonth": "Bitte geben Sie einen Tag zwischen 1 und 31 ein.",
+        "month": "Bitte wählen Sie einen Monat.",
+        "recipientsEmpty": "Bitte wählen Sie mindestens einen Empfänger.",
+        "email": "Bitte geben Sie gültige E-Mail-Adressen ein.",
+        "shareRight": "Für das Versenden an andere fehlt die Berechtigung (Gruppe „stats“, Schreibrecht).",
+        "externalNotAllowed": "Externe Empfänger sind nicht freigeschaltet. Bitte wenden Sie sich an einen Administrator."
+      },
+      "range": {
+        "label": "Zeitraum für den Versand",
+        "default": "Wie im Bericht",
+        "last7Days": "Letzte 7 Tage",
+        "last30Days": "Letzte 30 Tage",
+        "lastMonth": "Letzter Monat",
+        "lastQuarter": "Letztes Quartal",
+        "lastYear": "Letztes Jahr",
+        "custom": "Eigener Zeitraum"
+      }
+    },
+    "znunyImport": {
+      "title": "Statistiken aus Znuny übernehmen",
+      "intro": "Wählen Sie die Statistiken aus, die als Bericht oder gespeicherte Suche übernommen werden sollen.",
+      "fromDatabase": "Aus der Znuny-Datenbank",
+      "fromFile": "Aus einer Exportdatei",
+      "chooseFile": "Exportdatei wählen",
+      "fileTooLarge": "Die Datei ist zu groß (höchstens 1 MB).",
+      "loadFailed": "Die Statistiken konnten nicht geladen werden.",
+      "truncated": "Die Liste ist gekürzt.",
+      "importing": "Wird übernommen …",
+      "importFailed": "Die Statistiken konnten nicht übernommen werden.",
+      "imported": "{{count}} Statistiken übernommen.",
+      "imported_one": "{{count}} Statistik übernommen.",
+      "skipped": "{{count}} Statistiken wurden nicht übernommen.",
+      "skipped_one": "{{count}} Statistik wurde nicht übernommen.",
+      "target": {
+        "report": "Bericht",
+        "saved_search": "Gespeicherte Suche",
+        "none": "Nicht übernommen"
+      },
+      "action": {
+        "created": "Neu angelegt",
+        "updated": "Aktualisiert"
+      },
+      "approximated": "Angepasst",
+      "details": "Details",
+      "empty": "In Znuny sind keine Statistiken gespeichert, die Sie sehen dürfen.",
+      "needsCreate": "Zum Übernehmen von Statistiken fehlt Ihnen die Berechtigung, Berichte anzulegen.",
+      "apply": "Übernehmen ({{count}})",
+      "alreadyImportedUpdate": "Bereits übernommen – wird aktualisiert",
+      "fileHint": "Die ganze Datei wird übernommen; nicht abbildbare Statistiken werden übersprungen.",
+      "fileLoadFailed": "Die Datei konnte nicht gelesen werden.",
+      "close": "Schließen",
+      "dropped": "Nicht übernommen",
+      "issueLine": "{{element}}: {{value}}",
+      "loadErrors": "Ladefehler",
+      "select": "{{title}} auswählen"
     }
   },
   "webchat": {

@@ -24,6 +24,16 @@ class ReportingSettings(BaseModel):
     max_result_rows: int = Field(5_000, ge=100, le=10_000)
     export_row_limit: int = Field(100_000, ge=1_000, le=1_000_000)
     query_timeout_seconds: int = Field(60, ge=5, le=600)
+    #: scheduled delivery to external e-mail addresses (off by default)
+    schedule_external_recipients: bool = False
+    #: resolved addresses per delivery
+    schedule_max_recipients: int = Field(50, ge=1, le=500)
+    #: tiqora_report_run + files
+    run_retention_days: int = Field(90, ge=7, le=365)
+    #: rows per report in a PDF
+    pdf_row_limit: int = Field(1000, ge=100, le=5000)
+    #: all attachments of one mail
+    delivery_max_attachment_mb: int = Field(15, ge=1, le=50)
 
 
 REPORTING_SECTION = SettingsSection(

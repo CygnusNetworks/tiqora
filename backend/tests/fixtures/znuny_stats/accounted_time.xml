@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<otrs_stats>
+<Cache>0</Cache>
+<Description>Gebuchte Zeit je Mitarbeiter im September 2026.</Description>
+<Format>Print</Format>
+<Object>TicketAccountedTime</Object>
+<ObjectModule>Kernel::System::Stats::Dynamic::TicketAccountedTime</ObjectModule>
+<Permission>stats</Permission>
+<StatType>dynamic</StatType>
+<SumCol>0</SumCol>
+<SumRow>0</SumRow>
+<Title>rep52 Gebuchte Zeit</Title>
+<UseAsRestriction Element="ArticleAccountedTime" Fixed="1" TimeStart="2026-09-01 00:00:00" TimeStop="2026-09-30 23:59:59">
+</UseAsRestriction>
+<UseAsValueSeries Element="AccountedByAgent" Fixed="1">
+</UseAsValueSeries>
+<UseAsXvalue Element="KindsOfReporting" Fixed="1">
+<SelectedValues>TotalTime</SelectedValues>
+<SelectedValues>NumberOfTickets</SelectedValues>
+<SelectedValues>TicketMinTime</SelectedValues>
+</UseAsXvalue>
+<Valid>1</Valid>
+</otrs_stats>

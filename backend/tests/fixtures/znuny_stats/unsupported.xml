@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<otrs_stats>
+<Cache>0</Cache>
+<Description>Enthält Merkmale, die Tiqora nicht übernimmt.</Description>
+<Format>Print</Format>
+<Object>Ticket</Object>
+<ObjectModule>Kernel::System::Stats::Dynamic::Ticket</ObjectModule>
+<Permission>stats</Permission>
+<ShowAsDashboardWidget>1</ShowAsDashboardWidget>
+<StatType>dynamic</StatType>
+<SumCol>0</SumCol>
+<SumRow>0</SumRow>
+<Title>rep52 Nicht unterstützt</Title>
+<UseAsRestriction Element="DynamicField_Kundenwert" Fixed="0">
+<SelectedValues>gold</SelectedValues>
+</UseAsRestriction>
+<UseAsRestriction Element="EscalationTime" Fixed="1" TimeRelativeCount="7" TimeRelativeUnit="Day">
+</UseAsRestriction>
+<UseAsXvalue Element="CreateTime" Fixed="1" TimeRelativeCount="6" TimeRelativeUnit="Month" TimeRelativeUpcomingCount="3" TimeScaleCount="1">
+<SelectedValues>HalfYear</SelectedValues>
+</UseAsXvalue>
+<Valid>0</Valid>
+</otrs_stats>

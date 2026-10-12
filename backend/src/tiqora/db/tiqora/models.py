@@ -1737,3 +1737,168 @@ class TiqoraChatAgentState(TiqoraBase):
         SmallInteger, nullable=False, default=3, server_default="3"
     )
     changed: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class TiqoraReportSchedule(TiqoraBase):
+    """A scheduled report delivery; runs with the owner's permissions (no FK on the owner)."""
+
+    __tablename__ = "tiqora_report_schedule"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    owner_user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    #: pdf | xlsx | csv
+    format: Mapped[str] = mapped_column(
+        String(4), nullable=False, default="pdf", server_default="pdf"
+    )
+    #: Recurrence JSON
+    recurrence: Mapped[str] = mapped_column(Text, nullable=False)
+    time_zone: Mapped[str] = mapped_column(String(64), nullable=False)
+    #: de | en
+    language: Mapped[str] = mapped_column(
+        String(5), nullable=False, default="de", server_default="de"
+    )
+    #: '' = default subject of the language
+    subject: Mapped[str] = mapped_column(String(250), nullable=False)
+    #: '' = default body
+    body: Mapped[str] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=False)
+    only_if_nonempty: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
+    #: German; set by the auto-pause
+    paused_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    #: naive UTC; NULL while inactive
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    #: succeeded | partial | failed | skipped
+    last_status: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    #: consecutive failed scheduled runs
+    failure_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    #: optimistic lock, +1 per update
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        Index("ix_tiqora_report_schedule_due", "active", "next_run_at"),
+        Index("ix_tiqora_report_schedule_owner", "owner_user_id"),
+    )
+
+
+class TiqoraReportScheduleItem(TiqoraBase):
+    """One report of a schedule's bundle, in order (position 0..9)."""
+
+    __tablename__ = "tiqora_report_schedule_item"
+
+    schedule_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "tiqora_report_schedule.id",
+            ondelete="CASCADE",
+            name="fk_tiqora_report_schedule_item_schedule",
+        ),
+        primary_key=True,
+        autoincrement=False,
+    )
+    position: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=False)
+    #: ``builtin.<name>`` or ``<saved id>``
+    report_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    #: ScheduleItemOverrides JSON
+    overrides: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (Index("ix_tiqora_report_schedule_item_key", "report_key"),)
+
+
+class TiqoraReportScheduleRecipient(TiqoraBase):
+    """Recipient of a schedule: agent, group, role or external e-mail address."""
+
+    __tablename__ = "tiqora_report_schedule_recipient"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    schedule_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "tiqora_report_schedule.id",
+            ondelete="CASCADE",
+            name="fk_tiqora_report_schedule_recipient_schedule",
+        ),
+        nullable=False,
+    )
+    #: user | group | role | email
+    kind: Mapped[str] = mapped_column(String(5), nullable=False)
+    #: users.id / permission_groups.id / roles.id (kind != email)
+    ref_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: kind = email; stored lower-case
+    email: Mapped[str | None] = mapped_column(String(250), nullable=True)
+
+    __table_args__ = (
+        Index("ix_tiqora_report_schedule_recipient_schedule", "schedule_id"),
+        Index("ix_tiqora_report_schedule_recipient_email", "email"),
+    )
+
+
+class TiqoraReportRun(TiqoraBase):
+    """One delivery (bundle); outlives a deleted schedule until retention (no FK)."""
+
+    __tablename__ = "tiqora_report_run"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    schedule_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    #: name at run time
+    schedule_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    owner_user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: schedule | manual
+    run_kind: Mapped[str] = mapped_column(String(10), nullable=False)
+    #: manual "only to me"
+    owner_only: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    #: the occurrence (schedule runs)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    job_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    #: queued | running | succeeded | partial | failed | skipped
+    status: Mapped[str] = mapped_column(String(10), nullable=False)
+    #: JSON list at run time
+    report_keys: Mapped[str] = mapped_column(Text, nullable=False)
+    row_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    recipient_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: German lines; never e-mail addresses
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: German
+    error: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_tiqora_report_run_schedule", "schedule_id", "id"),
+        Index("ix_tiqora_report_run_finished", "finished_at"),
+        Index("ix_tiqora_report_run_owner", "owner_user_id"),
+    )
+
+
+class TiqoraReportRunFile(TiqoraBase):
+    """An attachment generated for a run."""
+
+    __tablename__ = "tiqora_report_run_file"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "tiqora_report_run.id", ondelete="CASCADE", name="fk_tiqora_report_run_file_run"
+        ),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    data: Mapped[bytes] = deferred(mapped_column(JOB_FILE_BLOB, nullable=False))
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (Index("ix_tiqora_report_run_file_run", "run_id"),)

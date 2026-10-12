@@ -164,8 +164,10 @@ class ReportRunOut(BaseModel):
 
 
 class ReportExportIn(ReportRunIn):
-    format: Literal["xlsx", "csv"] = "xlsx"
+    format: Literal["xlsx", "csv", "pdf"] = "xlsx"
     title: str = Field("Bericht", min_length=1, max_length=120)
+    #: number/date formats and fixed texts of a PDF (``de``; anything else is English)
+    locale: str | None = Field(None, max_length=10)
     #: frontend-translated column headers (column key -> header)
     column_labels: dict[_ColumnKey, _Label] = Field(
         default_factory=dict, max_length=MAX_LABEL_COLUMNS

@@ -44,7 +44,13 @@ from tiqora.domain.settings_store import get_setting
 from tiqora.domain.ticket_write_service import SEARCH_REINDEX_EVENT, _emit_event
 from tiqora.gdpr.audit import record_audit
 from tiqora.gdpr.gate import require_write_gate
-from tiqora.gdpr.saved_criteria import SAVED_CRITERIA_TABLES, scrub_saved_criteria
+from tiqora.gdpr.saved_criteria import (
+    SAVED_CRITERIA_TABLES,
+    SCHEDULE_ITEM_TABLE,
+    remove_erased_recipient_emails,
+    scrub_saved_criteria,
+    scrub_schedule_items,
+)
 from tiqora.reporting.cache import purge_report_cache_at
 from tiqora.znuny.cache_invalidation import invalidate_cache_type, invalidate_ticket_cache
 from tiqora.znuny.sessions import delete_customer_sessions
@@ -1193,6 +1199,8 @@ async def run_erasure(
         # Uploaded photos are keyed by the address hash — capture it before
         # anonymize rewrites the address.
         avatar_keys = sorted({email_key(c.email) for c in ordered if (c.email or "").strip()})
+        # Same reason: scheduled-report recipients are matched on the address as it was.
+        erased_emails = sorted({c.email for c in ordered if (c.email or "").strip()})
         login_to_new: dict[str, str] = {}
         company_to_new: dict[str, str] = {}
 
@@ -2057,6 +2065,16 @@ async def run_erasure(
             backup=_backup_saved,
         )
 
+        # Scheduled reports: parameter values naming the customer, and recipient rows with the
+        # customer's address (the latter is not restored by a rollback).
+        counts["schedule_items"] = await scrub_schedule_items(
+            session,
+            login_to_new,
+            company_to_new if mode == "delete" else None,
+            backup=_backup_saved,
+        )
+        counts["schedule_recipients"] = await remove_erased_recipient_emails(session, erased_emails)
+
         await _refresh_report_facts(session, report_ticket_ids)
 
         # ---- cache invalidation ----
@@ -2171,6 +2189,20 @@ async def rollback_job(
                     restore = {k: v for k, v in original.items() if k != "version"}
                     restore["version"] = int(current["version"]) + 1
                     await _update_row(session, table, pk, restore)
+                    restored += 1
+                continue
+
+            if table == SCHEDULE_ITEM_TABLE:
+                # Only `overrides` is ever UPDATEd; bump the parent so open editors get a 409.
+                if await _fetch_full_row(session, table, pk) is not None:
+                    await _update_row(session, table, pk, original)
+                    await session.execute(
+                        text(
+                            "UPDATE tiqora_report_schedule SET version = version + 1,"
+                            " changed_at = :now WHERE id = :sid"
+                        ),
+                        {"now": datetime.now(UTC).replace(tzinfo=None), "sid": pk["schedule_id"]},
+                    )
                     restored += 1
                 continue
 

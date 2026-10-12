@@ -7959,6 +7959,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/report-runs/{run_id}/files/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Report Run File
+         * @description A generated file. It holds data selected with the OWNER's permissions: the owner of the
+         *     run and admins may download it; everybody else gets 404.
+         */
+        get: operations["download_report_run_file_api_v1_report_runs__run_id__files__file_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Report Schedules
+         * @description Own schedules (lightweight rows); ``all=true`` lists everybody's, admins only.
+         */
+        get: operations["list_report_schedules_api_v1_report_schedules_get"];
+        put?: never;
+        /** Create Report Schedule */
+        post: operations["create_report_schedule_api_v1_report_schedules_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-schedules/preview-recurrence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Recurrence
+         * @description The next five occurrences and the sentence in ``body.language`` (pure, bounded).
+         */
+        post: operations["preview_recurrence_api_v1_report_schedules_preview_recurrence_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-schedules/{schedule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Report Schedule */
+        get: operations["get_report_schedule_api_v1_report_schedules__schedule_id__get"];
+        /** Update Report Schedule */
+        put: operations["update_report_schedule_api_v1_report_schedules__schedule_id__put"];
+        post?: never;
+        /** Delete Report Schedule */
+        delete: operations["delete_report_schedule_api_v1_report_schedules__schedule_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-schedules/{schedule_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Report Schedule Now
+         * @description "Jetzt senden": one delivery as a background job; one active manual run per schedule.
+         */
+        post: operations["run_report_schedule_now_api_v1_report_schedules__schedule_id__run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-schedules/{schedule_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Report Schedule Runs
+         * @description Run history, newest first (no e-mail addresses in it).
+         */
+        get: operations["list_report_schedule_runs_api_v1_report_schedules__schedule_id__runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reporting/sources": {
         parameters: {
             query?: never;
@@ -8062,6 +8183,66 @@ export interface paths {
          * @description Parse and validate a report file (JSON or YAML); saves nothing.
          */
         post: operations["import_report_file_api_v1_reports_import_file_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/import/znuny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Znuny Stats
+         * @description Znuny statistics the agent may run, mapped to Tiqora reports; saves nothing.
+         */
+        get: operations["preview_znuny_stats_api_v1_reports_import_znuny_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/import/znuny/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Znuny Stats
+         * @description Save the chosen Znuny statistics as private reports / saved searches (re-import updates).
+         */
+        post: operations["apply_znuny_stats_api_v1_reports_import_znuny_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/import/znuny/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Znuny Stats File
+         * @description Map a Znuny statistics export file (XML); saves nothing.
+         */
+        post: operations["preview_znuny_stats_file_api_v1_reports_import_znuny_file_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -15810,6 +15991,41 @@ export interface components {
             /** Test Id */
             test_id: string;
         };
+        /** ImportIssueOut */
+        ImportIssueOut: {
+            /** Element */
+            element: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "dropped" | "approximated";
+            /** Value */
+            value: string;
+        };
+        /** ImportedStatOut */
+        ImportedStatOut: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "created" | "updated";
+            /** Id */
+            id: number;
+            /** Import Key */
+            import_key: string;
+            /** Issues */
+            issues: components["schemas"]["ImportIssueOut"][];
+            /**
+             * Target
+             * @enum {string}
+             */
+            target: "report" | "saved_search";
+            /** Title */
+            title: string;
+        };
         /** JitDefaults */
         JitDefaults: {
             /** Allowed Email Domains */
@@ -18671,6 +18887,27 @@ export interface components {
             /** Y */
             y: number;
         };
+        /** Recurrence */
+        Recurrence: {
+            /** Day Of Month */
+            day_of_month?: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "daily" | "weekly" | "monthly" | "yearly";
+            /** Month */
+            month?: number | null;
+            /** Time */
+            time: string;
+            /** Weekdays */
+            weekdays?: number[];
+            /**
+             * Workdays Only
+             * @default false
+             */
+            workdays_only: boolean;
+        };
         /**
          * RecurrenceIn
          * @description Common RRULE subset: FREQ + INTERVAL + (COUNT xor UNTIL).
@@ -18690,6 +18927,25 @@ export interface components {
             type: string;
             /** Until */
             until?: string | null;
+        };
+        /** RecurrencePreviewIn */
+        RecurrencePreviewIn: {
+            /**
+             * Language
+             * @default de
+             * @enum {string}
+             */
+            language: "de" | "en";
+            recurrence: components["schemas"]["Recurrence"];
+            /** Time Zone */
+            time_zone?: string | null;
+        };
+        /** RecurrencePreviewOut */
+        RecurrencePreviewOut: {
+            /** Next Runs */
+            next_runs: string[];
+            /** Text */
+            text: string;
         };
         /** RedisStatusOut */
         RedisStatusOut: {
@@ -18836,11 +19092,13 @@ export interface components {
              * @default xlsx
              * @enum {string}
              */
-            format: "xlsx" | "csv";
+            format: "xlsx" | "csv" | "pdf";
             /** Grain */
             grain?: ("day" | "week" | "month" | "quarter" | "year") | null;
             /** Info Lines */
             info_lines?: string[];
+            /** Locale */
+            locale?: string | null;
             /**
              * No Cache
              * @default false
@@ -19063,6 +19321,190 @@ export interface components {
         ReportRunOut: {
             job?: components["schemas"]["JobAccepted"] | null;
             result?: components["schemas"]["ReportResultOut"] | null;
+        };
+        /** ReportScheduleIn */
+        ReportScheduleIn: {
+            /**
+             * Active
+             * @default true
+             */
+            active: boolean;
+            /**
+             * Body
+             * @default
+             */
+            body: string;
+            /**
+             * Format
+             * @default pdf
+             * @enum {string}
+             */
+            format: "pdf" | "xlsx" | "csv";
+            /** Items */
+            items: components["schemas"]["ScheduleItemIn"][];
+            /**
+             * Language
+             * @default de
+             * @enum {string}
+             */
+            language: "de" | "en";
+            /** Name */
+            name: string;
+            /**
+             * Only If Nonempty
+             * @default false
+             */
+            only_if_nonempty: boolean;
+            recipients: components["schemas"]["ScheduleRecipientsIn"];
+            recurrence: components["schemas"]["Recurrence"];
+            /**
+             * Subject
+             * @default
+             */
+            subject: string;
+            /** Time Zone */
+            time_zone?: string | null;
+        };
+        /**
+         * ReportScheduleListItemOut
+         * @description Lightweight row of the list (no availability checks, no recipient views).
+         */
+        ReportScheduleListItemOut: {
+            /** Active */
+            active: boolean;
+            /** Can Edit */
+            can_edit: boolean;
+            /** Failure Count */
+            failure_count: number;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "pdf" | "xlsx" | "csv";
+            /** Id */
+            id: number;
+            /** Is Owner */
+            is_owner: boolean;
+            /** Items */
+            items: components["schemas"]["ScheduleItemSummaryOut"][];
+            /** Last Run At */
+            last_run_at: string | null;
+            /** Last Status */
+            last_status: ("succeeded" | "partial" | "failed" | "skipped") | null;
+            /** Name */
+            name: string;
+            /** Next Run At */
+            next_run_at: string | null;
+            owner: components["schemas"]["ReportOwnerOut"];
+            /** Paused Reason */
+            paused_reason: string | null;
+            /** Recurrence Text */
+            recurrence_text: string;
+            /** Time Zone */
+            time_zone: string;
+            /** Version */
+            version: number;
+        };
+        /** ReportScheduleOut */
+        ReportScheduleOut: {
+            /** Active */
+            active: boolean;
+            /** Body */
+            body: string;
+            /** Can Edit */
+            can_edit: boolean;
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /** Failure Count */
+            failure_count: number;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "pdf" | "xlsx" | "csv";
+            /** Id */
+            id: number;
+            /** Is Owner */
+            is_owner: boolean;
+            /** Items */
+            items: components["schemas"]["ScheduleItemOut"][];
+            /**
+             * Language
+             * @enum {string}
+             */
+            language: "de" | "en";
+            /** Last Run At */
+            last_run_at: string | null;
+            /** Last Status */
+            last_status: ("succeeded" | "partial" | "failed" | "skipped") | null;
+            /** Name */
+            name: string;
+            /** Next Run At */
+            next_run_at: string | null;
+            /** Only If Nonempty */
+            only_if_nonempty: boolean;
+            owner: components["schemas"]["ReportOwnerOut"];
+            /** Paused Reason */
+            paused_reason: string | null;
+            /** Recipients */
+            recipients: components["schemas"]["ScheduleRecipientOut"][];
+            recurrence: components["schemas"]["Recurrence"] | null;
+            /** Recurrence Text */
+            recurrence_text: string;
+            /** Subject */
+            subject: string;
+            /** Time Zone */
+            time_zone: string;
+            /** Version */
+            version: number;
+        };
+        /** ReportScheduleUpdateIn */
+        ReportScheduleUpdateIn: {
+            /**
+             * Active
+             * @default true
+             */
+            active: boolean;
+            /**
+             * Body
+             * @default
+             */
+            body: string;
+            /**
+             * Format
+             * @default pdf
+             * @enum {string}
+             */
+            format: "pdf" | "xlsx" | "csv";
+            /** Items */
+            items: components["schemas"]["ScheduleItemIn"][];
+            /**
+             * Language
+             * @default de
+             * @enum {string}
+             */
+            language: "de" | "en";
+            /** Name */
+            name: string;
+            /**
+             * Only If Nonempty
+             * @default false
+             */
+            only_if_nonempty: boolean;
+            recipients: components["schemas"]["ScheduleRecipientsIn"];
+            recurrence: components["schemas"]["Recurrence"];
+            /**
+             * Subject
+             * @default
+             */
+            subject: string;
+            /** Time Zone */
+            time_zone?: string | null;
+            /** Version */
+            version: number;
         };
         /** ReportSourceOut */
         ReportSourceOut: {
@@ -19490,6 +19932,148 @@ export interface components {
             sort_order: "asc" | "desc";
             /** Version */
             version: number;
+        };
+        /** ScheduleItemIn */
+        ScheduleItemIn: {
+            overrides?: components["schemas"]["ScheduleItemOverrides"];
+            /** Report Key */
+            report_key: string;
+        };
+        /** ScheduleItemOut */
+        ScheduleItemOut: {
+            /** Available */
+            available: boolean;
+            overrides: components["schemas"]["ScheduleItemOverrides"];
+            /** Problem */
+            problem: string | null;
+            /** Report Key */
+            report_key: string;
+            /** Title */
+            title: string | null;
+            /** Title Key */
+            title_key: string | null;
+        };
+        /** ScheduleItemOverrides */
+        ScheduleItemOverrides: {
+            /** Grain */
+            grain?: ("day" | "week" | "month" | "quarter" | "year") | null;
+            /** Parameters */
+            parameters?: {
+                [key: string]: (string | number)[] | string | number | boolean | null;
+            };
+            /** Time Range */
+            time_range?: (components["schemas"]["RelativeTimeRange"] | components["schemas"]["AbsoluteTimeRange"]) | null;
+        };
+        /**
+         * ScheduleItemSummaryOut
+         * @description The list shows titles only (no per-item rights check, see the list route).
+         */
+        ScheduleItemSummaryOut: {
+            /** Report Key */
+            report_key: string;
+            /** Title */
+            title: string | null;
+            /** Title Key */
+            title_key: string | null;
+        };
+        /** ScheduleRecipientOut */
+        ScheduleRecipientOut: {
+            /** Email */
+            email: string | null;
+            /** Id */
+            id: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "user" | "group" | "role" | "email";
+            /** Label */
+            label: string;
+            /** Problem */
+            problem: string | null;
+        };
+        /** ScheduleRecipientsIn */
+        ScheduleRecipientsIn: {
+            /** Emails */
+            emails?: string[];
+            /** Group Ids */
+            group_ids?: number[];
+            /** Role Ids */
+            role_ids?: number[];
+            /** User Ids */
+            user_ids?: number[];
+        };
+        /** ScheduleRunAccepted */
+        ScheduleRunAccepted: {
+            job: components["schemas"]["JobAccepted"];
+            /** Run Id */
+            run_id: number;
+        };
+        /** ScheduleRunFileOut */
+        ScheduleRunFileOut: {
+            /** Content Type */
+            content_type: string;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Size Bytes */
+            size_bytes: number;
+        };
+        /** ScheduleRunIn */
+        ScheduleRunIn: {
+            /**
+             * Owner Only
+             * @default true
+             */
+            owner_only: boolean;
+        };
+        /**
+         * ScheduleRunOut
+         * @description One delivery of a schedule (run history). ``detail`` / ``error`` hold no addresses.
+         */
+        ScheduleRunOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Detail */
+            detail: string | null;
+            /** Due At */
+            due_at: string | null;
+            /** Error */
+            error: string | null;
+            /** Files */
+            files: components["schemas"]["ScheduleRunFileOut"][];
+            /** Finished At */
+            finished_at: string | null;
+            /** Id */
+            id: number;
+            /** Job Id */
+            job_id: number | null;
+            /** Owner Only */
+            owner_only: boolean;
+            /** Recipient Count */
+            recipient_count: number | null;
+            /** Row Count */
+            row_count: number | null;
+            /**
+             * Run Kind
+             * @enum {string}
+             */
+            run_kind: "schedule" | "manual";
+            /** Schedule Id */
+            schedule_id: number | null;
+            /** Schedule Name */
+            schedule_name: string;
+            /** Started At */
+            started_at: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "succeeded" | "partial" | "failed" | "skipped";
         };
         /** SearchHit */
         SearchHit: {
@@ -20199,6 +20783,43 @@ export interface components {
             text?: string | null;
             /** Valid Id */
             valid_id?: number | null;
+        };
+        /**
+         * StatLoadErrorOut
+         * @description ``stat_id`` is None in the aggregate entry non-admins get (no ids of unreadable stats).
+         */
+        StatLoadErrorOut: {
+            /** Message */
+            message: string;
+            /** Stat Id */
+            stat_id: number | null;
+        };
+        /** StatPreviewOut */
+        StatPreviewOut: {
+            /** Already Imported */
+            already_imported: ("report" | "saved_search") | null;
+            definition: components["schemas"]["ReportDefinition"] | null;
+            /** Description */
+            description: string;
+            /** Existing Id */
+            existing_id: number | null;
+            /** Import Key */
+            import_key: string;
+            /** Issues */
+            issues: components["schemas"]["ImportIssueOut"][];
+            /** Object Label */
+            object_label: string;
+            /** Stat Id */
+            stat_id: number | null;
+            /** Stat Number */
+            stat_number: string | null;
+            /**
+             * Target
+             * @enum {string}
+             */
+            target: "report" | "saved_search" | "none";
+            /** Title */
+            title: string;
         };
         /** StateCreate */
         StateCreate: {
@@ -21668,6 +22289,11 @@ export interface components {
             /** Login */
             login: string;
             /**
+             * Report External Recipients
+             * @default false
+             */
+            report_external_recipients: boolean;
+            /**
              * Sso Logout
              * @default false
              */
@@ -22099,6 +22725,34 @@ export interface components {
             partial: boolean;
             /** Unmapped */
             unmapped: components["schemas"]["UnmappedOut"][];
+        };
+        /** ZnunyStatsApplyIn */
+        ZnunyStatsApplyIn: {
+            /** File Content Base64 */
+            file_content_base64?: string | null;
+            /** Stat Ids */
+            stat_ids?: number[];
+        };
+        /** ZnunyStatsApplyOut */
+        ZnunyStatsApplyOut: {
+            /** Imported */
+            imported: components["schemas"]["ImportedStatOut"][];
+            /** Skipped */
+            skipped: components["schemas"]["StatPreviewOut"][];
+        };
+        /** ZnunyStatsFileIn */
+        ZnunyStatsFileIn: {
+            /** Content Base64 */
+            content_base64: string;
+        };
+        /** ZnunyStatsPreviewOut */
+        ZnunyStatsPreviewOut: {
+            /** Errors */
+            errors: components["schemas"]["StatLoadErrorOut"][];
+            /** Stats */
+            stats: components["schemas"]["StatPreviewOut"][];
+            /** Truncated */
+            truncated: boolean;
         };
     };
     responses: never;
@@ -42799,6 +43453,334 @@ export interface operations {
             };
         };
     };
+    download_report_run_file_api_v1_report_runs__run_id__files__file_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                run_id: number;
+                file_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_report_schedules_api_v1_report_schedules_get: {
+        parameters: {
+            query?: {
+                all?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportScheduleListItemOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_report_schedule_api_v1_report_schedules_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportScheduleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportScheduleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_recurrence_api_v1_report_schedules_preview_recurrence_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecurrencePreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurrencePreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_report_schedule_api_v1_report_schedules__schedule_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                schedule_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportScheduleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_report_schedule_api_v1_report_schedules__schedule_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                schedule_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportScheduleUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportScheduleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_report_schedule_api_v1_report_schedules__schedule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                schedule_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_report_schedule_now_api_v1_report_schedules__schedule_id__run_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                schedule_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleRunAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_report_schedule_runs_api_v1_report_schedules__schedule_id__runs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                schedule_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleRunOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_sources_api_v1_reporting_sources_get: {
         parameters: {
             query?: never;
@@ -42998,6 +43980,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReportFileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_znuny_stats_api_v1_reports_import_znuny_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZnunyStatsPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_znuny_stats_api_v1_reports_import_znuny_apply_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZnunyStatsApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZnunyStatsApplyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_znuny_stats_file_api_v1_reports_import_znuny_file_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZnunyStatsFileIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZnunyStatsPreviewOut"];
                 };
             };
             /** @description Validation Error */

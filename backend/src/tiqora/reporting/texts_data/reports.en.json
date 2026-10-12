@@ -1,0 +1,231 @@
+{
+  "reports": {
+    "builtin": {
+      "agent_activity": {
+        "title": "Agent activity"
+      },
+      "backlog_aging": {
+        "title": "Age of open tickets"
+      },
+      "backlog_by_state": {
+        "title": "Backlog by state"
+      },
+      "backlog_trend": {
+        "title": "Open tickets over time"
+      },
+      "channel_mix": {
+        "title": "Channel mix"
+      },
+      "created_heatmap": {
+        "title": "When tickets arrive"
+      },
+      "first_contact_resolution": {
+        "title": "First-contact resolution"
+      },
+      "open_now": {
+        "title": "Open tickets now"
+      },
+      "pingpong": {
+        "title": "Back and forth between queues"
+      },
+      "queue_transfers": {
+        "title": "Queue transfers"
+      },
+      "reopen_trend": {
+        "title": "Reopenings over time"
+      },
+      "sla_by_customer": {
+        "title": "SLA by customer"
+      },
+      "sla_compliance": {
+        "title": "SLA compliance"
+      },
+      "sla_times": {
+        "title": "Response and solution times"
+      },
+      "ticket_kpis": {
+        "title": "Key figures"
+      },
+      "time_by_agent": {
+        "title": "Booked time per agent"
+      },
+      "time_by_agent_month": {
+        "title": "Booked time per agent and month"
+      },
+      "time_by_customer": {
+        "title": "Booked time per customer"
+      },
+      "time_by_queue": {
+        "title": "Booked time per queue"
+      },
+      "time_by_type": {
+        "title": "Booked time per type"
+      },
+      "time_in_state": {
+        "title": "Time spent in each state"
+      },
+      "top_customers": {
+        "title": "Top customers"
+      },
+      "volume": {
+        "title": "Created and closed tickets"
+      },
+      "volume_by_channel": {
+        "title": "Tickets by channel"
+      },
+      "volume_by_queue": {
+        "title": "Tickets per queue"
+      }
+    },
+    "dimensions": {
+      "actor": "Agent",
+      "agent": "Agent",
+      "ai_auto_replied": "Answered by AI",
+      "ai_handed_off": "Handed over to an agent",
+      "ai_triaged": "Sorted by AI",
+      "archived": "Archived",
+      "booked": "Booked",
+      "booked_weekday": "Weekday of booking",
+      "channel": "Channel",
+      "closed": "Closed",
+      "created": "Created",
+      "created_hour": "Hour of creation",
+      "created_weekday": "Weekday of creation",
+      "customer": "Customer",
+      "customer_user": "Contact",
+      "first_response": "First response",
+      "from_queue": "From queue",
+      "from_state": "From state",
+      "from_state_type": "From state type",
+      "has_first_response": "With first response",
+      "kind": "Event",
+      "merged": "Merged",
+      "occurred": "Time",
+      "occurred_hour": "Hour",
+      "occurred_weekday": "Weekday",
+      "owner": "Owner",
+      "priority": "Priority",
+      "process": "Process",
+      "queue": "Queue",
+      "queue_at_create": "Queue at creation",
+      "reopened": "Reopened",
+      "responsible": "Responsible",
+      "service": "Service",
+      "sla": "SLA",
+      "snapshot": "Day",
+      "state": "State",
+      "state_type": "State type",
+      "ticket": "Ticket",
+      "ticket_priority": "Ticket priority",
+      "ticket_queue": "Ticket queue",
+      "ticket_state": "Ticket state",
+      "ticket_type": "Ticket type",
+      "to_queue": "To queue",
+      "to_state": "To state",
+      "to_state_type": "To state type",
+      "type": "Type"
+    },
+    "hourLabel": "{{hour}}:00",
+    "measures": {
+      "accounted_time": "Booked time",
+      "age_0_1d": "Under 1 day",
+      "age_1_3d": "1 to 3 days",
+      "age_30d_plus": "Over 30 days",
+      "age_3_7d": "3 to 7 days",
+      "age_7_30d": "7 to 30 days",
+      "agent_touches_avg": "Agents per ticket (average)",
+      "bookings": "Bookings",
+      "closed_tickets": "Closed",
+      "dwell_avg_hours": "Time in state (average)",
+      "dwell_p50_hours": "Time in state (median)",
+      "dwell_p90_hours": "Time in state (slowest 10 %)",
+      "escalated": "Escalated",
+      "events": "Events",
+      "fcr_rate": "Resolved on first contact",
+      "first_response_avg": "First response (average)",
+      "first_response_clock_avg": "First response, around the clock (average)",
+      "first_response_clock_p50": "First response, around the clock (median)",
+      "first_response_p50": "First response (median)",
+      "first_response_p90": "First response (slowest 10 %)",
+      "open_tickets": "Open",
+      "pingpong_tickets": "Tickets moved back and forth",
+      "queue_moves_avg": "Queue moves per ticket (average)",
+      "reopen_rate": "Reopen rate",
+      "reopened_tickets": "Reopened",
+      "response_breach_rate": "First-response breach rate",
+      "response_breaches": "First response breached",
+      "response_near_misses": "First response nearly missed",
+      "sla_met_rate": "SLA met",
+      "solution_avg": "Solution time (average)",
+      "solution_breach_rate": "Solution breach rate",
+      "solution_breaches": "Solution time breached",
+      "solution_clock_avg": "Solution time, around the clock (average)",
+      "solution_clock_p50": "Solution time, around the clock (median)",
+      "solution_near_misses": "Solution time nearly missed",
+      "solution_p50": "Solution time (median)",
+      "solution_p90": "Solution time (slowest 10 %)",
+      "tickets": "Tickets",
+      "time_units": "Booked time",
+      "unassigned": "Unassigned",
+      "update_breached_tickets": "Tickets with breached update time",
+      "update_breaches": "Update time breached"
+    },
+    "other": "Others",
+    "sources": {
+      "accounted_time": "Time bookings",
+      "daily_snapshot": "Daily snapshots",
+      "open_tickets": "Open tickets (now)",
+      "ticket_events": "Ticket events",
+      "tickets": "Tickets"
+    },
+    "totals": "Total",
+    "values": {
+      "channel": {
+        "email": "Email",
+        "internal": "Internal",
+        "phone": "Phone",
+        "sms": "SMS",
+        "telegram": "Telegram",
+        "webchat": "Web chat",
+        "whatsapp": "WhatsApp"
+      },
+      "event_kind": {
+        "close": "Closed",
+        "create": "Created",
+        "customer_message": "Customer message",
+        "merge": "Merged",
+        "note": "Note",
+        "owner": "Owner change",
+        "priority": "Priority change",
+        "process_activity": "Process step",
+        "queue": "Queue change",
+        "reopen": "Reopened",
+        "reply": "Reply",
+        "responsible": "Responsible change",
+        "service": "Service change",
+        "sla": "SLA change",
+        "state": "State change",
+        "type": "Type change"
+      },
+      "state_type": {
+        "closed": "Closed",
+        "merged": "Merged",
+        "new": "New",
+        "open": "Open",
+        "pending auto": "Pending auto",
+        "pending reminder": "Pending reminder",
+        "removed": "Removed"
+      },
+      "weekday": {
+        "1": "Monday",
+        "2": "Tuesday",
+        "3": "Wednesday",
+        "4": "Thursday",
+        "5": "Friday",
+        "6": "Saturday",
+        "7": "Sunday"
+      }
+    },
+    "weekLabel": "Wk {{week}}"
+  }
+}

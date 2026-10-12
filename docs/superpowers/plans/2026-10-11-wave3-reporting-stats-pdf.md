@@ -216,13 +216,13 @@ delivery_max_attachment_mb: int = Field(15, ge=1, le=50)      # all attachments 
 
 ### D3. Znuny XMLHash (Task 2)
 
-Znuny stores a stat in `xml_storage` as one row per leaf: `xml_type = 'Stats'`, `xml_key = <StatID>`, `xml_content_key` like `[1]{'otrs_stats'}[1]{'UseAsXvalue'}[1]{'SelectedValues'}[2]{'Content'}`, `xml_content_value` = the text (NULL = ''). `XMLHashGet` eval's these as Perl; Tiqora parses them with a tokenizer (never eval). Inside the content-key, `'` and `\` in hash keys are escaped as `\'` and `\\` (verify against `XML.pm` `_XMLHash2D` before implementing; if Znuny does not escape keys, the tokenizer still accepts the escapes).
+Znuny stores a stat in `xml_storage` as one row per leaf: `xml_type = 'Stats'`, `xml_key = <StatID>`, `xml_content_key` like `[1]{'otrs_stats'}[1]{'UseAsXvalue'}[1]{'SelectedValues'}[2]{'Content'}`, `xml_content_value` = the text (NULL = ''). `XMLHashGet` eval's these as Perl; Tiqora parses them with a tokenizer (never eval). Inside the content-key, `'` and `\` in hash keys are escaped as `\'` and `\\` (verified: `_XMLHash2D` does not escape keys, only `XMLHashGet` escapes values; the tokenizer still accepts the escapes).
 
 ```python
 # backend/src/tiqora/reporting/znuny_stats/xml_hash.py
 MAX_STAT_ROWS: Final = 20_000                 # leaves per stat; more -> XmlHashError
 MAX_DEPTH: Final = 12
-MAX_FILE_BYTES: Final = 2_000_000
+MAX_FILE_BYTES: Final = 1_000_000                # ruling 33: base64 ~1.37 MB behind the proxy
 class XmlHashError(ValueError):               # German message for the import report
     def __init__(self, message: str) -> None
 Path_ = list[int | str]
@@ -290,7 +290,8 @@ class StatLoadError:
     message: str                                  # German
 async def list_stat_ids(session: AsyncSession) -> list[int]
     # SELECT DISTINCT xml_key FROM xml_storage WHERE xml_type = 'Stats'; non-numeric keys skipped; sorted; capped
-async def load_stats(session: AsyncSession, stat_ids: Sequence[int]) -> tuple[list[ZnunyStat], list[StatLoadError]]
+async def load_stats(session: AsyncSession, stat_ids: Sequence[int], *, row_budget: int = MAX_TOTAL_ROWS) -> tuple[list[ZnunyStat], list[StatLoadError], bool]  # third value: truncated (row budget hit); leaves counted per chunk first
+async def list_stat_ids(session: AsyncSession, *, permission_group_ids: Collection[int] | None = None) -> list[int]  # non-admins: Permission leaves filter BEFORE the 500 cap (F10); the inline statement timeout (QueryBudget.inline) is applied by the Task 5 caller
     # one SELECT xml_key, xml_content_key, xml_content_value ... WHERE xml_type='Stats' AND xml_key IN (:keys as str)
     # (chunked by 200); per stat build_xml_hash + stat_from_xml_hash; XmlHashError -> StatLoadError, others continue
 async def load_stat_lookups(session: AsyncSession, user_id: int) -> StatLookups     # D5
@@ -381,7 +382,7 @@ def map_stat(stat: ZnunyStat, lookups: StatLookups, *, is_admin: bool) -> StatMa
 | `CustomerID`, `CustomerIDRaw` | `customer` | string | `*` → dropped |
 | `CustomerUserLogin`, `CustomerUserLoginRaw`, `CustomerUserID` | `customer_user` | string | `*` → dropped |
 | `CreateTime` | `created` | time | |
-| `CloseTime` | `closed` | time | |
+| `CloseTime`, `CloseTime2` | `closed` | time | `CloseTime2` is the solution-time objects' period (ruling 5) |
 | `SearchInArchive` | — | — | `NotArchivedTickets`/empty → nothing; `ArchivedTickets`/`AllTickets` → dropped "Archivierte Tickets werden in Berichten nicht mitgezählt." |
 | `ChangeTime`, `LastChangeTime`, `PendingUntilTime`, `EscalationTime`, `EscalationResponseTime`, `EscalationUpdateTime`, `EscalationSolutionTime` | — | — | dropped "Dieses Zeitfeld gibt es in den Berichtsdaten nicht." |
 | `LockIDs`, `Title`, `CreatedStateIDs`, `CreatedPriorityIDs`, `CreatedUserIDs`, `MIMEBase_*` | — | — | dropped "Wird in Berichten nicht unterstützt." |
@@ -873,7 +874,7 @@ Worker (`worker/report_scheduler.py`): `run_report_scheduler_worker_tick(setting
 
 ### D14. GDPR and user removal (Task 13)
 
-- Customer erasure (`gdpr/erasure.py` → `scrub_saved_criteria`): additionally (a) rewrites erased logins / company ids inside `tiqora_report_schedule_item.overrides.parameters` for parameters whose report field is `customer_user` / `customer` (resolve the report definition of the item; a built-in's parameter fields are known from `BUILTIN_REPORTS`), backed up through the same `BackupFn` (add `"tiqora_report_schedule_item"` to `SAVED_CRITERIA_TABLES` only if `rollback_job` restores by primary key generically — check; otherwise document "not restored"), and (b) deletes `tiqora_report_schedule_recipient` rows whose `email` equals an erased customer user's e-mail address (case-insensitive; addresses loaded from `customer_user.email` for the erased logins BEFORE anonymisation, or taken from the variable `erasure.py` already holds — find it), bumping the schedule's `version`/`changed_at`. Recipient deletion is not restored by a rollback (documented in `docs/gdpr.md`).
+- Customer erasure (`gdpr/erasure.py` → `scrub_saved_criteria`): additionally (a) rewrites erased logins / company ids inside `tiqora_report_schedule_item.overrides.parameters` for parameters whose report field is `customer_user` / `customer` (resolve the report definition of the item; a built-in's parameter fields are known from `BUILTIN_REPORTS`), backed up through the same `BackupFn` (add `"tiqora_report_schedule_item"` to `SAVED_CRITERIA_TABLES` only if `rollback_job` restores by primary key generically — check; otherwise document "not restored"), and (b) deletes `tiqora_report_schedule_recipient` rows whose `email` equals an erased customer user's e-mail address (case-insensitive; addresses loaded from `customer_user.email` for the erased logins BEFORE anonymisation, or taken from the variable `erasure.py` already holds — find it), bumping the schedule's `version`/`changed_at`. Recipient deletion is not restored by a rollback (documented in `docs/gdpr.md`). **Decision (Task 13):** `rollback_job` restores by column, but the generic branch cannot address a composite key row and `SAVED_CRITERIA_TABLES` bumps `version` on the row itself, so `tiqora_report_schedule_item` gets its own branch (before `is_ticket_delete`, per ruling): backup is `{"overrides": raw}` under `{schedule_id, position}`, restore is `_update_row` of `overrides` plus a `version`/`changed_at` bump of the parent schedule; the table is exported as `SCHEDULE_ITEM_TABLE`, not added to `SAVED_CRITERIA_TABLES`.
 - Agent removal (`domain/user_delete.py` `delete_user_rows`): schedules owned by the user are deleted (with items/recipients via CASCADE), recipient rows `kind='user' AND ref_id = user` are deleted, `tiqora_report_run.owner_user_id` rows of that user are deleted with their files. Add the new tables to whatever `blocking_references` / FK scan the module uses so the deletion is not refused (no FK exists, so it is a plain cleanup — read the module first).
 - The run history never contains e-mail addresses (D12 step 8/11), so nothing to scrub there; `tiqora_mail_log` rows written by deliveries contain no addresses either ("n Empfänger (Bcc)").
 
@@ -901,7 +902,7 @@ As wave-2 plan D13: module docstring naming band and seeds; `pytestmark = pytest
 ### Deviations from spec
 
 1. **Run files are stored in `tiqora_report_run_file`, not through `StorageBackend`** (spec §9). `StorageBackend` is the read-only article-attachment protocol; job files (`tiqora_job_file`) are purged after `jobs.retention_days` (14) and are creator-only. Own table with `run_retention_days` (90) and owner-or-admin download (A17).
-2. **One `tiqora_report_run` row per delivery**, holding the list of report keys, instead of one per report (spec: `report_id` per run). A delivery succeeds or fails as a whole (A15); per-report row counts go into `detail`.
+2. **One `tiqora_report_run` row per delivery**, holding the list of report keys, instead of one per report (spec: `report_id` per run). A delivery succeeds or fails as a whole (A15); the run stores the summed `row_count` of all its reports, and `detail` holds the recipient problems (D12 step 11), no per-report counts.
 3. **No `zip` format.** Formats are `pdf | xlsx | csv`; a CSV bundle of more than one report is zipped automatically.
 4. **Recurrence presets only, no cron** (A4); `tiqora/util/cron.py` stays GenericAgent's (it is naive UTC).
 5. **Znuny `Dynamic::TicketList` becomes a saved search** (A1); spec maps it to a definition.
@@ -911,6 +912,7 @@ As wave-2 plan D13: module docstring naming band and seeds; `pytestmark = pytest
 9. **HTML for the PDF is built with `html.escape`, no template engine** (Jinja2 is only a transitive dependency; nothing new to sandbox).
 10. **The ITSM stats** (CI/change, first-level solution rate) are not part of this import: the ITSM objects do not exist in Tiqora yet (wave 4).
 11. **Not in this plan:** NL questions and MCP tools (phase 4), report widgets / "show as dashboard widget" (dashboards plan, A14), XLSX streaming beyond the existing writer, dynamic-field report dimensions (A12), a ticket-list report source.
+12. **Schedule zone suffix only on wall-clock texts** (D15/Task 16 rule "schedule zone as suffix when different"). The suffix is added to the recurrence sentence (editor preview and the list's `recurrence_text`, which now carries `time_zone`). Instants (`next_run_at`, run times, the preview's next dates) are shown in the agent's display zone without a suffix: a schedule-zone label on a display-zone time would be wrong.
 
 ---
 

@@ -38,6 +38,7 @@ export const demoUser = {
   can_view_reports: true,
   can_create_reports: true,
   can_share_reports: true,
+  report_external_recipients: true,
   email: "alex.turner@example.com",
   time_zone: null,
   default_time_zone: "Europe/Berlin",

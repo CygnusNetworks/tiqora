@@ -174,8 +174,13 @@ saved searches (`search_profile`) are **read only** for Tiqora: it never writes,
 changes or deletes them, and Znuny keeps working with them. An agent imports them
 on demand ("Suchvorlagen aus Znuny übernehmen"); a profile changed in Znuny
 afterwards is not synced automatically but can be imported again, which updates
-the earlier copy. Changes made in Tiqora never go back. Znuny statistics definitions are not read
-(stats import is still missing).
+the earlier copy. Changes made in Tiqora never go back. Znuny statistics are
+treated the same way: `xml_storage` (rows with `xml_type = 'Stats'`) is **read only**; an
+agent imports them on demand ("Statistiken aus Znuny übernehmen"), a statistic changed in
+Znuny afterwards is re-imported on demand (the earlier copy is updated, its sharing is
+kept), and changes in Tiqora never go back. Znuny's own `Maint::Stats::Generate` cron and
+its stats module keep working independently; Tiqora's scheduled reports do not replace or
+stop them.
 
 ## Escalation recompute
 

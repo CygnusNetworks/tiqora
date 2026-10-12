@@ -569,6 +569,28 @@ are replaced by a catalogue of 25 built-in reports over typed sources.
   select on `search_profile`) and `znuny_import.py` (pure mapper) implement the
   Znuny profile import. `POST /api/v1/tickets/query` (`api/v1/tickets.py`) lists the
   tickets for a `Filter` in the caller's scope and backs the saved-search page.
+- **Znuny stats import** (`reporting/znuny_stats/`): `xml_hash.py` parses Znuny's XMLHash
+  (`xml_storage` rows or an export file, ISO-8859-1 aware), `reader.py` loads stats
+  read-only in chunks under `QueryBudget.inline` (no JOIN with `tiqora_*`), `mapper.py`
+  with `mapping_common.py` / `map_more.py` turns a stat into a `ReportDefinition` or a saved
+  search and lists every dropped or approximated element as `ImportIssue`; `service.py`
+  does preview and apply (`api/v1/reports.py`, `/reports/import/znuny*`). Re-imports update
+  by Znuny stat id and keep sharing.
+- **Server texts, SVG, PDF** (`texts.py`, `svg.py`, `pdf.py`): unattended runs have no
+  browser, so `texts.py` serves German/English `reports.*` strings from a committed
+  bundle in `texts_data/` (allowlisted subtrees of the frontend namespace, kept in sync by
+  `python -m tiqora.reporting.texts --sync|--check`). `svg.py` draws the charts with the
+  frontend colour tokens, `pdf.py` builds escaped HTML and renders with WeasyPrint
+  (refusing URL fetcher, off the event loop via `asyncio.to_thread`).
+- **Schedules** (`schedules.py`, `schedule_schemas.py`, `recurrence.py`, tables
+  `tiqora_report_schedule`, `_item`, `_recipient`, `tiqora_report_run`, `_run_file`;
+  `api/v1/report_schedules.py`): recurrence presets compute `next_run_at` DST-safe;
+  rights per `rights.py` plus recipient rules. `scheduler.py` runs in the worker services
+  `report_scheduler` (queues due runs as `core.report_delivery` jobs, 60 s default) and
+  `report_runs_purge` (retention). `delivery.py` renders with the owner's scope, stores the
+  files in `tiqora_report_run_file`, sends one mail (all recipients Bcc) through the
+  outbound sender and writes run status; failures mail the owner and pause the schedule
+  after 3 in a row. Run files and history are purged after `reporting.run_retention_days`.
 - **Builder UI**: `/agent/reports/new` and `/agent/reports/$reportKey/edit`
   (`routes/agent/ReportBuilderPage.tsx`, three panes with live preview; the
   report viewer `ReportViewPage.tsx` has the runtime parameter controls), `/agent/searches/...` for saved searches and

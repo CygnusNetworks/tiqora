@@ -3111,6 +3111,14 @@
           "name": "Report data upkeep",
           "description": "Keeps the report data (ticket facts and daily open-ticket snapshots) up to date continuously."
         },
+        "report_scheduler": {
+          "name": "Report schedules",
+          "description": "Sends the scheduled reports by e-mail when they are due."
+        },
+        "report_runs_purge": {
+          "name": "Clean up report runs",
+          "description": "Deletes the run history of scheduled reports, including the generated files, after the retention period."
+        },
         "webchat_sweep": {
           "name": "Web chat housekeeping",
           "description": "Ends chats nobody answered in time, closes chats whose visitor has left and deletes old chat transcripts after the retention period."
@@ -3936,6 +3944,26 @@
           "query_timeout_seconds": {
             "label": "Time limit per database query in seconds",
             "help": "If a single query takes longer it is stopped and a message is shown."
+          },
+          "schedule_external_recipients": {
+            "label": "Allow external recipients for scheduled reports",
+            "help": "Off: scheduled reports go to Tiqora agents, groups and roles only. On: users with write permission in the “stats” group may also enter external e-mail addresses."
+          },
+          "schedule_max_recipients": {
+            "label": "Maximum recipients per delivery",
+            "help": "Upper limit of resolved e-mail addresses per delivery of a scheduled report."
+          },
+          "run_retention_days": {
+            "label": "Keep delivery history for days",
+            "help": "Delivery history and the sent attachments are deleted after this many days (7 to 365)."
+          },
+          "pdf_row_limit": {
+            "label": "Maximum rows per report in a PDF",
+            "help": "Longer tables are cut off in the PDF and marked as truncated."
+          },
+          "delivery_max_attachment_mb": {
+            "label": "Maximum attachment size per e-mail in MB",
+            "help": "If all attachments of one delivery are larger, the delivery fails with a message."
           }
         }
       },
@@ -5115,7 +5143,8 @@
         "ticket_export": "Ticket export",
         "report_run": "Report",
         "report_export": "Report export",
-        "report_backfill": "Build report data"
+        "report_backfill": "Build report data",
+        "report_delivery": "Report delivery"
       },
       "gi_mail": "Send email from a web service request"
     },
@@ -5618,6 +5647,162 @@
       "defaultHint": "Without a choice this applies: {{values}}",
       "alwaysOn": "Always on (set by the report)",
       "privateOther": "Private"
+    },
+    "exportPdf": "As PDF file",
+    "schedules": {
+      "title": "Schedules",
+      "subtitle": "Send reports by e-mail automatically",
+      "create": "Create schedule",
+      "empty": "There are no schedules yet.",
+      "name": "Name",
+      "owner": "Owner",
+      "items": "Reports",
+      "recurrence": "Recurrence",
+      "nextRuns": "Next dates",
+      "nextRun": "Next delivery",
+      "lastRun": "Last delivery",
+      "recipients": "Recipients",
+      "users": "Agents",
+      "groups": "Groups",
+      "roles": "Roles",
+      "externalEmails": "External e-mail addresses",
+      "format": "Format",
+      "language": "Language",
+      "subject": "Subject",
+      "body": "Message",
+      "onlyIfNonempty": "Only send if there is data",
+      "active": "Active",
+      "paused": "Paused",
+      "pausedReason": "Paused: {{reason}}",
+      "resume": "Resume",
+      "runNow": "Send now",
+      "testSend": "Test send to me",
+      "testSendOwner": "Test send to the owner",
+      "sendToAll": "Send to all recipients",
+      "runStarted": "The delivery was started.",
+      "runFailed": "The delivery could not be started.",
+      "history": "Delivery history",
+      "noRuns": "Nothing has been sent yet.",
+      "download": "Download file",
+      "save": "Save",
+      "saved": "The schedule was saved.",
+      "saveFailed": "The schedule could not be saved.",
+      "delete": "Delete schedule",
+      "deleteConfirm": "Delete the schedule \"{{name}}\"?",
+      "loadFailed": "The schedules could not be loaded.",
+      "staleVersion": "The schedule was changed in the meantime. Please reload it.",
+      "unavailable": "No longer available",
+      "status": {
+        "queued": "Queued",
+        "running": "Running",
+        "succeeded": "Sent",
+        "partial": "Partially sent",
+        "failed": "Failed",
+        "skipped": "Skipped"
+      },
+      "kind": {
+        "schedule": "Schedule",
+        "manual": "Manual"
+      },
+      "recurrenceKind": {
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "monthly": "Monthly",
+        "yearly": "Yearly"
+      },
+      "time": "Time",
+      "workdaysOnly": "Workdays only",
+      "timeZone": "Time zone",
+      "rows": "{{count}} rows",
+      "rows_one": "{{count}} row",
+      "recipientCount": "{{count}} recipients",
+      "recipientCount_one": "{{count}} recipient",
+      "general": "General",
+      "message": "Message",
+      "weekdays": "Weekdays",
+      "month": "Month",
+      "dayOfMonth": "Day of month",
+      "dayOfMonthHint": "In shorter months the last day is used.",
+      "previewFailed": "The next dates could not be calculated.",
+      "toMe": "To me",
+      "needShareRight": "You do not have the right to send to others.",
+      "onlyMe": "Send to me only",
+      "remove": "Remove {{name}}",
+      "emailPlaceholder": "name@example.org",
+      "add": "Add",
+      "addReport": "Add report",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "runBusy": "A delivery is already running.",
+      "runTime": "Time",
+      "runStatus": "Status",
+      "runResult": "Result",
+      "files": "Files",
+      "reload": "Reload",
+      "notFound": "This schedule does not exist or is not visible to you.",
+      "needsCreate": "Schedules need the right to create reports.",
+      "showAll": "Show all",
+      "errors": {
+        "name": "Please enter a name.",
+        "items": "Please choose at least one report.",
+        "itemsMax": "A schedule can hold at most 10 reports.",
+        "time": "Please enter a valid time.",
+        "weekdays": "Please choose at least one weekday.",
+        "dayOfMonth": "Please enter a day between 1 and 31.",
+        "month": "Please choose a month.",
+        "recipientsEmpty": "Please choose at least one recipient.",
+        "email": "Please enter valid e-mail addresses.",
+        "shareRight": "You may not send to others (group \"stats\", write permission missing).",
+        "externalNotAllowed": "External recipients are not enabled. Please contact an administrator."
+      },
+      "range": {
+        "label": "Period for the delivery",
+        "default": "As in the report",
+        "last7Days": "Last 7 days",
+        "last30Days": "Last 30 days",
+        "lastMonth": "Last month",
+        "lastQuarter": "Last quarter",
+        "lastYear": "Last year",
+        "custom": "Custom period"
+      }
+    },
+    "znunyImport": {
+      "title": "Import statistics from Znuny",
+      "intro": "Choose the statistics to import as a report or a saved search.",
+      "fromDatabase": "From the Znuny database",
+      "fromFile": "From an export file",
+      "chooseFile": "Choose export file",
+      "fileTooLarge": "The file is too large (1 MB at most).",
+      "loadFailed": "The statistics could not be loaded.",
+      "truncated": "The list is truncated.",
+      "importing": "Importing …",
+      "importFailed": "The statistics could not be imported.",
+      "imported": "{{count}} statistics imported.",
+      "imported_one": "{{count}} statistic imported.",
+      "skipped": "{{count}} statistics were not imported.",
+      "skipped_one": "{{count}} statistic was not imported.",
+      "target": {
+        "report": "Report",
+        "saved_search": "Saved search",
+        "none": "Not imported"
+      },
+      "action": {
+        "created": "Created",
+        "updated": "Updated"
+      },
+      "approximated": "Adjusted",
+      "details": "Details",
+      "empty": "There are no statistics stored in Znuny that you may see.",
+      "needsCreate": "You need the right to create reports to import statistics.",
+      "apply": "Import ({{count}})",
+      "alreadyImportedUpdate": "Already imported – will be updated",
+      "fileHint": "The whole file is imported; statistics that cannot be mapped are skipped.",
+      "fileLoadFailed": "The file could not be read.",
+      "close": "Close",
+      "dropped": "Not imported",
+      "issueLine": "{{element}}: {{value}}",
+      "loadErrors": "Load errors",
+      "select": "Select {{title}}"
     }
   },
   "webchat": {

@@ -7,6 +7,7 @@ import { downloadUrl } from "@/components/customers/vcardExport";
 import { FactsBanner } from "@/components/reports/FactsBanner";
 import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
 import { filterRange, rangeInvalid, toRunIn, type ReportFilterState } from "@/components/reports/reportFilter";
+import { ZnunyStatsImportDialog } from "@/components/reports/ZnunyStatsImportDialog";
 import { ReportsAccessGate } from "@/components/reports/ReportsAccessGate";
 import { RunState } from "@/components/reports/RunState";
 import { ReportView } from "@/components/reports/ReportView";
@@ -47,6 +48,9 @@ const REPORT_CATEGORIES = [
   "customers",
   "patterns",
 ] as const;
+
+const headerBtnCls =
+  "inline-flex items-center rounded-md border border-hairline bg-surface px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:border-accent/60 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 const KPIS = "builtin.ticket_kpis";
 const VOLUME = "builtin.volume";
@@ -331,6 +335,7 @@ function ReportsPageContent() {
   const canCreate = user?.can_create_reports === true;
   const isAdmin = user?.is_admin === true;
   const [showAll, setShowAll] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [toDelete, setToDelete] = useState<ReportItem | null>(null);
 
   const catalogueQ = useQuery({
@@ -404,6 +409,18 @@ function ReportsPageContent() {
               {t("reports.saved.allAdmin")}
             </label>
           )}
+          {canCreate && (
+            <Link
+              to="/agent/reports/schedules"
+              className={headerBtnCls}
+              data-testid="reports-schedules-link"
+            >
+              {t("reports.schedules.title")}
+            </Link>
+          )}
+          <button type="button" className={headerBtnCls} onClick={() => setImportOpen(true)} data-testid="reports-znuny-import">
+            {t("reports.znunyImport.title")}
+          </button>
           {canCreate && (
             <Link
               to="/agent/reports/new"
@@ -610,6 +627,7 @@ function ReportsPageContent() {
           </section>
         </>
       )}
+      <ZnunyStatsImportDialog open={importOpen} onClose={() => setImportOpen(false)} canCreate={canCreate} />
       <ConfirmDialog
         open={toDelete !== null}
         title={t("reports.saved.deleteTitle")}

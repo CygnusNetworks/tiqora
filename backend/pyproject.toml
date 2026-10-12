@@ -64,6 +64,8 @@ dependencies = [
     "lxml>=6.1.1",
     "python-docx>=1.1",
     "openpyxl>=3.1",
+    # PDF reports (tiqora.reporting.pdf); needs Pango/HarfBuzz native libs
+    "weasyprint>=63,<71",
     "odfpy>=1.4",
     # NER-based person-name detection feeding PII masking (tiqora.ai.ner) —
     # runs inside the agent runtime/summary render path, must ship in the
@@ -171,6 +173,8 @@ module = [
     "odf.*",
     "openpyxl",
     "openpyxl.*",
+    "weasyprint",
+    "weasyprint.*",
     "docker",
     "docker.*",
     "psutil",

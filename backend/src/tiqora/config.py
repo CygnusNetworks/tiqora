@@ -478,6 +478,12 @@ class Settings(BaseSettings):
         default=60, validation_alias="TIQORA_REPORT_FACTS_INTERVAL"
     )
 
+    # Report schedules: how often the worker looks for due deliveries.
+    # ``daemon.report_scheduler.enabled`` (default ON) switches it off.
+    report_scheduler_interval_seconds: int = Field(
+        default=60, ge=15, le=3600, validation_alias="TIQORA_REPORT_SCHEDULER_INTERVAL"
+    )
+
     # Plugin system (see tiqora.plugins). Safe mode imports no plugin code at all; the
     # disabled list and the boot budget are the operator's way out of a broken plugin.
     plugins_safe_mode: bool = Field(default=False, validation_alias="TIQORA_PLUGINS_SAFE_MODE")

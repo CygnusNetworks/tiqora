@@ -125,6 +125,12 @@ RUN useradd --create-home --uid 10001 tiqora \
         openssl \
         xmlsec1 \
         libxmlsec1-openssl \
+        libpango-1.0-0 \
+        libpangoft2-1.0-0 \
+        libharfbuzz0b \
+        libharfbuzz-subset0 \
+        libfontconfig1 \
+        fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=python-deps /app/backend/.venv /app/.venv
