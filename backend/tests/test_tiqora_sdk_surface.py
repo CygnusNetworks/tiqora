@@ -46,7 +46,14 @@ def test_surface_is_exactly_the_planned_one() -> None:
 
 
 #: exact ``__all__`` of every SDK submodule; later tasks add one entry each
-SUBMODULES: dict[str, set[str]] = {}
+SUBMODULES: dict[str, set[str]] = {
+    "tiqora_sdk.tickets": {
+        "TicketDraft",
+        "PluginWriteError",
+        "PluginPermissionDenied",
+        "CustomerSummary",
+    },
+}
 
 
 def test_submodules_are_exact() -> None:
@@ -119,8 +126,9 @@ def test_no_unexported_public_names() -> None:
     import tiqora_sdk
 
     public = {n for n in dir(tiqora_sdk) if not n.startswith("_")}
-    # "annotations" comes from `from __future__`; "mcp" is the helper submodule.
-    assert public <= set(tiqora_sdk.__all__) | {"annotations", "mcp"}
+    # "annotations" comes from `from __future__`; "mcp" and the SUBMODULES are submodules.
+    submodules = {name.split(".", 1)[1] for name in SUBMODULES}
+    assert public <= set(tiqora_sdk.__all__) | {"annotations", "mcp"} | submodules
 
 
 def test_python_and_npm_sdk_versions_match() -> None:

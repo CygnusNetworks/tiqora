@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
 
 import httpx
@@ -15,9 +15,14 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.db.engine import get_session_factory
+from tiqora.plugins import writes as _writes
+from tiqora.plugins.customers import PluginCustomers
 from tiqora.security.outbound import HostResolver, pin_outbound_url
 
 if TYPE_CHECKING:
+    from tiqora.plugins.channels import (  # type: ignore[import-untyped]  # Task 13
+        PluginChannels,
+    )
     from tiqora.plugins.discovery import DiscoveredPlugin
 
 
@@ -112,7 +117,13 @@ _TICKET_SQL = text(
 
 
 class PluginTickets:
-    """Read-only ticket access for plugins."""
+    """Ticket access for plugins: reads, plus writes by name (see ``tiqora.plugins.writes``).
+
+    Without ``as_agent`` a write runs as the system user (no permission check, no sync
+    hooks; the plugin is trusted). With ``as_agent`` permissions are checked and hooks fire.
+    Names are exact: MariaDB matches case-insensitively, PostgreSQL case-sensitively.
+    A passed ``session`` is never committed; without one the call commits or rolls back itself.
+    """
 
     async def get(
         self,
@@ -152,6 +163,75 @@ class PluginTickets:
             customer_id=None if row[10] is None else str(row[10]),
         )
 
+    async def create(
+        self,
+        draft: _writes.TicketDraft,
+        *,
+        as_agent: int | None = None,
+        session: AsyncSession | None = None,
+    ) -> int:
+        """Create a ticket (queue, state, priority and type by name); returns its id."""
+        return await _writes.create_ticket(draft, as_agent=as_agent, session=session)
+
+    async def add_article(
+        self,
+        ticket_id: int,
+        *,
+        body: str,
+        subject: str = "",
+        sender_type: Literal["agent", "customer", "system"] = "agent",
+        channel: str = "internal",
+        visible_for_customer: bool = False,
+        from_address: str | None = None,
+        content_type: str = "text/plain; charset=utf-8",
+        as_agent: int | None = None,
+        session: AsyncSession | None = None,
+    ) -> int:
+        """Add a note or phone article; mail goes through a plugin channel, never from here."""
+        return await _writes.add_article(
+            ticket_id,
+            body=body,
+            subject=subject,
+            sender_type=sender_type,
+            channel=channel,
+            visible_for_customer=visible_for_customer,
+            from_address=from_address,
+            content_type=content_type,
+            as_agent=as_agent,
+            session=session,
+        )
+
+    async def set_state(
+        self,
+        ticket_id: int,
+        state: str,
+        *,
+        as_agent: int | None = None,
+        session: AsyncSession | None = None,
+    ) -> None:
+        await _writes.set_state(ticket_id, state, as_agent=as_agent, session=session)
+
+    async def move(
+        self,
+        ticket_id: int,
+        queue: str,
+        *,
+        as_agent: int | None = None,
+        session: AsyncSession | None = None,
+    ) -> None:
+        await _writes.move(ticket_id, queue, as_agent=as_agent, session=session)
+
+    async def set_dynamic_field(
+        self,
+        ticket_id: int,
+        name: str,
+        values: Sequence[str],
+        *,
+        as_agent: int | None = None,
+        session: AsyncSession | None = None,
+    ) -> None:
+        await _writes.set_dynamic_field(ticket_id, name, values, as_agent=as_agent, session=session)
+
 
 @dataclass(frozen=True)
 class PluginContext:
@@ -159,6 +239,8 @@ class PluginContext:
     version: str
     http: PluginHttp
     tickets: PluginTickets
+    customers: PluginCustomers = field(default_factory=PluginCustomers)
+    channels: PluginChannels | None = None
 
     @property
     def logger(self) -> structlog.typing.FilteringBoundLogger:
