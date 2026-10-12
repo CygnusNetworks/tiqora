@@ -17,6 +17,7 @@
 |---|---|
 | [guide/fresh-install.md](guide/fresh-install.md) | Greenfield install: empty DB → `tiqora bootstrap` → login |
 | [architecture.md](architecture.md) | System components and data flow |
+| [webchat.md](webchat.md) | Web chat internals: assistant loop, claims and handoff, identity paths |
 | [development.md](development.md) | Local development workflow + release checklist |
 | [testing.md](testing.md) | Test suite layout, golden-master tests, testcontainers |
 | [deployment.md](deployment.md) | Production-oriented deployment notes |

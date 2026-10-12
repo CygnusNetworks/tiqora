@@ -989,6 +989,17 @@ shows them. The queue tree is sorted case-insensitively.
   the caller publishes them after `commit()`. **MCP flush latency:** MCP has no Redis client, so an MCP-posted
   reply queues its wake-up but never publishes it; the visitor sees it on the next stream heartbeat, at most 25 s
   later (REST replies are immediate).
+- **Chat assistant.** A topic can be answered first by the AI (`bot` status). The visitor line is announced on the
+  Redis list `tiqora:chat:bot:queue`; the `tiqora-ai-worker` bot loop (`ai/chat_bot_loop.py`, concurrency
+  `TIQORA_CHAT_BOT_CONCURRENCY`) claims the session with one conditional `UPDATE` (lease, stale after 180 s), runs
+  `run_ticket_agent` with the queue's auto-reply policy and writes the answer through `deliver_bot_chat_reply`
+  (an agent article on the `WebChat` channel by the policy's service user plus a transcript line). The database is
+  the truth and a 15 s rescan repairs lost wake-ups. Every limit ends in `hand_off_chat` (to the waiting list, or
+  to the e-mail prompt when nobody is there), never in silence. Details: [webchat.md](webchat.md).
+- **Identity paths.** A visitor is recognised by a signed website token (`Tiqora.chat.identify`, verified against the
+  chat's encrypted secret), by a short portal assertion issued from the portal session cookie on Tiqora's own
+  origin, or not at all. All paths resolve a customer user and set `identity_source`; the token is never stored.
+  See [webchat.md](webchat.md#identity-paths).
 - **Shutdown.** uvicorn runs with `timeout_graceful_shutdown=8` so open streams are cut and the lifespan cleanup
   (hub close, pools) runs before Docker's 10 s stop grace period ends.
 

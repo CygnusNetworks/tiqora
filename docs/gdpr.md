@@ -354,6 +354,18 @@ The web chat ([guide](guide/webchat.md)) keeps visitor data in four places:
   matched nobody) is not reached; this is the same scope rule as for mail (see "Scope is by ticket customer"
   above). For such a person, delete or anonymize the chat tickets themselves, or wait for the retention purge,
   which clears the e-mail from the session row regardless of the customer.
+- **Signed-in visitors.** A website sign-in token (HS256, `exp` required) or the customer portal session only
+  tells Tiqora which customer the visitor is. The token is checked and discarded: it is not stored, logged or
+  sent to the model. What is stored is customer data that Znuny already holds (the customer user's login,
+  customer ID, e-mail and name, copied into the chat session and the ticket) and the source of the confirmation
+  (`identity_source`: `website` or `portal`). With the chat's switch **Unbekannte Kunden anlegen** Tiqora creates a
+  new customer user from the confirmed address; leave it off if the website must not create customer records.
+  Erasure of that customer reaches the chat rows through the ticket, as above.
+- **Chat assistant.** The text of an assistant conversation is sent to the configured LLM provider with the
+  queue's PII masking, like an automatic e-mail reply (see [ai-integration.md](ai-integration.md)); the
+  `tiqora_ai_audit_log` records the runs. The replies and the handoff note are ordinary ticket articles and fall
+  under the ticket's retention and erasure. The visitor is told at the start that an AI is answering
+  (EU AI Act transparency); this notice cannot be turned off.
 - **Chat without an address.** A visitor who gave no address gets a placeholder sender
   (`visitor-...@chat.invalid`); nothing is ever mailed to it (recipients in the reserved `.invalid` TLD are
   dropped). Customer notifications of chat tickets otherwise go to the address the visitor typed, which Tiqora
