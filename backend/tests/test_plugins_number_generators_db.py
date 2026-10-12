@@ -264,6 +264,20 @@ async def test_followup_finds_plugin_and_znuny_numbers(env: Env) -> None:
     assert unknown is None
 
 
+async def test_followup_takes_first_existing_candidate(env: Env) -> None:
+    # the plugin pattern finds 2099-000001 first (no such ticket), the Znuny number second
+    await env.select(YEARLY)
+    kw: dict[str, Any] = {"hook": "Ticket#", "hook_divider": "", "references": []}
+    async with env.factory() as session:
+        found = await detect_followup(
+            session,
+            SysConfig(session),
+            subject="Re: [Ticket#2099-000001] fwd Ticket#: 2026101210000017",
+            **kw,
+        )
+    assert found == ("2026101210000017", TICKET_ZNUNY)
+
+
 async def test_followup_ignores_plugin_scheme_when_not_selected(env: Env) -> None:
     kw: dict[str, Any] = {"hook": "Ticket#", "hook_divider": "", "references": []}
     async with env.factory() as session:
@@ -320,6 +334,7 @@ def test_registration_rules(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     reject("keine Zeichenkette", build=lambda req: 42, pattern=r".*")
     reject("konnte keine Beispielnummer bilden", build=_raising)
     reject("True oder False", uses_counter="yes")
+    reject("keine Anker", pattern=r"^\d{6}$")
     # a core generator name is qualified, never shadowed
     assert registrar.number_generator("DateChecksum", _build, **ok) == "Plugin_points_DateChecksum"
     staged = [i.key for p, i in registrar.staged if p is TICKET_NUMBER_GENERATORS]

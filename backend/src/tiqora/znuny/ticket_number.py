@@ -306,9 +306,10 @@ async def ticket_number_build(
     plugin_gen = await active_generator(session_factory)
     if plugin_gen is not None:
         if offset >= MAX_PLUGIN_COLLISIONS:
-            logger.warning(
-                "plugin_ticket_number_collisions", plugin=plugin_gen.plugin_id, offset=offset
-            )
+            if offset == MAX_PLUGIN_COLLISIONS:  # once per collision run, not per iteration
+                logger.warning(
+                    "plugin_ticket_number_collisions", plugin=plugin_gen.plugin_id, offset=offset
+                )
         else:
             plugin_tn = await build_with_plugin(plugin_gen, session_factory, sysconfig, offset)
             if plugin_tn is not None:

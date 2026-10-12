@@ -72,3 +72,10 @@ def test_anchored_pattern_has_one_group_and_a_trailing_boundary(
     compiled = re.compile(anchored_pattern(pattern))
     assert compiled.groups == 1
     assert (compiled.match(text) is not None) is expected
+
+
+def test_short_plugin_pattern_does_not_swallow_a_znuny_number() -> None:
+    # F9: \d{4} must not match the first digits of a 16-digit Znuny number
+    assert get_tn_candidates("Re: [Ticket#2026101210000017]", extra_patterns=[r"\d{4}"], **KW) == [
+        "2026101210000017"
+    ]

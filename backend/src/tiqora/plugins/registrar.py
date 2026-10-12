@@ -32,6 +32,7 @@ from tiqora.plugins.number_generators import (
     NumberBuild,
     NumberRequest,
     TicketNumberGenerator,
+    anchored_pattern,
     check_number,
 )
 from tiqora.plugins.placeholders import (
@@ -619,6 +620,15 @@ class PluginRegistrar:
                     f"({_NUMBER_REASONS.get(reason, reason)}): erlaubt sind 1 bis 50 Zeichen aus "
                     "A-Z, a-z, 0-9, Punkt, Unterstrich, Schrägstrich und Bindestrich, "
                     "passend zum Muster"
+                )
+            # follow-up detection searches the pattern inside a subject, so an anchored one
+            # (^…$) would never match there and every reply would open a new ticket
+            if not re.search(
+                re.escape("X") + anchored_pattern(item.pattern), "X" + str(example), re.IGNORECASE
+            ):
+                raise RegistrationRejected(
+                    f"Das Muster des Ticketnummer-Schemas „{name}“ muss innerhalb eines Betreffs "
+                    "passen können (keine Anker wie ^ oder $ verwenden)"
                 )
 
         self._stage(TICKET_NUMBER_GENERATORS, item, check=check)
