@@ -287,3 +287,28 @@ def test_itsm_link_type_ddl() -> None:
     assert 'server_default="0"' in migration
     assert migration.count("server_default=sa.false()") == 5
     assert migration.count("server_default=sa.true()") == 1
+
+
+def test_cmdb_ddl() -> None:
+    from sqlalchemy.dialects import mysql as mysql_dialect
+
+    from tiqora.db.tiqora.base import TiqoraBase
+
+    ver = TiqoraBase.metadata.tables["tiqora_cmdb_ci_version"]
+    assert "MEDIUMTEXT" in _column_ddl(ver, "attributes", mysql_dialect.dialect())
+    att = TiqoraBase.metadata.tables["tiqora_cmdb_attachment"]
+    assert "LONGBLOB" in _column_ddl(att, "content ", mysql_dialect.dialect())
+    attr = TiqoraBase.metadata.tables["tiqora_cmdb_ci_attr"]
+    assert {i.name for i in attr.indexes} >= {
+        "ix_tiqora_cmdb_ci_attr_key",
+        "ix_tiqora_cmdb_ci_attr_num",
+        "ix_tiqora_cmdb_ci_attr_date",
+        "ix_tiqora_cmdb_ci_attr_ci",
+        "ix_tiqora_cmdb_ci_attr_value",
+    }
+    link = TiqoraBase.metadata.tables["tiqora_itsm_link"]
+    assert any(c.name == "uq_tiqora_itsm_link" for c in link.constraints)
+    fks = {fk.target_fullname for fk in link.foreign_keys}
+    assert fks == {"tiqora_itsm_link_type.name"}
+    archive = TiqoraBase.metadata.tables["tiqora_cmdb_ci_version_archive"]
+    assert "AUTO_INCREMENT" not in _column_ddl(archive, "id ", mysql_dialect.dialect())

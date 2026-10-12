@@ -2051,3 +2051,334 @@ class TiqoraDashboardKioskItem(TiqoraBase):
         autoincrement=False,
     )
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
+
+# --- CMDB (wave 4) ---
+#
+# Tables of the Tiqora CMDB (Mode B) and the shared ITSM link table. No FK to Znuny tables:
+# ``*_by`` / ``group_id`` reference Znuny rows by value. ``tiqora_itsm_link_type`` belongs to
+# the ITSM core (``tiqora.itsm.models``); ``TiqoraItsmLink.link_type`` points at its ``name``
+# through a string FK (no import, a cycle otherwise). All timestamps are app-written naive UTC.
+
+
+class TiqoraCmdbCatalog(TiqoraBase):
+    """General-catalog rows: deployment/incident states, yes/no (Znuny ``general_catalog``)."""
+
+    __tablename__ = "tiqora_cmdb_catalog"
+    __table_args__ = (
+        UniqueConstraint("catalog_class", "item_key", name="uq_tiqora_cmdb_catalog_key"),
+        Index("ix_tiqora_cmdb_catalog_class", "catalog_class", "position"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    catalog_class: Mapped[str] = mapped_column(String(100), nullable=False)
+    item_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    functionality: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    valid: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
+    comment: Mapped[str | None] = mapped_column(String(250), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class TiqoraCmdbClass(TiqoraBase):
+    """A CI class (Znuny ``ITSMConfigItem::Class``): numbering, access group, current definition."""
+
+    __tablename__ = "tiqora_cmdb_class"
+    __table_args__ = (UniqueConstraint("class_key", name="uq_tiqora_cmdb_class_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    class_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    icon: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    number_prefix: Mapped[str] = mapped_column(String(20), nullable=False)
+    number_counter: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
+    #: Znuny ``groups.id`` (no FK)
+    group_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: ``tiqora_cmdb_class_definition.id`` (no FK: the two tables reference each other)
+    current_definition_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    portal_visible: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    valid: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
+    lock_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
+    created_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    changed_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class TiqoraCmdbClassDefinition(TiqoraBase):
+    """One immutable version of a class definition (JSON list of attribute definitions)."""
+
+    __tablename__ = "tiqora_cmdb_class_definition"
+    __table_args__ = (
+        UniqueConstraint("class_id", "version", name="uq_tiqora_cmdb_class_definition_version"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    class_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(
+            "tiqora_cmdb_class.id", name="fk_tiqora_cmdb_class_definition_class", ondelete="CASCADE"
+        ),
+        nullable=False,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    attributes: Mapped[str] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=False)
+    comment: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class TiqoraCmdbCi(TiqoraBase):
+    """A configuration item (header). ``cur_incident_state_id`` is the derived state."""
+
+    __tablename__ = "tiqora_cmdb_ci"
+    __table_args__ = (
+        UniqueConstraint("number", name="uq_tiqora_cmdb_ci_number"),
+        Index("ix_tiqora_cmdb_ci_class_name", "class_id", "name"),
+        Index("ix_tiqora_cmdb_ci_name", "name"),
+        Index("ix_tiqora_cmdb_ci_depl", "deployment_state_id"),
+        Index("ix_tiqora_cmdb_ci_cur_inci", "cur_incident_state_id"),
+        Index("ix_tiqora_cmdb_ci_changed", "changed_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    number: Mapped[str] = mapped_column(String(50), nullable=False)
+    class_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("tiqora_cmdb_class.id", name="fk_tiqora_cmdb_ci_class"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(250), nullable=False)
+    deployment_state_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("tiqora_cmdb_catalog.id", name="fk_tiqora_cmdb_ci_deployment_state"),
+        nullable=False,
+    )
+    #: the incident state the CI itself was given
+    incident_state_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("tiqora_cmdb_catalog.id", name="fk_tiqora_cmdb_ci_incident_state"),
+        nullable=False,
+    )
+    #: derived: own state or the warning propagated over links
+    cur_incident_state_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("tiqora_cmdb_catalog.id", name="fk_tiqora_cmdb_ci_cur_incident_state"),
+        nullable=False,
+    )
+    #: ``tiqora_cmdb_ci_version.id`` (no FK: the two tables reference each other)
+    current_version_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    version_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    lock_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
+    created_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    changed_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class TiqoraCmdbCiVersion(TiqoraBase):
+    """An immutable CI version: name, states and the JSON attribute document."""
+
+    __tablename__ = "tiqora_cmdb_ci_version"
+    __table_args__ = (Index("ix_tiqora_cmdb_ci_version_ci", "ci_id", "id"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    ci_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("tiqora_cmdb_ci.id", name="fk_tiqora_cmdb_ci_version_ci", ondelete="CASCADE"),
+        nullable=False,
+    )
+    definition_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("tiqora_cmdb_class_definition.id", name="fk_tiqora_cmdb_ci_version_definition"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(250), nullable=False)
+    deployment_state_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    incident_state_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    attributes: Mapped[str] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=False)
+    change_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class TiqoraCmdbCiVersionArchive(TiqoraBase):
+    """Old versions moved out of the hot table (same columns, original id kept)."""
+
+    __tablename__ = "tiqora_cmdb_ci_version_archive"
+    __table_args__ = (Index("ix_tiqora_cmdb_ci_version_archive_ci", "ci_id", "id"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    ci_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    definition_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    name: Mapped[str] = mapped_column(String(250), nullable=False)
+    deployment_state_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    incident_state_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    attributes: Mapped[str] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=False)
+    change_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    archived_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class TiqoraCmdbCiAttr(TiqoraBase):
+    """Search index: one row per stored attribute value of a CI's current version."""
+
+    __tablename__ = "tiqora_cmdb_ci_attr"
+    __table_args__ = (
+        Index("ix_tiqora_cmdb_ci_attr_key", "attr_path", "value_key"),
+        Index("ix_tiqora_cmdb_ci_attr_num", "attr_path", "value_num"),
+        Index("ix_tiqora_cmdb_ci_attr_date", "attr_path", "value_date"),
+        Index("ix_tiqora_cmdb_ci_attr_ci", "ci_id"),
+        Index("ix_tiqora_cmdb_ci_attr_value", "value_key"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    ci_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("tiqora_cmdb_ci.id", name="fk_tiqora_cmdb_ci_attr_ci", ondelete="CASCADE"),
+        nullable=False,
+    )
+    attr_path: Mapped[str] = mapped_column(String(200), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    value_text: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    value_key: Mapped[str | None] = mapped_column(String(191), nullable=True)
+    value_num: Mapped[Decimal | None] = mapped_column(Numeric(30, 6), nullable=True)
+    value_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class TiqoraCmdbCiHistory(TiqoraBase):
+    """CI history (Znuny ``configitem_history`` events). No FK: ``CiService.delete`` clears it."""
+
+    __tablename__ = "tiqora_cmdb_ci_history"
+    __table_args__ = (Index("ix_tiqora_cmdb_ci_history_ci", "ci_id", "id"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    ci_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    event: Mapped[str] = mapped_column(String(50), nullable=False)
+    detail: Mapped[str] = mapped_column(String(1000), nullable=False)
+    version_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    created_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class TiqoraCmdbAttachment(TiqoraBase):
+    """A file on a CI; ``ci_id`` NULL = staged upload not yet attached."""
+
+    __tablename__ = "tiqora_cmdb_attachment"
+    __table_args__ = (Index("ix_tiqora_cmdb_attachment_ci", "ci_id"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    ci_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("tiqora_cmdb_ci.id", name="fk_tiqora_cmdb_attachment_ci", ondelete="CASCADE"),
+        nullable=True,
+    )
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(255), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    content: Mapped[bytes] = mapped_column(JOB_FILE_BLOB, nullable=False)
+    created_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class TiqoraItsmLink(TiqoraBase):
+    """A link between two ITSM objects (CI, ticket, service, KB article, customer ...).
+
+    ``source``/``target`` follow ``tiqora_itsm_link_type.pointed``/``propagation``. Kinds:
+    ``ci`` | ``ticket`` | ``service`` | ``kb_article`` | ``customer_user`` | ``customer_company``;
+    keys are strings. ``link_type`` references ``tiqora_itsm_link_type.name`` (RESTRICT).
+    """
+
+    __tablename__ = "tiqora_itsm_link"
+    __table_args__ = (
+        UniqueConstraint(
+            "source_kind",
+            "source_key",
+            "target_kind",
+            "target_key",
+            "link_type",
+            name="uq_tiqora_itsm_link",
+        ),
+        Index("ix_tiqora_itsm_link_source", "source_kind", "source_key"),
+        Index("ix_tiqora_itsm_link_target", "target_kind", "target_key"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    source_kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    source_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    target_kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    target_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    link_type: Mapped[str] = mapped_column(
+        String(50),
+        ForeignKey(
+            "tiqora_itsm_link_type.name", name="fk_tiqora_itsm_link_link_type", ondelete="RESTRICT"
+        ),
+        nullable=False,
+    )
+    created_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class TiqoraCmdbImportTemplate(TiqoraBase):
+    """A saved CSV/XLSX import mapping for one class."""
+
+    __tablename__ = "tiqora_cmdb_import_template"
+    __table_args__ = (Index("ix_tiqora_cmdb_import_template_owner", "owner_user_id"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    class_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(
+            "tiqora_cmdb_class.id", name="fk_tiqora_cmdb_import_template_class", ondelete="CASCADE"
+        ),
+        nullable=False,
+    )
+    file_format: Mapped[str] = mapped_column(String(10), nullable=False)
+    options: Mapped[str] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=False)
+    mapping: Mapped[str] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=False)
+    owner_user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    shared: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    lock_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class TiqoraCmdbSavedSearch(TiqoraBase):
+    """A saved CMDB search (JSON criteria), private or shared."""
+
+    __tablename__ = "tiqora_cmdb_saved_search"
+    __table_args__ = (Index("ix_tiqora_cmdb_saved_search_owner", "owner_user_id"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    owner_user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    criteria: Mapped[str] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=False)
+    shared: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

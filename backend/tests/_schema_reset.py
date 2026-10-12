@@ -36,7 +36,11 @@ def reset_tiqora_schema(sync_url: str) -> None:
             for ix in insp.get_indexes(table)
             if ix["name"] and ix["name"].startswith("ix_owned_")
         ]
+        views = [name for name in insp.get_view_names() if name.startswith("tiqora_")]
         with engine.begin() as conn:
+            # a view blocks DROP TABLE (PostgreSQL) or dangles after it (MariaDB)
+            for view in views:
+                conn.execute(text(f"DROP VIEW IF EXISTS {view}"))
             if is_mysql:
                 conn.execute(text("SET FOREIGN_KEY_CHECKS=0"))
             for table in tiqora_tables:
@@ -54,8 +58,9 @@ def reset_tiqora_schema(sync_url: str) -> None:
         engine.dispose()
 
 
-#: rows Tiqora migrations insert themselves (migration 20261009_0063: the report state row)
-_MIGRATION_SEED_TABLES = ("tiqora_report_state",)
+#: rows Tiqora migrations insert themselves (migration 20261009_0063: the report state row;
+#: 20261010_0079: the CMDB general catalog)
+_MIGRATION_SEED_TABLES = ("tiqora_report_state", "tiqora_cmdb_catalog")
 
 
 def delete_migration_seed_rows(sync_url: str) -> None:
