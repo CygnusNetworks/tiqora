@@ -3686,6 +3686,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/identity-providers/{provider_id}/scim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Scim Status */
+        get: operations["scim_status_api_v1_admin_identity_providers__provider_id__scim_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/scim/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Scim Accounts */
+        get: operations["scim_accounts_api_v1_admin_identity_providers__provider_id__scim_accounts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/scim/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Scim Events */
+        get: operations["scim_events_api_v1_admin_identity_providers__provider_id__scim_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/scim/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Scim Groups */
+        get: operations["scim_groups_api_v1_admin_identity_providers__provider_id__scim_groups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/scim/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Scim Token */
+        post: operations["create_scim_token_api_v1_admin_identity_providers__provider_id__scim_tokens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/scim/tokens/{token_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Scim Token */
+        delete: operations["revoke_scim_token_api_v1_admin_identity_providers__provider_id__scim_tokens__token_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/identity-providers/{provider_id}/tests": {
         parameters: {
             query?: never;
@@ -16988,6 +17090,12 @@ export interface components {
             saml_available: boolean;
             /** Saml Missing */
             saml_missing: ("package" | "xmlsec1") | null;
+            /** Scim Base Url */
+            scim_base_url: string | null;
+            /** Session Absolute Max Seconds */
+            session_absolute_max_seconds: number;
+            /** Session Idle Max Seconds */
+            session_idle_max_seconds: number;
             /** Webauthn */
             webauthn: boolean;
         };
@@ -17109,18 +17217,29 @@ export interface components {
             metadata_error: string | null;
             /** Metadata Fetched At */
             metadata_fetched_at: string | null;
+            mfa_policy: components["schemas"]["MfaPolicyOut"];
             /** Name */
             name: string;
             /** Preset */
             preset: string | null;
             /** Read Only */
             read_only: boolean;
+            /** Require Mfa Claim */
+            require_mfa_claim: boolean;
             /** Require Sso Opt In */
             require_sso_opt_in: boolean;
             /** Role Rules */
             role_rules: components["schemas"]["RoleRule"][];
+            /** Scim Adopt Existing */
+            scim_adopt_existing: boolean;
+            /** Scim Enabled */
+            scim_enabled: boolean;
             /** Secrets Set */
             secrets_set: string[];
+            /** Session Absolute Seconds */
+            session_absolute_seconds: number | null;
+            /** Session Idle Seconds */
+            session_idle_seconds: number | null;
             /** Slug */
             slug: string;
             /** Sort */
@@ -17135,6 +17254,53 @@ export interface components {
              * @enum {string}
              */
             sync_mode: "managed" | "authoritative";
+        };
+        /**
+         * IdentityProviderPatch
+         * @description PATCH body: ``ProviderChanges`` with a partial ``mfa_policy`` (merged by the route).
+         */
+        IdentityProviderPatch: {
+            attribute_map?: components["schemas"]["AttributeMap"] | null;
+            /** Audience */
+            audience?: ("agent" | "customer" | "both") | null;
+            /** Button Icon */
+            button_icon?: string | null;
+            /** Button Label */
+            button_label?: string | null;
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            } | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            jit_defaults?: components["schemas"]["JitDefaults"] | null;
+            /** Jit Enabled */
+            jit_enabled?: boolean | null;
+            /** Match By */
+            match_by?: ("login" | "email") | null;
+            mfa_policy?: components["schemas"]["MfaPolicyIn"] | null;
+            /** Name */
+            name?: string | null;
+            /** Require Mfa Claim */
+            require_mfa_claim?: boolean | null;
+            /** Require Sso Opt In */
+            require_sso_opt_in?: boolean | null;
+            /** Role Rules */
+            role_rules?: components["schemas"]["RoleRule"][] | null;
+            /** Scim Adopt Existing */
+            scim_adopt_existing?: boolean | null;
+            /** Scim Enabled */
+            scim_enabled?: boolean | null;
+            /** Session Absolute Seconds */
+            session_absolute_seconds?: number | null;
+            /** Session Idle Seconds */
+            session_idle_seconds?: number | null;
+            /** Slug */
+            slug?: string | null;
+            /** Sort */
+            sort?: number | null;
+            /** Sync Mode */
+            sync_mode?: ("managed" | "authoritative") | null;
         };
         /** IdentityProviderSummaryOut */
         IdentityProviderSummaryOut: {
@@ -18390,6 +18556,63 @@ export interface components {
          * @description What counts as an IdP-side second factor and what happens without proof.
          */
         MfaPolicy: {
+            /**
+             * Fallback
+             * @default local_second_factor
+             * @enum {string}
+             */
+            fallback: "local_second_factor" | "reject" | "local_second_factor_or_enroll";
+            /** Oidc Acr Values */
+            oidc_acr_values?: string[];
+            /** Oidc Amr Values */
+            oidc_amr_values?: string[];
+            /**
+             * Oidc Request Acr Values
+             * @default
+             */
+            oidc_request_acr_values: string;
+            /** Saml Authn Context Classes */
+            saml_authn_context_classes?: string[];
+            /**
+             * Saml Mfa Attribute
+             * @default http://schemas.microsoft.com/claims/authnmethodsreferences
+             */
+            saml_mfa_attribute: string;
+            /** Saml Mfa Attribute Values */
+            saml_mfa_attribute_values?: string[];
+            /**
+             * Saml Request Authn Context
+             * @default false
+             */
+            saml_request_authn_context: boolean;
+        };
+        /**
+         * MfaPolicyIn
+         * @description Partial MFA policy: unset fields keep the stored value (merged by the route).
+         */
+        MfaPolicyIn: {
+            /** Fallback */
+            fallback?: ("local_second_factor" | "reject" | "local_second_factor_or_enroll") | null;
+            /** Oidc Acr Values */
+            oidc_acr_values?: string[] | null;
+            /** Oidc Amr Values */
+            oidc_amr_values?: string[] | null;
+            /** Oidc Request Acr Values */
+            oidc_request_acr_values?: string | null;
+            /** Saml Authn Context Classes */
+            saml_authn_context_classes?: string[] | null;
+            /** Saml Mfa Attribute */
+            saml_mfa_attribute?: string | null;
+            /** Saml Mfa Attribute Values */
+            saml_mfa_attribute_values?: string[] | null;
+            /** Saml Request Authn Context */
+            saml_request_authn_context?: boolean | null;
+        };
+        /**
+         * MfaPolicyOut
+         * @description What counts as an IdP-side second factor (read model of :class:`MfaPolicy`).
+         */
+        MfaPolicyOut: {
             /**
              * Fallback
              * @default local_second_factor
@@ -21793,6 +22016,169 @@ export interface components {
              * @enum {string}
              */
             status: "queued" | "running" | "succeeded" | "partial" | "failed" | "skipped";
+        };
+        /** ScimAccountOut */
+        ScimAccountOut: {
+            /** Active */
+            active: boolean;
+            /**
+             * Changed
+             * Format: date-time
+             */
+            changed: string;
+            /** Deleted */
+            deleted: boolean;
+            /** External Id */
+            external_id: string | null;
+            /** Login */
+            login: string | null;
+            /** Scim Id */
+            scim_id: string;
+            /** User Id */
+            user_id: number;
+            /**
+             * User Kind
+             * @enum {string}
+             */
+            user_kind: "agent" | "customer";
+            /** User Name */
+            user_name: string;
+        };
+        /** ScimAccountPageOut */
+        ScimAccountPageOut: {
+            /** Items */
+            items: components["schemas"]["ScimAccountOut"][];
+            /** Total */
+            total: number;
+        };
+        /** ScimEventOut */
+        ScimEventOut: {
+            /**
+             * Created
+             * Format: date-time
+             */
+            created: string;
+            /** Detail */
+            detail: string | null;
+            /** Id */
+            id: number;
+            /** Login */
+            login: string | null;
+            /** Method */
+            method: string;
+            /** Operation */
+            operation: string;
+            /** Resource */
+            resource: string;
+            /** Scim Id */
+            scim_id: string | null;
+            /** Status */
+            status: number;
+            /** User Id */
+            user_id: number | null;
+            /** User Kind */
+            user_kind: ("agent" | "customer") | null;
+        };
+        /** ScimGroupOut */
+        ScimGroupOut: {
+            /**
+             * Changed
+             * Format: date-time
+             */
+            changed: string;
+            /** Display Name */
+            display_name: string;
+            /** External Id */
+            external_id: string | null;
+            /** Member Count */
+            member_count: number;
+            /** Scim Id */
+            scim_id: string;
+        };
+        /** ScimGroupPageOut */
+        ScimGroupPageOut: {
+            /** Items */
+            items: components["schemas"]["ScimGroupOut"][];
+            /** Total */
+            total: number;
+        };
+        /** ScimStatusOut */
+        ScimStatusOut: {
+            /** Active Users */
+            active_users: number;
+            /** Adopt Existing */
+            adopt_existing: boolean;
+            /** Available */
+            available: boolean;
+            /** Base Url */
+            base_url: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Groups */
+            groups: number;
+            /** Last Activity At */
+            last_activity_at: string | null;
+            /** Pending Sync */
+            pending_sync: number;
+            /** Reason */
+            reason: string | null;
+            /** Tokens */
+            tokens: components["schemas"]["ScimTokenOut"][];
+            /** Users */
+            users: number;
+        };
+        /** ScimTokenCreateIn */
+        ScimTokenCreateIn: {
+            /**
+             * Expires In Days
+             * @default 365
+             */
+            expires_in_days: number;
+            /** Name */
+            name: string;
+            /**
+             * User Kind
+             * @enum {string}
+             */
+            user_kind: "agent" | "customer";
+        };
+        /** ScimTokenCreatedOut */
+        ScimTokenCreatedOut: {
+            record: components["schemas"]["ScimTokenOut"];
+            /** Token */
+            token: string;
+        };
+        /** ScimTokenOut */
+        ScimTokenOut: {
+            /** Active */
+            active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By Name */
+            created_by_name: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Id */
+            id: number;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Name */
+            name: string;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Token Hint */
+            token_hint: string;
+            /**
+             * User Kind
+             * @enum {string}
+             */
+            user_kind: "agent" | "customer";
         };
         /** SearchHit */
         SearchHit: {
@@ -34050,7 +34436,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ProviderChanges"];
+                "application/json": components["schemas"]["IdentityProviderPatch"];
             };
         };
         responses: {
@@ -34244,6 +34630,231 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["IdentityProviderOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scim_status_api_v1_admin_identity_providers__provider_id__scim_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScimStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scim_accounts_api_v1_admin_identity_providers__provider_id__scim_accounts_get: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+                q?: string | null;
+                include_deleted?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScimAccountPageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scim_events_api_v1_admin_identity_providers__provider_id__scim_events_get: {
+        parameters: {
+            query?: {
+                before_id?: number | null;
+                limit?: number;
+                failures_only?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScimEventOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scim_groups_api_v1_admin_identity_providers__provider_id__scim_groups_get: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScimGroupPageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_scim_token_api_v1_admin_identity_providers__provider_id__scim_tokens_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScimTokenCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScimTokenCreatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_scim_token_api_v1_admin_identity_providers__provider_id__scim_tokens__token_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+                token_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

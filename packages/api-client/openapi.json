@@ -17087,6 +17087,25 @@
             ],
             "title": "Saml Missing"
           },
+          "scim_base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scim Base Url"
+          },
+          "session_absolute_max_seconds": {
+            "title": "Session Absolute Max Seconds",
+            "type": "integer"
+          },
+          "session_idle_max_seconds": {
+            "title": "Session Idle Max Seconds",
+            "type": "integer"
+          },
           "webauthn": {
             "title": "Webauthn",
             "type": "boolean"
@@ -17096,7 +17115,10 @@
           "saml_available",
           "saml_missing",
           "public_base_url_set",
-          "webauthn"
+          "webauthn",
+          "session_idle_max_seconds",
+          "session_absolute_max_seconds",
+          "scim_base_url"
         ],
         "title": "IdentityCapabilitiesOut",
         "type": "object"
@@ -17383,6 +17405,9 @@
             ],
             "title": "Metadata Fetched At"
           },
+          "mfa_policy": {
+            "$ref": "#/components/schemas/MfaPolicyOut"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -17402,6 +17427,10 @@
             "title": "Read Only",
             "type": "boolean"
           },
+          "require_mfa_claim": {
+            "title": "Require Mfa Claim",
+            "type": "boolean"
+          },
           "require_sso_opt_in": {
             "title": "Require Sso Opt In",
             "type": "boolean"
@@ -17413,12 +17442,42 @@
             "title": "Role Rules",
             "type": "array"
           },
+          "scim_adopt_existing": {
+            "title": "Scim Adopt Existing",
+            "type": "boolean"
+          },
+          "scim_enabled": {
+            "title": "Scim Enabled",
+            "type": "boolean"
+          },
           "secrets_set": {
             "items": {
               "type": "string"
             },
             "title": "Secrets Set",
             "type": "array"
+          },
+          "session_absolute_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Absolute Seconds"
+          },
+          "session_idle_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Idle Seconds"
           },
           "slug": {
             "title": "Slug",
@@ -17470,9 +17529,267 @@
           "role_rules",
           "sync_mode",
           "metadata_fetched_at",
-          "endpoints"
+          "endpoints",
+          "require_mfa_claim",
+          "mfa_policy",
+          "session_idle_seconds",
+          "session_absolute_seconds",
+          "scim_enabled",
+          "scim_adopt_existing"
         ],
         "title": "IdentityProviderOut",
+        "type": "object"
+      },
+      "IdentityProviderPatch": {
+        "description": "PATCH body: ``ProviderChanges`` with a partial ``mfa_policy`` (merged by the route).",
+        "properties": {
+          "attribute_map": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AttributeMap"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "audience": {
+            "anyOf": [
+              {
+                "enum": [
+                  "agent",
+                  "customer",
+                  "both"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audience"
+          },
+          "button_icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Button Icon"
+          },
+          "button_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Button Label"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "jit_defaults": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JitDefaults"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "jit_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jit Enabled"
+          },
+          "match_by": {
+            "anyOf": [
+              {
+                "enum": [
+                  "login",
+                  "email"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match By"
+          },
+          "mfa_policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MfaPolicyIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "require_mfa_claim": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Require Mfa Claim"
+          },
+          "require_sso_opt_in": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Require Sso Opt In"
+          },
+          "role_rules": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RoleRule"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role Rules"
+          },
+          "scim_adopt_existing": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scim Adopt Existing"
+          },
+          "scim_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scim Enabled"
+          },
+          "session_absolute_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Absolute Seconds"
+          },
+          "session_idle_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Idle Seconds"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          },
+          "sort": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort"
+          },
+          "sync_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "managed",
+                  "authoritative"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sync Mode"
+          }
+        },
+        "title": "IdentityProviderPatch",
         "type": "object"
       },
       "IdentityProviderSummaryOut": {
@@ -21260,6 +21577,182 @@
           }
         },
         "title": "MfaPolicy",
+        "type": "object"
+      },
+      "MfaPolicyIn": {
+        "additionalProperties": false,
+        "description": "Partial MFA policy: unset fields keep the stored value (merged by the route).",
+        "properties": {
+          "fallback": {
+            "anyOf": [
+              {
+                "enum": [
+                  "local_second_factor",
+                  "reject",
+                  "local_second_factor_or_enroll"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback"
+          },
+          "oidc_acr_values": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oidc Acr Values"
+          },
+          "oidc_amr_values": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oidc Amr Values"
+          },
+          "oidc_request_acr_values": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oidc Request Acr Values"
+          },
+          "saml_authn_context_classes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saml Authn Context Classes"
+          },
+          "saml_mfa_attribute": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saml Mfa Attribute"
+          },
+          "saml_mfa_attribute_values": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saml Mfa Attribute Values"
+          },
+          "saml_request_authn_context": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saml Request Authn Context"
+          }
+        },
+        "title": "MfaPolicyIn",
+        "type": "object"
+      },
+      "MfaPolicyOut": {
+        "additionalProperties": false,
+        "description": "What counts as an IdP-side second factor (read model of :class:`MfaPolicy`).",
+        "properties": {
+          "fallback": {
+            "default": "local_second_factor",
+            "enum": [
+              "local_second_factor",
+              "reject",
+              "local_second_factor_or_enroll"
+            ],
+            "title": "Fallback",
+            "type": "string"
+          },
+          "oidc_acr_values": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Oidc Acr Values",
+            "type": "array"
+          },
+          "oidc_amr_values": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Oidc Amr Values",
+            "type": "array"
+          },
+          "oidc_request_acr_values": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Oidc Request Acr Values",
+            "type": "string"
+          },
+          "saml_authn_context_classes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Saml Authn Context Classes",
+            "type": "array"
+          },
+          "saml_mfa_attribute": {
+            "default": "http://schemas.microsoft.com/claims/authnmethodsreferences",
+            "maxLength": 200,
+            "title": "Saml Mfa Attribute",
+            "type": "string"
+          },
+          "saml_mfa_attribute_values": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Saml Mfa Attribute Values",
+            "type": "array"
+          },
+          "saml_request_authn_context": {
+            "default": false,
+            "title": "Saml Request Authn Context",
+            "type": "boolean"
+          }
+        },
+        "title": "MfaPolicyOut",
         "type": "object"
       },
       "MutationRequest": {
@@ -31398,6 +31891,483 @@
           "files"
         ],
         "title": "ScheduleRunOut",
+        "type": "object"
+      },
+      "ScimAccountOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "changed": {
+            "format": "date-time",
+            "title": "Changed",
+            "type": "string"
+          },
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "external_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Id"
+          },
+          "login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Login"
+          },
+          "scim_id": {
+            "title": "Scim Id",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "integer"
+          },
+          "user_kind": {
+            "enum": [
+              "agent",
+              "customer"
+            ],
+            "title": "User Kind",
+            "type": "string"
+          },
+          "user_name": {
+            "title": "User Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scim_id",
+          "user_kind",
+          "user_id",
+          "login",
+          "user_name",
+          "external_id",
+          "active",
+          "deleted",
+          "changed"
+        ],
+        "title": "ScimAccountOut",
+        "type": "object"
+      },
+      "ScimAccountPageOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ScimAccountOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ],
+        "title": "ScimAccountPageOut",
+        "type": "object"
+      },
+      "ScimEventOut": {
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Login"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "resource": {
+            "title": "Resource",
+            "type": "string"
+          },
+          "scim_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scim Id"
+          },
+          "status": {
+            "title": "Status",
+            "type": "integer"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "user_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "agent",
+                  "customer"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Kind"
+          }
+        },
+        "required": [
+          "id",
+          "created",
+          "method",
+          "resource",
+          "operation",
+          "status",
+          "scim_id",
+          "user_kind",
+          "user_id",
+          "login",
+          "detail"
+        ],
+        "title": "ScimEventOut",
+        "type": "object"
+      },
+      "ScimGroupOut": {
+        "properties": {
+          "changed": {
+            "format": "date-time",
+            "title": "Changed",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "external_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Id"
+          },
+          "member_count": {
+            "title": "Member Count",
+            "type": "integer"
+          },
+          "scim_id": {
+            "title": "Scim Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scim_id",
+          "display_name",
+          "external_id",
+          "member_count",
+          "changed"
+        ],
+        "title": "ScimGroupOut",
+        "type": "object"
+      },
+      "ScimGroupPageOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ScimGroupOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "items"
+        ],
+        "title": "ScimGroupPageOut",
+        "type": "object"
+      },
+      "ScimStatusOut": {
+        "properties": {
+          "active_users": {
+            "title": "Active Users",
+            "type": "integer"
+          },
+          "adopt_existing": {
+            "title": "Adopt Existing",
+            "type": "boolean"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "groups": {
+            "title": "Groups",
+            "type": "integer"
+          },
+          "last_activity_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Activity At"
+          },
+          "pending_sync": {
+            "title": "Pending Sync",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "tokens": {
+            "items": {
+              "$ref": "#/components/schemas/ScimTokenOut"
+            },
+            "title": "Tokens",
+            "type": "array"
+          },
+          "users": {
+            "title": "Users",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "base_url",
+          "available",
+          "reason",
+          "enabled",
+          "adopt_existing",
+          "tokens",
+          "users",
+          "active_users",
+          "groups",
+          "pending_sync",
+          "last_activity_at"
+        ],
+        "title": "ScimStatusOut",
+        "type": "object"
+      },
+      "ScimTokenCreateIn": {
+        "properties": {
+          "expires_in_days": {
+            "default": 365,
+            "title": "Expires In Days",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "user_kind": {
+            "enum": [
+              "agent",
+              "customer"
+            ],
+            "title": "User Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "user_kind"
+        ],
+        "title": "ScimTokenCreateIn",
+        "type": "object"
+      },
+      "ScimTokenCreatedOut": {
+        "properties": {
+          "record": {
+            "$ref": "#/components/schemas/ScimTokenOut"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "record"
+        ],
+        "title": "ScimTokenCreatedOut",
+        "type": "object"
+      },
+      "ScimTokenOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Name"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "token_hint": {
+            "title": "Token Hint",
+            "type": "string"
+          },
+          "user_kind": {
+            "enum": [
+              "agent",
+              "customer"
+            ],
+            "title": "User Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "user_kind",
+          "token_hint",
+          "created_at",
+          "created_by_name",
+          "expires_at",
+          "revoked_at",
+          "last_used_at",
+          "active"
+        ],
+        "title": "ScimTokenOut",
         "type": "object"
       },
       "SearchHit": {
@@ -58618,7 +59588,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ProviderChanges"
+                "$ref": "#/components/schemas/IdentityProviderPatch"
               }
             }
           },
@@ -59063,6 +60033,578 @@
         "summary": "Refresh Identity Provider Metadata",
         "tags": [
           "admin:identity"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-providers/{provider_id}/scim": {
+      "get": {
+        "operationId": "scim_status_api_v1_admin_identity_providers__provider_id__scim_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Scim Status",
+        "tags": [
+          "admin:identity:scim"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-providers/{provider_id}/scim/accounts": {
+      "get": {
+        "operationId": "scim_accounts_api_v1_admin_identity_providers__provider_id__scim_accounts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_deleted",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Deleted",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimAccountPageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Scim Accounts",
+        "tags": [
+          "admin:identity:scim"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-providers/{provider_id}/scim/events": {
+      "get": {
+        "operationId": "scim_events_api_v1_admin_identity_providers__provider_id__scim_events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "failures_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Failures Only",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScimEventOut"
+                  },
+                  "title": "Response Scim Events Api V1 Admin Identity Providers  Provider Id  Scim Events Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Scim Events",
+        "tags": [
+          "admin:identity:scim"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-providers/{provider_id}/scim/groups": {
+      "get": {
+        "operationId": "scim_groups_api_v1_admin_identity_providers__provider_id__scim_groups_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimGroupPageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Scim Groups",
+        "tags": [
+          "admin:identity:scim"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-providers/{provider_id}/scim/tokens": {
+      "post": {
+        "operationId": "create_scim_token_api_v1_admin_identity_providers__provider_id__scim_tokens_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScimTokenCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimTokenCreatedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Scim Token",
+        "tags": [
+          "admin:identity:scim"
+        ]
+      }
+    },
+    "/api/v1/admin/identity-providers/{provider_id}/scim/tokens/{token_id}": {
+      "delete": {
+        "operationId": "revoke_scim_token_api_v1_admin_identity_providers__provider_id__scim_tokens__token_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "token_id",
+            "required": true,
+            "schema": {
+              "title": "Token Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Scim Token",
+        "tags": [
+          "admin:identity:scim"
         ]
       }
     },

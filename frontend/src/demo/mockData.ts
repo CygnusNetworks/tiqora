@@ -1915,6 +1915,21 @@ function identityDetail(id: number) {
     role_rules: [{ attribute: "groups", value: "support", role_ids: [1], groups: [{ group_id: 3, permissions: ["ro", "create"] }] }],
     sync_mode: "managed",
     metadata_fetched_at: row.kind === "saml" ? t0 : null,
+    require_mfa_claim: false,
+    mfa_policy: {
+      fallback: "local_second_factor",
+      oidc_amr_values: ["mfa"],
+      oidc_acr_values: [],
+      oidc_request_acr_values: "",
+      saml_authn_context_classes: [],
+      saml_mfa_attribute: "http://schemas.microsoft.com/claims/authnmethodsreferences",
+      saml_mfa_attribute_values: ["http://schemas.microsoft.com/claims/multipleauthn"],
+      saml_request_authn_context: false,
+    },
+    session_idle_seconds: null,
+    session_absolute_seconds: null,
+    scim_enabled: false,
+    scim_adopt_existing: false,
     // Same shapes as backend identity/urls.py provider_urls().
     endpoints: {
       agent_redirect_uri: `${identityBase}/api/v1/auth/oidc/${row.slug}/callback`,
@@ -2469,7 +2484,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/admin/identity-providers/kinds")) return identityKinds;
   if (p.endsWith("/admin/identity-providers/presets")) return identityPresets;
   if (p.endsWith("/admin/identity-providers/capabilities"))
-    return { saml_available: true, saml_missing: null, public_base_url_set: true, webauthn: true };
+    return { saml_available: true, saml_missing: null, public_base_url_set: true, webauthn: true, session_idle_max_seconds: 28800, session_absolute_max_seconds: 86400, scim_base_url: "https://demo.example.org/scim/v2" };
   if (p.endsWith("/admin/identity-providers") && method === "GET") return identitySummaries;
   if (p.endsWith("/admin/identity-providers") && method === "POST") return identityDetail(1);
   if (p.match(/\/admin\/identity-providers\/\d+\/preview$/)) return identityTestResult.plan;
