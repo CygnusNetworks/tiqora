@@ -43,11 +43,12 @@ _ROLE_LABELS: Final = {
     "api": "Weboberfläche und Schnittstelle",
     "worker": "Hintergrunddienst",
     "mcp": "KI-Schnittstelle (MCP)",
+    "ai-worker": "KI-Hintergrunddienst",
 }
 
 
 class PluginRuntimeOut(BaseModel):
-    role: Literal["api", "worker", "mcp"]
+    role: Literal["api", "worker", "mcp", "ai-worker"]
     state: str
     version: str | None
     error: str | None

@@ -10,8 +10,8 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Final, Literal
 
-PluginRole = Literal["api", "worker", "mcp"]
-PLUGIN_ROLES: Final[tuple[PluginRole, ...]] = ("api", "worker", "mcp")
+PluginRole = Literal["api", "worker", "mcp", "ai-worker"]
+PLUGIN_ROLES: Final[tuple[PluginRole, ...]] = ("api", "worker", "mcp", "ai-worker")
 
 #: boots that died between ``mark_loading`` and ``mark_result`` before a plugin is quarantined
 QUARANTINE_AFTER: Final = 3
@@ -108,7 +108,8 @@ def summarize_status(
 
     Precedence (R-STATUS-ROLES): invalid > incompatible > quarantined (any role) >
     failed (any role) > restart_required > active / disabled > unknown. ``api_state`` is the
-    API process (it decides on/off); ``other_states`` are worker and mcp rows.
+    API process (it decides on/off); ``other_states`` are worker, mcp and
+    ai-worker rows (a role whose container never ran has no row and does not count).
     """
     if problem:
         return "invalid"

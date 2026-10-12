@@ -41,6 +41,7 @@ from tiqora.domain.settings_store import (
     get_setting_int,
 )
 from tiqora.logging_setup import configure_logging
+from tiqora.plugins.bootstrap import init_registry
 from tiqora.worker.status import record_tick_status
 
 logger = structlog.get_logger(__name__)
@@ -132,6 +133,12 @@ async def _run_loop(stop: asyncio.Event) -> None:
 
 
 async def _run_all(stop: asyncio.Event) -> None:
+    # Build + freeze the registry (core + enabled plugins) before any loop starts: number
+    # generators, placeholders, outbound filters and DF types apply here too. A broken plugin
+    # never blocks the boot (R-BOOT-ANYERR).
+    await init_registry(
+        role="ai-worker", settings=get_settings(), session_factory=get_session_factory()
+    )
     await asyncio.gather(_heartbeat_loop(stop), _run_loop(stop), run_chat_bot_loop(stop))
 
 

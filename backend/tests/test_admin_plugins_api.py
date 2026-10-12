@@ -209,6 +209,35 @@ async def test_runtime_roles_sorted_and_worker_failure_named(
     assert p["status_message"] == "Hintergrunddienst: RuntimeError: kaputt"
 
 
+async def test_ai_worker_failure_named_and_sorted_last(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    seeded_runtime: None,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    await store.mark_result(
+        factory,
+        PLUGIN_ID,
+        "ai-worker",
+        state=RuntimeState.FAILED,
+        version="1.0.0",
+        error="RuntimeError: kaputt",
+        now=T0,
+    )
+    p = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+    assert [r["role"] for r in p["runtime"]] == ["api", "ai-worker"]
+    assert p["status"] == "failed"
+    assert p["status_message"] == "KI-Hintergrunddienst: RuntimeError: kaputt"
+
+
+async def test_no_ai_worker_row_is_not_a_problem(
+    fixture_plugins: Installer, admin_client: AsyncClient, seeded_runtime: None
+) -> None:
+    p = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+    assert p["status"] == "active"
+    assert "ai-worker" not in {r["role"] for r in p["runtime"]}
+
+
 async def test_quarantined_worker_message(
     fixture_plugins: Installer,
     admin_client: AsyncClient,

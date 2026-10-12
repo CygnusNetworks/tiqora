@@ -24473,7 +24473,8 @@
             "enum": [
               "api",
               "worker",
-              "mcp"
+              "mcp",
+              "ai-worker"
             ],
             "title": "Role",
             "type": "string"
