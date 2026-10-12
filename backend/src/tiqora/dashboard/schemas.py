@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 from tiqora.dashboard.filters import DashboardFilters
 from tiqora.dashboard.layout import Rect
 from tiqora.dashboard.settings_models import MAX_WIDGET_SETTINGS_BYTES, WIDGET_KEY_RE
-from tiqora.domain.schemas import UtcDateTime
+from tiqora.domain.schemas import TicketListItem, UtcDateTime
 
 __all__ = [
     "MAX_DASHBOARDS_PER_USER",
@@ -170,6 +170,18 @@ class WidgetDataOut(BaseModel):
 class DashboardDataOut(BaseModel):
     widgets: dict[str, WidgetDataOut]  # widget id -> result; widgets without a provider are absent
     generated_at: UtcDateTime
+
+
+class DrillPageOut(BaseModel):
+    """The tickets behind a widget or a chart point, as one page (E5)."""
+
+    title: str  # German, e.g. "Meine offenen Tickets" / "Bericht „Volumen“ · Queue Support"
+    items: list[TicketListItem]
+    total: int
+    #: exact wave-0 filter for "Als Suche speichern"; ``None`` when none expresses the list
+    filter: dict[str, Any] | None = None
+    #: e.g. "Der Bericht kann einige Minuten älter sein als diese Liste."
+    note: str | None = None
 
 
 class WidgetPreviewIn(BaseModel):

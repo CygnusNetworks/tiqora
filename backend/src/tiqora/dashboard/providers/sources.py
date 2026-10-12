@@ -36,6 +36,8 @@ class ResolvedSource:
     criteria: Filter
     scope: TicketQueryScope
     counter_key: str
+    #: the saved search's name (``None`` for an own filter)
+    name: str | None = None
 
 
 def filter_counter_key(flt: dict[str, object]) -> str:
@@ -64,16 +66,18 @@ async def resolve_source(
             raise ProviderForbidden(MSG_SEARCH_UNREADABLE)
         criteria = search.criteria
         key = f"search:{source.id}"
+        name: str | None = search.name
     else:
         try:
             criteria = Filter.model_validate(source.filter)
         except ValidationError:
             raise ProviderForbidden(MSG_FILTER_INVALID) from None
         key = filter_counter_key(source.filter)
+        name = None
     scope = await ticket_query_scope(session, viewer, include_archived=False)
     if queue_ids:
         scope = replace(scope, queue_ids=scope.queue_ids & frozenset(queue_ids))
-    return ResolvedSource(criteria, scope, key)
+    return ResolvedSource(criteria, scope, key, name)
 
 
 async def compile_for_viewer(

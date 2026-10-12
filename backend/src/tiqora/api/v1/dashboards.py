@@ -9,8 +9,9 @@ cookie-authenticated writes is the global ``csrf_origin_middleware``.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
-from typing import Annotated, Any, Final, NoReturn
+from typing import Annotated, Any, Final, Literal, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
 from pydantic import ValidationError
@@ -25,11 +26,16 @@ from tiqora.api.deps import (
     get_session_factory_dep,
 )
 from tiqora.config import Settings
-from tiqora.dashboard import start, store, template_update
+from tiqora.dashboard import drill, start, store, template_update
 from tiqora.dashboard.filters import effective_filters
-from tiqora.dashboard.providers import DASHBOARD_PROVIDERS
+from tiqora.dashboard.providers import DASHBOARD_PROVIDERS, ProviderForbidden
 from tiqora.dashboard.providers.report import REPORT_WIDGET_TYPES, report_spec
-from tiqora.dashboard.runner import INVALID_SETTINGS_MESSAGE, run_batch, run_widget
+from tiqora.dashboard.runner import (
+    INVALID_SETTINGS_MESSAGE,
+    SINGLE_WIDGET_TIMEOUT_SECONDS,
+    run_batch,
+    run_widget,
+)
 from tiqora.dashboard.schemas import (
     MAX_WIDGETS_PER_DASHBOARD,
     DashboardCreateIn,
@@ -40,6 +46,7 @@ from tiqora.dashboard.schemas import (
     DashboardSaveIn,
     DashboardShareIn,
     DashboardTabOut,
+    DrillPageOut,
     TemplateUpdateApplyIn,
     TemplateUpdateOut,
     WidgetDataOut,
@@ -53,6 +60,7 @@ from tiqora.dashboard.settings_models import (
     SettingsError,
     validate_widget_settings,
 )
+from tiqora.domain.ticket_service import TicketService
 from tiqora.extensions import Registry, get_registry
 from tiqora.filters import FilterError
 from tiqora.jobs.schemas import JobAccepted
@@ -71,6 +79,7 @@ from tiqora.reporting.run_service import (
 )
 from tiqora.reporting.schemas import ReportRunIn
 from tiqora.reporting.settings import load_reporting_settings
+from tiqora.reporting.sql import ReportQueryTimeout, statement_timeout
 
 router = APIRouter(prefix="/dashboards", tags=["dashboards"])
 widget_types_router = APIRouter(prefix="/dashboard-widget-types", tags=["dashboards"])
@@ -81,6 +90,7 @@ NOT_A_REPORT_MESSAGE: Final = "Dieses Widget zeigt keinen Bericht."
 JOBS_FULL_MESSAGE: Final = (
     "Es laufen bereits mehrere Berichte im Hintergrund. Bitte warten Sie, bis einer fertig ist."
 )
+DRILL_TIMEOUT_MESSAGE: Final = "Die Liste braucht zu lange. Bitte grenzen Sie den Filter ein."
 CORE_WIDGET_VERSION: Final = 1
 
 
@@ -438,6 +448,80 @@ async def widget_data(
     if out is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, NO_DATA_MESSAGE)
     return out
+
+
+def _parse_point(raw: str | None) -> dict[str, Any] | None:
+    """The chart point of a drill request: a small JSON object, never a filter."""
+    if raw is None:
+        return None
+    bad = {"message": drill.MSG_BAD_POINT, "path": "point"}
+    if len(raw.encode("utf-8")) > drill.MAX_POINT_BYTES:
+        raise HTTPException(422, bad)
+    try:
+        point = json.loads(raw)
+    except ValueError:
+        raise HTTPException(422, bad) from None
+    if not isinstance(point, dict) or not point or len(point) > drill.MAX_POINT_KEYS:
+        raise HTTPException(422, bad)
+    return point
+
+
+@router.get("/{dashboard_id}/widgets/{widget_id}/tickets", response_model=DrillPageOut)
+async def widget_tickets(
+    dashboard_id: DashboardId,
+    widget_id: str,
+    session: DbSession,
+    user: CurrentUser,
+    app_settings: Annotated[Settings, Depends(get_app_settings)],
+    offset: Annotated[int, Query(ge=0, le=100_000)] = 0,
+    limit: Annotated[int, Query(ge=1, le=50)] = 50,
+    sort: Annotated[str | None, Query(max_length=20)] = None,
+    order: Literal["asc", "desc"] | None = None,
+    point: Annotated[str | None, Query(max_length=600)] = None,
+) -> DrillPageOut:
+    """The tickets behind a widget (or one chart point), computed like the widget itself.
+
+    The browser sends the widget id and, for a chart, one dimension value (``point``, a small
+    JSON object); the filter is rebuilt here from the stored settings, the viewer's scope and the
+    dashboard filters. Statements are bounded to the single-widget budget.
+    """
+    chosen = _parse_point(point)
+    if sort is not None and sort not in TicketService._SORT_COLUMNS:
+        raise HTTPException(422, {"message": "Diese Sortierung gibt es nicht.", "path": "sort"})
+    board = await _visible_dashboard(session, user, dashboard_id)
+    widget = next((w for w in board.widgets if w.id == widget_id), None)
+    if widget is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Widget nicht gefunden.")
+    try:
+        async with statement_timeout(session, int(SINGLE_WIDGET_TIMEOUT_SECONDS)):
+            return await drill.widget_tickets(
+                session,
+                user.id,
+                widget,
+                board.filters,
+                offset=offset,
+                limit=limit,
+                sort=sort,
+                order=order,
+                point=chosen,
+                app_settings=app_settings,
+            )
+    except drill.DrillNotPossible as exc:
+        raise HTTPException(
+            422, {"message": exc.message, "path": "point" if chosen else "widget_id"}
+        ) from None
+    except ProviderForbidden as exc:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, exc.message) from None
+    except RequestError as exc:
+        raise HTTPException(exc.status_code, {"message": exc.message, "path": exc.path}) from None
+    except (DefinitionError, FilterError) as exc:
+        raise HTTPException(422, {"message": exc.message, "path": exc.path}) from None
+    except ReportQueryTimeout:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, {"message": DRILL_TIMEOUT_MESSAGE}
+        ) from None
+    finally:
+        await session.rollback()  # frees the connection and ends the transaction before any commit
 
 
 @router.post(

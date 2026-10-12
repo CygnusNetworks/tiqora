@@ -332,12 +332,10 @@ async def test_online_route_and_helper_return_the_same_list(env: Env) -> None:
 
 
 async def test_reminders_scan_finds_a_due_reminder_behind_older_pending_tickets(
-    env: Env, monkeypatch: pytest.MonkeyPatch
+    env: Env,
 ) -> None:
-    """The scan is ordered by due time, so older-created far-future reminders cannot hide it."""
-    from tiqora.dashboard.providers import reminders
-
-    monkeypatch.setattr(reminders, "_SCAN_LIMIT", 2)
+    """The due window is part of the query (shared with the drill-down), so older-created
+    far-future reminders can neither hide the due one nor count in the total."""
     far = int(time.time()) + 90 * 86400
     for i in range(3):  # created before a_pending, due in three months
         env._sql_write(

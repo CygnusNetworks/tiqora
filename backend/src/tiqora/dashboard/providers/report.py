@@ -21,7 +21,7 @@ One runner, :func:`run_report_widget`, serves every report-based widget. Rules:
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Final
 
@@ -40,7 +40,8 @@ from tiqora.dashboard.settings_models import (
     ReportWidgetSettings,
     SlaGaugeSettings,
 )
-from tiqora.filters import FilterError
+from tiqora.filters import AllOf, AnyOf, Condition, Filter, FilterError, Not
+from tiqora.filters.model import FilterNode
 from tiqora.reporting.access import has_report_access
 from tiqora.reporting.cache import ReportCache, read_cache_generation
 from tiqora.reporting.definition import DefinitionError, ReportDefinition, TimeRange
@@ -80,20 +81,102 @@ WIDE_VISUALIZATIONS: Final = frozenset({"pivot", "heatmap"})
 MAX_WIDE_ROWS: Final = 200
 #: sources whose rows are tickets (a chart point can open a ticket list)
 TICKET_SOURCES: Final = frozenset({"tickets", "open_tickets"})
-#: dimension keys of a ticket source that map to a ticket-filter field (Task 9 refines this)
-TICKET_DRILL_DIMENSIONS: Final = frozenset(
-    {"queue", "state", "state_type", "priority", "type", "service", "sla", "channel", "created"}
-)
+#: report dimension / filter-field key of a ticket source -> the ticket-filter field of the same
+#: meaning. Person fields (owner, responsible, customer, customer user) are deliberately absent:
+#: their values never travel in a drill URL (open question 10), so a report that depends on one
+#: has no ticket list.
+REPORT_DIMENSION_TO_TICKET_FIELD: Final[Mapping[str, str]] = {
+    "queue": "queue_id",
+    "state": "state_id",
+    "state_type": "state_type",
+    "priority": "priority_id",
+    "type": "type_id",
+    "service": "service_id",
+    "sla": "sla_id",
+    "channel": "channel",
+    "created": "created",
+}
+#: kept for readers of the old name (the keys of the mapping)
+TICKET_DRILL_DIMENSIONS: Final = frozenset(REPORT_DIMENSION_TO_TICKET_FIELD)
+
+MSG_NO_POINT_LIST: Final = "Für diesen Wert gibt es keine Ticketliste."
 
 
-def drillable_dimensions(definition: ReportDefinition | None) -> list[str]:
+class DrillNotPossible(Exception):  # noqa: N818 - E5 name
+    """The report (or the chosen point) cannot be shown as an exact ticket list."""
+
+    def __init__(self, message: str = MSG_NO_POINT_LIST) -> None:
+        super().__init__(message)
+        self.message = message
+
+
+def map_report_filter(flt: Filter | None) -> Filter | None:
+    """The report-side filter on ticket-filter fields; ``DrillNotPossible`` for any other field."""
+    if flt is None or flt.where is None:
+        return None
+    return Filter(where=map_report_node(flt.where))
+
+
+def map_report_node(node: FilterNode) -> FilterNode:
+    if isinstance(node, Condition):
+        field_key = REPORT_DIMENSION_TO_TICKET_FIELD.get(node.field)
+        if field_key is None:
+            raise DrillNotPossible
+        return node.model_copy(update={"field": field_key})
+    if isinstance(node, AllOf):
+        return AllOf(all=[map_report_node(c) for c in node.all])
+    if isinstance(node, AnyOf):
+        return AnyOf(any=[map_report_node(c) for c in node.any])
+    return Not.model_validate({"not": map_report_node(node.not_)})
+
+
+def effective_dimension_keys(
+    definition: ReportDefinition, choices: Mapping[int, str] | None = None
+) -> list[str]:
+    """Dimension keys after the runtime ``dimension_choices`` (unknown choices are ignored)."""
+    keys = [d.key for d in definition.dimensions]
+    for index, choice in (choices or {}).items():
+        if 0 <= index < len(keys) and (
+            choice == keys[index] or choice in definition.dimensions[index].choices
+        ):
+            keys[index] = choice
+    return keys
+
+
+def check_drillable(definition: ReportDefinition, dimension_keys: Sequence[str]) -> None:
+    """Raise :class:`DrillNotPossible` unless every part of the report maps to ticket fields.
+
+    Parts: the source (``tickets`` / ``open_tickets``), the time field (``created``), every
+    dimension, the report's own filter and its runtime parameters.
+    """
+    if definition.source not in TICKET_SOURCES:
+        raise DrillNotPossible
+    if definition.time_field not in (None, "created"):
+        raise DrillNotPossible
+    if any(key not in REPORT_DIMENSION_TO_TICKET_FIELD for key in dimension_keys):
+        raise DrillNotPossible
+    if any(p.field not in REPORT_DIMENSION_TO_TICKET_FIELD for p in definition.parameters):
+        raise DrillNotPossible
+    map_report_filter(definition.filter)
+
+
+def drillable_dimensions(
+    definition: ReportDefinition | None, choices: Mapping[int, str] | None = None
+) -> list[str]:
     """Dimension keys of the report whose chart points can open a ticket list.
 
-    Pure. Only reports on ticket sources qualify; every other source answers ``[]``.
+    Pure. ``[]`` unless the whole report is expressible as a ticket filter
+    (:func:`check_drillable`): a single dimension, filter or parameter that is not would make
+    the list differ from the chart.
     """
-    if definition is None or definition.source not in TICKET_SOURCES:
+    if definition is None:
         return []
-    return [d.key for d in definition.dimensions if d.key in TICKET_DRILL_DIMENSIONS]
+    keys = effective_dimension_keys(definition, choices)
+    try:
+        check_drillable(definition, keys)
+    except DrillNotPossible:
+        return []
+    return keys
 
 
 def _report_meta(report_key: str | None, saved_name: str | None) -> dict[str, Any]:
@@ -144,10 +227,11 @@ async def run_report_widget(
     )
     queue_ids = filter_queue_ids(ctx)
     try:
+        dimension_choices_by_index = parse_dimension_choices(dimension_choices)
         overrides = RunOverrides(
             time_range=time_range,
             parameters=dict(parameters),
-            dimension_choices=parse_dimension_choices(dimension_choices),
+            dimension_choices=dimension_choices_by_index,
             common={"queue": queue_ids} if queue_ids else {},
         )
         outcome = await run_report_ref(
@@ -186,7 +270,7 @@ async def run_report_widget(
         definition=effective.model_dump(mode="json", exclude_none=True),
         result=_result_data(outcome, effective, max_rows),
         ignored_filters=list(outcome.ignored_common),
-        drillable_dimensions=drillable_dimensions(effective),
+        drillable_dimensions=drillable_dimensions(effective, dimension_choices_by_index),
     )
     return data
 

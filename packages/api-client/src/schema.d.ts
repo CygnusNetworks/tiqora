@@ -7011,6 +7011,30 @@ export interface paths {
         patch: operations["patch_widget_settings_api_v1_dashboards__dashboard_id__widgets__widget_id__settings_patch"];
         trace?: never;
     };
+    "/api/v1/dashboards/{dashboard_id}/widgets/{widget_id}/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Widget Tickets
+         * @description The tickets behind a widget (or one chart point), computed like the widget itself.
+         *
+         *     The browser sends the widget id and, for a chart, one dimension value (``point``, a small
+         *     JSON object); the filter is rebuilt here from the stored settings, the viewer's scope and the
+         *     dashboard filters. Statements are bounded to the single-widget budget.
+         */
+        get: operations["widget_tickets_api_v1_dashboards__dashboard_id__widgets__widget_id__tickets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/events/stream": {
         parameters: {
             query?: never;
@@ -14793,6 +14817,24 @@ export interface components {
             title?: string | null;
             /** User Id */
             user_id: number;
+        };
+        /**
+         * DrillPageOut
+         * @description The tickets behind a widget or a chart point, as one page (E5).
+         */
+        DrillPageOut: {
+            /** Filter */
+            filter?: {
+                [key: string]: unknown;
+            } | null;
+            /** Items */
+            items: components["schemas"]["TicketListItem"][];
+            /** Note */
+            note?: string | null;
+            /** Title */
+            title: string;
+            /** Total */
+            total: number;
         };
         /** DynamicFieldCreate */
         DynamicFieldCreate: {
@@ -41025,6 +41067,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WidgetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    widget_tickets_api_v1_dashboards__dashboard_id__widgets__widget_id__tickets_get: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+                sort?: string | null;
+                order?: ("asc" | "desc") | null;
+                point?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                dashboard_id: number;
+                widget_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrillPageOut"];
                 };
             };
             /** @description Validation Error */
