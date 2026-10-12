@@ -1,0 +1,129 @@
+{
+ "key": "hardware",
+ "name": "Hardware",
+ "icon": "hardware",
+ "attributes": [
+  {
+   "key": "Vendor",
+   "name": "Hersteller",
+   "type": "text",
+   "searchable": true
+  },
+  {
+   "key": "Model",
+   "name": "Modell",
+   "type": "text",
+   "searchable": true
+  },
+  {
+   "key": "Description",
+   "name": "Beschreibung",
+   "type": "textarea"
+  },
+  {
+   "key": "Type",
+   "name": "Typ",
+   "type": "catalog",
+   "options": {
+    "catalog_class": "ITSM::ConfigItem::Hardware::Type"
+   },
+   "searchable": false
+  },
+  {
+   "key": "Owner",
+   "name": "Besitzer",
+   "type": "customer_user",
+   "portal": true,
+   "searchable": true
+  },
+  {
+   "key": "SerialNumber",
+   "name": "Seriennummer",
+   "type": "text",
+   "searchable": true
+  },
+  {
+   "key": "Location",
+   "name": "Standort",
+   "type": "ci_ref",
+   "options": {
+    "class_keys": [
+     "location"
+    ]
+   }
+  },
+  {
+   "key": "WarrantyExpirationDate",
+   "name": "Garantie bis",
+   "type": "date"
+  },
+  {
+   "key": "InstallDate",
+   "name": "Installationsdatum",
+   "type": "date"
+  },
+  {
+   "key": "Note",
+   "name": "Notiz",
+   "type": "textarea"
+  }
+ ],
+ "catalog_items": [
+  {
+   "catalog_class": "ITSM::ConfigItem::Hardware::Type",
+   "item_key": "modem",
+   "name": "Modem",
+   "functionality": null,
+   "position": 10
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Hardware::Type",
+   "item_key": "monitor",
+   "name": "Monitor",
+   "functionality": null,
+   "position": 20
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Hardware::Type",
+   "item_key": "printer",
+   "name": "Printer",
+   "functionality": null,
+   "position": 30
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Hardware::Type",
+   "item_key": "router",
+   "name": "Router",
+   "functionality": null,
+   "position": 40
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Hardware::Type",
+   "item_key": "scanner",
+   "name": "Scanner",
+   "functionality": null,
+   "position": 50
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Hardware::Type",
+   "item_key": "switch",
+   "name": "Switch",
+   "functionality": null,
+   "position": 60
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Hardware::Type",
+   "item_key": "telephone",
+   "name": "Telephone",
+   "functionality": null,
+   "position": 70
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Hardware::Type",
+   "item_key": "other",
+   "name": "Other",
+   "functionality": null,
+   "position": 80
+  }
+ ]
+}

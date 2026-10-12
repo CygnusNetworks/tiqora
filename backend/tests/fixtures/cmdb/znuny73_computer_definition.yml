@@ -1,0 +1,37 @@
+# fixture in Znuny's documented format, not copied from a Znuny install
+Pages:
+  - Name: General
+    Sections:
+      - Section: Main
+Sections:
+  Main:
+    Content:
+      - Key: Vendor
+        Name: Vendor
+        Searchable: 1
+        Input:
+          Type: Text
+          MaxLength: 50
+      - Key: Model
+        Name: Model
+        Searchable: 1
+        Input:
+          Type: Text
+      - Key: Description
+        Name: Description
+        Input:
+          Type: TextArea
+  Hardware:
+    Content:
+      - Key: SerialNumber
+        Name: Serial number
+        Searchable: 1
+        Input:
+          Type: Text
+          Required: 1
+      - Key: Memory
+        Name: Memory (GB)
+        Input:
+          Type: Integer
+          ValueMin: 1
+          ValueMax: 4096

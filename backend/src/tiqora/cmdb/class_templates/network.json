@@ -1,0 +1,95 @@
+{
+ "key": "network",
+ "name": "Netzwerk",
+ "icon": "network",
+ "attributes": [
+  {
+   "key": "Type",
+   "name": "Typ",
+   "type": "catalog",
+   "options": {
+    "catalog_class": "ITSM::ConfigItem::Network::Type"
+   },
+   "searchable": false
+  },
+  {
+   "key": "NetworkAddress",
+   "name": "Netzwerkadresse",
+   "type": "ip",
+   "searchable": true
+  },
+  {
+   "key": "SubnetMask",
+   "name": "Subnetzmaske",
+   "type": "text"
+  },
+  {
+   "key": "Gateway",
+   "name": "Gateway",
+   "type": "ip"
+  },
+  {
+   "key": "Note",
+   "name": "Notiz",
+   "type": "textarea"
+  }
+ ],
+ "catalog_items": [
+  {
+   "catalog_class": "ITSM::ConfigItem::Network::Type",
+   "item_key": "lan",
+   "name": "LAN",
+   "functionality": null,
+   "position": 10
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Network::Type",
+   "item_key": "wlan",
+   "name": "WLAN",
+   "functionality": null,
+   "position": 20
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Network::Type",
+   "item_key": "wan",
+   "name": "WAN",
+   "functionality": null,
+   "position": 30
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Network::Type",
+   "item_key": "ethernet",
+   "name": "Ethernet",
+   "functionality": null,
+   "position": 40
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Network::Type",
+   "item_key": "gsm",
+   "name": "GSM",
+   "functionality": null,
+   "position": 50
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Network::Type",
+   "item_key": "isdn",
+   "name": "ISDN",
+   "functionality": null,
+   "position": 60
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Network::Type",
+   "item_key": "leased_line",
+   "name": "Leased Line",
+   "functionality": null,
+   "position": 70
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Network::Type",
+   "item_key": "other",
+   "name": "Other",
+   "functionality": null,
+   "position": 80
+  }
+ ]
+}
