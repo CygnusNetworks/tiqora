@@ -675,6 +675,91 @@ async def test_engine_keeps_revision_after_designer_edit_in_ownership_mode(env: 
     assert await env.one("SELECT COUNT(*) FROM pm_entity_sync") == 0
 
 
+async def test_update_defaults_scope_for_activities_only(env: Env) -> None:
+    """Golden-master finding: ``*Add`` defaults ``Scope`` for all four types, ``*Update`` only for
+    activities (``DB/Activity.pm:475``); an edited dialog/transition/action keeps its config."""
+    w = env.writer
+    made = {
+        "Activity": await w.create_entity("Activity", name="wf3 scope act", config={}),
+        "ActivityDialog": await w.create_entity(
+            "ActivityDialog", name="wf3 scope dlg", config={"Interface": ["AgentInterface"]}
+        ),
+        "Transition": await w.create_entity("Transition", name="wf3 scope tr", config={}),
+        "TransitionAction": await w.create_entity(
+            "TransitionAction", name="wf3 scope ta", config={"Module": "My::Module"}
+        ),
+    }
+    tables = {
+        "Activity": "pm_activity",
+        "ActivityDialog": "pm_activity_dialog",
+        "Transition": "pm_transition",
+        "TransitionAction": "pm_transition_action",
+    }
+    await env.session.commit()
+    for kind, written in made.items():  # created: all four carry the Add default
+        stored = load_znuny_yaml(
+            _s(
+                await env.one(
+                    f"SELECT config FROM {tables[kind]} WHERE entity_id = :e", e=written.entity_id
+                )
+            )  # noqa: S608
+        )
+        assert stored["Scope"] == "Global", kind
+
+    # a config without Scope, as ProcessImport's *Update stores it
+    imported = {
+        "Activity": {},
+        "ActivityDialog": {"Interface": ["AgentInterface"], "Fields": {}, "FieldOrder": []},
+        "Transition": {"Condition": {}},
+        "TransitionAction": {"Module": "My::Module", "Config": {}},
+    }
+    for kind, written in made.items():
+        await env.session.execute(
+            text(f"DELETE FROM {tables[kind]} WHERE entity_id = :e"),  # noqa: S608
+            {"e": written.entity_id},
+        )
+    await env.session.commit()
+    for kind, written in made.items():
+        await env.fresh_writer().import_entity(
+            kind,  # type: ignore[arg-type]
+            written.entity_id,
+            name=written.name,
+            config=imported[kind],
+        )
+        await env.session.commit()
+        stored = load_znuny_yaml(
+            _s(
+                await env.one(
+                    f"SELECT config FROM {tables[kind]} WHERE entity_id = :e", e=written.entity_id
+                )
+            )  # noqa: S608
+        )
+        assert ("Scope" in stored) is (kind == "Activity"), kind
+
+    # editing keeps a dialog without Scope as it is, and still defaults an activity's
+    dialog = made["ActivityDialog"]
+    current = await env.one(
+        "SELECT config FROM pm_activity_dialog WHERE entity_id = :e", e=dialog.entity_id
+    )
+    out = await env.fresh_writer().update_entity(
+        "ActivityDialog",
+        dialog.entity_id,
+        expected_version=entity_version(name=dialog.name, config=_s(current)),
+        name=dialog.name,
+        config={**imported["ActivityDialog"], "DescriptionShort": "edited"},
+    )
+    await env.session.commit()
+    assert out.name == dialog.name
+    edited = load_znuny_yaml(
+        _s(
+            await env.one(
+                "SELECT config FROM pm_activity_dialog WHERE entity_id = :e", e=dialog.entity_id
+            )
+        )
+    )
+    assert edited["DescriptionShort"] == "edited" and "Scope" not in edited
+
+
 async def test_config_normalisation(env: Env) -> None:
     w = env.writer
     act = await w.create_entity(

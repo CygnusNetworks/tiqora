@@ -122,6 +122,14 @@ class CalendarService:
             create_by=user_id,
             change_time=now,
             change_by=user_id,
+            # What Znuny's ``AppointmentCreate`` stores for a plain appointment (golden-master
+            # ``test_appointment_create_matches_znuny``): empty strings / 0, not NULL.
+            notify_template="",
+            notify_custom="",
+            notify_custom_unit_count=0,
+            notify_custom_unit="",
+            notify_custom_unit_point="",
+            recur_interval=1,
         )
         if data.recurrence:
             row.recurring = 1

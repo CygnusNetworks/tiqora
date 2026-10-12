@@ -158,12 +158,20 @@ def _scope(config: dict[str, Any]) -> None:
         raise InvalidReference("Für einen eingeschränkten Geltungsbereich fehlt ScopeEntityID.")
 
 
-def normalise_config(entity_type: SubEntityType, config: Mapping[str, Any]) -> dict[str, Any]:
-    """Shape a sub-entity config like Znuny's own forms store it (stringified scalars)."""
+def normalise_config(
+    entity_type: SubEntityType, config: Mapping[str, Any], *, creating: bool = True
+) -> dict[str, Any]:
+    """Shape a sub-entity config like Znuny's own forms store it (stringified scalars).
+
+    ``Scope`` is defaulted by every ``*Add`` (``DB/Activity.pm:133``, ``ActivityDialog.pm:159``,
+    ``Transition.pm:152``, ``TransitionAction.pm:159``) but by ``*Update`` only for activities
+    (``DB/Activity.pm:475``); a dialog, transition or action edited later keeps its config as is.
+    Golden-master finding (``tests/golden/test_process_designer.py``)."""
     if not isinstance(config, Mapping):
         raise InvalidReference("Die Konfiguration muss ein Objekt sein.")
     cfg: dict[str, Any] = stringify_scalars(_mapping(config))
-    _scope(cfg)
+    if creating or entity_type == "Activity":
+        _scope(cfg)
     if entity_type == "Activity":
         cfg["ActivityDialog"] = _renumber(cfg.get("ActivityDialog"))
     elif entity_type == "ActivityDialog":
@@ -375,7 +383,7 @@ class ProcessWriter:
         row = await self._require(entity_type, entity_id, lock=True)
         if row.version != expected_version:
             raise VersionConflict(entity_id)
-        cfg = normalise_config(entity_type, config)
+        cfg = normalise_config(entity_type, config, creating=False)
         _check_name(name)
         if name == row.name and stringify_scalars(_load_yaml_mapping(row.config)) == cfg:
             return self._written(entity_type, row)  # DB/Activity.pm:480-486: no write at all
@@ -393,10 +401,10 @@ class ProcessWriter:
     ) -> tuple[WrittenEntity, bool]:
         """Create or update one entity under a given id (``DB/Process.pm:1485-1860``).
 
-        The import stores the file's config as it is (stringified, ``Scope`` defaulted like
-        ``ActivityUpdate``, ``DB/Activity.pm:475``) and does not re-check references: the
-        caller remapped them and writes all entities in one transaction. Returns the written
-        entity and whether a new row was created. An unchanged row is not written.
+        The import stores the file's config as it is (stringified; only an activity gets the
+        ``Scope`` default of ``ActivityUpdate``, ``DB/Activity.pm:475``) and does not re-check
+        references: the caller remapped them and writes all entities in one transaction. Returns
+        the written entity and whether a new row was created. An unchanged row is not written.
         """
         if not ENTITY_ID_RE.match(entity_id):
             raise InvalidReference(f"Ungültige Kennung: {entity_id}")
@@ -406,7 +414,7 @@ class ProcessWriter:
         if entity_type == "Process":
             if state_entity_id not in _PROCESS_STATES:
                 raise InvalidReference(f"Unbekannter Prozessstatus: {state_entity_id}")
-        else:
+        elif entity_type == "Activity":  # only ActivityUpdate defaults Scope (Activity.pm:475)
             _scope(cfg)
         row = await self._row(entity_type, entity_id, lock=True)
         if row is None:

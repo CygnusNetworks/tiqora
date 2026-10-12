@@ -46,6 +46,8 @@ KEYS = (
     "tiqorasync.deploy.process",
     "tiqorasync.deploy.acl",
     "tiqorasync.watermark",
+    "tiqorasync.deploy.process.requested",  # written by Tiqora's queue_deploy_signal
+    "tiqorasync.deploy.acl.requested",
 )
 _BASE = {"signal": 0}  # highest tiqora_cache_invalidation.id before this module ran
 ACL_NAME = "golden-tiqorasync-acl"
@@ -347,3 +349,76 @@ def test_old_style_cache_type_rows_still_cleaned(clean: Engine) -> None:
     assert "Queue" in result["cleanup"]
     assert not any(t.startswith("TiqoraDeploy_") for t in result["cleanup"])
     assert result["dumps"] == 1
+
+
+@pytest.fixture()
+def revision_tables(clean: Engine) -> Generator[None, None, None]:
+    """The process/ACL revision tables for the end-to-end case (created if the DB lacks them)."""
+    from tiqora.db.tiqora.base import TiqoraBase
+    from tiqora.db.tiqora.models import TiqoraAclRevision, TiqoraProcessRevision
+    from tiqora.deployed.store import clear_revision_cache
+
+    names = ("tiqora_process_revision", "tiqora_acl_revision")
+    created = [n for n in names if n not in set(inspect(clean).get_table_names())]
+    TiqoraBase.metadata.create_all(
+        clean,
+        tables=[TiqoraProcessRevision.__table__, TiqoraAclRevision.__table__],
+        checkfirst=True,
+    )
+    with clean.begin() as conn:
+        max_ids = {
+            n: int(conn.execute(text(f"SELECT COALESCE(MAX(id), 0) FROM {n}")).scalar_one())  # noqa: S608
+            for n in names
+            if n not in created
+        }
+    clear_revision_cache()
+    try:
+        yield
+    finally:
+        clear_revision_cache()
+        with clean.begin() as conn:
+            for name, max_id in max_ids.items():
+                conn.execute(text(f"DELETE FROM {name} WHERE id > :m"), {"m": max_id})  # noqa: S608
+            for name in created:
+                conn.execute(text(f"DROP TABLE {name}"))
+
+
+@pytest.mark.asyncio
+async def test_tiqora_signal_deploy_end_to_end(
+    clean: Engine,
+    revision_tables: None,
+    golden_session_factory: Any,
+) -> None:
+    """Task 28: ``deploy_from_tiqora(mode="signal")`` -> TiqoraSync ``Run`` -> Tiqora reads ``ok``.
+
+    Tiqora records the revision and queues the signal (never touching the sync tables); the add-on
+    runs Znuny's own dump + purge and reports the signal id back, which is what the admin page
+    shows as "Znuny: ok". The heartbeat of the same run is what lets the gate pick the signal mode.
+    """
+    from tiqora.deployed.store import latest_revision_info
+    from tiqora.deployed.watcher import deploy_from_tiqora
+    from tiqora.deployed.znuny_sync import addon_can_deploy, read_znuny_sync_status
+    from tiqora.jobs.service import utc_now
+
+    _add_sync_row(clean)
+    _age_file(PROCESS_FILE)
+    async with golden_session_factory() as session:
+        result = await deploy_from_tiqora(session, "process", user_id=1, mode="signal")
+        newest = await latest_revision_info(session, "process")
+        pending = await read_znuny_sync_status(
+            session, "process", newest=newest, mode="signal", now=utc_now()
+        )
+    assert result.action in ("recorded", "unchanged")
+    assert pending.state == "pending"
+    assert _count(clean, "SELECT COUNT(*) FROM pm_entity_sync WHERE entity_id = :e", e=SYNC_ENTITY)
+
+    _run()
+
+    async with golden_session_factory() as session:
+        done = await read_znuny_sync_status(
+            session, "process", newest=newest, mode="signal", now=utc_now()
+        )
+        assert await addon_can_deploy(session, "process", now=utc_now())
+    assert (done.state, done.revision_id) == ("ok", result.revision_id)
+    assert _mtime(PROCESS_FILE) > 1_000_000
+    assert _count(clean, "SELECT COUNT(*) FROM pm_entity_sync") == 0
