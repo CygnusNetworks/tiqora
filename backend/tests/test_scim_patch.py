@@ -100,7 +100,7 @@ def test_bad_schema_or_empty_ops_invalid_syntax(payload: dict[str, Any]) -> None
 def test_too_many_ops() -> None:
     ops = [{"op": "add", "path": "active", "value": True}] * 3
     e = _err(lambda: parse_patch(_p(ops), max_ops=2))
-    assert e.status == 400
+    assert (e.status, e.scim_type) == (400, "invalidValue")
 
 
 def test_group_add_and_remove_members() -> None:
