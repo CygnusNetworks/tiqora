@@ -6,11 +6,12 @@ Later tasks append their DTOs here (CIs, links, search, ...). Datetimes use
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from tiqora.cmdb.definition import AttributeDef
+from tiqora.cmdb.definition import AttributeDef, AttributeType
+from tiqora.cmdb.render import RefKind
 from tiqora.domain.schemas import UtcDateTime
 
 ItsmModeOut = Literal["off", "znuny_readthrough", "tiqora"]
@@ -157,7 +158,114 @@ class LinkTypeOut(BaseModel):
     position: int
 
 
+class RefLinkOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    kind: RefKind
+    key: str
+
+
+class RenderedAttrOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    path: str
+    key: str
+    label: str
+    type: AttributeType
+    display: str | None
+    ref: RefLinkOut | None
+    children: list[RenderedAttrOut]
+    portal: bool
+
+
+RenderedAttrOut.model_rebuild()
+
+
+class CiVersionSummaryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    definition_id: int
+    definition_version: int
+    name: str
+    deployment_state_id: int
+    incident_state_id: int
+    deployment_state: str
+    incident_state: str
+    change_note: str | None
+    created_by: int
+    created_by_name: str | None
+    created_at: UtcDateTime
+    archived: bool
+
+
+class CiVersionOut(BaseModel):
+    """One version: raw document (``attributes``) and its display tree (``rendered``)."""
+
+    id: int
+    ci_id: int
+    definition_id: int
+    definition_version: int
+    name: str
+    deployment_state_id: int
+    incident_state_id: int
+    attributes: dict[str, Any]
+    rendered: list[RenderedAttrOut]
+    change_note: str | None
+    created_by: int
+    created_at: UtcDateTime
+    archived: bool
+
+
+class CiVersionPage(BaseModel):
+    items: list[CiVersionSummaryOut]
+    has_more: bool
+    archived_count: int
+
+
+class DiffRowOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    path: str
+    label: str
+    kind: Literal["added", "removed", "changed"]
+    old: str | None
+    new: str | None
+
+
+class CiDiffOut(BaseModel):
+    from_version_id: int
+    to_version_id: int
+    rows: list[DiffRowOut]
+
+
+class CiHistoryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    event: str
+    detail: str
+    version_id: int | None
+    created_by: int
+    created_by_name: str | None
+    created_at: UtcDateTime
+
+
+class CiHistoryPage(BaseModel):
+    items: list[CiHistoryOut]
+    has_more: bool
+
+
 __all__ = [
+    "CiDiffOut",
+    "CiHistoryOut",
+    "CiHistoryPage",
+    "CiVersionOut",
+    "CiVersionPage",
+    "CiVersionSummaryOut",
+    "DiffRowOut",
+    "RefLinkOut",
+    "RenderedAttrOut",
     "CatalogItemIn",
     "CatalogItemOut",
     "ClassTemplateApplyIn",

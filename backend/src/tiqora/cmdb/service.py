@@ -8,12 +8,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Final, Literal
 
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.cmdb.access import CmdbAccess, require_class_access
 from tiqora.cmdb.classes import ClassService
-from tiqora.cmdb.definition import AttributeDef, iter_attribute_paths
+from tiqora.cmdb.definition import AttributeDef, iter_attribute_paths, parse_definition_json
 from tiqora.cmdb.errors import CmdbError, CmdbNotFound
 from tiqora.cmdb.index import write_index
 from tiqora.cmdb.numbering import NumberExhausted, next_ci_number
@@ -27,6 +27,7 @@ from tiqora.cmdb.values import (
     normalize_values,
     unknown_top_level_keys,
 )
+from tiqora.db.legacy.user import Users
 from tiqora.db.tiqora.models import (
     TiqoraCmdbCatalog,
     TiqoraCmdbCi,
@@ -35,6 +36,7 @@ from tiqora.db.tiqora.models import (
     TiqoraCmdbCiVersion,
     TiqoraCmdbCiVersionArchive,
     TiqoraCmdbClass,
+    TiqoraCmdbClassDefinition,
     TiqoraItsmLink,
 )
 from tiqora.jobs.service import utc_now
@@ -47,6 +49,7 @@ _NAME_MAX: Final = 250
 _DETAIL_MAX: Final = 1000
 _VALUE_EVENTS_MAX: Final = 20
 _INCIDENT: Final = "incident"
+_PAGE_MAX: Final = 100
 
 
 class CiConflict(CmdbError):
@@ -92,6 +95,74 @@ class CiRecord:
 class SaveResult:
     ci: CiRecord
     changed: bool
+
+
+@dataclass(frozen=True, slots=True)
+class VersionRecord:
+    """One version with the attribute tree of **its own** definition."""
+
+    id: int
+    ci_id: int
+    definition_id: int
+    definition_version: int
+    definition_attrs: list[AttributeDef]
+    name: str
+    deployment_state_id: int
+    incident_state_id: int
+    attributes: dict[str, Any]
+    change_note: str | None
+    created_by: int
+    created_at: datetime
+    archived: bool
+
+
+@dataclass(frozen=True, slots=True)
+class VersionSummary:
+    """A version without its attribute document (list view)."""
+
+    id: int
+    ci_id: int
+    definition_id: int
+    definition_version: int
+    name: str
+    deployment_state_id: int
+    incident_state_id: int
+    deployment_state: str
+    incident_state: str
+    change_note: str | None
+    created_by: int
+    created_by_name: str | None
+    created_at: datetime
+    archived: bool
+
+
+@dataclass(frozen=True, slots=True)
+class VersionPage:
+    items: list[VersionSummary]
+    has_more: bool
+    archived_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class HistoryEntry:
+    id: int
+    ci_id: int
+    event: str
+    detail: str
+    version_id: int | None
+    created_by: int
+    created_by_name: str | None
+    created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class HistoryPage:
+    items: list[HistoryEntry]
+    has_more: bool
+
+
+def _page_limit(limit: int) -> int:
+    return max(1, min(int(limit), _PAGE_MAX))
 
 
 def system_access(user_id: int) -> CmdbAccess:
@@ -601,6 +672,200 @@ class CiService:
         merged.update(values)
         return merged
 
+    # --- versions and history ----------------------------------------------------------
+
+    async def _readable_ci(self, access: CmdbAccess, ci_id: int, enforce: bool) -> TiqoraCmdbCi:
+        row = await self._row(ci_id)
+        if enforce:
+            await require_class_access(self._s, access, int(row.class_id), "ro")
+        return row
+
+    async def _definitions(self, ids: set[int]) -> dict[int, tuple[int, list[AttributeDef]]]:
+        """definition id -> (version, attribute tree)."""
+        if not ids:
+            return {}
+        rows = await self._s.execute(
+            select(
+                TiqoraCmdbClassDefinition.id,
+                TiqoraCmdbClassDefinition.version,
+                TiqoraCmdbClassDefinition.attributes,
+            ).where(TiqoraCmdbClassDefinition.id.in_(sorted(ids)))
+        )
+        return {int(i): (int(v), parse_definition_json(a)) for i, v, a in rows.all()}
+
+    async def _user_names(self, ids: set[int]) -> dict[int, str]:
+        if not ids:
+            return {}
+        rows = await self._s.execute(
+            select(Users.id, Users.first_name, Users.last_name).where(Users.id.in_(sorted(ids)))
+        )
+        return {int(i): f"{f or ''} {ln or ''}".strip() for i, f, ln in rows.all()}
+
+    async def get_version(
+        self,
+        access: CmdbAccess,
+        ci_id: int,
+        version_id: int,
+        *,
+        enforce_permissions: bool = True,
+    ) -> VersionRecord:
+        """A version of the CI (hot table first, then the archive); another CI's version id is
+        answered as not found."""
+        await self._readable_ci(access, ci_id, enforce_permissions)
+        hot = (
+            await self._s.execute(
+                select(TiqoraCmdbCiVersion).where(
+                    TiqoraCmdbCiVersion.id == version_id, TiqoraCmdbCiVersion.ci_id == ci_id
+                )
+            )
+        ).scalar_one_or_none()
+        row: TiqoraCmdbCiVersion | TiqoraCmdbCiVersionArchive | None = hot
+        if row is None:
+            row = (
+                await self._s.execute(
+                    select(TiqoraCmdbCiVersionArchive).where(
+                        TiqoraCmdbCiVersionArchive.id == version_id,
+                        TiqoraCmdbCiVersionArchive.ci_id == ci_id,
+                    )
+                )
+            ).scalar_one_or_none()
+        if row is None:
+            raise CmdbNotFound(f"version {version_id}")
+        definitions = await self._definitions({int(row.definition_id)})
+        def_version, def_attrs = definitions.get(int(row.definition_id), (0, []))
+        return VersionRecord(
+            id=int(row.id),
+            ci_id=int(row.ci_id),
+            definition_id=int(row.definition_id),
+            definition_version=def_version,
+            definition_attrs=def_attrs,
+            name=row.name,
+            deployment_state_id=int(row.deployment_state_id),
+            incident_state_id=int(row.incident_state_id),
+            attributes=json.loads(row.attributes),
+            change_note=row.change_note,
+            created_by=int(row.created_by),
+            created_at=row.created_at,
+            archived=hot is None,
+        )
+
+    async def list_versions(
+        self,
+        access: CmdbAccess,
+        ci_id: int,
+        *,
+        before_id: int | None = None,
+        limit: int = 50,
+        include_archived: bool = False,
+        enforce_permissions: bool = True,
+    ) -> VersionPage:
+        """Keyset page, newest first (``before_id`` is exclusive). ``include_archived`` merges
+        the archive table (same id space); ``archived_count`` is always the archive size."""
+        await self._readable_ci(access, ci_id, enforce_permissions)
+        size = _page_limit(limit)
+        found: list[tuple[Any, bool]] = []
+        for model, archived in (
+            (TiqoraCmdbCiVersion, False),
+            *(((TiqoraCmdbCiVersionArchive, True),) if include_archived else ()),
+        ):
+            stmt = (
+                select(
+                    model.id,
+                    model.definition_id,
+                    model.name,
+                    model.deployment_state_id,
+                    model.incident_state_id,
+                    model.change_note,
+                    model.created_by,
+                    model.created_at,
+                )
+                .where(model.ci_id == ci_id)
+                .order_by(model.id.desc())
+                .limit(size + 1)
+            )
+            if before_id is not None:
+                stmt = stmt.where(model.id < before_id)
+            found.extend((r, archived) for r in (await self._s.execute(stmt)).all())
+        found.sort(key=lambda item: int(item[0].id), reverse=True)
+        has_more = len(found) > size
+        found = found[:size]
+        archived_count = int(
+            (
+                await self._s.execute(
+                    select(func.count())
+                    .select_from(TiqoraCmdbCiVersionArchive)
+                    .where(TiqoraCmdbCiVersionArchive.ci_id == ci_id)
+                )
+            ).scalar_one()
+        )
+        definitions = await self._definitions({int(r.definition_id) for r, _ in found})
+        states = await self._catalog(
+            {int(r.deployment_state_id) for r, _ in found}
+            | {int(r.incident_state_id) for r, _ in found}
+        )
+        users = await self._user_names({int(r.created_by) for r, _ in found})
+        items = [
+            VersionSummary(
+                id=int(r.id),
+                ci_id=ci_id,
+                definition_id=int(r.definition_id),
+                definition_version=definitions.get(int(r.definition_id), (0, []))[0],
+                name=r.name,
+                deployment_state_id=int(r.deployment_state_id),
+                incident_state_id=int(r.incident_state_id),
+                deployment_state=states.get(int(r.deployment_state_id), ("", "", None, True))[1],
+                incident_state=states.get(int(r.incident_state_id), ("", "", None, True))[1],
+                change_note=r.change_note,
+                created_by=int(r.created_by),
+                created_by_name=users.get(int(r.created_by)),
+                created_at=r.created_at,
+                archived=archived,
+            )
+            for r, archived in found
+        ]
+        return VersionPage(items=items, has_more=has_more, archived_count=archived_count)
+
+    async def list_history(
+        self,
+        access: CmdbAccess,
+        ci_id: int,
+        *,
+        before_id: int | None = None,
+        limit: int = 50,
+        enforce_permissions: bool = True,
+    ) -> HistoryPage:
+        """History events, newest first (keyset on ``before_id``, exclusive)."""
+        await self._readable_ci(access, ci_id, enforce_permissions)
+        size = _page_limit(limit)
+        stmt = (
+            select(TiqoraCmdbCiHistory)
+            .where(TiqoraCmdbCiHistory.ci_id == ci_id)
+            .order_by(TiqoraCmdbCiHistory.id.desc())
+            .limit(size + 1)
+        )
+        if before_id is not None:
+            stmt = stmt.where(TiqoraCmdbCiHistory.id < before_id)
+        rows = list((await self._s.execute(stmt)).scalars().all())
+        has_more = len(rows) > size
+        rows = rows[:size]
+        users = await self._user_names({int(r.created_by) for r in rows})
+        return HistoryPage(
+            items=[
+                HistoryEntry(
+                    id=int(r.id),
+                    ci_id=int(r.ci_id),
+                    event=r.event,
+                    detail=r.detail,
+                    version_id=None if r.version_id is None else int(r.version_id),
+                    created_by=int(r.created_by),
+                    created_by_name=users.get(int(r.created_by)),
+                    created_at=r.created_at,
+                )
+                for r in rows
+            ],
+            has_more=has_more,
+        )
+
     # --- delete ------------------------------------------------------------------------
 
     async def delete(
@@ -652,9 +917,14 @@ __all__ = [
     "CiConflict",
     "CiRecord",
     "CiService",
+    "HistoryEntry",
+    "HistoryPage",
     "InvalidValues",
     "NumberExhausted",
     "SaveResult",
     "UnknownAttributes",
+    "VersionPage",
+    "VersionRecord",
+    "VersionSummary",
     "system_access",
 ]
