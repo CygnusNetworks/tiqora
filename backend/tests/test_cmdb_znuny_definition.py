@@ -128,3 +128,25 @@ def test_unknown_keys_warn_but_do_not_fail() -> None:
 def test_document_without_attribute_list_is_rejected() -> None:
     with pytest.raises(DefinitionParseError):
         parse_znuny_definition("Foo: bar\n", "yaml")
+
+
+def test_yaml_flow_nesting_bomb_is_a_parse_error() -> None:
+    with pytest.raises(DefinitionParseError):
+        parse_znuny_definition("[" * 100000, "yaml")
+
+
+def test_yaml_alias_bomb_is_rejected_quickly() -> None:
+    import time
+
+    lines = ["a0: &a0 [x, x]"]
+    for i in range(1, 10):
+        lines.append(f"a{i}: &a{i} [" + ", ".join([f"*a{i - 1}"] * 9) + "]")
+    started = time.monotonic()
+    with pytest.raises(DefinitionParseError):
+        parse_znuny_definition("\n".join(lines) + "\n", "yaml")
+    assert time.monotonic() - started < 2
+
+
+def test_sub_that_is_not_a_list_warns() -> None:
+    res = parse_znuny_definition("- Key: Foo\n  Name: Foo\n  Sub: x\n", "yaml")
+    assert any("Sub bei Foo" in w for w in res.warnings)

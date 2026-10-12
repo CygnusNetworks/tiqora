@@ -59,6 +59,18 @@ class DefinitionImportResult:
     class_keys_used: set[str] = field(default_factory=set)
 
 
+class _NoAliasLoader(yaml.SafeLoader):
+    """SafeLoader that refuses aliases (``*x``): they allow exponential fan-out ("billion laughs")."""
+
+    def compose_node(self, parent: Any, index: Any) -> Any:
+        if self.check_event(yaml.events.AliasEvent):
+            event = self.peek_event()  # type: ignore[no-untyped-call]
+            raise yaml.composer.ComposerError(
+                None, None, "YAML-Aliase sind nicht erlaubt", event.start_mark
+            )
+        return super().compose_node(parent, index)
+
+
 def _depth(value: Any, limit: int, level: int = 0) -> bool:
     """True when the nested structure is deeper than ``limit`` (iterative-safe bound)."""
     if level > limit:
@@ -79,9 +91,11 @@ def _load(text: str, fmt: Literal["yaml", "perl"]) -> Any:
         except PerlDataError as exc:
             raise DefinitionParseError(f"Perl-Definition nicht lesbar: {exc}") from exc
     try:
-        data = yaml.safe_load(text)
+        data = yaml.load(text, Loader=_NoAliasLoader)  # noqa: S506 - SafeLoader subclass
     except yaml.YAMLError as exc:
         raise DefinitionParseError(f"YAML-Definition nicht lesbar: {exc}") from exc
+    except (RecursionError, MemoryError) as exc:
+        raise DefinitionParseError("YAML-Definition ist zu tief verschachtelt.") from exc
     # safe_load builds the tree first, so check the depth before we recurse over it
     if _depth(data, MAX_DEPTH):
         raise DefinitionParseError(f"Die Definition ist tiefer als {MAX_DEPTH} Ebenen.")
@@ -145,6 +159,8 @@ def _convert(item: Any, prefix: str, res: DefinitionImportResult) -> AttributeDe
     inp = inp if isinstance(inp, dict) else {}
     znuny_type = str(inp.get("Type", "Text"))
     sub_raw = item.get("Sub")
+    if sub_raw not in (None, "") and not isinstance(sub_raw, list):
+        res.warnings.append(f"Sub bei {path} ist keine Liste und wurde ignoriert")
     mapped = _TYPE_MAP.get(znuny_type)
     if mapped is None:
         res.warnings.append(f"Unbekannter Typ {znuny_type} bei {path}: als Text übernommen")
