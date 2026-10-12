@@ -102,7 +102,7 @@ from tiqora.jobs.service import (
     utc_now,
 )
 from tiqora.permissions.engine import PermissionEngine
-from tiqora.plugins.channels import ChannelDeliveryError
+from tiqora.plugins.channels import ChannelDeliveryError, driver_for
 from tiqora.reporting.settings import load_reporting_settings
 from tiqora.reporting.sql import ReportQueryTimeout, invalidate_quietly, statement_timeout
 from tiqora.webchat.agent import accept_waiting_chat_for_reply, agent_chat_body
@@ -344,7 +344,8 @@ def _telegram_extras(
     """Validate and decode the chat-composer fields of an article request.
 
     Returns the decoded attachments and the send options (``None`` when the
-    request uses none of them). 422 when they are used off Telegram, on bad
+    request uses none of them). Web chat, agent email and plugin channels carry files
+    only (no buttons/quotes). 422 when they are used off Telegram, on bad
     base64, or when the decoded total exceeds Telegram's 50 MB upload limit.
     """
     if _is_chat_reply(body):
@@ -359,6 +360,15 @@ def _telegram_extras(
     if body.attachments and body.channel.lower() == "email" and body.sender_type == "agent":
         # Outgoing agent email carries files too (reply dialog); buttons and
         # quotes stay Telegram-only.
+        if body.telegram_buttons or body.telegram_reply_to_article_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="buttons/quotes are only supported for Telegram replies",
+            )
+        return decode_attachments(body.attachments), None
+    if body.attachments and body.sender_type == "agent" and driver_for(body.channel) is not None:
+        # Plugin channel: decode here, the capability check (and its German 422) is
+        # deliver_plugin_channel_reply's job. Buttons/quotes stay Telegram-only.
         if body.telegram_buttons or body.telegram_reply_to_article_id is not None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

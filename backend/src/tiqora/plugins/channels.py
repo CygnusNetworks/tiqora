@@ -19,6 +19,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from typing import Final
 
+import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -69,6 +70,7 @@ MAX_CHANNEL_TIMEOUT: Final = 30
 #: ``external_id`` ends up in a Message-ID header-like string: keep it boring
 _PHONE_SHAPE_RE: Final = re.compile(r"^\+?[0-9 ()/.-]+$")
 _MIN_PHONE_DIGITS: Final = 7
+_log = structlog.get_logger(__name__)
 _EXTERNAL_ID_RE: Final = re.compile(r"^[A-Za-z0-9._-]{1,100}$")
 #: ``customer_user_id`` is varchar(250); the driver key prefix plus 150 characters fits
 _MAX_SENDER: Final = 150
@@ -386,6 +388,8 @@ async def deliver_plugin_channel_reply(
     message_id = article.message_id
     if external_id is not None and _EXTERNAL_ID_RE.fullmatch(external_id):
         message_id = f"<{driver.key}.{external_id}@tiqora.invalid>"
+    elif external_id is not None:
+        _log.warning("plugin_channel_external_id_ignored", channel=driver.key)
     stored = replace(
         article,
         message_id=message_id,

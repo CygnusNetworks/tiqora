@@ -385,6 +385,55 @@ async def test_inbound_only_channel_cannot_reply(env: Env, monkeypatch: pytest.M
     assert env.articles(tid) == before
 
 
+_ATT = [{"filename": "a.txt", "content_type": "text/plain", "content_base64": "YWJj"}]
+
+
+def _att_body(**kw: Any) -> dict[str, Any]:
+    return {
+        "subject": "",
+        "body": "Antwort",
+        "channel": CHANNEL,
+        "sender_type": "agent",
+        "to_address": "pp55-cust@example.org",
+        "is_visible_for_customer": True,
+        "attachments": _ATT,
+        **kw,
+    }
+
+
+async def test_attachment_without_capability_is_german_422_through_the_api(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tid = await env.ticket()
+    before = env.articles(tid)
+    async with _client(env, monkeypatch) as client:
+        resp = await client.post(f"/api/v1/tickets/{tid}/articles", json=_att_body())
+    assert resp.status_code == 422, resp.text
+    assert "keine Anhänge" in resp.json()["detail"]
+    assert _calls("channel.Chat.send") == []
+    assert env.articles(tid) == before
+
+
+async def test_attachment_with_capability_is_sent_through_the_api(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tid = await env.ticket()
+    real = plugin_channels.driver_for
+
+    def with_attachments(channel: str) -> Any:
+        driver = real(channel)
+        if driver is None:
+            return None
+        return replace(driver, capabilities=replace(driver.capabilities, attachments=True))
+
+    monkeypatch.setattr(plugin_channels, "driver_for", with_attachments)
+    async with _client(env, monkeypatch) as client:
+        resp = await client.post(f"/api/v1/tickets/{tid}/articles", json=_att_body())
+    assert resp.status_code == 201, resp.text
+    (sent,) = _calls("channel.Chat.send")
+    assert sent.attachments == (("a.txt", "text/plain", b"abc"),)
+
+
 async def test_veto_hook_runs_before_channel_send(env: Env) -> None:
     tid = await env.ticket()
     before = env.articles(tid)
