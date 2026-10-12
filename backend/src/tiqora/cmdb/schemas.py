@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from tiqora.cmdb.definition import AttributeDef, AttributeType
 from tiqora.cmdb.render import RefKind
+from tiqora.domain.field_options import FieldOptionOut
 from tiqora.domain.schemas import UtcDateTime
 from tiqora.filters.model import Filter
 
@@ -257,6 +258,99 @@ class CiHistoryPage(BaseModel):
     has_more: bool
 
 
+class CmdbNamedRefOut(BaseModel):
+    id: str
+    label: str
+
+
+class CmdbFilterFieldOut(BaseModel):
+    key: str
+    type: Literal["id", "string", "int", "datetime", "bool", "enum"]
+    ops: list[str]
+    label_key: str | None
+    label: str | None
+    enum_values: list[str]
+    options_source: str | None
+
+
+class CmdbFormOptionsOut(BaseModel):
+    """Option lists for the reference attributes the class definition uses; a type the
+    definition does not use is absent from the answer (``null`` is never sent)."""
+
+    catalog: dict[str, list[FieldOptionOut]] | None = None
+    service: list[FieldOptionOut] | None = None
+    sla: list[FieldOptionOut] | None = None
+    queue: list[FieldOptionOut] | None = None
+    priority: list[FieldOptionOut] | None = None
+    ticket_type: list[FieldOptionOut] | None = None
+    state: list[FieldOptionOut] | None = None
+    agent: list[FieldOptionOut] | None = None
+
+
+class CiClassRefOut(BaseModel):
+    id: int
+    class_key: str
+    name: str
+    icon: str | None
+    group_id: int
+
+
+class CiStatesOut(BaseModel):
+    deployment: CatalogItemOut
+    incident_own: CatalogItemOut
+    #: the derived state (own state, or ``warning`` through propagation)
+    incident_current: CatalogItemOut
+
+
+class CiCreateIn(BaseModel):
+    class_id: int = Field(ge=1)
+    name: str = Field(min_length=1, max_length=250)
+    deployment_state_id: int = Field(ge=1)
+    incident_state_id: int = Field(ge=1)
+    attributes: dict[str, Any] = Field(default_factory=dict)
+    change_note: str | None = Field(None, max_length=500)
+    attachment_ids: list[int] = Field(default_factory=list, max_length=20)
+
+
+class CiUpdateIn(BaseModel):
+    expected_lock_version: int = Field(ge=1)
+    name: str = Field(min_length=1, max_length=250)
+    deployment_state_id: int = Field(ge=1)
+    incident_state_id: int = Field(ge=1)
+    attributes: dict[str, Any] = Field(default_factory=dict)
+    change_note: str | None = Field(None, max_length=500)
+    #: confirm that attribute keys the class definition no longer knows are lost
+    drop_unknown: bool = False
+
+
+class CiOut(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: int
+    number: str
+    class_: CiClassRefOut = Field(serialization_alias="class")
+    name: str
+    deployment_state_id: int
+    incident_state_id: int
+    states: CiStatesOut
+    version_count: int
+    lock_version: int
+    current_version: CiVersionOut | None
+    rendered: list[RenderedAttrOut]
+    #: top-level keys of the current version that the class's current definition lacks
+    unknown_keys: list[str]
+    can_write: bool
+    created_by: int
+    created_at: UtcDateTime
+    changed_by: int
+    changed_at: UtcDateTime
+
+
+class CiSaveOut(BaseModel):
+    ci: CiOut
+    changed: bool
+
+
 CiSortKey = Literal["number", "name", "class", "changed_at", "deployment_state", "incident_state"]
 
 
@@ -321,6 +415,15 @@ class CmdbSavedSearchOut(BaseModel):
 
 
 __all__ = [
+    "CiClassRefOut",
+    "CiCreateIn",
+    "CiOut",
+    "CiSaveOut",
+    "CiStatesOut",
+    "CiUpdateIn",
+    "CmdbFilterFieldOut",
+    "CmdbFormOptionsOut",
+    "CmdbNamedRefOut",
     "CiListItemOut",
     "CiPage",
     "CiRefOut",

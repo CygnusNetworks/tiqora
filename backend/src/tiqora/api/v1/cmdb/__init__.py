@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from tiqora.api.v1.cmdb import classes
+from tiqora.api.v1.cmdb import cis, classes, searches
 from tiqora.api.v1.cmdb.deps import cmdb_gate
 
 router = APIRouter(prefix="/cmdb", tags=["cmdb"])
@@ -17,6 +17,8 @@ gated = APIRouter(dependencies=[Depends(cmdb_gate)])
 
 router.include_router(classes.status_router)
 gated.include_router(classes.router)
+gated.include_router(cis.router)
+gated.include_router(searches.router)
 # later tasks: gated.include_router(<their router>) above the next line
 router.include_router(gated)
 

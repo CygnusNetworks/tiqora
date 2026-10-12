@@ -10126,6 +10126,869 @@
         "title": "ChatTopicRefOut",
         "type": "object"
       },
+      "CiClassRefOut": {
+        "properties": {
+          "class_key": {
+            "title": "Class Key",
+            "type": "string"
+          },
+          "group_id": {
+            "title": "Group Id",
+            "type": "integer"
+          },
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "class_key",
+          "name",
+          "icon",
+          "group_id"
+        ],
+        "title": "CiClassRefOut",
+        "type": "object"
+      },
+      "CiCreateIn": {
+        "properties": {
+          "attachment_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 20,
+            "title": "Attachment Ids",
+            "type": "array"
+          },
+          "attributes": {
+            "additionalProperties": true,
+            "title": "Attributes",
+            "type": "object"
+          },
+          "change_note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Note"
+          },
+          "class_id": {
+            "minimum": 1.0,
+            "title": "Class Id",
+            "type": "integer"
+          },
+          "deployment_state_id": {
+            "minimum": 1.0,
+            "title": "Deployment State Id",
+            "type": "integer"
+          },
+          "incident_state_id": {
+            "minimum": 1.0,
+            "title": "Incident State Id",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 250,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "class_id",
+          "name",
+          "deployment_state_id",
+          "incident_state_id"
+        ],
+        "title": "CiCreateIn",
+        "type": "object"
+      },
+      "CiDiffOut": {
+        "properties": {
+          "from_version_id": {
+            "title": "From Version Id",
+            "type": "integer"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/DiffRowOut"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "to_version_id": {
+            "title": "To Version Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "from_version_id",
+          "to_version_id",
+          "rows"
+        ],
+        "title": "CiDiffOut",
+        "type": "object"
+      },
+      "CiHistoryOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "integer"
+          },
+          "created_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Name"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "event": {
+            "title": "Event",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "version_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Id"
+          }
+        },
+        "required": [
+          "id",
+          "event",
+          "detail",
+          "version_id",
+          "created_by",
+          "created_by_name",
+          "created_at"
+        ],
+        "title": "CiHistoryOut",
+        "type": "object"
+      },
+      "CiHistoryPage": {
+        "properties": {
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CiHistoryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "has_more"
+        ],
+        "title": "CiHistoryPage",
+        "type": "object"
+      },
+      "CiListItemOut": {
+        "properties": {
+          "changed_at": {
+            "format": "date-time",
+            "title": "Changed At",
+            "type": "string"
+          },
+          "class_key": {
+            "title": "Class Key",
+            "type": "string"
+          },
+          "class_name": {
+            "title": "Class Name",
+            "type": "string"
+          },
+          "deployment_functionality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployment Functionality"
+          },
+          "deployment_state": {
+            "title": "Deployment State",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "incident_functionality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incident Functionality"
+          },
+          "incident_state": {
+            "title": "Incident State",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "name",
+          "class_key",
+          "class_name",
+          "deployment_state",
+          "deployment_functionality",
+          "incident_state",
+          "incident_functionality",
+          "changed_at"
+        ],
+        "title": "CiListItemOut",
+        "type": "object"
+      },
+      "CiOut": {
+        "properties": {
+          "can_write": {
+            "title": "Can Write",
+            "type": "boolean"
+          },
+          "changed_at": {
+            "format": "date-time",
+            "title": "Changed At",
+            "type": "string"
+          },
+          "changed_by": {
+            "title": "Changed By",
+            "type": "integer"
+          },
+          "class": {
+            "$ref": "#/components/schemas/CiClassRefOut"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "integer"
+          },
+          "current_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CiVersionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deployment_state_id": {
+            "title": "Deployment State Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "incident_state_id": {
+            "title": "Incident State Id",
+            "type": "integer"
+          },
+          "lock_version": {
+            "title": "Lock Version",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          },
+          "rendered": {
+            "items": {
+              "$ref": "#/components/schemas/RenderedAttrOut"
+            },
+            "title": "Rendered",
+            "type": "array"
+          },
+          "states": {
+            "$ref": "#/components/schemas/CiStatesOut"
+          },
+          "unknown_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unknown Keys",
+            "type": "array"
+          },
+          "version_count": {
+            "title": "Version Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "class",
+          "name",
+          "deployment_state_id",
+          "incident_state_id",
+          "states",
+          "version_count",
+          "lock_version",
+          "current_version",
+          "rendered",
+          "unknown_keys",
+          "can_write",
+          "created_by",
+          "created_at",
+          "changed_by",
+          "changed_at"
+        ],
+        "title": "CiOut",
+        "type": "object"
+      },
+      "CiPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CiListItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "total_capped": {
+            "title": "Total Capped",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "total_capped"
+        ],
+        "title": "CiPage",
+        "type": "object"
+      },
+      "CiRefOut": {
+        "properties": {
+          "class_key": {
+            "title": "Class Key",
+            "type": "string"
+          },
+          "class_name": {
+            "title": "Class Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "name",
+          "class_key",
+          "class_name"
+        ],
+        "title": "CiRefOut",
+        "type": "object"
+      },
+      "CiSaveOut": {
+        "properties": {
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "ci": {
+            "$ref": "#/components/schemas/CiOut"
+          }
+        },
+        "required": [
+          "ci",
+          "changed"
+        ],
+        "title": "CiSaveOut",
+        "type": "object"
+      },
+      "CiSearchCriteria": {
+        "description": "The stored part of a search: everything except paging.",
+        "properties": {
+          "class_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 100,
+            "title": "Class Ids",
+            "type": "array"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Filter"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "order": {
+            "default": "asc",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "title": "Order",
+            "type": "string"
+          },
+          "q": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Q"
+          },
+          "sort": {
+            "default": "number",
+            "enum": [
+              "number",
+              "name",
+              "class",
+              "changed_at",
+              "deployment_state",
+              "incident_state"
+            ],
+            "title": "Sort",
+            "type": "string"
+          }
+        },
+        "title": "CiSearchCriteria",
+        "type": "object"
+      },
+      "CiSearchIn": {
+        "properties": {
+          "class_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 100,
+            "title": "Class Ids",
+            "type": "array"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Filter"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "default": 50,
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "default": 0,
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Offset",
+            "type": "integer"
+          },
+          "order": {
+            "default": "asc",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "title": "Order",
+            "type": "string"
+          },
+          "q": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Q"
+          },
+          "sort": {
+            "default": "number",
+            "enum": [
+              "number",
+              "name",
+              "class",
+              "changed_at",
+              "deployment_state",
+              "incident_state"
+            ],
+            "title": "Sort",
+            "type": "string"
+          }
+        },
+        "title": "CiSearchIn",
+        "type": "object"
+      },
+      "CiStatesOut": {
+        "properties": {
+          "deployment": {
+            "$ref": "#/components/schemas/CatalogItemOut"
+          },
+          "incident_current": {
+            "$ref": "#/components/schemas/CatalogItemOut"
+          },
+          "incident_own": {
+            "$ref": "#/components/schemas/CatalogItemOut"
+          }
+        },
+        "required": [
+          "deployment",
+          "incident_own",
+          "incident_current"
+        ],
+        "title": "CiStatesOut",
+        "type": "object"
+      },
+      "CiUpdateIn": {
+        "properties": {
+          "attributes": {
+            "additionalProperties": true,
+            "title": "Attributes",
+            "type": "object"
+          },
+          "change_note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Note"
+          },
+          "deployment_state_id": {
+            "minimum": 1.0,
+            "title": "Deployment State Id",
+            "type": "integer"
+          },
+          "drop_unknown": {
+            "default": false,
+            "title": "Drop Unknown",
+            "type": "boolean"
+          },
+          "expected_lock_version": {
+            "minimum": 1.0,
+            "title": "Expected Lock Version",
+            "type": "integer"
+          },
+          "incident_state_id": {
+            "minimum": 1.0,
+            "title": "Incident State Id",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 250,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_lock_version",
+          "name",
+          "deployment_state_id",
+          "incident_state_id"
+        ],
+        "title": "CiUpdateIn",
+        "type": "object"
+      },
+      "CiVersionOut": {
+        "description": "One version: raw document (``attributes``) and its display tree (``rendered``).",
+        "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "attributes": {
+            "additionalProperties": true,
+            "title": "Attributes",
+            "type": "object"
+          },
+          "change_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Note"
+          },
+          "ci_id": {
+            "title": "Ci Id",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "integer"
+          },
+          "definition_id": {
+            "title": "Definition Id",
+            "type": "integer"
+          },
+          "definition_version": {
+            "title": "Definition Version",
+            "type": "integer"
+          },
+          "deployment_state_id": {
+            "title": "Deployment State Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "incident_state_id": {
+            "title": "Incident State Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "rendered": {
+            "items": {
+              "$ref": "#/components/schemas/RenderedAttrOut"
+            },
+            "title": "Rendered",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "ci_id",
+          "definition_id",
+          "definition_version",
+          "name",
+          "deployment_state_id",
+          "incident_state_id",
+          "attributes",
+          "rendered",
+          "change_note",
+          "created_by",
+          "created_at",
+          "archived"
+        ],
+        "title": "CiVersionOut",
+        "type": "object"
+      },
+      "CiVersionPage": {
+        "properties": {
+          "archived_count": {
+            "title": "Archived Count",
+            "type": "integer"
+          },
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CiVersionSummaryOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "has_more",
+          "archived_count"
+        ],
+        "title": "CiVersionPage",
+        "type": "object"
+      },
+      "CiVersionSummaryOut": {
+        "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "change_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Note"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "integer"
+          },
+          "created_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Name"
+          },
+          "definition_id": {
+            "title": "Definition Id",
+            "type": "integer"
+          },
+          "definition_version": {
+            "title": "Definition Version",
+            "type": "integer"
+          },
+          "deployment_state": {
+            "title": "Deployment State",
+            "type": "string"
+          },
+          "deployment_state_id": {
+            "title": "Deployment State Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "incident_state": {
+            "title": "Incident State",
+            "type": "string"
+          },
+          "incident_state_id": {
+            "title": "Incident State Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "definition_id",
+          "definition_version",
+          "name",
+          "deployment_state_id",
+          "incident_state_id",
+          "deployment_state",
+          "incident_state",
+          "change_note",
+          "created_by",
+          "created_by_name",
+          "created_at",
+          "archived"
+        ],
+        "title": "CiVersionSummaryOut",
+        "type": "object"
+      },
       "ClassTemplateApplyIn": {
         "properties": {
           "group_id": {
@@ -10540,6 +11403,297 @@
           "created_at"
         ],
         "title": "CmdbDefinitionOut",
+        "type": "object"
+      },
+      "CmdbFilterFieldOut": {
+        "properties": {
+          "enum_values": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Enum Values",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "label_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Key"
+          },
+          "ops": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ops",
+            "type": "array"
+          },
+          "options_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options Source"
+          },
+          "type": {
+            "enum": [
+              "id",
+              "string",
+              "int",
+              "datetime",
+              "bool",
+              "enum"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "type",
+          "ops",
+          "label_key",
+          "label",
+          "enum_values",
+          "options_source"
+        ],
+        "title": "CmdbFilterFieldOut",
+        "type": "object"
+      },
+      "CmdbFormOptionsOut": {
+        "description": "Option lists for the reference attributes the class definition uses; a type the\ndefinition does not use is absent from the answer (``null`` is never sent).",
+        "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FieldOptionOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent"
+          },
+          "catalog": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "$ref": "#/components/schemas/FieldOptionOut"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FieldOptionOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "queue": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FieldOptionOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue"
+          },
+          "service": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FieldOptionOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service"
+          },
+          "sla": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FieldOptionOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sla"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FieldOptionOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "ticket_type": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FieldOptionOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Type"
+          }
+        },
+        "title": "CmdbFormOptionsOut",
+        "type": "object"
+      },
+      "CmdbNamedRefOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "CmdbNamedRefOut",
+        "type": "object"
+      },
+      "CmdbSavedSearchIn": {
+        "properties": {
+          "criteria": {
+            "$ref": "#/components/schemas/CiSearchCriteria"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "shared": {
+            "default": false,
+            "title": "Shared",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "criteria"
+        ],
+        "title": "CmdbSavedSearchIn",
+        "type": "object"
+      },
+      "CmdbSavedSearchOut": {
+        "properties": {
+          "changed_at": {
+            "format": "date-time",
+            "title": "Changed At",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "criteria": {
+            "$ref": "#/components/schemas/CiSearchCriteria"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "owned": {
+            "title": "Owned",
+            "type": "boolean"
+          },
+          "owner_user_id": {
+            "title": "Owner User Id",
+            "type": "integer"
+          },
+          "shared": {
+            "title": "Shared",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "shared",
+          "owned",
+          "owner_user_id",
+          "criteria",
+          "created_at",
+          "changed_at"
+        ],
+        "title": "CmdbSavedSearchOut",
         "type": "object"
       },
       "CmdbStatusOut": {
@@ -15279,6 +16433,58 @@
           "number"
         ],
         "title": "DialRequest",
+        "type": "object"
+      },
+      "DiffRowOut": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "added",
+              "removed",
+              "changed"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "new": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New"
+          },
+          "old": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "label",
+          "kind",
+          "old",
+          "new"
+        ],
+        "title": "DiffRowOut",
         "type": "object"
       },
       "DimensionCountOut": {
@@ -28652,6 +29858,34 @@
         "title": "RedisStatusOut",
         "type": "object"
       },
+      "RefLinkOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "ci",
+              "service",
+              "customer_user",
+              "customer_company",
+              "attachment",
+              "queue",
+              "agent",
+              "url"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "key"
+        ],
+        "title": "RefLinkOut",
+        "type": "object"
+      },
       "RelativeTimeRange": {
         "additionalProperties": false,
         "properties": {
@@ -28705,6 +29939,96 @@
           "models"
         ],
         "title": "RemoteModelsOut",
+        "type": "object"
+      },
+      "RenderedAttrOut": {
+        "properties": {
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/RenderedAttrOut"
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "portal": {
+            "title": "Portal",
+            "type": "boolean"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RefLinkOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": {
+            "enum": [
+              "text",
+              "textarea",
+              "integer",
+              "decimal",
+              "date",
+              "datetime",
+              "catalog",
+              "ci_ref",
+              "customer_user",
+              "customer_company",
+              "agent",
+              "service",
+              "sla",
+              "queue",
+              "priority",
+              "ticket_type",
+              "state",
+              "url",
+              "email",
+              "ip",
+              "mac",
+              "money",
+              "attachment",
+              "group"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "key",
+          "label",
+          "type",
+          "display",
+          "ref",
+          "children",
+          "portal"
+        ],
+        "title": "RenderedAttrOut",
         "type": "object"
       },
       "ReplyDraftOut": {
@@ -80493,6 +81817,882 @@
         ]
       }
     },
+    "/api/v1/cmdb/cis": {
+      "post": {
+        "operationId": "create_ci_api_v1_cmdb_cis_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CiCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CiOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Ci",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/cis/lookup": {
+      "get": {
+        "operationId": "lookup_api_v1_cmdb_cis_lookup_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 200,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "class_keys",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "maxItems": 50,
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Class Keys"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CiRefOut"
+                  },
+                  "title": "Response Lookup Api V1 Cmdb Cis Lookup Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Lookup",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/cis/search": {
+      "post": {
+        "operationId": "search_api_v1_cmdb_cis_search_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CiSearchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CiPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/cis/{ci_id}": {
+      "delete": {
+        "operationId": "delete_ci_api_v1_cmdb_cis__ci_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ci_id",
+            "required": true,
+            "schema": {
+              "title": "Ci Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Ci",
+        "tags": [
+          "cmdb"
+        ]
+      },
+      "get": {
+        "operationId": "get_ci_api_v1_cmdb_cis__ci_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ci_id",
+            "required": true,
+            "schema": {
+              "title": "Ci Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CiOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ci",
+        "tags": [
+          "cmdb"
+        ]
+      },
+      "put": {
+        "operationId": "update_ci_api_v1_cmdb_cis__ci_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ci_id",
+            "required": true,
+            "schema": {
+              "title": "Ci Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CiUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CiSaveOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Ci",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/cis/{ci_id}/diff": {
+      "get": {
+        "operationId": "diff_api_v1_cmdb_cis__ci_id__diff_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ci_id",
+            "required": true,
+            "schema": {
+              "title": "Ci Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from_version",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "From Version",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to_version",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "To Version",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CiDiffOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Diff",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/cis/{ci_id}/history": {
+      "get": {
+        "operationId": "history_api_v1_cmdb_cis__ci_id__history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ci_id",
+            "required": true,
+            "schema": {
+              "title": "Ci Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CiHistoryPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "History",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/cis/{ci_id}/versions": {
+      "get": {
+        "operationId": "list_versions_api_v1_cmdb_cis__ci_id__versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ci_id",
+            "required": true,
+            "schema": {
+              "title": "Ci Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Archived",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CiVersionPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Versions",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/cis/{ci_id}/versions/{version_id}": {
+      "get": {
+        "operationId": "get_version_api_v1_cmdb_cis__ci_id__versions__version_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ci_id",
+            "required": true,
+            "schema": {
+              "title": "Ci Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "title": "Version Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CiVersionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Version",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
     "/api/v1/cmdb/classes": {
       "get": {
         "operationId": "list_classes_api_v1_cmdb_classes_get",
@@ -80640,6 +82840,552 @@
           }
         },
         "summary": "Get Definition",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/companies/lookup": {
+      "get": {
+        "description": "Valid customer companies by name (contains) or customer id (prefix).",
+        "operationId": "lookup_companies_api_v1_cmdb_companies_lookup_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CmdbNamedRefOut"
+                  },
+                  "title": "Response Lookup Companies Api V1 Cmdb Companies Lookup Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Lookup Companies",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/filter-fields": {
+      "get": {
+        "operationId": "filter_fields_api_v1_cmdb_filter_fields_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "class_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Class Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CmdbFilterFieldOut"
+                  },
+                  "title": "Response Filter Fields Api V1 Cmdb Filter Fields Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Filter Fields",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/form-options": {
+      "get": {
+        "description": "Options for the reference attributes of the class's current definition (only the types\nthe definition uses; valid rows only, no ticket ACLs: a CI may reference any queue).",
+        "operationId": "form_options_api_v1_cmdb_form_options_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "class_id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Class Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CmdbFormOptionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Form Options",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/saved-searches": {
+      "get": {
+        "operationId": "list_searches_api_v1_cmdb_saved_searches_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CmdbSavedSearchOut"
+                  },
+                  "title": "Response List Searches Api V1 Cmdb Saved Searches Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Searches",
+        "tags": [
+          "cmdb"
+        ]
+      },
+      "post": {
+        "operationId": "create_search_api_v1_cmdb_saved_searches_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CmdbSavedSearchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CmdbSavedSearchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Search",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/saved-searches/{saved_id}": {
+      "delete": {
+        "operationId": "delete_search_api_v1_cmdb_saved_searches__saved_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "saved_id",
+            "required": true,
+            "schema": {
+              "title": "Saved Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Search",
+        "tags": [
+          "cmdb"
+        ]
+      },
+      "put": {
+        "operationId": "update_search_api_v1_cmdb_saved_searches__saved_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "saved_id",
+            "required": true,
+            "schema": {
+              "title": "Saved Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CmdbSavedSearchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CmdbSavedSearchOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Search",
         "tags": [
           "cmdb"
         ]

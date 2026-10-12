@@ -24,8 +24,10 @@ from tiqora.cmdb.classes import (
 )
 from tiqora.cmdb.errors import CmdbError, CmdbForbidden, CmdbNotFound
 from tiqora.cmdb.gate import CmdbUnavailable, require_tiqora_cmdb
+from tiqora.cmdb.service import CiConflict, InvalidValues, UnknownAttributes
 from tiqora.cmdb.znuny_definition import DefinitionParseError
 from tiqora.domain.auth import AuthenticatedUser
+from tiqora.filters import FilterError
 
 NOT_FOUND: Final = "Nicht gefunden"
 CONFLICT: Final = {"code": "conflict", "message": "Inzwischen geändert. Bitte neu laden."}
@@ -45,7 +47,7 @@ def cmdb_http_error(exc: Exception) -> HTTPException:
             status.HTTP_403_FORBIDDEN,
             {"code": "forbidden", "message": "Dafür fehlt die Berechtigung."},
         )
-    if isinstance(exc, ClassConflict):
+    if isinstance(exc, ClassConflict | CiConflict):
         return HTTPException(status.HTTP_409_CONFLICT, dict(CONFLICT))
     if isinstance(exc, DefinitionInvalid):
         return HTTPException(
@@ -82,6 +84,26 @@ def cmdb_http_error(exc: Exception) -> HTTPException:
         return HTTPException(
             status.HTTP_409_CONFLICT,
             {"code": "catalog_misconfigured", "message": "Der Katalog ist unvollständig."},
+        )
+    if isinstance(exc, UnknownAttributes):
+        return HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            {"code": "unknown_attributes", "keys": list(exc.keys)},
+        )
+    if isinstance(exc, InvalidValues):
+        return HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            {
+                "code": "invalid_values",
+                "issues": [
+                    {"path": i.path, "code": i.code, "message": i.message} for i in exc.issues
+                ],
+            },
+        )
+    if isinstance(exc, FilterError):
+        return HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            {"code": "invalid_filter", "message": exc.message, "path": exc.path},
         )
     if isinstance(exc, CmdbError):
         return HTTPException(

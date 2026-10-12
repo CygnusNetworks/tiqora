@@ -7098,6 +7098,144 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cmdb/cis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Ci */
+        post: operations["create_ci_api_v1_cmdb_cis_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cmdb/cis/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lookup */
+        get: operations["lookup_api_v1_cmdb_cis_lookup_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cmdb/cis/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search */
+        post: operations["search_api_v1_cmdb_cis_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cmdb/cis/{ci_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ci */
+        get: operations["get_ci_api_v1_cmdb_cis__ci_id__get"];
+        /** Update Ci */
+        put: operations["update_ci_api_v1_cmdb_cis__ci_id__put"];
+        post?: never;
+        /** Delete Ci */
+        delete: operations["delete_ci_api_v1_cmdb_cis__ci_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cmdb/cis/{ci_id}/diff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Diff */
+        get: operations["diff_api_v1_cmdb_cis__ci_id__diff_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cmdb/cis/{ci_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** History */
+        get: operations["history_api_v1_cmdb_cis__ci_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cmdb/cis/{ci_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Versions */
+        get: operations["list_versions_api_v1_cmdb_cis__ci_id__versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cmdb/cis/{ci_id}/versions/{version_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Version */
+        get: operations["get_version_api_v1_cmdb_cis__ci_id__versions__version_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cmdb/classes": {
         parameters: {
             query?: never;
@@ -7127,6 +7265,100 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cmdb/companies/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lookup Companies
+         * @description Valid customer companies by name (contains) or customer id (prefix).
+         */
+        get: operations["lookup_companies_api_v1_cmdb_companies_lookup_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cmdb/filter-fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Filter Fields */
+        get: operations["filter_fields_api_v1_cmdb_filter_fields_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cmdb/form-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Form Options
+         * @description Options for the reference attributes of the class's current definition (only the types
+         *     the definition uses; valid rows only, no ticket ACLs: a CI may reference any queue).
+         */
+        get: operations["form_options_api_v1_cmdb_form_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cmdb/saved-searches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Searches */
+        get: operations["list_searches_api_v1_cmdb_saved_searches_get"];
+        put?: never;
+        /** Create Search */
+        post: operations["create_search_api_v1_cmdb_saved_searches_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cmdb/saved-searches/{saved_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Search */
+        put: operations["update_search_api_v1_cmdb_saved_searches__saved_id__put"];
+        post?: never;
+        /** Delete Search */
+        delete: operations["delete_search_api_v1_cmdb_saved_searches__saved_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -14952,6 +15184,327 @@ export interface components {
             /** Ref */
             ref: string;
         };
+        /** CiClassRefOut */
+        CiClassRefOut: {
+            /** Class Key */
+            class_key: string;
+            /** Group Id */
+            group_id: number;
+            /** Icon */
+            icon: string | null;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+        };
+        /** CiCreateIn */
+        CiCreateIn: {
+            /** Attachment Ids */
+            attachment_ids?: number[];
+            /** Attributes */
+            attributes?: {
+                [key: string]: unknown;
+            };
+            /** Change Note */
+            change_note?: string | null;
+            /** Class Id */
+            class_id: number;
+            /** Deployment State Id */
+            deployment_state_id: number;
+            /** Incident State Id */
+            incident_state_id: number;
+            /** Name */
+            name: string;
+        };
+        /** CiDiffOut */
+        CiDiffOut: {
+            /** From Version Id */
+            from_version_id: number;
+            /** Rows */
+            rows: components["schemas"]["DiffRowOut"][];
+            /** To Version Id */
+            to_version_id: number;
+        };
+        /** CiHistoryOut */
+        CiHistoryOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number;
+            /** Created By Name */
+            created_by_name: string | null;
+            /** Detail */
+            detail: string;
+            /** Event */
+            event: string;
+            /** Id */
+            id: number;
+            /** Version Id */
+            version_id: number | null;
+        };
+        /** CiHistoryPage */
+        CiHistoryPage: {
+            /** Has More */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["CiHistoryOut"][];
+        };
+        /** CiListItemOut */
+        CiListItemOut: {
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /** Class Key */
+            class_key: string;
+            /** Class Name */
+            class_name: string;
+            /** Deployment Functionality */
+            deployment_functionality: string | null;
+            /** Deployment State */
+            deployment_state: string;
+            /** Id */
+            id: number;
+            /** Incident Functionality */
+            incident_functionality: string | null;
+            /** Incident State */
+            incident_state: string;
+            /** Name */
+            name: string;
+            /** Number */
+            number: string;
+        };
+        /** CiOut */
+        CiOut: {
+            /** Can Write */
+            can_write: boolean;
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /** Changed By */
+            changed_by: number;
+            class: components["schemas"]["CiClassRefOut"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number;
+            current_version: components["schemas"]["CiVersionOut"] | null;
+            /** Deployment State Id */
+            deployment_state_id: number;
+            /** Id */
+            id: number;
+            /** Incident State Id */
+            incident_state_id: number;
+            /** Lock Version */
+            lock_version: number;
+            /** Name */
+            name: string;
+            /** Number */
+            number: string;
+            /** Rendered */
+            rendered: components["schemas"]["RenderedAttrOut"][];
+            states: components["schemas"]["CiStatesOut"];
+            /** Unknown Keys */
+            unknown_keys: string[];
+            /** Version Count */
+            version_count: number;
+        };
+        /** CiPage */
+        CiPage: {
+            /** Items */
+            items: components["schemas"]["CiListItemOut"][];
+            /** Total */
+            total: number;
+            /** Total Capped */
+            total_capped: boolean;
+        };
+        /** CiRefOut */
+        CiRefOut: {
+            /** Class Key */
+            class_key: string;
+            /** Class Name */
+            class_name: string;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Number */
+            number: string;
+        };
+        /** CiSaveOut */
+        CiSaveOut: {
+            /** Changed */
+            changed: boolean;
+            ci: components["schemas"]["CiOut"];
+        };
+        /**
+         * CiSearchCriteria
+         * @description The stored part of a search: everything except paging.
+         */
+        CiSearchCriteria: {
+            /** Class Ids */
+            class_ids?: number[];
+            filter?: components["schemas"]["Filter"] | null;
+            /**
+             * Order
+             * @default asc
+             * @enum {string}
+             */
+            order: "asc" | "desc";
+            /** Q */
+            q?: string | null;
+            /**
+             * Sort
+             * @default number
+             * @enum {string}
+             */
+            sort: "number" | "name" | "class" | "changed_at" | "deployment_state" | "incident_state";
+        };
+        /** CiSearchIn */
+        CiSearchIn: {
+            /** Class Ids */
+            class_ids?: number[];
+            filter?: components["schemas"]["Filter"] | null;
+            /**
+             * Limit
+             * @default 50
+             */
+            limit: number;
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
+            /**
+             * Order
+             * @default asc
+             * @enum {string}
+             */
+            order: "asc" | "desc";
+            /** Q */
+            q?: string | null;
+            /**
+             * Sort
+             * @default number
+             * @enum {string}
+             */
+            sort: "number" | "name" | "class" | "changed_at" | "deployment_state" | "incident_state";
+        };
+        /** CiStatesOut */
+        CiStatesOut: {
+            deployment: components["schemas"]["CatalogItemOut"];
+            incident_current: components["schemas"]["CatalogItemOut"];
+            incident_own: components["schemas"]["CatalogItemOut"];
+        };
+        /** CiUpdateIn */
+        CiUpdateIn: {
+            /** Attributes */
+            attributes?: {
+                [key: string]: unknown;
+            };
+            /** Change Note */
+            change_note?: string | null;
+            /** Deployment State Id */
+            deployment_state_id: number;
+            /**
+             * Drop Unknown
+             * @default false
+             */
+            drop_unknown: boolean;
+            /** Expected Lock Version */
+            expected_lock_version: number;
+            /** Incident State Id */
+            incident_state_id: number;
+            /** Name */
+            name: string;
+        };
+        /**
+         * CiVersionOut
+         * @description One version: raw document (``attributes``) and its display tree (``rendered``).
+         */
+        CiVersionOut: {
+            /** Archived */
+            archived: boolean;
+            /** Attributes */
+            attributes: {
+                [key: string]: unknown;
+            };
+            /** Change Note */
+            change_note: string | null;
+            /** Ci Id */
+            ci_id: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number;
+            /** Definition Id */
+            definition_id: number;
+            /** Definition Version */
+            definition_version: number;
+            /** Deployment State Id */
+            deployment_state_id: number;
+            /** Id */
+            id: number;
+            /** Incident State Id */
+            incident_state_id: number;
+            /** Name */
+            name: string;
+            /** Rendered */
+            rendered: components["schemas"]["RenderedAttrOut"][];
+        };
+        /** CiVersionPage */
+        CiVersionPage: {
+            /** Archived Count */
+            archived_count: number;
+            /** Has More */
+            has_more: boolean;
+            /** Items */
+            items: components["schemas"]["CiVersionSummaryOut"][];
+        };
+        /** CiVersionSummaryOut */
+        CiVersionSummaryOut: {
+            /** Archived */
+            archived: boolean;
+            /** Change Note */
+            change_note: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: number;
+            /** Created By Name */
+            created_by_name: string | null;
+            /** Definition Id */
+            definition_id: number;
+            /** Definition Version */
+            definition_version: number;
+            /** Deployment State */
+            deployment_state: string;
+            /** Deployment State Id */
+            deployment_state_id: number;
+            /** Id */
+            id: number;
+            /** Incident State */
+            incident_state: string;
+            /** Incident State Id */
+            incident_state_id: number;
+            /** Name */
+            name: string;
+        };
         /** ClassTemplateApplyIn */
         ClassTemplateApplyIn: {
             /** Group Id */
@@ -15103,6 +15656,93 @@ export interface components {
             id: number;
             /** Version */
             version: number;
+        };
+        /** CmdbFilterFieldOut */
+        CmdbFilterFieldOut: {
+            /** Enum Values */
+            enum_values: string[];
+            /** Key */
+            key: string;
+            /** Label */
+            label: string | null;
+            /** Label Key */
+            label_key: string | null;
+            /** Ops */
+            ops: string[];
+            /** Options Source */
+            options_source: string | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "id" | "string" | "int" | "datetime" | "bool" | "enum";
+        };
+        /**
+         * CmdbFormOptionsOut
+         * @description Option lists for the reference attributes the class definition uses; a type the
+         *     definition does not use is absent from the answer (``null`` is never sent).
+         */
+        CmdbFormOptionsOut: {
+            /** Agent */
+            agent?: components["schemas"]["FieldOptionOut"][] | null;
+            /** Catalog */
+            catalog?: {
+                [key: string]: components["schemas"]["FieldOptionOut"][];
+            } | null;
+            /** Priority */
+            priority?: components["schemas"]["FieldOptionOut"][] | null;
+            /** Queue */
+            queue?: components["schemas"]["FieldOptionOut"][] | null;
+            /** Service */
+            service?: components["schemas"]["FieldOptionOut"][] | null;
+            /** Sla */
+            sla?: components["schemas"]["FieldOptionOut"][] | null;
+            /** State */
+            state?: components["schemas"]["FieldOptionOut"][] | null;
+            /** Ticket Type */
+            ticket_type?: components["schemas"]["FieldOptionOut"][] | null;
+        };
+        /** CmdbNamedRefOut */
+        CmdbNamedRefOut: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /** CmdbSavedSearchIn */
+        CmdbSavedSearchIn: {
+            criteria: components["schemas"]["CiSearchCriteria"];
+            /** Name */
+            name: string;
+            /**
+             * Shared
+             * @default false
+             */
+            shared: boolean;
+        };
+        /** CmdbSavedSearchOut */
+        CmdbSavedSearchOut: {
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            criteria: components["schemas"]["CiSearchCriteria"];
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Owned */
+            owned: boolean;
+            /** Owner User Id */
+            owner_user_id: number;
+            /** Shared */
+            shared: boolean;
         };
         /** CmdbStatusOut */
         CmdbStatusOut: {
@@ -16598,6 +17238,22 @@ export interface components {
             number: string;
             /** Ticket Id */
             ticket_id?: number | null;
+        };
+        /** DiffRowOut */
+        DiffRowOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "added" | "removed" | "changed";
+            /** Label */
+            label: string;
+            /** New */
+            new: string | null;
+            /** Old */
+            old: string | null;
+            /** Path */
+            path: string;
         };
         /** DimensionCountOut */
         DimensionCountOut: {
@@ -21220,6 +21876,16 @@ export interface components {
             /** Version */
             version?: string | null;
         };
+        /** RefLinkOut */
+        RefLinkOut: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "ci" | "service" | "customer_user" | "customer_company" | "attachment" | "queue" | "agent" | "url";
+        };
         /** RelativeTimeRange */
         RelativeTimeRange: {
             /** Count */
@@ -21244,6 +21910,27 @@ export interface components {
         RemoteModelsOut: {
             /** Models */
             models: string[];
+        };
+        /** RenderedAttrOut */
+        RenderedAttrOut: {
+            /** Children */
+            children: components["schemas"]["RenderedAttrOut"][];
+            /** Display */
+            display: string | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Path */
+            path: string;
+            /** Portal */
+            portal: boolean;
+            ref: components["schemas"]["RefLinkOut"] | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "text" | "textarea" | "integer" | "decimal" | "date" | "datetime" | "catalog" | "ci_ref" | "customer_user" | "customer_company" | "agent" | "service" | "sla" | "queue" | "priority" | "ticket_type" | "state" | "url" | "email" | "ip" | "mac" | "money" | "attachment" | "group";
         };
         /**
          * ReplyDraftOut
@@ -44295,6 +44982,375 @@ export interface operations {
             };
         };
     };
+    create_ci_api_v1_cmdb_cis_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CiCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CiOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lookup_api_v1_cmdb_cis_lookup_get: {
+        parameters: {
+            query?: {
+                q?: string;
+                class_keys?: string[] | null;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CiRefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_api_v1_cmdb_cis_search_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CiSearchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CiPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ci_api_v1_cmdb_cis__ci_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ci_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CiOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_ci_api_v1_cmdb_cis__ci_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ci_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CiUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CiSaveOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_ci_api_v1_cmdb_cis__ci_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ci_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    diff_api_v1_cmdb_cis__ci_id__diff_get: {
+        parameters: {
+            query: {
+                from_version: number;
+                to_version: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ci_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CiDiffOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    history_api_v1_cmdb_cis__ci_id__history_get: {
+        parameters: {
+            query?: {
+                before_id?: number | null;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ci_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CiHistoryPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_versions_api_v1_cmdb_cis__ci_id__versions_get: {
+        parameters: {
+            query?: {
+                before_id?: number | null;
+                limit?: number;
+                include_archived?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ci_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CiVersionPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_version_api_v1_cmdb_cis__ci_id__versions__version_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ci_id: number;
+                version_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CiVersionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_classes_api_v1_cmdb_classes_get: {
         parameters: {
             query?: never;
@@ -44352,6 +45408,254 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CmdbDefinitionOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lookup_companies_api_v1_cmdb_companies_lookup_get: {
+        parameters: {
+            query: {
+                q: string;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CmdbNamedRefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    filter_fields_api_v1_cmdb_filter_fields_get: {
+        parameters: {
+            query?: {
+                class_id?: number | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CmdbFilterFieldOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    form_options_api_v1_cmdb_form_options_get: {
+        parameters: {
+            query: {
+                class_id: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CmdbFormOptionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_searches_api_v1_cmdb_saved_searches_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CmdbSavedSearchOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_search_api_v1_cmdb_saved_searches_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CmdbSavedSearchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CmdbSavedSearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_search_api_v1_cmdb_saved_searches__saved_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                saved_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CmdbSavedSearchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CmdbSavedSearchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_search_api_v1_cmdb_saved_searches__saved_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                saved_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
