@@ -74,6 +74,7 @@ from tiqora.domain.ticket_write_service import (
     InvalidInput,
     TicketIn,
     TicketNotFound,
+    _ticket_must_exist,  # noqa: PLC2701
     add_article,
     assign_owner,
     assign_responsible,
@@ -273,7 +274,12 @@ _CREATE_KEYS: Final = frozenset(
         "SLA",
         "SLAID",
         "CustomerID",
+        "CustomerNo",
         "CustomerUser",
+        "ArchiveFlag",
+        # Znuny's TicketCreate requires UserID; accepted but ignored (user 1 stays the actor).
+        "UserID",
+        "TN",
     }
 )
 
@@ -441,10 +447,16 @@ async def _create_ticket_action(
     session_factory: async_sessionmaker[AsyncSession],
     sysconfig: SysConfig,
     data: dict[str, Any],
+    debugger: GiDebugger,
 ) -> None:
     unknown = sorted(str(k) for k in data if k not in _CREATE_KEYS)
     if unknown:
         raise _ActionError(f"Nicht unterstützte Schlüssel: {', '.join(unknown)}")
+    ignored = [k for k in ("UserID", "TN") if k in data]
+    if ignored:
+        await debugger.notice(
+            f"Action 'OTRS_TicketCreate': Ignorierte Schlüssel: {', '.join(ignored)}"
+        )
     title = data.get("Title")
     if not perl_truthy(title):
         raise _ActionError("Title fehlt.")
@@ -540,8 +552,10 @@ async def _create_ticket_action(
         what="Lock",
     )
 
-    customer_id = data.get("CustomerID")
+    # Znuny: ``CustomerNo || CustomerID``.
+    customer_id = data.get("CustomerNo") or data.get("CustomerID")
     customer_user = data.get("CustomerUser")
+    archive_flag = 1 if str(data.get("ArchiveFlag", "")).lower() in ("y", "1", "yes") else 0
     await create_ticket(
         session,
         session_factory,
@@ -559,6 +573,7 @@ async def _create_ticket_action(
             responsible_id=responsible_id,
             customer_id=None if customer_id is None else _perl_str(customer_id),
             customer_user_id=None if customer_user is None else _perl_str(customer_user),
+            archive_flag=archive_flag,
         ),
         user_id=_RESPONSE_USER,
     )
@@ -600,6 +615,14 @@ async def _enqueue_invocations(
                 "Error executing asynchronous call of Kernel::GenericInterface::Requester::Run()."
             )
     return None
+
+
+async def _unchanged(session: AsyncSession, ticket_id: int, column: str, new_id: int) -> bool:
+    """Znuny's ``Ticket{Queue,State,Priority,Responsible}Set`` write nothing when the value
+    is unchanged (Ticket.pm:2157, 4531, 5088, 5382). Without this a remote echoing the current
+    value would add history rows/events on every call (and loop event-driven invokers)."""
+    ticket = await _ticket_must_exist(session, ticket_id)
+    return int(ticket[column]) == new_id
 
 
 async def _run_action(
@@ -652,9 +675,14 @@ async def _run_action(
         )
     elif key == "OTRS_TicketQueueSet":
         queue_id = await _lookup_id(session, Queue, value, valid_only=True, what="Queue")
-        await move_queue(
-            session, ticket_id=ticket_id, new_queue_id=queue_id, user_id=user, sysconfig=sysconfig
-        )
+        if not await _unchanged(session, ticket_id, "queue_id", queue_id):
+            await move_queue(
+                session,
+                ticket_id=ticket_id,
+                new_queue_id=queue_id,
+                user_id=user,
+                sysconfig=sysconfig,
+            )
     elif key == "OTRS_TicketSLASet":
         sla_id = await _lookup_id(session, Sla, value, valid_only=True, what="SLA")
         await change_sla(
@@ -672,9 +700,14 @@ async def _run_action(
         )
     elif key == "OTRS_TicketStateSet":
         state_id = await _lookup_id(session, TicketState, value, valid_only=False, what="State")
-        await change_state(
-            session, ticket_id=ticket_id, new_state_id=state_id, user_id=user, sysconfig=sysconfig
-        )
+        if not await _unchanged(session, ticket_id, "ticket_state_id", state_id):
+            await change_state(
+                session,
+                ticket_id=ticket_id,
+                new_state_id=state_id,
+                user_id=user,
+                sysconfig=sysconfig,
+            )
     elif key == "OTRS_TicketOwnerSet":
         owner_id = await _lookup_id(session, Users, value, valid_only=True, what="Owner")
         await assign_owner(
@@ -684,20 +717,22 @@ async def _run_action(
         responsible_id = await _lookup_id(
             session, Users, value, valid_only=True, what="Responsible"
         )
-        await assign_responsible(
-            session, ticket_id=ticket_id, new_responsible_id=responsible_id, user_id=user
-        )
+        if not await _unchanged(session, ticket_id, "responsible_user_id", responsible_id):
+            await assign_responsible(
+                session, ticket_id=ticket_id, new_responsible_id=responsible_id, user_id=user
+            )
     elif key == "OTRS_TicketPrioritySet":
         priority_id = await _lookup_id(
             session, TicketPriority, value, valid_only=False, what="Priority"
         )
-        await change_priority(
-            session,
-            ticket_id=ticket_id,
-            new_priority_id=priority_id,
-            user_id=user,
-            sysconfig=sysconfig,
-        )
+        if not await _unchanged(session, ticket_id, "ticket_priority_id", priority_id):
+            await change_priority(
+                session,
+                ticket_id=ticket_id,
+                new_priority_id=priority_id,
+                user_id=user,
+                sysconfig=sysconfig,
+            )
     elif key == "OTRS_TicketArticleAdd":
         # Reached only with the required keys present (checked by the caller).
         assert isinstance(value, dict)  # noqa: S101 -- narrowed for mypy
@@ -789,7 +824,7 @@ async def handle_response(
             elif key == "OTRS_TicketCreate":
                 if not isinstance(value, dict):
                     raise _ActionError("Die Daten müssen ein Hash sein.")
-                await _create_ticket_action(session, session_factory, sysconfig, value)
+                await _create_ticket_action(session, session_factory, sysconfig, value, debugger)
             elif key == "OTRS_TicketArticleAdd":
                 if not isinstance(value, dict):
                     raise _ActionError("Die Daten müssen ein Hash sein.")

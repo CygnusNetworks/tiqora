@@ -497,11 +497,84 @@ async def test_ticket_create_supported_keys_and_rejects_unknown(url_fixture: str
     )
     assert any("Bogus" in str(x["content"]) for x in run.sink.lines)
 
+    # Znuny's TicketCreate payload: UserID/TN ignored, CustomerNo wins, ArchiveFlag mapped.
+    znuny = {
+        **full,
+        "Title": "GI51 created znuny",
+        "UserID": 999,
+        "TN": "2026101100001",
+        "CustomerNo": "GI51NO",
+        "ArchiveFlag": "y",
+    }
+    run = await _respond(url_fixture, None, {"OTRS_TicketCreate": znuny})
+    assert run.result["Success"] == 1
+    assert any("UserID" in str(x["summary"]) for x in run.sink.lines)
+
+    async def find_znuny(session: AsyncSession) -> Any:
+        return (
+            await session.execute(
+                text(
+                    "SELECT customer_id, archive_flag, create_by, tn FROM ticket"
+                    " WHERE title = 'GI51 created znuny'"
+                )
+            )
+        ).one()
+
+    row = await _with_session(url_fixture, find_znuny)
+    assert (row[0], int(row[1]), int(row[2])) == ("GI51NO", 1, 1)
+    assert row[3] != "2026101100001"
+    await _with_session(url_fixture, _forget_znuny_ticket)
+
     missing_owner = {k: v for k, v in full.items() if k != "Owner"}
     missing_owner["Title"] = "GI51 created no owner"
     run = await _respond(url_fixture, None, {"OTRS_TicketCreate": missing_owner})
     assert run.result["Success"] == 0
     assert len(await _with_session(url_fixture, find)) == 1  # nothing else was created
+
+
+async def _forget_znuny_ticket(session: AsyncSession) -> None:
+    """Drop the extra ticket so the "nothing else was created" count stays exact."""
+    await session.execute(
+        text(
+            "DELETE FROM ticket_history WHERE ticket_id IN"
+            " (SELECT id FROM (SELECT id FROM ticket WHERE title = 'GI51 created znuny') x)"
+        )
+    )
+    await session.execute(text("DELETE FROM ticket WHERE title = 'GI51 created znuny'"))
+    await session.commit()
+
+
+async def test_unchanged_values_write_nothing(url_fixture: str) -> None:
+    values = {
+        "OTRS_TicketQueueSet": "GI51Queue",
+        "OTRS_TicketStateSet": "open",
+        "OTRS_TicketPrioritySet": "4 high",
+        "OTRS_TicketResponsibleSet": "gi51resp",
+    }
+    first = await _respond(url_fixture, 51163, values)
+    assert first.result["Success"] == 1
+
+    async def counts(session: AsyncSession) -> tuple[int, int, Any]:
+        hist = (
+            await session.execute(
+                text("SELECT COUNT(*) FROM ticket_history WHERE ticket_id = 51163")
+            )
+        ).scalar_one()
+        outbox = (
+            await session.execute(
+                text("SELECT COUNT(*) FROM tiqora_event_outbox WHERE ticket_id = 51163")
+            )
+        ).scalar_one()
+        changed = (
+            await session.execute(text("SELECT change_time FROM ticket WHERE id = 51163"))
+        ).scalar_one()
+        return int(hist), int(outbox), changed
+
+    before = await _with_session(url_fixture, counts)
+    assert before[0] > 0
+    second = await _respond(url_fixture, 51163, values)
+    assert second.result["Success"] == 1
+    assert await _with_session(url_fixture, counts) == before
 
 
 async def test_async_invoker_execution_enqueues(url_fixture: str) -> None:
