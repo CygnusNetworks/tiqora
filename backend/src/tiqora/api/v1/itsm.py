@@ -23,12 +23,16 @@ from tiqora.api.v1.itsm_schemas import (
     CiTicketLinkOut,
     CiVersionOut,
     CiVersionPageOut,
+    CloseIncidentsIn,
     ItsmStatusOut,
     ItsmZnunyInfoOut,
     LinkedArticlesIn,
     LinkTypeOptionOut,
     MatrixOut,
     PrioritySuggestionOut,
+    ProblemIn,
+    ProblemIncidentsIn,
+    ProblemOut,
     RecentIncidentOut,
     ServiceIncidentStateOut,
     ServiceItsmOut,
@@ -60,6 +64,16 @@ from tiqora.itsm.linked_articles import (
 )
 from tiqora.itsm.mode import ItsmModeState, get_itsm_mode, require_itsm_enabled
 from tiqora.itsm.priority import load_matrix, suggest_priority
+from tiqora.itsm.problem import (
+    ProblemError,
+    ProblemView,
+    enqueue_close_incidents,
+    get_problem,
+    link_incidents,
+    publish_known_error,
+    save_problem,
+)
+from tiqora.itsm.problem import ProblemIn as ProblemData
 from tiqora.itsm.providers import get_ci_provider
 from tiqora.itsm.services import (
     ServiceNotFound,
@@ -69,6 +83,7 @@ from tiqora.itsm.services import (
 )
 from tiqora.itsm.settings import ItsmSettings, load_itsm_settings
 from tiqora.jobs.schemas import JobAccepted
+from tiqora.kb.service import KbService
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -603,6 +618,106 @@ async def post_linked_articles(
             acting_user_id=user.id,
         ),
     )
+    await session.commit()
+    return JobAccepted(job_id=job.id, status="queued")
+
+
+# --- problem management (Task 19) -------------------------------------------------------------
+
+
+@contextmanager
+def _problem_errors() -> Iterator[None]:
+    try:
+        yield
+    except ProblemError as exc:
+        raise HTTPException(exc.http_status, detail=exc.detail) from exc
+
+
+def _problem_out(view: ProblemView) -> ProblemOut:
+    return ProblemOut.model_validate(view.model_dump())
+
+
+@ticket_router.get("/{ticket_id}/problem", response_model=ProblemOut)
+async def read_problem(
+    ticket_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> ProblemOut:
+    """Root cause, workaround, known-error state and linked incidents. Needs ``ro``."""
+    await require_itsm_enabled(session)
+    cfg = await load_itsm_settings(session, settings)
+    with _problem_errors():
+        return _problem_out(await get_problem(session, ticket_id, user_id=user.id, cfg=cfg))
+
+
+@ticket_router.put("/{ticket_id}/problem", response_model=ProblemOut)
+async def put_problem(
+    ticket_id: int, body: ProblemIn, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> ProblemOut:
+    """Save root cause and workaround. Needs ``rw``; 409 ``not_a_problem`` on other types."""
+    await require_itsm_enabled(session)
+    cfg = await load_itsm_settings(session, settings)
+    with _problem_errors():
+        view = await save_problem(
+            session, ticket_id, ProblemData(**body.model_dump()), user_id=user.id, cfg=cfg
+        )
+    await session.commit()
+    return _problem_out(view)
+
+
+@ticket_router.post("/{ticket_id}/problem/incidents", response_model=ProblemOut)
+async def post_problem_incidents(
+    ticket_id: int,
+    body: ProblemIncidentsIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> ProblemOut:
+    """Link incidents to the problem (``ParentChild``, the problem is the parent); at most 50."""
+    await require_itsm_enabled(session)
+    cfg = await load_itsm_settings(session, settings)
+    with _problem_errors():
+        await link_incidents(session, ticket_id, body.incident_ticket_ids, user_id=user.id, cfg=cfg)
+        view = await get_problem(session, ticket_id, user_id=user.id, cfg=cfg)
+    await session.commit()
+    return _problem_out(view)
+
+
+@ticket_router.post("/{ticket_id}/problem/known-error", response_model=ProblemOut)
+async def post_known_error(
+    ticket_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> ProblemOut:
+    """Publish the problem as a known error: a KB article for review, linked to the ticket."""
+    await require_itsm_enabled(session)
+    cfg = await load_itsm_settings(session, settings)
+    kb = KbService(session, settings)
+    try:
+        with _problem_errors():
+            await publish_known_error(session, kb, ticket_id, user_id=user.id, cfg=cfg)
+            view = await get_problem(session, ticket_id, user_id=user.id, cfg=cfg)
+    finally:
+        await kb.close()
+    await session.commit()
+    return _problem_out(view)
+
+
+@ticket_router.post(
+    "/{ticket_id}/problem/close-incidents",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=JobAccepted,
+)
+async def post_close_incidents(
+    ticket_id: int,
+    body: CloseIncidentsIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> JobAccepted:
+    """Queue "close the linked incidents with workaround" (a note and the workaround state)."""
+    await require_itsm_enabled(session)
+    cfg = await load_itsm_settings(session, settings)
+    with _problem_errors():
+        job = await enqueue_close_incidents(
+            session, ticket_id, user_id=user.id, cfg=cfg, note_html=body.note_html
+        )
     await session.commit()
     return JobAccepted(job_id=job.id, status="queued")
 

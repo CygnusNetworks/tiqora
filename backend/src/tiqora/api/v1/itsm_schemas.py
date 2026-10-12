@@ -271,3 +271,45 @@ class LinkedArticlesIn(BaseModel):
     subject: str = Field(min_length=1, max_length=250)
     body_html: str = Field(min_length=1, max_length=200_000)
     visible_for_customer: bool = False
+
+
+# --- problem management (Task 19) ------------------------------------------------------------
+
+
+class ProblemIn(BaseModel):
+    root_cause: str | None = Field(None, max_length=20000)
+    workaround: str | None = Field(None, max_length=20000)
+
+
+class LinkedIncidentOut(BaseModel):
+    ticket_id: int
+    tn: str
+    title: str
+    type_name: str
+    state: str
+    state_type: str
+    closed: bool
+
+
+class ProblemOut(BaseModel):
+    ticket_id: int
+    root_cause: str | None
+    workaround: str | None
+    known_error: bool
+    known_error_article_id: int | None
+    #: state of the KB article (``review`` until a reviewer publishes it)
+    known_error_article_state: str | None
+    known_error_since: UtcDateTime | None
+    #: linked incidents the caller may read
+    incidents: list[LinkedIncidentOut]
+    change_time: UtcDateTime | None
+    change_by: int | None
+
+
+class ProblemIncidentsIn(BaseModel):
+    incident_ticket_ids: list[int] = Field(min_length=1, max_length=50)
+
+
+class CloseIncidentsIn(BaseModel):
+    #: the note written on every incident; a default text when omitted
+    note_html: str | None = Field(None, max_length=200_000)

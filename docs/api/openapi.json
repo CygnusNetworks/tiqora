@@ -10145,6 +10145,24 @@
         "title": "CiVersionPageOut",
         "type": "object"
       },
+      "CloseIncidentsIn": {
+        "properties": {
+          "note_html": {
+            "anyOf": [
+              {
+                "maxLength": 200000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note Html"
+          }
+        },
+        "title": "CloseIncidentsIn",
+        "type": "object"
+      },
       "CompanyCreateOut": {
         "properties": {
           "customer_id": {
@@ -20178,6 +20196,49 @@
         "title": "LinkedArticlesIn",
         "type": "object"
       },
+      "LinkedIncidentOut": {
+        "properties": {
+          "closed": {
+            "title": "Closed",
+            "type": "boolean"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "state_type": {
+            "title": "State Type",
+            "type": "string"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tn": {
+            "title": "Tn",
+            "type": "string"
+          },
+          "type_name": {
+            "title": "Type Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "tn",
+          "title",
+          "type_name",
+          "state",
+          "state_type",
+          "closed"
+        ],
+        "title": "LinkedIncidentOut",
+        "type": "object"
+      },
       "LlmModelIn": {
         "description": "POST and PUT (full replace).",
         "properties": {
@@ -26703,6 +26764,166 @@
           }
         },
         "title": "PriorityUpdate",
+        "type": "object"
+      },
+      "ProblemIn": {
+        "properties": {
+          "root_cause": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Cause"
+          },
+          "workaround": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workaround"
+          }
+        },
+        "title": "ProblemIn",
+        "type": "object"
+      },
+      "ProblemIncidentsIn": {
+        "properties": {
+          "incident_ticket_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Incident Ticket Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "incident_ticket_ids"
+        ],
+        "title": "ProblemIncidentsIn",
+        "type": "object"
+      },
+      "ProblemOut": {
+        "properties": {
+          "change_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change By"
+          },
+          "change_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Time"
+          },
+          "incidents": {
+            "items": {
+              "$ref": "#/components/schemas/LinkedIncidentOut"
+            },
+            "title": "Incidents",
+            "type": "array"
+          },
+          "known_error": {
+            "title": "Known Error",
+            "type": "boolean"
+          },
+          "known_error_article_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known Error Article Id"
+          },
+          "known_error_article_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known Error Article State"
+          },
+          "known_error_since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Known Error Since"
+          },
+          "root_cause": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Cause"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "workaround": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workaround"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "root_cause",
+          "workaround",
+          "known_error",
+          "known_error_article_id",
+          "known_error_article_state",
+          "known_error_since",
+          "incidents",
+          "change_time",
+          "change_by"
+        ],
+        "title": "ProblemOut",
         "type": "object"
       },
       "ProcessActivityOut": {
@@ -103376,6 +103597,409 @@
         "summary": "Print Ticket",
         "tags": [
           "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/problem": {
+      "get": {
+        "description": "Root cause, workaround, known-error state and linked incidents. Needs ``ro``.",
+        "operationId": "read_problem_api_v1_tickets__ticket_id__problem_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Problem",
+        "tags": [
+          "itsm"
+        ]
+      },
+      "put": {
+        "description": "Save root cause and workaround. Needs ``rw``; 409 ``not_a_problem`` on other types.",
+        "operationId": "put_problem_api_v1_tickets__ticket_id__problem_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProblemIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Problem",
+        "tags": [
+          "itsm"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/problem/close-incidents": {
+      "post": {
+        "description": "Queue \"close the linked incidents with workaround\" (a note and the workaround state).",
+        "operationId": "post_close_incidents_api_v1_tickets__ticket_id__problem_close_incidents_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseIncidentsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Close Incidents",
+        "tags": [
+          "itsm"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/problem/incidents": {
+      "post": {
+        "description": "Link incidents to the problem (``ParentChild``, the problem is the parent); at most 50.",
+        "operationId": "post_problem_incidents_api_v1_tickets__ticket_id__problem_incidents_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProblemIncidentsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Problem Incidents",
+        "tags": [
+          "itsm"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/problem/known-error": {
+      "post": {
+        "description": "Publish the problem as a known error: a KB article for review, linked to the ticket.",
+        "operationId": "post_known_error_api_v1_tickets__ticket_id__problem_known_error_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Known Error",
+        "tags": [
+          "itsm"
         ]
       }
     },
