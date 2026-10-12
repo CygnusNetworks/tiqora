@@ -433,6 +433,7 @@ async def test_event_fires_matching_invokers_once(url_fixture: str, follower_: F
         "history_id": hid,
         "past_execution": None,
         "dry_run": False,
+        "chain_depth": 0,
     }
     assert job["dedupe_key"] == f"gi:{hid}:{WS}:Send"
     again = await follower_.tick()
