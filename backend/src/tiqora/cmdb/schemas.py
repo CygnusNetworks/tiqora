@@ -407,6 +407,39 @@ class CiRefOut(BaseModel):
     class_name: str
 
 
+LinkKind = Literal["ci", "ticket", "service", "kb_article", "customer_user", "customer_company"]
+
+
+class LinkIn(BaseModel):
+    """``POST /links``: one stored orientation is chosen by the server (D8)."""
+
+    source_kind: LinkKind
+    source_key: str = Field(min_length=1, max_length=100)
+    target_kind: LinkKind
+    target_key: str = Field(min_length=1, max_length=100)
+    link_type: str = Field(min_length=1, max_length=50)
+
+
+class LinkedObjectOut(BaseModel):
+    """The other end of a link; ``hidden`` ends carry no key, label or url."""
+
+    kind: LinkKind
+    key: str
+    label: str
+    hidden: bool
+    url: str | None
+
+
+class LinkOut(BaseModel):
+    id: int
+    link_type: str
+    link_type_label: str
+    direction: Literal["outgoing", "incoming", "undirected"]
+    other: LinkedObjectOut
+    created_by: str | None
+    created_at: UtcDateTime
+
+
 class CmdbSavedSearchIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     shared: bool = False
@@ -468,5 +501,9 @@ __all__ = [
     "DefinitionIssueOut",
     "DefinitionValidateIn",
     "ItsmModeOut",
+    "LinkIn",
+    "LinkKind",
+    "LinkOut",
     "LinkTypeOut",
+    "LinkedObjectOut",
 ]

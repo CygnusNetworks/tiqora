@@ -21152,6 +21152,240 @@
         "title": "LegacySchemaOut",
         "type": "object"
       },
+      "LinkIn": {
+        "description": "``POST /links``: one stored orientation is chosen by the server (D8).",
+        "properties": {
+          "link_type": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Link Type",
+            "type": "string"
+          },
+          "source_key": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Source Key",
+            "type": "string"
+          },
+          "source_kind": {
+            "enum": [
+              "ci",
+              "ticket",
+              "service",
+              "kb_article",
+              "customer_user",
+              "customer_company"
+            ],
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "target_key": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Target Key",
+            "type": "string"
+          },
+          "target_kind": {
+            "enum": [
+              "ci",
+              "ticket",
+              "service",
+              "kb_article",
+              "customer_user",
+              "customer_company"
+            ],
+            "title": "Target Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_kind",
+          "source_key",
+          "target_kind",
+          "target_key",
+          "link_type"
+        ],
+        "title": "LinkIn",
+        "type": "object"
+      },
+      "LinkOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "direction": {
+            "enum": [
+              "outgoing",
+              "incoming",
+              "undirected"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "link_type": {
+            "title": "Link Type",
+            "type": "string"
+          },
+          "link_type_label": {
+            "title": "Link Type Label",
+            "type": "string"
+          },
+          "other": {
+            "$ref": "#/components/schemas/LinkedObjectOut"
+          }
+        },
+        "required": [
+          "id",
+          "link_type",
+          "link_type_label",
+          "direction",
+          "other",
+          "created_by",
+          "created_at"
+        ],
+        "title": "LinkOut",
+        "type": "object"
+      },
+      "LinkTypeOut": {
+        "description": "Read model of a valid link type offered between CIs (route: Task 11).",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "offer_ci_ci": {
+            "title": "Offer Ci Ci",
+            "type": "boolean"
+          },
+          "offer_ci_service": {
+            "title": "Offer Ci Service",
+            "type": "boolean"
+          },
+          "offer_ticket_ci": {
+            "title": "Offer Ticket Ci",
+            "type": "boolean"
+          },
+          "pointed": {
+            "title": "Pointed",
+            "type": "boolean"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "propagation": {
+            "enum": [
+              "none",
+              "source",
+              "target",
+              "both"
+            ],
+            "title": "Propagation",
+            "type": "string"
+          },
+          "source_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Label"
+          },
+          "target_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Label"
+          }
+        },
+        "required": [
+          "name",
+          "source_label",
+          "target_label",
+          "pointed",
+          "propagation",
+          "offer_ci_ci",
+          "offer_ci_service",
+          "offer_ticket_ci",
+          "position"
+        ],
+        "title": "LinkTypeOut",
+        "type": "object"
+      },
+      "LinkedObjectOut": {
+        "description": "The other end of a link; ``hidden`` ends carry no key, label or url.",
+        "properties": {
+          "hidden": {
+            "title": "Hidden",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "ci",
+              "ticket",
+              "service",
+              "kb_article",
+              "customer_user",
+              "customer_company"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "kind",
+          "key",
+          "label",
+          "hidden",
+          "url"
+        ],
+        "title": "LinkedObjectOut",
+        "type": "object"
+      },
       "LlmModelIn": {
         "description": "POST and PUT (full replace).",
         "properties": {
@@ -83532,6 +83766,313 @@
           }
         },
         "summary": "Form Options",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/link-types": {
+      "get": {
+        "description": "Valid link types offered for CI to CI, CI to service or ticket to CI links.",
+        "operationId": "list_link_types_api_v1_cmdb_link_types_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LinkTypeOut"
+                  },
+                  "title": "Response List Link Types Api V1 Cmdb Link Types Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Link Types",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/links": {
+      "get": {
+        "operationId": "list_links_api_v1_cmdb_links_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "object_kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "ci",
+                "ticket",
+                "service",
+                "kb_article",
+                "customer_user",
+                "customer_company"
+              ],
+              "title": "Object Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "object_key",
+            "required": true,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 1,
+              "title": "Object Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LinkOut"
+                  },
+                  "title": "Response List Links Api V1 Cmdb Links Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Links",
+        "tags": [
+          "cmdb"
+        ]
+      },
+      "post": {
+        "operationId": "create_link_api_v1_cmdb_links_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Link",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/links/{link_id}": {
+      "delete": {
+        "operationId": "delete_link_api_v1_cmdb_links__link_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "title": "Link Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Link",
         "tags": [
           "cmdb"
         ]

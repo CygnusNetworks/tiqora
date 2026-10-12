@@ -4,8 +4,8 @@ Users: ``cmdb4a`` (A, ``rw`` on GROUP_RW, ``ro`` on GROUP_RO), ``cmdb4b`` (B, ``
 GROUP_RO only), ``cmdb4admin`` (ADMIN, ``rw`` on ``admin``). Queues: QUEUE_RW (GROUP_RW),
 QUEUE_HIDDEN (GROUP_HIDDEN). Customers ``cmdb4-cust-a@example.org`` (company ``cmdb4-co-a``,
 extra mapping to ``cmdb4-co-c``) and ``cmdb4-cust-b@example.org`` (company ``cmdb4-co-b``).
-Tickets 740300 (QUEUE_RW, customer a, open), 740301 (QUEUE_HIDDEN, open), 740302 (QUEUE_RW,
-closed).
+Service 740400 (``cmdb4-service``). Tickets 740300 (QUEUE_RW, customer a, open), 740301
+(QUEUE_HIDDEN, open), 740302 (QUEUE_RW, closed).
 
 Test modules re-export ``cmdb_db`` and ``_cmdb_rows_reset`` (the latter autouse) as module
 attributes, which is what pytest collects (a plain import would trip ruff's F811):
@@ -60,6 +60,7 @@ __all__ = [
     "QUEUE_HIDDEN",
     "QUEUE_RW",
     "SERVER_ATTRS",
+    "SERVICE_ID",
     "SERVER_ATTRS_WITH_MANUAL",
     "TICKET_CLOSED",
     "TICKET_HIDDEN",
@@ -85,6 +86,7 @@ GROUP_RW, GROUP_RO, GROUP_HIDDEN = 740010, 740011, 740012
 USER_A, USER_B, USER_ADMIN = 740100, 740101, 740102
 QUEUE_RW, QUEUE_HIDDEN = 740200, 740201
 TICKET_OPEN, TICKET_HIDDEN, TICKET_CLOSED = 740300, 740301, 740302
+SERVICE_ID = 740400
 CUSTOMER_A, CUSTOMER_B = "cmdb4-cust-a@example.org", "cmdb4-cust-b@example.org"
 
 _USERS = {
@@ -191,6 +193,7 @@ class CmdbWorld:
 
 _ZNUNY_CLEANUP = (
     "DELETE FROM ticket WHERE id BETWEEN 740300 AND 740399",
+    "DELETE FROM service WHERE id BETWEEN 740400 AND 740499",
     "DELETE FROM customer_user_customer WHERE user_id LIKE 'cmdb4-cust-%'",
     "DELETE FROM customer_user WHERE login LIKE 'cmdb4-cust-%'",
     "DELETE FROM customer_company WHERE customer_id LIKE 'cmdb4-co-%'",
@@ -206,6 +209,7 @@ _TIQORA_CLEANUP = (
     " (SELECT id FROM tiqora_job WHERE created_by BETWEEN :lo AND :hi)",
     "DELETE FROM tiqora_job WHERE created_by BETWEEN :lo AND :hi",
     "DELETE FROM tiqora_event_outbox WHERE ticket_id BETWEEN 740300 AND 740399",
+    "DELETE FROM tiqora_cache_invalidation WHERE ticket_id BETWEEN 740300 AND 740399",
     "DELETE FROM tiqora_settings WHERE `key` LIKE 'itsm.%' OR `key` LIKE 'cmdb.%'",
 )
 #: FK-ordered: children first
@@ -304,6 +308,13 @@ def _seed_znuny_world(sync_url: str) -> None:
                     ),
                     {"id": qid, "n": f"cmdb4-queue-{qid}", "g": gid, "t": _T},
                 )
+            conn.execute(
+                text(
+                    "INSERT INTO service (id, name, valid_id, create_time, create_by,"
+                    " change_time, change_by) VALUES (:id, 'cmdb4-service', 1, :t, 1, :t, 1)"
+                ),
+                {"id": SERVICE_ID, "t": _T},
+            )
             admin_group = int(
                 conn.execute(
                     text("SELECT id FROM permission_groups WHERE name = 'admin'")

@@ -7400,6 +7400,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cmdb/link-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Link Types
+         * @description Valid link types offered for CI to CI, CI to service or ticket to CI links.
+         */
+        get: operations["list_link_types_api_v1_cmdb_link_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cmdb/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Links */
+        get: operations["list_links_api_v1_cmdb_links_get"];
+        put?: never;
+        /** Create Link */
+        post: operations["create_link_api_v1_cmdb_links_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cmdb/links/{link_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Link */
+        delete: operations["delete_link_api_v1_cmdb_links__link_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cmdb/saved-searches": {
         parameters: {
             query?: never;
@@ -19040,6 +19095,96 @@ export interface components {
             state_priority_has_color: boolean;
             /** Supported */
             supported: boolean;
+        };
+        /**
+         * LinkIn
+         * @description ``POST /links``: one stored orientation is chosen by the server (D8).
+         */
+        LinkIn: {
+            /** Link Type */
+            link_type: string;
+            /** Source Key */
+            source_key: string;
+            /**
+             * Source Kind
+             * @enum {string}
+             */
+            source_kind: "ci" | "ticket" | "service" | "kb_article" | "customer_user" | "customer_company";
+            /** Target Key */
+            target_key: string;
+            /**
+             * Target Kind
+             * @enum {string}
+             */
+            target_kind: "ci" | "ticket" | "service" | "kb_article" | "customer_user" | "customer_company";
+        };
+        /** LinkOut */
+        LinkOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: string | null;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "outgoing" | "incoming" | "undirected";
+            /** Id */
+            id: number;
+            /** Link Type */
+            link_type: string;
+            /** Link Type Label */
+            link_type_label: string;
+            other: components["schemas"]["LinkedObjectOut"];
+        };
+        /**
+         * LinkTypeOut
+         * @description Read model of a valid link type offered between CIs (route: Task 11).
+         */
+        LinkTypeOut: {
+            /** Name */
+            name: string;
+            /** Offer Ci Ci */
+            offer_ci_ci: boolean;
+            /** Offer Ci Service */
+            offer_ci_service: boolean;
+            /** Offer Ticket Ci */
+            offer_ticket_ci: boolean;
+            /** Pointed */
+            pointed: boolean;
+            /** Position */
+            position: number;
+            /**
+             * Propagation
+             * @enum {string}
+             */
+            propagation: "none" | "source" | "target" | "both";
+            /** Source Label */
+            source_label: string | null;
+            /** Target Label */
+            target_label: string | null;
+        };
+        /**
+         * LinkedObjectOut
+         * @description The other end of a link; ``hidden`` ends carry no key, label or url.
+         */
+        LinkedObjectOut: {
+            /** Hidden */
+            hidden: boolean;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "ci" | "ticket" | "service" | "kb_article" | "customer_user" | "customer_company";
+            /** Label */
+            label: string;
+            /** Url */
+            url: string | null;
         };
         /**
          * LlmModelIn
@@ -45786,6 +45931,145 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CmdbFormOptionsOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_link_types_api_v1_cmdb_link_types_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkTypeOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_links_api_v1_cmdb_links_get: {
+        parameters: {
+            query: {
+                object_kind: "ci" | "ticket" | "service" | "kb_article" | "customer_user" | "customer_company";
+                object_key: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_link_api_v1_cmdb_links_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_link_api_v1_cmdb_links__link_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                link_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

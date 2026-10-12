@@ -25,6 +25,7 @@ from tiqora.cmdb.classes import (
 )
 from tiqora.cmdb.errors import CmdbError, CmdbForbidden, CmdbNotFound
 from tiqora.cmdb.gate import CmdbUnavailable, require_tiqora_cmdb
+from tiqora.cmdb.links import UnknownLinkType
 from tiqora.cmdb.service import CiConflict, InvalidValues, UnknownAttributes
 from tiqora.cmdb.znuny_definition import DefinitionParseError
 from tiqora.domain.auth import AuthenticatedUser
@@ -83,6 +84,11 @@ def cmdb_http_error(exc: Exception) -> HTTPException:
         return HTTPException(
             status.HTTP_409_CONFLICT,
             {"code": "class_key_taken", "message": "Dieser Klassenschlüssel ist schon vergeben."},
+        )
+    if isinstance(exc, UnknownLinkType):
+        return HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            {"code": "unknown_link_type", "message": "Diesen Verknüpfungstyp gibt es nicht."},
         )
     if isinstance(exc, CatalogItemExists):
         return HTTPException(

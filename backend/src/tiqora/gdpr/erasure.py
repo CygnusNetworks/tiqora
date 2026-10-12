@@ -21,6 +21,10 @@ from sqlalchemy import bindparam, delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.avatars.service import EMAIL, cache_key, email_key, forget_cached
+from tiqora.cmdb.erasure import CREATED_SUFFIX as CMDB_CREATED_SUFFIX
+from tiqora.cmdb.erasure import PARTIAL_TABLES as CMDB_PARTIAL_TABLES
+from tiqora.cmdb.erasure import erase_cmdb_customer_data
+from tiqora.cmdb.index import rebuild_index
 from tiqora.config import Settings
 from tiqora.db.legacy.article import (
     Article,
@@ -2075,6 +2079,19 @@ async def run_erasure(
             backup=_backup_saved,
         )
         counts["schedule_recipients"] = await remove_erased_recipient_emails(session, erased_emails)
+        # CMDB: links of the customer / hard-deleted tickets go, the login in CI versions, the
+        # search index and the CI history is pseudonymised (see tiqora.cmdb.erasure).
+        if await _table_exists(session, "tiqora_itsm_link") and await _table_exists(
+            session, "tiqora_cmdb_ci_version"
+        ):
+            counts.update(
+                await erase_cmdb_customer_data(
+                    session,
+                    replacements=login_to_new,
+                    deleted_ticket_ids=ticket_ids if do_ticket_delete else [],
+                    add_backup=_backup_saved,
+                )
+            )
         # GenericInterface debugger lines hold payloads of these tickets (customer names,
         # addresses). Debug logs are disposable, so they go in every mode, without backup.
         if ticket_ids:
@@ -2173,6 +2190,7 @@ async def rollback_job(
 
         restored = 0
         ticket_ids: list[int] = []
+        cmdb_ci_ids: list[int] = []
         # A ticket hard-delete job (delete_tickets) backs up EVERY affected row
         # as a full row (tickets + all FK children + masters). Detect it via a
         # full-row "ticket" backup, then simply re-INSERT everything in id-DESC
@@ -2187,6 +2205,31 @@ async def rollback_job(
             pk = _json_load_row(bak.row_pk)
             original = _json_load_row(bak.original_row)
             table = bak.table_name
+
+            if table.endswith(CMDB_CREATED_SUFFIX):
+                # a row the erasure created in the CMDB (system version, its history line)
+                base = table[: -len(CMDB_CREATED_SUFFIX)]
+                await session.execute(
+                    text(f"DELETE FROM {_qi(base)} WHERE id = :i"),  # noqa: S608
+                    {"i": pk["id"]},
+                )
+                restored += 1
+                continue
+
+            if table == "tiqora_itsm_link":
+                if await _fetch_full_row(session, table, pk) is None:
+                    await _insert_row(session, table, original)
+                    restored += 1
+                continue
+
+            if table in CMDB_PARTIAL_TABLES:
+                # changed columns only (CI pointer, redacted version / history text)
+                if await _fetch_full_row(session, table, pk) is not None:
+                    await _update_row(session, table, pk, original)
+                    restored += 1
+                if table == "tiqora_cmdb_ci" and "id" in pk:
+                    cmdb_ci_ids.append(int(pk["id"]))
+                continue
 
             if table in SAVED_CRITERIA_TABLES:
                 # Saved searches/reports are only ever UPDATEd (criteria/definition + version).
@@ -2283,6 +2326,10 @@ async def rollback_job(
             if table == "ticket" and "id" in pk:
                 ticket_ids.append(int(pk["id"]))
             restored += 1
+
+        if cmdb_ci_ids:
+            # the restored current version is the old one: rebuild the search index from it
+            await rebuild_index(session, sorted(set(cmdb_ci_ids)))
 
         # Fix anonymize-mode login renames on related tables: after customer_user
         # is restored, rename related user_id from new→old using job.resolved_logins
