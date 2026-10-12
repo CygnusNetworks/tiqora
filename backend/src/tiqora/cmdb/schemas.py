@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from tiqora.cmdb.definition import AttributeDef, AttributeType
 from tiqora.cmdb.render import RefKind
 from tiqora.domain.schemas import UtcDateTime
+from tiqora.filters.model import Filter
 
 ItsmModeOut = Literal["off", "znuny_readthrough", "tiqora"]
 
@@ -256,7 +257,78 @@ class CiHistoryPage(BaseModel):
     has_more: bool
 
 
+CiSortKey = Literal["number", "name", "class", "changed_at", "deployment_state", "incident_state"]
+
+
+class CiSearchCriteria(BaseModel):
+    """The stored part of a search: everything except paging."""
+
+    class_ids: list[int] = Field(default_factory=list, max_length=100)
+    filter: Filter | None = None
+    q: str | None = Field(default=None, max_length=200)
+    sort: CiSortKey = "number"
+    order: Literal["asc", "desc"] = "asc"
+
+
+class CiSearchIn(CiSearchCriteria):
+    offset: int = Field(0, ge=0, le=100000)
+    limit: int = Field(50, ge=1, le=200)
+
+
+class CiListItemOut(BaseModel):
+    id: int
+    number: str
+    name: str
+    class_key: str
+    class_name: str
+    deployment_state: str
+    deployment_functionality: str | None
+    incident_state: str
+    incident_functionality: str | None
+    changed_at: UtcDateTime
+
+
+class CiPage(BaseModel):
+    items: list[CiListItemOut]
+    #: exact up to the count cap (10000), then the cap itself with ``total_capped``
+    total: int
+    total_capped: bool
+
+
+class CiRefOut(BaseModel):
+    id: int
+    number: str
+    name: str
+    class_key: str
+    class_name: str
+
+
+class CmdbSavedSearchIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    shared: bool = False
+    criteria: CiSearchCriteria
+
+
+class CmdbSavedSearchOut(BaseModel):
+    id: int
+    name: str
+    shared: bool
+    owned: bool
+    owner_user_id: int
+    criteria: CiSearchCriteria
+    created_at: UtcDateTime
+    changed_at: UtcDateTime
+
+
 __all__ = [
+    "CiListItemOut",
+    "CiPage",
+    "CiRefOut",
+    "CiSearchCriteria",
+    "CiSearchIn",
+    "CiSortKey",
+    "CmdbSavedSearchIn",
+    "CmdbSavedSearchOut",
     "CiDiffOut",
     "CiHistoryOut",
     "CiHistoryPage",
