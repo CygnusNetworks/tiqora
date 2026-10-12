@@ -34,6 +34,7 @@ if _t.TYPE_CHECKING:
     from pydantic import BaseModel
 
     from tiqora.plugins.df_types import DfBaseType, DfDisplay, DfValidate
+    from tiqora.plugins.mail_filters import MailFilterStage
     from tiqora.plugins.number_generators import NumberBuild
     from tiqora.plugins.placeholders import PlaceholderResolve
     from tiqora.plugins.process_points import ConditionRun, TransitionActionRun
@@ -161,6 +162,16 @@ class PluginRegistry(_t.Protocol):
         display: DfDisplay | None = None,
         config_model: type[BaseModel] | None = None,
     ) -> str: ...
+
+    def mail_filter(
+        self,
+        name: str,
+        stage: MailFilterStage,
+        run: _abc.Callable[..., _abc.Awaitable[None]],
+        *,
+        order: int = 100,
+        timeout_seconds: int = 5,
+    ) -> None: ...
 
 
 class Plugin(_t.Protocol):

@@ -31,6 +31,12 @@ from tiqora.plugins.df_types import (
     DynamicFieldType,
 )
 from tiqora.plugins.events import EVENT_SUBSCRIBERS, EventHandler, EventSubscriber
+from tiqora.plugins.mail_filters import (
+    INBOUND_MAIL_FILTERS,
+    OUTBOUND_MAIL_FILTERS,
+    MailFilter,
+    MailFilterStage,
+)
 from tiqora.plugins.manifest import PluginManifest
 from tiqora.plugins.mcp import CORE_MCP_TOOL_NAMES, MCP_TOOLS, McpTool
 from tiqora.plugins.naming import CAMEL_NAME_RE, TAG_NAME_RE, qualified
@@ -709,6 +715,53 @@ class PluginRegistrar:
 
         self._stage(DYNAMIC_FIELD_TYPES, item, check=check)
         return qname
+
+    def mail_filter(
+        self,
+        name: str,
+        stage: MailFilterStage,
+        run: Callable[..., Awaitable[None]],
+        *,
+        order: int = 100,
+        timeout_seconds: int = 5,
+    ) -> None:
+        """Stage a mail filter (D9): ``pre``/``post`` for incoming, ``outbound`` for outgoing mail.
+
+        ``run`` is ``async def (ctx: MailFilterContext, mail)`` where ``mail`` is an
+        ``InboundMail`` (pre), ``InboundMailResult`` (post) or ``OutboundMail`` (outbound).
+        Inbound filters are fail-open; an outbound filter may only add ``X-`` headers or veto.
+        """
+        point = OUTBOUND_MAIL_FILTERS if stage == "outbound" else INBOUND_MAIL_FILTERS
+
+        def check() -> None:
+            if stage not in ("pre", "post", "outbound"):
+                raise RegistrationRejected(
+                    f"Unbekannte Stufe „{stage}“ für einen Mailfilter; erlaubt: pre, post, outbound"
+                )
+            self._check_name(name, "den Mailfilter")
+            _require_async(run, f"Der Mailfilter „{name}“")
+            if isinstance(timeout_seconds, bool) or not 1 <= timeout_seconds <= 30:
+                raise RegistrationRejected(
+                    "Zeitlimit eines Mailfilters muss zwischen 1 und 30 Sekunden liegen"
+                )
+            if isinstance(order, bool) or not 0 <= order <= 1000:
+                raise RegistrationRejected(
+                    "Reihenfolge eines Mailfilters muss zwischen 0 und 1000 liegen"
+                )
+
+        if stage not in ("pre", "post", "outbound"):
+            # Reject before choosing a point: the capability to check depends on the stage.
+            check()
+        item = MailFilter(
+            key=f"{self.plugin_id}:{name}",
+            plugin_id=self.plugin_id,
+            stage=stage,
+            run=run,
+            order=order,
+            timeout_seconds=timeout_seconds,
+            context=self._context,
+        )
+        self._stage(point, item, check=check)
 
 
 _NUMBER_REASONS: Final = {

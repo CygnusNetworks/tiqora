@@ -7,6 +7,7 @@ from tiqora.channels.registry import CHANNELS
 from tiqora.jobs.registry import JOB_HANDLERS
 from tiqora.plugins.df_types import DYNAMIC_FIELD_TYPES
 from tiqora.plugins.events import EVENT_SUBSCRIBERS
+from tiqora.plugins.mail_filters import INBOUND_MAIL_FILTERS, OUTBOUND_MAIL_FILTERS
 from tiqora.plugins.mcp import MCP_TOOLS
 from tiqora.plugins.number_generators import TICKET_NUMBER_GENERATORS
 from tiqora.plugins.placeholders import PLACEHOLDERS
@@ -79,6 +80,14 @@ SUBMODULES: dict[str, set[str]] = {
         "NumberBuild",
     },
     "tiqora_sdk.fields": {"DfBaseType", "DfValidate", "DfDisplay"},
+    "tiqora_sdk.mail": {
+        "InboundMail",
+        "InboundMailResult",
+        "OutboundMail",
+        "MailVetoed",
+        "MailFilterStage",
+        "MailFilterContext",
+    },
 }
 
 
@@ -117,6 +126,7 @@ def test_registry_protocol_matches_registrar() -> None:
             "placeholder",
             "number_generator",
             "dynamic_field_type",
+            "mail_filter",
         }
     )
 
@@ -143,6 +153,8 @@ def test_phase1_points_are_sdk_stable() -> None:
             PLACEHOLDERS,
             TICKET_NUMBER_GENERATORS,
             DYNAMIC_FIELD_TYPES,
+            INBOUND_MAIL_FILTERS,
+            OUTBOUND_MAIL_FILTERS,
         )
     )
     assert CHANNELS.sdk_stable is False

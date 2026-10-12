@@ -362,3 +362,51 @@ def test_mcp_tool_with_unsupported_signature_rejected(registrar: PluginRegistrar
     with pytest.raises(RegistrationRejected, match="hello_ot.*Signatur"):
         registrar.mcp_tool("ot", odd_type, description="x")
     assert len(registrar.staged) == 0
+
+
+async def _filter(ctx: Any, mail: Any) -> None:
+    return None
+
+
+def test_mail_filter_stage_picks_the_point() -> None:
+    from tiqora.plugins.mail_filters import INBOUND_MAIL_FILTERS, OUTBOUND_MAIL_FILTERS
+
+    reg = _registrar(points=["core.mail.inbound_filters", "core.mail.outbound_filters"])
+    reg.mail_filter("vorher", "pre", _filter)
+    reg.mail_filter("nachher", "post", _filter)
+    reg.mail_filter("raus", "outbound", _filter)
+    points = [(p.key, p.item_key(i)) for p, i in reg.staged]
+    assert points == [
+        (INBOUND_MAIL_FILTERS.key, "org.example.hello:vorher"),
+        (INBOUND_MAIL_FILTERS.key, "org.example.hello:nachher"),
+        (OUTBOUND_MAIL_FILTERS.key, "org.example.hello:raus"),
+    ]
+
+
+def test_mail_filter_needs_the_capability_of_its_stage() -> None:
+    reg = _registrar(points=["core.mail.inbound_filters"])
+    with pytest.raises(RegistrationRejected, match="core.mail.outbound_filters"):
+        reg.mail_filter("raus", "outbound", _filter)
+    reg = _registrar(points=["core.mail.outbound_filters"])
+    with pytest.raises(RegistrationRejected, match="core.mail.inbound_filters"):
+        reg.mail_filter("vorher", "pre", _filter)
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"stage": "mid"}, "Unbekannte Stufe"),
+        ({"name": "X"}, "Ungültiger Name"),
+        ({"run": lambda ctx, mail: None}, "async"),
+        ({"timeout_seconds": 31}, "1 und 30"),
+        ({"timeout_seconds": 0}, "1 und 30"),
+        ({"order": 1001}, "0 und 1000"),
+    ],
+)
+def test_mail_filter_rejects_bad_arguments(kwargs: dict[str, Any], message: str) -> None:
+    reg = _registrar(points=["core.mail.inbound_filters", "core.mail.outbound_filters"])
+    args: dict[str, Any] = {"name": "pruefer", "stage": "pre", "run": _filter}
+    args.update(kwargs)
+    with pytest.raises(RegistrationRejected, match=message):
+        reg.mail_filter(args.pop("name"), args.pop("stage"), args.pop("run"), **args)
+    assert reg.staged == ()

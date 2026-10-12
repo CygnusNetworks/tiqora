@@ -20,6 +20,7 @@ from tiqora_sdk.hooks import (
     SyncOperation,
     TicketCreatePatch,
 )
+from tiqora_sdk.mail import InboundMail, InboundMailResult, MailFilterContext
 from tiqora_sdk.process import ActionContext
 from tiqora_sdk.templates import NumberRequest, PlaceholderRequest
 
@@ -243,6 +244,49 @@ def _register_df_types(registry: PluginRegistry) -> None:
     )
 
 
+async def _tagger(ctx: MailFilterContext, mail: InboundMail) -> None:
+    """``pre``: a subject with DRINGEND gets priority 5."""
+    behaviour.CALLS.append(("mail.pre.tagger", mail.subject))
+    if "DRINGEND" in mail.subject:
+        mail.headers["X-OTRS-Priority"] = "5 very high"
+
+
+async def _spam(ctx: MailFilterContext, mail: InboundMail) -> None:
+    """``pre``: mail from @spam.example.net is dropped."""
+    if mail.from_address.endswith("@spam.example.net"):
+        mail.headers["X-OTRS-Ignore"] = "yes"
+
+
+async def _broken_pre(ctx: MailFilterContext, mail: InboundMail) -> None:
+    """``pre``, ``MODE["mail.pre"]``: raise (after dropping the mail) | hang."""
+    mode = behaviour.MODE.get("mail.pre", "ok")
+    if mode == "raise":
+        mail.headers["X-OTRS-Ignore"] = "yes"  # must be undone: the filter failed
+        raise RuntimeError("kaputt")
+    if mode == "hang":
+        mail.headers["X-OTRS-Ignore"] = "yes"
+        await asyncio.sleep(30)
+
+
+async def _recorder(ctx: MailFilterContext, result: InboundMailResult) -> None:
+    """``post``: records ``(outcome, ticket_id)`` and the ticket title read through the SDK."""
+    behaviour.CALLS.append(("mail.post", (result.outcome, result.ticket_id)))
+    if result.ticket_id is not None:
+        ticket = await ctx.plugin.tickets.get(result.ticket_id)
+        behaviour.CALLS.append(("mail.post.title", None if ticket is None else ticket.title))
+    behaviour.CALLS.append(("mail.post.headers", dict(result.headers)))
+    if behaviour.MODE.get("mail.post") == "raise":
+        raise RuntimeError("kaputt")
+
+
+def _register_mail_filters(registry: PluginRegistry) -> None:
+    """Inbound: ``tagger``, ``spam``, ``broken`` (pre) and ``recorder`` (post)."""
+    registry.mail_filter("tagger", "pre", _tagger, order=100)
+    registry.mail_filter("spam", "pre", _spam, order=110)
+    registry.mail_filter("broken", "pre", _broken_pre, order=120, timeout_seconds=1)
+    registry.mail_filter("recorder", "post", _recorder, order=100, timeout_seconds=2)
+
+
 class PointsPlugin:
     def register(self, registry: PluginRegistry) -> None:
         # Each task of the plugin-points plan adds its ``_register_<point>(registry)`` call here.
@@ -251,6 +295,7 @@ class PointsPlugin:
         _register_placeholders(registry)
         _register_number_generators(registry)
         _register_df_types(registry)
+        _register_mail_filters(registry)
 
 
 plugin = PointsPlugin()

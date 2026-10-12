@@ -28,6 +28,7 @@ from tiqora.channels.email.parser import (
 from tiqora.db.legacy.mail_account import MailAccount
 from tiqora.domain.mail_log import write_mail_log
 from tiqora.domain.ticket_write_service import ArticleIn, TicketIn, add_article, create_ticket
+from tiqora.plugins.mail_filters import run_inbound_pre_filters
 from tiqora.znuny.followup import detect_followup
 from tiqora.znuny.followup import followup_state_name as followup_state_name_for
 from tiqora.znuny.sysconfig import SysConfig
@@ -122,6 +123,8 @@ class PipelineResult:
     orig_message_id: str | None = None
     orig_x_otrs_loop: str | None = None
     autoresponse_article_id: int | None = None
+    #: the header dict after all filters (Znuny's and the plugins'), for plugin post filters
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 async def _lookup_id(session: AsyncSession, table: str, name_col: str, value: str) -> int | None:
@@ -353,8 +356,33 @@ async def _process_message_inner(
             parsed.attachments = crypto.attachments
         parsed.subject = crypto.subject_for(parsed.subject)
     get_param = _build_get_param(parsed, trusted=bool(account.trusted))
+    result = await _dispatch_parsed(
+        session,
+        session_factory,
+        sysconfig,
+        parsed=parsed,
+        get_param=get_param,
+        account=account,
+        user_id=user_id,
+    )
+    result.headers = dict(get_param)
+    return result
 
+
+async def _dispatch_parsed(
+    session: AsyncSession,
+    session_factory: async_sessionmaker[AsyncSession],
+    sysconfig: SysConfig,
+    *,
+    parsed: ParsedEmail,
+    get_param: dict[str, str],
+    account: MailAccount,
+    user_id: int,
+) -> PipelineResult:
+    """Filters, follow-up detection and ticket/article creation for one parsed mail."""
     await apply_filters(session, get_param)
+    # Plugin filters run after Znuny's database filters, so they have the last word.
+    await run_inbound_pre_filters(get_param, parsed, account)
 
     ignore = (get_param.get("X-OTRS-Ignore") or "").strip().lower()
     if ignore in ("yes", "true"):

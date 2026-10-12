@@ -25,6 +25,7 @@ from tiqora.domain.settings_store import (
     KEY_POSTMASTER_LEAVE_ON_SERVER,
     get_setting_bool,
 )
+from tiqora.plugins.mail_filters import run_inbound_post_filters
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -105,6 +106,8 @@ async def process_account(
                     account=account,
                     user_id=user_id,
                 )
+            # The block above committed the message: post filters see the stored ticket.
+            await run_inbound_post_filters(result, result.headers, account_id)
             if result.outcome == "new_ticket":
                 stats["created"] += 1
                 POSTMASTER_CREATED.inc()

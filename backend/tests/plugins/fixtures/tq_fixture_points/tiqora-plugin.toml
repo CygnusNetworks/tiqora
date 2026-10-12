@@ -21,4 +21,6 @@ extension_points = [
   "core.templates.placeholders",
   "core.tickets.number_generators",
   "core.dynamic_fields.types",
+  "core.mail.inbound_filters",
+  "core.mail.outbound_filters",
 ]
