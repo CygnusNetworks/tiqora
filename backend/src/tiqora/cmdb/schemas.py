@@ -440,6 +440,57 @@ class LinkOut(BaseModel):
     created_at: UtcDateTime
 
 
+class ImpactNodeOut(BaseModel):
+    """A graph node. A hidden CI carries only ``id``, ``kind``, ``hidden`` and ``depth``."""
+
+    id: str
+    kind: Literal["ci", "service"]
+    ci_id: int | None = None
+    number: str | None = None
+    name: str | None = None
+    class_key: str | None = None
+    incident_functionality: str | None = None
+    hidden: bool
+    depth: int
+
+
+class ImpactEdgeOut(BaseModel):
+    source: str
+    target: str
+    link_type: str
+    propagates: bool
+
+
+class ImpactGraphOut(BaseModel):
+    nodes: list[ImpactNodeOut]
+    edges: list[ImpactEdgeOut]
+    truncated: bool
+    root: str
+
+
+class CiTicketOut(BaseModel):
+    ticket_id: int
+    number: str
+    title: str
+    queue_id: int
+    queue_name: str
+    state_name: str
+    state_type: str
+    open: bool
+    link_type: str
+
+
+class AffectedOut(BaseModel):
+    ci_count: int
+    services: list[CmdbNamedRefOut]
+    service_count: int
+    customers: list[CmdbNamedRefOut]
+    customer_count: int
+    open_tickets: list[CiTicketOut]
+    open_ticket_count: int
+    truncated: bool
+
+
 class CmdbSavedSearchIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     shared: bool = False
@@ -458,6 +509,11 @@ class CmdbSavedSearchOut(BaseModel):
 
 
 __all__ = [
+    "AffectedOut",
+    "CiTicketOut",
+    "ImpactEdgeOut",
+    "ImpactGraphOut",
+    "ImpactNodeOut",
     "CiClassRefOut",
     "CiCreateIn",
     "CiOut",

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, Response, status
 
@@ -12,8 +12,11 @@ from tiqora.cmdb.catalog import CatalogService
 from tiqora.cmdb.classes import ClassService
 from tiqora.cmdb.diff import diff_versions
 from tiqora.cmdb.errors import CmdbError
+from tiqora.cmdb.impact import affected, impact_graph, tickets_for_ci
+from tiqora.cmdb.links import LinkService
 from tiqora.cmdb.render import RenderedAttr, render_values
 from tiqora.cmdb.schemas import (
+    AffectedOut,
     CiClassRefOut,
     CiCreateIn,
     CiDiffOut,
@@ -24,13 +27,17 @@ from tiqora.cmdb.schemas import (
     CiSaveOut,
     CiSearchIn,
     CiStatesOut,
+    CiTicketOut,
     CiUpdateIn,
     CiVersionOut,
     CiVersionPage,
+    ImpactGraphOut,
+    LinkOut,
     RenderedAttrOut,
 )
 from tiqora.cmdb.search import lookup_cis, search_cis
 from tiqora.cmdb.service import CiRecord, CiService, VersionRecord
+from tiqora.cmdb.settings import load_cmdb_settings
 from tiqora.filters import FilterError
 
 router = APIRouter()
@@ -243,6 +250,54 @@ async def history(
     except CmdbError as exc:
         raise cmdb_http_error(exc) from exc
     return CiHistoryPage.model_validate(page, from_attributes=True)
+
+
+@router.get("/cis/{ci_id}/impact", response_model=ImpactGraphOut)
+async def ci_impact(
+    ci_id: int,
+    ctx: Ctx,
+    depth: Annotated[int, Query(ge=1, le=5)] = 2,
+    direction: Literal["both", "up", "down"] = "both",
+) -> ImpactGraphOut:
+    try:
+        return await impact_graph(
+            ctx.session,
+            ctx.access,
+            ci_id,
+            depth=depth,
+            direction=direction,
+            settings=await load_cmdb_settings(ctx.session),
+        )
+    except CmdbError as exc:
+        raise cmdb_http_error(exc) from exc
+
+
+@router.get("/cis/{ci_id}/affected", response_model=AffectedOut)
+async def ci_affected(ci_id: int, ctx: Ctx) -> AffectedOut:
+    try:
+        return await affected(
+            ctx.session, ctx.access, ci_id, settings=await load_cmdb_settings(ctx.session)
+        )
+    except CmdbError as exc:
+        raise cmdb_http_error(exc) from exc
+
+
+@router.get("/cis/{ci_id}/tickets", response_model=list[CiTicketOut])
+async def ci_tickets(
+    ci_id: int, ctx: Ctx, open_only: Annotated[bool, Query()] = False
+) -> list[CiTicketOut]:
+    try:
+        return await tickets_for_ci(ctx.session, ctx.access, ci_id, open_only=open_only)
+    except CmdbError as exc:
+        raise cmdb_http_error(exc) from exc
+
+
+@router.get("/cis/{ci_id}/links", response_model=list[LinkOut])
+async def ci_links(ci_id: int, ctx: Ctx) -> list[LinkOut]:
+    try:
+        return await LinkService(ctx.session).list_for(ctx.access, "ci", str(ci_id))
+    except CmdbError as exc:
+        raise cmdb_http_error(exc) from exc
 
 
 __all__ = ["ci_out", "router", "version_out"]

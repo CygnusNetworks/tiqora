@@ -718,6 +718,63 @@
         "title": "AdminProcessOut",
         "type": "object"
       },
+      "AffectedOut": {
+        "properties": {
+          "ci_count": {
+            "title": "Ci Count",
+            "type": "integer"
+          },
+          "customer_count": {
+            "title": "Customer Count",
+            "type": "integer"
+          },
+          "customers": {
+            "items": {
+              "$ref": "#/components/schemas/CmdbNamedRefOut"
+            },
+            "title": "Customers",
+            "type": "array"
+          },
+          "open_ticket_count": {
+            "title": "Open Ticket Count",
+            "type": "integer"
+          },
+          "open_tickets": {
+            "items": {
+              "$ref": "#/components/schemas/CiTicketOut"
+            },
+            "title": "Open Tickets",
+            "type": "array"
+          },
+          "service_count": {
+            "title": "Service Count",
+            "type": "integer"
+          },
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/CmdbNamedRefOut"
+            },
+            "title": "Services",
+            "type": "array"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ci_count",
+          "services",
+          "service_count",
+          "customers",
+          "customer_count",
+          "open_tickets",
+          "open_ticket_count",
+          "truncated"
+        ],
+        "title": "AffectedOut",
+        "type": "object"
+      },
       "AgentCustomerCreateOut": {
         "description": "Created customer-user ref for the ticket Kunde dialog.",
         "properties": {
@@ -10760,6 +10817,59 @@
         "title": "CiStatesOut",
         "type": "object"
       },
+      "CiTicketOut": {
+        "properties": {
+          "link_type": {
+            "title": "Link Type",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          },
+          "open": {
+            "title": "Open",
+            "type": "boolean"
+          },
+          "queue_id": {
+            "title": "Queue Id",
+            "type": "integer"
+          },
+          "queue_name": {
+            "title": "Queue Name",
+            "type": "string"
+          },
+          "state_name": {
+            "title": "State Name",
+            "type": "string"
+          },
+          "state_type": {
+            "title": "State Type",
+            "type": "string"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "number",
+          "title",
+          "queue_id",
+          "queue_name",
+          "state_name",
+          "state_type",
+          "open",
+          "link_type"
+        ],
+        "title": "CiTicketOut",
+        "type": "object"
+      },
       "CiUpdateIn": {
         "properties": {
           "attributes": {
@@ -20062,6 +20172,156 @@
           "login_url"
         ],
         "title": "IdentityTestStartOut",
+        "type": "object"
+      },
+      "ImpactEdgeOut": {
+        "properties": {
+          "link_type": {
+            "title": "Link Type",
+            "type": "string"
+          },
+          "propagates": {
+            "title": "Propagates",
+            "type": "boolean"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "target",
+          "link_type",
+          "propagates"
+        ],
+        "title": "ImpactEdgeOut",
+        "type": "object"
+      },
+      "ImpactGraphOut": {
+        "properties": {
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactEdgeOut"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactNodeOut"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "root": {
+            "title": "Root",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "nodes",
+          "edges",
+          "truncated",
+          "root"
+        ],
+        "title": "ImpactGraphOut",
+        "type": "object"
+      },
+      "ImpactNodeOut": {
+        "description": "A graph node. A hidden CI carries only ``id``, ``kind``, ``hidden`` and ``depth``.",
+        "properties": {
+          "ci_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ci Id"
+          },
+          "class_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Key"
+          },
+          "depth": {
+            "title": "Depth",
+            "type": "integer"
+          },
+          "hidden": {
+            "title": "Hidden",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "incident_functionality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incident Functionality"
+          },
+          "kind": {
+            "enum": [
+              "ci",
+              "service"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "hidden",
+          "depth"
+        ],
+        "title": "ImpactNodeOut",
         "type": "object"
       },
       "ImportIssueOut": {
@@ -82959,6 +83219,80 @@
         ]
       }
     },
+    "/api/v1/cmdb/cis/{ci_id}/affected": {
+      "get": {
+        "operationId": "ci_affected_api_v1_cmdb_cis__ci_id__affected_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ci_id",
+            "required": true,
+            "schema": {
+              "title": "Ci Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AffectedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ci Affected",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
     "/api/v1/cmdb/cis/{ci_id}/attachments": {
       "get": {
         "operationId": "list_ci_attachments_api_v1_cmdb_cis__ci_id__attachments_get",
@@ -83229,6 +83563,273 @@
           }
         },
         "summary": "History",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/cis/{ci_id}/impact": {
+      "get": {
+        "operationId": "ci_impact_api_v1_cmdb_cis__ci_id__impact_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ci_id",
+            "required": true,
+            "schema": {
+              "title": "Ci Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "depth",
+            "required": false,
+            "schema": {
+              "default": 2,
+              "maximum": 5,
+              "minimum": 1,
+              "title": "Depth",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "default": "both",
+              "enum": [
+                "both",
+                "up",
+                "down"
+              ],
+              "title": "Direction",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImpactGraphOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ci Impact",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/cis/{ci_id}/links": {
+      "get": {
+        "operationId": "ci_links_api_v1_cmdb_cis__ci_id__links_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ci_id",
+            "required": true,
+            "schema": {
+              "title": "Ci Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LinkOut"
+                  },
+                  "title": "Response Ci Links Api V1 Cmdb Cis  Ci Id  Links Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ci Links",
+        "tags": [
+          "cmdb"
+        ]
+      }
+    },
+    "/api/v1/cmdb/cis/{ci_id}/tickets": {
+      "get": {
+        "operationId": "ci_tickets_api_v1_cmdb_cis__ci_id__tickets_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ci_id",
+            "required": true,
+            "schema": {
+              "title": "Ci Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "open_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Open Only",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CiTicketOut"
+                  },
+                  "title": "Response Ci Tickets Api V1 Cmdb Cis  Ci Id  Tickets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ci Tickets",
         "tags": [
           "cmdb"
         ]
