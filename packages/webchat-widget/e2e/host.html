@@ -9,7 +9,7 @@
     <!-- A hostile / over-eager site stylesheet: the widget must look and sit right anyway. -->
     <style>
       * { letter-spacing: 9px !important; line-height: 0 !important; }
-      body > div, button, span, svg, path, iframe {
+      body > div, button:not([data-e2e]), span, svg, path, iframe {
         transform: scale(0.1) rotate(45deg) !important;
         opacity: 0 !important;
         visibility: hidden !important;
@@ -41,6 +41,25 @@
   <body>
     <h1>Our shop</h1>
     <p>Some page content that is none of the chat's business.</p>
+    <!-- Sign-in controls of the customer site; the mock server accepts these "signed" tokens. -->
+    <p>
+      <button data-e2e id="identify" type="button">Sign in</button>
+      <button data-e2e id="identify-other" type="button">Sign in as someone else</button>
+      <button data-e2e id="identify-bad" type="button">Sign in with a bad token</button>
+      <button data-e2e id="logout" type="button">Sign out</button>
+    </p>
+    <script>
+      var TOKENS = {
+        identify: "e30.eyJuYW1lIjoiRXJpa2EgTXVzdGVyIiwic3ViIjoiY3VzdC0xIn0.mocksig",
+        "identify-other": "e30.eyJuYW1lIjoiSGFucyBCZWlzcGllbCIsInN1YiI6ImN1c3QtMiJ9.mocksig",
+        "identify-bad": "e30.eyJuYW1lIjoiRXJpa2EgTXVzdGVyIiwic3ViIjoiY3VzdC0xIn0.badsig",
+      };
+      document.addEventListener("click", function (ev) {
+        var id = ev.target && ev.target.id;
+        if (id === "logout") window.Tiqora.chat.logout();
+        else if (TOKENS[id]) window.Tiqora.chat.identify(TOKENS[id]);
+      });
+    </script>
     <script
       src="http://127.0.0.1:5190/chat/v1/loader.js"
       data-tiqora-chat="wc_e2ekey"

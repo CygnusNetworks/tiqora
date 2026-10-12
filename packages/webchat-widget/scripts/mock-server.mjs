@@ -9,6 +9,14 @@
  *         http://localhost:5191 so it is cross-SITE to 127.0.0.1:5190
  *   5192  a host page that is NOT allowed (same HTML; the frame refuses it)
  *
+ * Chat assistant (Task 14): POST /__test/bot {on, hold} makes new sessions start in status
+ * `bot` (intro line, "typing" ping with who=bot, then one scripted bot line after every
+ * visitor line; `hold` parks the bot lines until POST /__test/bot-release). The visitor may
+ * POST /handoff. Sign-in: a token is `<hdr>.<base64url JSON {name, sub}>.mocksig`
+ * (`.mocksig` verifies, anything else is invalid_identity); POST /sessions {identity},
+ * POST /sessions/:id/identify and POST /identity/portal (404 until /__test/portal sets a
+ * portal customer) answer like the backend, including 409 identity_conflict for another customer.
+ *
  * Run `pnpm build` first. State is in memory; POST /__test/reset clears it.
  */
 import { randomBytes, randomUUID } from "node:crypto";
@@ -27,6 +35,7 @@ const TIQORA = `http://127.0.0.1:${TIQORA_PORT}`;
 // localhost vs 127.0.0.1 are different SITES, so the widget runs as a real third-party frame.
 const ALLOWED_ORIGIN = `http://localhost:${ALLOWED_PORT}`;
 const KEY = "wc_e2ekey";
+const BOT_NAME = "Robin";
 const UPLOAD_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 
 if (!existsSync(join(dist, "loader.js")) || !existsSync(join(dist, "frame.html"))) {
@@ -48,6 +57,25 @@ let offline = false;
 let lastSession = null;
 const stats = { frame200: 0, assets: 0 };
 const offlineMessages = [];
+let botMode = false;
+let botHold = false;
+/** @type {(() => void)[]} */
+let heldBotLines = [];
+let botLines = 0;
+let portal = null;
+
+/** The mock's "signed" identity: `<hdr>.<base64url JSON {name, sub}>.mocksig`; null when invalid. */
+function parseIdentity(token) {
+  if (typeof token !== "string") return null;
+  const parts = token.split(".");
+  if (parts.length !== 3 || parts[2] !== "mocksig") return null;
+  try {
+    const o = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+    return typeof o?.sub === "string" ? { sub: o.sub, name: typeof o.name === "string" ? o.name : null } : null;
+  } catch {
+    return null;
+  }
+}
 
 function resetState() {
   for (const s of sessions.values()) for (const r of s.streams) r.destroy();
@@ -57,6 +85,11 @@ function resetState() {
   stats.frame200 = 0;
   stats.assets = 0;
   offlineMessages.length = 0;
+  botMode = false;
+  botHold = false;
+  heldBotLines = [];
+  botLines = 0;
+  portal = null;
 }
 
 const json = (res, status, body, headers = {}) => {
@@ -138,7 +171,7 @@ function serveFrame(req, res, url) {
 
 // ---- chat API --------------------------------------------------------------------------
 
-const live = (s) => s.status === "waiting" || s.status === "active";
+const live = (s) => s.status === "waiting" || s.status === "active" || s.status === "bot";
 
 function config() {
   return {
@@ -148,6 +181,8 @@ function config() {
     topics: [{ key: "general", label: "Allgemein", online: !offline }],
     online: !offline,
     offline_mode: "form",
+    portal_identity: portal !== null,
+    bot_name: BOT_NAME,
     prechat_fields: [
       { key: "name", kind: "text", label: "Name", required: true, options: [] },
       { key: "email", kind: "email", label: "E-Mail", required: false, options: [] },
@@ -182,7 +217,25 @@ function pushEvent(s, event, data, id) {
   for (const r of s.streams) writeEvent(r, event, data, id);
 }
 function sessionEvent(s) {
-  pushEvent(s, "session", { status: s.status, agent_name: s.agent_name });
+  pushEvent(s, "session", {
+    status: s.status,
+    agent_name: s.agent_name,
+    ...(s.status === "bot" ? { bot_name: BOT_NAME } : {}),
+  });
+}
+
+/** One scripted AI answer to the latest visitor line: a typing ping, then the line. */
+function botTurn(s) {
+  if (s.status !== "bot") return;
+  s.botPending = true;
+  pushEvent(s, "typing", { who: "bot" }); // a stream that connects later is told on connect
+  const answer = () => {
+    s.botPending = false;
+    if (s.status !== "bot") return;
+    addMessage(s, { sender: "bot", agent_name: BOT_NAME, body: `Das beantworte ich gern (${++botLines}).` });
+  };
+  if (botHold) heldBotLines.push(answer);
+  else setTimeout(answer, 250);
 }
 
 function sessionOut(s) {
@@ -194,6 +247,9 @@ function sessionOut(s) {
     can_send: live(s),
     needs_contact: false,
     last_seq: s.messages.length,
+    identified_as: s.identity?.name ?? null,
+    bot_name: s.status === "bot" ? BOT_NAME : null,
+    can_handoff: s.status === "bot",
   };
 }
 
@@ -243,10 +299,16 @@ async function api(req, res, url) {
     const b = await readJson(req);
     if (b.key !== KEY) return notFound(res);
     if (!b.message) return json(res, 422, { detail: "invalid_prechat", errors: { message: "required" } });
+    let identity = null;
+    if (b.identity != null) {
+      identity = parseIdentity(b.identity);
+      if (!identity) return json(res, 422, { detail: "invalid_identity" });
+    }
     const s = {
       id: randomUUID(),
       token: randomBytes(24).toString("base64url"),
-      status: "waiting",
+      status: botMode ? "bot" : "waiting",
+      identity,
       agent_name: null,
       messages: [],
       files: new Map(),
@@ -255,7 +317,16 @@ async function api(req, res, url) {
     sessions.set(s.id, s);
     lastSession = s.id;
     const message = addMessage(s, { sender: "visitor", body: String(b.message), client_id: b.client_id ?? null });
+    if (s.status === "bot") {
+      addMessage(s, { sender: "system", code: "bot_intro", params: { name: BOT_NAME, notice: null } });
+      botTurn(s);
+    }
     return json(res, 200, { session_id: s.id, token: `${s.id}.${s.token}`, status: s.status, message });
+  }
+
+  if (method === "POST" && path === "/identity/portal") {
+    if (portal === null) return notFound(res);
+    return json(res, 200, { identity: portal.token, name: portal.name });
   }
 
   const m = /^\/sessions\/([^/]+)(\/.*)?$/.exec(path);
@@ -276,7 +347,29 @@ async function api(req, res, url) {
     const b = await readJson(req);
     if (!live(s)) return json(res, 404, { detail: "disabled" });
     const dup = s.messages.find((x) => b.client_id && x.client_id === b.client_id);
-    return json(res, 200, dup ?? addMessage(s, { sender: "visitor", body: String(b.body ?? ""), client_id: b.client_id ?? null }));
+    if (dup) return json(res, 200, dup);
+    const msg = addMessage(s, { sender: "visitor", body: String(b.body ?? ""), client_id: b.client_id ?? null });
+    botTurn(s);
+    return json(res, 200, msg);
+  }
+
+  if (method === "POST" && sub === "/identify") {
+    const b = await readJson(req);
+    const who = parseIdentity(b.identity);
+    if (!who) return json(res, 422, { detail: "invalid_identity" });
+    if (s.identity && s.identity.sub !== who.sub) return json(res, 409, { detail: "identity_conflict" });
+    s.identity = who;
+    res.writeHead(204, { "Cache-Control": "no-store" });
+    return res.end();
+  }
+
+  if (method === "POST" && sub === "/handoff") {
+    if (s.status !== "bot") return json(res, 409, { detail: "not_bot" });
+    s.status = "waiting";
+    addMessage(s, { sender: "system", code: "handoff", params: { reason: "visitor" } });
+    sessionEvent(s);
+    res.writeHead(204, { "Cache-Control": "no-store" });
+    return res.end();
   }
 
   if (method === "POST" && sub === "/typing") return json(res, 200, {});
@@ -317,6 +410,7 @@ async function api(req, res, url) {
     const last = Number(req.headers["last-event-id"]) || 0;
     for (const msg of s.messages) if (msg.seq > last) writeEvent(res, "message", msg, msg.seq);
     s.streams.add(res);
+    if (s.botPending) writeEvent(res, "typing", { who: "bot" });
     const beat = setInterval(() => res.write(": hb\n\n"), 10_000);
     res.on("close", () => {
       clearInterval(beat);
@@ -333,6 +427,15 @@ async function testHook(req, res, url) {
   if (p === "/__test/health") return json(res, 200, { ok: true });
   if (req.method === "GET" && p === "/__test/stats") return json(res, 200, stats);
   if (req.method === "GET" && p === "/__test/last-session") return json(res, 200, { session_id: lastSession });
+  if (req.method === "GET" && p === "/__test/session") {
+    const s = sessions.get(lastSession);
+    if (!s) return notFound(res);
+    return json(res, 200, {
+      status: s.status,
+      identity: s.identity,
+      messages: s.messages.map(({ seq, sender, code, body }) => ({ seq, sender, code, body })),
+    });
+  }
   if (req.method === "GET" && p === "/__test/offline-messages") return json(res, 200, offlineMessages);
   if (req.method !== "POST") return notFound(res);
   const b = await readJson(req);
@@ -342,6 +445,22 @@ async function testHook(req, res, url) {
   }
   if (p === "/__test/offline") {
     offline = !!b.on;
+    return json(res, 200, {});
+  }
+  if (p === "/__test/bot") {
+    botMode = !!b.on;
+    botHold = !!b.hold;
+    return json(res, 200, {});
+  }
+  if (p === "/__test/bot-release") {
+    const run = heldBotLines;
+    heldBotLines = [];
+    botHold = false;
+    for (const answer of run) answer();
+    return json(res, 200, { released: run.length });
+  }
+  if (p === "/__test/portal") {
+    portal = b.token ? { token: String(b.token), name: b.name ?? null } : null;
     return json(res, 200, {});
   }
   if (p === "/__test/drop-streams") {
