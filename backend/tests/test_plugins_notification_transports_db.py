@@ -321,6 +321,18 @@ async def test_failing_transport_counted(env: Env) -> None:
     assert len(_chat_calls()) == 2  # every recipient was tried
 
 
+class _RaisingSender:
+    async def send(self, message: Any, *, envelope_from: str | None = None) -> None:
+        raise OSError("relay down")
+
+
+async def test_mail_failure_still_delivers_via_plugin(env: Env) -> None:
+    env.sender = _RaisingSender()  # type: ignore[assignment]
+    sent, failed = await env.run(["Email", CHAT])
+    assert (sent, failed) == (2, 2)  # both chat messages out, both mails failed
+    assert len(_chat_calls()) == 2
+
+
 async def test_hanging_transport_bounded(env: Env) -> None:
     points_behaviour().MODE["transport"] = "hang"
     started = time.monotonic()

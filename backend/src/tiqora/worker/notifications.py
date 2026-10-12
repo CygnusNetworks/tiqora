@@ -1085,6 +1085,17 @@ async def process_event(
                         time_zone=zone,
                     )
                     contexts[(recipient.kind, zone)] = base_context
+            except Exception:  # noqa: BLE001 — no context, nothing can be rendered for this one
+                logger.exception(
+                    "notification_send_failed",
+                    notification_id=notification.id,
+                    ticket_id=ticket_id,
+                    recipient=recipient.email,
+                )
+                failed += 1
+                NOTIFICATIONS_ERRORS.inc()
+                continue
+            try:
                 if email_on and await _send_to_recipient(
                     session,
                     sysconfig,
@@ -1107,7 +1118,7 @@ async def process_event(
                 )
                 failed += 1
                 NOTIFICATIONS_ERRORS.inc()
-                continue
+                # falls through: the plugin transports are independent of the mail result
             if not plugin_transports or ticket_summary is None:
                 continue
             # Plugin transports run after the mail: a failed mail never keeps the chat message
@@ -1135,7 +1146,7 @@ async def process_event(
                     recipient=recipient.email,
                 )
                 failed += len(plugin_transports)
-                NOTIFICATIONS_ERRORS.inc()
+                NOTIFICATIONS_ERRORS.inc(len(plugin_transports))
 
     return sent, failed
 
