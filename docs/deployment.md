@@ -419,6 +419,16 @@ https://znuny.example.com/             → existing Znuny (until cutover)
 WebSocket/SSE: ensure proxy timeouts allow long-lived MCP SSE and UI event
 streams (no aggressive idle kills).
 
+## Wallboard links
+
+Dashboards can be shown on screens without a login (`/wallboard#<token>`, see
+[dashboards.md](dashboards.md#wallboard-und-tv-modus)). Nothing needs to be configured, and nginx needs no
+change: the secret is a URL fragment (never sent to a server) that the page forwards in the
+`X-Tiqora-Kiosk` header. The links need Redis (data cache and rate limiting). Behind a reverse proxy set
+`TIQORA_TRUSTED_PROXIES` and `TIQORA_FORWARDED_ALLOW_IPS` as for the web chat; otherwise every screen
+shares one address and one rate-limit bucket (240 requests per minute). Report tiles on a wallboard need
+the report result cache, i.e. Redis as well.
+
 ## Web chat
 
 The web chat (see the [admin and agent guide](guide/webchat.md)) is served by `tiqora-api` itself: the loader

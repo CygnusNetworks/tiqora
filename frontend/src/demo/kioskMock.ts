@@ -36,10 +36,15 @@ export interface DemoKioskOptions {
   showDetails?: boolean;
 }
 
-function widgetView(row: { id: string; type_key: string; type_version: number; layout: KioskWidget["layout"]; settings?: Record<string, unknown> }): KioskWidget {
+function widgetView(
+  row: { id: string; type_key: string; type_version: number; layout: KioskWidget["layout"]; settings?: Record<string, unknown>; title_override?: string | null },
+  showDetails = false,
+): KioskWidget {
   const allowed = KIOSK_SETTINGS_WHITELIST[row.type_key] ?? [];
   const settings = Object.fromEntries(Object.entries(row.settings ?? {}).filter(([k]) => allowed.includes(k)));
-  return { id: row.id, type_key: row.type_key, type_version: row.type_version, layout: row.layout, settings };
+  // A custom title may name a customer, so it only leaves with details (like the backend's `kiosk_title`).
+  const title = showDetails && row.title_override ? { title_override: row.title_override } : {};
+  return { id: row.id, type_key: row.type_key, type_version: row.type_version, layout: row.layout, settings, ...title };
 }
 
 /** The board of a demo link: every dashboard of the store, widgets reduced to what renders. */
@@ -52,7 +57,7 @@ export function demoKioskBoard(store: DemoDashboards, options: DemoKioskOptions 
     server_time: new Date().toISOString(),
     dashboards: store.list().map((tab) => {
       const d = store.get(tab.id);
-      return { id: d.id, name: d.name, filters: d.filters, widgets: d.widgets.map(widgetView) };
+      return { id: d.id, name: d.name, filters: d.filters, widgets: d.widgets.map((w) => widgetView(w, options.showDetails)) };
     }),
   };
 }
@@ -81,7 +86,7 @@ export function resolveKiosk(
   const widgets = Object.fromEntries(
     board.widgets.map((w) => {
       const full = store.get(board.id).widgets.find((x) => x.id === w.id);
-      const data = KIOSK_SETTINGS_WHITELIST[w.type_key] && full ? demoWidgetData(w.type_key, full.settings ?? {}) : undefined;
+      const data = KIOSK_SETTINGS_WHITELIST[w.type_key] && full ? demoWidgetData(w.type_key, full.settings ?? {}, board.filters?.queue_ids) : undefined;
       return [w.id, data ?? { status: "forbidden" as const, error: MSG_HIDDEN }];
     }),
   );

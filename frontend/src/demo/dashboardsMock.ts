@@ -246,10 +246,15 @@ function escalationItems(): { ticket: Item; epoch: number; kind: EscalationKind 
  * views, queues, notes, links, plugin widgets) - such widgets are absent from a batch like in
  * the real API.
  */
-export function demoWidgetData(key: string, settings: Settings = {}): WidgetResult | undefined {
+export function demoWidgetData(key: string, settings: Settings = {}, queueIds: number[] = []): WidgetResult | undefined {
+  // The demo has no query engine: a queue filter narrows the preset's tickets by their queue, and a
+  // counter then shows that count (without the sample trend, which belongs to the unfiltered number).
+  const narrow = (items: Item[]) => (queueIds.length > 0 ? items.filter((i) => queueIds.includes(i.queue_id)) : items);
   switch (key) {
     case "core.counter": {
-      const c = COUNTERS[customSource(settings) ? "mine_open" : presetOf(settings)];
+      const preset = customSource(settings) ? "mine_open" : presetOf(settings);
+      const c = COUNTERS[preset];
+      if (queueIds.length > 0) return { status: "ok", data: { value: narrow(PRESET_ITEMS[preset]).length, delta: null, spark: [] } };
       return { status: "ok", data: { value: c.value, delta: c.delta, spark: [...c.spark] } };
     }
     case "core.ticket-list": {
@@ -258,7 +263,7 @@ export function demoWidgetData(key: string, settings: Settings = {}): WidgetResu
       if (src?.kind === "saved_search" && src.id === GONE_SAVED_SEARCH_ID) {
         return { status: "forbidden", error: "Diese Suche ist für Sie nicht freigegeben." };
       }
-      const all = PRESET_ITEMS[customSource(settings) ? "mine_open" : presetOf(settings)];
+      const all = narrow(PRESET_ITEMS[customSource(settings) ? "mine_open" : presetOf(settings)]);
       return { status: "ok", data: { items: all.slice(0, limitOf(settings, 8)), total: all.length } };
     }
     case "core.escalations": {
@@ -429,7 +434,8 @@ function demoDrill(row: DashboardWidgetRow, query: DrillQuery = {}): DrillPage {
     title,
     items: all.slice(offset, offset + limit),
     total: all.length,
-    filter: null,
+    // What the list is filtered by, so "Als Suche speichern" has conditions to hand over (a chart point has none).
+    filter: point ? null : { version: 1, where: { all: [{ field: "owner_id", op: "eq", value: 1 }, { field: "state_type", op: "in", value: ["new", "open"] }] } },
     note: point ? "Berichtsdaten können wenige Minuten hinter der Liste zurückliegen." : null,
   };
 }
@@ -621,14 +627,14 @@ export function createDemoDashboards(options: DemoDashboardsOptions = {}) {
       const out: Record<string, WidgetResult> = {};
       for (const w of d.widgets) {
         if (widgetIds && widgetIds.length > 0 && !widgetIds.includes(w.id)) continue;
-        const result = demoWidgetData(w.type_key, w.settings ?? {});
+        const result = demoWidgetData(w.type_key, w.settings ?? {}, d.filters?.queue_ids);
         if (result) out[w.id] = result;
       }
       return { widgets: out };
     },
     widgetData(id: number, widgetId: string): WidgetResult {
       const row = find(id).widgets.find((w) => w.id === widgetId);
-      const result = row ? demoWidgetData(row.type_key, row.settings ?? {}) : undefined;
+      const result = row ? demoWidgetData(row.type_key, row.settings ?? {}, find(id).filters?.queue_ids) : undefined;
       if (!result) throw notFound();
       return result;
     },

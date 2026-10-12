@@ -160,6 +160,7 @@ test("a widget of an unknown type shows the unavailable tile and survives a save
     id: "e2e-gone",
     type_key: "org.example.gone",
     type_version: 1,
+    pinned: false,
     title_override: null,
     settings: { keep: "me" },
     layout: { lg: { x: 0, y: 0, w: 6, h: 3 } },

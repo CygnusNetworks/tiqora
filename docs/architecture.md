@@ -623,6 +623,39 @@ User guide: [dashboards.md](dashboards.md).
   on the client side; a cancelled connection is invalidated instead of pooled, and a batch ends
   after 20 s with the unfinished widgets `pending`. Counter samples older than 35 days are
   purged by the first sample write of each UTC day.
+- **Phase 2: filters, report seam, drill, kiosk.**
+  - *Filters.* `tiqora_dashboard.filters` (JSON: `queue_ids`, `time_range`), changed by
+    `PATCH /dashboards/{id}/filters` with the dashboard `version`. `resolve_source(..., queue_ids)`
+    narrows the viewer's `TicketQueryScope` (`scope.queue_ids & queue_ids`) in one place, so counters,
+    lists and drill all inherit it; an empty intersection compiles to zero rows. Widgets can opt out
+    (`pinned`).
+  - *Report seam.* `core.report` and its siblings call the reporting engine (`reporting/`) as the
+    viewer under `QueryBudget`; the runner passes its loop deadline (`ProviderContext.deadline`).
+    Above the inline row threshold the answer is `deferred` and the widget starts a reporting job
+    (`POST /dashboards/{id}/widgets/{id}/report-job`), polling it with `useJob`. Report providers do
+    not leave a changed `max_statement_time` behind.
+  - *Drill.* `GET /dashboards/{id}/widgets/{id}/tickets` returns the tickets and the `TicketFilter` behind
+    a tile (only ids and a chart point travel in the URL); queries run under a statement timeout
+    (503 with a German hint on timeout). The frontend hands the filter to the saved-search editor in
+    router state.
+  - *Template update.* `get_dashboard` adds `template_update` (a hint) for editors of template copies;
+    `GET/POST /dashboards/{id}/template-update` previews and merges or dismisses. `/data` never reads
+    templates.
+  - *Kiosk.* `tiqora_dashboard_kiosk_token` and `tiqora_dashboard_kiosk_item` (hash of a random token, rotation,
+    details flag, expiry, revocation, and the dashboards of the link; migration `20261010_0075`). `/api/v1/kiosk/*` is unauthenticated
+    (`/api/v1/kiosk` is in `_UNSCOPED_EXEMPT_PREFIXES`), reads the token from `X-Tiqora-Kiosk`, answers
+    one 404 for every failure, always sends `Cache-Control: no-store` and `Referrer-Policy: no-referrer`,
+    and is rate limited per address (240/min) and per misses (30/10 min) through Redis; behind a proxy
+    `trusted_proxies` decides the address. Widgets run as the link creator, but only types with a rule
+    in `KIOSK_RULES` run at all. Results are cached 20 s per link and dashboard version (5 s with
+    `pending` widgets), computed under a lock while waiters poll, and the last good value per widget is
+    kept for 6 h and merged into `pending` ones.
+  - *Redaction whitelist.* `KIOSK_SETTINGS_WHITELIST` lists the settings keys per widget type that may
+    leave (for example counter `tone`, ticket list `columns`/`limit`/`density`/`sort`, report
+    `display`/`max_rows`); never `source`, notes, links, `parameters` or `report_key`. Without details,
+    ticket fields are cut to a fixed subset and report definitions keep only what the view needs.
+    A pure test walks a board with every core widget type and a filter holding `customer_user_id` and
+    asserts nothing outside the whitelist leaves.
 
 ### Calendar / appointments
 
