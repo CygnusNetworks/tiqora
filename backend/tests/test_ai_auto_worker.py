@@ -11,15 +11,17 @@ imported) so no real HTTP call is ever made.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
 
 import pytest
 import structlog.testing
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, delete, select, text, update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from tests._llm_routing_helpers import make_model, routing_cleanup_statements, setup_agent_llm
+from tests._row_cleanup import delete_above_marks, snapshot_marks
 from tests.test_ai_runtime import ScriptedLlm, _propose_response
 from tiqora.ai import policies as ai_policies
 from tiqora.ai import providers as ai_providers
@@ -35,6 +37,7 @@ from tiqora.ai.llm import LlmClient
 from tiqora.ai.models import AUTONOMY_FULL, AUTONOMY_OFF, TiqoraAiTicketState, TiqoraLlmProvider
 from tiqora.config import get_settings
 from tiqora.db.tiqora.base import TiqoraBase
+from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.domain.settings_store import (
     KEY_AI_GLOBAL_REPLIES_PER_HOUR,
     KEY_AI_OUTBOX_WATERMARK,
@@ -1407,11 +1410,109 @@ async def test_outbox_tick_still_skips_webchat(
 _PLUGIN_CHANNEL = "Plugin_points_Chat"
 
 
+#: seed namespaces of the plugin-channel tests (``_seed_ticket(ns=…)``)
+_F36_NS = (83, 84, 85)
+#: autoincrement tables the plugin-channel tests write, children first (delete order)
+_F36_MARKED = (
+    "tiqora_ai_audit_log",
+    "tiqora_ai_usage",
+    "tiqora_ai_draft",
+    "tiqora_ai_queue_task_profile",
+    "tiqora_ai_queue_policy",
+    "tiqora_llm_profile_entry",
+    "tiqora_llm_profile",
+    "tiqora_llm_model",
+    "tiqora_llm_provider",
+    "tiqora_event_outbox",
+    "tiqora_cache_invalidation",
+    "ticket_history",
+    "article_data_mime_attachment",
+    "article_data_mime",
+    "article",
+)
+
+
+def _settings_rows(sync_url: str) -> dict[str, str | None]:
+    engine = create_engine(sync_url)
+    try:
+        with engine.begin() as conn:
+            rows = conn.execute(select(TiqoraSettings.key, TiqoraSettings.value)).all()
+        return {str(k): v for k, v in rows}
+    finally:
+        engine.dispose()
+
+
+def _restore_settings(sync_url: str, before: dict[str, str | None]) -> None:
+    """Put ``tiqora_settings`` back as it was: new keys go, changed values come back (the
+    MariaDB-only tests of this module share the table, so a key may have existed before)."""
+    after = _settings_rows(sync_url)
+    engine = create_engine(sync_url)
+    try:
+        with engine.begin() as conn:
+            added = [k for k in after if k not in before]
+            if added:
+                conn.execute(delete(TiqoraSettings).where(TiqoraSettings.key.in_(added)))
+            for key, value in before.items():
+                if key in after and after[key] != value:
+                    conn.execute(
+                        update(TiqoraSettings).where(TiqoraSettings.key == key).values(value=value)
+                    )
+    finally:
+        engine.dispose()
+
+
+def _delete_f36_rows(sync_url: str, marks: dict[str, int]) -> None:
+    """Everything the plugin-channel tests committed (m8): the rows keyed by the seed's fixed
+    ids and the tables without an ``id`` column by those ids, the autoincrement tables above
+    the marks (children first), then the seeded Znuny rows."""
+    agents = queues = [9800 + ns for ns in _F36_NS]  # _seed_ticket: same numbers
+    groups = [9830 + ns for ns in _F36_NS]
+    tickets = [9870 + ns for ns in _F36_NS]
+
+    def ids(values: list[int]) -> str:
+        return ", ".join(str(v) for v in values)
+
+    delete_above_marks(
+        sync_url,
+        marks,
+        first=[
+            (f"DELETE FROM tiqora_ai_article_origin WHERE queue_id IN ({ids(queues)})", {}),
+            (f"DELETE FROM tiqora_ai_ticket_state WHERE ticket_id IN ({ids(tickets)})", {}),
+        ],
+    )
+    delete_above_marks(
+        sync_url,
+        {},
+        first=[
+            (f"DELETE FROM ticket WHERE id IN ({ids(tickets)})", {}),
+            (f"DELETE FROM queue WHERE id IN ({ids(queues)})", {}),
+            (
+                f"DELETE FROM group_user WHERE user_id IN ({ids(agents)})"
+                f" OR group_id IN ({ids(groups)})",
+                {},
+            ),
+            (f"DELETE FROM permission_groups WHERE id IN ({ids(groups)})", {}),
+            (f"DELETE FROM users WHERE id IN ({ids(agents)})", {}),
+        ],
+    )
+
+
 @pytest.fixture(params=["mariadb_znuny_url", "postgres_znuny_url"])
-def plugin_db_url(request: pytest.FixtureRequest) -> str:
-    """The plugin-channel tests run on both dialects (the rest of the module is MariaDB-only)."""
+def plugin_db_url(request: pytest.FixtureRequest) -> Iterator[str]:
+    """The plugin-channel tests run on both dialects (the rest of the module is MariaDB-only).
+
+    They clean up after themselves (m8): marks and settings are taken before the test and
+    everything above them is deleted afterwards, after the test's own ``_drop_plugin_channel``.
+    """
     url: str = request.getfixturevalue(request.param)
-    return url
+    engine = create_engine(url)
+    TiqoraBase.metadata.create_all(engine)  # as _seed_ticket does; the marks need the tables
+    engine.dispose()
+    marks = snapshot_marks(url, _F36_MARKED)
+    settings_before = _settings_rows(url)
+    yield url
+    _delete_f36_rows(url, marks)
+    _restore_settings(url, settings_before)
 
 
 def _put_article_on_plugin_channel(
