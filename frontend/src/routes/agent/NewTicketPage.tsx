@@ -296,12 +296,14 @@ export function NewTicketPage() {
         full_name: `${c.first_name} ${c.last_name}`.trim() || c.login,
       });
     },
+    // The backend's German reason first (a 409 has seven: login taken, invalid e-mail, …);
+    // the generic texts only when the response carried none.
     onError: (err) =>
       setExternalError(
-        err instanceof ApiError && err.status === 409
-          ? t("customers.external.conflict")
-          : err instanceof ApiError && err.message && !err.message.startsWith("HTTP ")
-            ? err.message
+        err instanceof ApiError && err.message && !err.message.startsWith("HTTP ")
+          ? err.message
+          : err instanceof ApiError && err.status === 409
+            ? t("customers.external.conflict")
             : t("customers.external.error"),
       ),
   });

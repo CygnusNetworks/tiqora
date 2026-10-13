@@ -82,6 +82,45 @@ describe("DynamicFieldsPage plugin types", () => {
     });
   });
 
+  it("says so when the plugin types cannot be loaded", async () => {
+    pluginTypes.mockRejectedValue(new Error("kaputt"));
+    renderPage();
+    fireEvent.click(await screen.findByTestId("admin-new-button"));
+    expect(await screen.findByTestId("dynamic-field-plugin-types-error")).toHaveTextContent(
+      "Die Feldarten der Erweiterungen konnten nicht geladen werden.",
+    );
+  });
+
+  it("shows the stored plugin type of a field whose plugin is switched off", async () => {
+    pluginTypes.mockResolvedValue([]); // the plugin no longer offers it
+    list.mockResolvedValue({
+      items: [
+        {
+          id: 5,
+          name: "Vertrag",
+          label: "Vertragsnummer",
+          field_order: 10,
+          field_type: "Text",
+          object_type: "Ticket",
+          internal_field: 0,
+          valid_id: 1,
+          create_time: null,
+          change_time: null,
+          // the stored config is not read: the API's plugin_type is the source
+          config: {},
+          plugin_type: "Plugin_points_Contract",
+        },
+      ],
+      total: 1,
+    });
+    renderPage();
+    fireEvent.click(await screen.findByTestId("admin-row-menu-trigger-5"));
+    fireEvent.click(await screen.findByTestId("admin-row-edit-5"));
+    const stored = await screen.findByTestId("dynamic-field-plugin-type-stored");
+    expect(stored).toHaveTextContent("Art aus Erweiterung: Plugin_points_Contract");
+    expect(stored).toHaveTextContent("Die Erweiterung ist derzeit nicht aktiv; das Feld verhält sich wie „Text“.");
+  });
+
   it("offers no plugin type select when no plugin brings one", async () => {
     pluginTypes.mockResolvedValue([]);
     renderPage();

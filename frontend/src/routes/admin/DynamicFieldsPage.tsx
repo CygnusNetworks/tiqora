@@ -29,7 +29,6 @@ const FIELD_TYPES = ["Text", "TextArea", "Checkbox", "Dropdown", "Multiselect", 
 const OBJECT_TYPES = ["Ticket", "Article", "CustomerUser", "CustomerCompany"];
 /** Plugin field types exist only for these objects (the backend answers 422 otherwise). */
 const PLUGIN_TYPE_OBJECTS = new Set(["Ticket", "Article"]);
-const PLUGIN_TYPE_KEY = "TiqoraPluginType";
 const PLUGIN_CONFIG_KEY = "TiqoraPluginConfig";
 
 type FormState = {
@@ -91,9 +90,9 @@ export function DynamicFieldsPage() {
     queryFn: ({ signal }) => pluginPointsApi.dfPluginTypes(signal),
   });
   const pluginTypes = pluginTypesQ.data ?? [];
-  // Create: the picked type. Edit: the type stored on the field (it cannot change).
-  const storedPluginType =
-    typeof editing?.config?.[PLUGIN_TYPE_KEY] === "string" ? (editing.config[PLUGIN_TYPE_KEY] as string) : "";
+  // Create: the picked type. Edit: the type stored on the field (it cannot change), as the API
+  // reports it — also when its plugin is switched off and no longer offers the type.
+  const storedPluginType = editing?.plugin_type ?? "";
   const activePluginType = pluginTypes.find((p) => p.key === (editing ? storedPluginType : form.plugin_type));
   const pluginSchema = activePluginType?.config_schema as JsonSchema | null | undefined;
 
@@ -321,7 +320,21 @@ export function DynamicFieldsPage() {
               </HelpPopover>
             </span>
             {editing ? (
-              <p className="text-sm text-ink">{form.field_type}</p>
+              <>
+                <p className="text-sm text-ink">{form.field_type}</p>
+                {storedPluginType && (
+                  <p className="mt-1 text-xs text-muted" data-testid="dynamic-field-plugin-type-stored">
+                    {t("admin.dynamicFields.pluginTypeStored", {
+                      type: activePluginType?.label ?? storedPluginType,
+                    })}
+                    {!activePluginType && !pluginTypesQ.isPending && (
+                      <span className="ml-1">
+                        {t("admin.dynamicFields.pluginTypeInactive", { base: form.field_type })}
+                      </span>
+                    )}
+                  </p>
+                )}
+              </>
             ) : (
               <SelectField
                 items={FIELD_TYPES.map((ft) => ({ value: ft as string, label: ft }))}
@@ -333,6 +346,11 @@ export function DynamicFieldsPage() {
             )}
           </div>
 
+          {!editing && pluginTypesQ.isError && PLUGIN_TYPE_OBJECTS.has(form.object_type) && (
+            <p role="alert" className="text-xs text-danger" data-testid="dynamic-field-plugin-types-error">
+              {t("admin.dynamicFields.pluginTypesLoadError")}
+            </p>
+          )}
           {!editing && pluginTypes.length > 0 && PLUGIN_TYPE_OBJECTS.has(form.object_type) && (
             <div>
               <span className={labelClass}>{t("admin.dynamicFields.pluginType")}</span>

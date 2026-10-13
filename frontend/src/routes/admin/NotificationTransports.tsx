@@ -18,11 +18,14 @@ export function NotificationTransports({
   transports,
   saving,
   onSave,
+  loadFailed = false,
 }: {
   current: string[];
   transports: NotificationTransport[];
   saving?: boolean;
   onSave: (next: string[]) => void;
+  /** The plugin transports could not be listed: say so instead of looking like "only e-mail". */
+  loadFailed?: boolean;
 }) {
   const { t } = useTranslation();
   const [selected, setSelected] = useState<string[]>(current.length ? current : [EMAIL]);
@@ -46,6 +49,11 @@ export function NotificationTransports({
     >
       <fieldset className="space-y-1.5">
         <legend className="mb-1 font-medium text-ink">{t("admin.notificationEvents.transports")}</legend>
+        {loadFailed && (
+          <p role="alert" className="text-xs text-danger" data-testid="notification-transports-load-error">
+            {t("admin.notificationEvents.transportsLoadError")}
+          </p>
+        )}
         {offered.map((o) => (
           <label key={o.key} className="flex items-center gap-2">
             <input

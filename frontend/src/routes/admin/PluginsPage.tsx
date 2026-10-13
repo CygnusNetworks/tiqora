@@ -194,6 +194,14 @@ function NumberGeneratorBox({ plugin }: { plugin: PluginAdmin }) {
     mutationFn: (key: string | null) => pluginPointsApi.setNumberGenerator(key),
     onSuccess: (data) => qc.setQueryData(NUMBER_GENERATORS_KEY, data),
   });
+  if (q.isError) {
+    // Not "nothing offered": the plugin registers generators, the list just failed to load.
+    return (
+      <p role="alert" className="mt-3 text-xs text-danger" data-testid={`plugin-number-generator-error-${plugin.id}`}>
+        {t("admin.plugins.numberGenerator.loadError")}
+      </p>
+    );
+  }
   const own = (q.data?.available ?? []).filter((g) => g.plugin_id === plugin.id);
   if (!q.data || own.length === 0) return null;
   const activeOwn = own.some((g) => g.key === q.data.active);

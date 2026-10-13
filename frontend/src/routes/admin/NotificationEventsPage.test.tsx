@@ -184,6 +184,18 @@ describe("NotificationEventsPage Versandwege", () => {
     });
   });
 
+  it("says so when the plugin transports cannot be loaded", async () => {
+    transports.mockRejectedValue(new Error("kaputt"));
+    list.mockResolvedValue([notification({ ...baseItems, Transports: ["Email", "Plugin_points_Chat"] })]);
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Versandwege" }));
+    expect(await screen.findByTestId("notification-transports-load-error")).toHaveTextContent(
+      "Die Versandwege der Erweiterungen konnten nicht geladen werden",
+    );
+    // the stored plugin key is still kept
+    expect(screen.getByTestId("notification-transport-unknown-Plugin_points_Chat")).toBeInTheDocument();
+  });
+
   it("blocks saving an empty Versandwege selection", async () => {
     transports.mockResolvedValue([{ key: "Email", label: "E-Mail", plugin_id: null }]);
     list.mockResolvedValue([notification({ ...baseItems, Transports: ["Email"] })]);

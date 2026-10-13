@@ -197,6 +197,7 @@ export function NotificationEventsPage() {
                 <NotificationTransports
                   current={r.items?.Transports ?? []}
                   transports={transportsQ.data ?? []}
+                  loadFailed={transportsQ.isError}
                   saving={transportsM.isPending}
                   onSave={(next) =>
                     transportsM.mutate({ id: r.id, items: { ...(r.items ?? {}), Transports: next } })

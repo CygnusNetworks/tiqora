@@ -307,6 +307,50 @@ describe("admin page registry", () => {
     expect(screen.queryByText("ai-worker")).not.toBeInTheDocument();
   });
 
+  it("says so when the ticket number schemes cannot be loaded", async () => {
+    numberGenerators.mockRejectedValue(new Error("kaputt"));
+    adminList.mockResolvedValue({
+      safe_mode: false,
+      plugins: [
+        adminPlugin({
+          capabilities: [{ kind: "extension_point", value: "core.tickets.number_generators" }],
+        }),
+      ],
+    });
+    renderPage();
+    expect(await screen.findByTestId("plugin-number-generator-error-org.example.hello")).toHaveTextContent(
+      "Die Ticketnummer-Schemata dieser Erweiterung konnten nicht geladen werden.",
+    );
+  });
+
+  it("shows the backend's refusal of a scheme (F14)", async () => {
+    const { ApiError } = await import("@/lib/api");
+    const reason =
+      "Dieses Schema zählt nicht wie das Znuny-Schema (Datum); bei gemeinsamem Zähler nicht möglich.";
+    numberGenerators.mockResolvedValue({
+      active: null,
+      znuny_generator: "AutoIncrement",
+      available: [
+        { key: "Plugin_points_Daily", label: "Tageszähler", plugin_id: "org.example.hello", example: "20261013-1" },
+      ],
+    });
+    setNumberGenerator.mockRejectedValue(
+      new ApiError(422, { detail: reason }, "/api/v1/admin/plugins/number-generators"),
+    );
+    adminList.mockResolvedValue({
+      safe_mode: false,
+      plugins: [
+        adminPlugin({
+          capabilities: [{ kind: "extension_point", value: "core.tickets.number_generators" }],
+        }),
+      ],
+    });
+    renderPage();
+    await screen.findByTestId("plugin-number-generator-org.example.hello");
+    fireEvent.click(screen.getByRole("button", { name: "Für neue Tickets verwenden" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(reason);
+  });
+
   it("switches the ticket number scheme", async () => {
     const generators = (active: string | null) => ({
       active,

@@ -253,12 +253,22 @@ describe("NewTicketPage", () => {
     expect(screen.getAllByText(/Erika Extern/).length).toBeGreaterThan(0);
   });
 
-  it("says so when the e-mail address belongs to another customer", async () => {
-    externalCustomerImport.mockRejectedValue(new ApiError(409, "conflict", "/api/v1/customers/external-import"));
+  it("shows the backend's reason for a conflict", async () => {
+    const reason = "Die Anmeldung „pp55-ext1“ gehört schon zu einem anderen Kunden.";
+    externalCustomerImport.mockRejectedValue(
+      new ApiError(409, { detail: reason }, "/api/v1/customers/external-import"),
+    );
+    fireEvent.click(await searchExternal());
+    const err = await screen.findByTestId("new-ticket-customer-external-error");
+    expect(err.textContent).toBe(reason);
+    expect(screen.queryByTestId("new-ticket-customer-clear")).toBeNull();
+  });
+
+  it("falls back to the conflict text when a 409 carries no reason", async () => {
+    externalCustomerImport.mockRejectedValue(new ApiError(409, null, "/api/v1/customers/external-import"));
     fireEvent.click(await searchExternal());
     const err = await screen.findByTestId("new-ticket-customer-external-error");
     expect(err.textContent).toBe(i18n.t("customers.external.conflict"));
-    expect(screen.queryByTestId("new-ticket-customer-clear")).toBeNull();
   });
 
   it("drops a stale import error once the search changes", async () => {
