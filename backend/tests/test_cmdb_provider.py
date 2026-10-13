@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import AsyncIterator
 from datetime import datetime
 
 import pytest
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests import _cmdb_helpers
 from tests._cmdb_helpers import (
     GROUP_HIDDEN,
+    GROUP_RO,
+    GROUP_RW,
     SERVICE_ID,
     SERVICE_ID_2,
     TICKET_CLOSED,
@@ -25,6 +29,7 @@ from tests._cmdb_helpers import (
     make_class,
     set_mode,
 )
+from tests.itsm_provider_contract import CiProviderContract, SeededCis
 from tiqora.cmdb.links import LinkEnd, LinkService
 from tiqora.cmdb.provider import TiqoraCiProvider, create_tiqora_provider, tiqora_provider_factory
 from tiqora.cmdb.service import CiService, system_access
@@ -47,7 +52,8 @@ from tiqora.itsm.ci_provider import (
     LinkTypeOption,
     ServiceIncidentState,
 )
-from tiqora.itsm.providers import CI_PROVIDERS
+from tiqora.itsm.mode import get_itsm_mode
+from tiqora.itsm.providers import CI_PROVIDERS, get_ci_provider, tiqora_cmdb_empty
 from tiqora.znuny.sysconfig import SysConfig
 
 pytestmark = pytest.mark.db
@@ -101,7 +107,7 @@ def test_dto_fields_match_contract() -> None:
         "created_by_name",
         "change_note",
     ]
-    assert names(CiPage) == ["items", "total"]
+    assert names(CiPage) == ["items", "total", "truncated"]  # itsm1 added truncated (additive)
     assert names(ServiceIncidentState) == ["service_id", "state", "cis_incident", "cis_warning"]
     assert names(LinkTypeOption) == ["name", "source_label", "target_label", "pointed"]
     assert names(CiClassInfo) == ["key", "name", "icon", "can_read", "can_write"]
@@ -214,6 +220,7 @@ async def test_search_by_number_name_ip_with_exact_total(cmdb_db: CmdbWorld) -> 
         assert [i.ref for i in by_ip.items] == [_ref(a)]
         page = await P.search(s, CiQuery(text="cmdb4-", limit=2), user_id=USER_A)
         assert len(page.items) == 2 and page.total == 3
+        assert page.truncated is False  # Mode B counts exactly (R3)
         rest = await P.search(s, CiQuery(text="cmdb4-", limit=2, offset=2), user_id=USER_A)
         assert {i.ref for i in (*page.items, *rest.items)} == {_ref(a), _ref(b), _ref(c)}
         clamped = await P.search(s, CiQuery(text="cmdb4-", limit=10_000), user_id=USER_A)
@@ -348,3 +355,73 @@ async def test_methods_inert_outside_mode_b(cmdb_db: CmdbWorld) -> None:
         assert err.value.code == "cmdb_not_installed"
         with pytest.raises(CiUnavailable):
             await P.unlink_ticket(s, ticket_id=TICKET_OPEN, ref=ci, link_type=None, user_id=USER_A)
+
+
+# --- the ITSM core's conformance kit against Mode B --------------------------------------------
+
+
+async def _seed_contract_world(s: AsyncSession) -> SeededCis:
+    """a/b in a class on GROUP_RO (A and B read it), hidden on GROUP_RW (A only); a: 3 versions."""
+    shared = await make_class(s, key="cmdb4kit", group_id=GROUP_RO)
+    secret = await make_class(s, key="cmdb4kith", group_id=GROUP_RW)
+    a = await make_ci(s, shared, "cmdb4-kit-a")
+    b = await make_ci(s, shared, "cmdb4-kit-b", incident="incident")
+    hidden = await make_ci(s, secret, "cmdb4-kit-hidden")
+    for n in (1, 2):
+        await CiService(s).update(
+            system_access(USER_A),
+            a,
+            expected_lock_version=None,
+            name=f"cmdb4-kit-a{n}",
+            change_note=f"kit {n}",
+            enforce_permissions=False,
+        )
+    for ci in (a, b):
+        await LinkService(s).add(
+            system_access(USER_A),
+            source=LinkEnd("service", str(SERVICE_ID)),
+            target=LinkEnd("ci", str(ci)),
+            link_type_key="DependsOn",
+            enforce_permissions=False,
+        )
+    await s.commit()
+    return SeededCis(
+        user_id=USER_A,
+        restricted_user_id=USER_B,
+        a=_ref(a),
+        b=_ref(b),
+        hidden=_ref(hidden),
+        common_text="cmdb4-kit",
+        a_version_count=3,
+        ticket_id=TICKET_OPEN,
+        service_id=SERVICE_ID,
+        empty_service_id=SERVICE_ID_2,
+    )
+
+
+class TestTiqoraProviderContract(CiProviderContract):
+    """itsm1's conformance kit (``tests/itsm_provider_contract.py``) against the Mode B provider."""
+
+    @pytest.fixture
+    def provider(self) -> TiqoraCiProvider:
+        return P
+
+    @pytest.fixture
+    async def session(self, cmdb_db: CmdbWorld) -> AsyncIterator[AsyncSession]:
+        async with cmdb_db.factory() as s:
+            yield s
+
+    @pytest.fixture
+    async def seed(self, session: AsyncSession) -> SeededCis:
+        return await _seed_contract_world(session)
+
+
+async def test_provider_lookup_returns_tiqora_provider_in_mode_b(cmdb_db: CmdbWorld) -> None:
+    """One provider lookup for both modes: itsm1's ``get_ci_provider`` serves Mode B from cmdb."""
+    async with cmdb_db.factory() as s:
+        mode = (await get_itsm_mode(s)).mode
+        assert mode == "tiqora"
+        assert isinstance(get_ci_provider(mode, SysConfig(s)), TiqoraCiProvider)
+        assert await tiqora_cmdb_empty(s) is True
+        await make_ci(s, await make_class(s), "cmdb4-a")
+        assert await tiqora_cmdb_empty(s) is False

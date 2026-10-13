@@ -10,6 +10,9 @@ The subclass supplies:
 * ``provider``  -- the implementation under test;
 * ``session``   -- the (async) session passed to every call;
 * ``seed``      -- builds the data set described by :class:`SeededCis`.
+
+Subclasses: ``TestZnunyProviderContract`` (``test_itsm_znuny_provider.py``, Mode A) and
+``TestTiqoraProviderContract`` (``test_cmdb_provider.py``, Mode B).
 """
 
 from __future__ import annotations
@@ -54,13 +57,18 @@ class SeededCis:
 
 
 class _NoCommitSession:
-    """Proxy that fails the test when a provider ends or opens a transaction."""
+    """Proxy that fails the test when a provider ends or opens a transaction.
+
+    A SAVEPOINT (``begin_nested``) is allowed: it neither commits nor ends the caller's
+    transaction, and the Mode B provider needs it to absorb a concurrent insert of the same link
+    (unique key) without poisoning the caller's transaction.
+    """
 
     def __init__(self, inner: Any) -> None:
         self._inner = inner
 
     def __getattr__(self, name: str) -> Any:
-        if name in {"commit", "rollback", "begin", "close", "begin_nested"}:
+        if name in {"commit", "rollback", "begin", "close"}:
             raise AssertionError(f"provider called session.{name}()")
         return getattr(self._inner, name)
 
