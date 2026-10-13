@@ -127,6 +127,12 @@ def _guard_cixml(cixml: Any, operation: str) -> None:
             )
 
 
+def guard_cixml(cixml: Any, operation: str) -> None:
+    """Public form of the size/depth bound for operations that read ``CIXMLData`` without
+    converting it (``ConfigItemSearch``); raises :class:`CixmlError`."""
+    _guard_cixml(cixml, operation)
+
+
 def _int_attr(item: Mapping[str, Any], key: str) -> int | None:
     raw = item.get(key)
     if raw is None or raw == "":
@@ -168,6 +174,12 @@ def _parse_datetime(raw: Any) -> datetime | None:
         return datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
     except ValueError:
         return None
+
+
+def parse_gi_datetime(raw: Any) -> datetime | None:
+    """``ValidateInputDateTime``: ``MM/DD/YYYY``, ``YYYY-MM-DD`` or ``YYYY-MM-DD HH:MM:SS``
+    (the date forms mean midnight), else ``None``."""
+    return _parse_datetime(raw)
 
 
 # ---------------------------------------------------------------- check

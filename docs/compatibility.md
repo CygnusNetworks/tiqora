@@ -527,9 +527,29 @@ Items below are intentionally incomplete or out of scope.
 
 | Gap | Why deferred |
 |-----|----------------|
-| Custom OPM operations (e.g. CMDB `ConfigItem*`) | Installation-specific; no stable core wire contract |
+| Custom OPM operations | Installation-specific; no stable core wire contract (the ITSM `ConfigItem*` operations are implemented, see [ConfigItemSearch](#configitemsearch)) |
 | Package Manager remote install | Deploy/admin concern, not ticket integrator wire |
 | WSDL auto-serving | Znuny does not serve one either — see [SOAP transport](#soap-transport) |
+
+### ConfigItemSearch
+
+`ConfigItemSearch` (ITSMConfigurationManagement 6.5.4 and 7.3.5, identical) answers on the Tiqora CMDB
+in ITSM mode `tiqora` and on Znuny's own tables in Mode A (`znuny_readthrough`); mode `off` answers
+`Operation.NotImplemented`. Parameter checks, their order and the error texts follow
+`ConfigItemSearch.pm`; the answer is `{"ConfigItemIDs": [..]}` or `{"ConfigItemIDs": ""}` when nothing
+matches (Znuny). `Class` is required (one class per call); the agent needs `ro` on the class' group
+(Znuny: `GenericInterface::Operation::ConfigItemSearch###Permission`), otherwise `AccessDenied`.
+
+| Topic | Behaviour |
+|-------|-----------|
+| `Name`, `Number` | Case-insensitive, `*` is a wildcard anywhere, no wildcard means equality; `Number` may be a list (exact) |
+| `DeplStates`, `InciStates` | Names (array or comma separated string); the *current* state of the CI; unknown name: `InvalidParameter` |
+| `ConfigItem{Create,Change}Time{Newer,Older}Date` | `>=` / `<=`; only `YYYY-MM-DD HH:MM:SS` finds anything (like Znuny's SQL layer), other valid date forms answer empty |
+| `OrderBy`, `OrderByDirection` | Znuny's columns (`ConfigItemID`, `Number`, `ClassID`, `DeplStateID`, `InciStateID`, `CreateTime`, `CreateBy`, `ChangeTime`, `ChangeBy`, `Name`); default `ConfigItemID` ascending, a listed column without direction goes `Down`; invalid or repeated values answer empty |
+| `Limit` | Applied after sorting; `0` or negative: none |
+| `CIXMLData` | `Key` and `Key::Sub` (nested hash) values, an array is a list of alternatives, several keys must all match. Tiqora mode: only **searchable** attributes of the class (the CMDB attribute index; text types with `*` at the ends, catalog by name, integer exact); an inner `*` in a text value matches as "contains the longest literal piece" (can return more than Znuny); a key outside the definition finds nothing, a non-searchable one is `InvalidParameter`. Mode A: every attribute, compared in memory (dates are not normalised) |
+| `PreviousVersionSearch` | `Name` is matched against every version (hot and archived). Combined with `CIXMLData` the attributes are matched on the current version only (logged as `gi_previous_version_search_unsupported`) |
+| Bounds (Tiqora-only, a GI call cannot become a job) | Tiqora mode loads at most 10 000 candidates before sorting. Mode A: at most **1 000** ids (the first 1 000 matches in id order are sorted and limited) and a 30 s budget (also as database statement time); running out answers `ConfigItemSearch.Timeout` ("the search took too long"), nothing partial |
 
 ### TicketCreate / TicketUpdate
 

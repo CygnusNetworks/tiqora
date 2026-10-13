@@ -537,12 +537,11 @@ async def test_get_catalog_attribute_is_returned_by_name(cmdb_db: CmdbWorld) -> 
 
 
 async def test_write_and_search_operations_answer_per_mode(cmdb_db: CmdbWorld) -> None:
-    """The four operations of Tasks 22-24 exist as routes and honour the mode gate already."""
+    """The three write operations (Tasks 23/24) exist as routes and honour the mode gate."""
     routes = (
         ("POST", "/znuny-compat/ConfigItem", "ConfigItemCreate"),
         ("PATCH", "/znuny-compat/ConfigItem/1", "ConfigItemUpdate"),
         ("DELETE", "/znuny-compat/ConfigItem/1", "ConfigItemDelete"),
-        ("GET", "/znuny-compat/ConfigItemSearch", "ConfigItemSearch"),
     )
     async with _client(cmdb_db) as client:
         for mode in ("off", "znuny_readthrough", "tiqora"):
@@ -550,7 +549,7 @@ async def test_write_and_search_operations_answer_per_mode(cmdb_db: CmdbWorld) -
             for method, url, op in routes:
                 r = await client.request(method, url, params=_auth())
                 code = r.json()["Error"]["ErrorCode"]
-                if mode == "znuny_readthrough" and op != "ConfigItemSearch":
+                if mode == "znuny_readthrough":
                     assert code == f"{op}.NotAvailable", (mode, op)
                     assert r.json()["Error"]["ErrorMessage"] == (
                         "Die CMDB wird in Znuny geführt (Modus A)"

@@ -76,3 +76,23 @@ The webservice types are `ConfigItem::ConfigItemGet` etc. (`OPERATION_TYPES`).
 | `off` | `Operation.NotImplemented` | `Operation.NotImplemented` |
 
 Order: authentication, then the mode gate (an anonymous caller does not learn the mode).
+
+
+## ConfigItemSearch (Task 22; `ConfigItemSearch.pm` 6.5.4 / 7.3.5, `ITSMConfigItem.pm` `ConfigItemSearchExtended`, `Version.pm` `VersionSearch`)
+
+The two versions differ only in whitespace and in the `_CheckValue` branches (7.x dropped the
+Customer/CustomerCompany checks); the search path is identical.
+
+| Topic | Znuny behaviour |
+|---|---|
+| Check order | auth, `ConfigItem` non-empty hash (`MissingParameter`, "ConfigItem parameter is missing or not valid!"), `CIXMLData` non-empty hash (`InvalidParameter`), `Class` (`MissingParameter`), list conversion of `InciStates`, `DeplStates`, `OrderBy`, `OrderByDirection` (`WrongStructure`; "Structure for ConfigItem->InciStates ..." but "Structure for DeplStates ...", "Structure for OrderBy ...", "Structure for OrderByDirection ..."), `_CheckConfigItem` (Class, states, the four `ConfigItem*Date` via `ValidateInputDateTime`, `Limit` `IsNumber`, `CIXMLData` values), `Permission(Scope Class, Type SysConfig ...ConfigItemSearch###Permission)` -> `AccessDenied` "Can not search configuration items!" |
+| Answer | `ConfigItemIDs` list, `''` when empty (also when `ConfigItemSearch`/`VersionSearch` return undef, i.e. invalid `OrderBy` values or directions) |
+| Patterns | `*` -> `%` in `LOWER(..) LIKE LOWER(..)`; no wildcard -> `LOWER(..) = LOWER(..)`; `Number` as array -> exact `IN` |
+| Dates | `create_time >=` / `<=` and `change_time >=` / `<=` on `configitem`, SQL layer needs `YYYY-MM-DD HH:MM:SS` |
+| Order | CI search: default `id ASC`, listed columns default `DESC`, `id ASC` appended unless listed, `Name` skipped; version search (when `Name`, `CIXMLData`, `PreviousVersionSearch` or `OrderBy Name`): default `['ConfigItemID']` / `['Up']`, `ChangeTime` = version create time |
+| Limit | applied after combining and sorting (`@List[0..Limit-1]`) |
+| `CIXMLData` | flattened by `_FormatSearchXMLData` to `Key` / `Key::Sub` => values (a hash carries its value under its own key; `if ($Content)` drops Perl-falsy contents), searched on the current XML versions |
+
+Tiqora differences are listed in `docs/compatibility.md` (section ConfigItemSearch). Error codes:
+`ConfigItemSearch.InvalidParameter` for the Znuny cases, plus Tiqora's `ConfigItemSearch.Timeout`
+(Mode A budget) and `ConfigItemSearch.InvalidParameter` for non-searchable attributes.

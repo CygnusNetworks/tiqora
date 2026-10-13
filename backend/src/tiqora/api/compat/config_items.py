@@ -15,7 +15,8 @@ authentication, so an anonymous caller does not learn it.
 from __future__ import annotations
 
 import base64
-from collections.abc import Mapping, Sequence
+import re
+from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
 from typing import Any, Final, Literal
 
@@ -25,12 +26,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.api.compat.article_input import gi_error as _err
 from tiqora.api.compat.operations import _auth_from_params, _reprefix_auth_error
 from tiqora.cmdb.catalog import CatalogService
+from tiqora.cmdb.seed import DEPLOYMENT_STATE, INCIDENT_STATE
 from tiqora.config import Settings
 from tiqora.domain.auth import SessionStore
-from tiqora.itsm.importer import facades
+from tiqora.itsm.importer import facades, gi_search
+from tiqora.itsm.importer.gi_search import GiCriteria, GiRow, GiSearchError
 from tiqora.itsm.importer.ports import CiView, Ports
 from tiqora.itsm.znuny_format.definition import to_znuny_definition
-from tiqora.itsm.znuny_format.gi_cixml import GiLookups, xmldata_to_cixml
+from tiqora.itsm.znuny_format.gi_cixml import (
+    CixmlError,
+    GiLookups,
+    clean_cixml,
+    guard_cixml,
+    parse_gi_datetime,
+    xmldata_to_cixml,
+)
 from tiqora.itsm.znuny_format.xmldata import attributes_to_xmldata
 from tiqora.util.perl import perl_truthy
 from tiqora.znuny.sysconfig import SysConfig
@@ -369,6 +379,120 @@ async def _not_implemented(
     return _err("Operation.NotImplemented", f"{op}: not implemented yet")
 
 
+# --------------------------------------------------------------------------- ConfigItemSearch
+
+_ORDER_KEYS: Final[dict[str, Callable[[GiRow], Any]]] = {
+    "ConfigItemID": lambda r: r.id,
+    "Number": lambda r: r.number.casefold(),
+    "ClassID": lambda r: r.class_id,
+    "DeplStateID": lambda r: r.deployment_state_id,
+    "InciStateID": lambda r: r.incident_state_id,
+    "CreateTime": lambda r: r.created_at,
+    "CreateBy": lambda r: r.created_by,
+    "ChangeTime": lambda r: r.changed_at,
+    "ChangeBy": lambda r: r.changed_by,
+    "Name": lambda r: r.name.casefold(),
+}
+_STRICT_TIME: Final = re.compile(r"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d")
+_NUMBER: Final = re.compile(r"[+-]?(?:\d+\.?\d*|\.\d+)")
+_TIME_PARAMS: Final = (
+    "CreateTimeNewerDate",
+    "CreateTimeOlderDate",
+    "ChangeTimeNewerDate",
+    "ChangeTimeOlderDate",
+)
+
+
+def _with_data(value: Any) -> bool:
+    """Znuny ``IsStringWithData``: a defined, non-empty scalar."""
+    return isinstance(value, str | int | float) and not isinstance(value, bool) and value != ""
+
+
+def _csv_or_list(raw: Any) -> list[Any] | None:
+    """A non-empty string split at ``,`` (Perl ``split`` drops trailing empty fields) or a
+    non-empty list; ``None`` is ``WrongStructure``."""
+    if _with_data(raw) and not isinstance(raw, list):
+        return _split_ids(str(raw))
+    if isinstance(raw, list) and raw:
+        return list(raw)
+    return None
+
+
+def _flatten_search(xml: Mapping[str, Any], parent: str = "") -> dict[str, list[str]]:
+    """``_FormatSearchXMLData``: ``CIXMLData`` -> ``Key`` / ``Key::Sub`` -> value alternatives.
+
+    A hash entry carries its own value under its own key (dropped when Perl-falsy, like
+    Znuny). Scalars of any other type are skipped.
+    """
+    found: dict[str, list[str]] = {}
+
+    def add(key: str, value: Any) -> None:
+        if isinstance(value, str | int | float) and not isinstance(value, bool) and value != "":
+            found.setdefault(key, []).append(str(value))
+
+    for root in sorted(xml):
+        value = xml[root]
+        key = f"{parent}{root}"
+        entries = value if isinstance(value, list) else [value]
+        for entry in entries:
+            if isinstance(entry, Mapping):
+                rest = {k: v for k, v in entry.items() if k != root}
+                content = entry.get(root)
+                if perl_truthy(content):
+                    add(key, content)
+                for sub_key, items in _flatten_search(rest, f"{key}::").items():
+                    found.setdefault(sub_key, []).extend(items)
+            else:
+                add(key, entry)
+    return found
+
+
+def _order(rows: list[GiRow], order_by: list[Any], directions: list[Any], *, version: bool) -> None:
+    """Znuny's ORDER BY, applied in place. ``version``: the order of ``VersionSearch`` (used
+    when ``Name``, ``CIXMLData`` or ``PreviousVersionSearch`` is given), else the one of
+    ``ConfigItemSearch``."""
+    keys: list[tuple[str, bool]] = []  # (order key, descending)
+    given = order_by if not version else (order_by or ["ConfigItemID"])
+    dirs = directions if not (version and not directions) else ["Up"]
+    for index, name in enumerate(given):
+        if name == "Name" and not version:
+            continue  # ConfigItemSearch skips it (the version search orders by name)
+        direction = dirs[index] if index < len(dirs) and dirs[index] else "Down"
+        keys.append((str(name), direction != "Up"))
+    if "ConfigItemID" not in given:
+        keys.append(("ConfigItemID", False))
+    for name, descending in reversed(keys):
+        rows.sort(key=_ORDER_KEYS[name], reverse=descending)
+
+
+def _valid_order(order_by: list[Any], directions: list[Any]) -> bool:
+    """Znuny returns undef (-> an empty answer) for unknown or repeated ``OrderBy`` values and
+    for directions other than ``Up``/``Down``."""
+    seen: set[str] = set()
+    for name in order_by:
+        if not isinstance(name, str) or name not in _ORDER_KEYS or name in seen:
+            return False
+        seen.add(name)
+    return all(d in ("Up", "Down") for d in directions)
+
+
+async def _search_names_valid(reader: Any, catalog_class: str, names: list[Any]) -> bool:
+    for name in names:
+        if not isinstance(name, str | int | float) or not str(name):
+            return False
+        item = await reader.catalog_item(catalog_class, str(name))
+        if item is None or item.name != str(name):
+            return False
+    return True
+
+
+def _search_answer(rows: list[GiRow], limit: int | None) -> dict[str, Any]:
+    ids = [r.id for r in rows]
+    if limit is not None:
+        ids = ids[:limit]
+    return {"ConfigItemIDs": ids if ids else ""}
+
+
 async def op_config_item_search(
     data: dict[str, Any],
     session: AsyncSession,
@@ -377,9 +501,149 @@ async def op_config_item_search(
     request: Any | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
-    return await _not_implemented(
-        "ConfigItemSearch", data, session, session_store, request, settings
+    """``ConfigItemSearch``: ids of the items of ONE class (``Class`` is required) that match.
+
+    Parameter checks and their order follow ``ConfigItemSearch.pm``; the answer is
+    ``{"ConfigItemIDs": [..]}`` or ``{"ConfigItemIDs": ""}`` when nothing matches (Znuny).
+    """
+    op = "ConfigItemSearch"
+    auth = await _agent_auth(op, data, session, session_store, request, settings)
+    if isinstance(auth, dict):
+        return auth
+    user_id, _login = auth
+    ports, mode = await _gi_ports(session)
+    if (gate := _mode_error(op, mode)) is not None:
+        return gate
+
+    raw_item = data.get("ConfigItem")
+    if not (isinstance(raw_item, Mapping) and raw_item):
+        return _err(
+            f"{op}.MissingParameter", f"{op}: ConfigItem parameter is missing or not valid!"
+        )
+    item: dict[str, Any] = {
+        k: (v.strip() if isinstance(v, str) else v) for k, v in raw_item.items()
+    }
+
+    cixml = item.get("CIXMLData")
+    if cixml is not None:
+        if not (isinstance(cixml, Mapping) and cixml):
+            return _err(f"{op}.InvalidParameter", f"{op}: ConfigItem->CIXMLData is invalid!")
+        try:
+            guard_cixml(cixml, op)
+        except CixmlError as exc:
+            return _err(f"{op}.{exc.code}", exc.message)
+        cixml = clean_cixml(cixml)
+    if not perl_truthy(item.get("Class")):
+        return _err(f"{op}.MissingParameter", f"{op}: ConfigItem->Class parameter is missing!")
+
+    lists: dict[str, list[Any]] = {}
+    for key, label in (
+        ("InciStates", "ConfigItem->InciStates"),
+        ("DeplStates", "DeplStates"),
+        ("OrderBy", "OrderBy"),
+        ("OrderByDirection", "OrderByDirection"),
+    ):
+        if item.get(key) is None:
+            continue
+        parsed = _csv_or_list(item[key])
+        if parsed is None:
+            return _err(f"{op}.WrongStructure", f"{op}: Structure for {label} is not correct!")
+        lists[key] = parsed
+
+    # --- _CheckConfigItem
+    class_name = str(item["Class"])
+    cls = None
+    if mode == "tiqora":
+        found = await ports.reader.class_by_key_or_name(class_name)
+        cls = found if found is not None and found.name == class_name else None
+        if cls is None:
+            return _err(f"{op}.InvalidParameter", f"{op}: ConfigItem->Class parameter is invalid!")
+        for key, catalog_class in (
+            ("InciStates", INCIDENT_STATE),
+            ("DeplStates", DEPLOYMENT_STATE),
+        ):
+            if key in lists and not await _search_names_valid(
+                ports.reader, catalog_class, lists[key]
+            ):
+                return _err(
+                    f"{op}.InvalidParameter", f"{op}: ConfigItem->{key} parameter is invalid!"
+                )
+    times: dict[str, datetime | None] = {}
+    for param in _TIME_PARAMS:
+        value = item.get(f"ConfigItem{param}")
+        if value is None:
+            continue
+        parsed_time = parse_gi_datetime(value)
+        if parsed_time is None:
+            return _err(
+                f"{op}.InvalidParameter",
+                f"{op}: ConfigItem->ConfigItem{param} parameter is invalid!",
+            )
+        # ConfigItemSearch itself only takes the strict format; anything else gives no result
+        times[param] = parsed_time if _STRICT_TIME.fullmatch(str(value)) else None
+    limit: int | None = None
+    if item.get("Limit") is not None:
+        raw_limit = item["Limit"]
+        if isinstance(raw_limit, bool) or not _NUMBER.fullmatch(str(raw_limit)):
+            return _err(f"{op}.InvalidParameter", f"{op}: ConfigItem->Limit parameter is invalid!")
+        limit = max(1, int(float(raw_limit))) if float(raw_limit) > 0 else None
+    attributes: dict[str, list[str]] = {}
+    if isinstance(cixml, Mapping):
+        attributes = _flatten_search(cixml)
+
+    # --- permission (customers hold none)
+    if mode == "tiqora":
+        assert cls is not None
+        visible: set[int] = set()
+        if user_id != 0:
+            visible = await ports.reader.visible_class_ids(
+                user_id, await _permission_type(session, op)
+            )
+        if cls.id not in visible:
+            return denied(op)
+
+    order_by, directions = lists.get("OrderBy", []), lists.get("OrderByDirection", [])
+    if not _valid_order(order_by, directions) or any(
+        param in times and times[param] is None for param in _TIME_PARAMS
+    ):
+        logger.info("gi_config_item_search_invalid_order_or_time")
+        return {"ConfigItemIDs": ""}
+    number = item.get("Number")
+    number_list = (
+        [str(n) for n in number if _with_data(n)]
+        if isinstance(number, list)
+        else ([str(number)] if _with_data(number) else None)
     )
+    name = str(item["Name"]) if _with_data(item.get("Name")) else None
+    previous = perl_truthy(item.get("PreviousVersionSearch"))
+    if previous and attributes:
+        logger.warning("gi_previous_version_search_unsupported", detail="CIXMLData")
+    crit = GiCriteria(
+        class_name=class_name,
+        numbers=number_list or None,
+        name=name,
+        deployment_states=[str(x) for x in lists["DeplStates"]] if "DeplStates" in lists else None,
+        incident_states=[str(x) for x in lists["InciStates"]] if "InciStates" in lists else None,
+        attributes=attributes,
+        created_newer=times.get("CreateTimeNewerDate"),
+        created_older=times.get("CreateTimeOlderDate"),
+        changed_newer=times.get("ChangeTimeNewerDate"),
+        changed_older=times.get("ChangeTimeOlderDate"),
+        previous_versions=previous,
+    )
+    try:
+        if mode == "znuny_readthrough":
+            rows = await facades.get_mode_a_reader(session).search_rows(crit, user_id=user_id)
+        else:
+            assert cls is not None
+            rows = await gi_search.search_tiqora(session, ports.reader, cls, crit)
+    except GiSearchError as exc:
+        if exc.code == "AccessDenied":
+            return denied(op)
+        return _err(f"{op}.{exc.code}", exc.message)
+    version_mode = bool(name or attributes or previous or "Name" in order_by)
+    _order(rows, order_by, directions, version=version_mode)
+    return _search_answer(rows, limit)
 
 
 async def op_config_item_create(

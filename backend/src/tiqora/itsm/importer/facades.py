@@ -75,7 +75,7 @@ from tiqora.db.tiqora.models import (
 )
 from tiqora.filters.model import AllOf, Condition, Filter, FilterNode
 from tiqora.itsm import mode as itsm_mode
-from tiqora.itsm.importer import source_extra
+from tiqora.itsm.importer import gi_search, source_extra
 from tiqora.itsm.importer.ports import (
     EPOCH,
     CatalogView,
@@ -915,6 +915,23 @@ class ModeAReader:
             cur_incident_state=cur_inc[0],
             cur_incident_functionality=cur_inc[1],
             last_version_id=ci.last_version_id,
+        )
+
+    async def search_rows(
+        self,
+        crit: gi_search.GiCriteria,
+        *,
+        user_id: int,
+        budget_seconds: float | None = None,
+    ) -> list[gi_search.GiRow]:
+        """GI ``ConfigItemSearch`` in Mode A: bounded scan of Znuny's tables (see
+        :func:`gi_search.search_mode_a`); ``GiSearchError`` for refusals and the time budget."""
+        return await gi_search.search_mode_a(
+            self._s,
+            self._source,
+            crit,
+            user_id=user_id,
+            budget_seconds=budget_seconds,
         )
 
     async def attachment_contents(self, znuny_id: int) -> list[tuple[str, str, bytes]]:
