@@ -46,7 +46,7 @@ Every item is decided conservatively and marked **Assumption:** where it is used
 - **Write only `tiqora_*` tables, except through the existing Znuny write services** (`tiqora.domain.ticket_write_service`, `tiqora.domain.dynamic_field_values`, `tiqora.domain.user_provisioning`, `tiqora.znuny.history`, the new `tiqora.domain.customer_company_service` extracted from existing route code in Task 16). Plugin code writes Znuny tables only through the SDK services of D3. Never change Znuny DDL.
 - **Never JOIN `tiqora_*` tables with Znuny tables** (prod MariaDB mixes `general_ci`/`unicode_ci` → error 1267): load keys from one side, then query the other with an `IN` list. Integer joins inside Znuny tables are fine. The same rule is enforced on plugin report sources (D15).
 - **No `db.begin()` after autobegin:** a session that already executed a statement is in a transaction — use `commit()`/`rollback()`; savepoints via `session.begin_nested()` are allowed (used in D5).
-- **No long synchronous endpoints:** production nginx cuts `/api/` after 90 s; nothing in a request may exceed ~60 s. Every plugin call inside a request has a hard timeout far below that (sync hooks 5 s total, auth chain 20 s, channel send 30 s, GI operation 55 s, customer source 10 s); anything longer belongs in a plugin job (phase 1 `job_handler`) + polling.
+- **No long synchronous endpoints:** production nginx cuts `/api/` after 90 s; nothing in a request may exceed ~60 s. Every plugin call inside a request has a hard timeout far below that (sync hooks 5 s total, auth chain 20 s, channel send 30 s, GI operation 45 s (F6), customer sources 3 s (F17)); anything longer belongs in a plugin job (phase 1 `job_handler`) + polling.
 - **Migrations:** this plan adds none. If an implementer finds one unavoidable, it takes the **next free number at implementation time** (files currently run to `20261010_0076`, while the primary head is `20261010_0073` — check `cd backend && uv run alembic heads`, never trust ids written here), follows skill `alembic-two-chain-new-head-forks-graph` and R-MIGRATION-SERIAL, and the controller is told before writing it.
 - **Znuny golden peers 6.5 and 7.3** exist under `tests/golden` (`peers.yaml`, `README-multi-peer.md`); Task 22 runs on both.
 - **Znuny reference source** (6.5 core) at `<repo>/znuny-6.5.22/` (read-only).
@@ -174,7 +174,7 @@ def call_plugin_sync[T](plugin_id: str, what: str, fn: Callable[[], T]) -> CallO
     # is possible — documented: these callbacks must be pure and fast
 
 class PluginCallBudget:
-    """Shared deadline for a chain of calls (sync hooks: 5 s, auth chain: 20 s, customer sources: 5 s, transition actions: per action 1..10 s and 20 s per dialog submit, a timeout answers 422 and invalidates the session)."""
+    """Shared deadline for a chain of calls (sync hooks: 5 s, auth chain: 20 s, customer sources: 3 s (F17), transition actions: per action 1..10 s and 20 s per dialog submit, a timeout answers 422 and invalidates the session; placeholders 2 s per expansion and 3 s per multi-text caller, outbound mail filters 10 s per send, GI operations 45 s (F6))."""
     def __init__(self, seconds: float, *, clock: Callable[[], float] = time.monotonic) -> None
     def remaining(self) -> float          # >= 0
     def timeout_for(self, own: float) -> float   # min(own, remaining())
@@ -549,7 +549,9 @@ def validate_plugin_values(field: DynamicFieldConfig, values: list[str]) -> list
     # no plugin type -> values; validate raises ValueError -> DynamicFieldValueError(str(exc)[:300]);
     # any other failure (call_plugin_sync not ok) -> values unchanged + log (fail-open, Assumption 8);
     # returned list must be list[str] and pass normalize_df_values(base_type, …) again, else fail-open
-def display_plugin_value(field: DynamicFieldConfig, values: list[str]) -> str | None   # None -> core display
+def display_plugin_value(config: Mapping[str, Any], values: list[str]) -> str | None   # None -> core display (sync callers)
+async def display_value_bounded(field_type: str, config: Mapping[str, Any], stored: str | list[str] | None, *,
+                                budget: PluginCallBudget | None = None) -> str   # async callers: to_thread, 1 s (F24), ambient budget
 ```
 
 - `DynamicFieldConfig` gains `config: Mapping[str, Any] = field(default_factory=dict)` and property `plugin_type -> str | None`. `_load_field` today selects only `id, name, field_type, object_type`: it additionally selects `config` and parses it with `config_from_yaml` only when the raw text contains `TiqoraPluginType` (cheap substring check, so core fields pay no YAML parse on every write).
@@ -600,12 +602,13 @@ OUTBOUND_MAIL_FILTERS: Final[ExtensionPoint[MailFilter]]   # "core.mail.outbound
 
 async def run_inbound_pre_filters(get_param: dict[str, str], parsed: ParsedEmail, account: MailAccount) -> None
 async def run_inbound_post_filters(result: PipelineResult, get_param: Mapping[str, str], account_id: int) -> None
-async def run_outbound_filters(message: EmailMessage) -> None   # raises OutboundMailVetoed on MailVetoed
+async def run_outbound_filters(message: EmailMessage) -> dict[str, str]   # the X- headers to add; raises OutboundMailVetoed on MailVetoed
+def apply_outbound_headers(message: EmailMessage, added: Mapping[str, str]) -> EmailMessage   # a copy; the caller's message is never mutated (T11 M1)
 ```
 
 - Pre: in `_process_message_inner` directly after `await apply_filters(session, get_param)`; the `X-OTRS-Ignore` check that follows sees plugin changes. Every failure → log, next filter (fail-open). Filters run in `(order, key)` order.
 - Post: in `process_message`, after the message's transaction is committed (locate the commit in `process_message`; if the commit happens in the caller, place the call in the caller right after it — note the exact place in the commit body). Failures logged only.
-- Outbound: first statement of `SmtpMailSender.send` (`run_outbound_filters` returns immediately when `registry.items(OUTBOUND_MAIL_FILTERS)` is empty, so sites without plugins pay one dict lookup) (the one choke point for every real SMTP send: replies, notifications, auto-responses, report delivery, phone-mail, the direct `SmtpMailSender(...)` in `outbound_reply.py`). Header additions are applied with `message[name] = value` (replacing an existing value of the same name). Failure/timeout → log, send unchanged. `MailVetoed` → `raise OutboundMailVetoed(550, …)`; `smtp_reply_codes` already reads `.code` of any `aiosmtplib.SMTPResponseException` (verified 2026-10-12), so `is_permanent_smtp_failure` classifies the veto as permanent and every caller's existing permanent-failure handling applies; if that function changed meanwhile, extending it to read `.code` is part of Task 11.
+- Outbound: first statement of `SmtpMailSender.send` (`run_outbound_filters` returns immediately when `registry.items(OUTBOUND_MAIL_FILTERS)` is empty, so sites without plugins pay one dict lookup) (the one choke point for every real SMTP send: replies, notifications, auto-responses, report delivery, phone-mail, the direct `SmtpMailSender(...)` in `outbound_reply.py`). Header additions are collected by `run_outbound_filters` and applied by `apply_outbound_headers` to a copy of the message (replacing an existing value of the same name), so a retry or a second recipient never sees headers twice; one `PluginCallBudget(10 s)` per `send()`, per-filter cap 1..5 s (F4). Failure/timeout → log, send unchanged. `MailVetoed` → `raise OutboundMailVetoed(550, …)`; `smtp_reply_codes` already reads `.code` of any `aiosmtplib.SMTPResponseException` (verified 2026-10-12), so `is_permanent_smtp_failure` classifies the veto as permanent and every caller's existing permanent-failure handling applies; if that function changed meanwhile, extending it to read `.code` is part of Task 11.
 
 ### D10. Notification transports
 
@@ -757,7 +760,8 @@ CUSTOMER_SOURCES: Final[ExtensionPoint[CustomerSource]]   # "core.customers.sour
 class CustomerSourceConflict(ValueError): ...             # German: e-mail belongs to another customer, invalid data
 
 async def search_sources(q: str, limit: int) -> list[tuple[CustomerSource, ExternalCustomer]]
-    # all active sources in parallel (asyncio.gather of call_plugin), shared budget 5 s; failures skipped
+    # all active sources in parallel (asyncio.gather of call_plugin), shared budget 3 s (F17); failures skipped;
+    # the search route trims the combined hits to the room left and dedups them by login
 async def lookup_by_email(email: str, *, inbound_only: bool) -> tuple[CustomerSource, ExternalCustomer] | None
 async def materialize(session: AsyncSession, ext: ExternalCustomer, *, actor_id: int) -> str
     # login exists -> return it (no update, Assumption 7); e-mail used by another login -> CustomerSourceConflict;
@@ -794,7 +798,7 @@ GiOperationRun = Callable[[GiOperationContext, dict[str, Any]], Awaitable[dict[s
 @dataclass(frozen=True, slots=True)
 class GiOperation:
     type: str                              # "Plugin_<sid>::<Name>"
-    plugin_id: str; run: GiOperationRun; timeout_seconds: int   # 1..55
+    plugin_id: str; run: GiOperationRun; timeout_seconds: int   # 1..45 (F6: op + mapping stays < 60 s)
     context: PluginContext | None = None
 GI_OPERATIONS: Final[ExtensionPoint[GiOperation]]     # "core.gi.operations", item_key .type
 @dataclass(frozen=True, slots=True)
