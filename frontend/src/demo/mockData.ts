@@ -1802,6 +1802,20 @@ const demoDaemons = {
       last_result: { mode: "live" },
       notices: [],
     },
+    {
+      slug: "plugin_repositories",
+      enabled: true,
+      toggleable: false,
+      schedule: "interval",
+      interval_seconds: 21600,
+      interval_overridden: false,
+      tick_timeout_seconds: 600,
+      last_run_at: "2026-10-08T10:00:00Z",
+      last_ok_at: "2026-10-08T10:00:00Z",
+      last_error: null,
+      last_result: { repositories: 1, failed: 0, updates_available: 1 },
+      notices: [],
+    },
   ],
 };
 

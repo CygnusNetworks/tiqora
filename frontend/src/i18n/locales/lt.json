@@ -3448,6 +3448,10 @@
         "gi_debug_cleanup": {
           "name": "Clean up web service log",
           "description": "Deletes old entries of the web service log."
+        },
+        "plugin_repositories": {
+          "name": "Plugins: check package sources",
+          "description": "Regularly fetches the package lists of the configured package sources and looks for updates."
         }
       },
       "takeoverBadge": "Perėmimas",
@@ -4947,7 +4951,47 @@
         "backupNote": "The backup is kept for {{count}} days. Download it now if you might still need the data.",
         "backupDownload": "Download backup ({{name}})"
       },
-      "migrationError": "Database migration failed"
+      "migrationError": "Database migration failed",
+      "catalog": {
+        "search": "Search",
+        "category": "Category",
+        "allCategories": "All categories",
+        "repository": "Package source",
+        "allRepositories": "All package sources",
+        "empty": "No plugins found.",
+        "noRepositories": "No package source has been set up yet.",
+        "install": "Install",
+        "installed": "Installed",
+        "incompatible": "Does not fit this Tiqora version",
+        "installedVersion": "Installed: version {{version}}",
+        "homepage": "Website",
+        "loadError": "The package lists could not be loaded."
+      },
+      "repositories": {
+        "add": "Add package source",
+        "edit": "Edit",
+        "name": "Name",
+        "url": "Address of the package list",
+        "key": "Public key of the package source",
+        "keyHint": "Without a key, publishers of this package source are not shown as verified.",
+        "enabled": "Use this package source",
+        "disabled": "Disabled",
+        "fromEnv": "From the server configuration",
+        "check": "Check now",
+        "lastCheck": "Last checked",
+        "never": "never",
+        "pluginCount_one": "{{count}} plugin",
+        "pluginCount_other": "{{count}} plugins",
+        "verified": "Package list signed",
+        "unverified": "Package list not signed",
+        "delete": "Remove",
+        "deleteTitle": "Remove package source",
+        "deleteMessage": "The package source \"{{name}}\" will be removed. Plugins that are already installed are kept.",
+        "deleteFailed": "The package source could not be removed.",
+        "saveFailed": "The package source could not be saved.",
+        "checkFailed": "The check could not be started.",
+        "loadError": "The package sources could not be loaded."
+      }
     },
     "dashboardTemplates": {
       "title": "Dashboard templates",

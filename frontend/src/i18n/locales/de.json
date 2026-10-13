@@ -3456,6 +3456,10 @@
         "gi_debug_cleanup": {
           "name": "Webservice-Protokoll aufräumen",
           "description": "Löscht alte Einträge des Webservice-Protokolls."
+        },
+        "plugin_repositories": {
+          "name": "Erweiterungen: Paketquellen prüfen",
+          "description": "Lädt regelmäßig die Paketlisten der eingerichteten Paketquellen und sucht nach Aktualisierungen."
         }
       },
       "takeoverBadge": "Übernahme",
@@ -4955,7 +4959,47 @@
         "backupNote": "Die Sicherung wird {{count}} Tage aufbewahrt. Laden Sie sie jetzt herunter, wenn Sie die Daten noch brauchen könnten.",
         "backupDownload": "Sicherung herunterladen ({{name}})"
       },
-      "migrationError": "Fehler bei der Datenbank-Anpassung"
+      "migrationError": "Fehler bei der Datenbank-Anpassung",
+      "catalog": {
+        "search": "Suchen",
+        "category": "Kategorie",
+        "allCategories": "Alle Kategorien",
+        "repository": "Paketquelle",
+        "allRepositories": "Alle Paketquellen",
+        "empty": "Keine Erweiterungen gefunden.",
+        "noRepositories": "Es ist noch keine Paketquelle eingerichtet.",
+        "install": "Installieren",
+        "installed": "Installiert",
+        "incompatible": "Passt nicht zu dieser Tiqora-Version",
+        "installedVersion": "Installiert: Version {{version}}",
+        "homepage": "Webseite",
+        "loadError": "Die Paketlisten konnten nicht geladen werden."
+      },
+      "repositories": {
+        "add": "Paketquelle hinzufügen",
+        "edit": "Bearbeiten",
+        "name": "Name",
+        "url": "Adresse der Paketliste",
+        "key": "Öffentlicher Schlüssel der Paketquelle",
+        "keyHint": "Ohne Schlüssel werden Herausgeber dieser Paketquelle nicht als verifiziert angezeigt.",
+        "enabled": "Paketquelle verwenden",
+        "disabled": "Ausgeschaltet",
+        "fromEnv": "Aus der Server-Konfiguration",
+        "check": "Jetzt prüfen",
+        "lastCheck": "Zuletzt geprüft",
+        "never": "noch nie",
+        "pluginCount_one": "{{count}} Erweiterung",
+        "pluginCount_other": "{{count}} Erweiterungen",
+        "verified": "Paketliste signiert",
+        "unverified": "Paketliste nicht signiert",
+        "delete": "Entfernen",
+        "deleteTitle": "Paketquelle entfernen",
+        "deleteMessage": "Die Paketquelle „{{name}}“ wird entfernt. Bereits installierte Erweiterungen bleiben erhalten.",
+        "deleteFailed": "Die Paketquelle konnte nicht entfernt werden.",
+        "saveFailed": "Die Paketquelle konnte nicht gespeichert werden.",
+        "checkFailed": "Die Prüfung konnte nicht gestartet werden.",
+        "loadError": "Die Paketquellen konnten nicht geladen werden."
+      }
     },
     "dashboardTemplates": {
       "title": "Dashboard-Vorlagen",

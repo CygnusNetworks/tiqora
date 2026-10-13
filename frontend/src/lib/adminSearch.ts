@@ -573,7 +573,7 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     group: "system",
     nameKey: "admin.nav.plugins",
     descriptionKey: "admin.pageDescriptions.plugins",
-    keywords: ["erweiterungen", "plugins", "add-ons", "module", "pakete", "opm", "sicherer modus", "safe mode"],
+    keywords: ["erweiterungen", "plugins", "add-ons", "module", "pakete", "opm", "sicherer modus", "safe mode", "paketquelle", "repository", "installieren", "signatur", "aktualisierung"],
   },
   {
     slug: "settings-jobs",

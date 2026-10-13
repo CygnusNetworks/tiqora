@@ -15,7 +15,9 @@ import { pluginPointsApi } from "@/lib/pluginPointsApi";
 import { pluginsApi, type PluginAdmin, type PluginPackage } from "@/lib/pluginsApi";
 import { isPluginSafeMode } from "@/plugins/safeMode";
 import { capabilityText } from "./plugins/capabilities";
+import { CatalogTab } from "./plugins/CatalogTab";
 import { InstallDialog } from "./plugins/InstallDialog";
+import { RepositoriesTab } from "./plugins/RepositoriesTab";
 import { RestartPanel } from "./plugins/RestartPanel";
 import { sourceLabel, trustColor, trustLabelKey } from "./plugins/trust";
 import { PLUGIN_TABS, parsePluginTab } from "./plugins/tabs";
@@ -631,7 +633,11 @@ export function PluginsPage() {
         </p>
       )}
 
-      {tab !== "installed" ? null : plugins.length === 0 ? (
+      {tab === "available" ? (
+        <CatalogTab runtimeInstall={runtimeInstall} coordinatedRestart={coordinated} />
+      ) : tab === "repositories" ? (
+        <RepositoriesTab />
+      ) : plugins.length === 0 ? (
         <p className="rounded-xl border border-hairline bg-surface p-4 text-sm text-muted" data-testid="admin-plugins-empty">
           {t("admin.plugins.empty")}
         </p>

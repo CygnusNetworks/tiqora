@@ -8,7 +8,7 @@ import type { PluginAdmin } from "@/lib/pluginsApi";
 import { PLUGIN_SAFE_MODE_KEY } from "@/plugins/safeMode";
 import { ADMIN_PAGES, rankAdminPages } from "@/lib/adminSearch";
 import type { Job } from "@/lib/jobsApi";
-import { adminListFields, aiWorkerRuntime, packageReport, restartStatus, syncHookRow } from "@/test/pluginFixtures";
+import { adminListFields, aiWorkerRuntime, catalogEntry, packageReport, repository, restartStatus, syncHookRow } from "@/test/pluginFixtures";
 import { PluginsPage } from "./PluginsPage";
 
 const navigate = vi.fn();
@@ -32,8 +32,12 @@ const getPackage = vi.fn();
 const restartStatusFn = vi.fn();
 const requestRestart = vi.fn();
 const installPackage = vi.fn();
+const repositoriesFn = vi.fn();
+const catalogFn = vi.fn();
 vi.mock("@/lib/pluginsApi", () => ({
   pluginsApi: {
+    repositories: (...a: unknown[]) => repositoriesFn(...a),
+    catalog: (...a: unknown[]) => catalogFn(...a),
     download: (...a: unknown[]) => download(...a),
     getPackage: (...a: unknown[]) => getPackage(...a),
     restartStatus: (...a: unknown[]) => restartStatusFn(...a),
@@ -176,7 +180,9 @@ beforeEach(async () => {
   navigate.mockReset();
   searchState = {};
   jobState = undefined;
-  for (const fn of [download, getPackage, requestRestart, installPackage]) fn.mockReset();
+  for (const fn of [download, getPackage, requestRestart, installPackage, repositoriesFn, catalogFn]) fn.mockReset();
+  repositoriesFn.mockResolvedValue([repository()]);
+  catalogFn.mockResolvedValue({ categories: [], entries: [catalogEntry({ name: "Katalog-Plugin" })] });
   restartStatusFn.mockReset();
   restartStatusFn.mockResolvedValue(restartStatus({ generation: 4 }));
 });
@@ -534,6 +540,18 @@ describe("PluginsPage installed tab", () => {
     expect(screen.queryByTestId("plugin-card-org.example.hello")).toBeNull();
   });
 
+  it("fills the Verfügbar and Paketquellen tabs", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
+    searchState = { tab: "available" };
+    const first = renderPage();
+    expect(await screen.findByText("Katalog-Plugin")).toBeInTheDocument();
+    expect(screen.queryByTestId("plugin-card-org.example.hello")).toBeNull();
+    first.unmount();
+    searchState = { tab: "repositories" };
+    renderPage();
+    expect(await screen.findByTestId("repository-row-1")).toHaveTextContent("Beispiel-Paketquelle");
+  });
+
   it("treats an unknown or non-string tab as installed", async () => {
     adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
     searchState = { tab: 42 };
@@ -547,7 +565,7 @@ describe("admin page registry", () => {
   it("the palette finds the extensions page by its name and by keywords", async () => {
     await i18n.changeLanguage("de");
     const t = (key: string) => i18n.t(key);
-    for (const query of ["Erweiterungen", "safe mode", "opm"]) {
+    for (const query of ["Erweiterungen", "safe mode", "opm", "Paketquelle", "repository", "installieren", "signatur", "aktualisierung"]) {
       const hits = rankAdminPages(ADMIN_PAGES, query, t).map((page) => page.slug);
       expect(hits, query).toContain("plugins");
     }
