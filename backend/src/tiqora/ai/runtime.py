@@ -2105,9 +2105,7 @@ async def run_ticket_agent(
             await session.commit()
             try:
                 if plugin_driver is None:
-                    raise ChannelDeliveryError(
-                        f"Kanal „{src.channel}“ ist derzeit nicht verfügbar"
-                    )
+                    raise ChannelDeliveryError(f"Kanal „{src.channel}“ ist derzeit nicht verfügbar")
                 article_id = await deliver_plugin_channel_reply(
                     session,
                     sysconfig,
