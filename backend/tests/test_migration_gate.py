@@ -12,6 +12,7 @@ from __future__ import annotations
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 
+from tests.plugins.helpers import Installer
 from tiqora.cli.migrate import ALEMBIC_INI, build_alembic_config
 
 # The current head of the tiqora-only chain and of the owned chain. Update
@@ -62,3 +63,13 @@ def test_owned_head_is_not_downstream_of_later_tiqora_revisions() -> None:
     script = ScriptDirectory.from_config(build_alembic_config(include_owned=True))
     owned_ancestors = {rev.revision for rev in script.iterate_revisions(OWNED_HEAD, "base")}
     assert TIQORA_HEAD not in owned_ancestors
+
+
+def test_plugin_migrations_never_reach_core_graph(fixture_plugins: Installer) -> None:
+    """A plugin's revisions live in its own environment, never in the core graph."""
+    pkg_dir = fixture_plugins("tq_fixture_tables", plugin_id="org.example.tables")
+    assert (pkg_dir / "migrations" / "0001_init.py").is_file()
+    cfg = build_alembic_config(include_owned=False)
+    assert _heads(cfg) == {TIQORA_HEAD}
+    revisions = {r.revision for r in ScriptDirectory.from_config(cfg).walk_revisions()}
+    assert "tables_0001" not in revisions

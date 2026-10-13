@@ -30,6 +30,9 @@ MAX_ERROR_LEN: Final = 2000
 class BootInfo:
     enabled: bool
     boot_attempts: int
+    #: plugin version whose migrations last ran, and the German error of a failed run (D6)
+    migrated_version: str | None = None
+    migration_error: str | None = None
 
 
 def storable(plugin_id: str) -> bool:
@@ -59,6 +62,7 @@ async def sync_discovered(
         for p in wanted:
             name = ((p.manifest.name if p.manifest else p.dist_name) or p.plugin_id)[:200]
             version = (p.manifest.version if p.manifest else p.dist_version)[:64]
+            short_id = p.manifest.short_id if p.manifest else None
             row = rows.get(p.plugin_id)
             if row is None:
                 row = TiqoraPlugin(
@@ -67,6 +71,7 @@ async def sync_discovered(
                     version=version,
                     enabled=auto_enable,
                     source="image",
+                    short_id=short_id,
                     installed_at=now,
                     updated_at=now,
                 )
@@ -76,6 +81,8 @@ async def sync_discovered(
                 row.name = name
                 row.version = version
                 row.updated_at = now
+            if short_id is not None and row.short_id != short_id:
+                row.short_id = short_id
         try:
             await session.flush()
         except IntegrityError:
@@ -126,7 +133,12 @@ async def _prepare_once(
             )
             attempts = {r.plugin_id: r.boot_attempts for r in runtime.scalars()}
             info = {
-                pid: BootInfo(enabled=row.enabled, boot_attempts=attempts.get(pid, 0))
+                pid: BootInfo(
+                    enabled=row.enabled,
+                    boot_attempts=attempts.get(pid, 0),
+                    migrated_version=row.migrated_version,
+                    migration_error=row.migration_error,
+                )
                 for pid, row in rows.items()
             }
         await session.commit()

@@ -81,6 +81,18 @@ def add_plugins_subparser(sub: argparse._SubParsersAction) -> None:  # type: ign
     inspect_p.add_argument("--json", action="store_true", dest="as_json")
     inspect_p.set_defaults(func=_cmd_inspect)
 
+    migrate_p = plugins_sub.add_parser(
+        "migrate", help="Run the database changes of one plugin and record the result"
+    )
+    migrate_p.add_argument("plugin_id")
+    migrate_p.add_argument(
+        "--path",
+        type=Path,
+        default=None,
+        help="site directory of a freshly unpacked package (no activation of installed ones)",
+    )
+    migrate_p.set_defaults(func=_cmd_migrate)
+
     index_p = plugins_sub.add_parser("index", help="Build and sign a repository index.json")
     index_sub = index_p.add_subparsers(dest="index_command")
     build_p = index_sub.add_parser(
@@ -287,6 +299,63 @@ async def _cmd_inspect(args: argparse.Namespace) -> int:
             print(f"Hinweis: {line}")  # noqa: T201 — CLI output
         print("installierbar" if report.installable else "nicht installierbar")  # noqa: T201
     return 0 if report.installable else 1
+
+
+async def _cmd_migrate(args: argparse.Namespace) -> int:
+    import asyncio
+    from importlib.metadata import distributions
+
+    from tiqora.config import get_settings
+    from tiqora.jobs.service import utc_now
+    from tiqora.plugins.discovery import ENTRY_POINT_GROUP
+    from tiqora.plugins.migrations import (
+        PluginMigrationError,
+        plugin_migration_head,
+        plugin_session_factory,
+        record_migration,
+        upgrade_plugin,
+    )
+
+    settings = get_settings()
+    if args.path is not None:
+        # no activation: the installed version must not be on sys.path next to the new one
+        site = str(args.path.resolve())
+        entry_points = [
+            ep
+            for dist in distributions(path=[site])
+            for ep in dist.entry_points
+            if ep.group == ENTRY_POINT_GROUP
+        ]
+        sys.path.insert(0, site)
+        found = discover_plugins(entry_points_=entry_points)
+    else:
+        found = discover_plugins()
+    matches = [d for d in found if d.plugin_id == args.plugin_id]
+    if not matches:
+        _err(f"Fehler: Erweiterung {args.plugin_id} nicht gefunden")
+        return 1
+    plugin = matches[0]
+    if plugin.manifest is None or plugin.problem is not None:
+        _err(f"Fehler: Erweiterung {args.plugin_id} ist ungültig: {plugin.problem}")
+        return 1
+    version = plugin.manifest.version
+    error: str | None = None
+    head: str | None = None
+    try:
+        # the plugin environment runs its own event loop: keep it off this one
+        head = await asyncio.to_thread(upgrade_plugin, plugin, database_url=settings.database_url)
+        head = head or plugin_migration_head(plugin)
+    except PluginMigrationError as exc:
+        error = str(exc)
+    async with plugin_session_factory(settings.database_url) as factory:
+        await record_migration(
+            factory, plugin.plugin_id, version=version, head=head, error=error, now=utc_now()
+        )
+    if error is not None:
+        _err(error)
+        return 1
+    print(f"Erweiterung {plugin.plugin_id}: Datenbank aktuell ({head or version})")  # noqa: T201
+    return 0
 
 
 async def _cmd_index_build(args: argparse.Namespace) -> int:

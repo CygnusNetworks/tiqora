@@ -21,7 +21,12 @@ T1 = T0 + timedelta(hours=1)
 
 #: ids this suite owns: org.example.plg49a ... plg49z plus the fixture plugins
 _OWN_PREFIX = "org.example.plg49"
-_FIXTURE_IDS = ("org.example.hello", "org.example.broken", "org.example.slow")
+_FIXTURE_IDS = (
+    "org.example.hello",
+    "org.example.broken",
+    "org.example.slow",
+    "org.example.tables",
+)
 _FIXTURE_IDS_LIKE = tuple(f"{i}%" for i in _FIXTURE_IDS)
 
 

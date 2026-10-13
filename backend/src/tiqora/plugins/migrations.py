@@ -11,19 +11,35 @@ Znuny table), not a security boundary: an admin who installs a plugin trusts its
 
 from __future__ import annotations
 
+import os
 import re
-from collections.abc import Callable
+import subprocess
+import sys
+from collections.abc import AsyncIterator, Callable, Mapping, Sequence
+from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
+from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from tiqora.plugins.discovery import DiscoveredPlugin
 
 _ENV_DIR = Path(__file__).parent / "alembic_env"
 _MAX_REVISION_ID = 32  # width of the version_num column Alembic creates
+_MAX_ERROR_LEN = 2000
+
+MIGRATION_PENDING_MESSAGE: Final = (
+    "Datenbank-Änderungen der Erweiterung stehen aus oder sind fehlgeschlagen"
+)
+SAFE_MODE_MIGRATIONS_MESSAGE: Final = (
+    "Abgesicherter Modus: Datenbank-Änderungen der Erweiterungen übersprungen"
+)
 
 
 class PluginMigrationError(RuntimeError):
@@ -448,3 +464,143 @@ def downgrade_plugin_to_base(plugin: DiscoveredPlugin, *, database_url: str) -> 
     if migrations_dir(plugin) is None:
         return
     _run(plugin, database_url, lambda cfg: command.downgrade(cfg, "base"), upward=False)
+
+
+# --------------------------------------------------------------------------------------
+# Bookkeeping and boot run (D6 "Boot", F3)
+# --------------------------------------------------------------------------------------
+
+
+@asynccontextmanager
+async def plugin_session_factory(
+    database_url: str,
+) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+    """Session factory on a throw-away engine (CLI code runs several ``asyncio.run`` calls)."""
+    from tiqora.db.engine import _normalize_url, _utc_connect_args
+
+    url = _normalize_url(database_url)
+    engine = create_async_engine(url, poolclass=NullPool, connect_args=_utc_connect_args(url))
+    try:
+        yield async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    finally:
+        await engine.dispose()
+
+
+async def record_migration(
+    factory: async_sessionmaker[AsyncSession],
+    plugin_id: str,
+    *,
+    version: str,
+    head: str | None,
+    error: str | None,
+    now: datetime,
+) -> None:
+    """Store the outcome on ``tiqora_plugin``.
+
+    Success sets ``migrated_version``/``migrated_head`` and clears the error; a failure keeps
+    ``migrated_version`` (the version that last migrated fully) and only sets the error.
+    """
+    from tiqora.db.tiqora.models import TiqoraPlugin
+
+    if error is None:
+        values: dict[str, Any] = {
+            "migrated_version": version[:64],
+            "migrated_head": head[:64] if head else None,
+            "migrated_at": now,
+            "migration_error": None,
+        }
+    else:
+        values = {"migration_error": error[:_MAX_ERROR_LEN]}
+    async with factory() as session:
+        await session.execute(
+            update(TiqoraPlugin).where(TiqoraPlugin.id == plugin_id).values(values)
+        )
+        await session.commit()
+
+
+def _child_env(database_url: str) -> dict[str, str]:
+    """Environment of a migration subprocess: same import path, same database."""
+    env = dict(os.environ)
+    env["DATABASE_URL"] = database_url
+    # runtime plugin site directories are on this process's sys.path, not in PYTHONPATH
+    env["PYTHONPATH"] = os.pathsep.join(p for p in sys.path if p)
+    return env
+
+
+def _last_line(text: str) -> str:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return lines[-1] if lines else ""
+
+
+def _run_one_in_subprocess(plugin_id: str, *, database_url: str, timeout: int) -> str | None:
+    """``python -m tiqora.main plugins migrate <id>``; ``None`` = ok, else the German error."""
+    cmd = [sys.executable, "-m", "tiqora.main", "plugins", "migrate", plugin_id]
+    try:
+        done = subprocess.run(  # noqa: S603 - fixed argv, plugin id is not shell-interpreted
+            cmd,
+            env=_child_env(database_url),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return f"Datenbank-Änderung dauerte länger als {timeout} Sekunden und wurde abgebrochen"
+    except OSError as exc:
+        return f"Datenbank-Änderung konnte nicht gestartet werden: {exc}"
+    if done.returncode == 0:
+        return None
+    detail = _last_line(done.stderr) or _last_line(done.stdout)
+    if done.returncode == 1 and detail:  # the CLI prints the German error as its last line
+        return detail[:_MAX_ERROR_LEN]
+    return (
+        f"Datenbank-Änderung abgebrochen (Exit-Code {done.returncode})"
+        + (f": {detail}" if detail else "")
+    )[:_MAX_ERROR_LEN]
+
+
+def run_boot_migrations(
+    *,
+    database_url: str,
+    plugins: Sequence[DiscoveredPlugin],
+    rows: Mapping[str, tuple[str | None, str | None]],
+) -> dict[str, str | None]:
+    """Migrate every plugin that needs it; returns ``plugin_id -> error`` (``None`` = ok).
+
+    Sync, never raises. ``rows`` maps ``plugin_id -> (migrated_version, migration_error)``; an
+    error present here belongs to the current version and is not retried (only the install
+    job or "Erneut versuchen" does). Skipped entirely in safe mode and for ids in
+    ``TIQORA_PLUGINS_DISABLED``; incompatible or invalid plugins are not migrated. Each plugin
+    runs in its own subprocess with a timeout, so ``SystemExit``, a crash or a hang becomes a
+    recorded error and never stops the caller.
+    """
+    from tiqora.config import get_settings
+    from tiqora.plugins.compat import check_compat, release_core_version
+
+    settings = get_settings()
+    if settings.plugins_safe_mode:
+        return {}
+    core = release_core_version()
+    results: dict[str, str | None] = {}
+    for plugin in plugins:
+        try:
+            manifest = plugin.manifest
+            if manifest is None or plugin.problem is not None:
+                continue
+            if plugin.plugin_id in settings.plugins_disabled_ids:
+                continue
+            if migrations_dir(plugin) is None or check_compat(manifest, core=core) is not None:
+                continue
+            migrated, error = rows.get(plugin.plugin_id, (None, None))
+            if error or migrated == manifest.version:
+                continue
+            results[plugin.plugin_id] = _run_one_in_subprocess(
+                plugin.plugin_id,
+                database_url=database_url,
+                timeout=settings.plugins_migrate_timeout_seconds,
+            )
+        except Exception as exc:  # noqa: BLE001 - one plugin must never stop the others
+            results[plugin.plugin_id] = f"Datenbank-Änderung nicht ausgeführt: {exc}"[
+                :_MAX_ERROR_LEN
+            ]
+    return results

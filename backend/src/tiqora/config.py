@@ -528,6 +528,10 @@ class Settings(BaseSettings):
     plugins_boot_budget_seconds: int = Field(
         default=60, ge=1, le=3600, validation_alias="TIQORA_PLUGINS_BOOT_BUDGET_SECONDS"
     )
+    # One plugin's boot migration runs in a subprocess; a hang ends as a recorded error (F3).
+    plugins_migrate_timeout_seconds: int = Field(
+        default=300, ge=1, le=3600, validation_alias="TIQORA_PLUGINS_MIGRATE_TIMEOUT_SECONDS"
+    )
     plugin_events_interval_seconds: int = Field(
         default=5, ge=5, le=300, validation_alias="TIQORA_PLUGIN_EVENTS_INTERVAL_SECONDS"
     )

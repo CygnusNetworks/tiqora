@@ -32,6 +32,7 @@ from tiqora.plugins.loader import (
     import_and_register,
     run_in_daemon_thread,
 )
+from tiqora.plugins.migrations import MIGRATION_PENDING_MESSAGE, migrations_dir
 from tiqora.plugins.registrar import RegistrationRejected
 from tiqora.plugins.state import (
     QUARANTINE_AFTER,
@@ -343,6 +344,12 @@ async def _load_plugins(
         problem = _requirement_problem(p, by_id, results)
         if problem is not None:
             await record(p, RuntimeState.FAILED, problem)
+            continue
+        if migrations_dir(p) is not None and (
+            info.migrated_version != p.manifest.version or info.migration_error
+        ):
+            detail = info.migration_error or "noch nicht ausgeführt"
+            await record(p, RuntimeState.FAILED, f"{MIGRATION_PENDING_MESSAGE}: {detail}"[:2000])
             continue
         remaining = budget - (time.monotonic() - started)
         if remaining < 1:  # too little left for a meaningful import attempt

@@ -37,6 +37,8 @@ from tiqora.plugins.bootstrap import (
     plugin_tables_missing,
     retry_plugin_boot,
 )
+from tiqora.plugins.discovery import discovered_plugins
+from tiqora.plugins.migrations import MIGRATION_PENDING_MESSAGE
 from tiqora.plugins.state import (
     PluginStatus,
     RuntimeState,
@@ -747,3 +749,79 @@ async def test_no_retry_when_the_core_only_boot_had_another_cause(
         clock=fake.clock,
     )
     assert fake.sleeps == []
+
+
+async def _mark_migrated(
+    factory: async_sessionmaker[AsyncSession],
+    plugin_id: str,
+    *,
+    version: str | None,
+    error: str | None,
+) -> None:
+    from sqlalchemy import update
+
+    from tiqora.db.tiqora.models import TiqoraPlugin
+
+    async with factory() as s:
+        await s.execute(
+            update(TiqoraPlugin)
+            .where(TiqoraPlugin.id == plugin_id)
+            .values(migrated_version=version, migration_error=error)
+        )
+        await s.commit()
+
+
+async def test_load_gate_blocks_pending_migration(
+    fixture_plugins: Installer, factory: async_sessionmaker[AsyncSession], settings: Settings
+) -> None:
+    fixture_plugins("tq_fixture_tables", plugin_id="org.example.tables")
+    fixture_plugins()  # a plugin without migrations/ loads normally
+    reg = await init_registry(role="api", settings=settings, session_factory=factory)
+    blocked = loaded_plugins()["org.example.tables"]
+    assert blocked.state is RuntimeState.FAILED
+    assert blocked.error is not None
+    assert blocked.error.startswith(MIGRATION_PENDING_MESSAGE)
+    assert blocked.error.endswith("noch nicht ausgeführt")
+    assert loaded_plugins()["org.example.hello"].state is RuntimeState.ACTIVE
+    assert {r.owner for r in reg.registrations()} == {"core", "org.example.hello"}
+    assert "tq_fixture_tables" not in sys.modules  # never imported
+    (row,) = await runtime_rows(factory, "org.example.tables", role="api")
+    assert (row.state, row.error) == ("failed", blocked.error)
+
+
+async def test_load_gate_reports_the_recorded_migration_error(
+    fixture_plugins: Installer, factory: async_sessionmaker[AsyncSession], settings: Settings
+) -> None:
+    fixture_plugins("tq_fixture_tables", plugin_id="org.example.tables")
+    await store.prepare_boot(
+        factory,
+        [p for p in discovered_plugins() if p.plugin_id == "org.example.tables"],
+        role="api",
+        auto_enable=True,
+    )
+    await _mark_migrated(
+        factory,
+        "org.example.tables",
+        version="1.0.0",
+        error="Datenbank-Änderung „x“ fehlgeschlagen",
+    )
+    await init_registry(role="api", settings=settings, session_factory=factory)
+    state = loaded_plugins()["org.example.tables"]
+    assert state.state is RuntimeState.FAILED
+    assert state.error == f"{MIGRATION_PENDING_MESSAGE}: Datenbank-Änderung „x“ fehlgeschlagen"
+
+
+async def test_load_gate_passes_after_migration(
+    fixture_plugins: Installer, factory: async_sessionmaker[AsyncSession], settings: Settings
+) -> None:
+    fixture_plugins("tq_fixture_tables", plugin_id="org.example.tables")
+    await store.prepare_boot(
+        factory,
+        [p for p in discovered_plugins() if p.plugin_id == "org.example.tables"],
+        role="api",
+        auto_enable=True,
+    )
+    await _mark_migrated(factory, "org.example.tables", version="1.0.0", error=None)
+    reg = await init_registry(role="api", settings=settings, session_factory=factory)
+    assert loaded_plugins()["org.example.tables"].state is RuntimeState.ACTIVE
+    assert "org.example.tables" in {r.owner for r in reg.registrations()}
