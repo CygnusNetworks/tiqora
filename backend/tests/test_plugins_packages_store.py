@@ -9,9 +9,11 @@ import random
 from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
 
+import pymysql
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
 from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tests._plugins_state_helpers import T0, to_async_url
@@ -19,6 +21,7 @@ from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraPlugin, TiqoraPluginPackage
 from tiqora.plugins.inspect import PackageReport
 from tiqora.plugins.packages_store import (
+    _STATEMENT_MARGIN,
     PACKET_TOO_LARGE_TEXT,
     PackageTooLargeForDatabase,
     delete_package,
@@ -27,6 +30,7 @@ from tiqora.plugins.packages_store import (
     installed_runtime_rows,
     keep_shas,
     mark_package_installed,
+    mysql_escaped_size,
     purge_stale_packages,
     store_package,
     unmark_packages,
@@ -269,19 +273,24 @@ async def test_store_rejects_unknown_source(factory: async_sessionmaker[AsyncSes
 async def test_oversized_blob_maps_to_german_error_on_mariadb(
     mariadb_znuny_url: str,
 ) -> None:
-    """F11: a blob over max_allowed_packet (16 MiB) raises the domain error, not a driver one."""
+    """F11: a blob whose escaped size exceeds max_allowed_packet is refused before the INSERT.
+
+    NUL bytes escape to two bytes each, so ``packet // 2 + 1`` of them overflow whatever the
+    server's packet size is; without the pre-check this INSERT dies on the wire (2013 or a
+    raw "Not connected" from the rollback inside the flush).
+    """
     engine = create_async_engine(to_async_url(mariadb_znuny_url))
     async with engine.begin() as conn:
         await conn.run_sync(lambda c: TiqoraBase.metadata.create_all(c, checkfirst=True))
     sm = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     await _clean(sm)
     try:
-        blob = random.Random(63).randbytes(40 * 1024 * 1024)
         async with sm() as s:
+            packet = int((await s.execute(text("SELECT @@max_allowed_packet"))).scalar_one())
             with pytest.raises(PackageTooLargeForDatabase) as ei:
                 await store_package(
                     s,
-                    data=blob,
+                    data=b"\x00" * (packet // 2 + 1),
                     report=report(21),
                     manifest_text="m",
                     source="upload",
@@ -290,10 +299,58 @@ async def test_oversized_blob_maps_to_german_error_on_mariadb(
                     now=T0,
                 )
             assert str(ei.value) == PACKET_TOO_LARGE_TEXT
-            assert "max_allowed_packet" in str(ei.value)
-            await s.rollback()
-        async with sm() as s:
+            assert not s.new  # nothing pending, nothing sent
+            assert (await s.execute(text("SELECT 1"))).scalar_one() == 1  # session usable
             assert await get_package(s, sha(21)) is None
+            await s.commit()
     finally:
         await _clean(sm)
         await engine.dispose()
+
+
+def test_escaped_size_counts_the_seven_escaped_bytes() -> None:
+    assert mysql_escaped_size(b"abc") == 3
+    assert mysql_escaped_size(b"\x00\n\r\x1a'\"\\") == 14
+    assert mysql_escaped_size(bytes(range(256))) == 263
+
+
+def test_default_cap_of_random_bytes_passes_the_precheck_at_16_mib() -> None:
+    """F11: the 15 MiB default must not be refused against the 16 MiB MariaDB default."""
+    blob = random.Random(62).randbytes(15 * 1024 * 1024)
+    assert mysql_escaped_size(blob) + 2 * 4096 + _STATEMENT_MARGIN <= 16 * 1024 * 1024
+
+
+@pytest.mark.parametrize("code", [1153, 2013])
+async def test_flush_packet_error_still_maps_on_mariadb(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch, code: int
+) -> None:
+    """Fallback: a packet error at the flush (pre-check passed) maps to the domain error."""
+    engine = create_async_engine(to_async_url(mariadb_znuny_url))
+    sm = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with sm() as s:
+
+            async def boom() -> None:
+                raise OperationalError("INSERT", {}, pymysql.err.OperationalError(code, "x"))
+
+            monkeypatch.setattr(s, "flush", boom)
+            with pytest.raises(PackageTooLargeForDatabase):
+                await _put(s, 22)
+            await s.rollback()
+    finally:
+        await engine.dispose()
+
+
+async def test_lost_connection_is_not_reported_as_too_large(
+    factory: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A dead socket ("Not connected") is a driver error, not "Paket zu groß"."""
+    async with factory() as s:
+
+        async def boom() -> None:
+            raise InterfaceError("ROLLBACK", {}, pymysql.err.InterfaceError("(0, 'Not connected')"))
+
+        monkeypatch.setattr(s, "flush", boom)
+        with pytest.raises(InterfaceError):
+            await _put(s, 23)
+        await s.rollback()

@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import datetime
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, select, text, update
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,7 +22,13 @@ PACKET_TOO_LARGE_TEXT = (
     "Paket zu groß für die Datenbank-Einstellung max_allowed_packet; "
     "bitte erhöhen oder TIQORA_PLUGINS_MAX_PACKAGE_MB senken"
 )
-_PACKET_ERRORS = (1153, 2013)  # ER_NET_PACKET_TOO_LARGE, CR_SERVER_LOST (aiomysql)
+# Fallback only: ER_NET_PACKET_TOO_LARGE and CR_SERVER_LOST (aiomysql). 2013 is a generic
+# "connection lost"; it reaches the mapping only when the pre-check in ``store_package`` was
+# passed, so a lost connection during this INSERT may then read as "Paket zu groß".
+_PACKET_ERRORS = (1153, 2013)
+# pymysql/aiomysql send bytes as an escaped literal: these seven byte values take two bytes.
+_ESCAPED_BYTES = b"\x00\n\r\x1a'\"\\"
+_STATEMENT_MARGIN = 64 * 1024  # SQL text, the other short columns, protocol header
 
 
 class PackageTooLargeForDatabase(Exception):
@@ -30,6 +36,31 @@ class PackageTooLargeForDatabase(Exception):
 
     def __init__(self) -> None:
         super().__init__(PACKET_TOO_LARGE_TEXT)
+
+
+def mysql_escaped_size(data: bytes) -> int:
+    """Bytes the blob takes in the INSERT statement after client-side escaping."""
+    return 2 * len(data) - len(data.translate(None, delete=_ESCAPED_BYTES))
+
+
+def _is_mysql(session: AsyncSession) -> bool:
+    return session.get_bind().dialect.name in ("mysql", "mariadb")
+
+
+async def _check_packet_size(
+    session: AsyncSession, data: bytes, manifest_text: str, report_json: str
+) -> None:
+    """Refuse a blob that cannot fit into one MariaDB packet, before anything is sent.
+
+    Sending it would fail on the wire (2013), and the rollback inside the flush then hits a
+    dead socket and replaces that error with "Not connected"; so decide up front.
+    """
+    if not _is_mysql(session):
+        return
+    packet = int((await session.execute(text("SELECT @@max_allowed_packet"))).scalar_one())
+    rest = 2 * (len(manifest_text.encode()) + len(report_json.encode()))
+    if mysql_escaped_size(data) + rest + _STATEMENT_MARGIN > packet:
+        raise PackageTooLargeForDatabase
 
 
 def _is_packet_error(exc: DBAPIError) -> bool:
@@ -50,8 +81,10 @@ async def store_package(
 ) -> TiqoraPluginPackage:
     """Insert the package, or refresh the report of the row that already has this hash.
 
-    Raises ``PackageTooLargeForDatabase`` when MariaDB rejects the blob (1153/2013). After
-    2013 the connection is gone: the caller must roll back the session.
+    Raises ``PackageTooLargeForDatabase`` when the escaped blob does not fit into the MariaDB
+    ``max_allowed_packet`` (checked before the INSERT; the session stays usable). As a
+    fallback the driver errors 1153/2013 at the flush map to the same exception; after 2013
+    the connection is gone and the caller must roll back the session.
     """
     if source not in RUNTIME_SOURCES:
         raise ValueError(f"unknown package source {source!r}")
@@ -66,6 +99,8 @@ async def store_package(
         existing.key_id = report.key_id
         await session.flush()
         return existing
+    report_json = report.model_dump_json()
+    await _check_packet_size(session, data, manifest_text, report_json)
     row = TiqoraPluginPackage(
         sha256=report.sha256,
         plugin_id=report.plugin_id,
@@ -73,7 +108,7 @@ async def store_package(
         size_bytes=len(data),
         data=data,
         manifest=manifest_text,
-        report=report.model_dump_json(),
+        report=report_json,
         signature_status=report.trust.value,
         key_id=report.key_id,
         source=source,
@@ -86,7 +121,7 @@ async def store_package(
     try:
         await session.flush()
     except DBAPIError as exc:
-        if session.bind.dialect.name in ("mysql", "mariadb") and _is_packet_error(exc):
+        if _is_mysql(session) and _is_packet_error(exc):
             raise PackageTooLargeForDatabase from exc
         raise
     return row
