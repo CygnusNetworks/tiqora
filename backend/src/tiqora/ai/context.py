@@ -10,6 +10,7 @@ into an LLM prompt (plan §3.4 step 5).
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from email.utils import parseaddr
@@ -101,16 +102,21 @@ async def ticket_snapshot(session: AsyncSession, ticket_id: int) -> TicketSnapsh
     )
 
 
-def render_ticket_header(ticket: TicketSnapshot) -> str:
+def render_ticket_header(ticket: TicketSnapshot, mask: Callable[[str], str] | None = None) -> str:
     """Structured metadata header rendered ahead of the article text — same
     format for both the agent runtime (:mod:`tiqora.ai.runtime`) and the
     summary service (:mod:`tiqora.ai.summary`), so the model never sees two
-    divergent conventions. Never passed through :meth:`PiiMapper.mask` — the
-    ticket number/queue/state are not PII, and CustomerID/CustomerUser are
-    deliberately shown unmasked (they are needed verbatim for tool calls and
-    are already exempted via ``PiiMapper(never_mask=...)``)."""
+    divergent conventions.
+
+    ``mask`` (the run's :meth:`PiiMapper.mask` when masking is on) is applied
+    to CustomerID/CustomerUser only — the ticket number/queue/state are not
+    PII. A plain customer number passes through (``pii_never_mask``); a login
+    that is an e-mail address becomes the same ``[EMAIL_n]`` token as in the
+    articles, and the tools unmask it if the model passes it on."""
     customer_id = ticket.customer_id or "not set"
     customer_user_id = ticket.customer_user_id or "not set"
+    if mask is not None:
+        customer_id, customer_user_id = mask(customer_id), mask(customer_user_id)
     return "\n".join(
         (
             f"Ticket #{ticket.ticket_id} (number {ticket.ticket_number}): {ticket.title}",
@@ -352,9 +358,10 @@ async def _system_addresses(session: AsyncSession) -> frozenset[str]:
 
 def pii_never_mask(ticket: TicketSnapshot) -> set[str]:
     """Values a :class:`tiqora.ai.pii.PiiMapper` must leave readable for this
-    ticket: the customer ids the MCP tools need verbatim, and the ticket
-    number, which the loose PHONE pattern would otherwise swallow wherever it
-    is quoted ("[Cygnus#2026010510000011]")."""
+    ticket: the customer ids, and the ticket number, which the loose PHONE
+    pattern would otherwise swallow wherever it is quoted
+    ("[Cygnus#2026010510000011]"). A customer id that is an e-mail address is
+    dropped by the mapper itself and masked like any other address."""
     return {v for v in (ticket.customer_id, ticket.customer_user_id, ticket.ticket_number) if v}
 
 
