@@ -183,6 +183,53 @@ async def test_auth_failure_returns_znuny_error(env: Env) -> None:
     assert resp.json()["Error"]["ErrorCode"].endswith("AuthFail")
 
 
+async def test_sso_managed_agent_is_refused_like_a_wrong_password(env: Env) -> None:
+    """P2A-PM-I2b holds for plugin operations (they authenticate through the gated
+    ``_auth_from_params``): an agent mapped by SCIM under a provider that requires the IdP's
+    MFA gets the wrong-password answer for the right password (the operation's own
+    ``ctx.authenticate`` call fails), and the weak stored hash is not rehashed."""
+    import hashlib
+
+    from structlog.testing import capture_logs
+
+    from tests.test_plugins_auth_db import _refusals, _scim_map
+
+    legacy = hashlib.sha256(PASSWORD.encode()).hexdigest()
+    engine = create_engine(env.url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE users SET pw = :pw WHERE id = :i"), {"pw": legacy, "i": AGENT_ID}
+            )
+        _scim_map(env.url, user_kind="agent", login=LOGIN, require_mfa=True)
+        with capture_logs() as logs:
+            refused = await env.call(UserLogin=LOGIN, Password=PASSWORD)
+            wrong = await env.call(UserLogin=LOGIN, Password="falsch")
+        assert (refused.status_code, refused.json()) == (wrong.status_code, wrong.json())
+        assert refused.status_code == 401, refused.text
+        assert refused.json()["Error"]["ErrorCode"].endswith("AuthFail")
+        # the operation runs and asks ``ctx.authenticate``, which answers both calls alike
+        assert len([c for c in points_behaviour().CALLS if c[0] == "gi.op"]) == 2
+        assert [(e["path"], e["user_kind"], e["login"]) for e in _refusals(logs)] == [
+            ("compat", "agent", LOGIN)
+        ]
+        with engine.connect() as conn:
+            stored = conn.execute(
+                text("SELECT pw FROM users WHERE id = :i"), {"i": AGENT_ID}
+            ).scalar_one()
+        assert stored == legacy
+    finally:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "DELETE FROM tiqora_scim_user WHERE provider_id IN"
+                    " (SELECT id FROM tiqora_identity_provider WHERE slug LIKE 'pp55scim%')"
+                )
+            )
+            conn.execute(text("DELETE FROM tiqora_identity_provider WHERE slug LIKE 'pp55scim%'"))
+        engine.dispose()
+
+
 @pytest.mark.parametrize("mode", ["raise", "hang", "nondict"])
 async def test_operation_failure_is_fault(env: Env, mode: str) -> None:
     points_behaviour().MODE["gi.op"] = mode
