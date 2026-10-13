@@ -476,10 +476,10 @@ async def plugin_session_factory(
     database_url: str,
 ) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     """Session factory on a throw-away engine (CLI code runs several ``asyncio.run`` calls)."""
-    from tiqora.db.engine import _normalize_url, _utc_connect_args
+    from tiqora.db.engine import async_url_and_connect_args
 
-    url = _normalize_url(database_url)
-    engine = create_async_engine(url, poolclass=NullPool, connect_args=_utc_connect_args(url))
+    url, connect_args = async_url_and_connect_args(database_url)
+    engine = create_async_engine(url, poolclass=NullPool, connect_args=connect_args)
     try:
         yield async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     finally:
@@ -551,7 +551,9 @@ def _run_one_in_subprocess(plugin_id: str, *, database_url: str, timeout: int) -
     if done.returncode == 0:
         return None
     detail = _last_line(done.stderr) or _last_line(done.stdout)
-    if done.returncode == 1 and detail:  # the CLI prints the German error as its last line
+    # the CLI prints its one-line German error last; anything else (traceback, sys.exit text) is
+    # not that error and gets the generic prefix
+    if done.returncode == 1 and detail.startswith(("Datenbank-Änderung", "Fehler:")):
         return detail[:_MAX_ERROR_LEN]
     return (
         f"Datenbank-Änderung abgebrochen (Exit-Code {done.returncode})"

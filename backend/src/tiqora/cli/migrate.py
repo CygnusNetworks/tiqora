@@ -149,8 +149,6 @@ async def _record_all(
 ) -> None:
     from tiqora.jobs.service import utc_now
     from tiqora.plugins.migrations import (
-        PluginMigrationError,
-        plugin_migration_head,
         plugin_session_factory,
         record_migration,
     )
@@ -160,17 +158,13 @@ async def _record_all(
         for plugin_id, error in results.items():
             plugin = by_id[plugin_id]
             assert plugin.manifest is not None
-            head: str | None = None
             if error is None:
-                try:
-                    head = plugin_migration_head(plugin)
-                except PluginMigrationError:
-                    head = None
+                continue  # the child recorded version and head itself; no plugin code runs here
             await record_migration(
                 factory,
                 plugin_id,
                 version=plugin.manifest.version,
-                head=head,
+                head=None,
                 error=error,
                 now=utc_now(),
             )

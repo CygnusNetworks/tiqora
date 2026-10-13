@@ -27,6 +27,12 @@ def _normalize_url(url: str) -> str:
     return url
 
 
+def async_url_and_connect_args(database_url: str) -> tuple[str, dict[str, Any]]:
+    """Public helper for throw-away engines (CLI loops): async driver URL + UTC connect args."""
+    url = _normalize_url(database_url)
+    return url, _utc_connect_args(url)
+
+
 def _utc_connect_args(url: str) -> dict[str, Any]:
     """Force every DB connection's session timezone to UTC.
 

@@ -346,7 +346,7 @@ async def _cmd_migrate(args: argparse.Namespace) -> int:
         head = await asyncio.to_thread(upgrade_plugin, plugin, database_url=settings.database_url)
         head = head or plugin_migration_head(plugin)
     except PluginMigrationError as exc:
-        error = str(exc)
+        error = " ".join(str(exc).split())  # one line: the parent reads the last stderr line
     async with plugin_session_factory(settings.database_url) as factory:
         await record_migration(
             factory, plugin.plugin_id, version=version, head=head, error=error, now=utc_now()
@@ -354,7 +354,7 @@ async def _cmd_migrate(args: argparse.Namespace) -> int:
     if error is not None:
         _err(error)
         return 1
-    print(f"Erweiterung {plugin.plugin_id}: Datenbank aktuell ({head or version})")  # noqa: T201
+    print(f"Erweiterung {plugin.plugin_id}: Datenbank aktuell ({version})")  # noqa: T201
     return 0
 
 

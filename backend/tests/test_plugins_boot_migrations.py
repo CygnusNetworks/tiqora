@@ -478,3 +478,58 @@ def test_migrate_upgrade_to_other_revision_skips_plugins(
         lambda: pytest.fail("plugins must only migrate with the default 'heads' target"),
     )
     assert run_migrate(_migrate_args("upgrade", CORE_HEAD)) == 0
+
+
+_DUPLICATE_TABLE = """
+import sqlalchemy as sa
+from alembic import op
+
+revision = "tables_0002"
+down_revision = "tables_0001"
+
+
+def upgrade() -> None:
+    op.create_table("tqp_tables_note", sa.Column("id", sa.Integer, primary_key=True))
+
+
+def downgrade() -> None:
+    pass
+"""
+
+
+def test_real_db_error_is_recorded_as_one_line_naming_the_revision(
+    engine: Engine, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_tables(tmp_path, monkeypatch, extra={"0002_dup.py": _DUPLICATE_TABLE})
+    _seed(engine, TABLES_ID)
+    assert run_migrate(_migrate_args("upgrade")) == 0
+    error = _row(engine, TABLES_ID)["migration_error"]
+    assert error.startswith("Datenbank-Änderung „tables_0002“ fehlgeschlagen")
+    assert "Background on this error" in error  # still there, but as part of one line
+    assert "\n" not in error
+
+
+def test_successful_child_record_is_not_rewritten_by_the_parent(
+    engine: Engine, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _install_tables(tmp_path, monkeypatch)
+    _seed(engine, TABLES_ID)
+
+    def boom(_plugin: object) -> str:
+        raise AssertionError("plugin revision modules must not load in the entrypoint process")
+
+    monkeypatch.setattr("tiqora.plugins.migrations.plugin_migration_head", boom)
+    assert run_migrate(_migrate_args("upgrade")) == 0
+    row = _row(engine, TABLES_ID)
+    assert (row["migrated_version"], row["migrated_head"]) == ("1.0.0", "tables_0001")
+
+
+def test_unexpected_exit_one_gets_the_generic_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
+    import subprocess
+
+    from tiqora.plugins import migrations
+
+    done = subprocess.CompletedProcess([], 1, "", "Traceback ...\nValueError: kaputt\n")
+    monkeypatch.setattr(migrations.subprocess, "run", lambda *a, **k: done)
+    error = migrations._run_one_in_subprocess("x.y", database_url="sqlite://", timeout=5)
+    assert error == "Datenbank-Änderung abgebrochen (Exit-Code 1): ValueError: kaputt"
