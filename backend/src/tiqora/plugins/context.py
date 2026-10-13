@@ -121,7 +121,13 @@ class PluginTickets:
     hooks; the plugin is trusted). With ``as_agent`` permissions are checked and hooks fire.
     Names are exact: MariaDB matches case-insensitively, PostgreSQL case-sensitively.
     A passed ``session`` is never committed; without one the call commits or rolls back itself.
+
+    ``plugin_id`` is the owning plugin (set by the plugin's context): article writes may then also
+    use that plugin's own channel keys. Core callers construct it without one.
     """
+
+    def __init__(self, plugin_id: str | None = None) -> None:
+        self._plugin_id = plugin_id
 
     async def get(
         self,
@@ -168,8 +174,13 @@ class PluginTickets:
         as_agent: int | None = None,
         session: AsyncSession | None = None,
     ) -> int:
-        """Create a ticket (queue, state, priority and type by name); returns its id."""
-        return await _writes.create_ticket(draft, as_agent=as_agent, session=session)
+        """Create a ticket (queue, state, priority and type by name); returns its id.
+
+        A first article on one of the plugin's own channels is stored on that channel, never sent.
+        """
+        return await _writes.create_ticket(
+            draft, as_agent=as_agent, session=session, plugin_id=self._plugin_id
+        )
 
     async def add_article(
         self,
@@ -185,7 +196,13 @@ class PluginTickets:
         as_agent: int | None = None,
         session: AsyncSession | None = None,
     ) -> int:
-        """Add a note or phone article; mail goes through a plugin channel, never from here."""
+        """Add an article on ``internal``, ``phone`` or one of the plugin's own channels.
+
+        On an own channel, ``as_agent=None`` only stores it (the plugin delivered it itself);
+        ``as_agent=<id>`` with ``sender_type="agent"`` and ``visible_for_customer=True`` sends it
+        through the channel's ``send`` first, like an agent reply (``to`` is ``None``: route by
+        ``message.ticket``). E-mail is never sent from here.
+        """
         return await _writes.add_article(
             ticket_id,
             body=body,
@@ -197,6 +214,7 @@ class PluginTickets:
             content_type=content_type,
             as_agent=as_agent,
             session=session,
+            plugin_id=self._plugin_id,
         )
 
     async def set_state(
@@ -272,7 +290,7 @@ def minimal_context(plugin_id: str) -> PluginContext:
         plugin_id,
         "0",
         http=PluginHttp([]),
-        tickets=PluginTickets(),
+        tickets=PluginTickets(plugin_id),
         channels=PluginChannels(plugin_id),
     )
 
@@ -289,6 +307,6 @@ def make_plugin_context(plugin: DiscoveredPlugin) -> PluginContext:
         plugin_id=plugin.plugin_id,
         version=plugin.manifest.version,
         http=PluginHttp(plugin.manifest.capabilities.outbound_hosts),
-        tickets=PluginTickets(),
+        tickets=PluginTickets(plugin.plugin_id),
         channels=PluginChannels(plugin.plugin_id),
     )

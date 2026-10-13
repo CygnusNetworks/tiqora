@@ -262,9 +262,9 @@ async def test_state_and_move(env: Env) -> None:
 async def test_email_channel_refused(env: Env) -> None:
     tid = await _create(env)
     before = env.scalar("SELECT COUNT(*) FROM article WHERE ticket_id = :t", t=tid)
-    with pytest.raises(PluginWriteError, match="eigenen Kanal"):
+    with pytest.raises(PluginWriteError, match="einen eigenen Kanal"):
         await PluginTickets().add_article(tid, body="x", channel="email")
-    with pytest.raises(PluginWriteError, match="eigenen Kanal"):
+    with pytest.raises(PluginWriteError, match="einen eigenen Kanal"):
         await PluginTickets().create(
             TicketDraft(title="x", queue="pp55-q1", body="b", channel="telegram")
         )

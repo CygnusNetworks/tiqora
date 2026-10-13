@@ -1148,13 +1148,24 @@ spelling.
 - `as_agent=None` writes as the system user: no permission check and no sync
   hooks. The plugin is trusted.
 - `as_agent=<id>` goes through `TicketWriteService`: permission checks
-  (`PluginPermissionDenied`) and sync hooks apply; a veto surfaces to the
-  plugin as `OperationVetoed` (inside an HTTP route you normally let it become
-  a 422).
+  (`PluginPermissionDenied`) and sync hooks apply. A veto reaches the plugin
+  as `PluginWriteError` carrying the veto text (like every refused write);
+  `OperationVetoed` itself is never raised to plugin code. Tiqora maps neither
+  exception to an HTTP status, so a plugin route catches `PluginWriteError`
+  and answers 422 itself (`raise HTTPException(422, str(exc))`); left
+  uncaught it becomes a 500.
 - `session=None` opens and commits its own session; with `session=` the caller
   commits and the method never calls `begin()`.
-- Plugins never send e-mail through `add_article`: any core channel other than
-  `internal` and `phone` raises `PluginWriteError`. Use your own channel.
+- `add_article` and the first article of `create` accept `channel="internal"`,
+  `"phone"` or a channel key (or qualified name) of the plugin's **own**
+  channels. Every other channel (e-mail, Telegram, chat, another plugin's
+  channel) raises `PluginWriteError`: plugins never send e-mail from here.
+  On an own channel, `add_article(..., as_agent=None)` only stores the article
+  (for a message the plugin delivered itself); `add_article(...,
+  as_agent=<id>, sender_type="agent", visible_for_customer=True)` sends it
+  through the channel's `send` first, like an agent reply, with
+  `OutboundChannelMessage.to = None` (route by `message.ticket`). `create`
+  stores its first article on the channel and never sends it.
 - `create` passes `customer_user` and `customer_id` through unchanged (like
   Znuny's `TicketCreate`): giving only `customer_user` leaves `customer_id`
   empty. `set_state` with a pending state writes no pending time (due

@@ -25,7 +25,7 @@ from tiqora.znuny.sysconfig import SysConfig
 
 __all__ = ["PluginPermissionDenied", "PluginWriteError", "TicketDraft"]
 
-#: channels a plugin may write through ``add_article`` (everything else is mail or a chat driver)
+#: core channels a plugin may write through ``add_article``; besides these only its own channels
 _PLAIN_CHANNELS = frozenset({"internal", "phone"})
 
 
@@ -98,11 +98,24 @@ async def _lookup_id(session: AsyncSession, table: str, label: str, name: str) -
     return int(row[0])
 
 
-def _check_channel(channel: str) -> str:
+def _check_channel(channel: str, plugin_id: str | None) -> str:
+    """``internal``, ``phone`` or a loaded channel of the calling plugin (D3/D11); else refused.
+
+    E-mail, Telegram, chat and other plugins' channels are never written from here.
+    """
     key = channel.strip().lower()
-    if key not in _PLAIN_CHANNELS:
-        raise PluginWriteError("E-Mails versendet eine Erweiterung über ihren eigenen Kanal")
-    return key
+    if key in _PLAIN_CHANNELS:
+        return key
+    if plugin_id is not None:
+        from tiqora.plugins.channels import driver_for  # channels imports this module
+
+        driver = driver_for(key)
+        if driver is not None and driver.plugin_id == plugin_id:
+            return driver.key
+    raise PluginWriteError(
+        f"Kanal „{channel}“ ist hier nicht erlaubt: eine Erweiterung schreibt nur über "
+        "„internal“, „phone“ oder einen eigenen Kanal"
+    )
 
 
 def _service(session: AsyncSession) -> tws.TicketWriteService:
@@ -116,9 +129,13 @@ async def _check_dynamic_field_names(session: AsyncSession, names: Sequence[str]
 
 
 async def create_ticket(
-    draft: TicketDraft, *, as_agent: int | None, session: AsyncSession | None
+    draft: TicketDraft,
+    *,
+    as_agent: int | None,
+    session: AsyncSession | None,
+    plugin_id: str | None = None,
 ) -> int:
-    channel = _check_channel(draft.channel) if draft.body else "internal"
+    channel = _check_channel(draft.channel, plugin_id) if draft.body else "internal"
 
     async def work(s: AsyncSession) -> int:
         queue_id = await _lookup_id(s, "queue", "Queue", draft.queue)
@@ -176,8 +193,9 @@ async def add_article(
     content_type: str,
     as_agent: int | None,
     session: AsyncSession | None,
+    plugin_id: str | None = None,
 ) -> int:
-    key = _check_channel(channel)
+    key = _check_channel(channel, plugin_id)
 
     async def work(s: AsyncSession) -> int:
         article = tws.ArticleIn(

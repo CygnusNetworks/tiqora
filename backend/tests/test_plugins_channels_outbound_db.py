@@ -32,7 +32,9 @@ from tiqora.plugins.channels import (
     OutboundChannelMessage,
     PluginChannels,
 )
+from tiqora.plugins.context import PluginTickets
 from tiqora.plugins.sync_hooks import OperationVetoed, SyncBreaker
+from tiqora.plugins.writes import PluginWriteError, TicketDraft
 from tiqora.znuny.sysconfig import SysConfig
 
 pytestmark = pytest.mark.db
@@ -464,6 +466,83 @@ async def test_composer_list(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
             "can_reply": True,
         }
     ]
+
+
+def _own_tickets() -> Any:
+    """``ctx.tickets`` exactly as the fixture plugin got it from ``make_plugin_context``."""
+    driver = plugin_channels.driver_for(CHANNEL)
+    assert driver is not None and driver.context is not None
+    return driver.context.tickets
+
+
+async def test_plugin_records_a_message_on_its_own_channel(env: Env) -> None:
+    """D3: a plugin may write on its own channel; without ``as_agent`` it is stored, not sent."""
+    tid = await env.ticket()
+    aid = await _own_tickets().add_article(
+        tid,
+        body="Erinnerung",
+        subject="Erinnerung",
+        sender_type="system",
+        channel="Plugin_points_Chat",
+        visible_for_customer=True,
+    )
+    ((channel, sender, visible),) = env.rows(
+        "SELECT cc.name, st.name, a.is_visible_for_customer FROM article a"
+        " JOIN communication_channel cc ON cc.id = a.communication_channel_id"
+        " JOIN article_sender_type st ON st.id = a.article_sender_type_id WHERE a.id = :a",
+        a=aid,
+    )
+    assert (channel, sender, visible) == (CHANNEL_NAME, "system", 1)
+    assert _calls("channel.Chat.send") == []  # the plugin delivered it itself
+
+
+async def test_plugin_agent_message_on_its_own_channel_is_sent(env: Env) -> None:
+    tid = await env.ticket()
+    before = env.articles(tid)
+    aid = await _own_tickets().add_article(
+        tid, body="Ihr Termin", channel=CHANNEL, visible_for_customer=True, as_agent=AGENT
+    )
+    (sent,) = _calls("channel.Chat.send")
+    assert sent.ticket.id == tid and sent.agent_id == AGENT and sent.body == "Ihr Termin"
+    assert sent.to is None  # the plugin routes by message.ticket
+    assert env.articles(tid) == before + 1
+    ((channel, msg_id),) = env.rows(
+        "SELECT cc.name, m.a_message_id FROM article a"
+        " JOIN communication_channel cc ON cc.id = a.communication_channel_id"
+        " JOIN article_data_mime m ON m.article_id = a.id WHERE a.id = :a",
+        a=aid,
+    )
+    assert (channel, msg_id) == (CHANNEL_NAME, "<plugin_points_chat.m-1@tiqora.invalid>")
+
+
+async def test_plugin_creates_a_ticket_on_its_own_channel(env: Env) -> None:
+    tid = await _own_tickets().create(
+        TicketDraft(title="Neu", queue="pp55o-q", body="Hallo", channel=CHANNEL)
+    )
+    assert [
+        r[0]
+        for r in env.rows(
+            "SELECT cc.name FROM article a"
+            " JOIN communication_channel cc ON cc.id = a.communication_channel_id"
+            " WHERE a.ticket_id = :t",
+            t=tid,
+        )
+    ] == [CHANNEL_NAME]
+    assert _calls("channel.Chat.send") == []
+
+
+async def test_other_callers_cannot_write_on_a_plugin_channel(env: Env) -> None:
+    tid = await env.ticket()
+    before = env.articles(tid)
+    for tickets in (PluginTickets(), PluginTickets("org.example.other")):
+        with pytest.raises(PluginWriteError, match="einen eigenen Kanal"):
+            await tickets.add_article(tid, body="x", channel=CHANNEL)
+        with pytest.raises(PluginWriteError, match="einen eigenen Kanal"):
+            await tickets.create(TicketDraft(title="x", queue="pp55o-q", body="b", channel=CHANNEL))
+    with pytest.raises(PluginWriteError, match="einen eigenen Kanal"):
+        await _own_tickets().add_article(tid, body="x", channel="email")
+    assert env.articles(tid) == before
+    assert _calls("channel.Chat.send") == []
 
 
 def test_plugin_channels_are_tiqora_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
