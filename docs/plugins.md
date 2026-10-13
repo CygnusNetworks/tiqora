@@ -1349,6 +1349,21 @@ message. AI auto-replies treat plugin channels as Tiqora-only channels
 (Znuny cannot answer them) and send through the driver. `GET
 /api/v1/channels/plugin` lists them for the composer.
 
+When the plugin of a channel is disabled, failed or not loaded in the process
+(for example an `ai-worker` built from an image without the plugin), nothing
+falls back to e-mail or Internal: an agent reply on a `plugin_*` key answers
+422 "Kanal „…“ ist derzeit nicht verfügbar", an AI auto-reply on a
+`Plugin_*` article becomes a draft, and the reply dialog shows the channel as
+unavailable and blocks sending.
+
+Limit: the queue-level switch for AI auto-replies in `parallel` operation
+(`queue_serves_tiqora_only_channel`) only knows the core Tiqora-only channels
+(Telegram via its `queue_name`, web chat topics), because a plugin channel has
+no queue setting. A queue served only by a plugin channel cannot enable
+auto-replies in `parallel` mode; the runtime gate would still answer its
+events. Use `tiqora_primary`, or let the queue also serve a core Tiqora-only
+channel.
+
 **Inbound routes are public and create tickets as the system user.** Always
 verify a signature or shared secret before calling `ingest`
 (`from tiqora_sdk.channels import verify_shared_secret` compares in constant

@@ -705,6 +705,10 @@ async def add_article(
         from tiqora.plugins.channels import driver_for
 
         plugin_channel = driver_for(article.channel)
+        if plugin_channel is None and article.channel.lower().startswith("plugin_"):
+            # The plugin is disabled, failed or not loaded in this process: storing the
+            # article as Internal would look like a delivered reply that never left.
+            raise InvalidInput(f"Kanal „{article.channel}“ ist derzeit nicht verfügbar")
     if plugin_channel is not None:
         from tiqora.plugins.channels import ensure_tiqora_channel_row
 

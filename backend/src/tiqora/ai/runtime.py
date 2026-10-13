@@ -142,6 +142,7 @@ from tiqora.domain.ticket_write_service import ArticleIn, InvalidInput, add_arti
 from tiqora.domain.ticket_write_service import change_state as domain_change_state
 from tiqora.domain.ticket_write_service import set_customer as domain_set_customer
 from tiqora.plugins.channels import ChannelDeliveryError, deliver_plugin_channel_reply, driver_for
+from tiqora.plugins.naming import PLUGIN_PREFIX
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -453,6 +454,11 @@ async def _load_mcp_tools(
 
 def _is_channel(channel: str | None, expected: str) -> bool:
     return (channel or "").strip().lower() == expected
+
+
+def _is_plugin_channel(channel: str | None) -> bool:
+    """A plugin channel row (``Plugin_<short_id>_<Name>``), loaded in this process or not."""
+    return (channel or "").strip().lower().startswith(PLUGIN_PREFIX.lower())
 
 
 async def _resolve_channel_tone_prompt(
@@ -2089,13 +2095,19 @@ async def run_ticket_agent(
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
                 )
-        elif src is not None and (plugin_driver := driver_for(src.channel)) is not None:
+        elif src is not None and _is_plugin_channel(src.channel):
             # A plugin channel (D11): its a_from is a handle (maybe shaped like an address)
             # that must never reach SMTP. The driver delivers; when it cannot (inbound only,
-            # too long, failing) the answer stays a draft for an agent. Tool writes are still
-            # uncommitted: commit them first, so the rollback below only drops the failed send.
+            # too long, failing, or the plugin is not active in this process) the answer stays
+            # a draft for an agent. Tool writes are still uncommitted: commit them first, so the
+            # rollback below only drops the failed send.
+            plugin_driver = driver_for(src.channel)
             await session.commit()
             try:
+                if plugin_driver is None:
+                    raise ChannelDeliveryError(
+                        f"Kanal „{src.channel}“ ist derzeit nicht verfügbar"
+                    )
                 article_id = await deliver_plugin_channel_reply(
                     session,
                     sysconfig,

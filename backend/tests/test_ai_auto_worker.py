@@ -52,6 +52,14 @@ def _mysql_async(url: str) -> str:
     return url.replace("mysql+pymysql://", "mysql+aiomysql://")
 
 
+def _async_url(url: str) -> str:
+    if url.startswith("postgresql+psycopg2://"):
+        return url.replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return _mysql_async(url)
+
+
 def _seed_ticket(sync_url: str, *, ns: int) -> dict[str, Any]:
     agent_id = 9800 + ns
     group_id = 9830 + ns
@@ -210,11 +218,15 @@ def _insert_outbox_event(
             text(
                 "INSERT INTO tiqora_event_outbox"
                 " (event_type, ticket_id, payload, created, processed)"
-                " VALUES (:et, :tid, :pl, current_timestamp, 0)"
+                " VALUES (:et, :tid, :pl, current_timestamp, :done)"
             ),
-            {"et": event_type, "tid": ticket_id, "pl": payload},
+            {"et": event_type, "tid": ticket_id, "pl": payload, "done": False},
         )
-        event_id = conn.execute(text("SELECT LAST_INSERT_ID()")).scalar()
+        # dialect-neutral (the plugin-channel tests also run on PostgreSQL)
+        event_id = conn.execute(
+            text("SELECT MAX(id) FROM tiqora_event_outbox WHERE ticket_id = :tid"),
+            {"tid": ticket_id},
+        ).scalar()
     engine.dispose()
     assert event_id is not None
     return int(event_id)
@@ -1395,7 +1407,16 @@ async def test_outbox_tick_still_skips_webchat(
 _PLUGIN_CHANNEL = "Plugin_points_Chat"
 
 
-def _put_article_on_plugin_channel(sync_url: str, article_id: int) -> None:
+@pytest.fixture(params=["mariadb_znuny_url", "postgres_znuny_url"])
+def plugin_db_url(request: pytest.FixtureRequest) -> str:
+    """The plugin-channel tests run on both dialects (the rest of the module is MariaDB-only)."""
+    url: str = request.getfixturevalue(request.param)
+    return url
+
+
+def _put_article_on_plugin_channel(
+    sync_url: str, article_id: int, *, handle: str = "chat-handle-7"
+) -> None:
     """Move a seeded customer article onto the fixture plugin's channel (handle as ``a_from``)."""
     engine = create_engine(sync_url)
     with engine.begin() as conn:
@@ -1418,8 +1439,8 @@ def _put_article_on_plugin_channel(sync_url: str, article_id: int) -> None:
             {"n": _PLUGIN_CHANNEL, "a": article_id},
         )
         conn.execute(
-            text("UPDATE article_data_mime SET a_from = 'chat-handle-7' WHERE article_id = :a"),
-            {"a": article_id},
+            text("UPDATE article_data_mime SET a_from = :h WHERE article_id = :a"),
+            {"h": handle, "a": article_id},
         )
     engine.dispose()
 
@@ -1460,6 +1481,9 @@ async def _plugin_channel_auto_reply(
     *,
     ns: int,
     send_mode: str | None = None,
+    plugin_loaded: bool = True,
+    operation_mode: str = OPERATION_MODE_PARALLEL,
+    handle: str = "chat-handle-7",
 ) -> tuple[dict[str, int], dict[str, int]]:
     from tests._plugin_points import boot_points_plugin, points_behaviour
 
@@ -1467,7 +1491,7 @@ async def _plugin_channel_auto_reply(
     article_id = _add_article(
         sync_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Hallo Chat"
     )
-    _put_article_on_plugin_channel(sync_url, article_id)
+    _put_article_on_plugin_channel(sync_url, article_id, handle=handle)
     _insert_outbox_event(
         sync_url,
         ticket_id=seed["ticket_id"],
@@ -1475,15 +1499,16 @@ async def _plugin_channel_auto_reply(
         article_id=article_id,
         channel="plugin_points_chat",
     )
-    engine = create_async_engine(_mysql_async(sync_url))
+    engine = create_async_engine(_async_url(sync_url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
-    boot_points_plugin(tmp_path, monkeypatch, role="ai-worker")
-    if send_mode is not None:
-        points_behaviour().MODE["channel.send"] = send_mode
+    if plugin_loaded:
+        boot_points_plugin(tmp_path, monkeypatch, role="ai-worker")
+        if send_mode is not None:
+            points_behaviour().MODE["channel.send"] = send_mode
     try:
         async with factory() as session:
             await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
-            await set_operation_mode(session, OPERATION_MODE_PARALLEL)
+            await set_operation_mode(session, operation_mode)
         _patch_llm(monkeypatch, ScriptedLlm([_propose_response("reply", "Chat answer.")]))
         totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
     finally:
@@ -1494,22 +1519,20 @@ async def _plugin_channel_auto_reply(
 
 
 async def test_plugin_channel_event_auto_replied_through_driver_in_parallel(
-    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+    plugin_db_url: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Any
 ) -> None:
     """F36: a plugin channel has no Znuny counterpart (``is_tiqora_only_channel``), so the auto
     worker answers it in ``parallel`` operation, over the driver and never over SMTP."""
     from tests._plugin_points import points_behaviour
 
     try:
-        seed, totals = await _plugin_channel_auto_reply(
-            mariadb_znuny_url, monkeypatch, tmp_path, ns=83
-        )
+        seed, totals = await _plugin_channel_auto_reply(plugin_db_url, monkeypatch, tmp_path, ns=83)
         assert totals["gate_open"] == 0 and totals["auto_replies"] == 1
         assert totals["tiqora_only_replies"] == 1
         (sent,) = [m for n, m in points_behaviour().CALLS if n == "channel.Chat.send"]
         assert sent.to == "chat-handle-7" and sent.body.endswith("Chat answer.")
         assert sent.ticket.id == seed["ticket_id"]
-        engine = create_engine(mariadb_znuny_url)
+        engine = create_engine(plugin_db_url)
         with engine.begin() as conn:
             rows = conn.execute(
                 text(
@@ -1525,22 +1548,22 @@ async def test_plugin_channel_event_auto_replied_through_driver_in_parallel(
         assert [r[0] for r in rows] == ["customer", "agent"]
         assert rows[1][1] == "<plugin_points_chat.m-1@tiqora.invalid>"
     finally:
-        _drop_plugin_channel(mariadb_znuny_url)
+        _drop_plugin_channel(plugin_db_url)
 
 
 async def test_plugin_channel_failed_send_leaves_a_draft(
-    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+    plugin_db_url: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Any
 ) -> None:
     """A failing driver must not lose the answer or fall through to e-mail: it becomes a draft."""
     from tests._plugin_points import points_behaviour
 
     try:
         seed, totals = await _plugin_channel_auto_reply(
-            mariadb_znuny_url, monkeypatch, tmp_path, ns=84, send_mode="raise"
+            plugin_db_url, monkeypatch, tmp_path, ns=84, send_mode="raise"
         )
         assert totals["auto_replies"] == 0
         assert len([c for n, c in points_behaviour().CALLS if n == "channel.Chat.send"]) == 1
-        engine = create_engine(mariadb_znuny_url)
+        engine = create_engine(plugin_db_url)
         with engine.begin() as conn:
             agent_articles = conn.execute(
                 text(
@@ -1557,4 +1580,48 @@ async def test_plugin_channel_failed_send_leaves_a_draft(
         engine.dispose()
         assert agent_articles == 0 and drafts == 1
     finally:
-        _drop_plugin_channel(mariadb_znuny_url)
+        _drop_plugin_channel(plugin_db_url)
+
+
+async def test_unavailable_plugin_channel_drafts_instead_of_mailing_the_handle(
+    plugin_db_url: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    """The plugin is not loaded in the ai-worker (disabled, failed, missing from the image): an
+    address-shaped handle must not fall through to SMTP; the answer stays a draft."""
+    mailed: list[Any] = []
+
+    async def _no_smtp(*args: Any, **kwargs: Any) -> int:
+        mailed.append(kwargs.get("article"))
+        raise AssertionError("an auto-reply on a plugin channel reached the e-mail path")
+
+    monkeypatch.setattr("tiqora.channels.email.outbound_reply.deliver_agent_email_reply", _no_smtp)
+    try:
+        seed, totals = await _plugin_channel_auto_reply(
+            plugin_db_url,
+            monkeypatch,
+            tmp_path,
+            ns=85,
+            plugin_loaded=False,
+            operation_mode=OPERATION_MODE_TIQORA_PRIMARY,
+            handle="pp55-chat@example.org",
+        )
+        assert mailed == []
+        assert totals["auto_replies"] == 0
+        engine = create_engine(plugin_db_url)
+        with engine.begin() as conn:
+            agent_articles = conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM article a JOIN article_sender_type st"
+                    " ON st.id = a.article_sender_type_id"
+                    " WHERE a.ticket_id = :t AND st.name = 'agent'"
+                ),
+                {"t": seed["ticket_id"]},
+            ).scalar()
+            drafts = conn.execute(
+                text("SELECT COUNT(*) FROM tiqora_ai_draft WHERE ticket_id = :t"),
+                {"t": seed["ticket_id"]},
+            ).scalar()
+        engine.dispose()
+        assert agent_articles == 0 and drafts == 1
+    finally:
+        _drop_plugin_channel(plugin_db_url)

@@ -468,6 +468,22 @@ async def test_composer_list(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
     ]
 
 
+async def test_reply_on_a_channel_whose_plugin_is_gone_is_refused(env: Env) -> None:
+    """Disabled, failed or not loaded: never stored as a visible Internal article with a 201."""
+    from tiqora.plugins.state import set_loaded_plugins
+
+    tid = await env.ticket()
+    before = env.articles(tid)
+    set_loaded_plugins([])
+    assert plugin_channels.driver_for(CHANNEL) is None
+    with pytest.raises(InvalidInput, match="derzeit nicht verfügbar"):
+        await env.reply(tid)
+    with pytest.raises(InvalidInput, match="derzeit nicht verfügbar"):
+        await env.reply(tid, is_visible_for_customer=False)
+    assert env.articles(tid) == before
+    assert _calls("channel.Chat.send") == [] and env.sender.sent == []
+
+
 def _own_tickets() -> Any:
     """``ctx.tickets`` exactly as the fixture plugin got it from ``make_plugin_context``."""
     driver = plugin_channels.driver_for(CHANNEL)
