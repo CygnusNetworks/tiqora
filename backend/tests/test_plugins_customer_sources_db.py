@@ -211,6 +211,27 @@ async def test_search_skips_what_is_already_local(env: Env) -> None:
     assert [e["login"] for e in body["external"]] == ["pp55-ext2", "pp55-ext3"]
 
 
+async def test_external_hits_fit_the_limit_and_are_unique(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every source gets the whole room; the combined list is trimmed and deduplicated by login."""
+    from tiqora.api.v1 import reference
+    from tiqora.plugins.customer_sources import search_sources
+
+    async def two_sources(q: str, limit: int) -> list[Any]:
+        hits = await search_sources(q, limit + 1)  # a source that ignores the limit
+        return hits + hits  # a second source knowing the same people
+
+    monkeypatch.setattr(reference, "search_sources", two_sources)
+    async with env.client() as client:
+        r = await client.get(
+            "/api/v1/reference/customer-search",
+            params={"q": "pp55-ext", "external": "true", "limit": 2},
+        )
+    assert r.status_code == 200, r.text
+    assert [e["login"] for e in r.json()["external"]] == ["pp55-ext1", "pp55-ext2"]
+
+
 @pytest.mark.parametrize("mode", ["raise", "hang"])
 async def test_failing_source_is_skipped(env: Env, mode: str) -> None:
     points_behaviour().MODE["cs"] = mode

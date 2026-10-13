@@ -339,9 +339,14 @@ async def customer_search(
     external_hits: list[ExternalContactOut] = []
     if external and len(contacts) < limit and len(q.strip()) >= 2:
         known = {c.login.lower() for c in contacts}
-        for source, hit in await search_sources(q.strip(), limit - len(contacts)):
-            if hit.login.strip().lower() in known:
+        room = limit - len(contacts)
+        for source, hit in await search_sources(q.strip(), room):
+            if len(external_hits) >= room:
+                break  # each source got the whole room; the combined list must still fit
+            login_key = hit.login.strip().lower()
+            if login_key in known:
                 continue
+            known.add(login_key)  # the first source (registration order) wins a shared login
             external_hits.append(
                 ExternalContactOut(
                     source=source.key,
