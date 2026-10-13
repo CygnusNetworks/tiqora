@@ -10,6 +10,7 @@ ticket in queue B, ``MB`` incident in queue B, ``PLAIN`` unlinked ticket (A).
 from __future__ import annotations
 
 import json
+import warnings
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -467,10 +468,14 @@ async def test_vetoed_update_note_is_422_and_stores_nothing(
     boot_points_plugin(tmp_path, monkeypatch)
     try:
         points_behaviour().MODE["hook.article.create"] = "veto"
-        got = await w.client.post(
-            w.url(tail="/updates"), json={"mode": "note", "body_html": "<p>Stand</p>"}
-        )
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            got = await w.client.post(
+                w.url(tail="/updates"), json={"mode": "note", "body_html": "<p>Stand</p>"}
+            )
         assert got.status_code == 422 and got.json()["detail"] == "Vertragsnummer fehlt"
+        # m7: no deprecated status constant on this path
+        assert not [c for c in caught if "HTTP_422_UNPROCESSABLE_ENTITY" in str(c.message)]
         assert await w.articles(M) == 0
         updates = select(func.count()).select_from(TiqoraItsmMajorIncidentUpdate)
         assert (await w.session.execute(updates)).scalar_one() == 0

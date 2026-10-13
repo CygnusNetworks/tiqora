@@ -709,7 +709,7 @@ def _major_errors() -> Iterator[None]:
     except OperationVetoed as exc:
         # a plugin's sync hook refused the update note (German text for the agent); nothing
         # is stored, as on the ticket routes
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
 
 
 def _major_out(view: MajorIncidentView) -> MajorIncidentOut:
