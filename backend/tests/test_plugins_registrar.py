@@ -619,7 +619,7 @@ def test_gi_invoker_must_be_async_and_named(registrar: PluginRegistrar) -> None:
 def test_builtin_report_key_over_120_chars_rejected() -> None:
     from tiqora.reporting.definition import ReportDefinition
 
-    long_id = ".".join(["a" * 24] * 4)[:100]  # 100 chars, a legal plugin id
+    long_id = ".".join(["a" * 24] * 3 + ["a" * 25])  # 100 chars, a legal plugin id
     assert len(long_id) == 100
     reg = _registrar(
         plugin_id=long_id, points=["core.reporting.sources", "core.reporting.builtin_reports"]
