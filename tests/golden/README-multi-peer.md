@@ -201,6 +201,14 @@ cd backend && GOLDEN=1 GOLDEN_PEER=znuny-6.5-itsm uv run python -m pytest -q -m 
   and `znuny-7.3-itsm` (13 cases, 11 run on an ITSM peer), the two plain cases on `znuny-6.5` and
   `znuny-7.3`; differences between Tiqora and Znuny are listed in `docs/itsm-import.md`.
 
+- `test_tiqoraitsm_addon.py` (wave-4 import Task 26): the `TiqoraITSM` add-on (ticket zoom widget
+  "Betroffene CIs (Tiqora)", `Kernel::System::TiqoraITSM`) copied into the peer, SysConfig rebuilt,
+  widget driven with a real `Kernel::Output::HTML::Layout`. The module creates the CMDB rows, an
+  agent without access to the secret class group and (if absent) the tables/views, and removes
+  all of it again. Results (2026-10-13): 11 passed on `znuny-6.5` (plain, fresh DB: tables and
+  views created by the module) and on `znuny-7.3-itsm` (7.3 framework; the add-on does not read
+  `configitem`, so a plain `znuny-7.3` behaves the same; not run separately).
+
 Package sources (`https://download.znuny.org/releases/itsm/`):
 
 | Peer | Packages | Source |

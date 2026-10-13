@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<otrs_package version="1.0">
+    <Name>TiqoraITSM</Name>
+    <Version>1.0.0</Version>
+    <!-- Multi-framework: parallel-op peers OTRS/Znuny 6.0–6.5 and Znuny 7.0–7.3.
+         Package Manager installs when any listed Framework matches the peer. -->
+    <Framework>6.0.x</Framework>
+    <Framework>6.1.x</Framework>
+    <Framework>6.2.x</Framework>
+    <Framework>6.3.x</Framework>
+    <Framework>6.4.x</Framework>
+    <Framework>6.5.x</Framework>
+    <Framework>7.0.x</Framework>
+    <Framework>7.1.x</Framework>
+    <Framework>7.2.x</Framework>
+    <Framework>7.3.x</Framework>
+    <Vendor>Cygnus Networks GmbH</Vendor>
+    <URL>https://cygnusnetworks.de/</URL>
+    <License>GPL-3.0-only</License>
+    <ChangeLog Version="1.0.0" Date="2026-10-13">Initial release: the ticket zoom widget "Betroffene CIs (Tiqora)" and the read-only helper module for Znuny sites whose ITSM data moved to Tiqora.</ChangeLog>
+    <Description Lang="en">
+        Companion of Tiqora, the parallel Python/FastAPI reimplementation of
+        Znuny, for sites whose configuration items (CMDB) moved from Znuny's
+        ITSM packages to Tiqora. Shows the CIs that Tiqora links to a ticket
+        in a sidebar widget of the agent ticket zoom, with their deployment
+        and incident state and a link into Tiqora. The add-on only reads two
+        versioned views and two settings of Tiqora and never writes to the
+        database. It is inactive until Tiqora holds the ITSM data.
+    </Description>
+    <Description Lang="de">
+        Begleiter von Tiqora, der parallelen Python/FastAPI-Nachimplementierung
+        von Znuny, fuer Installationen, deren Konfigurationselemente (CMDB)
+        von den ITSM-Paketen in Znuny nach Tiqora umgezogen sind. Zeigt in
+        einer Seitenleiste der Ticketansicht fuer Agenten die CIs, die Tiqora
+        mit dem Ticket verknuepft, mit Einsatz- und Vorfallstatus und einem
+        Verweis nach Tiqora. Das Paket liest nur zwei versionierte Sichten und
+        zwei Einstellungen von Tiqora und schreibt nie in die Datenbank. Es
+        bleibt inaktiv, solange Tiqora die ITSM-Daten nicht fuehrt.
+    </Description>
+    <BuildDate>2026-10-13 00:00:00</BuildDate>
+    <BuildHost>build.cygnusnetworks.de</BuildHost>
+    <Filelist>
+        <File Location="Kernel/System/TiqoraITSM.pm" Permission="644"></File>
+        <File Location="Kernel/Output/HTML/TicketZoom/TiqoraITSM.pm" Permission="644"></File>
+        <File Location="Kernel/Output/HTML/Templates/Standard/AgentTicketZoom/TiqoraITSM.tt" Permission="644"></File>
+        <File Location="Kernel/Language/de_TiqoraITSM.pm" Permission="644"></File>
+        <File Location="Kernel/Config/Files/XML/TiqoraITSM.xml" Permission="644"></File>
+    </Filelist>
+</otrs_package>
