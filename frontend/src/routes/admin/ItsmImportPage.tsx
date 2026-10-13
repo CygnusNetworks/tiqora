@@ -8,11 +8,14 @@ import { Spinner } from "@/components/ui/Spinner";
 import { JobDialog } from "@/components/jobs/JobDialog";
 import { ImportRunReport } from "@/components/itsm-import/ImportRunReport";
 import { ImportStatusCard } from "@/components/itsm-import/ImportStatusCard";
+import { RollbackDialog } from "@/components/itsm-import/RollbackDialog";
+import { SwitchDialog } from "@/components/itsm-import/SwitchDialog";
 import { apiErrorMessage } from "@/lib/avatarApi";
 import { formatDateTime } from "@/lib/format";
 import { itsmImportApi, itsmImportKeys, type ImportRunOut } from "@/lib/itsmImportApi";
 
 const REFETCH_INTERVAL_MS = 10_000;
+const ROLLBACK_DOCS_URL = "https://github.com/CygnusNetworks/tiqora/blob/main/docs/itsm.md#zurück-zu-modus-a";
 
 /** Admin page "ITSM-Daten aus Znuny übernehmen": dry run, import and the run reports. */
 export function ItsmImportPage() {
@@ -22,6 +25,9 @@ export function ItsmImportPage() {
   const [confirming, setConfirming] = useState(false);
   const [jobId, setJobId] = useState<number | null>(null);
   const [openRun, setOpenRun] = useState<number | null>(null);
+  const [switching, setSwitching] = useState(false);
+  const [switchJobId, setSwitchJobId] = useState<number | null>(null);
+  const [rollingBack, setRollingBack] = useState(false);
 
   const statusQ = useQuery({
     queryKey: itsmImportKeys.status(),
@@ -58,6 +64,13 @@ export function ItsmImportPage() {
   const canImport = !!s?.can_import;
   const reason = s && !s.can_import ? (s.blocked_reason ?? t("admin.itsmImport.blockedFallback")) : undefined;
   const busy = start.isPending;
+  const inModeA = s?.mode === "znuny_readthrough";
+  const switchReason = s && !s.can_switch ? (s.blocked_reason ?? t("admin.itsmImport.switch.blockedFallback")) : undefined;
+  // Znuny ITSM is there but its release is not readable: only "Umstellen ohne CI-Daten" is left.
+  const withoutCiData = !!s && s.znuny_itsm_present && s.profile == null;
+  const switchedBy =
+    s?.switched?.run_id != null ? runsQ.data?.find((r) => r.id === s.switched?.run_id)?.started_by_name : null;
+  const drift = s?.znuny_changes_since_switch ?? 0;
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 p-4" data-testid="admin-itsm-import-page">
@@ -76,6 +89,45 @@ export function ItsmImportPage() {
       {s && (
         <>
           <ImportStatusCard status={s} />
+
+          {s.mode === "tiqora" && (
+            <div className="space-y-2">
+              <p
+                className="rounded-lg border border-success bg-success/10 p-3 text-sm text-ink"
+                data-testid="itsm-switched-banner"
+              >
+                {s.switched?.switched_at
+                  ? switchedBy
+                    ? t("admin.itsmImport.switched.bannerBy", {
+                        date: formatDateTime(s.switched.switched_at, locale),
+                        name: switchedBy,
+                      })
+                    : t("admin.itsmImport.switched.banner", { date: formatDateTime(s.switched.switched_at, locale) })
+                  : t("admin.itsmImport.switched.bannerNoDate")}
+              </p>
+              {drift > 0 && (
+                <p
+                  className="rounded-lg border border-warn bg-warn/10 p-3 text-sm text-ink"
+                  role="alert"
+                  data-testid="itsm-drift-warning"
+                >
+                  {t("admin.itsmImport.switched.drift", { count: drift })}{" "}
+                  <a
+                    href={ROLLBACK_DOCS_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                    data-testid="itsm-drift-docs"
+                  >
+                    {t("admin.itsmImport.switched.driftDocs")}
+                  </a>
+                </p>
+              )}
+              <Button variant="ghost" size="sm" onClick={() => setRollingBack(true)} data-testid="itsm-rollback-open">
+                {t("admin.itsmImport.rollback.open")}
+              </Button>
+            </div>
+          )}
 
           {reason && (
             <p className="text-sm text-warn" data-testid="itsm-import-blocked">
@@ -120,7 +172,23 @@ export function ItsmImportPage() {
             >
               {t("admin.itsmImport.import")}
             </Button>
+            {inModeA && (
+              <Button
+                variant="secondary"
+                onClick={() => setSwitching(true)}
+                disabled={!s.can_switch || busy}
+                title={switchReason}
+                data-testid="itsm-switch-open"
+              >
+                {t("admin.itsmImport.switch.open")}
+              </Button>
+            )}
           </div>
+          {inModeA && switchReason && (
+            <p className="text-sm text-muted" data-testid="itsm-switch-blocked">
+              {switchReason}
+            </p>
+          )}
           {start.isError && (
             <p className="text-sm text-danger" role="alert" data-testid="itsm-import-start-error">
               {apiErrorMessage(start.error, t("admin.itsmImport.startError"))}
@@ -171,6 +239,26 @@ export function ItsmImportPage() {
         pending={busy}
       />
 
+      <SwitchDialog
+        open={switching}
+        onClose={() => setSwitching(false)}
+        onStarted={(id) => {
+          setSwitchJobId(id);
+          refresh();
+        }}
+        withoutCiData={withoutCiData}
+      />
+      <RollbackDialog open={rollingBack} onClose={() => setRollingBack(false)} />
+      <JobDialog
+        jobId={switchJobId}
+        title={t("admin.itsmImport.switch.jobTitle")}
+        testId="switch-job-dialog"
+        onClose={() => {
+          setSwitchJobId(null);
+          refresh();
+        }}
+        onSucceeded={refresh}
+      />
       <JobDialog
         jobId={jobId}
         title={t("jobs.kinds.core.itsm_import")}

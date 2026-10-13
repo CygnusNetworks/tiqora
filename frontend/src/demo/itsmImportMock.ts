@@ -55,7 +55,7 @@ const JOB: Job = {
   finished_at: "2026-10-12T09:01:10Z",
 };
 
-const STATUS: ImportStatus = {
+const MODE_A_STATUS: ImportStatus = {
   mode: "znuny_readthrough",
   znuny_itsm_present: true,
   profile: "ITSM 6.5",
@@ -70,16 +70,55 @@ const STATUS: ImportStatus = {
   last_run: DRY_RUN,
 };
 
+const SWITCHED_AT = "2026-10-12T10:00:00Z";
+const SWITCH_RUN: ImportRunOut = {
+  ...DRY_RUN,
+  id: 2,
+  kind: "switch",
+  started_at: SWITCHED_AT,
+  finished_at: "2026-10-12T10:02:00Z",
+  issue_count: 0,
+  issues: [],
+};
+
+/** Switched to Tiqora, with 3 CIs changed in Znuny since (drift warning). */
+const SWITCHED_STATUS: ImportStatus = {
+  ...MODE_A_STATUS,
+  mode: "tiqora",
+  can_import: false,
+  can_switch: false,
+  blocked_reason: "Die ITSM-Daten werden bereits in Tiqora geführt.",
+  readonly_flag: true,
+  switched: { by: 1, run_id: SWITCH_RUN.id, switched_at: SWITCHED_AT },
+  znuny_changes_since_switch: 3,
+  last_run: SWITCH_RUN,
+};
+
+/** The demo has no server: the switch and the way back flip this flag. */
+let switched = false;
+
+/** Back to the Mode A start state (tests). */
+export function resetItsmImportMock(): void {
+  switched = false;
+}
+
 export function resolveItsmImport(path: string, method: string): unknown | undefined {
   if (path.endsWith(`/api/v1/jobs/${DEMO_ITSM_IMPORT_JOB_ID}`) && method === "GET") return JOB;
   const m = path.match(/\/api\/v1\/admin\/itsm\/import(\/.*)?$/);
   if (!m) return undefined;
   const rest = m[1] ?? "";
-  if (rest === "/status" && method === "GET") return STATUS;
-  if (rest === "/runs" && method === "GET") return [DRY_RUN];
+  if (rest === "/status" && method === "GET") return switched ? SWITCHED_STATUS : MODE_A_STATUS;
+  if (rest === "/runs" && method === "GET") return switched ? [SWITCH_RUN, DRY_RUN] : [DRY_RUN];
   if (rest === "/runs" && method === "POST") return { job_id: DEMO_ITSM_IMPORT_JOB_ID, status: "queued" };
   if (/^\/runs\/\d+$/.test(rest) && method === "GET") return DRY_RUN;
-  if (rest === "/switch" && method === "POST") return { job_id: DEMO_ITSM_IMPORT_JOB_ID, status: "queued" };
-  if ((rest === "/rollback" || rest === "/release-lock") && method === "POST") return STATUS;
+  if (rest === "/switch" && method === "POST") {
+    switched = true;
+    return { job_id: DEMO_ITSM_IMPORT_JOB_ID, status: "queued" };
+  }
+  if (rest === "/rollback" && method === "POST") {
+    switched = false;
+    return MODE_A_STATUS;
+  }
+  if (rest === "/release-lock" && method === "POST") return switched ? SWITCHED_STATUS : MODE_A_STATUS;
   return undefined;
 }

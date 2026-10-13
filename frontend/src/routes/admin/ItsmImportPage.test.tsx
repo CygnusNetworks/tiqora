@@ -10,6 +10,8 @@ const status = vi.fn();
 const runs = vi.fn();
 const startRun = vi.fn();
 const releaseLock = vi.fn();
+const switchToTiqora = vi.fn();
+const rollback = vi.fn();
 
 vi.mock("@/lib/itsmImportApi", async (orig) => ({
   ...(await orig<typeof import("@/lib/itsmImportApi")>()),
@@ -18,6 +20,8 @@ vi.mock("@/lib/itsmImportApi", async (orig) => ({
     runs: (...a: unknown[]) => runs(...a),
     startRun: (...a: unknown[]) => startRun(...a),
     releaseLock: (...a: unknown[]) => releaseLock(...a),
+    switchToTiqora: (...a: unknown[]) => switchToTiqora(...a),
+    rollback: (...a: unknown[]) => rollback(...a),
   },
 }));
 vi.mock("@/lib/jobsApi", () => ({
@@ -78,6 +82,8 @@ describe("ItsmImportPage", () => {
     runs.mockReset().mockResolvedValue([]);
     startRun.mockReset().mockResolvedValue({ job_id: 7, status: "queued" });
     releaseLock.mockReset().mockResolvedValue(statusFixture());
+    switchToTiqora.mockReset().mockResolvedValue({ job_id: 11, status: "queued" });
+    rollback.mockReset().mockResolvedValue(statusFixture());
     await i18n.changeLanguage("de");
   });
 
@@ -133,5 +139,82 @@ describe("ItsmImportPage", () => {
     renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Sperre aufheben" }));
     await waitFor(() => expect(releaseLock).toHaveBeenCalled());
+  });
+
+  it("disables the switch button with the reason when switching is not possible", async () => {
+    status.mockResolvedValue(statusFixture({ can_switch: false, blocked_reason: "Es läuft bereits ein Import." }));
+    renderPage();
+    const btn = await screen.findByTestId("itsm-switch-open");
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute("title", "Es läuft bereits ein Import.");
+  });
+
+  it("switches: dialog, job dialog and a status refresh", async () => {
+    status.mockResolvedValue(statusFixture({ can_switch: true }));
+    renderPage();
+    fireEvent.click(await screen.findByTestId("itsm-switch-open"));
+    fireEvent.click(screen.getByLabelText("Die Erweiterung TiqoraITSM ist in Znuny installiert"));
+    fireEvent.change(screen.getByTestId("itsm-switch-confirm"), { target: { value: "UMSTELLEN" } });
+    const calls = status.mock.calls.length;
+    fireEvent.click(screen.getByTestId("itsm-switch-submit"));
+    await waitFor(() =>
+      expect(switchToTiqora).toHaveBeenCalledWith({ confirm: "UMSTELLEN", addon_installed: true, edits_stopped: false, without_ci_data: false }),
+    );
+    expect(await screen.findByTestId("switch-job-dialog")).toHaveTextContent("job 11");
+    await waitFor(() => expect(status.mock.calls.length).toBeGreaterThan(calls));
+  });
+
+  it("offers the switch without CI data when the Znuny ITSM release is not readable", async () => {
+    status.mockResolvedValue(statusFixture({ can_switch: true, profile: null, can_import: false, blocked_reason: "Nicht lesbar." }));
+    renderPage();
+    fireEvent.click(await screen.findByTestId("itsm-switch-open"));
+    fireEvent.click(screen.getByLabelText("Die Erweiterung TiqoraITSM ist in Znuny installiert"));
+    fireEvent.change(screen.getByTestId("itsm-switch-confirm"), { target: { value: "UMSTELLEN" } });
+    expect(screen.getByTestId("itsm-switch-submit")).toBeDisabled();
+    fireEvent.click(screen.getByLabelText(/CI-Daten aus Znuny nicht übernommen werden/));
+    fireEvent.click(screen.getByTestId("itsm-switch-submit"));
+    await waitFor(() =>
+      expect(switchToTiqora).toHaveBeenCalledWith(expect.objectContaining({ without_ci_data: true })),
+    );
+  });
+
+  const SWITCHED = {
+    mode: "tiqora",
+    can_import: false,
+    can_switch: false,
+    blocked_reason: "Die ITSM-Daten werden bereits in Tiqora geführt.",
+    switched: { by: 1, run_id: 3, switched_at: "2026-10-12T10:00:00Z" },
+  };
+
+  it("shows the switched banner with the admin's name and no switch button", async () => {
+    status.mockResolvedValue(statusFixture({ ...SWITCHED, znuny_changes_since_switch: 0 }));
+    runs.mockResolvedValue([{ ...RUN, kind: "switch" }]);
+    renderPage();
+    const banner = await screen.findByTestId("itsm-switched-banner");
+    await waitFor(() => expect(banner).toHaveTextContent("umgestellt von Erika Beispiel"));
+    expect(banner).toHaveTextContent("Tiqora führt das ITSM seit");
+    expect(screen.queryByTestId("itsm-switch-open")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("itsm-drift-warning")).not.toBeInTheDocument();
+  });
+
+  it("warns about CIs changed in Znuny since the switch", async () => {
+    status.mockResolvedValue(statusFixture({ ...SWITCHED, znuny_changes_since_switch: 3 }));
+    renderPage();
+    const warn = await screen.findByTestId("itsm-drift-warning");
+    expect(warn).toHaveTextContent("Seit der Umstellung wurden in Znuny 3 CIs geändert.");
+    expect(warn).toHaveTextContent("Diese Änderungen sind in Tiqora nicht enthalten.");
+    expect(screen.getByTestId("itsm-drift-docs").getAttribute("href")).toContain("docs/itsm.md#zurück-zu-modus-a");
+  });
+
+  it("rolls back with ZURÜCK and reloads the status", async () => {
+    status.mockResolvedValue(statusFixture(SWITCHED));
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Zurück zu Znuny (Modus A)" }));
+    fireEvent.change(screen.getByTestId("itsm-rollback-confirm"), { target: { value: "ZURÜCK" } });
+    status.mockResolvedValue(statusFixture());
+    fireEvent.click(screen.getByTestId("itsm-rollback-submit"));
+    await waitFor(() => expect(rollback).toHaveBeenCalledWith({ confirm: "ZURÜCK" }));
+    await waitFor(() => expect(screen.queryByTestId("itsm-switched-banner")).not.toBeInTheDocument());
+    expect(await screen.findByTestId("itsm-switch-open")).toBeInTheDocument();
   });
 });

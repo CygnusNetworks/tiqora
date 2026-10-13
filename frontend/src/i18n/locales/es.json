@@ -5673,6 +5673,41 @@
       "confirmMessage": "The data is written to the Tiqora CMDB. As long as Znuny runs the ITSM, your agents keep seeing the data from Znuny.",
       "releaseLock": "Release lock",
       "releaseLockError": "The lock could not be released.",
+      "switch": {
+        "open": "Switch to Tiqora",
+        "blockedFallback": "Switching is only possible after a successful import.",
+        "title": "Switch to Tiqora",
+        "intro": "The switch runs in this order:",
+        "step1": "Znuny screens for editing CIs are locked (with the TiqoraITSM add-on).",
+        "step2": "Tiqora takes over all changes from Znuny one last time.",
+        "step3": "From then on you maintain CIs in Tiqora only.",
+        "addonLegend": "Add-on in Znuny",
+        "addonInstalled": "The TiqoraITSM add-on is installed in Znuny",
+        "addonMissing": "The TiqoraITSM add-on is not installed in Znuny",
+        "editsStopped": "Nobody edits CIs in Znuny any more",
+        "noCiDataWarning": "Tiqora cannot read this Znuny ITSM version. No CIs will be taken over.",
+        "noCiDataConfirm": "I confirm that the CI data from Znuny is not taken over.",
+        "typeToConfirm": "Type {{word}} to confirm",
+        "submit": "Switch",
+        "error": "The switch could not be started.",
+        "jobTitle": "Switch to Tiqora"
+      },
+      "switched": {
+        "banner": "Tiqora has run the ITSM since {{date}}.",
+        "bannerBy": "Tiqora has run the ITSM since {{date}} (switched by {{name}}).",
+        "bannerNoDate": "Tiqora runs the ITSM.",
+        "drift_one": "Since the switch, {{count}} CI was changed in Znuny. This change is not included in Tiqora.",
+        "drift_other": "Since the switch, {{count}} CIs were changed in Znuny. These changes are not included in Tiqora.",
+        "driftDocs": "What now?"
+      },
+      "rollback": {
+        "open": "Back to Znuny (Mode A)",
+        "title": "Back to Znuny (Mode A)",
+        "message": "Tiqora will then show the CIs from Znuny again. Changes you made in Tiqora since the switch are not visible in Znuny.",
+        "typeToConfirm": "Type {{word}} to confirm",
+        "submit": "Back to Znuny",
+        "error": "Going back could not be done."
+      },
       "runs": "Runs",
       "col": {
         "kind": "Type",

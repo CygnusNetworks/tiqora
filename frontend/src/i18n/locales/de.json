@@ -5681,6 +5681,41 @@
       "confirmMessage": "Die Daten werden in die CMDB von Tiqora geschrieben. Solange Znuny das ITSM führt, sehen Ihre Agenten weiter die Daten aus Znuny.",
       "releaseLock": "Sperre aufheben",
       "releaseLockError": "Die Sperre konnte nicht aufgehoben werden.",
+      "switch": {
+        "open": "Auf Tiqora umstellen",
+        "blockedFallback": "Die Umstellung ist erst nach einer erfolgreichen Übernahme möglich.",
+        "title": "Auf Tiqora umstellen",
+        "intro": "Die Umstellung läuft in dieser Reihenfolge:",
+        "step1": "Znuny-Bildschirme zum Bearbeiten von CIs werden gesperrt (mit der Erweiterung TiqoraITSM).",
+        "step2": "Tiqora übernimmt ein letztes Mal alle Änderungen aus Znuny.",
+        "step3": "Ab dann pflegen Sie CIs nur noch in Tiqora.",
+        "addonLegend": "Erweiterung in Znuny",
+        "addonInstalled": "Die Erweiterung TiqoraITSM ist in Znuny installiert",
+        "addonMissing": "Die Erweiterung TiqoraITSM ist in Znuny nicht installiert",
+        "editsStopped": "In Znuny werden keine CIs mehr bearbeitet",
+        "noCiDataWarning": "Diese Znuny-ITSM-Version kann Tiqora nicht lesen. Es werden keine CIs übernommen.",
+        "noCiDataConfirm": "Ich bestätige, dass die CI-Daten aus Znuny nicht übernommen werden.",
+        "typeToConfirm": "Geben Sie {{word}} ein, um zu bestätigen",
+        "submit": "Umstellen",
+        "error": "Die Umstellung konnte nicht gestartet werden.",
+        "jobTitle": "Umstellung auf Tiqora"
+      },
+      "switched": {
+        "banner": "Tiqora führt das ITSM seit {{date}}.",
+        "bannerBy": "Tiqora führt das ITSM seit {{date}} (umgestellt von {{name}}).",
+        "bannerNoDate": "Tiqora führt das ITSM.",
+        "drift_one": "Seit der Umstellung wurde in Znuny {{count}} CI geändert. Diese Änderung ist in Tiqora nicht enthalten.",
+        "drift_other": "Seit der Umstellung wurden in Znuny {{count}} CIs geändert. Diese Änderungen sind in Tiqora nicht enthalten.",
+        "driftDocs": "Was jetzt?"
+      },
+      "rollback": {
+        "open": "Zurück zu Znuny (Modus A)",
+        "title": "Zurück zu Znuny (Modus A)",
+        "message": "Tiqora zeigt dann wieder die CIs aus Znuny. Änderungen, die Sie seit der Umstellung in Tiqora gemacht haben, sind in Znuny nicht sichtbar.",
+        "typeToConfirm": "Geben Sie {{word}} ein, um zu bestätigen",
+        "submit": "Zurück zu Znuny",
+        "error": "Der Wechsel zurück konnte nicht durchgeführt werden."
+      },
       "runs": "Läufe",
       "col": {
         "kind": "Art",
