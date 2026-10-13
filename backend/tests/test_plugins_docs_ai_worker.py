@@ -14,6 +14,13 @@ def test_ai_worker_runs_no_sync_hooks_in_docs() -> None:
     assert "automatische KI-Antworten" in DOC
 
 
+def test_part1_ai_worker_bullet_does_not_promise_sync_hooks() -> None:
+    # Teil 1 calls sync hooks "Prüfungen"; the ai-worker runs none (R16).
+    assert "Prüfungen und Kanäle bei" not in DOC
+    assert "Filter für ausgehende E-Mails\n  und Kanäle bei KI-Antworten" in DOC
+    assert "danach Worker und MCP-Dienst" not in DOC
+
+
 def test_all_four_processes_need_the_plugin_image() -> None:
     assert "Alle drei brauchen" not in DOC
     assert "der drei Prozesse" not in DOC

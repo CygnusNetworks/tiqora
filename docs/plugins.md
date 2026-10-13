@@ -123,7 +123,7 @@ nichts Halbfertiges.
 (den letzten nur, wenn Sie einen betreiben). **Alle brauchen das gleiche Image
 und dasselbe Volume.** Die Reihenfolge beim Neustart steht in
 [deployment.md](deployment.md#erweiterungen-einbauen-plugins): zuerst
-`tiqora-api`, danach Worker und MCP-Dienst.
+`tiqora-api`, danach die übrigen Dienste.
 
 Den Inhalt eines Images prüfen Sie ohne Datenbank mit:
 
@@ -159,8 +159,8 @@ Prozessen, in denen sie läuft, und ihren automatischen Abläufen.
   (`mcp`) und KI-Hintergrunddienst (`ai-worker`). Der Hintergrunddienst führt
   Ticket-Abonnements, geplante Aufgaben und Jobs aus; der KI-Hintergrunddienst
   führt keine Abonnements, Aufgaben oder Schnittstellen aus, nutzt aber die
-  Erweiterungspunkte (zum Beispiel Platzhalter, Prüfungen und Kanäle bei
-  KI-Antworten).
+  Erweiterungspunkte (zum Beispiel Platzhalter, Filter für ausgehende E-Mails
+  und Kanäle bei KI-Antworten). Prüfungen vor dem Speichern laufen dort nicht.
 
 | Zustand (Anzeige) | Bedeutung | Was tun |
 |---|---|---|
