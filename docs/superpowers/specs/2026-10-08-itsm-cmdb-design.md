@@ -185,6 +185,30 @@ short pointer to it.
   templates. Built once, in whichever of process phase 4 / ITSM phase 3 comes
   first.
 
+### 4. Wave-4 ITSM core: status and deviations (2026-10-12)
+
+Phases 0 and 1 are implemented by `docs/superpowers/plans/2026-10-12-wave4-itsm-core.md`:
+phase 0 (schema and behaviour survey, `docs/itsm-import.md`, golden ITSM peers 6.5 and 7.3) and
+phase 1 (types/states/DFs setup, priority matrix, service meta, editable ITSM dialogs in zoom, link
+delete / link types / note to linked tickets / link graph, problem / known error / major incident,
+Mode A read-through adapter). Phase 2 (Mode B CMDB, importer, add-on) stays with the CMDB and
+ITSM-import plans. Deviations from this spec (plan section "Deviations"; user view in
+`docs/itsm.md` chapters 2 to 5):
+
+- D1 editable dynamic fields in zoom already existed; only the ITSM screens were added.
+- D2 Mode A shows CIs only; Znuny changes and work orders stay in Znuny (phase 3 archive).
+- D3 Mode A link writes skip `configitem_history`.
+- D4 problem root cause and workaround live in `tiqora_itsm_problem`, not in dynamic fields.
+- D5 "minimum time between incidents" is a per-service warning; Znuny's per-SLA value is shown read-only.
+- D6 setup is an explicit admin action; `Change` / `Change::Task` are opt-in.
+- D7 the link-type admin cannot create Znuny link types (SysConfig), it manages `tiqora_itsm_link_type`.
+- D8 service type outside Mode A is free text with suggestions.
+- D9 CI attachments are not shown in Mode A.
+- D10 ITSM statistics are not part of this plan.
+- D11 `link_objects` was brought to `LinkObject.pm` parity (reverse direction, type groups, link history).
+- Major-incident customer reply is off by default (`itsm.major_incident_customer_reply`) and always uses
+  e-mail, also for plugin channels.
+
 ## Scope
 
 ### A. ITSM core + incident/problem
@@ -350,9 +374,8 @@ shapes on the compat layer, mapped to the Tiqora model; process action
   connectors can be third-party; the generic CSV/XLSX and REST import covers
   everything else. Further connectors (Snipe-IT, i-doit, Entra/Intune) only on
   demand.
-- **Open (product owner):** default ITSM mode. Note the scope: a fresh
-  install without Znuny ITSM can only use Mode B, so the question concerns
-  parallel-operation sites that run Znuny ITSM. Implementation does not
-  depend on the answer — the mode is an admin setting `itsm.mode`
-  (`off` | `znuny_readthrough` | `tiqora`) — only the default and the docs'
-  recommendation do. Decide before the ITSM wave-4 release.
+- **Decided 2026-10-12 (product owner): default ITSM mode.** The first start stores an automatic
+  default once: Znuny ITSM core tables detected (`general_catalog` and `cip_allocate`) gives Mode A
+  (`znuny_readthrough`), otherwise Mode B (`tiqora`); it is never re-detected. Mode B is the
+  recommended target; Mode A to B only through the importer (explicit run, also "Umstellen ohne
+  CI-Daten" for unsupported Znuny ITSM versions). See `docs/itsm.md` chapter 1.

@@ -1000,6 +1000,37 @@ the agent's zone. In ticket zoom a dynamic field is editable only if Znuny's
 `Ticket::Frontend::AgentTicketFreeText###DynamicField` setting enables it
 (stock Znuny enables none, so sites must configure it) and the agent has `rw`.
 
+### ITSM (`tiqora.itsm`)
+
+The ITSM core lives in `tiqora.itsm` (user-facing description: [itsm.md](itsm.md)).
+
+- **Mode resolution** (`mode.py`): `itsm.mode` (`off` | `znuny_readthrough` | `tiqora`) with
+  `itsm.mode_meta` and `itsm.switch` in `tiqora_settings`; `mode.py` is the only writer. The first
+  start stores the automatic default (Znuny ITSM core tables detected: Mode A, else Mode B) once.
+  Guarded transitions (`allowed_transitions`); `znuny_readthrough` to `tiqora` only through the
+  importer (`switch_to_tiqora` / `rollback_to_znuny`). Every ITSM route calls `require_itsm_enabled`
+  (409 `itsm_off`).
+- **CI provider contract** (`ci_provider.py`, `providers.py`): one `CiProvider` protocol (classes, search, get,
+  versions, ticket links, service incident states, `is_empty`) with a registry (`CI_PROVIDERS`,
+  `get_ci_provider`) keyed by mode. Mode A
+  registers `ZnunyCiProvider`; Mode B is registered by the CMDB plan. The contract kit
+  `tests/itsm_provider_contract.py` runs against every provider.
+- **Znuny adapter** (`znuny_adapter/`): read-only SQL on `configitem*`, `general_catalog`,
+  `cip_allocate` and the extra `service` columns, per schema profile (`profiles.py`; 6.5 and 7.3
+  surveyed, see [itsm-import.md](itsm-import.md)), detection in `detect.py`, `provider.py` is the
+  `ZnunyCiProvider`; class definitions are parsed safely (`definitions.py`, `znuny/perl_data.py`,
+  YAML with a 1 MiB / depth-64 bound). All adapter SQL stays in `reader.py`, `catalog.py` and
+  `attributes.py`; a test guard rejects any JOIN between `tiqora_*` and Znuny tables
+  (collation error 1267 on mixed MariaDB collations).
+- **Domain**: `link_types.py`, `priority.py`, `services.py`, `problem.py`, `major_incident.py`,
+  `summary.py`, `link_graph.py`, `setup.py`; link writes in `ticket_write_service` (`link_objects`,
+  `unlink_objects`) are `LinkObject.pm` ports with history and cache invalidation.
+- **Jobs**: `linked_articles.py` (`core.itsm_linked_articles`) writes through `TicketWriteService`
+  per target ticket and records progress in `tiqora_itsm_bulk_target`, so a restart never resends a
+  customer e-mail.
+- **API**: `/api/v1/itsm/*` (API-key area `cmdb`), ticket routes under `/api/v1/tickets/{id}/...`
+  (area `tickets`), admin under `/api/v1/admin/itsm/*`.
+
 ### Events and workers
 
 - Writes emit events via a transactional outbox (`tiqora_event_outbox`).

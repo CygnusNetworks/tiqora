@@ -1019,6 +1019,14 @@ While drafts are pending, the watcher keeps the current revision running
 (`waiting_for_deploy`). Without drafts it records a `tiqora` revision when the
 rows changed anyway (an import or a direct DB edit).
 
+## ITSM next to Znuny ITSM
+
+Tiqora keeps its own ITSM state in `tiqora_itsm_*` tables and never writes Znuny's ITSM tables.
+While Znuny ITSM leads (Mode A, `itsm.mode = znuny_readthrough`) Tiqora only reads CIs and writes
+ticket links through the existing link service; what Znuny sees of that and what differs is listed
+in [itsm.md](itsm.md) chapter 5. The switch to Tiqora-led ITSM (Mode B) happens only through the
+importer; the runbook is chapter 7 of [itsm.md](itsm.md) and [itsm-import.md](itsm-import.md).
+
 ## Schema ownership
 
 When parallel operation ends:

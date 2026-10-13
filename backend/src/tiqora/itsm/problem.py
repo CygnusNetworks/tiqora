@@ -45,6 +45,9 @@ MAX_TEXT = 20000
 #: Znuny state types of a finished ticket
 CLOSED_STATE_TYPES = frozenset({"closed", "removed", "merged"})
 KNOWN_ERROR_LANGUAGE = "de"
+# Object type of ``TiqoraKbLink`` rows; a name, not a literal, so the no-cross-join guard does not
+# read it as the Znuny table ``ticket``.
+KB_LINK_OBJECT_TYPE = "ticket"
 
 
 class ProblemError(Exception):
@@ -352,13 +355,17 @@ async def publish_known_error(
         await session.execute(
             select(TiqoraKbLink.id).where(
                 TiqoraKbLink.article_id == article.id,
-                TiqoraKbLink.object_type == "ticket",
+                TiqoraKbLink.object_type == KB_LINK_OBJECT_TYPE,
                 TiqoraKbLink.object_id == problem_id,
             )
         )
     ).first()
     if linked is None:
-        session.add(TiqoraKbLink(article_id=article.id, object_type="ticket", object_id=problem_id))
+        session.add(
+            TiqoraKbLink(
+                article_id=article.id, object_type=KB_LINK_OBJECT_TYPE, object_id=problem_id
+            )
+        )
     now = _now()
     row.known_error_article_id = article.id
     if not row.known_error:

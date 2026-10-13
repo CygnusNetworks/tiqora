@@ -105,7 +105,7 @@ def test_dataclasses_are_frozen_with_i3_fields() -> None:
             "limit",
             "offset",
         ],
-        "CiPage": ["items", "total"],
+        "CiPage": ["items", "total", "truncated"],
         "CiTicketLink": ["ticket_id", "ci", "link_type", "direction", "created_at"],
         "LinkTypeOption": ["name", "source_label", "target_label", "pointed"],
         "ServiceIncidentState": ["service_id", "state", "cis_incident", "cis_warning"],

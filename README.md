@@ -442,8 +442,7 @@ explicit operator action — see [docs/cutover.md](./docs/cutover.md).
 Day-to-day agent, customer-portal and admin work is covered. What is still
 missing or narrower than Znuny (last reviewed 2026-10-01):
 
-- **Missing:** saved searches, configurable dashboard widgets, link overview
-  and link-type admin, admin screens for sessions / SQL box / maintenance /
+- **Missing:** saved searches, configurable dashboard widgets, admin screens for sessions / SQL box / maintenance /
   system log, calendar admin and appointment rules, portal print view.
 - **Partial:** statistics (fixed reports instead of the Znuny stats framework),
   GenericAgent execution, bulk actions, user preferences, GenericInterface

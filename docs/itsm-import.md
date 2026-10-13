@@ -563,3 +563,11 @@ wie die Daemon-Aufgabe.
 Siehe `backend/tests/fixtures/znuny-itsm/README.md`: `itsm_survey.py <peer> --out <ordner> --verify`
 erzeugt DDL (mit Znunys eigenem `XML2SQL`), Zeilen, Konfiguration und diese Tabellen neu und lädt die
 Ergebnisse zur Kontrolle in je einen frischen MariaDB- und PostgreSQL-Container.
+
+Das Verhalten (Abschnitt „Behaviour“) wird mit demselben Skript neu gemessen:
+`itsm_survey.py <peer> --behaviour --out backend/tests/fixtures/znuny-itsm/behaviour/` auf einem frischen
+Peer (`znuny-6.5-itsm` oder `znuny-7.3-itsm`, `GOLDEN=1`). Danach laufen `test_itsm_behaviour_vectors.py` und
+`tests/golden/test_itsm_mode_a.py`; weicht ein Vektor ab, steht die Änderung im Diff der `behaviour/<profil>.json`
+und muss in diesem Dokument und in `docs/itsm.md` (Kapitel 5) nachgezogen werden. Bei einer neuen
+Znuny-ITSM-Linie: zuerst Schema vermessen (`--verify`), dann das Profil in `znuny_adapter/profiles.py`
+ergänzen, dann das Verhalten messen.
