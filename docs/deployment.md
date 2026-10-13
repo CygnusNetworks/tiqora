@@ -138,6 +138,82 @@ tab. The SPA CSP (`script-src 'self'`, `connect-src 'self'`) is the only
 browser-side control for plugin frontends and is enforced only in production
 (`TIQORA_CSP_ENFORCE`).
 
+## Erweiterungen zur Laufzeit installieren
+
+Besides baking (above), admins can install plugin packages (`.tqplugin`) in the
+web UI (Admin, Erweiterungen) or fetch them from a package source. The package
+itself is stored in the **database**; the plugins directory only holds the
+unpacked working copy that each process re-creates from it. The image ships
+`/var/lib/tiqora/plugins` and `/var/lib/tiqora/plugin-repository`, owned by
+user `tiqora`, so this works without any compose change. The shipped compose
+examples additionally mount a named volume `tiqora_plugins` on `tiqora-api`,
+`tiqora-worker`, `tiqora-ai-worker` and `tiqora-mcp`.
+
+### Volume
+
+- One shared volume or one per container both work, because the database holds
+  the packages (every process unpacks them itself).
+- A **bind mount** keeps the host's ownership, so the host directory must
+  belong to uid 10001: `chown -R 10001:10001 /srv/tiqora/plugins`, mounted at
+  `/var/lib/tiqora/plugins`.
+- Read-only root file system (`read_only: true`): mount the plugins volume
+  read-write, or set `TIQORA_PLUGINS_RUNTIME_INSTALL=0` and bake plugins into
+  the image instead.
+
+### Start order
+
+`tiqora-worker`, `tiqora-ai-worker` and `tiqora-mcp` must start **after** the
+api is healthy: the api runs the plugin migrations at its start, and a
+process that boots earlier keeps those plugins in the failed state until its
+next restart. The compose examples therefore use
+`depends_on: tiqora-api: condition: service_healthy`. Without that (other
+orchestrators), restart these three once after the first start that applied
+new plugin migrations. Kubernetes: gate the pods on the api with an init
+container that waits for `/health`, or roll them out after the api.
+
+### Restart policy and exit code 75
+
+After an install, update or removal the processes restart in a coordinated way:
+each one leaves with **exit code 75** and relies on the container runtime to
+start it again. Every service needs `restart: unless-stopped` (or `always`;
+Kubernetes: the default `restartPolicy: Always`). On platforms without
+automatic restarts set `TIQORA_PLUGINS_COORDINATED_RESTART=0`; the admin page
+then shows that a restart is pending and you restart the services yourself.
+Running plugin installs hold the restart back, so a half-applied database
+change is never interrupted.
+
+### Environment variables
+
+| Variable | Default | Notes |
+|---|---|---|
+| `TIQORA_PLUGINS_DIR` | `/var/lib/tiqora/plugins` | Working copy of installed packages. Must be writable for uid 10001. |
+| `TIQORA_PLUGINS_RUNTIME_INSTALL` | `true` | `0` switches the install, update and removal endpoints off (bake only). |
+| `TIQORA_PLUGINS_ALLOW_UNSIGNED` | `false` | Allow installing packages without a trusted signature. Admins can sign their own packages, so this gate prevents accidents, not abuse. |
+| `TIQORA_PLUGINS_TRUSTED_KEYS` | *(empty)* | Additional trusted publisher public keys (`ed25519:<base64>`, comma-separated). |
+| `TIQORA_PLUGINS_MAX_PACKAGE_MB` | `15` (1-25) | Largest accepted package. Must fit the database setting `max_allowed_packet` (MariaDB); otherwise the upload is refused with a hint to raise it or lower this value. |
+| `TIQORA_PLUGINS_COORDINATED_RESTART` | `true` | `0` for platforms without automatic restarts (see above). |
+| `TIQORA_PLUGINS_RESTART_TIMEOUT_SECONDS` | `180` (30-1800) | How long the coordinated restart waits for the processes before it fails. |
+| `TIQORA_PLUGINS_MIGRATE_TIMEOUT_SECONDS` | `300` (1-3600) | Limit per plugin database migration (run in a subprocess). |
+| `TIQORA_PLUGIN_REPOSITORIES` | *(empty)* | JSON list of package sources managed by the deployment (example below). |
+| `TIQORA_PLUGIN_REPOSITORY_FILE_ROOT` | `/var/lib/tiqora/plugin-repository` | `file://` sources must lie below this directory. |
+| `TIQORA_PLUGIN_REPOSITORIES_INTERVAL_SECONDS` | `21600` | How often the daemon refreshes the package sources. |
+
+`TIQORA_PLUGIN_REPOSITORIES` example (`public_key` is optional; without it the
+index cannot be verified and its packages are treated as unverified):
+
+```bash
+TIQORA_PLUGIN_REPOSITORIES='[
+  {"name": "Example Plugins", "url": "https://plugins.example.org/index.json",
+   "public_key": "ed25519:AAAA...base64..."},
+  {"name": "Offline mirror", "url": "file:///var/lib/tiqora/plugin-repository/index.json"}
+]'
+```
+
+Environment-managed sources cannot be edited or deleted in the web UI. A new
+plugin that creates tables is refused when another plugin already uses its
+short name; removing a plugin offers "Daten behalten" or a backup before the
+tables are dropped.
+
 ## OIDC / SSO configuration
 
 Optional; the agent login page shows a "Sign in with SSO" button once

@@ -25,6 +25,22 @@ x-tiqora-env: &tiqora-env
   TIQORA_LOG_LEVEL: INFO
   TIQORA_PUBLIC_BASE_URL: http://localhost:${TIQORA_PORT:-8000}
 
+# Runtime plugin installs (Admin -> Erweiterungen). The packages live in the
+# database; tiqora_plugins is only the unpacked working copy, so it can be
+# shared or per container. Needs (see docs/deployment.md, "Erweiterungen zur
+# Laufzeit installieren"):
+#   - restart: unless-stopped (or always): after an install the processes exit
+#     with code 75 and rely on the restart policy. Without automatic restarts
+#     set TIQORA_PLUGINS_COORDINATED_RESTART=0 and restart by hand.
+#   - a writable plugins dir. With read_only: true mount tiqora_plugins rw, or
+#     set TIQORA_PLUGINS_RUNTIME_INSTALL=0 and bake plugins into the image.
+# Optional env vars (defaults): TIQORA_PLUGINS_DIR=/var/lib/tiqora/plugins,
+#   TIQORA_PLUGINS_RUNTIME_INSTALL=1, TIQORA_PLUGINS_ALLOW_UNSIGNED=0,
+#   TIQORA_PLUGINS_TRUSTED_KEYS=, TIQORA_PLUGINS_MAX_PACKAGE_MB=15,
+#   TIQORA_PLUGINS_COORDINATED_RESTART=1, TIQORA_PLUGINS_RESTART_TIMEOUT_SECONDS=180,
+#   TIQORA_PLUGIN_REPOSITORIES=, TIQORA_PLUGIN_REPOSITORY_FILE_ROOT=/var/lib/tiqora/plugin-repository,
+#   TIQORA_PLUGIN_REPOSITORIES_INTERVAL_SECONDS=21600
+
 services:
   postgres:
     image: postgres:16
@@ -86,6 +102,8 @@ services:
     image: ghcr.io/cygnusnetworks/tiqora:latest
     restart: unless-stopped
     command: ["api"]
+    volumes:
+      - tiqora_plugins:/var/lib/tiqora/plugins
     environment:
       <<: *tiqora-env
     ports:
@@ -111,6 +129,8 @@ services:
     image: ghcr.io/cygnusnetworks/tiqora:latest
     restart: unless-stopped
     command: ["worker"]
+    volumes:
+      - tiqora_plugins:/var/lib/tiqora/plugins
     environment:
       <<: *tiqora-env
     depends_on:
@@ -118,6 +138,7 @@ services:
         condition: service_healthy
 
 volumes:
+  tiqora_plugins:
   tiqora_pg:
   tiqora_redis:
   tiqora_meili:

@@ -165,6 +165,11 @@ ENV PATH="/app/.venv/bin:$PATH" \
 # Pins for `tiqora plugins bake`: plugin installs must not move any core dependency.
 RUN python -m tiqora.main plugins constraints > /app/backend/core-constraints.txt
 
+# Plugin working directories (D1/D5): writable for the runtime user without any
+# compose change. No VOLUME instruction: it would create anonymous volumes.
+RUN mkdir -p /var/lib/tiqora/plugins /var/lib/tiqora/plugin-repository \
+    && chown -R tiqora:tiqora /var/lib/tiqora
+
 WORKDIR /app/backend
 USER tiqora
 EXPOSE 8000 8001
