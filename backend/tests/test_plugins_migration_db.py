@@ -129,6 +129,8 @@ def test_plugins_migration_up_down_up_matches_the_models(alembic_env: str) -> No
                 == _PLUGINS
             )
         assert _present(engine) == set(_TABLES)
+        # 20261010_0082 widens tiqora_plugin: compare the shape at head with the ORM
+        _migrate("head")
         migrated = _shape(engine)
 
         _migrate(_PREVIOUS, down=True)

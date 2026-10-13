@@ -538,6 +538,41 @@ class Settings(BaseSettings):
         default=15, ge=5, le=300, validation_alias="TIQORA_PLUGIN_TASKS_INTERVAL_SECONDS"
     )
 
+    # Runtime install of plugin packages (.tqplugin), repositories and coordinated restarts.
+    plugins_dir: str = Field(
+        default="/var/lib/tiqora/plugins", validation_alias="TIQORA_PLUGINS_DIR"
+    )
+    plugins_runtime_install: bool = Field(
+        default=True, validation_alias="TIQORA_PLUGINS_RUNTIME_INSTALL"
+    )
+    plugins_allow_unsigned: bool = Field(
+        default=False, validation_alias="TIQORA_PLUGINS_ALLOW_UNSIGNED"
+    )
+    # Comma list of "ed25519:<base64>" publisher keys.
+    plugins_trusted_keys: str = Field(default="", validation_alias="TIQORA_PLUGINS_TRUSTED_KEYS")
+    # le=25 keeps every accepted package under the global request body cap.
+    plugins_max_package_mb: int = Field(
+        default=15, ge=1, le=25, validation_alias="TIQORA_PLUGINS_MAX_PACKAGE_MB"
+    )
+    plugins_coordinated_restart: bool = Field(
+        default=True, validation_alias="TIQORA_PLUGINS_COORDINATED_RESTART"
+    )
+    plugins_restart_timeout_seconds: int = Field(
+        default=180, ge=30, le=1800, validation_alias="TIQORA_PLUGINS_RESTART_TIMEOUT_SECONDS"
+    )
+    # JSON list of repositories configured by the operator.
+    plugin_repositories: str = Field(default="", validation_alias="TIQORA_PLUGIN_REPOSITORIES")
+    plugin_repository_file_root: str = Field(
+        default="/var/lib/tiqora/plugin-repository",
+        validation_alias="TIQORA_PLUGIN_REPOSITORY_FILE_ROOT",
+    )
+    plugin_repositories_interval_seconds: int = Field(
+        default=21600,
+        ge=900,
+        le=604800,
+        validation_alias="TIQORA_PLUGIN_REPOSITORIES_INTERVAL_SECONDS",
+    )
+
     # Web chat sweep (waiting timeout, idle chats, retention). ``daemon.webchat_sweep.enabled``
     # (default ON) switches it off; this is only the poll interval.
     webchat_sweep_interval_seconds: int = Field(
@@ -600,6 +635,11 @@ class Settings(BaseSettings):
     customer_smime_cert_column: str = Field(
         default="", validation_alias="TIQORA_CUSTOMER_SMIME_CERT_COLUMN"
     )
+
+    @property
+    def plugins_max_package_bytes(self) -> int:
+        """Largest accepted ``.tqplugin`` in bytes."""
+        return self.plugins_max_package_mb * 1024 * 1024
 
     @property
     def plugins_disabled_ids(self) -> frozenset[str]:

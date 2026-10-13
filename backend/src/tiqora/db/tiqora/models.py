@@ -1493,6 +1493,22 @@ class TiqoraPlugin(TiqoraBase):
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     #: agent who last switched ``enabled`` (NULL = system)
     changed_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: short name behind the ``tqp_<short_id>_*`` tables; needed to drop data after removal
+    short_id: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    #: installed package (source "upload"/"repository"); NULL = image
+    package_sha256: Mapped[str | None] = mapped_column(CHAR(64), nullable=True)
+    #: source "repository": where it came from (soft reference)
+    repository_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: key that signed the installed version (updates from another repository need the same key)
+    key_id: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    signer: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    installed_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: plugin version whose migrations ran last, and the Alembic head reached for it
+    migrated_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    migrated_head: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    migrated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    #: German, at most 2000 characters; NULL = fine
+    migration_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class TiqoraPluginRuntime(TiqoraBase):
@@ -1533,6 +1549,114 @@ class TiqoraPluginHook(TiqoraBase):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     __table_args__ = (Index("ix_tiqora_plugin_hook_plugin_id", "plugin_id"),)
+
+
+class TiqoraPluginPackage(TiqoraBase):
+    """Every uploaded or downloaded ``.tqplugin``; installed ones are kept."""
+
+    __tablename__ = "tiqora_plugin_package"
+
+    #: sha256 of the whole file
+    sha256: Mapped[str] = mapped_column(CHAR(64), primary_key=True)
+    plugin_id: Mapped[str] = mapped_column(String(190), nullable=False)
+    version: Mapped[str] = mapped_column(String(64), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    data: Mapped[bytes] = deferred(mapped_column(JOB_FILE_BLOB, nullable=False))
+    #: ``tiqora-plugin.toml`` text
+    manifest: Mapped[str] = mapped_column(Text, nullable=False)
+    #: PackageReport JSON at upload time
+    report: Mapped[str] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=False)
+    signature_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    key_id: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    #: "upload" | "repository"
+    source: Mapped[str] = mapped_column(String(20), nullable=False)
+    repository_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    uploaded_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    #: set when an install job used it; NULL = never installed
+    installed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (Index("ix_tiqora_plugin_package_plugin_id", "plugin_id"),)
+
+
+class TiqoraPluginRepository(TiqoraBase):
+    """A package source: an ``index.json`` URL, optionally with a publisher key."""
+
+    __tablename__ = "tiqora_plugin_repository"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    url: Mapped[str] = mapped_column(String(1000), nullable=False)
+    #: sha256(url): a unique index on a short column (1000 chars cannot be indexed on MariaDB)
+    url_key: Mapped[str] = mapped_column(CHAR(64), nullable=False)
+    #: ``ed25519:<base64>``; NULL = index not verifiable
+    public_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    #: "admin" | "env"
+    origin: Mapped[str] = mapped_column(String(10), nullable=False)
+    #: last accepted index (exact bytes as UTF-8)
+    index_json: Mapped[str | None] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=True)
+    index_sha256: Mapped[str | None] = mapped_column(CHAR(64), nullable=True)
+    #: from the index; a lower value later is refused (rollback guard)
+    index_generated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    index_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_ok_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (Index("uq_tiqora_plugin_repository_url_key", "url_key", unique=True),)
+
+
+class TiqoraProcess(TiqoraBase):
+    """One row per running api/worker/mcp/ai-worker process (coordinated restart)."""
+
+    __tablename__ = "tiqora_process"
+
+    #: ``{role}:{hostname}:{pid}:{uuid4().hex[:8]}``
+    instance_id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    hostname: Mapped[str] = mapped_column(String(200), nullable=False)
+    pid: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: restart generation current at boot (0 = none)
+    boot_generation: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    heartbeat_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    #: set right before a coordinated exit
+    exiting_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    #: JSON list of ``<plugin id>@<package sha>`` this process loaded (runtime dir GC)
+    loaded_packages: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (Index("ix_tiqora_process_role", "role"),)
+
+
+class TiqoraRestart(TiqoraBase):
+    """A coordinated restart request; ``generation`` grows with every request."""
+
+    __tablename__ = "tiqora_restart"
+
+    generation: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    requested_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    requested_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: German, shown in the panel
+    reason: Mapped[str] = mapped_column(String(200), nullable=False)
+    #: comma list of roles that had live processes at request time, in restart order
+    roles: Mapped[str] = mapped_column(String(200), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    #: German; set when the sequence stopped
+    failed_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class TiqoraPluginData(TiqoraBase):
+    """Owner of the kept ``tqp_<short_id>_*`` tables of a removed plugin."""
+
+    __tablename__ = "tiqora_plugin_data"
+
+    short_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    plugin_id: Mapped[str] = mapped_column(String(190), nullable=False)
+    kept_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
 
 class TiqoraReport(TiqoraBase):
