@@ -17,7 +17,7 @@ container from a release tree listed in `peers.yaml`.
 
 `test_process_deploy.py` proves Tiqora's process/ACL dumps equal Znuny's `ProcessDump`/deployed ACL file, the deploy watcher snapshots Znuny deploys, and a new process ticket writes Znuny's history and dynamic field values (znuny-6.5: passed; 7.3: passed (cached peer image `tiqora-golden-peer-znuny-7.3`, built 2026-07-27, Znuny 7.3.5), 2026-10-09).
 
-`test_tiqoraitsm_addon.py` (znuny-6.5, znuny-7.3), `test_itsm_import.py` and `test_gi_config_items.py` (the ITSM peers `znuny-6.5-itsm`, `znuny-7.3-itsm`) cover the ITSM importer, the `ConfigItem*` GI operations and the TiqoraITSM add-on; last recorded run 2026-10-13 (Task 28): 35 + 35 cases passed on the two ITSM peers with CMDB-PM-I1 applied. Not re-run for the docs commit (docs only).
+`test_tiqoraitsm_addon.py` (znuny-6.5, znuny-7.3), `test_itsm_import.py` and `test_gi_config_items.py` (the ITSM peers `znuny-6.5-itsm`, `znuny-7.3-itsm`) cover the ITSM importer, the `ConfigItem*` GI operations and the TiqoraITSM add-on; last recorded run 2026-10-13 at the merge into roadmap-wave1 (fresh compose projects, CMDB-PM-I1 included): all 30 add-on cases on `znuny-6.5`, `znuny-7.3`, `znuny-6.5-itsm` and `znuny-7.3-itsm`, and the 6 importer + 29 GI cases on both ITSM peers, passed (incl. `test_readonly_blocks_deleting_ci_links`).
 
 `test_process_designer.py` covers the wave-3 process designer against the peer: a Znuny export
 (`ProcessImport` of every sample in `scripts/test/sample/ProcessManagement/`, then `_GetProcessData`
