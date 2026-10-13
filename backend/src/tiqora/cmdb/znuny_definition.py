@@ -145,15 +145,20 @@ def _convert(attr: AttrDef, prefix: str, res: DefinitionImportResult) -> Attribu
         if conv is not None:
             sub.append(conv)
 
+    required = perl_truthy(inp.get("Required"))
     try:
         return AttributeDef(
             key=key,
             name=attr.name[:200],
             type=mapped,  # type: ignore[arg-type]
-            required=perl_truthy(inp.get("Required")),
+            required=required,
             searchable=attr.searchable and mapped not in ("group", "attachment"),
-            # Znuny's _DefinitionPrepare already clamped the counts (CountMin defaults to 1)
-            count_min=attr.count_min,
+            # Znuny's _DefinitionPrepare already clamped the counts (CountMin defaults to 1).
+            # In Znuny CountMin is the number of input rows shown and Input.Required decides
+            # whether a value is mandatory; Tiqora's count_min is "values required", so it
+            # takes CountMin only for required inputs (ruling CMDB-PM-I1). count_default keeps
+            # the rows Znuny shows.
+            count_min=attr.count_min if required else 0,
             count_max=attr.count_max,
             count_default=attr.count_default,
             options=options,

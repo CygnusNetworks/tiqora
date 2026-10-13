@@ -73,6 +73,9 @@ Aus Znuny übernehmen Sie eine vorhandene Klassendefinition mit **Definition imp
 Tiqora nicht abbilden kann, wird als Hinweis aufgelistet). Gelesen wird die Definition mit
 demselben Parser wie im Modus A und im ITSM-Import, also nach Znunys eigenen Regeln: fehlt
 `CountMin`, gilt 1; Schlüssel mit Leerzeichen oder Umlauten lehnt schon Znuny ab, ebenso hier.
+`CountMin` ist in Znuny die Zahl der angezeigten Eingabezeilen, Pflicht ist ein Wert nur mit
+`Required`; Tiqora übernimmt `CountMin` daher nur für Pflichtattribute als Mindestzahl der
+Werte, alle anderen Attribute bleiben optional und zeigen trotzdem die Zeilen wie in Znuny.
 Verweise auf andere CIs (`CI`, `CISimple`) übernehmen die Klasse aus `CIClassName`. Der Umfang
 ist begrenzt (1 MiB, 64 Ebenen, keine YAML-Aliase), damit eine manipulierte Datei nichts
 anrichten kann.
