@@ -82,9 +82,18 @@ def counter(source: dict[str, Any]) -> W:
     return W("c", "core.counter", settings={"source": source})
 
 
+#: functional tests need no production budget (25 s): budget semantics are covered by
+#: test_dashboard_runner.py; a loaded host must not turn a correct answer into "pending"
+FUNCTIONAL_TIMEOUT = 120.0
+
+
 async def run(env: Env, uid: int, widget: W) -> Any:
-    out = await run_widget(env.factory, registry(), uid, widget)
+    out = await run_widget(env.factory, registry(), uid, widget, timeout=FUNCTIONAL_TIMEOUT)
     assert out is not None
+    assert out.status != "pending", (
+        f"host starved: the widget did not finish within {FUNCTIONAL_TIMEOUT:.0f} s"
+        f" (infrastructure, not a product failure): {out!r}"
+    )
     return out
 
 
