@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from sqlalchemy import select
 
@@ -285,6 +287,52 @@ async def test_class_without_cis_needs_no_reindex(cmdb_db: CmdbWorld) -> None:
 def test_reindex_job_is_registered() -> None:
     assert get_registry().get(JOB_HANDLERS, CMDB_REINDEX_KIND) is CMDB_REINDEX_JOB
     assert CMDB_REINDEX_JOB.title_key == "jobs.kinds.core.cmdb_reindex"
+
+
+async def test_reindex_walks_again_when_the_definition_moves_mid_run(
+    cmdb_db: CmdbWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """M-A: a definition change during the walk joins the running job (dedupe); the batches done
+    before it were built from the older definition, so the job walks the class once more."""
+    from tiqora.cmdb import reindex
+    from tiqora.cmdb.access import load_access
+    from tiqora.cmdb.schemas import CiSearchIn
+    from tiqora.cmdb.search import search_cis
+
+    async with cmdb_db.factory() as s:
+        cid = await make_class(s, key="cmdb4mid")
+        a = await make_ci(s, cid, "cmdb4-mid-a", attributes={"Model": [{"v": "R640"}]})
+        b = await make_ci(s, cid, "cmdb4-mid-b", attributes={"Model": [{"v": "R650"}]})
+        acc = await load_access(s, USER_ADMIN)
+    base = parse_attrs(SERVER_ATTRS)
+    searchable = [base[0], base[1].model_copy(update={"searchable": True}), *base[2:]]
+
+    real = reindex.rebuild_index
+    calls: list[list[int]] = []
+    changed: list[bool] = []
+
+    async def rebuild_then_change(session: Any, ci_ids: Any) -> int:
+        n = await real(session, ci_ids)
+        calls.append(list(ci_ids))
+        if not changed:  # the admin makes Model searchable after the first batch
+            changed.append(True)
+            async with cmdb_db.factory() as other:
+                await ClassService(other).add_definition(
+                    cid, searchable, comment=None, user_id=USER_ADMIN
+                )
+                await other.commit()
+        return n
+
+    monkeypatch.setattr(reindex, "rebuild_index", rebuild_then_change)
+    assert await reindex.reindex_class(cmdb_db.factory, cid, batch=1) == 4  # 2 CIs x 2 walks
+    assert calls == [[a], [b], [a], [b]]
+    async with cmdb_db.factory() as s:
+        # without the second walk a, indexed before the change, would not be found
+        assert [i.id for i in (await search_cis(s, acc, CiSearchIn(q="R640"))).items] == [a]
+        assert [i.id for i in (await search_cis(s, acc, CiSearchIn(q="R650"))).items] == [b]
+    calls.clear()
+    assert await reindex.reindex_class(cmdb_db.factory, cid, batch=1) == 2  # stable: one walk
+    assert calls == [[a], [b]]
 
 
 async def test_searchable_change_reindexes_existing_cis(cmdb_db: CmdbWorld) -> None:
