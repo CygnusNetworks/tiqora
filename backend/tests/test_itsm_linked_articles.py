@@ -490,6 +490,25 @@ async def test_state_veto_comes_before_the_reply_is_sent(
     assert _hook_tickets(hooks, "article.create") == []  # refused before the article
 
 
+async def test_article_veto_in_reply_mode_sends_no_mail(
+    w: World, hooks: Any, mail_spy: list[int]
+) -> None:
+    """m4: in reply mode the ``article.create`` hook runs before the e-mail goes out, so a
+    vetoed reply is a per-ticket skip without a customer mail."""
+    hooks.MODE["hook.article.create"] = "veto_listed"
+    hooks.VETO_TICKETS.add(T_D)
+    job_id, payload = await w.start_job(w.body(mode="reply", target_ticket_ids=[T_D]))
+    before = await w.history(T_D)
+    out = await run_linked_articles(w.ctx(job_id), payload)
+    assert mail_spy == []
+    assert out["done"] == []
+    assert out["skipped"] == [
+        {"ticket_id": T_D, "reason": "vetoed", "detail": f"Ticket {T_D}: Vertragsnummer fehlt"}
+    ]
+    assert await w.articles(T_D) == [] and await w.history(T_D) == before
+    assert _hook_tickets(hooks, "article.create") == [T_D]
+
+
 async def test_state_hook_fires_once_per_target(w: World, hooks: Any) -> None:
     """The pre-flight replaces change_state's own hook call (hooks_checked), no double call."""
     job_id, payload = await w.start_job(w.body(target_ticket_ids=[T_C]))
