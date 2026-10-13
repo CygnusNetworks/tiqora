@@ -135,7 +135,7 @@ def test_sign_refuses_in_place_without_force(tmp_path: Path, capsys) -> None:
     assert _run([*argv, "--force"]) == 0
     assert pkg.read_bytes() != before
     assert read_tqplugin(pkg.read_bytes(), max_bytes=10**7).signature is not None
-    assert parse_public_key(pub)
+    assert verify_package_sig(pkg, pub)
 
 
 def test_index_build_and_sign(tmp_path: Path, capsys) -> None:
@@ -211,3 +211,73 @@ def test_index_build_publisher_flags_must_come_together(tmp_path: Path, capsys) 
     assert code == 2
     assert not (tmp_path / "index.json").exists()
     assert "zusammen" in capsys.readouterr().err
+
+
+def verify_package_sig(pkg: Path, pub: str) -> bool:
+    from tiqora.plugins.signing import verify_signature
+
+    with zipfile.ZipFile(pkg) as zf:
+        checksums = zf.read("CHECKSUMS")
+        sig = zf.read("SIGNATURE")
+    verify_signature(sig, checksums, parse_public_key(pub))  # raises when invalid
+    return True
+
+
+def test_pack_rejects_package_the_reader_rejects(tmp_path: Path, capsys) -> None:
+    log = tmp_path / "CHANGELOG.md"
+    log.write_text("x" * 200_000, encoding="utf-8")
+    out = tmp_path / "a.tqplugin"
+    argv = ["plugins", "pack", str(build_wheel(tmp_path)), "--changelog", str(log), "-o", str(out)]
+    assert _run(argv) == 1
+    assert "Fehler" in capsys.readouterr().err
+    assert not out.exists()
+    assert not (tmp_path / "a.tqplugin.tmp").exists()
+
+
+def test_sign_rejects_corrupt_package(tmp_path: Path, capsys) -> None:
+    _keygen(tmp_path, capsys)
+    bad = tmp_path / "bad.tqplugin"
+    with zipfile.ZipFile(bad, "w") as zf:
+        zf.writestr("CHECKSUMS", "garbage")
+    before = bad.read_bytes()
+    argv = ["plugins", "sign", str(bad), "--key", str(tmp_path / "k.pem"), "--force"]
+    assert _run(argv) == 1
+    assert bad.read_bytes() == before
+
+
+def test_sign_alias_path_still_needs_force(tmp_path: Path, capsys, monkeypatch) -> None:
+    _keygen(tmp_path, capsys)
+    pkg = tmp_path / "a.tqplugin"
+    assert _run(["plugins", "pack", str(build_wheel(tmp_path)), "--output", str(pkg)]) == 0
+    monkeypatch.chdir(tmp_path)
+    before = pkg.read_bytes()
+    argv = ["plugins", "sign", "a.tqplugin", "--key", "k.pem", "-o", str(pkg)]
+    assert _run(argv) == 2
+    assert pkg.read_bytes() == before
+
+
+def test_index_sign_with_non_ed25519_key_exits_2(tmp_path: Path, capsys) -> None:
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    key = tmp_path / "ec.pem"
+    key.write_bytes(
+        ec.generate_private_key(ec.SECP256R1()).private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+    sig_dir = tmp_path / "index.json"
+    sig_dir.write_text("{}", encoding="utf-8")
+    assert _run(["plugins", "index", "sign", str(sig_dir), "--key", str(key)]) == 2
+    assert "Fehler" in capsys.readouterr().err
+
+
+def test_index_sign_unwritable_sig_exits_2(tmp_path: Path, capsys) -> None:
+    _keygen(tmp_path, capsys)
+    idx = tmp_path / "index.json"
+    idx.write_text("{}", encoding="utf-8")
+    (tmp_path / "index.json.sig").mkdir()
+    assert _run(["plugins", "index", "sign", str(idx), "--key", str(tmp_path / "k.pem")]) == 2
+    assert "Fehler" in capsys.readouterr().err

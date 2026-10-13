@@ -173,8 +173,13 @@ async def _cmd_keygen(args: argparse.Namespace) -> int:
     except OSError as exc:
         _err(f"Fehler: {exc}")
         return 2
-    with os.fdopen(fd, "wb") as fh:
-        fh.write(pem)
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(pem)
+    except OSError as exc:
+        os.unlink(args.out)
+        _err(f"Fehler: {exc}")
+        return 2
     print(f"Privater Schlüssel: {args.out}")  # noqa: T201 — CLI output
     print(f"public_key: {public}")  # noqa: T201 — CLI output
     print(f"key_id: {key_id(parse_public_key(public))}")  # noqa: T201 — CLI output
@@ -182,6 +187,8 @@ async def _cmd_keygen(args: argparse.Namespace) -> int:
 
 
 def _load_key(path: Path) -> Any:
+    from cryptography.exceptions import UnsupportedAlgorithm
+
     from tiqora.plugins.signing import SignatureError, load_private_key
 
     try:
@@ -189,38 +196,54 @@ def _load_key(path: Path) -> Any:
     except (SignatureError, OSError) as exc:
         _err(f"Fehler: {exc}")
         return None
+    except UnsupportedAlgorithm:
+        _err("Fehler: Privater Schlüssel konnte nicht gelesen werden")
+        return None
 
 
 async def _cmd_pack(args: argparse.Namespace) -> int:
-    from tiqora.plugins.package import PackageError, write_tqplugin
+    from tiqora.config import get_settings
+    from tiqora.plugins.package import PackageError, read_tqplugin, write_tqplugin
 
     if args.output.exists() and not args.force:
         _err(f"Fehler: {args.output} existiert bereits (--force zum Überschreiben)")
         return 2
+    tmp = args.output.with_name(args.output.name + ".tmp")
     try:
         changelog = args.changelog.read_text(encoding="utf-8") if args.changelog else None
-        write_tqplugin(args.wheel, args.output, changelog=changelog)
+        write_tqplugin(args.wheel, tmp, changelog=changelog)
+        # Same reader the install paths use: fail at pack time, not at install time.
+        read_tqplugin(tmp.read_bytes(), max_bytes=get_settings().plugins_max_package_bytes)
+        os.replace(tmp, args.output)
     except (PackageError, OSError, UnicodeDecodeError) as exc:
         _err(f"Fehler: {exc}")
         return 1
+    finally:
+        tmp.unlink(missing_ok=True)
     print(f"Geschrieben nach {args.output}")  # noqa: T201 — CLI output
     return 0
+
+
+def _same_path(a: Path, b: Path) -> bool:
+    return os.path.abspath(a) == os.path.abspath(b)
 
 
 async def _cmd_sign(args: argparse.Namespace) -> int:
     import zipfile
 
-    from tiqora.plugins.package import PackageError, add_signature
+    from tiqora.config import get_settings
+    from tiqora.plugins.package import PackageError, add_signature, read_tqplugin
     from tiqora.plugins.signing import sign_bytes
 
     out: Path = args.output or args.package
-    if out == args.package and not args.force:
+    if _same_path(out, args.package) and not args.force:
         _err("Fehler: Die Datei würde überschrieben (--output angeben oder --force)")
         return 2
     private = _load_key(args.key)
     if private is None:
         return 2
     try:
+        read_tqplugin(args.package.read_bytes(), max_bytes=get_settings().plugins_max_package_bytes)
         with zipfile.ZipFile(args.package) as zf:
             checksums = zf.read("CHECKSUMS")
         add_signature(args.package, sign_bytes(private, checksums), out)
@@ -285,13 +308,16 @@ async def _cmd_index_build(args: argparse.Namespace) -> int:
         return 2
     max_bytes = get_settings().plugins_max_package_bytes
     found: dict[str, list[tuple[TqPackage, str]]] = {}
+    digests: dict[str, str] = {}
     for path in sorted(args.directory.glob("*.tqplugin")):
         try:
-            pkg = read_tqplugin(path.read_bytes(), max_bytes=max_bytes)
+            data = path.read_bytes()
+            pkg = read_tqplugin(data, max_bytes=max_bytes)
         except (PackageError, OSError) as exc:
             _err(f"Fehler: {path.name}: {exc}")
             return 1
         found.setdefault(pkg.manifest.id, []).append((pkg, path.name))
+        digests[path.name] = hashlib.sha256(data).hexdigest()
 
     def _ver(item: tuple[TqPackage, str]) -> Version:
         try:
@@ -323,7 +349,7 @@ async def _cmd_index_build(args: argparse.Namespace) -> int:
                 {
                     "version": pkg.manifest.version,
                     "url": quote(name),
-                    "sha256": hashlib.sha256((args.directory / name).read_bytes()).hexdigest(),
+                    "sha256": digests[name],
                     "size": pkg.size_bytes,
                     "sdk": pkg.manifest.sdk,
                     "tiqora": pkg.manifest.tiqora,
@@ -361,7 +387,11 @@ async def _cmd_index_build(args: argparse.Namespace) -> int:
     except IndexFormatError as exc:
         _err(f"Fehler: {exc}")
         return 1
-    args.output.write_bytes(raw)
+    try:
+        args.output.write_bytes(raw)
+    except OSError as exc:
+        _err(f"Fehler: {exc}")
+        return 2
     print(f"Geschrieben nach {args.output} ({len(plugins)} Erweiterungen)")  # noqa: T201
     return 0
 
@@ -378,6 +408,10 @@ async def _cmd_index_sign(args: argparse.Namespace) -> int:
         _err(f"Fehler: {exc}")
         return 2
     out = args.index.with_name(args.index.name + ".sig")
-    out.write_bytes(sign_bytes(private, raw))
+    try:
+        out.write_bytes(sign_bytes(private, raw))
+    except OSError as exc:
+        _err(f"Fehler: {exc}")
+        return 2
     print(f"Geschrieben nach {out}")  # noqa: T201 — CLI output
     return 0
