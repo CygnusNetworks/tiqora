@@ -5,7 +5,9 @@ What an erased customer leaves behind in the CMDB, and what happens to it:
 * ``tiqora_itsm_link`` rows with the customer user (or a hard-deleted ticket) as an end are
   deleted. History lines of the affected CIs that name those objects (``LinkAdd``/``LinkDelete``
   details carry the object's label) are redacted; the redaction is per kind, so other
-  customers' or tickets' link lines on the same CI are redacted with them.
+  customers' or tickets' link lines on the same CI are redacted with them. Link lines that
+  name the customer (display name) or a hard-deleted ticket (number) are also redacted on every
+  other CI, so a link removed before the erasure leaves no name behind either.
 * ``customer_user`` attribute values holding the login are pseudonymised with the same token the
   tickets get. The current version is replaced by a new system version (change note
   ``Datenschutz``); the previous current version and every older or archived version is
@@ -57,6 +59,8 @@ PARTIAL_TABLES: Final = frozenset(
 CHANGE_NOTE: Final = "Datenschutz"
 REDACTED_LINK: Final = "[gelöscht]"
 _CHUNK: Final = 50
+#: width of ``tiqora_cmdb_ci_history.detail`` (``cmdb.links`` cuts its lines there)
+_DETAIL_MAX: Final = 1000
 _SYSTEM_USER: Final = 1
 
 
@@ -182,6 +186,52 @@ async def _redact_link_history(
             prefix, sep, rest = detail.partition(": ")
             kind = rest.partition(" ")[0] if sep else ""
             if kind not in kinds:
+                continue
+            await add_backup("tiqora_cmdb_ci_history", {"id": int(hid)}, {"detail": detail})
+            await session.execute(
+                update(TiqoraCmdbCiHistory)
+                .where(TiqoraCmdbCiHistory.id == hid)
+                .values(detail=f"{prefix}: {kind} {REDACTED_LINK}")
+                .execution_options(synchronize_session=False)
+            )
+            n += 1
+    return n
+
+
+def _names_object(kind: str, rest: str, detail: str, label: str) -> bool:
+    """Does the history ``detail`` (``<type>: <kind> <rest>``) name the erased object?"""
+    if kind == "ticket":
+        # label is ``<tn> <title>``; the ticket number alone identifies it
+        return rest == label or rest.startswith(f"{label} ")
+    # a label cut at the column width still names the customer
+    return rest == label or (len(detail) >= _DETAIL_MAX and label.startswith(rest))
+
+
+async def _redact_link_history_by_label(
+    session: AsyncSession, add_backup: BackupFn, kind: str, labels: Sequence[str]
+) -> int:
+    """Redact ``LinkAdd``/``LinkDelete`` lines naming an erased object on **every** CI.
+
+    The CI-scoped pass above only sees links that still exist at erasure time; a link removed
+    earlier left its history lines behind. The lines are found by the object's label as
+    ``cmdb.links`` wrote it (customer display name, ticket number), captured before the
+    customer row was anonymised. Another object with the very same label is redacted too.
+    """
+    n = 0
+    for label in sorted({lb for lb in labels if lb.strip()}):
+        rows = (
+            await session.execute(
+                select(TiqoraCmdbCiHistory.id, TiqoraCmdbCiHistory.detail).where(
+                    TiqoraCmdbCiHistory.event.in_(["LinkAdd", "LinkDelete"]),
+                    TiqoraCmdbCiHistory.detail.contains(f": {kind} {label}", autoescape=True),
+                )
+            )
+        ).all()
+        for hid, hdetail in rows:
+            detail = str(hdetail)
+            prefix, sep, rest_all = detail.partition(": ")
+            found_kind, _, rest = rest_all.partition(" ")
+            if not sep or found_kind != kind or not _names_object(kind, rest, detail, label):
                 continue
             await add_backup("tiqora_cmdb_ci_history", {"id": int(hid)}, {"detail": detail})
             await session.execute(
@@ -373,10 +423,15 @@ async def erase_cmdb_customer_data(
     replacements: Mapping[str, str],
     deleted_ticket_ids: Sequence[int],
     add_backup: BackupFn,
+    customer_labels: Sequence[str] = (),
+    deleted_ticket_numbers: Sequence[str] = (),
 ) -> dict[str, int]:
     """Apply the erasure to the CMDB tables (see the module docstring); returns the counts.
 
     ``replacements`` maps each erased login to the token the tickets get; the caller commits.
+    ``customer_labels`` are the erased customers' display names as they were before the
+    anonymisation, ``deleted_ticket_numbers`` the numbers of the hard-deleted tickets: link
+    history naming them is redacted on every CI, also where the link is long gone.
     """
     counts: dict[str, int] = {}
     logins = sorted(replacements)
@@ -386,6 +441,12 @@ async def erase_cmdb_customer_data(
     counts["tiqora_itsm_link"] = n_links
     counts["tiqora_cmdb_ci_history"] = await _redact_link_history(
         session, add_backup, link_cis, kinds
+    )
+    counts["tiqora_cmdb_ci_history"] += await _redact_link_history_by_label(
+        session, add_backup, "customer_user", customer_labels
+    )
+    counts["tiqora_cmdb_ci_history"] += await _redact_link_history_by_label(
+        session, add_backup, "ticket", deleted_ticket_numbers
     )
     if logins:
         n_hot, current_cis = await _pseudonymise_versions(

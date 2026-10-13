@@ -229,3 +229,62 @@ async def test_erasure_scrubs_cmdb_data_and_rollback_restores_it(
         )
         == 3
     )
+
+
+@pytest.mark.parametrize("delete_mode", [False, True])
+async def test_erasure_redacts_history_of_links_removed_earlier(
+    cmdb_db: CmdbWorld, delete_mode: bool
+) -> None:
+    """A link removed before the erasure still left the customer's name (and the ticket's
+    number and title) in the CI history; the erasure must redact those lines too."""
+    async with cmdb_db.factory() as s:
+        cid = await make_class(s, attributes=_ATTRS)
+        a = await make_ci(s, cid, "cmdb4-a")
+        links = LinkService(s)
+        for end in (LinkEnd("customer_user", CUSTOMER_A), LinkEnd("ticket", str(TICKET_OPEN))):
+            rec = await links.add(
+                system_access(USER_A),
+                source=LinkEnd("ci", str(a)),
+                target=end,
+                link_type_key="RelevantTo",
+                enforce_permissions=False,
+            )
+            await links.delete(system_access(USER_A), rec.id, enforce_permissions=False)
+        await s.commit()
+    tn = f"2026101074{TICKET_OPEN}"
+
+    def lines(pattern: str) -> int:
+        return _count(
+            cmdb_db,
+            "SELECT COUNT(*) FROM tiqora_cmdb_ci_history WHERE ci_id = :c AND detail LIKE :p",
+            c=a,
+            p=pattern,
+        )
+
+    assert _count(cmdb_db, "SELECT COUNT(*) FROM tiqora_itsm_link") == 0
+    assert lines("%Cora Customer%") == 2  # LinkAdd + LinkDelete
+    assert lines(f"%{tn}%") == 2
+    cuid = _count(cmdb_db, "SELECT id FROM customer_user WHERE login = :l", l=CUSTOMER_A)
+
+    result = await run_erasure(
+        cmdb_db.factory,
+        Settings(),
+        customer_user_ids=[cuid],
+        mode="delete" if delete_mode else "anonymize",
+        delete_tickets=delete_mode,
+        seed=7,
+        force_parallel=True,
+        actor="test",
+    )
+
+    assert lines("%Cora Customer%") == 0
+    assert lines("%: customer_user [gelöscht]") == 2
+    # a ticket that stays (anonymize) keeps its line; a hard-deleted one is redacted
+    assert lines(f"%{tn}%") == (0 if delete_mode else 2)
+    assert lines("%: ticket [gelöscht]") == (2 if delete_mode else 0)
+
+    await rollback_job(
+        cmdb_db.factory, Settings(), result.job_id, force_parallel=True, actor="test"
+    )
+    assert lines("%Cora Customer%") == 2
+    assert lines(f"%{tn}%") == 2

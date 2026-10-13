@@ -1206,6 +1206,10 @@ async def run_erasure(
         avatar_keys = sorted({email_key(c.email) for c in ordered if (c.email or "").strip()})
         # Same reason: scheduled-report recipients are matched on the address as it was.
         erased_emails = sorted({c.email for c in ordered if (c.email or "").strip()})
+        # CMDB link history names the customer by display name (cmdb.links): capture it too.
+        cmdb_customer_labels = sorted(
+            {f"{c.first_name or ''} {c.last_name or ''}".strip() or c.login for c in ordered}
+        )
         login_to_new: dict[str, str] = {}
         company_to_new: dict[str, str] = {}
 
@@ -1229,9 +1233,9 @@ async def run_erasure(
         # ---- Preload tickets / articles for these logins ----
         ticket_rows = (
             await session.execute(
-                select(Ticket.id, Ticket.customer_user_id, Ticket.customer_id, Ticket.title).where(
-                    Ticket.customer_user_id.in_(logins)
-                )
+                select(
+                    Ticket.id, Ticket.customer_user_id, Ticket.customer_id, Ticket.title, Ticket.tn
+                ).where(Ticket.customer_user_id.in_(logins))
             )
         ).all()
         ticket_ids = [int(r.id) for r in ticket_rows]
@@ -2090,6 +2094,10 @@ async def run_erasure(
                     replacements=login_to_new,
                     deleted_ticket_ids=ticket_ids if do_ticket_delete else [],
                     add_backup=_backup_saved,
+                    customer_labels=cmdb_customer_labels,
+                    deleted_ticket_numbers=(
+                        [str(r.tn) for r in ticket_rows] if do_ticket_delete else []
+                    ),
                 )
             )
         # GenericInterface debugger lines hold payloads of these tickets (customer names,
