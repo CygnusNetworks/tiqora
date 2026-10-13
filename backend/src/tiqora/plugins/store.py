@@ -335,7 +335,14 @@ async def set_enabled(
 
 
 async def reset_plugin(session: AsyncSession, plugin_id: str, *, now: datetime) -> None:
-    """ "Try again": crash counters to 0, QUARANTINED -> DISABLED, circuit breakers closed."""
+    """ "Try again": crash counters to 0, QUARANTINED -> DISABLED, circuit breakers closed.
+
+    A recorded ``migration_error`` is cleared too, so the next ``migrate upgrade`` (boot)
+    runs the plugin's database changes again (F3 (3)).
+    """
+    await session.execute(
+        update(TiqoraPlugin).where(TiqoraPlugin.id == plugin_id).values(migration_error=None)
+    )
     await session.execute(
         update(TiqoraPluginRuntime)
         .where(

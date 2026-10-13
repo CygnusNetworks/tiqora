@@ -7,6 +7,7 @@ plugin tables.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import sys
 from collections.abc import Iterator
@@ -25,6 +26,7 @@ from tiqora.cli.migrate import add_migrate_subparser, run_migrate
 from tiqora.config import get_settings
 from tiqora.main import main
 from tiqora.plugins import migrations as migrations_mod
+from tiqora.plugins import store
 from tiqora.plugins.discovery import DiscoveredPlugin, clear_discovery_cache, discovered_plugins
 from tiqora.plugins.migrations import SAFE_MODE_MIGRATIONS_MESSAGE, run_boot_migrations
 
@@ -326,6 +328,33 @@ def test_error_for_the_current_version_is_not_retried_at_boot(
         conn.execute(
             text("UPDATE tiqora_plugin SET version = '0.9.0' WHERE id = :i"), {"i": TABLES_ID}
         )
+    assert run_migrate(_migrate_args("upgrade")) == 0
+    assert calls == [TABLES_ID]
+
+
+def test_try_again_clears_the_error_so_the_next_boot_migrates(
+    engine: Engine, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F3 (3): "Erneut versuchen" is the way to retry a failed migration of the same version."""
+    _install_tables(tmp_path, monkeypatch)
+    calls: list[str] = []
+    monkeypatch.setattr(
+        migrations_mod, "_run_one_in_subprocess", lambda plugin_id, **kw: calls.append(plugin_id)
+    )
+    _seed(engine, TABLES_ID, version="1.0.0", error="Datenbank-Änderung „x“ fehlgeschlagen")
+    assert run_migrate(_migrate_args("upgrade")) == 0
+    assert calls == []
+
+    async def try_again() -> None:
+        async with (
+            migrations_mod.plugin_session_factory(os.environ["DATABASE_URL"]) as factory,
+            factory() as session,
+        ):
+            await store.reset_plugin(session, TABLES_ID, now=T0)
+            await session.commit()
+
+    asyncio.run(try_again())
+    assert _row(engine, TABLES_ID)["migration_error"] is None
     assert run_migrate(_migrate_args("upgrade")) == 0
     assert calls == [TABLES_ID]
 
