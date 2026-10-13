@@ -19,6 +19,7 @@ from tests._cmdb_helpers import (
     client_for,
     make_ci,
     make_class,
+    make_link_type,
     run_jobs_until_idle,
     set_mode,
 )
@@ -135,11 +136,27 @@ async def test_incident_marks_dependents_warning(cmdb_db: CmdbWorld) -> None:
         assert await _cur(s, [a, b, c]) == ["warning", "warning", "incident"]
 
 
+#: a directed test type that propagates only to the source end (the stock DependsOn is "both")
+SRC_ONLY = "Cmdb4DependsSrc"
+
+
 async def test_incident_does_not_propagate_to_dependencies(cmdb_db: CmdbWorld) -> None:
     async with cmdb_db.factory() as s:
-        a, b = await _chain(s, ["cmdb4-a", "cmdb4-b"])
+        await make_link_type(s, SRC_ONLY, "source")
+        a, b = await _chain(s, ["cmdb4-a", "cmdb4-b"], link_type=SRC_ONLY)
         await _set_own_incident(s, a, "incident")  # a depends on b, not the other way round
         assert await _cur(s, [a, b]) == ["incident", "operational"]
+
+
+async def test_default_depends_on_warns_both_directions_transitively(cmdb_db: CmdbWorld) -> None:
+    """Survey question 2, s2b/s2c: Znuny ships {DependsOn: Both}; the warning follows the link
+    in either direction and over several hops."""
+    async with cmdb_db.factory() as s:
+        a, b, c = await _chain(s, ["cmdb4-a", "cmdb4-b", "cmdb4-c"])
+        await _set_own_incident(s, a, "incident")  # the dependent end is in incident
+        assert await _cur(s, [a, b, c]) == ["incident", "warning", "warning"]
+        await _set_own_incident(s, a, "operational")
+        assert await _cur(s, [a, b, c]) == ["operational"] * 3
 
 
 async def test_cycle_terminates_and_marks_warning(cmdb_db: CmdbWorld) -> None:
@@ -200,10 +217,11 @@ async def test_non_propagating_type_does_not_propagate(cmdb_db: CmdbWorld) -> No
 
 async def test_two_incidents_one_cleared_keeps_warning(cmdb_db: CmdbWorld) -> None:
     async with cmdb_db.factory() as s:
+        await make_link_type(s, SRC_ONLY, "source")
         cid = await make_class(s)
         a, b, c = [await make_ci(s, cid, f"cmdb4-{n}") for n in "abc"]
-        await _link(s, a, b)
-        await _link(s, a, c)
+        await _link(s, a, b, SRC_ONLY)
+        await _link(s, a, c, SRC_ONLY)
         await _set_own_incident(s, b, "incident")
         await _set_own_incident(s, c, "incident")
         assert await _cur(s, [a, b, c]) == ["warning", "incident", "incident"]
@@ -343,7 +361,86 @@ async def test_service_state_ignores_non_propagating_link(cmdb_db: CmdbWorld) ->
         )
         await s.commit()
         got = (await service_incident_states(s, [SERVICE_ID]))[SERVICE_ID]
-        assert got.state is None
+        # survey s5 (RelevantTo does not count): a linked CI on a non-propagating type leaves the
+        # service operational -- it has CIs, so it has a state, as in Mode A
+        assert got.state is not None and got.state.functionality == "operational"
+        assert (got.cis_incident, got.cis_warning) == (0, 0)
+
+
+async def _service_link(s: AsyncSession, service_id: int, ci_id: int) -> None:
+    await LinkService(s).add(
+        system_access(USER_A),
+        source=LinkEnd("service", str(service_id)),
+        target=LinkEnd("ci", str(ci_id)),
+        link_type_key="DependsOn",
+    )
+    await s.commit()
+
+
+async def _functionality(s: AsyncSession, service_id: int) -> str | None:
+    got = (await service_incident_states(s, [service_id]))[service_id]
+    return None if got.state is None else got.state.functionality
+
+
+async def test_service_state_counts_only_productive_cis(cmdb_db: CmdbWorld) -> None:
+    """Survey s3: an incident CI in a non-productive deployment state (Planned) is ignored."""
+    async with cmdb_db.factory() as s:
+        cid = await make_class(s)
+        planned = await make_ci(s, cid, "cmdb4-planned", deployment="planned", incident="incident")
+        await _service_link(s, SERVICE_ID, planned)
+        assert await _functionality(s, SERVICE_ID) == "operational"
+        live = await make_ci(s, cid, "cmdb4-live", deployment="repair", incident="incident")
+        await _service_link(s, SERVICE_ID, live)  # "repair" is productive too
+        got = (await service_incident_states(s, [SERVICE_ID]))[SERVICE_ID]
+        assert got.state is not None and got.state.functionality == "incident"
+        assert got.state.key == "incident" and got.cis_incident == 1
+
+
+async def test_service_state_child_service_raises_parent_to_warning(cmdb_db: CmdbWorld) -> None:
+    """Survey s6: a valid ``Parent::Child`` in incident makes an operational parent warning (never
+    incident); a parent that is worse on its own keeps its state."""
+    child_id = 740402
+    cmdb_db.sql(
+        "INSERT INTO service (id, name, valid_id, create_time, create_by, change_time, change_by)"
+        " VALUES (:i, :n, 1, :t, 1, :t, 1)",
+        i=child_id,
+        n="cmdb4-service::child",
+        t="2026-10-01 08:00:00",
+    )
+    try:
+        async with cmdb_db.factory() as s:
+            cid = await make_class(s)
+            bad = await make_ci(s, cid, "cmdb4-bad", incident="incident")
+            await _service_link(s, child_id, bad)
+            states = await service_incident_states(s, [SERVICE_ID, child_id])
+            assert states[child_id].state is not None
+            assert states[child_id].state.functionality == "incident"
+            parent = states[SERVICE_ID]  # no CI of its own, but a child in incident
+            assert parent.state is not None and parent.state.functionality == "warning"
+            assert (parent.cis_incident, parent.cis_warning) == (0, 0)
+        cmdb_db.sql("UPDATE service SET valid_id = 2 WHERE id = :i", i=child_id)
+        async with cmdb_db.factory() as s:  # new snapshot (MariaDB: repeatable read)
+            assert await _functionality(s, SERVICE_ID) is None  # an invalid child does not count
+    finally:
+        cmdb_db.sql("DELETE FROM tiqora_itsm_link WHERE source_key = :k", k=str(child_id))
+        cmdb_db.sql("DELETE FROM service WHERE id = :i", i=child_id)
+
+
+async def test_service_state_incident_beats_warning(cmdb_db: CmdbWorld) -> None:
+    """Survey s4: one warned and one incident CI give incident; the counts name both."""
+    async with cmdb_db.factory() as s:
+        await make_link_type(s, SRC_ONLY, "source")
+        cid = await make_class(s)
+        warned, root = [await make_ci(s, cid, n) for n in ("cmdb4-warned", "cmdb4-root")]
+        await _link(s, warned, root, SRC_ONLY)
+        await _set_own_incident(s, root, "incident")
+        hit = await make_ci(s, cid, "cmdb4-hit", incident="incident")
+        await _service_link(s, SERVICE_ID, warned)
+        assert await _functionality(s, SERVICE_ID) == "warning"
+        await _service_link(s, SERVICE_ID, hit)
+        got = (await service_incident_states(s, [SERVICE_ID]))[SERVICE_ID]
+        assert got.state is not None and got.state.functionality == "incident"
+        assert (got.cis_incident, got.cis_warning) == (1, 1)
 
 
 async def test_link_type_propagation_change_enqueues_full_recompute(cmdb_db: CmdbWorld) -> None:

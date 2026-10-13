@@ -81,6 +81,7 @@ __all__ = [
     "cmdb_db",
     "make_ci",
     "make_class",
+    "make_link_type",
     "portal_client_for",
     "parse_attrs",
     "run_jobs_until_idle",
@@ -516,6 +517,37 @@ async def make_ci(
     )
     await session.commit()
     return rec.id
+
+
+async def make_link_type(
+    session: AsyncSession, name: str, propagation: str, *, pointed: bool = True
+) -> None:
+    """A test-own ``origin="tiqora"`` link type (offered for CI-CI and CI-service) and commit.
+
+    ``_cmdb_rows_reset`` removes it again (non-default Tiqora-origin rows)."""
+    from tiqora.itsm.models import TiqoraItsmLinkType
+
+    session.add(
+        TiqoraItsmLinkType(
+            name=name,
+            origin="tiqora",
+            source_label=None,
+            target_label=None,
+            pointed=pointed,
+            propagation=propagation,
+            offer_ticket_ticket=False,
+            offer_ticket_ci=False,
+            offer_ci_ci=True,
+            offer_ci_service=True,
+            position=900,
+            valid=True,
+            create_time=_T,
+            create_by=USER_ADMIN,
+            change_time=_T,
+            change_by=USER_ADMIN,
+        )
+    )
+    await session.commit()
 
 
 async def _dep(session: AsyncSession, key: str) -> int:

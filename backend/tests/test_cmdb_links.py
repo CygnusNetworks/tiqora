@@ -380,7 +380,7 @@ async def test_link_types_route_lists_the_offered_valid_types(cmdb_db: CmdbWorld
     assert r.status_code == 200, r.text
     by_name = {t["name"]: t for t in r.json()}
     assert set(by_name) == {"DependsOn", "Includes", "ConnectedTo", "RelevantTo"}
-    assert by_name["DependsOn"]["propagation"] == "source"
+    assert by_name["DependsOn"]["propagation"] == "both"  # survey: {DependsOn: Both}
     assert by_name["DependsOn"]["pointed"] is True
     assert by_name["RelevantTo"]["offer_ticket_ci"] is True
     assert [t["name"] for t in r.json()] == ["DependsOn", "Includes", "ConnectedTo", "RelevantTo"]
@@ -393,7 +393,7 @@ async def test_link_type_service_reads_the_step0_table(cmdb_db: CmdbWorld) -> No
             svc = LinkTypeService(s)
             assert "Includes" not in [t.name for t in await svc.list_types()]
             assert "Includes" in [t.name for t in await svc.list_types(include_invalid=True)]
-            assert await svc.propagating() == {"DependsOn": "source"}
+            assert await svc.propagating() == {"DependsOn": "both"}
             row = await svc.get_by_name("DependsOn")
             assert isinstance(row, TiqoraItsmLinkType)
     finally:

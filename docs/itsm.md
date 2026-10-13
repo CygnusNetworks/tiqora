@@ -148,7 +148,7 @@ schreibgeschützt (Fehler `read_only`).
 ### Vorfallstatus des Services
 
 Der Vorfallstatus (operational, warning, incident) wird aus den verknüpften CIs berechnet wie in
-Znuny: Es zählen nur Verknüpfungstypen mit Weitergabe, nur CIs mit produktivem Einsatzstatus, die
+Znuny, in Modus A aus Znunys CIs und in Modus B aus der Tiqora-CMDB mit derselben Regel: Es zählen nur Verknüpfungstypen mit Weitergabe, nur CIs mit produktivem Einsatzstatus, die
 schlechteste Funktionalität gewinnt (incident vor warning vor operational), ein Kind-Service in
 Warnung macht den Eltern-Service höchstens zu warning. Die Anzeige erscheint am Ticket und in der
 Service-Ansicht.

@@ -48,6 +48,7 @@ from tiqora.itsm.ci_provider import (
     ServiceIncidentState,
 )
 from tiqora.itsm.link_types import Propagation, offered_link_types, znuny_link_types
+from tiqora.itsm.service_state import counts_for_service, fold_service_states, service_closure
 from tiqora.itsm.settings import ItsmSettings, load_itsm_settings
 from tiqora.itsm.znuny_adapter import attributes as attrs
 from tiqora.itsm.znuny_adapter.catalog import (
@@ -76,34 +77,10 @@ _DEFAULT_STATE_NAME: Final = {
     "warning": "Warning",
     "incident": "Incident",
 }
-_REVERSED: Final[Mapping[str, str]] = {
-    "source": "target",
-    "target": "source",
-    "both": "both",
-    "none": "none",
-}
 TICKET_OBJECT: Final = "Ticket"
 SERVICE_OBJECT: Final = "Service"
 
 SettingsLoader = Callable[[AsyncSession], Any]
-
-
-def _counts_for_service(propagation: str, pointed: bool, service_is_source: bool) -> bool:
-    """``LinkKeyListWithData(Object1 => Service, Direction => reverse(propagation))``.
-
-    ``propagation`` is the direction from the CI's point of view; Znuny reads it from the
-    service, so it is reversed. ``Source``: the CI is the link source (an unpointed type is
-    stored either way and counts either way); ``Target``: the service is the source of a pointed
-    link; unpointed types never match ``Target``.
-    """
-    wanted = _REVERSED.get(propagation, "none")
-    if wanted == "both":
-        return True
-    if wanted == "source":
-        return (not pointed) or (not service_is_source)
-    if wanted == "target":
-        return pointed and service_is_source
-    return False
 
 
 class ZnunyCiProvider:
@@ -534,24 +511,13 @@ class ZnunyCiProvider:
         if not wanted:
             return {}
         reader = await get_reader(session)
-        names: dict[int, tuple[str, int]] = {
-            int(sid): (str(name), int(valid))
+        names: dict[int, tuple[str, bool]] = {
+            int(sid): (str(name), int(valid) == 1)
             for sid, name, valid in (
                 await session.execute(text("SELECT id, name, valid_id FROM service"))
             ).all()
         }
-        children_of: dict[str, list[int]] = defaultdict(list)
-        for sid, (name, valid) in names.items():
-            if valid == 1 and "::" in name:
-                children_of[name.rpartition("::")[0]].append(sid)
-        closure: set[int] = set()
-        pending = [s for s in wanted if s in names]
-        while pending:
-            sid = pending.pop()
-            if sid in closure:
-                continue
-            closure.add(sid)
-            pending.extend(children_of.get(names[sid][0], ()))
+        closure, children_of = service_closure(names, wanted)
 
         links = (
             await reader.object_ci_links(session, object_name=SERVICE_OBJECT, object_ids=closure)
@@ -582,27 +548,21 @@ class ZnunyCiProvider:
             prop: Propagation = zt.propagation if zt is not None else "none"
             if (
                 zt is not None
-                and _counts_for_service(prop, zt.pointed, lk.object_is_source)
+                and counts_for_service(prop, zt.pointed, lk.object_is_source)
                 and functionality(ci.cur_depl_state_id) == "productive"
             ):
                 counted[lk.object_id].add(ci.id)
 
-        final: dict[int, str] = {}
-        has_cis: dict[int, bool] = {}
-        counts: dict[int, tuple[int, int]] = {}
-        for sid in sorted(closure, key=lambda s: -names[s][0].count("::")):
-            kinds = [functionality(cis[c].cur_inci_state_id) for c in counted[sid]]
-            n_incident = sum(1 for k in kinds if k == "incident")
-            n_warning = sum(1 for k in kinds if k == "warning")
-            state = "incident" if n_incident else "warning" if n_warning else "operational"
-            if state == "operational":
-                for child in children_of.get(names[sid][0], ()):
-                    if final.get(child, "operational") != "operational":
-                        state = "warning"
-                        break
-            final[sid] = state
-            has_cis[sid] = bool(linked[sid])
-            counts[sid] = (n_incident, n_warning)
+        folded = fold_service_states(
+            names,
+            children_of,
+            closure,
+            {
+                sid: [functionality(cis[c].cur_inci_state_id) for c in ci_ids]
+                for sid, ci_ids in counted.items()
+            },
+            {sid: bool(ci_ids) for sid, ci_ids in linked.items()},
+        )
 
         def pick(kind: str) -> CatalogValue | None:
             of_kind = sorted(
@@ -613,16 +573,16 @@ class ZnunyCiProvider:
 
         out: dict[int, ServiceIncidentState] = {}
         for sid in wanted:
-            if sid not in final:
+            fold = folded.get(sid)
+            if fold is None:
                 out[sid] = ServiceIncidentState(sid, None, 0, 0)
                 continue
-            state = final[sid]
-            no_state = state == "operational" and not has_cis[sid]
+            shown = fold.shown
             out[sid] = ServiceIncidentState(
                 service_id=sid,
-                state=None if no_state else pick(state),
-                cis_incident=counts[sid][0],
-                cis_warning=counts[sid][1],
+                state=None if shown is None else pick(shown),
+                cis_incident=fold.cis_incident,
+                cis_warning=fold.cis_warning,
             )
         return out
 

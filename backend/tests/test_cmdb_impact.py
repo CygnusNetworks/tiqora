@@ -200,8 +200,9 @@ async def test_affected_lists_services_customers_and_open_tickets(cmdb_db: CmdbW
     assert [t.ticket_id for t in out.open_tickets] == [TICKET_OPEN]  # hidden queue, closed
     assert out.open_ticket_count == 1 and not out.truncated
     assert out.open_tickets[0].open and out.open_tickets[0].state_type == "open"
-    # an incident at app reaches only app itself: still its own links, but no CI below it
-    assert none.ci_count == 1 and [t.ticket_id for t in none.open_tickets] == [TICKET_OPEN]
+    # DependsOn propagates both ways (survey: {DependsOn: Both}): an incident at app also reaches
+    # db, which has no links of its own
+    assert none.ci_count == 2 and [t.ticket_id for t in none.open_tickets] == [TICKET_OPEN]
 
 
 async def test_affected_service_only_when_type_propagates_toward_it(cmdb_db: CmdbWorld) -> None:

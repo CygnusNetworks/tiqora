@@ -142,7 +142,7 @@ Jeder Linktyp hat eine **Weitergabe**: `none`, `source`, `target` oder `both`. `
 Das **Quell**-CI der Verknüpfung bekommt die Warnung, wenn das **Ziel**-CI in Störung ist.
 
 *Beispiel.* `web-01.example.org` **hängt ab von** `db-01.example.org` (Linktyp `DependsOn`,
-Weitergabe `source`, Quelle ist `web-01`). Setzen Sie `db-01` auf den Vorfallstatus
+Quelle ist `web-01`). Setzen Sie `db-01` auf den Vorfallstatus
 „Vorfall“ (`incident`), wechselt `web-01` automatisch in den abgeleiteten Status „Warnung“
 (`warning`) – und jedes CI, das wiederum von `web-01` abhängt, ebenfalls. Der eigene Status von
 `web-01` bleibt unberührt; die Detailseite zeigt beide („Eigener“ und „Aktueller
@@ -163,8 +163,18 @@ die Funktion oder Gültigkeit eines Vorfallstatus, startet diese Neuberechnung v
 letzten gültigen Vorfallstatus mit der Funktion `warning` lässt Tiqora nicht entfernen (`409`
 `last_warning_state`): ohne ihn ließe sich kein abgeleiteter Zustand mehr berechnen.
 
-**Services** bekommen aus den CIs, die sie tragen, einen Vorfallstatus: der schlimmste
-Status gewinnt, einschließlich `incident`.
+**Services** bekommen aus den CIs, die sie tragen, einen Vorfallstatus – nach derselben Regel
+wie in Modus A (Znunys Verhalten, siehe [itsm.md](itsm.md), Kapitel 3): Es zählen nur
+Verknüpfungen, deren Linktyp zum Service hin weitergibt, und nur CIs mit produktivem
+Einsatzstatus (z. B. „Production“, „Repair“; ein CI in „Planned“ zählt nicht); der schlimmste
+Status gewinnt, einschließlich `incident`. Ist der Service danach `operational`, macht ihn ein
+gültiger Kind-Service (`Eltern::Kind`), der nicht `operational` ist, zu `warning`. Ein Service
+ohne verknüpftes CI und ohne solchen Kind-Service hat keinen Status.
+
+`DependsOn` gibt wie in Znuny (`ITSM::Core::IncidentLinkTypeDirection`, Vorgabe
+`{DependsOn: Both}`) in **beide** Richtungen weiter: Im Beispiel oben bekommt auch `db-01` die
+Warnung, wenn `web-01` in Störung ist. Wer nur eine Richtung will, stellt die Weitergabe des
+Linktyps unter *Admin → ITSM → Linktypen* auf `source` oder `target`.
 
 ## Abhängigkeiten und „Auswirkungen“
 

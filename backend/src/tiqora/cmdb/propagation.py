@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from pydantic import BaseModel
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.cmdb import links as links_mod
@@ -33,6 +33,7 @@ from tiqora.cmdb.seed import INCIDENT_STATE
 from tiqora.cmdb.settings import CmdbSettings, load_cmdb_settings
 from tiqora.db.tiqora.models import TiqoraCmdbCatalog, TiqoraCmdbCi, TiqoraItsmLink
 from tiqora.itsm.ci_provider import CatalogValue, ServiceIncidentState
+from tiqora.itsm.service_state import counts_for_service, fold_service_states, service_closure
 from tiqora.jobs.context import JobContext
 from tiqora.jobs.registry import JobHandler
 from tiqora.jobs.service import enqueue_job
@@ -40,7 +41,6 @@ from tiqora.jobs.service import enqueue_job
 PROPAGATION_JOB_KIND: Final = "core.cmdb_propagation"
 MAX_DEPTH: Final = 50
 _CHUNK: Final = 1000
-_FUNC_RANK: Final = {"incident": 2, "warning": 1}
 
 
 @dataclass(frozen=True, slots=True)
@@ -358,32 +358,39 @@ CMDB_PROPAGATION_JOB = JobHandler(
 async def service_incident_states(
     session: AsyncSession, service_ids: Sequence[int]
 ) -> dict[int, ServiceIncidentState]:
-    """Worst current incident functionality over the CIs a service depends on (R12).
+    """Service incident state from the Tiqora CMDB, with the ITSM core's rule (R12).
 
-    Only links whose type propagates *toward the service end* count. A service without such a
-    CI gets ``state=None``. Pure ``tiqora_*`` queries (no join with Znuny tables).
+    :mod:`tiqora.itsm.service_state` folds it the same way as Mode A (behaviour survey,
+    question 2): propagating link types in their direction, productive CIs only, worst
+    functionality wins, a non-operational valid child service (``Parent::Child``) raises an
+    operational parent to ``warning``; no linked CI and no such child gives ``state=None``.
+    Separate statements on ``service`` and the ``tiqora_*`` tables (no JOIN between them).
     """
-    ids = sorted({int(i) for i in service_ids})
-    out = {i: ServiceIncidentState(i, None, 0, 0) for i in ids}
-    if not ids:
+    wanted = sorted({int(i) for i in service_ids})
+    out = {i: ServiceIncidentState(i, None, 0, 0) for i in wanted}
+    if not wanted:
         return out
-    props = await LinkTypeService(session).propagating()
-    if not props:
+    services: dict[int, tuple[str, bool]] = {
+        int(sid): (str(name), int(valid) == 1)
+        for sid, name, valid in (
+            await session.execute(text("SELECT id, name, valid_id FROM service"))
+        ).all()
+    }
+    closure, children_of = service_closure(services, wanted)
+    if not closure:
         return out
-    names = sorted(props)
-    pairs: set[tuple[int, int]] = set()  # (service, ci)
-    for chunk in _chunks(ids):
+    types = {t.name: t for t in await LinkTypeService(session).list_types()}
+    rows: list[tuple[int, int, str, bool]] = []  # (service, ci, link type, service is source)
+    for chunk in _chunks(sorted(closure)):
         keys = [str(i) for i in chunk]
-        for sk, skind, tk, _tkind, name in (
+        for sk, skind, tk, name in (
             await session.execute(
                 select(
                     TiqoraItsmLink.source_key,
                     TiqoraItsmLink.source_kind,
                     TiqoraItsmLink.target_key,
-                    TiqoraItsmLink.target_kind,
                     TiqoraItsmLink.link_type,
                 ).where(
-                    TiqoraItsmLink.link_type.in_(names),
                     (
                         (TiqoraItsmLink.source_kind == "service")
                         & (TiqoraItsmLink.source_key.in_(keys))
@@ -397,46 +404,100 @@ async def service_incident_states(
                 )
             )
         ).all():
-            prop = props[str(name)]
             service_is_source = skind == "service"
-            affects_service = (
-                prop == "both"
-                or (prop == "source" and service_is_source)
-                or (prop == "target" and not service_is_source)
-            )
-            if not affects_service:
-                continue
             svc, ci = (sk, tk) if service_is_source else (tk, sk)
             if str(svc).isdigit() and str(ci).isdigit():
-                pairs.add((int(svc), int(ci)))
-    if not pairs:
-        return out
-    ci_state = await _ci_rows(session, sorted({c for _, c in pairs}))
-    catalog = {
-        int(i): CatalogValue(str(k), str(n), f)
-        for i, k, n, f in (
-            await session.execute(
-                select(
-                    TiqoraCmdbCatalog.id,
-                    TiqoraCmdbCatalog.item_key,
-                    TiqoraCmdbCatalog.name,
-                    TiqoraCmdbCatalog.functionality,
-                ).where(TiqoraCmdbCatalog.id.in_(sorted({cur for _, cur in ci_state.values()})))
-            )
-        ).all()
-    }
-    by_service: dict[int, list[CatalogValue]] = {}
-    for svc, ci in sorted(pairs):
-        if ci in ci_state and ci_state[ci][1] in catalog:
-            by_service.setdefault(svc, []).append(catalog[ci_state[ci][1]])
-    for svc, values in by_service.items():
-        worst = max(values, key=lambda v: _FUNC_RANK.get(v.functionality or "", 0))
-        out[svc] = ServiceIncidentState(
-            svc,
-            worst,
-            sum(1 for v in values if v.functionality == "incident"),
-            sum(1 for v in values if v.functionality == "warning"),
+                rows.append((int(svc), int(ci), str(name), service_is_source))
+    ci_state = await _ci_states(session, sorted({ci for _, ci, _, _ in rows}))
+    functionality = await _functionalities(session, {i for pair in ci_state.values() for i in pair})
+    linked: dict[int, bool] = {}
+    counted: dict[int, dict[int, str | None]] = {}
+    for svc, ci, name, service_is_source in rows:
+        if ci not in ci_state:
+            continue  # a link to a CI that no longer exists
+        linked[svc] = True
+        ltype = types.get(name)
+        depl, cur = ci_state[ci]
+        if (
+            ltype is not None
+            and counts_for_service(str(ltype.propagation), bool(ltype.pointed), service_is_source)
+            and functionality.get(depl) == "productive"
+        ):
+            counted.setdefault(svc, {})[ci] = functionality.get(cur)
+    folded = fold_service_states(
+        services,
+        children_of,
+        closure,
+        {svc: list(by_ci.values()) for svc, by_ci in counted.items()},
+        linked,
+    )
+    canonical = await _canonical_incident_values(session)
+    for sid in wanted:
+        fold = folded.get(sid)
+        if fold is None:
+            continue
+        shown = fold.shown
+        out[sid] = ServiceIncidentState(
+            sid,
+            None if shown is None else canonical.get(shown),
+            fold.cis_incident,
+            fold.cis_warning,
         )
+    return out
+
+
+async def _ci_states(session: AsyncSession, ids: Sequence[int]) -> dict[int, tuple[int, int]]:
+    """CI id -> (deployment state id, current derived incident state id)."""
+    out: dict[int, tuple[int, int]] = {}
+    for chunk in _chunks(sorted(ids)):
+        rows = await session.execute(
+            select(
+                TiqoraCmdbCi.id,
+                TiqoraCmdbCi.deployment_state_id,
+                TiqoraCmdbCi.cur_incident_state_id,
+            ).where(TiqoraCmdbCi.id.in_(list(chunk)))
+        )
+        for i, depl, cur in rows.all():
+            out[int(i)] = (int(depl), int(cur))
+    return out
+
+
+async def _functionalities(session: AsyncSession, ids: Iterable[int]) -> dict[int, str | None]:
+    wanted = sorted(set(ids))
+    if not wanted:
+        return {}
+    rows = await session.execute(
+        select(TiqoraCmdbCatalog.id, TiqoraCmdbCatalog.functionality).where(
+            TiqoraCmdbCatalog.id.in_(wanted)
+        )
+    )
+    return {int(i): f for i, f in rows.all()}
+
+
+async def _canonical_incident_values(session: AsyncSession) -> dict[str, CatalogValue]:
+    """Per functionality the incident state a service shows: the valid one whose key is the
+    functionality (seeds ``operational``/``warning``/``incident``), else the first by position."""
+    rows = (
+        await session.execute(
+            select(
+                TiqoraCmdbCatalog.item_key,
+                TiqoraCmdbCatalog.name,
+                TiqoraCmdbCatalog.functionality,
+            )
+            .where(
+                TiqoraCmdbCatalog.catalog_class == INCIDENT_STATE,
+                TiqoraCmdbCatalog.valid.is_(True),
+            )
+            .order_by(TiqoraCmdbCatalog.position, TiqoraCmdbCatalog.id)
+        )
+    ).all()
+    out: dict[str, CatalogValue] = {}
+    for key, name, func_ in rows:
+        if func_ is None:
+            continue
+        current = out.get(func_)
+        if current is None or (str(key) == func_ and current.key != func_):
+            out[func_] = CatalogValue(str(key), str(name), func_)
     return out
 
 

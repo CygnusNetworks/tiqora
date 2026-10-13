@@ -124,7 +124,8 @@ async def test_tables_and_seed(cmdb_db: CmdbWorld) -> None:
                 select(TiqoraItsmLinkType).where(TiqoraItsmLinkType.name == "DependsOn")
             )
         ).scalar_one()
-        assert dep.propagation == "source" and dep.pointed
+        # the ITSM survey pinned Znuny's IncidentLinkTypeDirection {DependsOn: Both} (R12)
+        assert dep.propagation == "both" and dep.pointed
         names = set((await s.execute(select(TiqoraItsmLinkType.name))).scalars())
         assert {d.name for d in DEFAULT_LINK_TYPES} <= names
 
