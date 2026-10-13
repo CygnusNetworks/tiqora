@@ -288,21 +288,44 @@ def test_mcp_lifespan_registers_role_mcp_with_sigterm() -> None:
 # ---------------------------------------------------------------- helpers
 
 
-async def test_start_process_watch_survives_a_database_error(
+async def test_start_process_watch_still_starts_loop_after_register_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """I1: a failed first registration must not leave the process out of restarts."""
+
     async def broken(*a: Any, **k: Any) -> str:
         raise RuntimeError("db down")
 
+    seen: dict[str, Any] = {}
+
+    async def fake_loop(factory: object, role: str, instance_id: str, **kw: Any) -> None:
+        seen.update(role=role, instance_id=instance_id)
+
     monkeypatch.setattr(restart, "register_process", broken)
+    monkeypatch.setattr(restart, "restart_watch_loop", fake_loop)
     got = await restart.start_process_watch(
         "factory",  # type: ignore[arg-type]
         "worker",
         settings=object(),  # type: ignore[arg-type]
         on_exit=lambda: None,
     )
-    assert got is None
+    assert got is not None
+    await got.task
+    assert seen["role"] == "worker" and seen["instance_id"] == got.instance_id
+    assert got.instance_id.startswith("worker:")
     await restart.stop_process_watch(None)  # no-op
+
+
+def test_loaded_packages_from_sys_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+    root = tmp_path / "plugins"
+    good = root / "acme.demo" / "1.0.0-abcdef123456" / "site"
+    other_root = tmp_path / "elsewhere" / "acme.x" / "1.0-aaaaaaaaaaaa" / "site"
+    monkeypatch.setattr(
+        "sys.path",
+        ["/usr/lib/python", str(good), str(other_root), str(root / "acme.demo" / "noshaversion")],
+    )
+    assert restart.loaded_packages_from_sys_path(str(root)) == ["acme.demo@abcdef123456"]
+    assert restart.loaded_packages_from_sys_path(None) == []
 
 
 async def test_stop_process_watch_cancels_loop_and_unregisters(

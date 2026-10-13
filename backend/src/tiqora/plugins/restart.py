@@ -16,10 +16,12 @@ import json
 import os
 import signal
 import socket
+import sys
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Final, Literal
 
 import structlog
@@ -271,6 +273,38 @@ async def _insert_process(
     )
 
 
+def _new_instance_id(role: str, host: str, pid: int) -> str:
+    return f"{role}:{host}:{pid}:{uuid.uuid4().hex[:8]}"
+
+
+PackagesSource = Sequence[str] | Callable[[], Sequence[str]]
+
+
+def _resolve_packages(source: PackagesSource) -> list[str]:
+    return list(source() if callable(source) else source)
+
+
+def loaded_packages_from_sys_path(plugins_dir: str | None) -> list[str]:
+    """``id@sha12`` of every runtime site dir on ``sys.path`` (F8).
+
+    Plugin packages are activated as ``<plugins_dir>/<id>/<version>-<sha12>/site``; what is
+    on ``sys.path`` is what this process has loaded or can still import, so it is also
+    what the boot-time runtime gc must not delete.
+    """
+    if not plugins_dir:
+        return []
+    root = Path(plugins_dir)
+    out: set[str] = set()
+    for entry in list(sys.path):
+        path = Path(entry)
+        if path.name != "site" or path.parent.parent.parent != root:
+            continue
+        sha = path.parent.name.rsplit("-", 1)[-1]
+        if sha and sha != path.parent.name:
+            out.add(f"{path.parent.parent.name}@{sha}")
+    return sorted(out)
+
+
 async def register_process(
     factory: async_sessionmaker[AsyncSession],
     role: ProcessRole,
@@ -287,7 +321,7 @@ async def register_process(
     """
     host = hostname or socket.gethostname()
     process_id = pid if pid is not None else os.getpid()
-    instance_id = f"{role}:{host}:{process_id}:{uuid.uuid4().hex[:8]}"
+    instance_id = _new_instance_id(role, host, process_id)
     async with factory() as session:
         await _insert_process(
             session,
@@ -467,19 +501,24 @@ async def restart_watch_loop(
     stop: asyncio.Event | None = None,
     sleep: Callable[[float], Awaitable[object]] | None = None,
     clock: Callable[[], datetime] = utcnow,
-    loaded_packages: Sequence[str] = (),
+    loaded_packages: PackagesSource = (),
 ) -> None:
     """Heartbeat and follow restart requests until this process leaves.
 
     Any database error is logged and the loop carries on: it never kills the process.
+    A missing row (registration failed at boot, or the row was purged) is re-inserted on
+    the next tick. ``loaded_packages`` may be a callable: the stored list follows it, so
+    plugins loaded after registration (late boot retry) are recorded too (F8).
     """
     global _REQUESTED
     hostname = socket.gethostname()
     pid = os.getpid()
     boot_generation: int | None = None
+    written: list[str] | None = None
     while stop is None or not stop.is_set():
         try:
             now = clock()
+            packages = _resolve_packages(loaded_packages)
             if not await heartbeat(factory, instance_id, now=now):
                 async with factory() as session:
                     await _insert_process(
@@ -490,10 +529,20 @@ async def restart_watch_loop(
                         pid=pid,
                         now=now,
                         boot_generation=boot_generation,
-                        loaded_packages=loaded_packages,
+                        loaded_packages=packages,
                     )
                     await session.commit()
-            elif boot_generation is None:
+                written = packages
+            elif packages != written:
+                async with factory() as session:
+                    await session.execute(
+                        update(TiqoraProcess)
+                        .where(TiqoraProcess.instance_id == instance_id)
+                        .values(loaded_packages=json.dumps(packages))
+                    )
+                    await session.commit()
+                written = packages
+            if boot_generation is None:
                 async with factory() as session:
                     boot_generation = (
                         await session.execute(
@@ -596,20 +645,31 @@ async def start_process_watch(
     settings: Settings,
     on_exit: Callable[[], None],
     stop: asyncio.Event | None = None,
-    loaded_packages: Sequence[str] = (),
-) -> ProcessWatch | None:
+    loaded_packages: PackagesSource | None = None,
+) -> ProcessWatch:
     """Register this process and start its restart watch loop.
 
-    Never raises: a database problem is logged and the process runs without a registry
-    row (a coordinated restart then simply does not include it).
+    Never raises. When the first registration fails (database down, or ``tiqora_process``
+    not migrated yet because this role booted before the api), the loop starts anyway: its
+    heartbeat finds no row and inserts it on the first tick that works, so the process
+    still takes part in coordinated restarts.
+
+    ``loaded_packages`` defaults to the runtime site dirs on ``sys.path`` (F8), re-read
+    every tick so late plugin boots are recorded.
     """
+    plugins_dir = getattr(settings, "plugins_dir", None)
+    source: PackagesSource = (
+        loaded_packages
+        if loaded_packages is not None
+        else (lambda: loaded_packages_from_sys_path(plugins_dir))
+    )
     try:
         instance_id = await register_process(
-            factory, role, now=utcnow(), loaded_packages=loaded_packages
+            factory, role, now=utcnow(), loaded_packages=_resolve_packages(source)
         )
     except Exception as exc:
         log.warning("plugin_process_register_failed", role=role, error=str(exc))
-        return None
+        instance_id = _new_instance_id(role, socket.gethostname(), os.getpid())
     task = asyncio.create_task(
         restart_watch_loop(
             factory,
@@ -618,7 +678,7 @@ async def start_process_watch(
             settings=settings,
             on_exit=on_exit,
             stop=stop,
-            loaded_packages=loaded_packages,
+            loaded_packages=source,
         )
     )
     return ProcessWatch(instance_id, task, factory)

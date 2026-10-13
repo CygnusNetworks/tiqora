@@ -590,3 +590,68 @@ async def _row_of(factory: async_sessionmaker[AsyncSession], iid: str) -> Tiqora
 
 async def _request_in(s: AsyncSession) -> None:
     await request_restart(s, by=7, reason=REASON, now=T0 + timedelta(seconds=1))
+
+
+async def test_unregistered_process_registers_itself_in_the_loop(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """I1: no row (register failed at boot) -> the first working tick inserts it."""
+    iid = f"worker:{HOST}:91:selfreg"
+    stop = asyncio.Event()
+
+    async def sleeper(seconds: float) -> None:
+        stop.set()
+
+    await restart_watch_loop(
+        factory,
+        "worker",
+        iid,
+        settings=_settings(plugins_coordinated_restart=False),
+        on_exit=lambda: None,
+        stop=stop,
+        sleep=sleeper,
+        clock=lambda: T0,
+        loaded_packages=["acme.demo@abc123"],
+    )
+    row = await _row_of(factory, iid)
+    async with factory() as s:  # the loop inserts the real hostname, which _clean misses
+        await s.execute(delete(TiqoraProcess).where(TiqoraProcess.instance_id == iid))
+        await s.commit()
+    assert row.role == "worker"
+    assert json.loads(row.loaded_packages or "") == ["acme.demo@abc123"]
+
+
+async def test_loaded_packages_follow_late_boots(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """F8/I2: a plugin loaded after registration shows up in the stored list."""
+    iid = await register_process(factory, "worker", now=T0, hostname=HOST, pid=92)
+    current: list[str] = []
+    stop = asyncio.Event()
+    calls = 0
+
+    async def sleeper(seconds: float) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            current.append("acme.late@def456")
+        else:
+            stop.set()
+
+    await restart_watch_loop(
+        factory,
+        "worker",
+        iid,
+        settings=_settings(plugins_coordinated_restart=False),
+        on_exit=lambda: None,
+        stop=stop,
+        sleep=sleeper,
+        clock=lambda: T0,
+        loaded_packages=lambda: list(current),
+    )
+    row = await _row_of(factory, iid)
+    assert json.loads(row.loaded_packages or "") == ["acme.late@def456"]
+    async with factory() as s:
+        assert (await live_loaded_packages(s, now=T0 + timedelta(seconds=5)))["acme.late"] == {
+            "def456"
+        }
