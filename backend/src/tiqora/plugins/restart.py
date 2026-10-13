@@ -20,7 +20,7 @@ import sys
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Final, Literal
 
@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.config import Settings
 from tiqora.db.tiqora.models import TiqoraJob, TiqoraProcess, TiqoraRestart
 from tiqora.domain.schemas import UtcDateTime
+from tiqora.jobs.service import utc_now
 from tiqora.plugins import state
 
 log = structlog.get_logger(__name__)
@@ -54,6 +55,8 @@ ROLE_LABEL: Final[dict[str, str]] = {
 }
 
 #: job kinds of the ``plugins`` lane (install, uninstall, fetch, repository refresh)
+#: the ``install_jobs.*_KIND`` constants; spelled out here because install_jobs imports this
+#: module (a test pins the equality)
 PLUGIN_JOB_KINDS: Final[tuple[str, ...]] = (
     "core.plugin_install",
     "core.plugin_uninstall",
@@ -82,8 +85,8 @@ def restart_roles() -> tuple[ProcessRole, ...]:
     return tuple(r for r in RESTART_ORDER if r in hosts)
 
 
-def utcnow() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
+#: naive UTC "now"; the one helper of the job system, re-exported for the plugin modules
+utcnow = utc_now
 
 
 @dataclass(frozen=True, slots=True)

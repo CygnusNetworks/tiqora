@@ -315,8 +315,14 @@ async def _restart_rows(env: Env) -> list[TiqoraRestart]:
 
 
 def test_install_job_kind_is_a_plugins_lane_kind() -> None:
-    assert install_jobs.PLUGIN_INSTALL_KIND in restart.PLUGIN_JOB_KINDS
-    assert install_jobs.PLUGIN_UNINSTALL_KIND in restart.PLUGIN_JOB_KINDS
+    # restart.py spells the kinds out (import cycle); they must stay the install_jobs constants
+    assert set(restart.PLUGIN_JOB_KINDS) == {
+        install_jobs.PLUGIN_INSTALL_KIND,
+        install_jobs.PLUGIN_UNINSTALL_KIND,
+        install_jobs.PLUGIN_FETCH_KIND,
+        install_jobs.PLUGIN_REPOSITORY_REFRESH_KIND,
+    }
+    assert len(restart.PLUGIN_JOB_KINDS) == 4
     reg = Registry()
     register_core(reg)
     handler = reg.get(JOB_HANDLERS, "core.plugin_install")
@@ -535,15 +541,45 @@ async def test_failed_fresh_install_can_be_retried_with_a_fixed_package(
     job = await _install(env, bad, restart=False)
     assert job.status == "failed"
     assert await _plugin_row(env) is None
-    # the failed run owns the short id (MariaDB keeps the tables it created)
+    # the failed run owns the short id while tables are left (MariaDB keeps the DDL);
+    # PostgreSQL rolled them back, so the claim was given back
     async with env.factory() as s:
         owner = await s.get(TiqoraPluginData, "tables")
-    assert owner is not None and owner.plugin_id == TABLES
+    if await _tables(env):
+        assert owner is not None and owner.plugin_id == TABLES
+    else:
+        assert owner is None
     fixed, _ = env.package("1.0.1")
     job = await _install(env, fixed, restart=False)
     assert job.status == "succeeded", job.error
     row = await _plugin_row(env)
     assert row is not None and row.version == "1.0.1" and row.migration_error is None
+    async with env.factory() as s:
+        assert await s.get(TiqoraPluginData, "tables") is None
+
+
+async def test_failed_fresh_install_without_tables_gives_the_short_id_back(
+    env: Env, children: list[Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Task 15 M8: the migrate child died before creating a table -> no claim is left."""
+    inprocess = install_jobs._run_subprocess
+
+    async def migrate_crashes(
+        argv: Sequence[str],
+        timeout: float,  # noqa: ASYNC109 - same signature as the real runner
+        *,
+        env: Mapping[str, str] | None = None,
+    ) -> tuple[int, str]:
+        if "migrate" in argv:
+            return 1, "Speicherzugriffsfehler"
+        return await inprocess(argv, timeout, env=env)
+
+    monkeypatch.setattr(install_jobs, "_run_subprocess", migrate_crashes)
+    data, _ = env.package("1.0.0")
+    job = await _install(env, data, restart=False)
+    assert job.status == "failed"
+    assert (job.error or "").startswith("Datenbank-Änderungen fehlgeschlagen")
+    assert await _plugin_row(env) is None and await _tables(env) == set()
     async with env.factory() as s:
         assert await s.get(TiqoraPluginData, "tables") is None
 

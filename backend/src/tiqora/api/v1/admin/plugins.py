@@ -51,6 +51,7 @@ from tiqora.plugins.runtime import (
     activate_runtime_plugins_in,
     plugins_dir_status,
 )
+from tiqora.plugins.signing import TrustLevelName
 from tiqora.plugins.state import (
     PLUGIN_ROLES,
     PluginStatus,
@@ -149,9 +150,7 @@ class PluginAdminOut(BaseModel):
     contributions: list[PluginContributionOut]
     settings_section: str | None
     #: trust level of the installed package; None for plugins baked into the image
-    signature_status: (
-        Literal["official", "verified_publisher", "local", "unsigned", "invalid"] | None
-    )
+    signature_status: TrustLevelName | None
     signer: str | None
     #: runtime source, or an image row whose plugin is gone from the image
     can_uninstall: bool
@@ -211,7 +210,7 @@ def _status_message(
     return None
 
 
-_TrustLevel = Literal["official", "verified_publisher", "local", "unsigned", "invalid"]
+_TrustLevel = TrustLevelName
 _TRUST_LEVELS: Final[tuple[_TrustLevel, ...]] = (
     "official",
     "verified_publisher",

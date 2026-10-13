@@ -15,7 +15,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, Literal
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
@@ -47,6 +47,10 @@ class TrustLevel(StrEnum):
     LOCAL = "local"
     UNSIGNED = "unsigned"
     INVALID = "invalid"
+
+
+#: the values of :class:`TrustLevel` as a ``Literal`` for API models (a test pins the equality)
+TrustLevelName = Literal["official", "verified_publisher", "local", "unsigned", "invalid"]
 
 
 def parse_public_key(text: str) -> Ed25519PublicKey:

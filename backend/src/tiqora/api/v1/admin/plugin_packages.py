@@ -50,7 +50,7 @@ from tiqora.plugins.restart import (
     restart_status,
     utcnow,
 )
-from tiqora.plugins.signing import KeyRing
+from tiqora.plugins.signing import KeyRing, TrustLevelName
 
 log = structlog.get_logger(__name__)
 
@@ -98,7 +98,7 @@ class PluginPackageOut(BaseModel):
     support: str | None
     categories: list[str]
     changelog: str | None
-    trust: Literal["official", "verified_publisher", "local", "unsigned", "invalid"]
+    trust: TrustLevelName
     key_id: str | None
     signer: str | None
     capabilities: list[CapabilityLineOut]

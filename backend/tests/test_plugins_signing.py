@@ -5,6 +5,7 @@ import json
 import logging
 import re
 from dataclasses import replace
+from typing import get_args
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
@@ -16,6 +17,7 @@ from tiqora.plugins.signing import (
     PublisherKey,
     SignatureError,
     TrustLevel,
+    TrustLevelName,
     generate_keypair,
     key_id,
     load_private_key,
@@ -461,3 +463,7 @@ def test_catalog_badge_follows_the_install_rules() -> None:
         ]
     )
     assert publisher_verified_in(rotated, "org.example", 1) is True
+
+
+def test_trust_level_literal_matches_the_enum() -> None:
+    assert set(get_args(TrustLevelName)) == {level.value for level in TrustLevel}

@@ -38,7 +38,7 @@ from tiqora.jobs.service import utc_now
 from tiqora.plugins import migrations, packages_store, runtime
 from tiqora.plugins.inspect import PackageReport, inspect_read_package, installed_state
 from tiqora.plugins.inspect import short_id_owners as load_short_id_owners
-from tiqora.plugins.migrations import _child_env
+from tiqora.plugins.migrations import child_env
 from tiqora.plugins.package import PackageError, read_tqplugin
 from tiqora.plugins.repositories import (
     FetchError,
@@ -163,7 +163,7 @@ async def _run_subprocess(
 
 
 def _child_environment(settings: Settings) -> dict[str, str]:
-    env = _child_env(settings.database_url)
+    env = child_env(settings.database_url)
     env.pop("TIQORA_PLUGINS_SAFE_MODE", None)
     return env
 
@@ -285,6 +285,32 @@ async def _claim_short_id(ctx: JobContext, report: PackageReport) -> None:
             )
 
 
+async def _release_unused_claim(ctx: JobContext, report: PackageReport) -> None:
+    """A failed fresh install that left no ``tqp_<short>_*`` table gives its short id back.
+
+    Otherwise the claim blocks every other plugin id with that short id, and it is orphaned
+    when the fixed package uses another short id (Task 15 M8). With tables left behind
+    (MariaDB commits DDL) the claim stays, so a retry can adopt them. Best effort.
+    """
+    try:
+        async with ctx.session_factory() as session:
+            if await session.get(TiqoraPlugin, report.plugin_id) is not None:
+                return  # an update: the installed plugin owns the short id
+            claim = await session.get(TiqoraPluginData, report.short_id)
+            if claim is None or claim.plugin_id != report.plugin_id:
+                return
+            if await migrations.plugin_tables(session, report.short_id):
+                return
+            await session.delete(claim)
+            await session.commit()
+    except Exception as exc:  # noqa: BLE001 - the job fails with the migration error anyway
+        log.warning(
+            "plugin_short_id_release_failed",
+            plugin=report.plugin_id,
+            error=f"{type(exc).__name__}: {exc}"[:300],
+        )
+
+
 async def run_plugin_install(ctx: JobContext, payload: PluginInstallPayload) -> dict[str, Any]:
     settings = ctx.settings
     # 1. the stored package, judged again with today's keys and installed state
@@ -363,6 +389,7 @@ async def run_plugin_install(ctx: JobContext, payload: PluginInstallPayload) -> 
         env=env,
     )
     if code != 0:
+        await _release_unused_claim(ctx, report)
         detail = _last_line(output) or f"Exit-Code {code}"
         raise JobFailed(f"Datenbank-Änderungen fehlgeschlagen: {detail}"[:_MAX_OUTPUT])
     head = None

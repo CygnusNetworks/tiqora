@@ -552,7 +552,7 @@ async def record_migration(
         await session.commit()
 
 
-def _child_env(database_url: str) -> dict[str, str]:
+def child_env(database_url: str) -> dict[str, str]:
     """Environment of a migration subprocess: same import path, same database."""
     env = dict(os.environ)
     env["DATABASE_URL"] = database_url
@@ -572,7 +572,7 @@ def _run_one_in_subprocess(plugin_id: str, *, database_url: str, timeout: int) -
     try:
         done = subprocess.run(  # noqa: S603 - fixed argv, plugin id is not shell-interpreted
             cmd,
-            env=_child_env(database_url),
+            env=child_env(database_url),
             capture_output=True,
             text=True,
             timeout=timeout,
