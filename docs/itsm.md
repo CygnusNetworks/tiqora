@@ -284,33 +284,196 @@ Alle Einzelheiten, Einstellungen und Grenzen stehen in [cmdb.md](cmdb.md).
 
 ## 7 Parallelbetrieb und Umstieg
 
-Folgt. Einzelheiten stehen in den Kapiteln „Koexistenz mit Znuny“, „ITSM-Daten aus Znuny
-übernehmen“ und „Znuny-Erweiterung TiqoraITSM“.
+Dieses Kapitel beschreibt, wie Tiqora und Znuny beim ITSM nebeneinander arbeiten und wie Sie die
+ITSM-Daten von Znuny nach Tiqora übernehmen. Es hat drei Teile: „Koexistenz mit Znuny“ (die Modi und
+der Umstieg), „ITSM-Daten aus Znuny übernehmen“ (die Admin-Seite und die Befehlszeile) und
+„Znuny-Erweiterung TiqoraITSM“ (das Paket, das in Znuny läuft). Die technische Seite des Importers
+(Zuordnung, Meldungscodes, Golden-Abgleich) steht in [itsm-import.md](itsm-import.md).
 
 ## Koexistenz mit Znuny
 
-Folgt.
+### Die drei Modi
+
+| Modus | Wer pflegt CIs | Was Agenten in Tiqora sehen | Was Agenten in Znuny sehen | Was Kunden sehen |
+|---|---|---|---|---|
+| ITSM ausgeschaltet | niemand in Tiqora; Znuny nach seinen eigenen Regeln | keine ITSM-Funktionen | alles wie bisher | nichts von Tiqora-ITSM |
+| Znuny führt das ITSM (Modus A) | Znuny; Tiqora liest die CIs nur | CIs schreibgeschützt aus Znuny („In Znuny bearbeiten“), Verknüpfungen mit Tickets, Incident, Problem, Großstörung | alles wie bisher, die CMDB ist unverändert bearbeitbar | in Znuny wie bisher; die Tiqora-Seite „Meine Geräte und Systeme“ ist nicht verfügbar |
+| Tiqora führt das ITSM (Modus B) | Tiqora (die Tiqora-CMDB, Kapitel 6) | CIs bearbeiten, anlegen, löschen, Anhänge, Importe, Auswirkungen | CI-Ansichten lesbar; Bildschirme, die CIs ändern, sind gesperrt, das Ticket zeigt „Betroffene CIs (Tiqora)“ | „Meine Geräte und Systeme“ im Kundenportal; in Znuny auf Wunsch die Seite „Konfigurationselemente“ |
+
+Die Vorgabe wird beim ersten Start automatisch gewählt: Wird Znuny ITSM in der Datenbank gefunden,
+ist es **Modus A**, sonst **Modus B**. Die **Empfehlung ist Modus B**: Er ist das Ziel, Modus A ist die
+Brücke, bis Sie die Daten übernommen haben. Den Modus wechseln Sie nicht von Hand von A nach B; dieser
+Weg läuft ausschließlich über den Import (siehe oben, Kapitel 1).
 
 ### Was Sie in welchem Modus sehen
 
-Folgt.
+**Modus A.** In Tiqora zeigt das Ticket die verknüpften CIs aus den Tabellen von Znuny, die
+CMDB-Seiten antworten mit „Die CMDB wird in Znuny geführt“ (`409 cmdb_in_znuny`). Nichts von dem, was
+Sie importieren, ist sichtbar, bevor Sie umgestellt haben; auch das übernommene Zwischenergebnis bleibt
+verborgen. In Znuny ändert sich nichts. Die Erweiterung TiqoraITSM ist inaktiv und zeigt nichts an.
+Admin, ITSM, „Import aus Znuny“ ist die Seite, von der aus Sie umstellen.
+
+**Modus B.**
+
+- In Tiqora: die vollständige CMDB (Kapitel 6), der Ticket-Bereich „Betroffene CIs“, die Seite
+  „Meine Geräte und Systeme“ im Kundenportal.
+- In Znuny (mit TiqoraITSM): im Ticket-Zoom das Feld **Betroffene CIs (Tiqora)** mit Einsatz- und
+  Vorfallstatus und einem Link nach Tiqora; die Znuny-Bildschirme zum Anlegen, Bearbeiten, Löschen und
+  für Massenaktionen antworten mit der Seite „Die CMDB wird jetzt in Tiqora gepflegt.“ samt Link;
+  Übersicht, Zoom, Suche, Historie und Druck der CIs bleiben lesbar (sie zeigen den Stand zum
+  Zeitpunkt der Umstellung).
+- Für Kunden in Znuny, wenn Sie es einschalten: die Seite „Konfigurationselemente“ mit Nummer, Name,
+  Klasse und Zuständen. Sie zeigt nur CIs, deren Klasse im Kundenportal sichtbar ist, und keine
+  Attribute.
+
+**Ausgeschaltet.** Die ITSM-Funktionen von Tiqora sind weg; Znuny arbeitet unverändert weiter.
 
 ### Umstellung auf Tiqora (Ablauf)
 
-Folgt.
+Die Umstellung braucht keinen Stillstand. Bis zum letzten Schritt können Sie wiederholen und
+abbrechen, Znuny bleibt führend.
+
+1. **Probelauf, Bericht lesen.** Admin, ITSM, „Import aus Znuny“, Schaltfläche „Probelauf“. Er liest und
+   zählt, schreibt aber nichts. Lesen Sie den Bericht (Abschnitt „ITSM-Daten aus Znuny übernehmen“) und
+   beheben Sie, was in Znuny zu korrigieren ist (z. B. Attribut-Schlüssel mit Leerzeichen).
+2. **Übernehmen, beliebig oft wiederholen.** „Übernehmen“ kopiert Katalog, Klassen, CIs mit allen
+   Versionen, Verknüpfungen, Anhänge, Prioritätsmatrix und Service-Angaben. Jeder weitere Lauf holt nur
+   Neues nach. Solange Znuny führt, sehen Ihre Agenten weiter die Daten aus Znuny.
+3. **TiqoraITSM in Znuny installieren** (Anleitung: `packages/znuny-addon/TiqoraITSM/install/README.md`)
+   und `TiqoraITSM::BaseURL` auf die Adresse Ihrer Tiqora-Installation setzen. Das Paket schreibt nie in
+   die Datenbank und bleibt bis zur Umstellung inaktiv.
+4. **Znuny-Webservices mit `ConfigItem*`-Operationen auf Tiqora umstellen.** Die Generic Interface von
+   Znuny lässt sich nicht sperren: Ein Webservice, der `ConfigItemCreate`, `-Update` oder `-Delete`
+   aufruft, würde nach der Umstellung weiter in Znuny schreiben, und Tiqora sähe das nicht. Richten Sie
+   diese Aufrufer auf die Kompatibilitätsschicht von Tiqora (`/znuny-compat`, siehe
+   [compatibility.md](compatibility.md)) um. Das Gleiche gilt für Skripte der Konsole und für
+   Import/Export-Aufträge in Znuny.
+5. **„Auf Tiqora umstellen“.** Der Dialog fragt, ob TiqoraITSM installiert ist oder ob in Znuny keine
+   CIs mehr bearbeitet werden; ist beides nicht der Fall, startet die Umstellung nicht. Danach läuft sie als
+   Hintergrundauftrag: Znuny wird für CI-Bearbeitung gesperrt, ein letzter Import holt die letzten
+   Änderungen, dann stellt Tiqora den Modus um. Schlägt sie fehl oder wird sie abgebrochen, wird die Sperre
+   in Znuny wieder aufgehoben; die Seite zeigt andernfalls die Schaltfläche „Sperre aufheben“.
+6. **Prüfen.** Ein Ticket mit verknüpften CIs zeigt in Znuny das Feld „Betroffene CIs (Tiqora)“; der
+   Bildschirm „CI bearbeiten“ in Znuny zeigt die Sperrseite; in Tiqora steht oben „Tiqora führt das
+   ITSM seit …“, und der Drift-Hinweis („Seit der Umstellung wurden in Znuny … CIs geändert“) zeigt 0.
+
+Sonderfall „Umstellen ohne CI-Daten“: Ist die installierte Znuny-ITSM-Version für den Import unbekannt
+oder gibt es nur ITSMCore ohne CMDB, kann Tiqora keine CIs lesen. Der Dialog bietet dann eine Umstellung an,
+die nur Katalog, Prioritätsmatrix und Service-Angaben übernimmt, soweit lesbar. Sie müssen ausdrücklich
+bestätigen, dass die CI-Daten aus Znuny nicht übernommen werden.
 
 ### Was bleibt, was entfällt (je Znuny-Bildschirm)
 
-Folgt.
+| Znuny-Bildschirm | Nach der Umstellung |
+|---|---|
+| CI-Übersicht und Suche | bleibt (nur lesen); in Tiqora: CMDB, Suche |
+| CI-Zoom (Ansicht, Versionen, Historie) | bleibt (nur lesen); in Tiqora: CMDB, CI öffnen |
+| CI bearbeiten / anlegen | gesperrt durch TiqoraITSM; in Tiqora: CMDB, „Neues CI“ und „Bearbeiten“ |
+| CI löschen | gesperrt durch TiqoraITSM; in Tiqora: CMDB, „Löschen“ |
+| Massenaktion | gesperrt durch TiqoraITSM; in Tiqora: CMDB, Massenbearbeitung |
+| CI mit Ticket verknüpfen (Verknüpfen-Maske) | gesperrt, soweit ein CI beteiligt ist; in Tiqora am Ticket („Betroffene CIs“) oder, wenn eingeschaltet, über die Verknüpfungsaktion der Erweiterung |
+| Klassen-Definition (Admin) | Ansicht bleibt (nur lesen); Ändern gesperrt; in Tiqora: CMDB, Klassen, Designer |
+| Import/Export von CIs | bleibt, wird aber nicht gesperrt (siehe Bekannte Lücken); in Tiqora: CMDB, Import und Export |
+| Change- und Arbeitsauftrag-Masken | bleiben unverändert in Znuny; in Tiqora entfällt (siehe Phase 3), die Daten werden nur gezählt |
+| Kundenansicht der CIs in Znuny | bleibt (nur lesen); in Tiqora: Kundenportal, „Meine Geräte und Systeme“; optional die Seite der Erweiterung |
+| Service-Zoom | bleibt unverändert (wird nicht gesperrt); in Tiqora: Services, ITSM-Angaben |
+| ITSM-Statistiken (CI, Change) | entfällt (siehe Phase 3); Tiqoras Berichte kennen die Znuny-ITSM-Auswertungen nicht |
 
 ### Zurück zu Modus A
 
-Folgt.
+Auf der Seite „Import aus Znuny“ führt „Zurück zu Znuny (Modus A)“ zum alten Zustand: Znuny ist wieder
+führend, die Sperre der CI-Bildschirme ist aufgehoben, Tiqora liest die CIs wieder aus Znuny. Sie müssen das
+Wort im Dialog zur Bestätigung eingeben.
+
+**Was verloren geht:** Alles, was Sie seit der Umstellung in Tiqora an CIs geändert haben, ist in Znuny nicht
+sichtbar. Tiqora löscht es aber nicht; die übernommenen und geänderten Zeilen bleiben in den Tiqora-Tabellen
+liegen und sind in Modus A verborgen (`409 cmdb_in_znuny`). Haben Sie in der Zwischenzeit auch in Znuny
+Änderungen vorgenommen, existieren zwei Stände nebeneinander; Sie müssen sie von Hand zusammenführen.
+
+**Danach erneut übernehmen:** Ein neuer Import ist wieder möglich. Er erkennt die bereits übernommenen CIs
+über ihre Znuny-Kennung und lässt CIs unangetastet, deren neueste Version in Tiqora entstanden ist (Meldung
+`changed_in_tiqora`); was Sie in Tiqora geändert haben, behält also den Vorrang. Wollen Sie den Znuny-Stand
+vollständig nach Tiqora holen, löschen Sie die betroffenen CIs in Tiqora vor dem Import.
+
+### Bekannte Lücken
+
+- **Generic Interface, Konsole und Import/Export von Znuny werden nicht gesperrt.** Ein Webservice, ein
+  Konsolenbefehl oder ein Import/Export-Auftrag kann nach der Umstellung weiter in die Znuny-Tabellen
+  schreiben. Tiqora zählt solche Änderungen (Drift-Hinweis, auch geänderte Verknüpfungen), übernimmt sie aber
+  nicht. Stellen Sie die Aufrufer vor der Umstellung um (Schritt 4).
+- **Changes und Arbeitsaufträge** von Znuny werden nur gezählt (Meldung `changes_not_imported`), nicht
+  übernommen. Die Masken in Znuny bleiben bis zum Abbau von Znuny bestehen.
+- **CI-Anhänge im Dateisystem** (Speicher „FS“ statt Datenbank) kann der Importer nicht lesen; sie
+  erscheinen als `attachment_in_filesystem` im Bericht und müssen von Hand kopiert werden.
+- **ITSM-Statistiken** von Znuny werden nicht übernommen.
 
 ## ITSM-Daten aus Znuny übernehmen
 
-Folgt.
+Die Seite finden Sie unter Admin, ITSM, „Import aus Znuny“ („ITSM-Import öffnen“ auf der Seite „ITSM“).
+Sie zeigt den Modus, die gefundene Znuny-ITSM-Version, die Zahl der CIs, Klassen, Changes und
+Arbeitsaufträge in Znuny, den letzten Lauf und die Läufe als Liste mit ihrem Bericht.
+
+| Lauf | Was er tut |
+|---|---|
+| Probelauf | Liest und zählt alles, schreibt nichts. Der Bericht zeigt, was ein echter Lauf täte, und die Meldungen dazu |
+| Übernahme | Schreibt Katalog, Klassen, CIs, Verknüpfungen, Anhänge, Prioritätsmatrix und Service-Angaben nach Tiqora; wiederholbar, nichts wird doppelt angelegt |
+| Umstellung | Sperrt Znuny, importiert ein letztes Mal und stellt auf Modus B um (siehe „Umstellung auf Tiqora“) |
+| Zurück | Führt zu Modus A zurück |
+
+Es läuft immer nur ein Auftrag; nach der Umstellung ist ein weiterer Import nicht mehr möglich („Die
+ITSM-Daten werden bereits in Tiqora geführt.“). Der Fortschritt erscheint auf der Seite. Den Bericht lesen
+Sie als Übersicht je Schritt (neu, aktualisiert, unverändert, übersprungen, Probleme) oder als CSV-Datei;
+die Bedeutung der Meldungen steht in [itsm-import.md](itsm-import.md), Abschnitt „Importer: Zuordnung und
+Bericht“.
+
+Auf der Befehlszeile gilt:
+
+```sh
+tiqora itsm import --dry-run   # Probelauf, gibt die Zähler aus
+tiqora itsm import             # echte Übernahme
+tiqora itsm status             # Modus und letzter Lauf (mit --json maschinenlesbar)
+```
+
+`tiqora itsm import` startet den Auftrag und wartet auf den Worker; der Worker muss laufen. Es gelten
+dieselben Sperren wie auf der Seite.
 
 ## Znuny-Erweiterung TiqoraITSM
 
-Folgt.
+TiqoraITSM ist ein kleines Paket für Znuny und OTRS (Installation:
+`packages/znuny-addon/TiqoraITSM/install/README.md`). Es schreibt nie in die Datenbank, außer dass die
+optionale Verknüpfungsaktion die Tiqora-API aufruft. Es zeigt und tut Folgendes:
+
+- **Betroffene CIs (Tiqora).** Ein Feld im Ticket-Zoom, nur im Modus B. Es zeigt die mit dem Ticket
+  verknüpften CIs mit Einsatz- und Vorfallstatus und einem Link nach Tiqora. Ein Agent sieht nur CIs, deren
+  Klasse er in Znuny mindestens mit `ro` lesen darf.
+- **Sperre der CI-Bildschirme.** Nach der Umstellung antworten die Znuny-Bildschirme, die CIs ändern, mit
+  „Die CMDB wird jetzt in Tiqora gepflegt.“ und einem Link nach Tiqora.
+- **Kundenseite (optional).** „Konfigurationselemente“ im Kundenbereich von Znuny, einzuschalten über zwei
+  Systemkonfigurationen; sie zeigt CIs des Kunden, seiner Firma und der zugeordneten Kunden
+  (`customer_user_customer`), nur Klassen mit Sichtbarkeit im Kundenportal, nur Kopfdaten.
+- **Verknüpfen aus Znuny (optional).** Ein kleines Formular im Feld, um ein Ticket mit einem CI zu
+  verknüpfen.
+
+| Einstellung | Vorgabe | Bedeutung |
+|---|---|---|
+| `TiqoraITSM::BaseURL` | `https://tiqora.example.org` | Adresse von Tiqora (nur `http(s)`); setzen Sie sie auf Ihre Installation |
+| `TiqoraITSM::AgentCIPath` | `/agent/cmdb/` | Pfad eines CIs in Tiqora; die CI-Nummer wird angehängt |
+| `TiqoraITSM::CustomerCIPath` | `/portal/config-items/` | Pfad eines CIs im Kundenportal |
+| `TiqoraITSM::ReadOnly::Force` | `0` | Die CMDB auch ohne Tiqoras Markierung als schreibgeschützt behandeln |
+| `TiqoraITSM::ReadOnly::Actions` | Liste der Bildschirme (Anlegen, Bearbeiten, Löschen, Massenaktion, Definition ändern) | Aktionen (oder `Aktion::Unteraktion`), die bei Sperre abgelehnt werden |
+| `PreApplicationModule###TiqoraITSMReadOnly` | gültig | Das Sperrmodul selbst |
+| `TiqoraITSM::Linking::Enabled` | `0` | Verknüpfen von Tickets mit CIs aus Znuny erlauben |
+| `TiqoraITSM::APIKey` | leer | API-Schlüssel eines eigenen Tiqora-Benutzers (Bereich `cmdb:rw`) |
+
+**Verknüpfen und Berechtigungen.** Das Verknüpfen ist aus. Schalten Sie `TiqoraITSM::Linking::Enabled` ein
+und setzen Sie `TiqoraITSM::APIKey`, dann ruft Znuny `POST /api/v1/cmdb/links` mit dem Schlüssel auf. Tiqora
+prüft die Rechte des Schlüssel-Benutzers: `rw` auf dem Ticket und `ro` auf dem CI. Legen Sie dafür einen
+eigenen Benutzer an, der nur den Bereich `cmdb:rw` hat und dessen Gruppenrechte auf die CMDB-Klassen und die
+Queues beschränkt sind, deren Tickets verknüpft werden. Der Znuny-Agent wird nicht an Tiqora übermittelt;
+Tiqoras Historie zeigt den Schlüssel-Benutzer. Der Schlüssel steht in der Systemkonfiguration von Znuny und
+damit in Support-Paketen: Tauschen Sie ihn aus (Tiqora-Admin, API-Schlüssel, neu anlegen, eintragen,
+alten löschen), wenn ein Support-Paket die Firma verlassen hat.
+
+**Kundenseite.** Schalten Sie sie ein, indem Sie `CustomerFrontend::Module###CustomerTiqoraITSM` und
+`CustomerFrontend::Navigation###CustomerTiqoraITSM###002-TiqoraITSM` gültig setzen. Ohne Daten in Tiqora
+bleibt die Seite leer.

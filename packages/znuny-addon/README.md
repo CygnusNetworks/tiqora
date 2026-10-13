@@ -19,4 +19,7 @@ build/install/verify/uninstall instructions.
 [`TiqoraITSM/install/README.md`](TiqoraITSM/install/README.md); golden test
 `tests/golden/test_tiqoraitsm_addon.py`.
 
+Operator documentation (modes, switch runbook, settings, permission model of the optional linking):
+[docs/itsm.md](../../docs/itsm.md#koexistenz-mit-znuny).
+
 See [docs/parallel-operation.md](../../docs/parallel-operation.md).
