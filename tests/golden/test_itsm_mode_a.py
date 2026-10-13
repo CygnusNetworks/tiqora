@@ -1121,6 +1121,28 @@ def _stringified(value: Any) -> Any:
     return "" if value is None else str(value)
 
 
+def _setup_field_orders(conn: pymysql.Connection, seed: SeedSet) -> dict[str, int]:
+    """The order each seed field gets from Tiqora's setup on a plain peer.
+
+    Like ITSMCore's package setup (``_DynamicFieldsCreate``: last ``FieldOrder`` + 1), the setup
+    appends its fields after the highest order already present. The seed holds the orders of a
+    fresh peer (one core field, so 2..9); other golden modules of the same session add fields
+    first (``test_gi_mapping`` 9001, ``test_gi_requester`` 9002), so the seed numbers are shifted
+    past the fields that are not the setup's own.
+    """
+    names = tuple(f.name for f in seed.dynamic_fields)
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT COALESCE(MAX(field_order), 0) FROM dynamic_field WHERE name NOT IN %s",
+            (names,),
+        )
+        row = cur.fetchone()
+    assert row is not None
+    base = int(row[0])
+    first = min(f.field_order for f in seed.dynamic_fields)
+    return {f.name: base + 1 + f.field_order - first for f in seed.dynamic_fields}
+
+
 def _assert_setup_rows(conn: pymysql.Connection, seed: SeedSet, *, packages: bool) -> None:
     """The ticket types, the workaround state and the dynamic fields equal the seed definitions.
 
@@ -1128,6 +1150,7 @@ def _assert_setup_rows(conn: pymysql.Connection, seed: SeedSet, *, packages: boo
     does not (ticket type ``RfC``, history types ``CILinkAdd`` / ``CILinkDelete``, the ``itsm-*``
     groups).
     """
+    setup_orders = {} if packages else _setup_field_orders(conn, seed)
     with conn.cursor() as cur:
         # RfC belongs to ITSMChangeManagement: Tiqora's setup creates its own change types instead
         wanted_types = [t.name for t in seed.ticket_types if packages or t.name != "RfC"]
@@ -1156,7 +1179,8 @@ def _assert_setup_rows(conn: pymysql.Connection, seed: SeedSet, *, packages: boo
                 field.field_type,
                 field.object_type,
             )
-            assert (order, internal, valid) == (field.field_order, 1, 1), field.name
+            want_order = field.field_order if packages else setup_orders[field.name]
+            assert (order, internal, valid) == (want_order, 1, 1), field.name
             raw = config.decode() if isinstance(config, bytes) else config
             assert yaml.load(raw, Loader=_ZnunyYamlLoader) == field.config, field.name  # noqa: S506
         if packages:
@@ -1284,8 +1308,11 @@ async def test_setup_on_plain_peer_equals_itsm_packages(
 
 
 @pytest.mark.plain_peer
-async def test_znuny_reads_tiqora_seeded_dynamic_fields(plain_peer_setup: SeedSet) -> None:
+async def test_znuny_reads_tiqora_seeded_dynamic_fields(
+    plain_peer_setup: SeedSet, golden_conn: pymysql.Connection
+) -> None:
     """Znuny loads what Tiqora's setup wrote: ``DynamicFieldGet``, ``YAML->Load``, validation."""
+    setup_orders = _setup_field_orders(golden_conn, plain_peer_setup)
     names = [f.name for f in plain_peer_setup.dynamic_fields]
     znuny = znuny_json(
         "my @Names = ("
@@ -1329,7 +1356,7 @@ Emit({
             field.object_type,
         )
         assert (int(got["order"]), int(got["internal"]), int(got["valid"])) == (
-            field.field_order,
+            setup_orders[field.name],
             1,
             1,
         )
