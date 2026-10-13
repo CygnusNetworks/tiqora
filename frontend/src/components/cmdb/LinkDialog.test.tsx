@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import i18n from "@/i18n";
 import { createDemoCmdb, type DemoCmdb } from "@/demo/cmdbMock";
@@ -114,6 +115,36 @@ describe("LinkDialog", () => {
     fireEvent.click(screen.getByTestId("ci-link-submit"));
     expect(await screen.findByTestId("ci-link-error")).toBeInTheDocument();
     expect(screen.getByTestId("ci-link-dialog")).toBeInTheDocument();
+  });
+});
+
+describe("LinkDialog reopened", () => {
+  it("does not show the error of a failed attempt again", async () => {
+    vi.restoreAllMocks();
+    serveCmdb(store, seen, (m, p) => {
+      if (m === "POST" && p.endsWith("/cmdb/links")) throw new Error("403");
+      return extra(m, p);
+    });
+    function Host() {
+      const [open, setOpen] = useState(true);
+      return (
+        <>
+          <button type="button" data-testid="reopen" onClick={() => setOpen(true)} />
+          <LinkDialog open={open} ciId={6} onClose={() => setOpen(false)} />
+        </>
+      );
+    }
+    await renderWithRouter(<Host />);
+    await pickKind("ticket");
+    await search("ci-link-target", "Switch");
+    fireEvent.mouseDown(await screen.findByTestId("ci-link-target-result-740301"));
+    fireEvent.click(screen.getByTestId("ci-link-submit"));
+    expect(await screen.findByTestId("ci-link-error")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("ci-link-cancel"));
+    await waitFor(() => expect(screen.queryByTestId("ci-link-dialog")).toBeNull());
+    fireEvent.click(screen.getByTestId("reopen"));
+    expect(await screen.findByTestId("ci-link-dialog")).toBeInTheDocument();
+    expect(screen.queryByTestId("ci-link-error")).toBeNull();
   });
 });
 

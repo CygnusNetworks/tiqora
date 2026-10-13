@@ -148,6 +148,8 @@ export function CmdbClassEditorPage() {
     onSuccess: (saved) => {
       qc.setQueryData(["admin", "cmdb", "class", classId], saved);
       void qc.invalidateQueries({ queryKey: ["admin", "cmdb", "classes"] });
+      // the agent pages cache classes and definitions too
+      void qc.invalidateQueries({ queryKey: ["cmdb"] });
       setNotice(t("admin.cmdb.editor.classSaved"));
     },
   });
@@ -167,6 +169,7 @@ export function CmdbClassEditorPage() {
       setComment("");
       setNotice(t("admin.cmdb.editor.versions.saved"));
       await qc.invalidateQueries({ queryKey: ["admin", "cmdb", "class", classId] });
+      void qc.invalidateQueries({ queryKey: ["cmdb"] });
     },
   });
 

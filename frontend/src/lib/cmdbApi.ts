@@ -198,6 +198,13 @@ export function useCmdbStatus() {
   });
 }
 
+export const cmdbLinkTypesKey = ["cmdb", "link-types"] as const;
+
+/** The valid ITSM link types with their source/target labels (read-only here, edited under ITSM). */
+export function useCmdbLinkTypes(enabled = true) {
+  return useQuery({ queryKey: cmdbLinkTypesKey, queryFn: () => cmdbApi.linkTypes(), enabled, staleTime: 60_000 });
+}
+
 export const cmdbSavedSearchesKey = ["cmdb", "saved-searches"] as const;
 
 /** The caller's own and the shared saved CI searches. */

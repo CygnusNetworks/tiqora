@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { QueryClient } from "@tanstack/react-query";
 import { DEMO_ITSM_MODE_KEY } from "@/demo/itsmMode";
 import { type DemoCmdb } from "@/demo/cmdbMock";
 import { CmdbCatalogPage } from "./CmdbCatalogPage";
@@ -61,6 +62,7 @@ describe("CmdbCatalogPage", () => {
   });
 
   it("keeps the key read-only on edit and saves with PUT", async () => {
+    const invalidate = vi.spyOn(QueryClient.prototype, "invalidateQueries");
     await renderAdminPage(CmdbCatalogPage, PATH);
     fireEvent.click(await screen.findByTestId("cmdb-catalog-class-CMDB::OS"));
     fireEvent.click(await screen.findByTestId("cmdb-catalog-edit-debian"));
@@ -73,6 +75,7 @@ describe("CmdbCatalogPage", () => {
     const put = requests.find((r) => r.method === "PUT" && /\/catalog\/21$/.test(r.path));
     expect(put?.body).toMatchObject({ catalog_class: "CMDB::OS", item_key: "debian", name: "Debian GNU/Linux", functionality: null });
     expect(await screen.findByTestId("cmdb-catalog-row-debian")).toHaveTextContent("Debian GNU/Linux");
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["cmdb"] });
   });
 
   it("creates an incident state with its functionality", async () => {

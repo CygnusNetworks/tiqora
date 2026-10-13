@@ -897,6 +897,7 @@ export function resolveCmdb(
     };
     return ok(att, 201);
   }
+  if (/^\/attachments\/\d+$/.test(sub) && method === "DELETE") return none();
   if (sub === "/cis/search" && method === "POST") return ok(search(store, (body ?? {}) as SearchBody));
   if (sub === "/cis/lookup") {
     const rows = store.cis.filter((c) => matches(c, query.get("q") ?? ""));

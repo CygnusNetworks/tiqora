@@ -9,13 +9,14 @@ import { CiLinksPanel } from "@/components/cmdb/CiLinksPanel";
 import { CiStateBadge } from "@/components/cmdb/CiStateBadge";
 import { CiVersionsPanel } from "@/components/cmdb/CiVersionsPanel";
 import { CmdbModeNotice } from "@/components/cmdb/CmdbModeNotice";
+import { linkTypeLabel } from "@/components/cmdb/linksModel";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Spinner } from "@/components/ui/Spinner";
 import { Tabs } from "@/components/ui/Tabs";
 import { ApiError } from "@/lib/api";
-import { cmdbApi, useCmdbStatus, type Ci } from "@/lib/cmdbApi";
+import { cmdbApi, useCmdbLinkTypes, useCmdbStatus, type Ci } from "@/lib/cmdbApi";
 import { CI_DETAIL_TABS, validateCiDetailSearch, type CiDetailSearch, type CiDetailTab } from "@/components/cmdb/ciDetailModel";
 
 // The graph library stays out of the main bundle: the chunk loads with the "Abhängigkeiten" tab.
@@ -27,6 +28,7 @@ const LINK_BTN =
 function TicketsTab({ ciId }: { ciId: number }) {
   const { t } = useTranslation();
   const [openOnly, setOpenOnly] = useState(false);
+  const linkTypes = useCmdbLinkTypes().data;
   const q = useQuery({ queryKey: ["cmdb", "ci", ciId, "tickets", openOnly], queryFn: () => cmdbApi.tickets(ciId, openOnly), placeholderData: keepPreviousData });
   return (
     <div className="space-y-3">
@@ -68,7 +70,7 @@ function TicketsTab({ ciId }: { ciId: number }) {
                   <td className="px-3 py-2">{tk.title}</td>
                   <td className="px-3 py-2">{tk.state_name}</td>
                   <td className="px-3 py-2">{tk.queue_name}</td>
-                  <td className="px-3 py-2 text-muted">{tk.link_type}</td>
+                  <td className="px-3 py-2 text-muted">{linkTypeLabel(linkTypes, tk.link_type, "either")}</td>
                 </tr>
               ))}
             </tbody>

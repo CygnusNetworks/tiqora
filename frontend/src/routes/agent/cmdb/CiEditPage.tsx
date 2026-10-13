@@ -5,7 +5,9 @@ import { useTranslation } from "react-i18next";
 import { CiAttributeForm } from "@/components/cmdb/CiAttributeForm";
 import { CmdbModeNotice } from "@/components/cmdb/CmdbModeNotice";
 import {
+  attachmentIds,
   emptyValues,
+  errorPaths,
   pruneEmpty,
   validateValues,
   VALIDATION_CODES,
@@ -98,6 +100,8 @@ function CiEditor({ mode, cls, defs, options, deploymentItems, incidentItems, ci
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [nameError, setNameError] = useState(false);
   const [issueCount, setIssueCount] = useState(0);
+  // 422 issues without an input to show them under (name, states, class, stale paths)
+  const [otherIssues, setOtherIssues] = useState<Array<{ path: string; label: string; message: string }>>([]);
   const [serverUnknown, setServerUnknown] = useState<string[]>([]);
   const [dropUnknown, setDropUnknown] = useState(false);
   const [needConfirm, setNeedConfirm] = useState(false);
@@ -165,10 +169,23 @@ function CiEditor({ mode, cls, defs, options, deploymentItems, incidentItems, ci
       }
       if (err instanceof ApiError && err.status === 422 && body.code === "invalid_values") {
         const issues = body.issues ?? [];
-        setErrors(
-          Object.fromEntries(
-            issues.map((i) => [i.path, (VALIDATION_CODES as readonly string[]).includes(i.code) ? `cmdb.validation.${i.code}` : (i.message ?? i.code)]),
-          ),
+        const text = (i: { code: string; message?: string }) =>
+          (VALIDATION_CODES as readonly string[]).includes(i.code) ? `cmdb.validation.${i.code}` : (i.message ?? i.code);
+        setErrors(Object.fromEntries(issues.map((i) => [i.path, text(i)])));
+        const shown = errorPaths(defs, values);
+        const fieldLabel: Record<string, string> = {
+          name: t("cmdb.edit.name"),
+          deployment_state_id: t("cmdb.detail.deployment"),
+          incident_state_id: t("cmdb.detail.incidentOwn"),
+          class_id: t("cmdb.edit.classField"),
+        };
+        setOtherIssues(
+          issues
+            .filter((i) => !shown.has(i.path))
+            .map((i) => {
+              const msg = text(i);
+              return { path: i.path, label: fieldLabel[i.path] ?? i.path, message: msg.startsWith("cmdb.validation.") ? t(msg) : msg };
+            }),
         );
         setIssueCount(issues.length);
         return;
@@ -185,6 +202,7 @@ function CiEditor({ mode, cls, defs, options, deploymentItems, incidentItems, ci
   const save = () => {
     setMessage(null);
     setNeedConfirm(false);
+    setOtherIssues([]);
     const found = validateValues(defs, values);
     const noName = name.trim() === "";
     setErrors(found);
@@ -206,6 +224,23 @@ function CiEditor({ mode, cls, defs, options, deploymentItems, incidentItems, ci
       return made;
     } catch (err) {
       setMessage({ kind: "error", text: apiErrorMessage(err, t("cmdb.edit.uploadFailed")) });
+    }
+  };
+
+  // attachments the saved version references stay (they are part of the CI's history); any other
+  // upload whose value is removed is deleted right away, and a staged one is no longer bound on create
+  const savedAttachments = useMemo(
+    () => new Set(attachmentIds(defs, (ci?.current_version?.attributes ?? {}) as Record<string, unknown>)),
+    [defs, ci],
+  );
+  const removeAttachment = async (id: number) => {
+    setStaged((prev) => prev.filter((x) => x !== id));
+    if (savedAttachments.has(id)) return;
+    try {
+      await cmdbApi.removeAttachment(id);
+      setAttachments((prev) => prev.filter((a) => a.id !== id));
+    } catch (err) {
+      setMessage({ kind: "error", text: apiErrorMessage(err, t("cmdb.edit.removeFileFailed")) });
     }
   };
 
@@ -231,9 +266,18 @@ function CiEditor({ mode, cls, defs, options, deploymentItems, incidentItems, ci
       </div>
 
       {issueCount > 0 && (
-        <p role="alert" className="rounded-md border border-danger px-3 py-2 text-sm text-danger" data-testid="ci-edit-summary">
-          {t("cmdb.edit.summary", { count: issueCount })}
-        </p>
+        <div role="alert" className="rounded-md border border-danger px-3 py-2 text-sm text-danger" data-testid="ci-edit-summary">
+          <p>{t("cmdb.edit.summary", { count: issueCount })}</p>
+          {otherIssues.length > 0 && (
+            <ul className="mt-1 list-disc space-y-0.5 pl-5" data-testid="ci-edit-other-issues">
+              {otherIssues.map((i) => (
+                <li key={i.path}>
+                  <span className="font-medium">{i.label}</span>: {i.message}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
       {message && (
         <p
@@ -303,7 +347,7 @@ function CiEditor({ mode, cls, defs, options, deploymentItems, incidentItems, ci
         <h2 id="ci-edit-attrs" className="text-sm font-semibold text-ink">
           {t("cmdb.edit.attributes")}
         </h2>
-        <CiAttributeForm defs={defs} values={values} onChange={setValues} options={options} errors={errors} disabled={saveM.isPending} attachments={attachments} onUpload={upload} />
+        <CiAttributeForm defs={defs} values={values} onChange={setValues} options={options} errors={errors} disabled={saveM.isPending} attachments={attachments} onUpload={upload} onRemoveAttachment={removeAttachment} />
       </section>
 
       <div>
@@ -398,18 +442,7 @@ export function CiEditPage({ ciId, classId }: { ciId?: number; classId?: number 
 
   if (statusQ.data && !active) return shell(<CmdbModeNotice status={statusQ.data} />);
 
-  if (edit && ciQ.error instanceof ApiError && ciQ.error.status === 404) {
-    return shell(
-      <>
-        <p role="alert" className="text-sm text-ink" data-testid="ci-edit-not-found">
-          {t("cmdb.detail.notFound")}
-        </p>
-        <Link to="/agent/cmdb" className="text-sm text-accent hover:underline">
-          {t("cmdb.detail.back")}
-        </Link>
-      </>,
-    );
-  }
+  if (edit && ciQ.error instanceof ApiError && ciQ.error.status === 404) return <CiEditNotFound />;
   if (edit && ci && !ci.can_write) {
     return shell(
       <>
@@ -499,11 +532,26 @@ export function CiEditPage({ ciId, classId }: { ciId?: number; classId?: number 
   );
 }
 
-/** Route component of `/agent/cmdb/$ciId/edit`. */
+function CiEditNotFound() {
+  const { t } = useTranslation();
+  return (
+    <div className="mx-auto max-w-4xl space-y-3 p-4 sm:p-6" data-testid="ci-edit-shell">
+      <p role="alert" className="text-sm text-ink" data-testid="ci-edit-not-found">
+        {t("cmdb.detail.notFound")}
+      </p>
+      <Link to="/agent/cmdb" className="text-sm text-accent hover:underline">
+        {t("cmdb.detail.back")}
+      </Link>
+    </div>
+  );
+}
+
+/** Route component of `/agent/cmdb/$ciId/edit`; a malformed id is "not found" without a request. */
 export function CiEditRoute() {
   const { ciId } = useParams({ from: "/agent/cmdb/$ciId/edit" });
   const id = Number(ciId);
-  return <CiEditPage ciId={Number.isInteger(id) && id > 0 ? id : -1} />;
+  if (!Number.isInteger(id) || id <= 0) return <CiEditNotFound />;
+  return <CiEditPage ciId={id} />;
 }
 
 /** Route component of `/agent/cmdb/new` (`?class=`). */

@@ -114,6 +114,8 @@ describe("CiDetailPage", () => {
   it("lists linked tickets, narrows to open ones and links to the ticket", async () => {
     await renderDetail("/agent/cmdb/3?tab=tickets");
     expect(await screen.findByTestId("ci-ticket-1")).toHaveTextContent("Datenbank antwortet nicht");
+    await waitFor(() => expect(screen.getByTestId("ci-ticket-1")).toHaveTextContent("betrifft / betroffen von"));
+    expect(screen.getByTestId("ci-tickets")).not.toHaveTextContent("RelevantTo");
     expect(screen.getByTestId("ci-ticket-2")).toBeInTheDocument();
     expect(within(screen.getByTestId("ci-ticket-1")).getByRole("link", { name: "2026100801" })).toHaveAttribute("href", "/agent/tickets/1");
     fireEvent.click(screen.getByTestId("ci-tickets-open-only"));

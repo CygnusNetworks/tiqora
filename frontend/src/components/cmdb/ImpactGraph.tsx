@@ -8,9 +8,10 @@ import { usePhoneWidth } from "@/components/process-designer/usePhoneWidth";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/cn";
-import { cmdbApi, type ImpactGraph as ImpactGraphData } from "@/lib/cmdbApi";
+import { cmdbApi, useCmdbLinkTypes, type ImpactGraph as ImpactGraphData, type LinkType } from "@/lib/cmdbApi";
 import { CiStateBadge } from "./CiStateBadge";
 import { impactTree, layoutImpact, nodeLabel, type ImpactTreeItem } from "./impactLayout";
+import { linkTypeLabel } from "./linksModel";
 
 type GraphNode = ImpactGraphData["nodes"][number];
 type ImpactFlowNode = Node<{ node: GraphNode; root: boolean }, "impact">;
@@ -65,7 +66,7 @@ const themeVars = {
   "--xy-attribution-background-color": "transparent",
 } as React.CSSProperties;
 
-function toFlow(graph: ImpactGraphData): { nodes: ImpactFlowNode[]; edges: Edge[] } {
+function toFlow(graph: ImpactGraphData, types: LinkType[] | undefined): { nodes: ImpactFlowNode[]; edges: Edge[] } {
   const layout = layoutImpact(graph);
   const byId = new Map(graph.nodes.map((n) => [n.id, n]));
   const nodes: ImpactFlowNode[] = layout.nodes.map((p) => ({
@@ -81,7 +82,7 @@ function toFlow(graph: ImpactGraphData): { nodes: ImpactFlowNode[]; edges: Edge[
     id: e.id,
     source: e.source,
     target: e.target,
-    label: e.link_type,
+    label: linkTypeLabel(types, e.link_type, "source"),
     focusable: false,
     markerEnd: { type: MarkerType.ArrowClosed },
     // propagating links solid, the others dashed
@@ -92,7 +93,7 @@ function toFlow(graph: ImpactGraphData): { nodes: ImpactFlowNode[]; edges: Edge[
   return { nodes, edges };
 }
 
-function TreeList({ item, depth }: { item: ImpactTreeItem; depth: number }) {
+function TreeList({ item, depth, types }: { item: ImpactTreeItem; depth: number; types: LinkType[] | undefined }) {
   const { t } = useTranslation();
   const { node, via } = item;
   const label = node.hidden ? t("cmdb.hiddenNode") : nodeLabel(node);
@@ -101,7 +102,7 @@ function TreeList({ item, depth }: { item: ImpactTreeItem; depth: number }) {
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1 text-sm">
         {via && (
           <span className="text-xs text-muted">
-            {t(via.outgoing ? "cmdb.impact.out" : "cmdb.impact.in", { type: via.link_type })}
+            {t(via.outgoing ? "cmdb.impact.out" : "cmdb.impact.in", { type: linkTypeLabel(types, via.link_type, via.outgoing ? "source" : "target") })}
             {via.propagates ? ` · ${t("cmdb.impact.propagates")}` : ""}
           </span>
         )}
@@ -120,7 +121,7 @@ function TreeList({ item, depth }: { item: ImpactTreeItem; depth: number }) {
       {item.children.length > 0 && (
         <ul className="ml-4 border-l border-hairline pl-3">
           {item.children.map((c) => (
-            <TreeList key={c.node.id} item={c} depth={depth + 1} />
+            <TreeList key={c.node.id} item={c} depth={depth + 1} types={types} />
           ))}
         </ul>
       )}
@@ -128,9 +129,9 @@ function TreeList({ item, depth }: { item: ImpactTreeItem; depth: number }) {
   );
 }
 
-function Canvas({ graph }: { graph: ImpactGraphData }) {
+function Canvas({ graph, types }: { graph: ImpactGraphData; types: LinkType[] | undefined }) {
   const navigate = useNavigate();
-  const flow = useMemo(() => toFlow(graph), [graph]);
+  const flow = useMemo(() => toFlow(graph, types), [graph, types]);
   return (
     <div className="h-[28rem] rounded-md border border-hairline" style={themeVars} data-testid="impact-canvas" aria-hidden="true">
       <ReactFlow
@@ -173,6 +174,7 @@ export function ImpactGraph({ ciId }: { ciId: number }) {
     placeholderData: keepPreviousData,
   });
   const tree = useMemo(() => (q.data ? impactTree(q.data) : null), [q.data]);
+  const types = useCmdbLinkTypes().data;
   const alone = q.data ? q.data.nodes.length <= 1 : false;
 
   return (
@@ -231,13 +233,13 @@ export function ImpactGraph({ ciId }: { ciId: number }) {
             <>
               {!phone && (
                 <ReactFlowProvider>
-                  <Canvas graph={q.data} />
+                  <Canvas graph={q.data} types={types} />
                 </ReactFlowProvider>
               )}
               <div className={cn(!phone && "sr-only")} data-testid="impact-list">
                 {tree && (
                   <ul aria-label={t("cmdb.impact.listLabel")}>
-                    <TreeList item={tree} depth={0} />
+                    <TreeList item={tree} depth={0} types={types} />
                   </ul>
                 )}
               </div>

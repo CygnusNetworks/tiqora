@@ -63,6 +63,23 @@ describe("CiLinksPanel", () => {
     expect(store.links.some((l) => l.id === 1)).toBe(false);
   });
 
+  it("does not show a failed removal again when the dialog is reopened", async () => {
+    vi.restoreAllMocks();
+    serveCmdb(store, seen, (m) => {
+      if (m === "DELETE") throw new Error("409");
+      return undefined;
+    });
+    await renderWithRouter(<CiLinksPanel ciId={3} canWrite />);
+    fireEvent.click(await screen.findByTestId("ci-link-1-remove"));
+    fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+    expect(await screen.findByTestId("ci-link-remove-error")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
+    await waitFor(() => expect(screen.queryByTestId("confirm-dialog")).toBeNull());
+    fireEvent.click(screen.getByTestId("ci-link-1-remove"));
+    expect(await screen.findByTestId("confirm-dialog")).toBeInTheDocument();
+    expect(screen.queryByTestId("ci-link-remove-error")).toBeNull();
+  });
+
   it("offers neither add nor remove to a reader", async () => {
     await renderWithRouter(<CiLinksPanel ciId={3} canWrite={false} />);
     await screen.findByTestId("ci-links");

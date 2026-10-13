@@ -61,6 +61,27 @@ describe("ImpactGraph", () => {
     expect(within(list).getByTestId("impact-item-ci:3")).toHaveTextContent("db-01");
   });
 
+  it("names the links with their labels, not the link-type keys", async () => {
+    setViewport(390);
+    graphOverride = {
+      root: "ci:1",
+      truncated: false,
+      nodes: [
+        { id: "ci:1", kind: "ci", ci_id: 1, number: "SRV-0001", name: "web-01", hidden: false, depth: 0 },
+        { id: "ci:2", kind: "ci", ci_id: 2, number: "SRV-0002", name: "app-01", hidden: false, depth: 1 },
+        { id: "ci:3", kind: "ci", ci_id: 3, number: "SRV-0003", name: "db-01", hidden: false, depth: 1 },
+      ],
+      edges: [
+        { source: "ci:1", target: "ci:2", link_type: "DependsOn", propagates: true },
+        { source: "ci:3", target: "ci:1", link_type: "DependsOn", propagates: true },
+      ],
+    } as ImpactGraphData;
+    await renderWithRouter(<ImpactGraph ciId={1} />);
+    await waitFor(() => expect(screen.getByTestId("impact-item-ci:2")).toHaveTextContent("hängt ab von"));
+    expect(screen.getByTestId("impact-item-ci:3")).toHaveTextContent("wird benötigt von");
+    expect(screen.getByTestId("impact-list")).not.toHaveTextContent("DependsOn");
+  });
+
   it("draws the canvas on wide screens and keeps the list for screen readers", async () => {
     setViewport(1280);
     await renderWithRouter(<ImpactGraph ciId={1} />);

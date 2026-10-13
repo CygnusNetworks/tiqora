@@ -4,6 +4,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { KEY_PATTERN, exampleNumber, suggestClassKey } from "@/components/cmdb/adminModel";
 import { CmdbModeNotice } from "@/components/cmdb/CmdbModeNotice";
+import { JobDialog } from "@/components/jobs/JobDialog";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -216,11 +217,19 @@ export function CmdbClassesPage() {
     onSuccess: async (status) => {
       qc.setQueryData(["admin", "cmdb", "status"], status);
       await qc.invalidateQueries({ queryKey: ["admin", "cmdb"] });
+      void qc.invalidateQueries({ queryKey: ["cmdb"] });
     },
+  });
+
+  const [recomputeJob, setRecomputeJob] = useState<number | null>(null);
+  const recomputeM = useMutation({
+    mutationFn: () => cmdbAdminApi.recomputePropagation(),
+    onSuccess: (accepted) => setRecomputeJob(accepted.job_id),
   });
 
   const openEditor = (c: CmdbClass) => {
     void qc.invalidateQueries({ queryKey: ["admin", "cmdb", "classes"] });
+    void qc.invalidateQueries({ queryKey: ["cmdb"] });
     void navigate({ to: "/admin/cmdb/classes/$classId", params: { classId: String(c.id) } });
   };
 
@@ -264,13 +273,32 @@ export function CmdbClassesPage() {
       )}
 
       {active && (
-        <p className="text-xs text-muted" data-testid="cmdb-linktypes-hint">
-          {t("admin.cmdb.classes.linkTypesHint")}{" "}
-          <a href="/admin/itsm/link-types" className="text-accent hover:underline" data-testid="cmdb-linktypes-link">
-            {t("admin.cmdb.classes.linkTypesLink")}
-          </a>
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted" data-testid="cmdb-linktypes-hint">
+            {t("admin.cmdb.classes.linkTypesHint")}{" "}
+            <a href="/admin/itsm/link-types" className="text-accent hover:underline" data-testid="cmdb-linktypes-link">
+              {t("admin.cmdb.classes.linkTypesLink")}
+            </a>
+          </p>
+          <Button
+            disabled={recomputeM.isPending}
+            onClick={() => recomputeM.mutate()}
+            title={t("admin.cmdb.classes.recomputeHint")}
+            data-testid="cmdb-recompute"
+          >
+            {t("admin.cmdb.classes.recompute")}
+          </Button>
+        </div>
       )}
+      {recomputeM.isError && (
+        <p role="alert" className="text-sm text-danger">{apiErrorMessage(recomputeM.error, t("admin.cmdb.classes.recomputeError"))}</p>
+      )}
+      <JobDialog
+        jobId={recomputeJob}
+        title={t("jobs.kinds.core.cmdb_propagation")}
+        testId="cmdb-recompute-job"
+        onClose={() => setRecomputeJob(null)}
+      />
 
       {active && (
         <div className="overflow-x-auto rounded-xl border border-hairline bg-surface" data-testid="cmdb-classes-table">

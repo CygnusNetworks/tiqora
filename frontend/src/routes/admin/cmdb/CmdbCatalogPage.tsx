@@ -235,6 +235,8 @@ export function CmdbCatalogPage() {
             setEditing(null);
             void qc.invalidateQueries({ queryKey: ["admin", "cmdb", "catalog"] });
             void qc.invalidateQueries({ queryKey: ["admin", "cmdb", "status"] });
+            // the agent pages cache classes, catalog and status too
+            void qc.invalidateQueries({ queryKey: ["cmdb"] });
           }}
         />
       )}

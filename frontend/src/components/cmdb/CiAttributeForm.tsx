@@ -24,6 +24,7 @@ type Ctx = {
   disabled?: boolean;
   attachments: CmdbAttachment[];
   onUpload?: (file: File) => Promise<CmdbAttachment | void> | void;
+  onRemoveAttachment?: (id: number) => Promise<void> | void;
   idBase: string;
 };
 
@@ -51,6 +52,7 @@ export function CiAttributeForm({
   disabled,
   attachments,
   onUpload,
+  onRemoveAttachment,
 }: {
   defs: AttributeDef[];
   values: AttrValues;
@@ -60,6 +62,8 @@ export function CiAttributeForm({
   disabled?: boolean;
   attachments?: CmdbAttachment[];
   onUpload?: (file: File) => Promise<CmdbAttachment | void> | void;
+  /** Called after an attachment value was cleared with "Entfernen" (the page decides whether the file goes). */
+  onRemoveAttachment?: (id: number) => Promise<void> | void;
 }) {
   const idBase = useId();
   const ctx: Ctx = {
@@ -70,6 +74,7 @@ export function CiAttributeForm({
     disabled,
     attachments: attachments ?? [],
     onUpload,
+    onRemoveAttachment,
     idBase,
   };
   return (
@@ -341,6 +346,22 @@ function AttachmentControl({
             {t("cmdb.form.upload")}
           </Button>
         </>
+      )}
+      {ctx.onRemoveAttachment && typeof value === "number" && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="shrink-0"
+          disabled={ctx.disabled}
+          data-testid={`${testId}-remove-file`}
+          onClick={() => {
+            onValue(null);
+            void ctx.onRemoveAttachment?.(value);
+          }}
+        >
+          {t("cmdb.form.removeFile")}
+        </Button>
       )}
     </div>
   );

@@ -5099,7 +5099,10 @@
         "attributeCount_other": "{{count}} Attribute",
         "saveError": "Die Klasse konnte nicht gespeichert werden.",
         "linkTypesHint": "Verknüpfungstypen zwischen CIs, Services und Tickets pflegen Sie zusammen mit den übrigen ITSM-Einstellungen.",
-        "linkTypesLink": "ITSM-Verknüpfungstypen öffnen"
+        "linkTypesLink": "ITSM-Verknüpfungstypen öffnen",
+        "recompute": "Vorfallstatus neu berechnen",
+        "recomputeHint": "Berechnet den abgeleiteten Vorfallstatus aller CIs neu, etwa nach Änderungen an den Verknüpfungstypen.",
+        "recomputeError": "Die Neuberechnung ließ sich nicht starten."
       },
       "seed": {
         "catalogMissing": "Die Standardeinträge des Katalogs (Zustände) fehlen.",
@@ -7771,7 +7774,8 @@
       "removeEntry": "Entfernen",
       "upload": "Datei hochladen",
       "empty": "—",
-      "noAttributes": "Keine Attributwerte."
+      "noAttributes": "Keine Attributwerte.",
+      "removeFile": "Datei entfernen"
     },
     "validation": {
       "required": "Pflichtfeld.",
@@ -8002,7 +8006,9 @@
         "message": "Sie haben ungespeicherte Änderungen. Möchten Sie die Seite trotzdem verlassen?",
         "confirm": "Verlassen",
         "stay": "Bleiben"
-      }
+      },
+      "classField": "Klasse",
+      "removeFileFailed": "Die Datei ließ sich nicht entfernen."
     },
     "links": {
       "add": "Verknüpfung hinzufügen",

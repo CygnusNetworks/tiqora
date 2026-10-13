@@ -16,11 +16,11 @@ export function NewTicketPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const search = useSearch({ strict: false }) as PortalNewTicketSearch;
-  const cis = usePortalCis();
-  // `?ci=` preselects a device; a picked id the list no longer offers is dropped on submit.
-  const [picked, setPicked] = useState<number[]>(() =>
-    typeof search.ci === "number" && Number.isInteger(search.ci) ? [search.ci] : [],
-  );
+  const preselect = typeof search.ci === "number" && Number.isInteger(search.ci) ? search.ci : undefined;
+  const cis = usePortalCis(preselect);
+  // `?ci=` preselects a device (loaded on its own beyond the first page); a picked id the
+  // customer may not see is dropped on submit.
+  const [picked, setPicked] = useState<number[]>(() => (preselect !== undefined ? [preselect] : []));
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();

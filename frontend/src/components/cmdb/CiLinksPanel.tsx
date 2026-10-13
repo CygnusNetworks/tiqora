@@ -119,7 +119,10 @@ export function CiLinksPanel({ ciId, canWrite }: { ciId: number; canWrite: boole
         role="alertdialog"
         pending={remove.isPending}
         onConfirm={() => removing && remove.mutate(removing.id)}
-        onCancel={() => setRemoving(null)}
+        onCancel={() => {
+          setRemoving(null);
+          remove.reset();
+        }}
       >
         {remove.isError && (
           <p role="alert" className="text-sm text-danger" data-testid="ci-link-remove-error">

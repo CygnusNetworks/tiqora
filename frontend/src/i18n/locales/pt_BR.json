@@ -5091,7 +5091,10 @@
         "attributeCount_other": "{{count}} attributes",
         "saveError": "The class could not be saved.",
         "linkTypesHint": "Link types between CIs, services and tickets are managed together with the other ITSM settings.",
-        "linkTypesLink": "Open ITSM link types"
+        "linkTypesLink": "Open ITSM link types",
+        "recompute": "Recalculate incident states",
+        "recomputeHint": "Recalculates the derived incident state of every CI, e.g. after link types changed.",
+        "recomputeError": "The recalculation could not be started."
       },
       "seed": {
         "catalogMissing": "The standard catalog entries (states) are missing.",
@@ -7763,7 +7766,8 @@
       "removeEntry": "Remove",
       "upload": "Upload file",
       "empty": "—",
-      "noAttributes": "No attribute values."
+      "noAttributes": "No attribute values.",
+      "removeFile": "Remove file"
     },
     "validation": {
       "required": "Required field.",
@@ -7994,7 +7998,9 @@
         "message": "You have unsaved changes. Leave the page anyway?",
         "confirm": "Leave",
         "stay": "Stay"
-      }
+      },
+      "classField": "Class",
+      "removeFileFailed": "The file could not be removed."
     },
     "links": {
       "add": "Add link",

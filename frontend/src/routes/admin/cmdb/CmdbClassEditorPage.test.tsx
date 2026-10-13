@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient } from "@tanstack/react-query";
 import i18n from "@/i18n";
 import { ApiError } from "@/lib/api";
 import { cmdbAdminApi } from "@/lib/cmdbAdminApi";
@@ -117,6 +118,7 @@ describe("CmdbClassEditorPage", () => {
 
   it("saves the edited tree as a new version and lists its changes against the previous one", async () => {
     serveAdminDemo(store, requests);
+    const invalidate = vi.spyOn(QueryClient.prototype, "invalidateQueries");
     await open(2);
     fireEvent.click(await screen.findByTestId("def-add"));
     fireEvent.change(await screen.findByTestId("def-key"), { target: { value: "phone" } });
@@ -134,6 +136,8 @@ describe("CmdbClassEditorPage", () => {
     expect(body.attributes.map((a) => a.key)).toEqual(["address", "phone"]);
     expect(body.attributes[1]).toMatchObject({ name: "Telefon", searchable: true, type: "text" });
     expect(screen.queryByTestId("def-version-1")).toBeInTheDocument();
+    // the agent side (new-CI form, filters) must not keep the old definition for a minute
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["cmdb"] });
 
     fireEvent.click(screen.getByTestId("def-diff-toggle-2"));
     const diff = await screen.findByTestId("def-diff-2");

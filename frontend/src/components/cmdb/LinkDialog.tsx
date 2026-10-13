@@ -62,6 +62,12 @@ export function LinkDialog({ open, ciId, onClose }: { open: boolean; ciId: numbe
     },
   });
 
+  // a failed add must not greet the next opening of the dialog
+  const close = () => {
+    add.reset();
+    onClose();
+  };
+
   const kindItems = LINK_KINDS.map((k) => ({ value: k, label: t(`cmdb.links.kinds.${k}`) }));
   const pick = (v: FieldValue, label?: string) => setTarget(typeof v === "string" && v !== "" ? { key: v, label: label ?? v } : null);
   const common = { id: "ci-link-target", testId: "ci-link-target", options: [] as never[], required: true };
@@ -141,12 +147,12 @@ export function LinkDialog({ open, ciId, onClose }: { open: boolean; ciId: numbe
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={close}
       title={t("cmdb.links.dialog.title")}
       size="lg"
       footer={
         <>
-          <Button variant="secondary" onClick={onClose} disabled={add.isPending} data-testid="ci-link-cancel">
+          <Button variant="secondary" onClick={close} disabled={add.isPending} data-testid="ci-link-cancel">
             {t("common.cancel")}
           </Button>
           <Button variant="primary" disabled={!canSubmit} onClick={() => add.mutate()} data-testid="ci-link-submit">

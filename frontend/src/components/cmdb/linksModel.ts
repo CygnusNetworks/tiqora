@@ -22,3 +22,18 @@ export function typesForKind(types: LinkType[], kind: LinkKindId): LinkType[] {
 export function groupLinks(links: LinkOut[]): Array<{ kind: LinkKindId; links: LinkOut[] }> {
   return LINK_KINDS.map((kind) => ({ kind, links: links.filter((l) => l.other.kind === kind) })).filter((g) => g.links.length > 0);
 }
+
+/**
+ * Display label of a link type seen from one end (`"source"`: this end is the link's source).
+ * `"either"` (the direction is unknown) gives the shared label of an undirected type and both
+ * labels of a directed one. Unknown types keep their key.
+ */
+export function linkTypeLabel(types: readonly LinkType[] | undefined, name: string, side: "source" | "target" | "either"): string {
+  const lt = types?.find((x) => x.name === name);
+  if (!lt) return name;
+  const src = lt.source_label ?? name;
+  const tgt = lt.target_label ?? name;
+  if (side === "source") return src;
+  if (side === "target") return tgt;
+  return src === tgt ? src : `${src} / ${tgt}`;
+}

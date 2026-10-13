@@ -5,11 +5,12 @@ import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { NewTicketPage } from "./NewTicketPage";
 
-const { navigate, search, createTicket, list } = vi.hoisted(() => ({
+const { navigate, search, createTicket, list, get } = vi.hoisted(() => ({
   navigate: vi.fn(),
   search: { current: {} as Record<string, unknown> },
   createTicket: vi.fn(),
   list: vi.fn(),
+  get: vi.fn(),
 }));
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
@@ -19,7 +20,7 @@ vi.mock("@/lib/portalApi", () => ({
   portalApi: { portalCreateTicket: createTicket },
   ApiError: class ApiError extends Error {},
 }));
-vi.mock("@/lib/portalCmdbApi", () => ({ portalCmdbApi: { list } }));
+vi.mock("@/lib/portalCmdbApi", () => ({ portalCmdbApi: { list, get } }));
 
 function wrap() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -52,6 +53,7 @@ beforeEach(() => {
   createTicket.mockReset();
   createTicket.mockResolvedValue({ ticket_id: 5 });
   list.mockReset();
+  get.mockReset();
   search.current = {};
   void i18n.changeLanguage("de");
 });
@@ -69,6 +71,32 @@ describe("portal NewTicketPage device picker", () => {
     await waitFor(() =>
       expect(createTicket).toHaveBeenCalledWith({ title: "Titel", body: "Text", config_item_ids: [2] }),
     );
+  });
+
+  it("keeps a ?ci= device that is not on the first page of the picker", async () => {
+    search.current = { ci: 150 };
+    list.mockResolvedValue({ items: [ci(1), ci(2)], total: 150 });
+    get.mockResolvedValue({ ...ci(150), rendered: [] });
+    wrap();
+    expect(await screen.findByTestId("portal-new-ticket-ci-150")).toBeChecked();
+    expect(get).toHaveBeenCalledWith(150);
+    fill();
+    fireEvent.click(screen.getByTestId("portal-new-ticket-submit"));
+    await waitFor(() =>
+      expect(createTicket).toHaveBeenCalledWith({ title: "Titel", body: "Text", config_item_ids: [150] }),
+    );
+  });
+
+  it("drops a ?ci= device the customer may not see", async () => {
+    search.current = { ci: 999 };
+    list.mockResolvedValue({ items: [ci(1)], total: 1 });
+    get.mockRejectedValue(new Error("404"));
+    wrap();
+    await screen.findByTestId("portal-new-ticket-ci-1");
+    await waitFor(() => expect(get).toHaveBeenCalledWith(999));
+    fill();
+    fireEvent.click(screen.getByTestId("portal-new-ticket-submit"));
+    await waitFor(() => expect(createTicket).toHaveBeenCalledWith({ title: "Titel", body: "Text" }));
   });
 
   it("omits config_item_ids when nothing is picked", async () => {

@@ -135,6 +135,22 @@ describe("CiEditPage", () => {
     expect(screen.getByTestId("ci-edit-summary")).toHaveTextContent("2 Fehler");
   });
 
+  it("lists 422 issues that have no input in the summary", async () => {
+    putError = new ApiError(
+      422,
+      { detail: { code: "invalid_values", issues: [{ path: "name", code: "too_long", message: "x" }, { path: "Legacy[1]", code: "unknown_key", message: "Unbekanntes Attribut." }, { path: "hostname[1]", code: "too_long", message: "y" }] } },
+      "/api/v1/cmdb/cis/1",
+    );
+    await renderEdit("/agent/cmdb/1/edit");
+    await screen.findByTestId("ci-attr-hostname-1-input");
+    fireEvent.change(screen.getByTestId("ci-edit-name"), { target: { value: "web-01e.example.org" } });
+    save();
+    const other = await screen.findByTestId("ci-edit-other-issues");
+    const items = within(other).getAllByRole("listitem").map((li) => li.textContent);
+    expect(items).toEqual(["Name: Der Wert ist zu lang.", "Legacy[1]: Unbekanntes Attribut."]);
+    expect(screen.getByTestId("ci-edit-summary")).toHaveTextContent("3 Fehler");
+  });
+
   it("blocks saving a required attribute that is empty, before any request", async () => {
     await renderEdit("/agent/cmdb/1/edit");
     const hostname = await screen.findByTestId("ci-attr-hostname-1-input");
@@ -201,6 +217,45 @@ describe("CiEditPage", () => {
     await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/agent\/cmdb\/\d+$/));
     expect(bodyOf("POST", /\/cmdb\/cis$/)).toMatchObject({ class_id: 1, name: "app-01.example.org", attachment_ids: [1] });
     expect(store.cis.some((c) => c.name === "app-01.example.org")).toBe(true);
+  });
+
+  it("deletes a staged upload that is removed again, and does not bind it on create", async () => {
+    classesOverride = (cs) =>
+      cs.map((c) =>
+        c.id === 1 && c.definition
+          ? { ...c, definition: { ...c.definition, attributes: [...c.definition.attributes, { key: "doc", name: "Dokument", type: "attachment", count_min: 0, count_max: 1, count_default: 1, required: false, searchable: false, portal: false, options: {} } as never] } }
+          : c,
+      );
+    const router = await renderEdit("/agent/cmdb/new?class=1");
+    fireEvent.change(await screen.findByTestId("ci-edit-name"), { target: { value: "app-02.example.org" } });
+    fireEvent.change(await screen.findByTestId("ci-attr-hostname-1-input"), { target: { value: "app-02.example.org" } });
+    fireEvent.change(await screen.findByTestId("ci-attr-doc-1-input-file"), { target: { files: [new File(["x"], "falsch.txt")] } });
+    fireEvent.click(await screen.findByTestId("ci-attr-doc-1-input-remove-file"));
+    await waitFor(() => expect(requests.some((r) => r.method === "DELETE" && r.path.endsWith("/attachments/1"))).toBe(true));
+    expect(screen.queryByTestId("ci-attr-doc-1-input-remove-file")).not.toBeInTheDocument();
+    save();
+    await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/agent\/cmdb\/\d+$/));
+    expect(bodyOf("POST", /\/cmdb\/cis$/)).toMatchObject({ attachment_ids: [] });
+  });
+
+  it("keeps an attachment the saved version references when its value is removed", async () => {
+    classesOverride = (cs) =>
+      cs.map((c) =>
+        c.id === 1 && c.definition
+          ? { ...c, definition: { ...c.definition, attributes: [...c.definition.attributes, { key: "doc", name: "Dokument", type: "attachment", count_min: 0, count_max: 1, count_default: 1, required: false, searchable: false, portal: false, options: {} } as never] } }
+          : c,
+      );
+    ciOverride = (ci) => ({ ...ci, current_version: ci.current_version ? { ...ci.current_version, attributes: { ...ci.current_version.attributes, doc: [{ v: 77 }] } } : ci.current_version });
+    await renderEdit("/agent/cmdb/1/edit");
+    fireEvent.click(await screen.findByTestId("ci-attr-doc-1-input-remove-file"));
+    await waitFor(() => expect(screen.queryByTestId("ci-attr-doc-1-input-remove-file")).not.toBeInTheDocument());
+    expect(requests.some((r) => r.method === "DELETE")).toBe(false);
+  });
+
+  it("answers a malformed id with 'not found' without asking the server", async () => {
+    await renderEdit("/agent/cmdb/abc/edit");
+    expect(await screen.findByTestId("ci-edit-not-found")).toBeInTheDocument();
+    expect(requests.some((r) => /\/cis\//.test(r.path))).toBe(false);
   });
 
   it("binds attachments to the CI when editing", async () => {

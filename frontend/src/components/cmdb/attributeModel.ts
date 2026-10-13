@@ -123,6 +123,40 @@ export function entriesAt(values: AttrValues, key: string, parents: EntryPath): 
   return level?.[key] ?? [];
 }
 
+/**
+ * Every issue path the form can show an error under: the list path of each attribute
+ * (`NIC`, `NIC[1].IPAddress`) and the path of each entry (`NIC[1]`, `NIC[1].IPAddress[2]`).
+ */
+export function errorPaths(defs: readonly AttributeDef[], values: AttrValues, prefix = ""): Set<string> {
+  const out = new Set<string>();
+  for (const def of defs) {
+    const listPath = `${prefix}${def.key}`;
+    out.add(listPath);
+    (values[def.key] ?? []).forEach((entry, i) => {
+      const epath = `${listPath}[${i + 1}]`;
+      out.add(epath);
+      if (def.sub && def.sub.length > 0) {
+        for (const sub of errorPaths(def.sub, entry.s ?? {}, `${epath}.`)) out.add(sub);
+      }
+    });
+  }
+  return out;
+}
+
+/** Ids of the attachments the values reference (attachment attributes, sub attributes included). */
+export function attachmentIds(defs: readonly AttributeDef[], values: AttrValues | Record<string, unknown>): number[] {
+  const out = new Set<number>();
+  for (const def of defs) {
+    const entries = (values as AttrValues)[def.key];
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      if (def.type === "attachment" && typeof entry?.v === "number") out.add(entry.v);
+      if (def.sub && def.sub.length > 0 && entry?.s) for (const id of attachmentIds(def.sub, entry.s)) out.add(id);
+    }
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
 /** Top-level keys the definition does not know (sorted); saving removes them. */
 export function unknownKeys(defs: readonly AttributeDef[], values: Record<string, unknown>): string[] {
   const known = new Set(defs.map((d) => d.key));

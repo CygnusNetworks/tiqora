@@ -117,6 +117,20 @@ describe("CmdbClassesPage", () => {
     expect(screen.getByTestId("cmdb-linktypes-link")).toHaveAttribute("href", "/admin/itsm/link-types");
   });
 
+  it("starts the full recompute of the incident states and shows its job", async () => {
+    serveAdminDemo(store, requests, (_m, path) =>
+      path.endsWith("/jobs/9301")
+        ? { id: 9301, kind: "core.cmdb_propagation", title_key: "jobs.kinds.core.cmdb_propagation", status: "running", progress_done: 0, progress_total: null, progress_message: null, result: null, error: null, created_at: "2026-10-12T08:00:00", started_at: null, finished_at: null, files: [] }
+        : undefined,
+    );
+    await renderAdminPage(CmdbClassesPage, PATH);
+    fireEvent.click(await screen.findByTestId("cmdb-recompute"));
+    await waitFor(() =>
+      expect(requests.some((r) => r.method === "POST" && r.path.endsWith("/admin/cmdb/propagation/recompute"))).toBe(true),
+    );
+    expect(await screen.findByTestId("cmdb-recompute-job-close")).toBeInTheDocument();
+  });
+
   it("shows only the mode notice outside Mode B and never calls the gated routes", async () => {
     localStorage.setItem(DEMO_ITSM_MODE_KEY, "znuny_readthrough");
     serveAdminDemo(store, requests);
