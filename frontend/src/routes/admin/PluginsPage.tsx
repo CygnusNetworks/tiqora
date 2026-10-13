@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/Switch";
 import { toBcp47 } from "@/i18n";
 import { apiErrorMessage } from "@/lib/avatarApi";
 import { formatDateTime } from "@/lib/format";
+import { pluginPointsApi } from "@/lib/pluginPointsApi";
 import { pluginsApi, type PluginAdmin } from "@/lib/pluginsApi";
 import { isPluginSafeMode } from "@/plugins/safeMode";
 
@@ -37,7 +38,25 @@ const POINT_KEYS: Record<string, string> = {
   "core.worker.scheduled_tasks": "scheduled_tasks",
   "core.reporting.builtin_reports": "builtin_reports",
   "core.reporting.sources": "report_sources",
+  "core.events.sync_hooks": "sync_hooks",
+  "core.process.transition_actions": "transition_actions",
+  "core.process.condition_modules": "condition_modules",
+  "core.templates.placeholders": "placeholders",
+  "core.tickets.number_generators": "number_generators",
+  "core.dynamic_fields.types": "df_types",
+  "core.mail.inbound_filters": "inbound_mail_filters",
+  "core.mail.outbound_filters": "outbound_mail_filters",
+  "core.notifications.transports": "notification_transports",
+  "core.channels.drivers": "channel_drivers",
+  "core.auth.password_providers": "password_providers",
+  "core.customers.sources": "customer_sources",
+  "core.gi.operations": "gi_operations",
+  "core.gi.invokers": "gi_invokers",
+  "core.gi.mappings": "gi_mappings",
 };
+
+const NUMBER_GENERATORS_POINT = "core.tickets.number_generators";
+const NUMBER_GENERATORS_KEY = ["admin", "plugins", "number-generators"] as const;
 
 const SLOT_KEYS: Record<string, string> = {
   "agent.nav": "nav",
@@ -116,8 +135,15 @@ function PluginDetails({ plugin }: { plugin: PluginAdmin }) {
               <li key={hook.key} className="rounded-lg bg-surface-subtle px-3 py-2" data-testid={`plugin-hook-${plugin.id}-${hook.key}`}>
                 <div className="flex flex-wrap items-baseline gap-x-2">
                   <span className="font-medium text-ink">{hook.name}</span>
+                  {hook.kind === "sync" && (
+                    <span className="text-xs text-muted">{t("admin.plugins.hooks.kind.sync")}</span>
+                  )}
                   <span className="text-xs text-muted">
-                    {hook.kind === "event" ? t("admin.plugins.hooks.onTicketChange") : (hook.schedule ?? "")}
+                    {hook.kind === "event"
+                      ? t("admin.plugins.hooks.onTicketChange")
+                      : hook.kind === "sync"
+                        ? t(`admin.plugins.hooks.operation.${hook.schedule ?? ""}`, { defaultValue: hook.schedule ?? "" })
+                        : (hook.schedule ?? "")}
                   </span>
                 </div>
                 {hook.tripped && (
@@ -153,6 +179,74 @@ function PluginDetails({ plugin }: { plugin: PluginAdmin }) {
         )}
       </section>
     </div>
+  );
+}
+
+/** "Ticketnummer-Schema" of a plugin that offers number generators: pick one for new tickets, or go back to Znuny's. */
+function NumberGeneratorBox({ plugin }: { plugin: PluginAdmin }) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: NUMBER_GENERATORS_KEY,
+    queryFn: ({ signal }) => pluginPointsApi.numberGenerators(signal),
+  });
+  const setM = useMutation({
+    mutationFn: (key: string | null) => pluginPointsApi.setNumberGenerator(key),
+    onSuccess: (data) => qc.setQueryData(NUMBER_GENERATORS_KEY, data),
+  });
+  const own = (q.data?.available ?? []).filter((g) => g.plugin_id === plugin.id);
+  if (!q.data || own.length === 0) return null;
+  const activeOwn = own.some((g) => g.key === q.data.active);
+  return (
+    <section
+      className="mt-3 rounded-lg bg-surface-subtle px-3 py-2 text-sm"
+      data-testid={`plugin-number-generator-${plugin.id}`}
+    >
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
+        {t("admin.plugins.numberGenerator.title")}
+      </h3>
+      <ul className="mt-1 space-y-1.5">
+        {own.map((g) => (
+          <li key={g.key} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="font-medium text-ink">{g.label}</span>
+            {g.example && (
+              <span className="text-xs text-muted">{t("admin.plugins.numberGenerator.example", { example: g.example })}</span>
+            )}
+            {g.key === q.data.active ? (
+              <SoftChip color="var(--color-green)">{t("admin.plugins.numberGenerator.active")}</SoftChip>
+            ) : (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={setM.isPending}
+                onClick={() => setM.mutate(g.key)}
+              >
+                {t("admin.plugins.numberGenerator.use")}
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {activeOwn && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="mt-1.5"
+          disabled={setM.isPending}
+          onClick={() => setM.mutate(null)}
+        >
+          {t("admin.plugins.numberGenerator.reset")}
+        </Button>
+      )}
+      <p className="mt-1.5 text-xs text-muted">
+        {t("admin.plugins.numberGenerator.znunyNote", { generator: q.data.znuny_generator })}
+      </p>
+      {setM.isError && (
+        <p role="alert" className="mt-1 text-xs text-danger">
+          {apiErrorMessage(setM.error, t("admin.plugins.actionError"))}
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -263,6 +357,9 @@ function PluginCard({
           {open ? t("admin.plugins.hideDetails") : t("admin.plugins.details")}
         </Button>
       </div>
+      {plugin.capabilities.some((c) => c.kind === "extension_point" && c.value === NUMBER_GENERATORS_POINT) && (
+        <NumberGeneratorBox plugin={plugin} />
+      )}
       {open && <PluginDetails plugin={plugin} />}
     </li>
   );

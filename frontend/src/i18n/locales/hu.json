@@ -2615,7 +2615,10 @@
       "possibleNone": "Üres kijelölés engedélyezése",
       "defaultValue": "Alapértelmezett érték",
       "yearsInPast": "Évek a múltban",
-      "yearsInFuture": "Évek a jövőben"
+      "yearsInFuture": "Évek a jövőben",
+      "pluginType": "Kind from extension",
+      "pluginTypeHint": "Checked in Tiqora; in Znuny the field appears as “{{base}}”.",
+      "pluginTypeNone": "None (standard kind)"
     },
     "postmasterFilters": {
       "title_plural": "Postmaster szűrők",
@@ -3870,7 +3873,9 @@
         "backendOff": "A(z) {{backend}} ki van kapcsolva: ez az értesítés egyáltalán nem megy ki, amíg újra be nem kapcsolják (ahogy a Znunyben).",
         "hint": "A feladó címének egy kulcsával írja alá (az ügyfélértesítések a várólista alapértelmezett aláírókulcsát részesítik előnyben), a címzett első érvényes kulcsával titkosítja. A Znuny ugyanezeket a beállításokat olvassa.",
         "save": "Mentés"
-      }
+      },
+      "transports": "Delivery channels",
+      "transportEmail": "E-mail"
     },
     "tar": {
       "title": "Jegyattribútum-kapcsolatok",
@@ -4766,7 +4771,8 @@
         "roles": {
           "api": "Web interface and API",
           "worker": "Background service",
-          "mcp": "AI interface (MCP)"
+          "mcp": "AI interface (MCP)",
+          "ai-worker": "AI background service"
         },
         "states": {
           "loading": "Starting",
@@ -4782,7 +4788,17 @@
         "title": "Automatic processes",
         "onTicketChange": "on ticket changes",
         "stopped": "Stopped after {{count}} errors",
-        "lastError": "Last error"
+        "lastError": "Last error",
+        "kind": {
+          "sync": "Check before saving"
+        },
+        "operation": {
+          "ticket.create": "Create ticket",
+          "article.create": "Add message/note",
+          "ticket.queue_move": "Change queue",
+          "ticket.state_change": "Change state",
+          "ticket.dynamic_fields_update": "Change dynamic fields"
+        }
       },
       "capabilities": {
         "title": "What this extension declares",
@@ -4796,7 +4812,22 @@
           "scheduled_tasks": "Runs scheduled tasks in the background",
           "builtin_reports": "Provides ready-made reports",
           "report_sources": "Provides data sources for reports",
-          "other": "Uses the extension point {{value}}"
+          "other": "Uses the extension point {{value}}",
+          "sync_hooks": "Checks ticket changes before they are saved (can reject them)",
+          "transition_actions": "Provides actions for processes",
+          "condition_modules": "Provides conditions for processes",
+          "placeholders": "Provides placeholders for templates",
+          "number_generators": "Provides a ticket number scheme",
+          "df_types": "Provides kinds of dynamic fields",
+          "inbound_mail_filters": "Processes incoming e-mails",
+          "outbound_mail_filters": "Checks outgoing e-mails (can reject sending)",
+          "notification_transports": "Provides delivery channels for notifications",
+          "channel_drivers": "Provides a channel",
+          "password_providers": "Checks passwords at sign-in",
+          "customer_sources": "Provides a customer directory",
+          "gi_operations": "Provides web service operations",
+          "gi_invokers": "Provides web service calls (invokers)",
+          "gi_mappings": "Provides web service mappings"
         },
         "slot": {
           "nav": "Adds a menu entry",
@@ -4805,6 +4836,14 @@
           "widget": "Shows a tile on the dashboard",
           "other": "Extends the interface ({{value}})"
         }
+      },
+      "numberGenerator": {
+        "title": "Ticket number scheme",
+        "use": "Use for new tickets",
+        "active": "Used for new tickets",
+        "example": "Example: {{example}}",
+        "znunyNote": "Tickets that Znuny creates in parallel keep getting numbers in the Znuny scheme ({{generator}}). Replies to both kinds of numbers are recognised.",
+        "reset": "Use Znuny scheme"
       }
     },
     "dashboardTemplates": {

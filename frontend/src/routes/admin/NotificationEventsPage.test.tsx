@@ -21,6 +21,11 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
+const transports = vi.fn();
+vi.mock("@/lib/pluginPointsApi", () => ({
+  pluginPointsApi: { notificationTransports: (...a: unknown[]) => transports(...a) },
+}));
+
 const baseItems = {
   Events: ["TicketCreate"],
   Recipients: ["Customer"],
@@ -60,7 +65,8 @@ function renderPage() {
 
 describe("NotificationEventsPage email security", () => {
   beforeEach(async () => {
-    for (const fn of [list, update, status]) fn.mockReset();
+    for (const fn of [list, update, status, transports]) fn.mockReset();
+    transports.mockResolvedValue([]);
     await i18n.changeLanguage("en");
     update.mockResolvedValue(notification(baseItems));
   });
@@ -127,5 +133,35 @@ describe("NotificationEventsPage email security", () => {
     expect(
       withSecurity(items, { enabled: false, level: "PGPSign", missingSign: "", missingCrypt: "" }),
     ).toEqual(baseItems);
+  });
+});
+
+describe("NotificationEventsPage Versandwege", () => {
+  beforeEach(async () => {
+    for (const fn of [list, update, status, transports]) fn.mockReset();
+    await i18n.changeLanguage("de");
+    status.mockResolvedValue(backendStatus(false, false));
+    update.mockResolvedValue(notification(baseItems));
+  });
+
+  it("edits Versandwege and keeps unknown transports", async () => {
+    transports.mockResolvedValue([
+      { key: "Email", label: "E-Mail", plugin_id: null },
+      { key: "Plugin_points_Chat", label: "Chat (Test)", plugin_id: "org.example.points" },
+    ]);
+    list.mockResolvedValue([notification({ ...baseItems, Transports: ["Email", "SMS"] })]);
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Versandwege" }));
+    const form = await screen.findByTestId("notification-transports");
+    expect(await screen.findByLabelText("Chat (Test)")).not.toBeChecked();
+    expect(screen.getByLabelText("E-Mail")).toBeChecked();
+    expect(screen.getByTestId("notification-transport-unknown-SMS")).toHaveTextContent("SMS");
+    fireEvent.click(screen.getByLabelText("Chat (Test)"));
+    fireEvent.submit(form);
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    expect(update.mock.calls[0][0]).toBe(7);
+    expect(update.mock.calls[0][1]).toEqual({
+      items: { ...baseItems, Transports: ["Email", "SMS", "Plugin_points_Chat"] },
+    });
   });
 });

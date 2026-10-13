@@ -3,6 +3,7 @@
  * field the generated schema marks required — including the ones the backend
  * fills from defaults — so tests need no `as FrontendPlugin` casts.
  */
+import type { Schemas } from "@tiqora/api-client";
 import type { FrontendContribution, FrontendPlugin } from "@/lib/pluginsApi";
 
 type Contribution<S extends FrontendContribution["slot"]> = Extract<FrontendContribution, { slot: S }>;
@@ -65,6 +66,46 @@ export function dashboardWidget(
     settings_schema: null,
     refresh_on: [],
     permission: null,
+    ...overrides,
+  };
+}
+
+type AdminPlugin = Schemas["PluginAdminOut"];
+type AdminHook = AdminPlugin["hooks"][number];
+type AdminRuntime = AdminPlugin["runtime"][number];
+
+/** A sync hook row (`kind: "sync"`, `schedule` = the operation key) as `GET /api/v1/admin/plugins` returns it. */
+export function syncHookRow(
+  pluginId: string,
+  name: string,
+  operation: string,
+  overrides: Partial<AdminHook> = {},
+): AdminHook {
+  return {
+    key: `sync:${pluginId}:${name}`,
+    kind: "sync",
+    name,
+    schedule: operation,
+    tripped: false,
+    consecutive_failures: 0,
+    total_failures: 0,
+    last_error: null,
+    last_error_at: null,
+    last_ok_at: null,
+    last_run_at: null,
+    ...overrides,
+  };
+}
+
+/** The `ai-worker` runtime row of a plugin. */
+export function aiWorkerRuntime(version = "1.0.0", overrides: Partial<AdminRuntime> = {}): AdminRuntime {
+  return {
+    role: "ai-worker",
+    state: "active",
+    version,
+    error: null,
+    boot_attempts: 1,
+    updated_at: "2026-10-10T06:00:00Z",
     ...overrides,
   };
 }

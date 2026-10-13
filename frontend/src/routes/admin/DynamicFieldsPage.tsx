@@ -20,9 +20,17 @@ import {
   type DynamicFieldConfig,
 } from "@/components/admin/DynamicFieldConfigEditor";
 import { formatDateTime } from "@/lib/format";
+import { pluginPointsApi } from "@/lib/pluginPointsApi";
+import { SchemaForm } from "@/components/fields/SchemaForm";
+import type { JsonSchema } from "@/components/fields/jsonSchema";
+import type { FieldValues } from "@/components/fields/types";
 
 const FIELD_TYPES = ["Text", "TextArea", "Checkbox", "Dropdown", "Multiselect", "Date", "DateTime"];
 const OBJECT_TYPES = ["Ticket", "Article", "CustomerUser", "CustomerCompany"];
+/** Plugin field types exist only for these objects (the backend answers 422 otherwise). */
+const PLUGIN_TYPE_OBJECTS = new Set(["Ticket", "Article"]);
+const PLUGIN_TYPE_KEY = "TiqoraPluginType";
+const PLUGIN_CONFIG_KEY = "TiqoraPluginConfig";
 
 type FormState = {
   name: string;
@@ -32,6 +40,8 @@ type FormState = {
   object_type: string;
   config: DynamicFieldConfig;
   valid_id: number;
+  /** Key of the plugin field type picked on create; "" = a standard type. */
+  plugin_type: string;
 };
 
 function emptyForm(): FormState {
@@ -43,6 +53,7 @@ function emptyForm(): FormState {
     object_type: "Ticket",
     config: {},
     valid_id: 1,
+    plugin_type: "",
   };
 }
 
@@ -55,6 +66,7 @@ function formFromRow(row: DynamicFieldOut): FormState {
     object_type: row.object_type,
     config: row.config ?? {},
     valid_id: row.valid_id,
+    plugin_type: "",
   };
 }
 
@@ -73,6 +85,17 @@ export function DynamicFieldsPage() {
     queryKey: ["admin", "dynamic-fields"],
     queryFn: ({ signal }) => api.adminDynamicFields.list({ valid: "all", pageSize: 500 }, signal),
   });
+
+  const pluginTypesQ = useQuery({
+    queryKey: ["admin", "dynamic-field-plugin-types"],
+    queryFn: ({ signal }) => pluginPointsApi.dfPluginTypes(signal),
+  });
+  const pluginTypes = pluginTypesQ.data ?? [];
+  // Create: the picked type. Edit: the type stored on the field (it cannot change).
+  const storedPluginType =
+    typeof editing?.config?.[PLUGIN_TYPE_KEY] === "string" ? (editing.config[PLUGIN_TYPE_KEY] as string) : "";
+  const activePluginType = pluginTypes.find((p) => p.key === (editing ? storedPluginType : form.plugin_type));
+  const pluginSchema = activePluginType?.config_schema as JsonSchema | null | undefined;
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["admin", "dynamic-fields"] });
@@ -175,6 +198,7 @@ export function DynamicFieldsPage() {
           object_type: form.object_type as DynamicFieldCreate["object_type"],
           config: form.config,
           valid_id: form.valid_id,
+          ...(form.plugin_type ? { plugin_type: form.plugin_type } : {}),
         });
       }
     } catch (err) {
@@ -302,11 +326,42 @@ export function DynamicFieldsPage() {
               <SelectField
                 items={FIELD_TYPES.map((ft) => ({ value: ft as string, label: ft }))}
                 value={form.field_type}
+                disabled={form.plugin_type !== ""}
                 onChange={(v) => setForm((f) => ({ ...f, field_type: v, config: {} }))}
                 testId="dynamic-field-type"
               />
             )}
           </div>
+
+          {!editing && pluginTypes.length > 0 && PLUGIN_TYPE_OBJECTS.has(form.object_type) && (
+            <div>
+              <span className={labelClass}>{t("admin.dynamicFields.pluginType")}</span>
+              <SelectField
+                items={[
+                  { value: "", label: t("admin.dynamicFields.pluginTypeNone") },
+                  ...pluginTypes.map((p) => ({ value: p.key, label: p.label })),
+                ]}
+                value={form.plugin_type}
+                onChange={(key) =>
+                  setForm((f) => {
+                    const picked = pluginTypes.find((p) => p.key === key);
+                    return {
+                      ...f,
+                      plugin_type: key,
+                      field_type: picked ? picked.base_type : "Text",
+                      config: {},
+                    };
+                  })
+                }
+                testId="dynamic-field-plugin-type"
+              />
+              {activePluginType && (
+                <p className="mt-1 text-xs text-muted" data-testid="dynamic-field-plugin-type-hint">
+                  {t("admin.dynamicFields.pluginTypeHint", { base: activePluginType.base_type })}
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <span className={labelClass}>
@@ -324,7 +379,13 @@ export function DynamicFieldsPage() {
               <SelectField
                 items={OBJECT_TYPES.map((ot) => ({ value: ot as string, label: ot }))}
                 value={form.object_type}
-                onChange={(v) => setForm((f) => ({ ...f, object_type: v }))}
+                onChange={(v) =>
+                  setForm((f) =>
+                    PLUGIN_TYPE_OBJECTS.has(v) || f.plugin_type === ""
+                      ? { ...f, object_type: v }
+                      : { ...f, object_type: v, plugin_type: "", field_type: "Text", config: {} },
+                  )
+                }
                 testId="dynamic-field-object-type"
               />
             )}
@@ -345,6 +406,18 @@ export function DynamicFieldsPage() {
               value={form.config}
               onChange={(config) => setForm((f) => ({ ...f, config }))}
             />
+            {activePluginType && pluginSchema && (
+              <div className="mt-3" data-testid="dynamic-field-plugin-config">
+                <SchemaForm
+                  schema={pluginSchema}
+                  values={(form.config[PLUGIN_CONFIG_KEY] as FieldValues | undefined) ?? {}}
+                  onChange={(next) =>
+                    setForm((f) => ({ ...f, config: { ...f.config, [PLUGIN_CONFIG_KEY]: next } }))
+                  }
+                  testId="dynamic-field-plugin-config-form"
+                />
+              </div>
+            )}
           </div>
 
           <div>

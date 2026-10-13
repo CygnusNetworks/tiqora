@@ -2615,7 +2615,10 @@
       "possibleNone": "Leere Auswahl erlauben",
       "defaultValue": "Standardwert",
       "yearsInPast": "Jahre in der Vergangenheit",
-      "yearsInFuture": "Jahre in der Zukunft"
+      "yearsInFuture": "Jahre in der Zukunft",
+      "pluginType": "Art aus Erweiterung",
+      "pluginTypeHint": "Wird in Tiqora geprüft; in Znuny erscheint das Feld als „{{base}}“.",
+      "pluginTypeNone": "Keine (Standardart)"
     },
     "postmasterFilters": {
       "title_plural": "Postmaster-Filter",
@@ -3878,7 +3881,9 @@
         "backendOff": "{{backend}} ist deaktiviert: Diese Benachrichtigung wird gar nicht versendet, bis es wieder aktiviert ist (wie in Znuny).",
         "hint": "Signiert mit einem Schlüssel der Absenderadresse (Kundenbenachrichtigungen bevorzugen den Standard-Signaturschlüssel der Queue), verschlüsselt mit dem ersten gültigen Schlüssel des Empfängers. Znuny liest dieselben Einstellungen.",
         "save": "Speichern"
-      }
+      },
+      "transports": "Versandwege",
+      "transportEmail": "E-Mail"
     },
     "tar": {
       "title": "Ticket-Attributbeziehungen",
@@ -4774,7 +4779,8 @@
         "roles": {
           "api": "Weboberfläche und Schnittstelle",
           "worker": "Hintergrunddienst",
-          "mcp": "KI-Schnittstelle (MCP)"
+          "mcp": "KI-Schnittstelle (MCP)",
+          "ai-worker": "KI-Hintergrunddienst"
         },
         "states": {
           "loading": "Startet",
@@ -4790,7 +4796,17 @@
         "title": "Automatische Abläufe",
         "onTicketChange": "bei Ticketänderungen",
         "stopped": "Angehalten nach {{count}} Fehlern",
-        "lastError": "Letzter Fehler"
+        "lastError": "Letzter Fehler",
+        "kind": {
+          "sync": "Prüfung vor dem Speichern"
+        },
+        "operation": {
+          "ticket.create": "Ticket anlegen",
+          "article.create": "Nachricht/Notiz hinzufügen",
+          "ticket.queue_move": "Queue wechseln",
+          "ticket.state_change": "Status ändern",
+          "ticket.dynamic_fields_update": "Zusatzfelder ändern"
+        }
       },
       "capabilities": {
         "title": "Was diese Erweiterung angibt",
@@ -4804,7 +4820,22 @@
           "scheduled_tasks": "Führt geplante Aufgaben im Hintergrund aus",
           "builtin_reports": "Liefert fertige Berichte",
           "report_sources": "Liefert Datenquellen für Berichte",
-          "other": "Nutzt den Erweiterungspunkt {{value}}"
+          "other": "Nutzt den Erweiterungspunkt {{value}}",
+          "sync_hooks": "Prüft Ticketänderungen vor dem Speichern (kann sie ablehnen)",
+          "transition_actions": "Liefert Aktionen für Prozesse",
+          "condition_modules": "Liefert Bedingungen für Prozesse",
+          "placeholders": "Liefert Platzhalter für Vorlagen",
+          "number_generators": "Liefert ein Ticketnummer-Schema",
+          "df_types": "Liefert Arten von Zusatzfeldern",
+          "inbound_mail_filters": "Bearbeitet eingehende E-Mails",
+          "outbound_mail_filters": "Prüft ausgehende E-Mails (kann den Versand ablehnen)",
+          "notification_transports": "Liefert Versandwege für Benachrichtigungen",
+          "channel_drivers": "Liefert einen Kanal",
+          "password_providers": "Prüft Kennwörter bei der Anmeldung",
+          "customer_sources": "Liefert ein Kundenverzeichnis",
+          "gi_operations": "Liefert Webservice-Operationen",
+          "gi_invokers": "Liefert Webservice-Aufrufe (Invoker)",
+          "gi_mappings": "Liefert Webservice-Zuordnungen (Mapping)"
         },
         "slot": {
           "nav": "Fügt einen Menüpunkt hinzu",
@@ -4813,6 +4844,14 @@
           "widget": "Zeigt eine Kachel im Dashboard",
           "other": "Erweitert die Oberfläche ({{value}})"
         }
+      },
+      "numberGenerator": {
+        "title": "Ticketnummer-Schema",
+        "use": "Für neue Tickets verwenden",
+        "active": "Wird für neue Tickets verwendet",
+        "example": "Beispiel: {{example}}",
+        "znunyNote": "Tickets, die Znuny parallel anlegt, bekommen weiter Nummern nach dem Znuny-Schema ({{generator}}). Antworten auf beide Arten von Nummern werden erkannt.",
+        "reset": "Znuny-Schema verwenden"
       }
     },
     "dashboardTemplates": {
