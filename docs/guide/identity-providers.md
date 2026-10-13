@@ -329,7 +329,7 @@ Voraussetzungen:
 
 ### Microsoft Entra ID
 
-Beispielwerte: Mandant `contoso-example.onmicrosoft.com`, Anwendung „Tiqora Support“.
+Beispielwerte: Mandant `contoso.example.org`, Anwendung „Tiqora Support“.
 
 1. **Entra ID → Unternehmensanwendungen → Tiqora Support → Bereitstellung → Erste Schritte**.
 2. Bereitstellungsmodus **Automatisch**.
@@ -393,7 +393,10 @@ sich aus keine Rechte**. Sie wirken über Regeln im Tab **Rollen aus dem Anmelde
   Objekt-ID der Gruppe). Das bleibt stabil, wenn die Gruppe umbenannt wird.
 
 Änderungen der Mitgliedschaft stellt Tiqora in eine Warteschlange; der Dienst **Rollen aus Gruppen der
-Bereitstellung** (Verwaltung → Dienste, Standard alle 15 Sekunden) wendet sie an. Es gilt derselbe
+Bereitstellung** (Verwaltung → Dienste, Standard alle 15 Sekunden) wendet sie an. Jeder Lauf arbeitet
+die Warteschlange bis zu zehn Sekunden lang ab; die Umbenennung einer großen Gruppe oder eine
+Regeländerung bei vielen Konten kann daher einige Läufe dauern. Ein Eintrag, der nicht angewendet
+werden kann, rückt ans Ende der Warteschlange und wird im nächsten Lauf erneut versucht. Es gilt derselbe
 Modus wie bei der Anmeldung (*managed* oder *Wie Znuny*, siehe oben). Eine Rolle fällt damit auch dann
 weg, wenn sich die Person nie wieder anmeldet. Ist der Dienst abgeschaltet, bleiben Änderungen bis zum
 nächsten Einschalten in der Warteschlange. Eine Gruppe darf bis zu 5000 Mitglieder haben.

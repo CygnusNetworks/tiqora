@@ -151,6 +151,8 @@ def _reject_fail(code: str, *, value: str = "") -> _Fail:
             code, http_status=status.HTTP_403_FORBIDDEN, detail="SSO not enabled for this account"
         )
     if code == "mfa_required":
+        # 403 like every other policy refusal here: the identity provider authenticated the
+        # person, Tiqora's step-up policy refuses the login (401 would read as "no session").
         return _Fail(
             code,
             http_status=status.HTTP_403_FORBIDDEN,

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator, Iterator
+from datetime import datetime
 from typing import Any
 
 import pytest
@@ -265,7 +266,7 @@ async def test_manual_role_survives_group_removal(db: AsyncSession) -> None:
         max_members=MAXM,
     )
     await db.commit()
-    assert await _pending(db) == [(uid, 1)]
+    assert [u for u, _ in await _pending(db)] == [uid]
     assert (await run_scim_role_sync_tick())["processed"] == 1
     assert await _roles(db, uid) == {MANUAL}
     assert await _marks(db, uid) == set()
@@ -279,6 +280,7 @@ async def test_newer_enqueue_survives_tick(
     a, uid = await _agent(db, tenant, "a")
     await _group(db, tenant, "Support", a)
     await _only_pending(db, uid)
+    [(_, read)] = await _pending(db)
     original = provisioning.apply_assignments
 
     async def apply_then_requeue(session: AsyncSession, **kw: Any) -> None:
@@ -288,7 +290,8 @@ async def test_newer_enqueue_survives_tick(
     monkeypatch.setattr(provisioning, "apply_assignments", apply_then_requeue)
     assert (await run_scim_role_sync_tick())["processed"] == 1
     assert await _roles(db, uid) == {ROLE}
-    assert await _pending(db) == [(uid, 2)]  # generation 2 != the generation read (1)
+    [(queued, newer)] = await _pending(db)
+    assert queued == uid and newer > read  # a newer generation than the one the tick read
     monkeypatch.setattr(provisioning, "apply_assignments", original)
     assert (await run_scim_role_sync_tick())["processed"] == 1
     assert await _pending(db) == []
@@ -347,10 +350,71 @@ async def test_error_keeps_row(db: AsyncSession, monkeypatch: pytest.MonkeyPatch
     async def boom(session: AsyncSession, **kw: Any) -> None:
         raise RuntimeError("znuny down")
 
+    before = await _pending(db)
     monkeypatch.setattr(provisioning, "apply_assignments", boom)
     assert await run_scim_role_sync_tick() == {"processed": 0, "ignored": 0, "errors": 1}
-    assert await _pending(db) == [(uid, 1)]
+    assert await _pending(db) == before
     assert await _roles(db, uid) == set()
+
+
+@pytest.mark.asyncio
+async def test_generation_never_repeats(db: AsyncSession) -> None:
+    """Final review (T11 M4): a re-created row must not reuse a generation a tick already read."""
+    tenant = await _tenant(db)
+    _, uid = await _agent(db, tenant, "a")
+    await _only_pending(db, uid)
+    [(_, first)] = await _pending(db)
+    # what a tick does after applying: the row is gone, the next enqueue starts afresh
+    await db.execute(text("DELETE FROM tiqora_scim_pending_sync"))
+    await enqueue_role_sync(db, tenant.provider.id, [uid])
+    await db.commit()
+    [(_, second)] = await _pending(db)
+    assert second != first and second > first
+
+
+@pytest.mark.asyncio
+async def test_tick_drains_more_than_one_batch(db: AsyncSession) -> None:
+    """Final review (T11 M5): one tick works through the queue, not just one batch."""
+    tenant = await _tenant(db)
+    a, uid_a = await _agent(db, tenant, "a")
+    b, uid_b = await _agent(db, tenant, "b")
+    c, uid_c = await _agent(db, tenant, "c")
+    await _group(db, tenant, "Support", a, b, c)
+    await _only_pending(db, uid_a, uid_b, uid_c)
+    assert await run_scim_role_sync_tick(batch=1) == {"processed": 3, "ignored": 0, "errors": 0}
+    assert await _pending(db) == []
+    for uid in (uid_a, uid_b, uid_c):
+        assert await _roles(db, uid) == {ROLE}
+
+
+@pytest.mark.asyncio
+async def test_failed_row_goes_to_the_back(
+    db: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Final review (T11 M5): a row that keeps failing does not block the head of the queue."""
+    tenant = await _tenant(db)
+    a, uid_a = await _agent(db, tenant, "a")
+    b, uid_b = await _agent(db, tenant, "b")
+    await _group(db, tenant, "Support", a, b)
+    await _only_pending(db, uid_a, uid_b)
+    await db.execute(
+        text("UPDATE tiqora_scim_pending_sync SET queued_at = :t WHERE user_id = :u"),
+        {"t": datetime(2000, 1, 1), "u": uid_a},
+    )
+    await db.commit()
+    original = provisioning.apply_assignments
+
+    async def fail_for_a(session: AsyncSession, **kw: Any) -> None:
+        if kw["user_id"] == uid_a:
+            raise RuntimeError("znuny down")
+        await original(session, **kw)
+
+    monkeypatch.setattr(provisioning, "apply_assignments", fail_for_a)
+    assert await run_scim_role_sync_tick(batch=1) == {"processed": 1, "ignored": 0, "errors": 1}
+    rows = await _q(db, "SELECT user_id, queued_at FROM tiqora_scim_pending_sync")
+    assert [int(r[0]) for r in rows] == [uid_a]
+    assert rows[0][1].year > 2000  # pushed behind everything queued before the failure
+    assert await _roles(db, uid_b) == {ROLE}
 
 
 @pytest.mark.asyncio
@@ -359,10 +423,11 @@ async def test_tick_honours_switch(db: AsyncSession) -> None:
     a, uid = await _agent(db, tenant, "a")
     await _group(db, tenant, "Support", a)
     await _only_pending(db, uid)
+    before = await _pending(db)
     db.add(TiqoraSettings(key=KEY_SCIM_ROLE_SYNC_ENABLED, value="false"))
     await db.commit()
     assert await run_scim_role_sync_tick() == {"skipped": 1}
-    assert await _pending(db) == [(uid, 1)]
+    assert await _pending(db) == before and [u for u, _ in before] == [uid]
     assert await _roles(db, uid) == set()
 
 

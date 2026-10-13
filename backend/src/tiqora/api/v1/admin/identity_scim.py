@@ -12,7 +12,7 @@ from collections.abc import Iterable
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.deps import AppSettings, DbSession
@@ -48,7 +48,7 @@ from tiqora.identity.scim.tokens import (
 )
 from tiqora.identity.store import ProviderRecord, get_provider
 from tiqora.identity.types import SCIM_KINDS
-from tiqora.identity.urls import base_url
+from tiqora.identity.urls import scim_base_url
 
 router = APIRouter(prefix="/identity-providers/{provider_id}/scim", tags=["admin:identity:scim"])
 
@@ -58,10 +58,8 @@ MSG_UNAVAILABLE = (
     "Bereitstellung ist nur für OpenID-Connect- und SAML-Anmeldedienste aus der Verwaltung"
     " möglich, nicht für LDAP oder Dienste aus den Umgebungsvariablen."
 )
-MSG_NO_BASE_URL = "Die öffentliche Adresse (TIQORA_PUBLIC_BASE_URL) ist nicht gesetzt."
 
 _IN_CHUNK = 500
-_SEARCH_ID_CAP = 1000
 # Operations that are not provisioning work (they must not count as "last activity").
 _NOISE_OPERATIONS = ("auth_failed", "rate_limited", "token_create", "token_revoke")
 
@@ -87,12 +85,6 @@ async def _require(session: AsyncSession, settings: Settings, provider_id: int) 
 
 def _available(record: ProviderRecord) -> bool:
     return record.source == "db" and record.kind in SCIM_KINDS
-
-
-def _scim_url(settings: Settings) -> str | None:
-    if not settings.public_base_url.strip():
-        return None
-    return base_url(settings) + "/scim/v2"
 
 
 def _token_error(exc: ScimTokenError) -> HTTPException:
@@ -163,7 +155,7 @@ async def scim_status(
     _ = admin
     record = await _require(session, settings, provider_id)
     available = _available(record)
-    base = _scim_url(settings)
+    base = scim_base_url(settings)
     tokens = await _token_out(session, await list_tokens(session, provider_id)) if available else []
 
     users = groups = pending = active = 0
@@ -267,34 +259,51 @@ async def revoke_scim_token(
 # --------------------------------------------------------------------------- accounts / groups
 
 
-async def _search_filter(session: AsyncSession, provider_id: int, q: str) -> Any:
-    """``q`` matches the stored userName (hash of the casefold) or a local login (IN-list)."""
+async def _search_ids(
+    session: AsyncSession, provider_id: int, q: str, *, include_deleted: bool
+) -> list[int]:
+    """Mapping ids of *provider_id* whose stored userName equals ``q`` (casefold hash) or whose
+    local login contains ``q`` (case-insensitive on both dialects).
+
+    The provider's own mappings are loaded first and the Znuny logins are matched by chunked
+    IN-list, so the result never depends on other providers' or unmanaged accounts.
+    """
     needle = q.strip()
-    pattern = "%" + needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-    agent_ids = (
-        await session.scalars(
-            select(Users.id).where(Users.login.like(pattern, escape="\\")).limit(_SEARCH_ID_CAP)
+    name_hash = _sha(needle.casefold())
+    pattern = (
+        "%" + needle.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+    )
+    where: list[Any] = [TiqoraScimUser.provider_id == provider_id]
+    if not include_deleted:
+        where.append(TiqoraScimUser.deleted.is_(False))
+    mapped = (
+        await session.execute(
+            select(
+                TiqoraScimUser.id,
+                TiqoraScimUser.user_kind,
+                TiqoraScimUser.user_id,
+                TiqoraScimUser.user_name_fold_hash,
+            ).where(*where)
         )
     ).all()
-    customer_ids = (
-        await session.scalars(
-            select(CustomerUser.id)
-            .where(CustomerUser.login.like(pattern, escape="\\"))
-            .limit(_SEARCH_ID_CAP)
+    hits = {int(row_id) for row_id, _, _, fold_hash in mapped if fold_hash == name_hash}
+    for kind in ("agent", "customer"):
+        by_account: dict[int, list[int]] = {}
+        for row_id, row_kind, user_id, _ in mapped:
+            if row_kind == kind:
+                by_account.setdefault(int(user_id), []).append(int(row_id))
+        column_id, column_login = (
+            (Users.id, Users.login) if kind == "agent" else (CustomerUser.id, CustomerUser.login)
         )
-    ).all()
-    clauses: list[Any] = [TiqoraScimUser.user_name_fold_hash == _sha(needle.casefold())]
-    if agent_ids:
-        clauses.append(
-            (TiqoraScimUser.user_kind == "agent")
-            & TiqoraScimUser.user_id.in_([int(i) for i in agent_ids])
-        )
-    if customer_ids:
-        clauses.append(
-            (TiqoraScimUser.user_kind == "customer")
-            & TiqoraScimUser.user_id.in_([int(i) for i in customer_ids])
-        )
-    return or_(*clauses)
+        for chunk in _chunks(by_account):
+            matched = await session.scalars(
+                select(column_id).where(
+                    column_id.in_(chunk), func.lower(column_login).like(pattern, escape="\\")
+                )
+            )
+            for account_id in matched.all():
+                hits.update(by_account[int(account_id)])
+    return sorted(hits)
 
 
 @router.get("/accounts", response_model=ScimAccountPageOut)
@@ -314,19 +323,35 @@ async def scim_accounts(
     if not include_deleted:
         where.append(TiqoraScimUser.deleted.is_(False))
     if q is not None and q.strip():
-        where.append(await _search_filter(session, provider_id, q))
-    total = int(
-        (await session.execute(select(func.count(TiqoraScimUser.id)).where(*where))).scalar_one()
-    )
-    rows = (
-        await session.scalars(
-            select(TiqoraScimUser)
-            .where(*where)
-            .order_by(TiqoraScimUser.id)
-            .offset(offset)
-            .limit(limit)
+        matched = await _search_ids(session, provider_id, q, include_deleted=include_deleted)
+        total = len(matched)
+        page = matched[offset : offset + limit]
+        rows = (
+            (
+                await session.scalars(
+                    select(TiqoraScimUser)
+                    .where(TiqoraScimUser.id.in_(page))
+                    .order_by(TiqoraScimUser.id)
+                )
+            ).all()
+            if page
+            else []
         )
-    ).all()
+    else:
+        total = int(
+            (
+                await session.execute(select(func.count(TiqoraScimUser.id)).where(*where))
+            ).scalar_one()
+        )
+        rows = (
+            await session.scalars(
+                select(TiqoraScimUser)
+                .where(*where)
+                .order_by(TiqoraScimUser.id)
+                .offset(offset)
+                .limit(limit)
+            )
+        ).all()
     items: list[ScimAccountOut] = []
     logins: dict[str, dict[int, str]] = {}
     valid: dict[str, dict[int, int]] = {}

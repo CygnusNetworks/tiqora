@@ -329,7 +329,8 @@ def schemas_document() -> list[dict[str, Any]]:
         _attr("id", mutability="readOnly", uniqueness="server", case_exact=True),
     ]
     group_attrs = [
-        _attr("displayName", required=True, uniqueness="server"),
+        # Duplicate group names are allowed (S7); RFC 7643 then says "none".
+        _attr("displayName", required=True),
         _attr("externalId", case_exact=True),
         _attr(
             "members",

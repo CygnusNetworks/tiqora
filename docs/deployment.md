@@ -207,6 +207,12 @@ for the Puppet-managed nginx (not inspectable from this repository, so a checkli
 ```nginx
 location /scim/ {
     proxy_pass http://tiqora-api;   # same upstream as /api/
+    # same proxy_set_header lines as the /api/ block: the per-IP lockout and the
+    # Location/meta.location fallback (no TIQORA_PUBLIC_BASE_URL) read them
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
     client_max_body_size 2m;
     proxy_read_timeout 90s;
 }

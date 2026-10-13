@@ -749,12 +749,12 @@ async def test_enqueue_role_sync_upserts(session: AsyncSession) -> None:
     await session.commit()
     first = await _pending(session, rec.id)
     assert set(first) == {63021, 63022}
-    assert first[63021][1] == 1 and first[63022][1] == 1
+    assert first[63021][1] >= 1 and first[63022][1] >= 1
     assert await enqueue_role_sync(session, rec.id, [63022]) == 1
     await session.commit()
     second = await _pending(session, rec.id)
     assert set(second) == {63021, 63022}
-    assert second[63022][1] == 2 and second[63021][1] == 1
+    assert second[63022][1] > first[63022][1] and second[63021] == first[63021]
     assert second[63022][0] >= first[63022][0]  # DATETIME may be second-granular (MariaDB)
     assert second[63021] == first[63021]
 
@@ -786,8 +786,9 @@ async def test_rule_change_enqueues_managed_agents(session: AsyncSession) -> Non
         ),
     )
     await session.commit()
-    assert set(await _pending(session, rec.id)) == {63025}
+    queued = await _pending(session, rec.id)
+    assert set(queued) == {63025}
     # a sync-mode change re-queues again with a higher generation
     await _update(session, rec.id, ProviderChanges(sync_mode="authoritative"))
     await session.commit()
-    assert (await _pending(session, rec.id))[63025][1] == 2
+    assert (await _pending(session, rec.id))[63025][1] > queued[63025][1]

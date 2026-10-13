@@ -10,6 +10,7 @@ session back on failure and writes one audit event per write (own session, S8).
 from __future__ import annotations
 
 import time
+import traceback
 from collections.abc import Callable, Coroutine
 from typing import Annotated, Any, Final
 
@@ -18,7 +19,6 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.routing import APIRoute
 from redis.asyncio import Redis
-from sqlalchemy import select
 from sqlalchemy.exc import DataError, IntegrityError, OperationalError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import JSONResponse, Response
@@ -33,7 +33,6 @@ from tiqora.api.scim.auth import (
 )
 from tiqora.api.scim.body import read_scim_json
 from tiqora.config import Settings
-from tiqora.db.legacy.customer import CustomerUser
 from tiqora.domain.session_revocation import end_agent_sessions, end_customer_sessions
 from tiqora.identity.scim.audit import ScimOperation, record_event
 from tiqora.identity.scim.errors import ScimError, scim_error_body
@@ -113,7 +112,12 @@ def _to_scim_error(exc: Exception) -> ScimError:
         return ScimError(400, "invalidValue", "A value is not acceptable")
     if isinstance(exc, OperationalError):
         return ScimHttpError(503, None, "Temporarily unavailable", {"Retry-After": "1"})
-    logger.error("scim.unhandled_error", error_type=type(exc).__name__, exc_info=exc)
+    # Type and frames only: the message can echo attribute values (driver errors quote binds).
+    frames = [
+        f"{frame.filename}:{frame.lineno} {frame.name}"
+        for frame in traceback.extract_tb(exc.__traceback__)
+    ]
+    logger.error("scim.unhandled_error", error_type=type(exc).__name__, frames=frames)
     return ScimError(500, None, "Internal server error")
 
 
@@ -246,11 +250,9 @@ async def _after_user_write(
     if ctx.tenant.user_kind == "agent":
         await end_agent_sessions(ctx.db, redis, settings, result.user_id, reason="scim")
         return
-    login = (
-        await ctx.db.execute(select(CustomerUser.login).where(CustomerUser.id == result.user_id))
-    ).scalar_one_or_none()
-    if login:
-        await end_customer_sessions(ctx.db, redis, settings, [str(login)], reason="scim")
+    # The login was read before the commit (``ScimUserResult.login``): no query can fail here.
+    if result.login:
+        await end_customer_sessions(ctx.db, redis, settings, [result.login], reason="scim")
 
 
 # --------------------------------------------------------------------------- discovery

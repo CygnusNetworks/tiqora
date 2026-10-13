@@ -415,7 +415,7 @@ Supported subset:
 | Auth | per-provider bearer token (`tqscim_…`), sha256-hashed, up to 5 active per provider, scoped to agents or customers |
 | Resources | `Users`, `Groups` (agents only); GET/POST/PUT/PATCH/DELETE; discovery: `ServiceProviderConfig`, `ResourceTypes`, `Schemas` |
 | User attributes | `userName`, `externalId`, `name.givenName`/`familyName`, `displayName`, `emails`, `phoneNumbers` (type `mobile`), `active`; the enterprise extension, `password` and `groups` are accepted and ignored |
-| Filter | `eq` on `id`, `userName`, `externalId`, `emails.value`, `displayName` (Groups: `id`, `displayName`, `externalId`), one condition, at most 1000 characters |
+| Filter | `eq` on `id`, `userName`, `externalId`, `emails.value` (Groups: `id`, `displayName`, `externalId`), one condition, at most 1000 characters; anything else answers 400 `invalidFilter` |
 | Paging | `startIndex` / `count`, `count` capped at 200 (default 100) |
 | PATCH | `add` / `replace` / `remove` with and without path; group member add/remove |
 

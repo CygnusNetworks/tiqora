@@ -683,6 +683,59 @@ async def test_repost_after_delete_revives(db: AsyncSession) -> None:
     assert (await get_user(db, tenant, r.resource["id"], base=BASE))["userName"] == login
 
 
+@pytest.mark.asyncio
+async def test_revive_drops_stale_group_memberships(db: AsyncSession) -> None:
+    """Final review (T11 M3): a member row left by a delete/group-write race must not come back."""
+    tenant = await _agent_tenant(db)
+    login = "sc63.revgrp@example.test"
+    c = await create_user(db, tenant, _doc(login), base=BASE)
+    member = await _scalar(
+        db, "SELECT id FROM tiqora_scim_user WHERE scim_id = :s", s=c.resource["id"]
+    )
+    await delete_user(db, tenant, c.resource["id"])
+    now = utc_now()
+    group = TiqoraScimGroup(
+        provider_id=tenant.provider.id,
+        scim_id="00000000-0000-4000-8000-000000630003",
+        display_name="Support",
+        display_name_fold="support",
+        display_name_fold_hash="2" * 64,
+        version=1,
+        created=now,
+        changed=now,
+    )
+    db.add(group)
+    await db.flush()
+    # the race: a group write added the (already deleted) mapping after delete_user ran
+    db.add(TiqoraScimGroupMember(group_id=group.id, member_id=member))
+    await db.flush()
+
+    r = await create_user(db, tenant, _doc(login), base=BASE)
+    assert r.operation == "revive"
+    count = "SELECT COUNT(*) FROM tiqora_scim_group_member WHERE member_id = :m"
+    assert await _scalar(db, count, m=member) == 0
+    assert (await get_user(db, tenant, r.resource["id"], base=BASE)).get("groups", []) == []
+
+
+@pytest.mark.asyncio
+async def test_result_carries_the_login_of_the_account(db: AsyncSession) -> None:
+    """Final review (T12 M1): the router ends customer sessions without a read after commit."""
+    tenant = make_tenant(
+        await seed_scim_provider(db, audience="customer", slug="sc63u-custlog"), "customer"
+    )
+    login = "sc63.kundelog@example.test"
+    c = await create_user(db, tenant, _doc(login), base=BASE)
+    r = await patch_user(db, tenant, c.resource["id"], _replace("active", False), base=BASE)
+    assert r.deactivated and r.login == login
+    reactivated = await patch_user(
+        db, tenant, c.resource["id"], _replace("active", True), base=BASE
+    )
+    d = await delete_user(db, tenant, reactivated.resource["id"])
+    assert d.deactivated and d.login == login
+    revived = await create_user(db, tenant, _doc(login), base=BASE)
+    assert revived.operation == "revive" and revived.login == login
+
+
 # ---------------------------------------------------------------------------- read
 
 

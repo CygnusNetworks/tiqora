@@ -165,6 +165,11 @@ def test_schemas_document_lists_user_and_group() -> None:
     assert {"userName", "emails", "active"} <= user_names
     id_attr = next(a for a in docs[0]["attributes"] if a["name"] == "id")
     assert id_attr["mutability"] == "readOnly"
+    # final review: duplicate group names are allowed by design (S7), so no uniqueness claim
+    display = next(a for a in docs[1]["attributes"] if a["name"] == "displayName")
+    assert display["uniqueness"] == "none"
+    user_name = next(a for a in docs[0]["attributes"] if a["name"] == "userName")
+    assert user_name["uniqueness"] == "server"
 
 
 def test_meta_version_is_weak_etag() -> None:

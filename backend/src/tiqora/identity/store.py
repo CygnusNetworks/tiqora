@@ -108,7 +108,14 @@ _SIMPLE_FIELDS = (
     "scim_adopt_existing",
 )
 # Phase-3 fields: OIDC/SAML database providers only (LDAP and env rows refuse them).
-_PHASE3_FIELDS = (*_SIMPLE_FIELDS[-5:], "mfa_policy")
+_PHASE3_FIELDS = (
+    "require_mfa_claim",
+    "session_idle_seconds",
+    "session_absolute_seconds",
+    "scim_enabled",
+    "scim_adopt_existing",
+    "mfa_policy",
+)
 _RULES_ADAPTER: TypeAdapter[list[RoleRule]] = TypeAdapter(list[RoleRule])
 
 MSG_SLUG_INVALID = "Dieser Kurzname ist ungültig (nur a–z, 0–9 und Bindestrich, 2–63 Zeichen)."
@@ -436,10 +443,6 @@ def _validate_rule_dns(role_rules: list[RoleRule] | None) -> None:
                     )
                 }
             ) from None
-
-
-def _lifetime_message(low: int, high: int) -> str:
-    return f"Zwischen {low // 60} Minuten und {high // 60} Minuten."
 
 
 def _validate_phase3_fields(

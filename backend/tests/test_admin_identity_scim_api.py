@@ -389,6 +389,9 @@ async def test_accounts_groups_events_lists(env: Env) -> None:
     assert [i["login"] for i in by_name["items"]] == ["sc63adm.on"]
     by_part = (await env.client.get(f"{env.url}/accounts", params={"q": "63adm.of"})).json()
     assert [i["login"] for i in by_part["items"]] == ["sc63adm.off"]
+    # final review (T18 M1): a part of the login matches case-insensitively on both dialects
+    upper = (await env.client.get(f"{env.url}/accounts", params={"q": "63ADM.OF"})).json()
+    assert [i["login"] for i in upper["items"]] == ["sc63adm.off"]
     assert (await env.client.get(f"{env.url}/accounts", params={"q": "nobody"})).json()[
         "total"
     ] == 0

@@ -15,6 +15,7 @@ from typing import Any
 import httpx
 import pytest
 import pytest_asyncio
+import structlog.testing
 from fastapi import FastAPI
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -766,6 +767,60 @@ async def test_unexpected_error_is_scim_500_and_rolled_back(
     assert_scim_error(resp, 500)
     assert "secret internals" not in resp.text
     assert ("rejected", 500, "status_500") in await env.events("a")
+
+
+async def test_unexpected_error_log_carries_no_exception_text(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Final review (T12 M3): driver errors echo bound values; only type and frames are logged."""
+    from tiqora.api.scim import router as scim_router_module
+
+    async def boom(*_a: Any, **_k: Any) -> Any:
+        raise RuntimeError("attr-value-sc63api@example.test")
+
+    monkeypatch.setattr(scim_router_module, "create_user", boom)
+    with structlog.testing.capture_logs() as logs:
+        resp = await env.client.post(
+            f"{BASE}/Users", json=user_doc(f"{PREFIX}.boomlog@example.test"), headers=env.h()
+        )
+    assert_scim_error(resp, 500)
+    entry = next(e for e in logs if e["event"] == "scim.unhandled_error")
+    assert entry["error_type"] == "RuntimeError"
+    assert "exc_info" not in entry
+    assert any("boom" in frame for frame in entry["frames"])
+    assert "attr-value-sc63api" not in repr(logs)
+
+
+async def test_customer_sessions_end_without_a_read_after_commit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Final review (T12 M1): the login comes with the result, so a committed deactivation
+    always ends the sessions (no query that can fail between commit and revocation)."""
+    from tiqora.api.scim import router as scim_router_module
+    from tiqora.identity.scim.users import ScimUserResult
+
+    class NoQueries:
+        async def execute(self, *_a: Any, **_k: Any) -> Any:
+            raise AssertionError("no database read after the commit")
+
+    ended: list[list[str]] = []
+
+    async def record(_db: Any, _redis: Any, _settings: Any, logins: list[str], **_k: Any) -> None:
+        ended.append(list(logins))
+
+    monkeypatch.setattr(scim_router_module, "end_customer_sessions", record)
+    tenant = ScimTenant(provider=None, user_kind="customer", token_id=1)  # type: ignore[arg-type]
+    ctx = scim_router_module.ScimContext(
+        tenant=tenant,
+        db=NoQueries(),  # type: ignore[arg-type]
+        factory=None,  # type: ignore[arg-type]
+        started=0.0,
+    )
+    result = ScimUserResult(
+        {}, 63299, "deactivate", True, False, None, login=f"{PREFIX}.k@example.test"
+    )
+    await scim_router_module._after_user_write(ctx, _settings(), FakeRedis(), result)  # type: ignore[arg-type]
+    assert ended == [[f"{PREFIX}.k@example.test"]]
 
 
 async def test_bulk_and_me_not_implemented(env: Env) -> None:

@@ -82,7 +82,7 @@ from tiqora.identity.store import (
     validate_changes,
 )
 from tiqora.identity.types import audience_includes
-from tiqora.identity.urls import IdentityUrlsUnavailable, base_url, provider_urls
+from tiqora.identity.urls import IdentityUrlsUnavailable, provider_urls, scim_base_url
 from tiqora.settings_sections.section import SECRET_MASK
 
 logger = structlog.get_logger(__name__)
@@ -396,12 +396,6 @@ async def list_identity_presets(admin: AdminUser) -> list[IdentityPresetOut]:
     ]
 
 
-def _scim_base_url(settings: Settings) -> str | None:
-    if not settings.public_base_url.strip():
-        return None
-    return base_url(settings) + "/scim/v2"
-
-
 @router.get("/capabilities", response_model=IdentityCapabilitiesOut)
 async def identity_capabilities(admin: AdminUser, settings: AppSettings) -> IdentityCapabilitiesOut:
     _ = admin
@@ -413,7 +407,7 @@ async def identity_capabilities(admin: AdminUser, settings: AppSettings) -> Iden
         webauthn=webauthn_enabled(settings),
         session_idle_max_seconds=settings.session_ttl_seconds,
         session_absolute_max_seconds=settings.session_absolute_ttl_seconds,
-        scim_base_url=_scim_base_url(settings),
+        scim_base_url=scim_base_url(settings),
     )
 
 

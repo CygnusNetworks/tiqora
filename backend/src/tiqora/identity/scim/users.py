@@ -87,6 +87,9 @@ class ScimUserResult:
     deactivated: bool  # True: the router ends the account's sessions after the commit
     reactivated: bool
     detail: str | None
+    # Login of the Znuny account, read before the commit: ending customer sessions after the
+    # commit needs no further query (a failing read must not leave a deactivated session alive).
+    login: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -434,6 +437,7 @@ async def create_user(
     operation: ScimOperation
     deactivated = reactivated = False
     detail: str | None = None
+    login: str | None = None
 
     if found is None:
         if inp.email and not email_domain_allowed(provider, inp.email):
@@ -474,6 +478,7 @@ async def create_user(
         account = (await _load_accounts(session, kind, [user_id])).get(user_id)
         if account is None:
             raise _not_found()
+        login = account.login
         fields = await _apply_profile(session, tenant, account, inp)
         detail = ",".join(fields) or None
         if existing is None:  # adopt: an absent ``active`` leaves the account alone
@@ -484,6 +489,10 @@ async def create_user(
             active = True if inp.active is None else inp.active
             operation = "revive"
             row = existing
+            # A member row left by a delete/group-write race must not become effective again.
+            await session.execute(
+                delete(TiqoraScimGroupMember).where(TiqoraScimGroupMember.member_id == row.id)
+            )
             fold = inp.user_name.casefold()
             row.scim_id = str(uuid.uuid4())
             row.deleted = False
@@ -500,7 +509,7 @@ async def create_user(
 
     await _enqueue(session, tenant, user_id)
     resource = await _render_one(session, tenant, row, base)
-    return ScimUserResult(resource, user_id, operation, deactivated, reactivated, detail)
+    return ScimUserResult(resource, user_id, operation, deactivated, reactivated, detail, login)
 
 
 async def get_user(
@@ -639,7 +648,9 @@ async def _update(
         operation = "reactivate"
     detail = ",".join([*fields, *notes]) or None
     resource = await _render_one(session, tenant, row, base)
-    return ScimUserResult(resource, row.user_id, operation, deactivated, reactivated, detail)
+    return ScimUserResult(
+        resource, row.user_id, operation, deactivated, reactivated, detail, account.login
+    )
 
 
 async def replace_user(
@@ -686,4 +697,5 @@ async def delete_user(session: AsyncSession, tenant: ScimTenant, scim_id: str) -
     row.version += 1
     row.changed = utc_now()
     await session.flush()
-    return ScimUserResult({}, row.user_id, "delete", deactivated, False, None)
+    login = account.login if account is not None else None
+    return ScimUserResult({}, row.user_id, "delete", deactivated, False, None, login)

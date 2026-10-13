@@ -7,10 +7,11 @@ this module inside the function, never at module level.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Iterable
 
 import structlog
-from sqlalchemy import delete, insert, select
+from sqlalchemy import delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.config import get_settings
@@ -35,6 +36,8 @@ from tiqora.identity.types import SYSTEM_USER_ID, utc_now
 logger = structlog.get_logger(__name__)
 
 _CHUNK = 1000
+# One tick drains the queue for at most this long (the default interval is 15 s).
+_TICK_BUDGET_SECONDS = 10.0
 
 
 async def enqueue_role_sync(
@@ -42,8 +45,11 @@ async def enqueue_role_sync(
 ) -> int:
     """Queue agents for a role re-evaluation; returns the number of rows written.
 
-    Delete-then-bulk-insert with ``generation = old + 1`` (the tick deletes ``WHERE generation =
-    <read>``, so a newer enqueue survives). Flushes only; the caller owns the transaction.
+    Delete-then-bulk-insert with ``generation = max(old + 1, time.time_ns())`` (the tick deletes
+    ``WHERE generation = <read>``, so a newer enqueue survives). The clock part keeps a row that
+    was deleted and re-created, or two overlapping enqueues that both read the same old value,
+    from repeating a generation a tick already read. Flushes only; the caller owns the
+    transaction.
     """
     ids = sorted(set(user_ids))
     if not ids:
@@ -62,6 +68,7 @@ async def enqueue_role_sync(
             delete(model).where(model.provider_id == provider_id, model.user_id.in_(chunk))
         )
     now = utc_now()
+    clock = time.time_ns()
     await session.execute(
         insert(model),
         [
@@ -69,7 +76,7 @@ async def enqueue_role_sync(
                 "provider_id": provider_id,
                 "user_id": uid,
                 "queued_at": now,
-                "generation": old.get(uid, 0) + 1,
+                "generation": max(old.get(uid, 0) + 1, clock),
             }
             for uid in ids
         ],
@@ -193,8 +200,36 @@ async def _sync_one(provider_id: int, user_id: int, generation: int) -> bool:
     return applied
 
 
-async def run_scim_role_sync_tick(*, batch: int = 200) -> dict[str, int]:
+async def _push_back(provider_id: int, user_id: int, generation: int) -> None:
+    """Move a failed row behind everything queued so far; it is retried, but not first."""
+    model = TiqoraScimPendingSync
+    try:
+        async with get_session_factory()() as session:
+            await session.execute(
+                update(model)
+                .where(
+                    model.provider_id == provider_id,
+                    model.user_id == user_id,
+                    model.generation == generation,
+                )
+                .values(queued_at=utc_now())
+            )
+            await session.commit()
+    except Exception:
+        logger.exception(
+            "scim_role_sync_push_back_failed", provider_id=provider_id, user_id=user_id
+        )
+
+
+async def run_scim_role_sync_tick(
+    *, batch: int = 200, budget_seconds: float = _TICK_BUDGET_SECONDS
+) -> dict[str, int]:
     """Apply the queued role re-evaluations (oldest first); ``{"skipped": 1}`` when switched off.
+
+    One tick works through the queue in batches until it is empty or *budget_seconds* are used
+    up, so a large rename or rules change does not wait one interval per batch. Each row is
+    handled at most once per tick; a failed row is pushed behind the others (``queued_at``
+    reset) so it cannot block the head of the queue.
 
     Counts: ``processed`` (applied), ``ignored`` (nothing to do: missing provider, system or
     invalid user, no live mapping, rules no longer SCIM-based; the row is dropped), ``errors``
@@ -203,24 +238,36 @@ async def run_scim_role_sync_tick(*, batch: int = 200) -> dict[str, int]:
     async with get_session_factory()() as session:
         if not await get_setting_bool(session, KEY_SCIM_ROLE_SYNC_ENABLED, True):
             return {"skipped": 1}
-        model = TiqoraScimPendingSync
-        rows = (
-            await session.execute(
-                select(model.provider_id, model.user_id, model.generation)
-                .order_by(model.queued_at, model.provider_id, model.user_id)
-                .limit(batch)
-            )
-        ).all()
+    model = TiqoraScimPendingSync
+    deadline = time.monotonic() + budget_seconds
+    seen: set[tuple[int, int]] = set()
     processed = ignored = errors = 0
-    for provider_id, user_id, generation in rows:
-        try:
-            if await _sync_one(int(provider_id), int(user_id), int(generation)):
-                processed += 1
-            else:
-                ignored += 1
-        except Exception:
-            errors += 1
-            logger.exception("scim_role_sync_failed", provider_id=provider_id, user_id=user_id)
-    if rows:
+    while time.monotonic() < deadline:
+        async with get_session_factory()() as session:
+            # Rows handled earlier in this tick may still be queued (failed, or re-queued with a
+            # newer generation); read past them.
+            fetched = (
+                await session.execute(
+                    select(model.provider_id, model.user_id, model.generation)
+                    .order_by(model.queued_at, model.provider_id, model.user_id)
+                    .limit(batch + len(seen))
+                )
+            ).all()
+        rows = [r for r in fetched if (int(r[0]), int(r[1])) not in seen][:batch]
+        if not rows:
+            break
+        for provider_id, user_id, generation in rows:
+            key = (int(provider_id), int(user_id))
+            seen.add(key)
+            try:
+                if await _sync_one(key[0], key[1], int(generation)):
+                    processed += 1
+                else:
+                    ignored += 1
+            except Exception:
+                errors += 1
+                logger.exception("scim_role_sync_failed", provider_id=provider_id, user_id=user_id)
+                await _push_back(key[0], key[1], int(generation))
+    if seen:
         logger.info("scim_role_sync_tick", processed=processed, ignored=ignored, errors=errors)
     return {"processed": processed, "ignored": ignored, "errors": errors}
