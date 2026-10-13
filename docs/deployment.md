@@ -109,10 +109,10 @@ nothing else.
 
 ### Restart order
 
-Roll out in this order: `tiqora-api` first, then `tiqora-worker` and
-`tiqora-mcp`. The first release with plugins adds the `tiqora_plugin*` tables
-through the API's migration at start (`TIQORA_RUN_MIGRATIONS=1`). A worker or
-MCP process that starts earlier boots core-only, logs `plugins_boot_failed`
+Roll out in this order: `tiqora-api` first, then `tiqora-worker`,
+`tiqora-mcp` and `tiqora-ai-worker`. The first release with plugins adds the `tiqora_plugin*` tables
+through the API's migration at start (`TIQORA_RUN_MIGRATIONS=1`). A worker,
+MCP or ai-worker process that starts earlier boots core-only, logs `plugins_boot_failed`
 and retries loading plugins every 60 seconds for up to 30 minutes; after that
 it needs a restart. Run exactly **one** `tiqora-worker` replica: with two,
 every plugin task runs twice and event subscribers race for their cursors.

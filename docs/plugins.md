@@ -119,8 +119,9 @@ nichts Halbfertiges.
 
 **Schritt 4: Image umstellen und neu starten.** Tragen Sie
 `tiqora-mit-erweiterungen` (oder den Namen in Ihrer Registry) als Image für
-`tiqora-api`, `tiqora-worker` und `tiqora-mcp` ein. **Alle drei brauchen das
-gleiche Image.** Die Reihenfolge beim Neustart steht in
+`tiqora-api`, `tiqora-worker`, `tiqora-mcp` und `tiqora-ai-worker` ein
+(den letzten nur, wenn Sie einen betreiben). **Alle brauchen das gleiche Image
+und dasselbe Volume.** Die Reihenfolge beim Neustart steht in
 [deployment.md](deployment.md#erweiterungen-einbauen-plugins): zuerst
 `tiqora-api`, danach Worker und MCP-Dienst.
 
@@ -144,7 +145,7 @@ Prozessen, in denen sie läuft, und ihren automatischen Abläufen.
   `TIQORA_PLUGINS_AUTO_ENABLE` nicht auf `0` steht (Standard: an). Mit `0`
   erscheint sie ausgeschaltet und wartet auf Ihre Freigabe.
 - **Ein- und Ausschalten wirkt erst nach einem Neustart** von
-  `tiqora-api`, `tiqora-worker` und `tiqora-mcp`. Bis dahin zeigt die Liste
+  `tiqora-api`, `tiqora-worker`, `tiqora-mcp` und `tiqora-ai-worker`. Bis dahin zeigt die Liste
   "Neustart nötig".
 - **Wieder einschalten holt nichts nach.** Eine Erweiterung, die für
   Ticketänderungen angemeldet ist, beginnt nach dem Wiedereinschalten am
@@ -166,7 +167,7 @@ Prozessen, in denen sie läuft, und ihren automatischen Abläufen.
 | Aktiv | Geladen und läuft. | – |
 | Ausgeschaltet | Ausgeschaltet (Schalter oder `TIQORA_PLUGINS_DISABLED`). Es wird kein Code der Erweiterung ausgeführt. | – |
 | Neustart nötig | Schalter und geladener Zustand unterscheiden sich. | Dienste neu starten. |
-| Fehler | Beim Laden ist ein Fehler aufgetreten (der Text steht in den Details, mit Angabe des Dienstes, zum Beispiel "Hintergrunddienst: RuntimeError: …"), oder ein automatischer Ablauf wurde nach 5 Fehlern in Folge angehalten. Gilt, sobald **einer** der drei Prozesse betroffen ist. | Ursache beheben (Log, Einstellungen), "Erneut versuchen". |
+| Fehler | Beim Laden ist ein Fehler aufgetreten (der Text steht in den Details, mit Angabe des Dienstes, zum Beispiel "Hintergrunddienst: RuntimeError: …"), oder ein automatischer Ablauf wurde nach 5 Fehlern in Folge angehalten. Gilt, sobald **einer** der Prozesse betroffen ist. | Ursache beheben (Log, Einstellungen), "Erneut versuchen". |
 | Übersprungen | Der Start der Erweiterung ist dreimal hintereinander abgestürzt (der Prozess endete beim Laden). Tiqora lädt sie nicht mehr, damit es startet. | Ursache klären, "Erneut versuchen", danach Neustart. |
 | Nicht kompatibel | Die Erweiterung verlangt eine andere SDK- oder Tiqora-Version (`sdk`, `tiqora` im Manifest). | Passende Version einbauen. |
 | Ungültig | Das Paket ist unbrauchbar: Manifest fehlt oder ist fehlerhaft, Dateien fehlen (zum Beispiel `web/index.js`), Kennung doppelt. Die Meldung nennt den Grund. | Paket neu bauen (siehe [Dateien im Wheel](#dateien-im-wheel)). |
@@ -276,8 +277,9 @@ eine Erweiterung kann, steht in ihrer Karte unter "Erweiterungen" (Bereich
 
 Der KI-Hintergrunddienst (`ai-worker`) lädt Erweiterungen jetzt ebenfalls:
 Nutzen Sie dasselbe Image und dasselbe Volume wie für die anderen Dienste (siehe
-[deployment.md](deployment.md)). Auf der Seite "Dienste" erscheint er mit der
-Rolle "KI-Hintergrunddienst". Wer keinen `ai-worker` betreibt, hat dafür keinen
+[deployment.md](deployment.md)). In der Prozessliste der Erweiterung erscheint
+er mit der Rolle "KI-Hintergrunddienst". Prüfungen vor dem Speichern gelten
+dort nicht (siehe unten). Wer keinen `ai-worker` betreibt, hat dafür keinen
 Eintrag, und das stört den Zustand der Erweiterung nicht.
 
 ### Prüfung vor dem Speichern
@@ -288,7 +290,7 @@ hinzufügen, Queue wechseln, Status ändern, Zusatzfelder ändern. Lehnt sie ab,
 sieht die Person einen Hinweistext, und es wurde nichts gespeichert und nichts
 verschickt (auch keine E-Mail).
 
-- Jede Prüfung hat insgesamt höchstens 5 Sekunden. Fällt eine Prüfung aus oder
+- Alle Prüfungen eines Vorgangs zusammen haben höchstens 5 Sekunden. Fällt eine Prüfung aus oder
   ist zu langsam, entscheidet die Erweiterung vorher, ob die Änderung dann
   durchgeht ("fail open") oder abgelehnt wird ("fail closed").
 - Nach 5 Fehlern in Folge zeigt die Seite der Erweiterung die Prüfung als
@@ -296,7 +298,8 @@ verschickt (auch keine E-Mail).
   nichts ungeprüft durchgeht; alle 30 Sekunden wird sie einmal versucht, und
   bei Erfolg arbeitet sie wieder. "Erneut versuchen" setzt sie sofort zurück.
 - **Nicht geprüft werden:** eingehende E-Mails, Änderungen über die
-  GenericInterface-Webservices, Prozess-Aktionen, Änderungen durch Znuny
+  GenericInterface-Webservices, Prozess-Aktionen, automatische KI-Antworten,
+  KI-Werkzeuge und die automatische KI-Triage, Änderungen durch Znuny
   selbst und Schreibzugriffe einer Erweiterung im Namen des Systems.
 
 ### Ticketnummer-Schema
@@ -1040,14 +1043,16 @@ requests at 90 s and Tiqora treats 60 s as its limit:
 Every process loads every enabled plugin; the table says where a point is
 exercised. The `ai-worker` is a plugin host since 0.2.0 (it calls
 `init_registry(role="ai-worker")` first): it hosts no subscribers, tasks or
-routes, but its AI auto-replies and summaries run the write services, sync
-hooks, placeholders, number generators, DF types, outbound filters and
-channels. A site without an `ai-worker` container has no `ai-worker` runtime
+routes, but its AI auto-replies and summaries use placeholders, number
+generators, DF types, outbound filters and channels. It runs **no sync
+hooks**: the AI paths write through the module-level functions, not through
+`TicketWriteService`. A site without an `ai-worker` container has no `ai-worker` runtime
 row, which does not affect the plugin status.
 
 | Point | api | worker | mcp | ai-worker |
 |---|---|---|---|---|
-| sync hooks, channels | yes | yes | yes | yes |
+| sync hooks | yes | yes | yes | – |
+| channels | yes | yes | yes | yes |
 | transition actions, conditions | yes | yes | yes | – |
 | placeholders, number generators, DF types, outbound mail filters | yes | yes | yes | yes |
 | inbound mail filters, notification transports | – | yes | – | – |
@@ -1117,7 +1122,8 @@ Behaviour, all pinned by tests:
 
 **Not hooked** (they write without calling sync hooks): inbound e-mail
 processing (use the inbound mail filters), GenericInterface provider
-operations, process transition actions, plugin writes with `as_agent=None`
+operations, process transition actions, AI auto-replies, AI tool writes and
+automatic triage moves (the ai-worker and `ai/` code), plugin writes with `as_agent=None`
 (trusted system user), the module-level write functions, MCP tools that do
 not go through `TicketWriteService`, the derived writes of the ITSM features
 (priority matrix, major-incident type change), anything Znuny itself does, and
@@ -1497,7 +1503,8 @@ Was die Ausbaustufen 1 und 2a bewusst nicht können (auf Deutsch, in einfachen W
   nächsten Stufe. Bis dahin legen Erweiterungen ihre Daten in ihren
   Einstellungen oder in ihrem eigenen externen Speicher ab.
 - **Der KI-Hintergrunddienst lädt Erweiterungen,** führt aber keine
-  Abonnements, Aufgaben oder Schnittstellen aus. Es gibt keine eigenen
+  Abonnements, Aufgaben, Schnittstellen oder Prüfungen vor dem Speichern aus:
+  KI-Antworten werden von solchen Prüfungen nicht abgelehnt. Es gibt keine eigenen
   KI-Erweiterungspunkte.
 - **Schreiben an Tickets nur über die Dienste des SDK** (anlegen, Nachricht,
   Status, Queue, Zusatzfeld). Mit `as_agent` gelten Rechte und Prüfungen, ohne

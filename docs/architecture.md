@@ -843,7 +843,7 @@ installed only by baking them into the image (`tiqora plugins bake`).
   imports plugin code; yields `DiscoveredPlugin` with the parsed manifest, web
   manifest, locales and a German `problem` when the package is unusable.
 - *Bootstrap* (`bootstrap.init_registry`, called by api, worker and mcp before
-  anything captures `get_registry()`; the ai-worker calls it too since SDK 0.2.0): builds the core
+  anything captures `get_registry()`; the ai-worker too since 0.2.0): builds the core
   registry, then for each enabled, compatible plugin in dependency order
   (`requires`) imports it in a daemon thread with a timeout
   (`TIQORA_PLUGINS_IMPORT_TIMEOUT_SECONDS`, total `..._BOOT_BUDGET_SECONDS`),
