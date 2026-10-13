@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.legacy.user import Users
+from tiqora.db.tiqora.models import TiqoraIdentityProvider, TiqoraScimUser
 from tiqora.extensions.core import get_registry
 from tiqora.extensions.registry import ExtensionPoint
 from tiqora.plugins.calls import PluginCallBudget, call_plugin
@@ -97,15 +98,38 @@ def _providers(user_kind: Literal["agent", "customer"]) -> list[PasswordAuthProv
 
 async def _existing_account(
     session: AsyncSession, user_kind: Literal["agent", "customer"], named: str
-) -> str | None:
-    """The stored spelling of a valid account login, or None."""
+) -> tuple[str, int] | None:
+    """The stored spelling and id of a valid account login, or None."""
     if user_kind == "agent":
-        stmt = select(Users.login).where(Users.login == named, Users.valid_id == 1)
+        stmt = select(Users.login, Users.id).where(Users.login == named, Users.valid_id == 1)
     else:
-        stmt = select(CustomerUser.login).where(
+        stmt = select(CustomerUser.login, CustomerUser.id).where(
             CustomerUser.login == named, CustomerUser.valid_id == 1
         )
-    return (await session.execute(stmt)).scalars().first()
+    row = (await session.execute(stmt)).first()
+    return None if row is None else (str(row[0]), int(row[1]))
+
+
+async def _sso_managed(
+    session: AsyncSession, user_kind: Literal["agent", "customer"], account_id: int
+) -> bool:
+    """R15: the account has a SCIM mapping whose provider requires the IdP's MFA proof.
+
+    Such an account signs in through its IdP (step-up); a plugin password provider must not
+    be a way around that. Deprovisioned mappings count as well (fail closed). Only Tiqora
+    tables, joined on the integer provider id: no join with a Znuny table (collations).
+    """
+    stmt = (
+        select(TiqoraScimUser.id)
+        .join(TiqoraIdentityProvider, TiqoraIdentityProvider.id == TiqoraScimUser.provider_id)
+        .where(
+            TiqoraScimUser.user_kind == user_kind,
+            TiqoraScimUser.user_id == account_id,
+            TiqoraIdentityProvider.require_mfa_claim.is_(True),
+        )
+        .limit(1)
+    )
+    return (await session.execute(stmt)).first() is not None
 
 
 async def plugin_password_sign_in(
@@ -170,14 +194,24 @@ async def plugin_password_sign_in(
                 reason="bad_result",
             )
             continue
-        account = await _existing_account(session, user_kind, named)
-        if account is None:
+        found = await _existing_account(session, user_kind, named)
+        if found is None:
             logger.warning(
                 "plugin_auth_rejected",
                 plugin=provider.plugin_id,
                 provider=provider.key,
                 login=login,
                 reason="unknown_or_invalid_account",
+            )
+            continue
+        account, account_id = found
+        if await _sso_managed(session, user_kind, account_id):
+            logger.warning(
+                "plugin_auth_rejected",
+                plugin=provider.plugin_id,
+                provider=provider.key,
+                login=login,
+                reason="sso_managed",
             )
             continue
         if account != login:

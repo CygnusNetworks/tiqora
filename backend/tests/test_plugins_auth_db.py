@@ -2,7 +2,8 @@
 
 Seed band 55370-55389: agents 55370 ``pp55-agent`` (a password nobody types), 55371 ``pp55-2fa``
 (TOTP enabled), 55372 ``pp55-agent2``, 55373 ``pp55-invalid`` (valid_id 2), 55374 ``pp55-local``
-(a real local password); the customer ``pp55-portal`` is removed by its login. The rate limiter
+(a real local password); the customer ``pp55-portal`` is removed by its login; SCIM
+providers ``pp55scim*`` and their mappings (R15) by slug. The rate limiter
 is off except in the test that exercises it, which uses an in-memory Redis.
 """
 
@@ -50,6 +51,9 @@ def _clean(url: str) -> None:
             "DELETE FROM user_preferences WHERE user_id BETWEEN 55370 AND 55389",
             "DELETE FROM users WHERE id BETWEEN 55370 AND 55389",
             "DELETE FROM customer_user WHERE login = 'pp55-portal'",
+            "DELETE FROM tiqora_scim_user WHERE provider_id IN"
+            " (SELECT id FROM tiqora_identity_provider WHERE slug LIKE 'pp55scim%')",
+            "DELETE FROM tiqora_identity_provider WHERE slug LIKE 'pp55scim%'",
         ):
             conn.execute(text(sql))
     engine.dispose()
@@ -96,8 +100,9 @@ def _seed(url: str) -> None:
 
 
 class Env:
-    def __init__(self, maker: async_sessionmaker[AsyncSession]) -> None:
+    def __init__(self, maker: async_sessionmaker[AsyncSession], url: str = "") -> None:
         self.maker = maker
+        self.url = url
 
     def client(self, redis: Any = None, **settings: Any) -> httpx.AsyncClient:
         app = create_app(Settings(**{**BASE, **settings}))  # type: ignore[arg-type]
@@ -125,7 +130,7 @@ async def env(
     engine = create_async_engine(_to_async_url(url))
     maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     boot_points_plugin(tmp_path, monkeypatch)
-    yield Env(maker)
+    yield Env(maker, url)
     await engine.dispose()
     _clean(url)
 
@@ -268,3 +273,97 @@ async def test_chain_budget(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
     assert r.status_code == 401
     assert elapsed < 1.0, elapsed  # not 1 s + 1 s: the second provider is skipped
     assert _calls("auth.backup") == []
+
+
+def _scim_map(url: str, *, user_kind: str, login: str, require_mfa: bool) -> None:
+    """A SCIM mapping for ``login`` under a new provider (R15 seed; made-up values)."""
+    import hashlib
+    import uuid
+    from datetime import datetime
+
+    now = datetime(2026, 10, 13, 9, 0, 0)
+    slug = f"pp55scim{uuid.uuid4().hex[:8]}"
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO tiqora_identity_provider (slug, kind, source, name, audience,"
+                " enabled, sort, config, match_by, require_sso_opt_in, attribute_map,"
+                " jit_enabled, jit_defaults, role_rules, sync_mode, require_mfa_claim,"
+                " scim_enabled, create_by, create_time, change_by, change_time)"
+                " VALUES (:slug, 'oidc', 'db', 'pp55 idp', 'both', :t, 10, '{}', 'login', :f,"
+                " '{}', :f, '{}', '[]', 'managed', :mfa, :t, 1, :now, 1, :now)"
+            ),
+            {"slug": slug, "t": True, "f": False, "mfa": require_mfa, "now": now},
+        )
+        provider_id = conn.execute(
+            text("SELECT id FROM tiqora_identity_provider WHERE slug = :s"), {"s": slug}
+        ).scalar_one()
+        table = "users" if user_kind == "agent" else "customer_user"
+        account_id = conn.execute(
+            text(f"SELECT id FROM {table} WHERE login = :l"),  # noqa: S608
+            {"l": login},
+        ).scalar_one()
+        fold = login.casefold()
+        conn.execute(
+            text(
+                "INSERT INTO tiqora_scim_user (provider_id, user_kind, scim_id, user_id,"
+                " user_name, user_name_fold, user_name_fold_hash, deleted, version, created,"
+                " changed) VALUES (:p, :k, :sid, :u, :n, :fold, :h, :f, 1, :now, :now)"
+            ),
+            {
+                "p": provider_id,
+                "k": user_kind,
+                "sid": str(uuid.uuid4()),
+                "u": account_id,
+                "n": login,
+                "fold": fold,
+                "h": hashlib.sha256(fold.encode()).hexdigest(),
+                "f": False,
+                "now": now,
+            },
+        )
+    engine.dispose()
+
+
+async def test_scim_mfa_managed_agent_is_refused(env: Env) -> None:
+    """R15: a plugin password provider cannot sign in an agent whose SCIM provider requires
+    the IdP's MFA proof (that agent signs in through the IdP's step-up)."""
+    _scim_map(env.url, user_kind="agent", login="pp55-agent", require_mfa=True)
+    with capture_logs() as logs:
+        async with env.client() as client:
+            r = await _agent(client)
+    assert r.status_code == 401 and r.json()["detail"] == "Invalid credentials"
+    assert "tiqora_session" not in r.cookies
+    rejected = [e for e in logs if e["event"] == "plugin_auth_rejected"]
+    assert rejected and {e["reason"] for e in rejected} == {"sso_managed"}
+    assert rejected[0]["login"] == "pp55-agent"
+    assert len(_calls("auth.directory")) == 1  # the provider said yes; the core refused
+
+
+async def test_scim_mapping_without_mfa_requirement_still_signs_in(env: Env) -> None:
+    _scim_map(env.url, user_kind="agent", login="pp55-agent", require_mfa=False)
+    async with env.client() as client:
+        r = await _agent(client)
+    assert r.status_code == 200, r.text
+    assert r.json()["user"]["login"] == "pp55-agent"
+
+
+async def test_scim_mfa_check_applies_to_the_mapped_account(env: Env) -> None:
+    """The check looks at the account the provider names, not at the typed login."""
+    _scim_map(env.url, user_kind="agent", login="pp55-agent2", require_mfa=True)
+    points_behaviour().MODE["auth"] = "other_login"
+    with capture_logs() as logs:
+        async with env.client() as client:
+            r = await _agent(client, password="irgendwas")
+    assert r.status_code == 401
+    assert "sso_managed" in {e.get("reason") for e in logs}
+
+
+async def test_scim_mfa_managed_customer_is_refused(env: Env) -> None:
+    _scim_map(env.url, user_kind="customer", login="pp55-portal", require_mfa=True)
+    with capture_logs() as logs:
+        async with env.client() as client:
+            r = await _portal(client)
+    assert r.status_code == 401 and r.json()["detail"] == "Invalid credentials"
+    assert "sso_managed" in {e.get("reason") for e in logs}

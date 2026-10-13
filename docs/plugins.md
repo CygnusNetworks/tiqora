@@ -358,10 +358,10 @@ Eine Erweiterung kann zusätzlich Kennwörter prüfen (zum Beispiel gegen ein
 Verzeichnis). Sie ersetzt nie die Sicherheitsfunktionen: Sperre nach
 Fehlversuchen, Zwei-Faktor-Anmeldung und Einrichtung gelten weiter, und die
 Gesamtprüfung ist auf 20 Sekunden begrenzt. Der Kennworttext wird nicht
-protokolliert. **Achtung:** Für Mitarbeitende, die über SCIM und Single
-Sign-on verwaltet werden und bei denen der Mehrfaktor-Nachweis des
-Anmeldedienstes verlangt wird, kann eine Kennwort-Erweiterung diese
-Anforderung umgehen. Schalten Sie eine solche Erweiterung dort nicht ein.
+protokolliert. Konten, die über SCIM von einem Anmeldedienst mit Pflicht zum
+Mehrfaktor-Nachweis verwaltet werden, meldet eine Kennwort-Erweiterung nicht
+an: Tiqora weist die Anmeldung ab (`plugin_auth_rejected`,
+`reason=sso_managed`); diese Konten melden sich über den Anmeldedienst an.
 Ein nicht erreichbarer LDAP-Server antwortet weiterhin mit "nicht verfügbar",
 bevor die Erweiterung gefragt wird.
 
@@ -1391,12 +1391,12 @@ attempts count. Notes:
 - An LDAP sign-in that raises `LdapSignInUnavailable` answers 503 before the
   plugin chain runs.
 - Plugin logins are `auth_method="plugin"` (no local password change).
-- **Known gap (accepted for wave 4):** a plugin password provider can sign in
-  an agent that SCIM manages with an MFA claim requirement, bypassing the SSO
-  step-up. Do not enable a password provider on a site that relies on that
-  requirement; the core check (skip logins with a SCIM row whose provider has
-  `require_mfa_claim`, log `plugin_auth_rejected reason=sso_managed`) is
-  planned for the merge of both features.
+- **SCIM-managed accounts (R15):** when the account a provider names (agent or
+  customer) has a `tiqora_scim_user` row whose identity provider has
+  `require_mfa_claim`, the core skips that provider's answer and logs
+  `plugin_auth_rejected reason=sso_managed`; the chain goes on with the next
+  provider, whose answer is checked the same way. Deprovisioned mappings count
+  too (fail closed). Such accounts sign in through the IdP and its step-up.
 
 ### Customer sources
 

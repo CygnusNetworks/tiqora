@@ -458,10 +458,11 @@ Eine abgewiesene Anmeldung ändert nichts (kein Konto, keine Verknüpfung, keine
 und die Werte, die der Anmeldedienst geliefert hat. Ist der Nachweis erbracht, überspringt die Anmeldung den
 Tiqora-Faktor wie bisher.
 
-**Hinweis zu Plugin-Anmeldeanbietern**: Ein Passwort-Anbieter aus einem Plugin kann einen SCIM-verwalteten
-Agenten anmelden, **ohne** dass der Anmeldedienst einen zweiten Faktor bestätigt hat, solange der
-Abgleich beim Zusammenführen von SCIM und Plugin-Anmeldung nicht eingebaut ist. Setzen Sie bis dahin keine
-Plugin-Passwort-Anbieter für Konten ein, bei denen der zweite Faktor des Anmeldedienstes Pflicht ist.
+**Hinweis zu Plugin-Anmeldeanbietern**: Ein Passwort-Anbieter aus einem Plugin meldet **kein** Konto an,
+das über SCIM von einem Anbieter mit Pflicht zum Mehrfaktor-Nachweis verwaltet wird (auch nicht nach der
+Deprovisionierung). Solche Konten melden sich über den Anmeldedienst an; der abgewiesene Versuch steht im
+Protokoll als `plugin_auth_rejected` mit `reason=sso_managed`. Konten anderer SCIM-Anbieter und lokale
+Konten prüft der Plugin-Anbieter wie bisher.
 
 ## Sitzungsdauer
 
