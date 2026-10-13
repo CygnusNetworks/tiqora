@@ -519,10 +519,33 @@ async def test_migration_failure_keeps_old_version(env: Env, children: list[Any]
     row = await _plugin_row(env)
     assert row is not None
     assert (row.version, row.package_sha256) == ("1.0.0", good_sha)
-    # the child recorded why; the installed version stays what it was
-    assert row.migration_error is not None and "tables_0002" in row.migration_error
+    # the failed attempt is not written onto the healthy installed version: the load gate
+    # and the boot migrations must keep treating 1.0.0 as fine
+    assert row.migration_error is None
     assert row.migrated_version == "1.0.0"
     assert await _restart_rows(env) == []
+
+
+async def test_failed_fresh_install_can_be_retried_with_a_fixed_package(
+    env: Env, children: list[Any]
+) -> None:
+    bad, _ = env.package(
+        "1.0.0", extra_members={f"{PACKAGE}/migrations/0002_bad.py": _BAD_MIGRATION}
+    )
+    job = await _install(env, bad, restart=False)
+    assert job.status == "failed"
+    assert await _plugin_row(env) is None
+    # the failed run owns the short id (MariaDB keeps the tables it created)
+    async with env.factory() as s:
+        owner = await s.get(TiqoraPluginData, "tables")
+    assert owner is not None and owner.plugin_id == TABLES
+    fixed, _ = env.package("1.0.1")
+    job = await _install(env, fixed, restart=False)
+    assert job.status == "succeeded", job.error
+    row = await _plugin_row(env)
+    assert row is not None and row.version == "1.0.1" and row.migration_error is None
+    async with env.factory() as s:
+        assert await s.get(TiqoraPluginData, "tables") is None
 
 
 async def test_update_keeps_enabled_and_hook_cursors(env: Env, children: list[Any]) -> None:

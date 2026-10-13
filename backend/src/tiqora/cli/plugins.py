@@ -379,7 +379,13 @@ async def _cmd_migrate(args: argparse.Namespace) -> int:
         error = " ".join(str(exc).split())  # one line: the parent reads the last stderr line
     async with plugin_session_factory(settings.database_url) as factory:
         await record_migration(
-            factory, plugin.plugin_id, version=version, head=head, error=error, now=utc_now()
+            factory,
+            plugin.plugin_id,
+            version=version,
+            head=head,
+            error=error,
+            now=utc_now(),
+            error_only_for_version=args.path is not None,
         )
     if error is not None:
         _err(error)

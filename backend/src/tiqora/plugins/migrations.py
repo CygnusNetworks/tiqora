@@ -494,8 +494,13 @@ async def record_migration(
     head: str | None,
     error: str | None,
     now: datetime,
+    error_only_for_version: bool = False,
 ) -> None:
     """Store the outcome on ``tiqora_plugin``.
+
+    ``error_only_for_version``: record a failure only on a row whose ``version`` is the one
+    attempted (an install job migrating a not yet installed update must not mark the
+    still-installed older version as failed).
 
     Success sets ``migrated_version``/``migrated_head`` and clears the error; a failure keeps
     ``migrated_version`` (the version that last migrated fully) and only sets the error.
@@ -511,10 +516,11 @@ async def record_migration(
         }
     else:
         values = {"migration_error": error[:_MAX_ERROR_LEN]}
+    stmt = update(TiqoraPlugin).where(TiqoraPlugin.id == plugin_id)
+    if error is not None and error_only_for_version:
+        stmt = stmt.where(TiqoraPlugin.version == version[:64])
     async with factory() as session:
-        await session.execute(
-            update(TiqoraPlugin).where(TiqoraPlugin.id == plugin_id).values(values)
-        )
+        await session.execute(stmt.values(values))
         await session.commit()
 
 

@@ -13,6 +13,7 @@ plugin's row written; the previously installed version stays active until then.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import re
 import sys
 from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -118,6 +119,10 @@ async def _run_subprocess(
         proc.kill()
         await proc.wait()
         return TIMEOUT_EXIT_CODE, f"Zeitüberschreitung: länger als {int(timeout)} Sekunden"
+    except BaseException:  # cancelled (job timeout, worker shutdown): no orphaned child
+        with contextlib.suppress(ProcessLookupError):
+            proc.kill()
+        raise
     return proc.returncode if proc.returncode is not None else 1, _tail(
         out.decode("utf-8", errors="replace")
     )
@@ -219,6 +224,33 @@ async def _write_plugin_row(
         await packages_store.mark_package_installed(session, report.sha256, now=now)
 
 
+async def _recorded_head(ctx: JobContext, plugin_id: str) -> str | None:
+    async with ctx.session_factory() as session:
+        row = await session.get(TiqoraPlugin, plugin_id)
+        head = row.migrated_head if row is not None else None
+        await session.rollback()
+    return head
+
+
+async def _claim_short_id(ctx: JobContext, report: PackageReport) -> None:
+    """Fresh install: own the short id before the migrate child creates tables (F2).
+
+    MariaDB commits DDL implicitly, so a failed first install leaves ``tqp_<short>_*`` behind
+    without a plugin row; the ownership row lets a retry of the same plugin adopt them.
+    """
+    async with ctx.session_factory() as session, session.begin():
+        if await session.get(TiqoraPlugin, report.plugin_id) is not None:
+            return
+        if await session.get(TiqoraPluginData, report.short_id) is None:
+            session.add(
+                TiqoraPluginData(
+                    short_id=report.short_id,
+                    plugin_id=report.plugin_id,
+                    kept_at=utc_now().replace(microsecond=0),
+                )
+            )
+
+
 async def run_plugin_install(ctx: JobContext, payload: PluginInstallPayload) -> dict[str, Any]:
     settings = ctx.settings
     # 1. the stored package, judged again with today's keys and installed state
@@ -279,6 +311,7 @@ async def run_plugin_install(ctx: JobContext, payload: PluginInstallPayload) -> 
 
     # 4. database changes in a child; from here on the job is not requeued after an interruption
     await ctx.checkpoint("migrate")
+    await _claim_short_id(ctx, report)
     await ctx.progress(3, 4, "Datenbank wird angepasst")
     code, output = await _run_subprocess(
         [
@@ -297,8 +330,14 @@ async def run_plugin_install(ctx: JobContext, payload: PluginInstallPayload) -> 
     if code != 0:
         detail = _last_line(output) or f"Exit-Code {code}"
         raise JobFailed(f"Datenbank-Änderungen fehlgeschlagen: {detail}"[:_MAX_OUTPUT])
-    match = _HEAD_RE.search(_last_line(output))
-    head = match.group(1) if match else None
+    head = None
+    for line in reversed(output.splitlines()):
+        match = _HEAD_RE.search(line)
+        if match:
+            head = match.group(1)
+            break
+    if head is None and report.action == "update":
+        head = await _recorded_head(ctx, report.plugin_id)  # the child recorded it already
 
     # 5. the plugin's row
     await _write_plugin_row(
