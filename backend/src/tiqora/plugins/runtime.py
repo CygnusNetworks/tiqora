@@ -179,9 +179,23 @@ def activate_paths(site_dirs: Iterable[Path]) -> list[Path]:
     return added
 
 
+def _older_than_tmp_max_age(path: Path, now: float) -> bool:
+    """True when ``path`` was last modified more than ``_TMP_MAX_AGE`` ago (False if gone)."""
+    try:
+        return now - path.stat().st_mtime > _TMP_MAX_AGE
+    except OSError:
+        return False
+
+
 def gc_runtime_dirs(settings: Settings, keep: Mapping[str, Sequence[str]]) -> int:
     """Remove version dirs not named in ``keep`` (plugin_id -> sha256s), dirs of unknown ids
-    and ``.tmp-*``/``.probe-*`` older than 1 h. Only when the directory is writable."""
+    and ``.tmp-*``/``.probe-*`` older than 1 h. Only when the directory is writable.
+
+    P2B-GC-AGE: a version dir (or plugin id dir) modified within the last ``_TMP_MAX_AGE`` is
+    never removed, even when ``keep`` does not name it. The boot GC checks "no plugin job
+    active" first and removes later; an install that starts in between unpacks a fresh dir its
+    plugin row does not name yet (check-then-act window). Such a dir is left for a later boot.
+    """
     if not plugins_dir_status(settings).writable:
         return 0
     root = Path(settings.plugins_dir)
@@ -189,11 +203,7 @@ def gc_runtime_dirs(settings: Settings, keep: Mapping[str, Sequence[str]]) -> in
     now = time.time()
     for entry in sorted(root.iterdir()):
         if entry.name.startswith((".tmp-", ".probe-")):
-            try:
-                old = now - entry.stat().st_mtime > _TMP_MAX_AGE
-            except OSError:
-                continue
-            if old:
+            if _older_than_tmp_max_age(entry, now):
                 if entry.is_dir():
                     _discard(entry)
                 else:
@@ -202,16 +212,21 @@ def gc_runtime_dirs(settings: Settings, keep: Mapping[str, Sequence[str]]) -> in
             continue
         if entry.name.startswith(".") or not entry.is_dir():
             continue
+        # judged before the children go: removing one updates the id dir's mtime
+        entry_old = _older_than_tmp_max_age(entry, now)
         wanted = {sha[:12] for sha in keep.get(entry.name, ())}
         for child in sorted(entry.iterdir()):
             if not child.is_dir() or not _VERSION_DIR_RE.match(child.name):
                 continue
             if child.name.rsplit("-", 1)[1] in wanted:
                 continue
+            if not _older_than_tmp_max_age(child, now):
+                continue  # P2B-GC-AGE: possibly an install that is unpacking right now
             _discard(child)
             removed += 1
-        with contextlib.suppress(OSError):
-            entry.rmdir()  # only succeeds when empty
+        if entry_old:  # a fresh id dir may be one an install just created for its version dir
+            with contextlib.suppress(OSError):
+                entry.rmdir()  # only succeeds when empty
     return removed
 
 

@@ -392,7 +392,10 @@ Endung `.tqplugin` hoch (Schaltfläche "Paket hochladen") oder holen es aus
 einer Paketquelle (Abschnitt 8). Das Paket liegt danach in der **Datenbank**;
 jeder Dienst (`api`, `worker`, `mcp`, `ai-worker`) packt es beim Start selbst
 aus. Das Verzeichnis `TIQORA_PLUGINS_DIR` ist nur eine Arbeitskopie und darf
-verloren gehen.
+verloren gehen. Beim Start räumt jeder Dienst ausgepackte Versionen auf, die
+weder installiert noch von einem laufenden Dienst geladen sind; Verzeichnisse,
+die jünger als eine Stunde sind, bleiben dabei bis zu einem späteren Start
+liegen (eine gerade laufende Installation könnte sie eben erst angelegt haben).
 
 **Ablauf.**
 

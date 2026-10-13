@@ -179,6 +179,13 @@ def test_activate_paths_appends_never_inserts(
     assert sys.path == ["/a", "/b", str(tmp_path / "x")]
 
 
+def _age(*paths: Path) -> None:
+    """Make ``paths`` look older than the GC's minimum age (``_TMP_MAX_AGE`` = 1 h)."""
+    old = time.time() - 7200
+    for path in paths:
+        os.utime(path, (old, old))
+
+
 def test_gc_keeps_current_and_previous(tmp_path: Path) -> None:
     s = _settings(tmp_path)
     root = tmp_path / "plugins"
@@ -186,6 +193,11 @@ def test_gc_keeps_current_and_previous(tmp_path: Path) -> None:
     for i, sha in enumerate(shas):
         (root / "org.example.hello" / f"1.{i}.0-{sha[:12]}" / "site").mkdir(parents=True)
     (root / "org.example.gone" / f"1.0.0-{'d' * 12}" / "site").mkdir(parents=True)
+    _age(
+        *(root / "org.example.hello").iterdir(),
+        *(root / "org.example.gone").iterdir(),
+        root / "org.example.gone",
+    )
     old_tmp = root / ".tmp-old"
     old_tmp.mkdir()
     old = time.time() - 7200
@@ -200,6 +212,29 @@ def test_gc_keeps_current_and_previous(tmp_path: Path) -> None:
     assert not (root / "org.example.gone").exists()
     assert not old_tmp.exists() and fresh_tmp.exists()
     assert removed == 3
+
+
+def test_gc_skips_version_dirs_younger_than_tmp_max_age(tmp_path: Path) -> None:
+    """P2B-GC-AGE: an unpack that started after the boot GC's "no plugin job" check leaves a
+    fresh dir that no plugin row names yet; it survives until it is older than 1 h."""
+    s = _settings(tmp_path)
+    root = tmp_path / "plugins"
+    hello = root / "org.example.hello"
+    fresh_known = hello / f"1.1.0-{'e' * 12}"  # new version of an installed plugin
+    fresh_new = root / "org.example.new" / f"1.0.0-{'f' * 12}"  # first install of a new id
+    for path in (fresh_known, fresh_new):
+        (path / "site").mkdir(parents=True)
+    kept = hello / f"1.0.0-{'a' * 12}"
+    (kept / "site").mkdir(parents=True)
+    _age(kept, hello)
+
+    assert gc_runtime_dirs(s, {"org.example.hello": ["a" * 64]}) == 0
+    assert fresh_known.exists() and fresh_new.exists() and kept.exists()
+
+    _age(fresh_known, fresh_new, fresh_new.parent)
+    assert gc_runtime_dirs(s, {"org.example.hello": ["a" * 64]}) == 2
+    assert not fresh_known.exists() and kept.exists()
+    assert not fresh_new.parent.exists()
 
 
 def test_gc_does_nothing_when_not_writable(tmp_path: Path) -> None:

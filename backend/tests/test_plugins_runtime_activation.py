@@ -441,7 +441,8 @@ async def test_boot_collects_stale_runtime_dirs(
     old_tmp = root / ".tmp-old"
     for path in (stale, in_use, gone, old_tmp):
         path.mkdir(parents=True)
-    os.utime(old_tmp, (1_000_000, 1_000_000))
+    for path in (old_tmp, stale.parent, in_use.parent, gone.parent, gone.parent.parent):
+        os.utime(path, (1_000_000, 1_000_000))  # older than _TMP_MAX_AGE (P2B-GC-AGE)
     host = "gc-test.example.org"
     await register_process(
         factory,
@@ -472,6 +473,8 @@ async def test_boot_gc_waits_while_a_plugin_job_runs(
     """An install may have unpacked a dir its plugin row does not name yet."""
     fresh = Path(rt_settings.plugins_dir) / "org.example.fresh" / "1.0.0-dddddddddddd" / "site"
     fresh.mkdir(parents=True)
+    for path in (fresh.parent, fresh.parent.parent):
+        os.utime(path, (1_000_000, 1_000_000))  # old enough for the GC (P2B-GC-AGE)
 
     async def busy(_session: AsyncSession) -> bool:
         return True
@@ -484,3 +487,19 @@ async def test_boot_gc_waits_while_a_plugin_job_runs(
     monkeypatch.setattr(restart_mod, "plugin_job_active", original)
     assert await gc_runtime_dirs_at_boot(rt_settings, factory) >= 1
     assert not fresh.exists()
+
+
+async def test_boot_gc_keeps_a_dir_unpacked_after_its_job_check(
+    factory: async_sessionmaker[AsyncSession],
+    rt_settings: Settings,
+) -> None:
+    """P2B-GC-AGE: no plugin job is active, but a fresh dir nobody names yet (an install
+    that began right after the check) survives the boot GC; once it is old it goes."""
+    fresh = Path(rt_settings.plugins_dir) / "org.example.fresh" / "1.0.0-eeeeeeeeeeee" / "site"
+    fresh.mkdir(parents=True)
+    await gc_runtime_dirs_at_boot(rt_settings, factory)
+    assert fresh.exists()
+    for path in (fresh.parent, fresh.parent.parent):
+        os.utime(path, (1_000_000, 1_000_000))
+    assert await gc_runtime_dirs_at_boot(rt_settings, factory) >= 1
+    assert not fresh.parent.parent.exists()
