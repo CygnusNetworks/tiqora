@@ -1,14 +1,12 @@
-import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/SelectField";
 import { SoftChip } from "@/components/ui/StatusChip";
 import { Spinner } from "@/components/ui/Spinner";
-import { useJob } from "@/components/jobs/useJob";
 import { apiErrorMessage } from "@/lib/avatarApi";
-import { pluginsApi, type CatalogEntry, type PluginPackage } from "@/lib/pluginsApi";
-import { InstallDialog } from "./InstallDialog";
+import { pluginsApi, type CatalogEntry } from "@/lib/pluginsApi";
 
 const SEARCH_DEBOUNCE_MS = 300;
 const ALL = "";
@@ -28,10 +26,13 @@ const entryKey = (e: CatalogEntry) => `${e.repository_id}:${e.plugin_id}`;
 /** "Verfügbar": the stored indexes of all package sources, with search and category filter. */
 export function CatalogTab({
   runtimeInstall,
-  coordinatedRestart = false,
+  downloading,
+  onDownload,
 }: {
   runtimeInstall: boolean;
-  coordinatedRestart?: boolean;
+  /** A download job runs (started here or from the "Installiert" tab). */
+  downloading: boolean;
+  onDownload: (repositoryId: number, pluginId: string, version: string) => void;
 }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
@@ -59,45 +60,11 @@ export function CatalogTab({
     placeholderData: (prev) => prev,
   });
 
-  // Install / update = download the package from the repository (a job), then show it in the install dialog.
-  const [pkg, setPkg] = useState<PluginPackage | null>(null);
-  const [jobId, setJobId] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const downloadM = useMutation({
-    mutationFn: ({ repoId, pluginId, version }: { repoId: number; pluginId: string; version: string }) =>
-      pluginsApi.download(repoId, { plugin_id: pluginId, version }),
-    onSuccess: (accepted) => setJobId(accepted.job_id),
-    onError: (err) => setError(apiErrorMessage(err, t("admin.plugins.update.failed"))),
-  });
-  const { job } = useJob(jobId);
-  const handled = useRef<number | null>(null);
-  useEffect(() => {
-    if (jobId == null || !job || handled.current === jobId) return;
-    if (job.status === "succeeded") {
-      handled.current = jobId;
-      const sha = job.result?.package_sha256;
-      if (typeof sha !== "string") {
-        setError(t("admin.plugins.update.failed"));
-        setJobId(null);
-        return;
-      }
-      pluginsApi
-        .getPackage(sha)
-        .then(setPkg)
-        .catch((err) => setError(apiErrorMessage(err, t("admin.plugins.update.failed"))))
-        .finally(() => setJobId(null));
-    } else if (job.status === "failed" || job.status === "cancelled") {
-      handled.current = jobId;
-      setError(job.error?.trim() || t("admin.plugins.update.failed"));
-      setJobId(null);
-    }
-  }, [job, jobId, t]);
-  const downloading = downloadM.isPending || jobId != null;
-
+  // Install / update = download the package from the repository (a job on the page, which then
+  // opens the install dialog).
   const start = (e: CatalogEntry) => {
     if (!e.latest_compatible) return;
-    setError(null);
-    downloadM.mutate({ repoId: e.repository_id, pluginId: e.plugin_id, version: e.latest_compatible });
+    onDownload(e.repository_id, e.plugin_id, e.latest_compatible);
   };
 
   const repos = reposQ.data ?? [];
@@ -166,16 +133,6 @@ export function CatalogTab({
             )}
           </div>
 
-          {error != null && (
-            <p role="alert" className="text-sm text-danger" data-testid="catalog-error">
-              {error}
-            </p>
-          )}
-          {downloading && (
-            <p className="flex items-center gap-2 text-sm text-muted" role="status" data-testid="catalog-running">
-              <Spinner /> {t("admin.plugins.update.running")}
-            </p>
-          )}
           {catalogQ.isLoading && <Spinner />}
           {catalogQ.isError && (
             <p role="alert" className="text-sm text-danger">
@@ -247,7 +204,6 @@ export function CatalogTab({
           )}
         </>
       )}
-      {pkg && <InstallDialog key={pkg.sha256} pkg={pkg} open onClose={() => setPkg(null)} coordinatedRestart={coordinatedRestart} />}
     </div>
   );
 }

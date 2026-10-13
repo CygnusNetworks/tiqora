@@ -22,13 +22,10 @@ export function trustColor(level: TrustLevel): string {
 }
 
 /** Where an installed plugin came from: the image, an upload, or a named repository. */
-export function sourceLabel(t: TFunction, p: PluginAdmin, repositoryNames: ReadonlyMap<number, string> = new Map()): string {
+export function sourceLabel(t: TFunction, p: PluginAdmin): string {
   if (p.source === "repository") {
-    const name = p.update?.repository_name;
-    const known = p.update ? repositoryNames.get(p.update.repository_id) : undefined;
-    const repo = known ?? name;
-    return repo
-      ? t("admin.plugins.source.repositoryNamed", { name: repo })
+    return p.repository_name
+      ? t("admin.plugins.source.repositoryNamed", { name: p.repository_name })
       : t("admin.plugins.source.repository");
   }
   if (p.source === "upload") return t("admin.plugins.source.upload");

@@ -4914,10 +4914,10 @@
         "trustNote": "Erweiterungen laufen mit vollen Rechten in Tiqora. Die Angaben oben beschreiben, was die Erweiterung von sich sagt – sie sind keine Absicherung.",
         "submit": "Installieren",
         "running": "Erweiterung wird installiert …",
-        "done": "Installiert."
+        "done": "Installiert.",
+        "failed": "Die Installation wurde nicht abgeschlossen."
       },
       "restart": {
-        "title": "Neustart",
         "now": "Jetzt neu starten",
         "running": "Tiqora wird neu gestartet …",
         "apiDown": "Weboberfläche startet neu …",
@@ -4946,17 +4946,20 @@
         "imageHint": "Diese Erweiterung ist im Image eingebaut. Zum Aktualisieren brauchen Sie ein neues Tiqora-Image."
       },
       "uninstall": {
-        "button": "Entfernen",
-        "title": "Erweiterung entfernen",
+        "button": "Deinstallieren",
+        "title": "Erweiterung deinstallieren",
         "dataLegend": "Daten der Erweiterung",
         "keepData": "Daten behalten",
         "keepHint": "Die Tabellen der Erweiterung bleiben erhalten. Wird sie später neu installiert, sind die Daten wieder da.",
         "deleteData": "Daten löschen",
-        "deleteHint": "Die Tabellen der Erweiterung werden gelöscht. Vorher wird eine Sicherung angelegt, die {{count}} Tage aufbewahrt wird.",
-        "submit": "Entfernen",
-        "running": "Erweiterung wird entfernt …",
-        "done": "Entfernt.",
-        "backupNote": "Die Sicherung wird {{count}} Tage aufbewahrt. Laden Sie sie jetzt herunter, wenn Sie die Daten noch brauchen könnten.",
+        "deleteHint_one": "Die Tabellen der Erweiterung werden gelöscht. Vorher wird eine Sicherung angelegt, die einen Tag aufbewahrt wird.",
+        "deleteHint_other": "Die Tabellen der Erweiterung werden gelöscht. Vorher wird eine Sicherung angelegt, die {{count}} Tage aufbewahrt wird.",
+        "submit": "Deinstallieren",
+        "running": "Erweiterung wird deinstalliert …",
+        "done": "Deinstalliert.",
+        "failed": "Die Erweiterung wurde nicht deinstalliert.",
+        "backupNote_one": "Die Sicherung wird einen Tag aufbewahrt. Laden Sie sie jetzt herunter, wenn Sie die Daten noch brauchen könnten.",
+        "backupNote_other": "Die Sicherung wird {{count}} Tage aufbewahrt. Laden Sie sie jetzt herunter, wenn Sie die Daten noch brauchen könnten.",
         "backupDownload": "Sicherung herunterladen ({{name}})"
       },
       "migrationError": "Fehler bei der Datenbank-Anpassung",

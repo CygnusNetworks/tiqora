@@ -2118,6 +2118,8 @@ const demoAdminPlugins: PluginAdminList = {
       signer: null,
       can_uninstall: false,
       migration_error: null,
+      repository_id: null,
+      repository_name: null,
       update: null,
       capabilities: [
         { kind: "extension_point", value: "core.events.subscribers" },
@@ -2176,6 +2178,8 @@ const demoAdminPlugins: PluginAdminList = {
       signer: null,
       can_uninstall: false,
       migration_error: null,
+      repository_id: null,
+      repository_name: null,
       update: null,
       capabilities: [{ kind: "extension_point", value: "core.mcp.tools" }],
       contributions: [],
@@ -2204,6 +2208,8 @@ const demoAdminPlugins: PluginAdminList = {
       signer: null,
       can_uninstall: false,
       migration_error: null,
+      repository_id: null,
+      repository_name: null,
       update: null,
       capabilities: [{ kind: "extension_point", value: "core.http.public_routes" }],
       contributions: [],
@@ -2222,7 +2228,7 @@ const demoAdminPlugins: PluginAdminList = {
       support: null,
       license: "MIT",
       categories: ["Beispiele"],
-      source: "upload",
+      source: "repository",
       installed_at: "2026-10-11T09:00:00Z",
       enabled: true,
       status: "active",
@@ -2232,6 +2238,8 @@ const demoAdminPlugins: PluginAdminList = {
       signer: "Example Org",
       can_uninstall: true,
       migration_error: null,
+      repository_id: 1,
+      repository_name: "Beispiel-Paketquelle",
       update: { image_plugin: false, repository_id: 1, repository_name: "Beispiel-Paketquelle", version: "1.1.0" },
       capabilities: [
         { kind: "extension_point", value: "core.events.subscribers" },
@@ -2320,8 +2328,20 @@ const demoPluginJob = {
   id: 990001,
   kind: "core.plugin_install",
   title_key: "jobs.kinds.core.plugin_install",
-  result: { plugin_id: "org.example.tables", version: "1.1.0" },
-  files: [],
+  // Stateless on purpose: one job serves download, install and uninstall. The download needs
+  // package_sha256, the dialogs follow restart_generation 3 (the restart GET already reports
+  // it as finished), and "Daten löschen" offers the backup file.
+  result: {
+    plugin_id: "org.example.tables",
+    version: "1.1.0",
+    action: "update",
+    package_sha256: "b".repeat(64),
+    restart_generation: 3,
+    migrated_head: null,
+  },
+  files: [
+    { id: 1, name: "org.example.tables-daten.jsonl.gz", content_type: "application/gzip", size_bytes: 2048 },
+  ],
 };
 
 export function resolveData(path: string, method: string): unknown | undefined {
@@ -2329,7 +2349,8 @@ export function resolveData(path: string, method: string): unknown | undefined {
   // Plugins: the demo plugin's list entry and its translations (code: src/demo/demoPlugin.tsx).
   if (p.endsWith("/api/v1/plugins/frontend")) return demoPluginFrontend;
   if (p.endsWith("/api/v1/admin/plugins")) return demoAdminPlugins;
-  if (p.endsWith("/api/v1/admin/plugins/restart")) return method === "GET" ? demoRestartStatus : { ...demoRestartStatus, finished_at: null };
+  // GET and POST both report generation 3 as finished, so the restart panel completes at once.
+  if (p.endsWith("/api/v1/admin/plugins/restart")) return demoRestartStatus;
   if (p.endsWith("/api/v1/admin/plugins/packages") && method === "POST") return demoUploadedPackage;
   if (/\/api\/v1\/admin\/plugins\/packages\/[^/]+$/.test(p) && method === "GET") return demoUploadedPackage;
   if (/\/api\/v1\/admin\/plugins\/packages\/[^/]+\/install$/.test(p) && method === "POST")

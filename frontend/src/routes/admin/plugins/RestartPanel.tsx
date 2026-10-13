@@ -17,20 +17,21 @@ function isOver(status: RestartStatus): boolean {
 }
 
 /**
- * Follows a coordinated restart. `generationHint` is the generation of the
- * latest restart that existed BEFORE this one was requested: a status that is
- * not newer than the hint is not ours yet, so the panel keeps waiting. Without
- * a hint (and without a coordinated status) the restart has to be done by hand.
+ * Follows the coordinated restart with generation `generation`, the one the
+ * server recorded for this action (the job result, or the POST answer). A
+ * newer generation supersedes ours and is followed instead. `null` means no
+ * coordinated restart was recorded: Tiqora has to be restarted by hand.
  */
-export function RestartPanel({ generationHint }: { generationHint?: number | null }) {
+export function RestartPanel({ generation }: { generation: number | null }) {
   const { t } = useTranslation();
   const startedAt = useRef(Date.now());
-  const hint = generationHint ?? null;
+  const manual = generation == null;
   const isOurs = (s: RestartStatus | null | undefined): s is RestartStatus =>
-    s != null && (hint == null || s.generation > hint);
+    s != null && generation != null && s.generation >= generation;
   const q = useQuery({
-    queryKey: RESTART_QUERY_KEY,
+    queryKey: [...RESTART_QUERY_KEY, generation],
     queryFn: ({ signal }) => pluginsApi.restartStatus(signal),
+    enabled: !manual,
     // Polling carries on through errors: the web interface is down while it restarts.
     refetchInterval: (query) => {
       const data = query.state.data;
@@ -42,7 +43,7 @@ export function RestartPanel({ generationHint }: { generationHint?: number | nul
   const status = q.data;
   const ours = isOurs(status) ? status : null;
 
-  if (!q.isError && (hint == null || status?.coordinated === false) && !q.isPending && (status == null || !status.coordinated)) {
+  if (manual) {
     return (
       <p className="text-sm text-ink" data-testid="plugin-restart-manual">
         {t("admin.plugins.restart.manual")}

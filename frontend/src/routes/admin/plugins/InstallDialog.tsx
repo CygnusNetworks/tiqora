@@ -10,6 +10,7 @@ import { apiErrorMessage } from "@/lib/avatarApi";
 import { pluginsApi, type PluginPackage } from "@/lib/pluginsApi";
 import { capabilityText } from "./capabilities";
 import { RestartPanel } from "./RestartPanel";
+import { jobRestartGeneration } from "./restartGeneration";
 import { trustColor, trustLabelKey } from "./trust";
 
 const MAX_LISTED_TABLES = 3;
@@ -51,35 +52,21 @@ export function InstallDialog({
   const [restart, setRestart] = useState(true);
   const [trusted, setTrusted] = useState(false);
   const [jobId, setJobId] = useState<number | null>(null);
-  const [restartBefore, setRestartBefore] = useState(0);
   const wantsRestart = coordinatedRestart && restart;
   const isNew = pkg.action === "install";
 
   const installM = useMutation({
-    mutationFn: async () => {
-      let before = 0;
-      if (wantsRestart) {
-        // The generation of the restart before ours, so the panel only follows the new one.
-        try {
-          before = (await pluginsApi.restartStatus())?.generation ?? 0;
-        } catch {
-          before = 0;
-        }
-      }
-      const accepted = await pluginsApi.installPackage(pkg.sha256, {
+    mutationFn: () =>
+      pluginsApi.installPackage(pkg.sha256, {
         enable: isNew ? enable : true,
         restart: wantsRestart,
-      });
-      return { accepted, before };
-    },
-    onSuccess: ({ accepted, before }) => {
-      setRestartBefore(before);
-      setJobId(accepted.job_id);
-    },
+      }),
+    onSuccess: (accepted) => setJobId(accepted.job_id),
   });
   const { job, isTerminal, cancel, isCancelling } = useJob(jobId);
 
   const succeeded = job?.status === "succeeded";
+  const failed = isTerminal && !succeeded;
   const started = jobId != null;
   const needsTrust = pkg.trust === "unsigned";
   const canInstall = pkg.installable && pkg.problems.length === 0 && (!needsTrust || trusted) && !installM.isPending;
@@ -89,7 +76,8 @@ export function InstallDialog({
   const lines = pkg.capabilities.filter((c) => !(manyTables && c.kind === "table"));
 
   const finish = () => {
-    if (isTerminal) {
+    // also when closed early: the job goes on, and the list must not offer stale actions
+    if (started) {
       void qc.invalidateQueries({ queryKey: ["admin", "plugins"] });
       void qc.invalidateQueries({ queryKey: ["plugins", "frontend"] });
     }
@@ -231,12 +219,17 @@ export function InstallDialog({
         )}
         {started && (
           <div className="space-y-3" data-testid="plugin-install-job">
-            <p className="font-medium text-ink">
-              {succeeded ? t("admin.plugins.install.done") : t("admin.plugins.install.running")}
+            <p className={failed ? "font-medium text-danger" : "font-medium text-ink"} data-testid="plugin-install-headline">
+              {succeeded
+                ? t("admin.plugins.install.done")
+                : failed
+                  ? t("admin.plugins.install.failed")
+                  : t("admin.plugins.install.running")}
             </p>
             {job && <JobProgress job={job} onCancel={cancel} cancelling={isCancelling} testId="plugin-install-progress" />}
             {succeeded && (!coordinatedRestart || restart) && (
-              <RestartPanel generationHint={wantsRestart ? restartBefore : undefined} />
+              // no generation (switched off, or the job could not request it): restart by hand
+              <RestartPanel generation={wantsRestart ? jobRestartGeneration(job.result) : null} />
             )}
           </div>
         )}

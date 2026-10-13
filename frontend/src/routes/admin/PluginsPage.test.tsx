@@ -114,6 +114,8 @@ function adminPlugin(overrides: Partial<PluginAdmin> = {}): PluginAdmin {
     can_uninstall: false,
     migration_error: null,
     update: null,
+    repository_id: null,
+    repository_name: null,
     capabilities: [
       { kind: "extension_point", value: "core.events.subscribers" },
       { kind: "extension_point", value: "core.http.public_routes" },
@@ -397,6 +399,8 @@ describe("PluginsPage installed tab", () => {
       source: "repository",
       signature_status: "official",
       can_uninstall: true,
+      repository_id: 3,
+      repository_name: "Offizielle Quelle",
       update: { version: "1.1.0", image_plugin: false, repository_id: 3, repository_name: "Offizielle Quelle" },
     });
     adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [withUpdate] });
@@ -550,6 +554,66 @@ describe("PluginsPage installed tab", () => {
     searchState = { tab: "repositories" };
     renderPage();
     expect(await screen.findByTestId("repository-row-1")).toHaveTextContent("Beispiel-Paketquelle");
+  });
+
+  it("opens the install dialog for a catalogue download even after a tab switch", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
+    catalogFn.mockResolvedValue({ categories: [], entries: [catalogEntry({ plugin_id: "org.example.new", name: "Katalog-Plugin" })] });
+    download.mockResolvedValue({ job_id: 5 });
+    getPackage.mockResolvedValue(packageReport({ sha256: "cd".repeat(32) }));
+    searchState = { tab: "available" };
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const page = () => (
+      <QueryClientProvider client={qc}>
+        <I18nextProvider i18n={i18n}>
+          <PluginsPage />
+        </I18nextProvider>
+      </QueryClientProvider>
+    );
+    const view = render(page());
+    fireEvent.click(await screen.findByTestId("catalog-action-org.example.new"));
+    await waitFor(() => expect(download).toHaveBeenCalledWith(1, { plugin_id: "org.example.new", version: "1.0.0" }));
+    expect(await screen.findByTestId("plugin-update-running")).toBeInTheDocument();
+    // the admin switches to "Installiert" while the job runs; the job then finishes
+    searchState = {};
+    view.rerender(page());
+    expect(await screen.findByTestId("plugin-card-org.example.hello")).toBeInTheDocument();
+    jobState = job({ status: "succeeded", result: { package_sha256: "cd".repeat(32) } });
+    view.rerender(page());
+    await waitFor(() => expect(getPackage).toHaveBeenCalledWith("cd".repeat(32)));
+    expect(await screen.findByRole("dialog", { name: "Erweiterung installieren" })).toBeInTheDocument();
+  });
+
+  it("shows the failed catalogue download's reason", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
+    catalogFn.mockResolvedValue({ categories: [], entries: [catalogEntry({ plugin_id: "org.example.new", name: "Katalog-Plugin" })] });
+    download.mockResolvedValue({ job_id: 5 });
+    jobState = job({ status: "failed", error: "Prüfsumme stimmt nicht mit der Paketquelle überein" });
+    searchState = { tab: "available" };
+    renderPage();
+    fireEvent.click(await screen.findByTestId("catalog-action-org.example.new"));
+    expect(await screen.findByTestId("admin-plugins-action-error")).toHaveTextContent(
+      "Prüfsumme stimmt nicht mit der Paketquelle überein",
+    );
+    expect(getPackage).not.toHaveBeenCalled();
+  });
+
+  it("keeps the page when a background reload fails (the api restarting)", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <I18nextProvider i18n={i18n}>
+          <PluginsPage />
+        </I18nextProvider>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByTestId("plugin-card-org.example.hello")).toBeInTheDocument();
+    adminList.mockRejectedValue(new TypeError("Failed to fetch"));
+    await qc.invalidateQueries({ queryKey: ["admin", "plugins"] });
+    await waitFor(() => expect(adminList).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId("plugin-card-org.example.hello")).toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "Bereiche der Erweiterungen" })).toBeInTheDocument();
   });
 
   it("treats an unknown or non-string tab as installed", async () => {

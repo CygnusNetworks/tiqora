@@ -84,7 +84,7 @@ describe("UninstallDialog", () => {
     await waitFor(() =>
       expect(uninstall).toHaveBeenCalledWith("org.example.tables", { delete_data: false, restart: true }),
     );
-    expect(await screen.findByTestId("plugin-uninstall-job")).toHaveTextContent("Erweiterung wird entfernt");
+    expect(await screen.findByTestId("plugin-uninstall-job")).toHaveTextContent("Erweiterung wird deinstalliert");
   });
 
   it("does not ask for a restart when restarts are not coordinated", async () => {
@@ -114,6 +114,34 @@ describe("UninstallDialog", () => {
     const link = await screen.findByTestId("plugin-uninstall-backup-7");
     expect(link).toHaveAttribute("href", "/api/v1/jobs/990001/files/7");
     expect(screen.getByTestId("plugin-uninstall-backup")).toHaveTextContent("21 Tage aufbewahrt");
+  });
+
+  it("follows the restart the job recorded and says when it failed", async () => {
+    uninstall.mockResolvedValue({ job_id: 990001 });
+    jobState = job({ status: "succeeded", result: { restart_generation: 5 } });
+    renderDialog();
+    fireEvent.click(screen.getByTestId("plugin-uninstall-submit"));
+    expect(await screen.findByTestId("plugin-restart-running")).toHaveTextContent("Tiqora wird neu gestartet");
+    expect(screen.getByTestId("plugin-uninstall-headline")).toHaveTextContent("Deinstalliert.");
+  });
+
+  it("says the uninstall failed after a failed job", async () => {
+    uninstall.mockResolvedValue({ job_id: 990001 });
+    jobState = job({ status: "failed", error: "kaputt" });
+    renderDialog();
+    fireEvent.click(screen.getByTestId("plugin-uninstall-submit"));
+    expect(await screen.findByTestId("plugin-uninstall-headline")).toHaveTextContent(
+      "Die Erweiterung wurde nicht deinstalliert.",
+    );
+    expect(screen.queryByTestId("plugin-restart-running")).toBeNull();
+  });
+
+  it("names a retention of one day in the singular", async () => {
+    getSection.mockResolvedValue({ values: { retention_days: 1 } });
+    renderDialog();
+    fireEvent.click(screen.getByLabelText(/Daten löschen/));
+    await waitFor(() => expect(screen.getByTestId("plugin-uninstall-delete-hint")).toHaveTextContent("einen Tag"));
+    expect(screen.getByTestId("plugin-uninstall-delete-hint")).not.toHaveTextContent("1 Tage");
   });
 
   it("falls back to 14 days when the retention setting cannot be read", async () => {

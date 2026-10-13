@@ -4914,10 +4914,10 @@
         "trustNote": "Extensions run inside Tiqora with full access. The information above shows what the extension claims to do - it is not a safeguard.",
         "submit": "Install",
         "running": "Installing the extension …",
-        "done": "Installed."
+        "done": "Installed.",
+        "failed": "The installation did not complete."
       },
       "restart": {
-        "title": "Restart",
         "now": "Restart now",
         "running": "Tiqora is restarting …",
         "apiDown": "The web interface is restarting …",
@@ -4946,17 +4946,20 @@
         "imageHint": "This extension is built into the image. To update it you need a new Tiqora image."
       },
       "uninstall": {
-        "button": "Remove",
-        "title": "Remove extension",
+        "button": "Uninstall",
+        "title": "Uninstall extension",
         "dataLegend": "Extension data",
         "keepData": "Keep data",
         "keepHint": "The extension's tables are kept. If it is installed again later, the data is back.",
         "deleteData": "Delete data",
-        "deleteHint": "The extension's tables are deleted. A backup is made first and kept for {{count}} days.",
-        "submit": "Remove",
-        "running": "Removing extension …",
-        "done": "Removed.",
-        "backupNote": "The backup is kept for {{count}} days. Download it now if you might still need the data.",
+        "deleteHint_one": "The extension's tables are deleted. A backup is made first and kept for one day.",
+        "deleteHint_other": "The extension's tables are deleted. A backup is made first and kept for {{count}} days.",
+        "submit": "Uninstall",
+        "running": "Uninstalling extension …",
+        "done": "Uninstalled.",
+        "failed": "The extension was not uninstalled.",
+        "backupNote_one": "The backup is kept for one day. Download it now if you might still need the data.",
+        "backupNote_other": "The backup is kept for {{count}} days. Download it now if you might still need the data.",
         "backupDownload": "Download backup ({{name}})"
       },
       "migrationError": "Database migration failed",

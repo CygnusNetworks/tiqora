@@ -3,66 +3,26 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
-import type { Job } from "@/lib/jobsApi";
-import { catalogEntry, packageReport, repository } from "@/test/pluginFixtures";
+import { catalogEntry, repository } from "@/test/pluginFixtures";
 import { CatalogTab } from "./CatalogTab";
 
 const catalog = vi.fn();
 const repositories = vi.fn();
-const download = vi.fn();
-const getPackage = vi.fn();
 vi.mock("@/lib/pluginsApi", () => ({
   pluginsApi: {
     catalog: (...a: unknown[]) => catalog(...a),
     repositories: (...a: unknown[]) => repositories(...a),
-    download: (...a: unknown[]) => download(...a),
-    getPackage: (...a: unknown[]) => getPackage(...a),
   },
 }));
 
-vi.mock("./InstallDialog", () => ({
-  InstallDialog: ({ pkg }: { pkg: { plugin_id: string; version: string } }) => (
-    <div data-testid="install-dialog">{`${pkg.plugin_id}@${pkg.version}`}</div>
-  ),
-}));
+const onDownload = vi.fn();
 
-let jobState: Job | undefined;
-vi.mock("@/components/jobs/useJob", () => ({
-  useJob: (id: number | null) => ({
-    job: id == null ? undefined : jobState,
-    isTerminal: jobState ? ["succeeded", "failed", "cancelled"].includes(jobState.status) : false,
-    cancel: vi.fn(),
-    isCancelling: false,
-  }),
-}));
-
-function job(overrides: Partial<Job> = {}): Job {
-  return {
-    cancel_requested: false,
-    created_at: "2026-10-12T08:00:00Z",
-    created_by: 1,
-    error: null,
-    files: [],
-    finished_at: null,
-    id: 5,
-    kind: "core.plugin_fetch",
-    progress_done: 0,
-    progress_message: null,
-    progress_total: null,
-    result: null,
-    started_at: "2026-10-12T08:00:01Z",
-    status: "running",
-    title_key: "jobs.kinds.core.plugin_fetch",
-    ...overrides,
-  };
-}
-
-function renderTab(runtimeInstall = true) {
+function renderTab(runtimeInstall = true, downloading = false) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <I18nextProvider i18n={i18n}>
-        <CatalogTab runtimeInstall={runtimeInstall} />
+        <CatalogTab runtimeInstall={runtimeInstall} downloading={downloading} onDownload={onDownload} />
       </I18nextProvider>
     </QueryClientProvider>,
   );
@@ -94,10 +54,9 @@ const ENTRIES = {
 
 beforeEach(async () => {
   await i18n.changeLanguage("de");
-  for (const fn of [catalog, repositories, download, getPackage]) fn.mockReset();
+  for (const fn of [catalog, repositories, onDownload]) fn.mockReset();
   catalog.mockResolvedValue(ENTRIES);
   repositories.mockResolvedValue([repository()]);
-  jobState = undefined;
 });
 
 describe("CatalogTab", () => {
@@ -140,33 +99,17 @@ describe("CatalogTab", () => {
     expect(screen.getByTestId("catalog-action-org.example.new")).toBeDisabled();
   });
 
-  it("installs from a repository via download job and install dialog", async () => {
-    download.mockResolvedValue({ job_id: 5, status: "queued" });
-    getPackage.mockResolvedValue(packageReport({ plugin_id: "org.example.old", version: "1.1.0" }));
-    const view = renderTab();
+  it("hands the newest compatible release to the page's download job", async () => {
+    renderTab();
     fireEvent.click(await screen.findByTestId("catalog-action-org.example.old"));
-    await waitFor(() =>
-      expect(download).toHaveBeenCalledWith(1, { plugin_id: "org.example.old", version: "1.1.0" }),
-    );
-    jobState = job({ status: "succeeded", result: { package_sha256: "b".repeat(64) } });
-    view.rerender(
-      <QueryClientProvider client={new QueryClient()}>
-        <I18nextProvider i18n={i18n}>
-          <CatalogTab runtimeInstall />
-        </I18nextProvider>
-      </QueryClientProvider>,
-    );
-    expect(await screen.findByTestId("install-dialog")).toHaveTextContent("org.example.old@1.1.0");
-    expect(getPackage).toHaveBeenCalledWith("b".repeat(64));
+    expect(onDownload).toHaveBeenCalledWith(1, "org.example.old", "1.1.0");
   });
 
-  it("shows the failed download job's reason", async () => {
-    download.mockResolvedValue({ job_id: 5, status: "queued" });
-    jobState = job({ status: "failed", error: "Prüfsumme stimmt nicht mit der Paketquelle überein" });
-    renderTab();
-    fireEvent.click(await screen.findByTestId("catalog-action-org.example.new"));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Prüfsumme stimmt nicht mit der Paketquelle überein");
-    expect(screen.queryByTestId("install-dialog")).toBeNull();
+  it("disables the actions while a download runs", async () => {
+    renderTab(true, true);
+    await screen.findByText("Neu-Plugin");
+    expect(screen.getByTestId("catalog-action-org.example.new")).toBeDisabled();
+    expect(screen.getByTestId("catalog-action-org.example.old")).toBeDisabled();
   });
 
   it("explains when no repository is configured", async () => {

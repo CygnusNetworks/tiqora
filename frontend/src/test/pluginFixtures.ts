@@ -240,6 +240,8 @@ export function adminPluginRow(overrides: Partial<AdminPlugin> = {}): AdminPlugi
     can_uninstall: false,
     migration_error: null,
     update: null,
+    repository_id: null,
+    repository_name: null,
     capabilities: [],
     contributions: [],
     hooks: [],

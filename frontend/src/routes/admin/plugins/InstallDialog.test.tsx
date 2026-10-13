@@ -118,14 +118,60 @@ describe("InstallDialog", () => {
 
   it("shows the restart panel once the job succeeded", async () => {
     installPackage.mockResolvedValue({ job_id: 7, status: "queued" });
-    jobState = job({ status: "succeeded", finished_at: "2026-10-12T08:00:20Z" });
-    // The restart the dialog asked for is generation 5; generation 4 is the old one.
-    restartStatusFn.mockResolvedValueOnce(restartStatus({ generation: 4 }));
+    // The job recorded restart generation 5; generation 4 is the old, finished one.
+    jobState = job({ status: "succeeded", finished_at: "2026-10-12T08:00:20Z", result: { restart_generation: 5 } });
     renderDialog();
     fireEvent.click(screen.getByRole("button", { name: "Installieren" }));
     expect(await screen.findByText("Installiert.")).toBeInTheDocument();
     expect(await screen.findByTestId("plugin-restart-running")).toHaveTextContent("Tiqora wird neu gestartet");
     expect(installPackage).toHaveBeenCalledWith("a".repeat(64), { enable: true, restart: true });
+  });
+
+  it("finishes at once when the recorded restart is already over (stateless demo)", async () => {
+    installPackage.mockResolvedValue({ job_id: 7, status: "queued" });
+    jobState = job({ status: "succeeded", result: { restart_generation: 4 } });
+    renderDialog();
+    fireEvent.click(screen.getByRole("button", { name: "Installieren" }));
+    expect(await screen.findByTestId("plugin-restart-done")).toHaveTextContent("Tiqora wurde neu gestartet.");
+  });
+
+  it("asks for a manual restart when the job could not request one", async () => {
+    installPackage.mockResolvedValue({ job_id: 7, status: "queued" });
+    jobState = job({ status: "succeeded", result: { restart_generation: null } });
+    renderDialog();
+    fireEvent.click(screen.getByRole("button", { name: "Installieren" }));
+    expect(await screen.findByTestId("plugin-restart-manual")).toBeInTheDocument();
+    expect(screen.queryByTestId("plugin-restart-running")).toBeNull();
+    expect(restartStatusFn).not.toHaveBeenCalled();
+  });
+
+  it("says the install failed instead of 'wird installiert' after a failed job", async () => {
+    installPackage.mockResolvedValue({ job_id: 7, status: "queued" });
+    jobState = job({ status: "failed", error: "Prüfung fehlgeschlagen: kaputt" });
+    renderDialog();
+    fireEvent.click(screen.getByRole("button", { name: "Installieren" }));
+    expect(await screen.findByTestId("plugin-install-headline")).toHaveTextContent(
+      "Die Installation wurde nicht abgeschlossen.",
+    );
+  });
+
+  it("refreshes the list when closed while the job still runs", async () => {
+    installPackage.mockResolvedValue({ job_id: 7, status: "queued" });
+    jobState = job();
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const invalidate = vi.spyOn(qc, "invalidateQueries");
+    const onClose = vi.fn();
+    render(
+      <QueryClientProvider client={qc}>
+        <I18nextProvider i18n={i18n}>
+          <InstallDialog pkg={packageReport()} open onClose={onClose} coordinatedRestart />
+        </I18nextProvider>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Installieren" }));
+    fireEvent.click(await screen.findByTestId("plugin-install-close"));
+    expect(onClose).toHaveBeenCalled();
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["admin", "plugins"] });
   });
 
   it("hides the restart checkbox when coordinated restart is off", async () => {

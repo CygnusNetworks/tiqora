@@ -19,12 +19,18 @@ describe("trust", () => {
     expect(sourceLabel(t, adminPluginRow({ source: "image" }))).toBe("admin.plugins.source.image");
     expect(sourceLabel(t, adminPluginRow({ source: "upload" }))).toBe("admin.plugins.source.upload");
     expect(sourceLabel(t, adminPluginRow({ source: "repository" }))).toBe("admin.plugins.source.repository");
-    const update = { image_plugin: false, repository_id: 3, repository_name: "Alt", version: "2.0.0" };
-    expect(sourceLabel(t, adminPluginRow({ source: "repository", update }))).toBe(
-      "admin.plugins.source.repositoryNamed:Alt",
+    // named after the plugin's own repository, with or without a pending update
+    const own = { repository_id: 3, repository_name: "Eigene Quelle" };
+    expect(sourceLabel(t, adminPluginRow({ source: "repository", ...own }))).toBe(
+      "admin.plugins.source.repositoryNamed:Eigene Quelle",
     );
-    expect(sourceLabel(t, adminPluginRow({ source: "repository", update }), new Map([[3, "Neu"]]))).toBe(
-      "admin.plugins.source.repositoryNamed:Neu",
+    const update = { image_plugin: false, repository_id: 4, repository_name: "Andere", version: "2.0.0" };
+    expect(sourceLabel(t, adminPluginRow({ source: "repository", ...own, update }))).toBe(
+      "admin.plugins.source.repositoryNamed:Eigene Quelle",
+    );
+    // the repository was deleted: no name
+    expect(sourceLabel(t, adminPluginRow({ source: "repository", repository_id: 3 }))).toBe(
+      "admin.plugins.source.repository",
     );
   });
 });

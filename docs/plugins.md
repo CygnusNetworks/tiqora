@@ -181,8 +181,9 @@ kompatibel, Übersprungen, Fehler, Unbekannt, Neustart nötig, Aktiv/Ausgeschalt
 
 **"Erneut versuchen"** setzt die Absturzzähler zurück, schließt die
 Schutzschalter (Abläufe, die nach 5 Fehlern in Folge angehalten wurden, laufen
-sofort wieder) und macht aus "Übersprungen" wieder "Ausgeschaltet"; geladen wird
-beim nächsten Neustart. Anders als beim Wiedereinschalten bleibt der
+sofort wieder), macht aus "Übersprungen" wieder "Ausgeschaltet" und vergisst einen
+Fehler bei der Datenbank-Anpassung, sodass der nächste Start sie noch einmal
+ausführt; geladen wird beim nächsten Neustart. Anders als beim Wiedereinschalten bleibt der
 Lesezeiger der Ticket-Abonnements erhalten: Was während des Fehlers nicht
 zugestellt werden konnte, wird nachgeholt.
 
@@ -409,7 +410,7 @@ verloren gehen.
    und werden vom Container-System neu gestartet: zuerst `worker`, dann
    `ai-worker` und `mcp`, zuletzt `api`. Die Folge hält an, wenn ein Dienst nicht
    zurückkommt, und die Seite nennt ihn. Solange ein Installations- oder
-   Entfernen-Job läuft, wartet der Neustart. Voraussetzungen für den Betrieb
+   Deinstallations-Job läuft, wartet der Neustart. Voraussetzungen für den Betrieb
    (Neustart-Richtlinie, Start-Reihenfolge, Volume) stehen in
    [deployment.md](deployment.md#erweiterungen-zur-laufzeit-installieren).
 
@@ -417,7 +418,7 @@ verloren gehen.
 
 - **Erweiterungen aus dem Image** (mit `tiqora plugins bake` eingebaut) werden
   nicht überschrieben. Sie erscheinen mit "Im Image eingebaut"; eine neue
-  Version braucht ein neues Image. Entfernen können Sie sie nur, indem Sie das
+  Version braucht ein neues Image. Deinstallieren können Sie sie nur, indem Sie das
   Image neu bauen.
 - **Ältere Versionen** werden abgelehnt ("Zurückstufen"). Wenn Sie zurück
   müssen, installieren Sie die ältere Version als neu gebautes Paket mit
@@ -427,7 +428,7 @@ verloren gehen.
   Seite "Installation über die Oberfläche ist hier nicht möglich: …" und
   alle Installationswege antworten mit einem Fehler. Eingebaute Erweiterungen
   laufen weiter wie bisher; neue kommen dann nur über ein Image.
-- **Installieren mit einem API-Schlüssel.** Hochladen, Installieren, Entfernen
+- **Installieren mit einem API-Schlüssel.** Hochladen, Installieren, Deinstallieren
   und das Ändern von Paketquellen gehen nur in der Weboberfläche mit
   Anmeldung (Antwort 403 "Nur in der Weboberfläche möglich", auch mit
   Schlüsseln, die Schreibrechte für die Verwaltung haben). Lesen darf ein
@@ -479,9 +480,9 @@ Tabellen („Daten behalten“) einer anderen Kennung gehören.
   Das ist ein **Schutz vor versehentlichen Änderungen**, keine Sicherheitsgrenze:
   Erweiterungscode läuft ohnehin mit vollen Rechten (Abschnitt 1).
 
-### Entfernen
+### Deinstallieren
 
-"Entfernen" fragt, was mit den Daten geschehen soll:
+"Deinstallieren" fragt, was mit den Daten geschehen soll:
 
 - **Daten behalten:** Tabellen und Einstellungen bleiben. Installieren Sie
   dieselbe Erweiterung später wieder (in derselben oder einer neueren
@@ -1934,7 +1935,7 @@ shows as "Nicht kompatibel" and is not loaded.
 Was die Ausbaustufen 1, 2a und 2b bewusst nicht können (auf Deutsch, in einfachen Worten):
 
 - **Nachinstallieren im Betrieb hat Grenzen.** Pakete (`.tqplugin`) lassen sich
-  in der Verwaltung installieren, aktualisieren und entfernen (Abschnitt 7).
+  in der Verwaltung installieren, aktualisieren und deinstallieren (Abschnitt 7).
   Erlaubt sind nur reine Python-Pakete, deren Abhängigkeiten schon im Image
   sind; alles andere und alles, was im Image steckt, ändern Sie nur mit einem
   neuen Image. Die Installation braucht ein beschreibbares Verzeichnis oder
@@ -1954,7 +1955,7 @@ Was die Ausbaustufen 1, 2a und 2b bewusst nicht können (auf Deutsch, in einfach
   `tiqora_*`-Tabellen ändern und keine Fremdschlüssel darauf anlegen. Die
   Schutzprüfung verhindert Versehen, sie ist keine Sicherheitsgrenze. Unter
   MariaDB können abgebrochene Änderungen halbe Tabellen hinterlassen. Beim
-  Entfernen mit "Daten löschen" liegt die einzige Kopie in der Sicherung, und
+  Deinstallieren mit "Daten löschen" liegt die einzige Kopie in der Sicherung, und
   die wird nur N Tage aufbewahrt (Standard 14).
 - **Der KI-Hintergrunddienst lädt Erweiterungen,** führt aber keine
   Abonnements, Aufgaben, Schnittstellen oder Prüfungen vor dem Speichern aus:
@@ -1981,6 +1982,6 @@ Was die Ausbaustufen 1, 2a und 2b bewusst nicht können (auf Deutsch, in einfach
 - **Ein Schreiber für Ereignisse.** Siehe Galera-Hinweis oben; Ereignisse
   kommen aus `ticket_history`, nicht aus einem Ereignisbus.
 - **Ausschalten wirkt nach Neustart,** und der Zustand "Aktiv" gilt pro Prozess.
-  Nach Installieren, Aktualisieren oder Entfernen starten die Dienste einer nach
+  Nach Installieren, Aktualisieren oder Deinstallieren starten die Dienste einer nach
   dem anderen neu (Abschnitt 7); währenddessen sind einzelne Dienste kurz nicht
   erreichbar, und ein Neustart wartet, solange ein Installations-Job läuft.

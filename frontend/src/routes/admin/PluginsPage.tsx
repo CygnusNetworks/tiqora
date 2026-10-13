@@ -239,7 +239,6 @@ function PluginCard({
   onFocused,
   onToggle,
   onRetry,
-  repositoryNames,
   updateBusy,
   onUpdate,
   onUninstall,
@@ -251,7 +250,6 @@ function PluginCard({
   onFocused: () => void;
   onToggle: (enabled: boolean) => void;
   onRetry: () => void;
-  repositoryNames: ReadonlyMap<number, string>;
   updateBusy: boolean;
   onUpdate: () => void;
   onUninstall: () => void;
@@ -299,7 +297,7 @@ function PluginCard({
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <SoftChip color="var(--color-muted)" data-testid={`plugin-source-${id}`}>
-              {sourceLabel(t, plugin, repositoryNames)}
+              {sourceLabel(t, plugin)}
             </SoftChip>
             {plugin.signature_status && (
               <SoftChip color={trustColor(plugin.signature_status)} data-testid={`plugin-trust-${id}`}>
@@ -441,19 +439,11 @@ export function PluginsPage() {
     if (fileRef.current) fileRef.current.value = "";
     if (file) uploadM.mutate(file);
   };
-  const [restartHint, setRestartHint] = useState<number | null>(null);
+  // The generation the server recorded for our request: the panel follows exactly that one.
+  const [restartGeneration, setRestartGeneration] = useState<number | null>(null);
   const restartM = useMutation({
-    mutationFn: async () => {
-      let before = 0;
-      try {
-        before = (await pluginsApi.restartStatus())?.generation ?? 0;
-      } catch {
-        before = 0;
-      }
-      await pluginsApi.requestRestart();
-      return before;
-    },
-    onSuccess: setRestartHint,
+    mutationFn: () => pluginsApi.requestRestart(),
+    onSuccess: (status) => setRestartGeneration(status.generation),
   });
   const [uninstalling, setUninstalling] = useState<PluginAdmin | null>(null);
 
@@ -493,11 +483,16 @@ export function PluginsPage() {
     }
   }, [download.job, downloadJobId]);
   const downloading = downloadM.isPending || downloadJobId != null;
-  const startUpdate = (plugin: PluginAdmin) => {
-    if (!plugin.update) return;
+  // Shared by "Aktualisieren" here and the "Verfügbar" tab: the job lives on the page, so a
+  // tab switch while it runs does not lose the install dialog.
+  const startDownload = (repoId: number, pluginId: string, version: string) => {
     setDownloadError(null);
     setDownloadMessage(null);
-    downloadM.mutate({ repoId: plugin.update.repository_id, pluginId: plugin.id, version: plugin.update.version });
+    downloadM.mutate({ repoId, pluginId, version });
+  };
+  const startUpdate = (plugin: PluginAdmin) => {
+    if (!plugin.update) return;
+    startDownload(plugin.update.repository_id, plugin.id, plugin.update.version);
   };
 
   const search = useSearch({ strict: false }) as { tab?: unknown };
@@ -518,7 +513,9 @@ export function PluginsPage() {
       </div>
     );
   }
-  if (listQ.isError || !listQ.data) {
+  // Only without any data: a failed background refetch (the api restarting) keeps the page
+  // and its open dialogs and restart progress.
+  if (!listQ.data) {
     return (
       <div className="p-4 text-sm text-danger" data-testid="admin-plugins-page">
         {apiErrorMessage(listQ.error, t("admin.plugins.loadError"))}
@@ -528,8 +525,6 @@ export function PluginsPage() {
 
   const { plugins, safe_mode: safeMode, runtime_install: runtimeInstall } = listQ.data;
   const coordinated = listQ.data.coordinated_restart;
-  const repositoryNames = new Map<number, string>();
-  for (const p of plugins) if (p.update) repositoryNames.set(p.update.repository_id, p.update.repository_name);
   const restartPending = plugins.some((p) => p.status === "restart_required");
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4" data-testid="admin-plugins-page">
@@ -598,8 +593,8 @@ export function PluginsPage() {
       )}
       {restartPending && (
         <div className="space-y-2 rounded-lg border border-hairline bg-surface p-3" data-testid="plugin-restart-box">
-          {restartHint != null ? (
-            <RestartPanel generationHint={restartHint} />
+          {restartGeneration != null ? (
+            <RestartPanel generation={restartGeneration} />
           ) : coordinated ? (
             <Button variant="secondary" disabled={restartM.isPending} onClick={() => restartM.mutate()} data-testid="plugin-restart-now">
               {t("admin.plugins.restart.now")}
@@ -623,6 +618,7 @@ export function PluginsPage() {
       )}
 
       <Tabs
+        ariaLabel={t("admin.plugins.tabs.aria")}
         items={PLUGIN_TABS.map((id) => ({ id, label: t(`admin.plugins.tabs.${id}`) }))}
         value={tab}
         onChange={setTab}
@@ -634,7 +630,7 @@ export function PluginsPage() {
       )}
 
       {tab === "available" ? (
-        <CatalogTab runtimeInstall={runtimeInstall} coordinatedRestart={coordinated} />
+        <CatalogTab runtimeInstall={runtimeInstall} downloading={downloading} onDownload={startDownload} />
       ) : tab === "repositories" ? (
         <RepositoriesTab />
       ) : plugins.length === 0 ? (
@@ -654,7 +650,6 @@ export function PluginsPage() {
                 run({ id: plugin.id, what: "switch" }, () => toggleM.mutate({ id: plugin.id, enabled }))
               }
               onRetry={() => run({ id: plugin.id, what: "retry" }, () => retryM.mutate(plugin.id))}
-              repositoryNames={repositoryNames}
               updateBusy={downloading}
               onUpdate={() => startUpdate(plugin)}
               onUninstall={() => setUninstalling(plugin)}

@@ -10,6 +10,7 @@ import { jobsApi } from "@/lib/jobsApi";
 import { pluginsApi, type PluginAdmin } from "@/lib/pluginsApi";
 import { settingsSectionsApi } from "@/lib/settingsSectionsApi";
 import { RestartPanel } from "./RestartPanel";
+import { jobRestartGeneration } from "./restartGeneration";
 
 /** Backup retention of the job system when the setting cannot be read (`jobs.retention_days`). */
 const DEFAULT_RETENTION_DAYS = 14;
@@ -36,7 +37,6 @@ export function UninstallDialog({
   const [deleteData, setDeleteData] = useState(false);
   const [restart, setRestart] = useState(true);
   const [jobId, setJobId] = useState<number | null>(null);
-  const [restartBefore, setRestartBefore] = useState(0);
   const wantsRestart = coordinatedRestart && restart;
 
   // The backup is only kept for the job system's retention time; admins treat it as the only copy (F22).
@@ -48,29 +48,17 @@ export function UninstallDialog({
   const days = retentionDays(retentionQ.data?.values as Record<string, unknown> | undefined);
 
   const uninstallM = useMutation({
-    mutationFn: async () => {
-      let before = 0;
-      if (wantsRestart) {
-        try {
-          before = (await pluginsApi.restartStatus())?.generation ?? 0;
-        } catch {
-          before = 0;
-        }
-      }
-      const accepted = await pluginsApi.uninstall(plugin.id, { delete_data: deleteData, restart: wantsRestart });
-      return { accepted, before };
-    },
-    onSuccess: ({ accepted, before }) => {
-      setRestartBefore(before);
-      setJobId(accepted.job_id);
-    },
+    mutationFn: () => pluginsApi.uninstall(plugin.id, { delete_data: deleteData, restart: wantsRestart }),
+    onSuccess: (accepted) => setJobId(accepted.job_id),
   });
   const { job, isTerminal, cancel, isCancelling } = useJob(jobId);
   const started = jobId != null;
   const succeeded = job?.status === "succeeded";
+  const failed = isTerminal && !succeeded;
 
   const finish = () => {
-    if (isTerminal) {
+    // also when closed early: the job goes on, and a second "Deinstallieren" would get a 409
+    if (started) {
       void qc.invalidateQueries({ queryKey: ["admin", "plugins"] });
       void qc.invalidateQueries({ queryKey: ["plugins", "frontend"] });
     }
@@ -154,8 +142,12 @@ export function UninstallDialog({
         )}
         {started && (
           <div className="space-y-3" data-testid="plugin-uninstall-job">
-            <p className="font-medium text-ink">
-              {succeeded ? t("admin.plugins.uninstall.done") : t("admin.plugins.uninstall.running")}
+            <p className={failed ? "font-medium text-danger" : "font-medium text-ink"} data-testid="plugin-uninstall-headline">
+              {succeeded
+                ? t("admin.plugins.uninstall.done")
+                : failed
+                  ? t("admin.plugins.uninstall.failed")
+                  : t("admin.plugins.uninstall.running")}
             </p>
             {job && <JobProgress job={job} onCancel={cancel} cancelling={isCancelling} testId="plugin-uninstall-progress" />}
             {succeeded && job.files.length > 0 && (
@@ -177,7 +169,9 @@ export function UninstallDialog({
                 </ul>
               </div>
             )}
-            {succeeded && wantsRestart && <RestartPanel generationHint={restartBefore} />}
+            {succeeded && (!coordinatedRestart || restart) && (
+              <RestartPanel generation={wantsRestart ? jobRestartGeneration(job.result) : null} />
+            )}
           </div>
         )}
       </div>
