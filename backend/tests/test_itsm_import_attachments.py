@@ -111,8 +111,14 @@ def _seed_file(
     data: bytes | None = BLOB,
     content_type: str | None = "application/octet-stream",
     size: int | None = None,
+    bare_key: bool = False,
+    extra_prefs: dict[str, str] | None = None,
 ) -> None:
-    """Rows as ``ConfigItemAttachmentAdd`` + ``VirtualFS::Write`` leave them."""
+    """Rows as ``ConfigItemAttachmentAdd`` + ``VirtualFS::Write`` leave them.
+
+    ``backend_key`` of the DB backend is ``Compress=0;Crypt=0;FileID=<id>;Mode=binary;`` (as the
+    Znuny 6.5 / 7.3 peers write it); ``bare_key`` stores just the number instead.
+    """
     filename = f"ConfigItem/{ci_id}/{name}"
     engine = create_engine(w.sync_url)
     try:
@@ -129,11 +135,14 @@ def _seed_file(
                     ),
                     {"f": filename, "c": payload, "t": T0},
                 )
-                key = str(
-                    conn.execute(
-                        text("SELECT MAX(id) FROM virtual_fs_db WHERE filename = :f"),
-                        {"f": filename},
-                    ).scalar_one()
+                file_id = conn.execute(
+                    text("SELECT MAX(id) FROM virtual_fs_db WHERE filename = :f"),
+                    {"f": filename},
+                ).scalar_one()
+                key = (
+                    str(file_id)
+                    if bare_key
+                    else f"Compress=0;Crypt=0;FileID={file_id};Mode=binary;"
                 )
             conn.execute(
                 text(
@@ -150,6 +159,7 @@ def _seed_file(
             }
             if content_type is not None:
                 prefs["ContentType"] = content_type
+            prefs.update(extra_prefs or {})
             for k, v in prefs.items():
                 conn.execute(
                     text(
@@ -184,6 +194,43 @@ async def test_reader_returns_db_and_fs_backend_files(world: _World) -> None:
     assert dump.created_at == T0 + timedelta(hours=1)
     assert (big.data, big.size) == (None, 4096)  # FS backend: size known, no bytes
     assert (note.data, note.content_type) == (b"hello", "text/plain")
+
+
+async def test_reader_reads_a_bare_number_backend_key(world: _World) -> None:
+    """Older rows (and the plan's first fixtures) carry just the ``virtual_fs_db`` id."""
+    _seed_file(world, CI_A, "bare.bin", bare_key=True)
+    async with world.factory() as s:
+        got = await source_extra.read_ci_attachments(s, [CI_A], with_data=True)
+    assert [(a.filename, a.data) for a in got] == [("bare.bin", BLOB)]
+
+
+@pytest.mark.parametrize(
+    ("key", "expected"),
+    [
+        ("Compress=0;Crypt=0;FileID=3;Mode=binary;", 3),  # what Znuny 6.5 / 7.3 write
+        ("FileID=12;", 12),
+        (" 7 ", 7),
+        ("42", 42),
+        ("Compress=0;Crypt=0;Mode=binary;", None),
+        ("FileID=x;", None),
+        ("fs-key", None),
+        ("", None),
+    ],
+)
+def test_db_file_id_parses_znuny_backend_keys(key: str, expected: int | None) -> None:
+    assert source_extra._db_file_id(key) == expected
+
+
+async def test_reader_carries_the_uploader_and_content_id_preferences(world: _World) -> None:
+    """GI ``ConfigItemGet`` shows ``UserID`` and ``ContentID`` of the VirtualFS preferences."""
+    _seed_file(world, CI_A, "a.bin", extra_prefs={"UserID": "7", "ContentID": "cid-1"})
+    _seed_file(world, CI_B, "b.bin")
+    async with world.factory() as s:
+        got = await source_extra.read_ci_attachments(s, [CI_A, CI_B], with_data=False)
+    assert [(a.filename, a.user_id, a.content_id) for a in got] == [
+        ("a.bin", 7, "cid-1"),
+        ("b.bin", None, ""),
+    ]
 
 
 async def test_reader_without_data_never_selects_content(world: _World) -> None:

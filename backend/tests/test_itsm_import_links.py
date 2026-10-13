@@ -205,8 +205,8 @@ async def test_link_seen_from_both_cis_is_added_once(world: _World) -> None:
     rows = [r for r in await _links(world) if {r.source_key, r.target_key} == {c3, c4}]
     assert len(rows) == 1
     steps = ctx.report.steps["links"]
-    assert steps.created == 5
-    assert steps.unchanged == 1
+    # the second sighting (the other end's page) is not counted again
+    assert (steps.created, steps.unchanged) == (5, 0)
 
 
 async def test_non_valid_state_is_skipped(world: _World) -> None:

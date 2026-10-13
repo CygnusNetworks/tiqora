@@ -804,9 +804,11 @@ async def import_service_meta(session: AsyncSession, row: ServiceItsmRow, *, use
 
 async def cmdb_attachment_contents(
     session: AsyncSession, ci_id: int, attachment_ids: Sequence[int]
-) -> list[tuple[str, str, bytes]]:
-    """(filename, content type, bytes) of the given attachments of a Tiqora CI, in the order
-    given. Used by GI ``ConfigItemGet`` after the caller proved class permission."""
+) -> list[tuple[str, str, bytes, dict[str, str]]]:
+    """(filename, content type, bytes, extra ``Preferences``) of the given attachments of a Tiqora
+    CI, in the order given. Used by GI ``ConfigItemGet`` after the caller proved class
+    permission. The extra preferences are what Znuny's ``VirtualFS`` keeps besides the size:
+    ``UserID`` (the uploader) and an empty ``ContentID``."""
     if not attachment_ids:
         return []
     rows = (
@@ -816,13 +818,17 @@ async def cmdb_attachment_contents(
                 TiqoraCmdbAttachment.filename,
                 TiqoraCmdbAttachment.content_type,
                 TiqoraCmdbAttachment.content,
+                TiqoraCmdbAttachment.created_by,
             ).where(
                 TiqoraCmdbAttachment.ci_id == ci_id,
                 TiqoraCmdbAttachment.id.in_(list(attachment_ids)),
             )
         )
     ).all()
-    by_id = {int(i): (str(f), str(c), bytes(b)) for i, f, c, b in rows}
+    by_id = {
+        int(i): (str(f), str(c), bytes(b), {"ContentID": "", "UserID": str(int(u))})
+        for i, f, c, b, u in rows
+    }
     return [by_id[i] for i in attachment_ids if i in by_id]
 
 
@@ -934,9 +940,23 @@ class ModeAReader:
             budget_seconds=budget_seconds,
         )
 
-    async def attachment_contents(self, znuny_id: int) -> list[tuple[str, str, bytes]]:
+    async def attachment_contents(
+        self, znuny_id: int
+    ) -> list[tuple[str, str, bytes, dict[str, str]]]:
+        """(filename, content type, bytes, extra ``Preferences``) of the CI's attachments."""
         found = await self._source.attachments([znuny_id], with_data=True)
-        return [(a.filename, a.content_type, a.data or b"") for a in found]
+        return [
+            (
+                a.filename,
+                a.content_type,
+                a.data or b"",
+                {
+                    "ContentID": a.content_id,
+                    **({} if a.user_id is None else {"UserID": str(a.user_id)}),
+                },
+            )
+            for a in found
+        ]
 
     async def catalog_names(self) -> dict[int, str]:
         """Znuny general-catalog id -> name (``GeneralCatalog`` attribute values)."""

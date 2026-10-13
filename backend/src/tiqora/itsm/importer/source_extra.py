@@ -107,7 +107,8 @@ async def count_changes(session: AsyncSession) -> dict[str, int]:
 #
 # ``virtual_fs.filename = 'ConfigItem/<ConfigItemID>/<FileName>'``; ``virtual_fs.backend`` names
 # the storage class: ``Kernel::System::VirtualFS::DB`` keeps the bytes in ``virtual_fs_db`` (row id
-# = ``virtual_fs.backend_key``; MySQL as BLOB, PostgreSQL as MIME::Base64 text), any other backend
+# = ``FileID`` of ``virtual_fs.backend_key`` (``Compress=0;Crypt=0;FileID=3;Mode=binary;``, or a
+# bare number); MySQL as BLOB, PostgreSQL as MIME::Base64 text), any other backend
 # (``...::FS``) keeps files on Znuny's disk, which Tiqora cannot reach (``data`` stays None).
 # ``virtual_fs_preferences`` carries ``ContentType`` and ``FilesizeRaw``.
 
@@ -129,7 +130,8 @@ def _prefix_query(n: int) -> str:
 
 _PREFERENCES = text(
     "SELECT virtual_fs_id, preferences_key, preferences_value FROM virtual_fs_preferences"
-    " WHERE virtual_fs_id IN :ids AND preferences_key IN ('ContentType', 'FilesizeRaw')"
+    " WHERE virtual_fs_id IN :ids"
+    " AND preferences_key IN ('ContentType', 'FilesizeRaw', 'UserID', 'ContentID')"
 ).bindparams(bindparam("ids", expanding=True))
 _CONTENT = text("SELECT id, content FROM virtual_fs_db WHERE id IN :ids").bindparams(
     bindparam("ids", expanding=True)
@@ -193,10 +195,10 @@ async def read_ci_attachments(
     content: dict[int, bytes] = {}
     if with_data:
         db_keys = {
-            f[0]: int(f[4])
+            f[0]: file_id
             for f in files
             if f[3].endswith(_DB_BACKEND_SUFFIX)
-            and f[4].isdigit()
+            and (file_id := _db_file_id(f[4])) is not None
             and (sizes[f[0]] or 0) <= MAX_ATTACHMENT_BYTES
         }
         by_key = {key: vfs for vfs, key in db_keys.items()}
@@ -215,9 +217,32 @@ async def read_ci_attachments(
                 size=len(data) if size is None and data is not None else (size or 0),
                 data=data,
                 created_at=created,
+                user_id=_user_id(prefs.get(vfs_id, {})),
+                content_id=prefs.get(vfs_id, {}).get("ContentID", ""),
             )
         )
     return out
+
+
+def _db_file_id(backend_key: str) -> int | None:
+    """``virtual_fs_db.id`` named by a ``virtual_fs.backend_key``.
+
+    Znuny's ``VirtualFS::DB`` writes ``Compress=0;Crypt=0;FileID=3;Mode=binary;`` (seen on the
+    Znuny 6.5 and 7.3 golden peers); a bare number is accepted as well.
+    """
+    key = backend_key.strip()
+    if key.isdigit():
+        return int(key)
+    for pair in key.split(";"):
+        name, _, value = pair.partition("=")
+        if name.strip() == "FileID" and value.strip().isdigit():
+            return int(value.strip())
+    return None
+
+
+def _user_id(prefs: dict[str, str]) -> int | None:
+    raw = prefs.get("UserID", "").strip()
+    return int(raw) if raw.isdigit() else None
 
 
 def _size(prefs: dict[str, str]) -> int | None:

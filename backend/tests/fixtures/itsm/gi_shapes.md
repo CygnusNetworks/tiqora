@@ -32,7 +32,9 @@ There is no `ChangeTime` and no `*ID` state key. `CreateTime` is `YYYY-MM-DD HH:
 
 Attachment hash (`Kernel/System/ITSMConfigItem.pm:693-743`, `VirtualFS->Read`): `Filename`,
 `Content`, `ContentType`, `Type => 'attachment'`, `Filesize` = `Preferences->{FilesizeRaw}`
-(bytes, the "4.6 KBytes" form of the POD is in `Preferences->{Filesize}`), `Preferences`.
+(bytes; the "4.6 KBytes" form of the POD is only in the POD), `Preferences` = every row of
+`virtual_fs_preferences` (`ConfigItemID`, `ContentID` (empty), `ContentType`, `FilesizeRaw`, `UserID`;
+seen on the 7.3 golden peer).
 
 ## Differences 6.5.4 vs 7.3.5
 

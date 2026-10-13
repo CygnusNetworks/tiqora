@@ -266,17 +266,6 @@ def gi_time(value: datetime | None) -> str:
     return "" if value is None else value.strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _human_size(size: int) -> str:
-    """``Kernel::Language`` ``FormatDataSize``: 1 decimal, units Bytes/KBytes/MBytes/GBytes."""
-    if size >= 1024**3:
-        return f"{size / 1024**3:.1f} GBytes"
-    if size >= 1024**2:
-        return f"{size / 1024**2:.1f} MBytes"
-    if size >= 1024:
-        return f"{size / 1024:.1f} KBytes"
-    return f"{size} Bytes"
-
-
 def _parse_id(raw: Any) -> int | None:
     """A CI id from a GI value; anything that is not a plain positive integer is ``None``."""
     text = str(raw).strip()
@@ -315,7 +304,7 @@ async def _attachments(
             session, view.id, [a[0] for a in view.attachments]
         )
     out: list[dict[str, Any]] = []
-    for filename, content_type, content in files:
+    for filename, content_type, content, extra in files:
         if not filename:
             continue
         out.append(
@@ -325,11 +314,12 @@ async def _attachments(
                 "Filename": filename,
                 "Filesize": str(len(content)),
                 "Type": "attachment",
+                # the rows ``VirtualFS->Write`` keeps (Znuny has no human-readable "Filesize" here)
                 "Preferences": {
                     "ConfigItemID": str(view.id),
                     "ContentType": content_type,
-                    "Filesize": _human_size(len(content)),
                     "FilesizeRaw": str(len(content)),
+                    **extra,
                 },
             }
         )

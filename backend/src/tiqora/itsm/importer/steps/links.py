@@ -70,6 +70,7 @@ async def run_links(ctx: StepContext, maps: ClassMaps | None = None) -> None:
         done = 0
         after = 0
         refused: set[str] = set()  # links not imported: reported once, not once per end
+        seen: set[str] = set()  # links handled in this run: counted once, not once per end
         while True:
             ids = await ports.source.ci_ids_page(after, ctx.page_size)
             if not ids:
@@ -77,7 +78,7 @@ async def run_links(ctx: StepContext, maps: ClassMaps | None = None) -> None:
             after = max(ids)
             await ctx.check_cancelled()
             links = await ports.source.links_for_cis(ids)
-            await _links_page(ctx, session, writer, store, maps, links, refused)
+            await _links_page(ctx, session, writer, store, maps, links, refused, seen)
             if not ctx.dry_run:
                 await session.commit()
             done += len(ids)
@@ -92,11 +93,12 @@ async def _links_page(
     maps: ClassMaps,
     links: list[ZnunyLink],
     refused: set[str],
+    seen: set[str],
 ) -> None:
     candidates: list[ZnunyLink] = []
     ci_keys: set[str] = set()
     for link in links:
-        if link.map_key in refused:
+        if link.map_key in refused or link.map_key in seen:
             continue  # seen from the other end's page before
         if link.state_name != _VALID_STATE:
             refused.add(link.map_key)
@@ -116,6 +118,7 @@ async def _links_page(
             )
             ctx.report.count(STEP, "skipped")
             continue
+        seen.add(link.map_key)
         candidates.append(link)
         for obj, key in (
             (link.source_object, link.source_key),

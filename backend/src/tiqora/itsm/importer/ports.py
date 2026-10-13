@@ -112,6 +112,9 @@ class ZnunyAttachment:
     size: int
     data: bytes | None  # None: FS backend or not requested
     created_at: datetime
+    #: ``virtual_fs_preferences`` ``UserID`` / ``ContentID`` (GI ``ConfigItemGet`` shows them)
+    user_id: int | None = None
+    content_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)

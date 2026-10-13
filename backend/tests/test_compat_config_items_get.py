@@ -278,7 +278,9 @@ class _FakeModeAReader:
         self.asked.append((znuny_id, user_id))
         return self.view if self.view is not None and self.view.id == znuny_id else None
 
-    async def attachment_contents(self, znuny_id: int) -> list[tuple[str, str, bytes]]:
+    async def attachment_contents(
+        self, znuny_id: int
+    ) -> list[tuple[str, str, bytes, dict[str, str]]]:
         return []
 
     async def catalog_names(self) -> dict[int, str]:
@@ -426,7 +428,15 @@ async def test_get_with_attachments_base64(cmdb_db: CmdbWorld) -> None:
     assert att["Type"] == "attachment"
     assert att["Filesize"] == str(len(payload))
     assert att["Preferences"]["FilesizeRaw"] == str(len(payload))
-    assert att["Preferences"]["Filesize"] == "512 Bytes"
+    # the preferences are the rows Znuny's VirtualFS keeps: no human-readable "Filesize" in them,
+    # the uploader and an empty ContentID instead (golden: test_gi_config_items.py)
+    assert att["Preferences"] == {
+        "ConfigItemID": str(ci_id),
+        "ContentID": "",
+        "ContentType": "application/octet-stream",
+        "FilesizeRaw": str(len(payload)),
+        "UserID": str(USER_A),
+    }
     assert att["Content"].endswith("\n") and "\n" in att["Content"][:-1]  # encode_base64 lines
     assert base64.b64decode(att["Content"]) == payload
 

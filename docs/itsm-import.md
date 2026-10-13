@@ -652,3 +652,32 @@ Semikolon als Trenner wie die übrigen Berichte. Filtern Sie zuerst nach `Code`:
 `definition_unreadable` bedeuten, dass Daten fehlen. Die Spalte `Objekt` führt direkt zum Datensatz in
 Znuny. Texte aus Znuny können in Excel als Formel gedeutet werden; deshalb beginnt jede Zelle, die mit
 `=`, `+`, `-` oder `@` anfängt, mit einem vorangestellten Apostroph.
+
+## Importer und GI gegen Znuny: Golden-Abgleich (`tests/golden/test_itsm_import.py`, `test_gi_config_items.py`)
+
+Beide Module laufen auf `znuny-6.5-itsm` und `znuny-7.3-itsm` (Stand 2026-10-13: je 35 Fälle grün, mit dem
+CMDB-Fix CMDB-PM-I1, siehe unten). Sie legen die Daten mit `Kernel::System::ITSMConfigItem` im Peer an,
+lassen den Importer laufen und vergleichen Tiqoras Zeilen mit dem, was Znuny selbst liefert
+(`VersionList`, `VersionGet`, `link_relation`, `LinkList`, die GI-Operationen `ConfigItem*` und die
+Prozess-Aktion `ConfigItemUpdate`). Beim Abgleich gefundene und behobene Abweichungen:
+
+* `virtual_fs.backend_key` des DB-Backends lautet `Compress=0;Crypt=0;FileID=3;Mode=binary;`, nicht
+  nur die Zahl: der Importer meldete jeden Anhang als „liegt im Dateisystem“.
+* Eine Verknüpfung, die auf den Seiten beider CIs auftaucht, wurde im Bericht doppelt gezählt.
+* `ConfigItemGet` liefert in `Attachment.Preferences` die Zeilen aus `virtual_fs_preferences`
+  (`ConfigItemID`, `ContentID`, `ContentType`, `FilesizeRaw`, `UserID`), keine lesbare `Filesize`.
+
+Bewusste, dokumentierte Unterschiede, die bleiben:
+
+* Znuny beantwortet Fehler mit HTTP 200, Tiqora mit 4xx (für alle Operationen der Kompatibilitätsschicht).
+* `ConfigItemGet` und `ConfigItemDelete` senden bei Znuny den Fehlercode literal als
+  `$Self->{OperationName}.AuthFail`; Tiqora sendet `ConfigItemGet.AuthFail` (siehe
+  `backend/tests/fixtures/itsm/gi_shapes.md`). `ConfigItemSearch`, `-Create` und `-Update` prüfen in
+  Znuny `UserLogin`/`SessionID` und `Password` selbst (`MissingParameter`); Tiqora nutzt die
+  gemeinsame Anmeldung der Kompatibilitätsschicht (`AuthFail`).
+* Znuny behält nach `Vendor::1 = ''` einen leeren Textwert, Tiqora entfernt den Wert.
+* Link-Typen mit gleichem Quell- und Zielnamen (`RelevantTo`) haben in Znuny keine Richtung; Tiqora
+  speichert sie in kanonischer Reihenfolge (CI zuerst).
+* Die Golden-Fälle `ConfigItemUpdate` und Prozess-Aktion setzen den Fix CMDB-PM-I1 voraus (optionale
+  importierte Attribute sind keine Pflichtfelder), sonst scheitern sie an der importierten Klasse
+  `Computer`.
