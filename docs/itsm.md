@@ -328,6 +328,12 @@ Admin, ITSM, „Import aus Znuny“ ist die Seite, von der aus Sie umstellen.
 
 **Ausgeschaltet.** Die ITSM-Funktionen von Tiqora sind weg; Znuny arbeitet unverändert weiter.
 
+**Ereignisse für Webhooks.** Verknüpft oder trennt Tiqora ein Ticket und ein CI, steht im Ausgang
+(Outbox) des Tickets ein Ereignis `LinkAdd` oder `LinkDelete` mit `target_object: "ITSMConfigItem"`, in
+beiden Modi. `target_key` ist in Modus A die CI-ID von Znuny (`configitem.id`) und in Modus B die CI-ID
+von Tiqora. Nach einer Umstellung zeigen dieselben Schlüssel also auf andere Tabellen; ein Empfänger,
+der CI-IDs speichert, ordnet sie über die Zuordnung des Imports (Znuny-ID zu Tiqora-ID) um.
+
 ### Umstellung auf Tiqora (Ablauf)
 
 Die Umstellung braucht keinen Stillstand. Bis zum letzten Schritt können Sie wiederholen und
@@ -355,12 +361,17 @@ abbrechen, Znuny bleibt führend.
    in Znuny wieder aufgehoben; die Seite zeigt andernfalls die Schaltfläche „Sperre aufheben“.
 6. **Prüfen.** Ein Ticket mit verknüpften CIs zeigt in Znuny das Feld „Betroffene CIs (Tiqora)“; der
    Bildschirm „CI bearbeiten“ in Znuny zeigt die Sperrseite; in Tiqora steht oben „Tiqora führt das
-   ITSM seit …“, und der Drift-Hinweis („Seit der Umstellung wurden in Znuny … CIs geändert“) zeigt 0.
+   ITSM seit …“, und der Drift-Hinweis („Seit der Umstellung wurden in Znuny … CIs oder
+   CI-Verknüpfungen geändert“) erscheint nicht.
 
-Sonderfall „Umstellen ohne CI-Daten“: Ist die installierte Znuny-ITSM-Version für den Import unbekannt
-oder gibt es nur ITSMCore ohne CMDB, kann Tiqora keine CIs lesen. Der Dialog bietet dann eine Umstellung an,
-die nur Katalog, Prioritätsmatrix und Service-Angaben übernimmt, soweit lesbar. Sie müssen ausdrücklich
-bestätigen, dass die CI-Daten aus Znuny nicht übernommen werden.
+Gibt es in Znuny nur ITSMCore ohne das CMDB-Paket, läuft der normale Ablauf: Der Import übernimmt Katalog,
+Prioritätsmatrix und Service-Angaben (es gibt keine Klassen und CIs), danach stellen Sie wie oben um.
+
+Sonderfall „Umstellen ohne CI-Daten“: Ist die installierte Znuny-ITSM-Version für den Import unbekannt,
+kann Tiqora keine ITSM-Daten aus Znuny lesen, auch Katalog, Prioritätsmatrix und Service-Angaben nicht.
+Der Dialog bietet dann eine Umstellung an, die nichts aus Znuny übernimmt; Sie müssen ausdrücklich
+bestätigen, dass die CI-Daten aus Znuny nicht übernommen werden. Kann Tiqora die Version lesen, lehnt
+Tiqora diesen Weg ab (`409`), denn dann gilt der Ablauf mit Import.
 
 ### Was bleibt, was entfällt (je Znuny-Bildschirm)
 
@@ -399,8 +410,10 @@ vollständig nach Tiqora holen, löschen Sie die betroffenen CIs in Tiqora vor d
 
 - **Generic Interface, Konsole und Import/Export von Znuny werden nicht gesperrt.** Ein Webservice, ein
   Konsolenbefehl oder ein Import/Export-Auftrag kann nach der Umstellung weiter in die Znuny-Tabellen
-  schreiben. Tiqora zählt solche Änderungen (Drift-Hinweis, auch geänderte Verknüpfungen), übernimmt sie aber
-  nicht. Stellen Sie die Aufrufer vor der Umstellung um (Schritt 4).
+  schreiben. Tiqora zählt geänderte CIs und neu angelegte Verknüpfungen mit einem CI (Drift-Hinweis),
+  übernimmt sie aber nicht. Eine in Znuny gelöschte Verknüpfung hinterlässt keine Zeile und wird nicht
+  gezählt; in der Verknüpfen-Maske von Znuny sperrt TiqoraITSM auch das Löschen, über Webservice oder
+  Konsole bleibt es unbemerkt. Stellen Sie die Aufrufer vor der Umstellung um (Schritt 4).
 - **Changes und Arbeitsaufträge** von Znuny werden nur gezählt (Meldung `changes_not_imported`), nicht
   übernommen. Die Masken in Znuny bleiben bis zum Abbau von Znuny bestehen.
 - **CI-Anhänge im Dateisystem** (Speicher „FS“ statt Datenbank) kann der Importer nicht lesen; sie
