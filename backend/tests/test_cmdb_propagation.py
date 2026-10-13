@@ -20,6 +20,7 @@ from tests._cmdb_helpers import (
     make_ci,
     make_class,
     run_jobs_until_idle,
+    set_mode,
 )
 from tiqora.cmdb.links import LinkEnd, LinkService
 from tiqora.cmdb.propagation import (
@@ -354,6 +355,103 @@ async def test_link_type_propagation_change_enqueues_full_recompute(cmdb_db: Cmd
         await s.commit()
         assert first == second
         assert await _queued_job_kinds(s) == ["core.cmdb_propagation"]
+
+
+async def _propagation_jobs(s: AsyncSession) -> list[tuple[str, str | None]]:
+    rows = await s.execute(
+        text(
+            "SELECT kind, dedupe_key FROM tiqora_job WHERE kind = 'core.cmdb_propagation'"
+            " AND status = 'queued'"
+        )
+    )
+    return [(str(k), d) for k, d in rows.all()]
+
+
+async def test_itsm_link_type_patch_queues_cmdb_recompute(cmdb_db: CmdbWorld) -> None:
+    """Task 30 / R2: itsm1's link-type PATCH queues the full recompute in Mode B when
+    propagation, pointed or valid changes; other fields (labels) do not."""
+    base = "/api/v1/admin/itsm/link-types"
+    async with client_for(cmdb_db, USER_ADMIN) as c:
+        r = await c.post(base, json={"name": "Cmdb4Feeds", "pointed": True, "propagation": "none"})
+        assert r.status_code == 201, r.text
+        type_id = r.json()["id"]
+        r = await c.patch(f"{base}/{type_id}", json={"source_label": "speist"})
+        assert r.status_code == 200, r.text
+        async with cmdb_db.factory() as s:
+            assert await _propagation_jobs(s) == []
+        r = await c.patch(f"{base}/{type_id}", json={"propagation": "source"})
+        assert r.status_code == 200, r.text
+        async with cmdb_db.factory() as s:
+            assert await _propagation_jobs(s) == [("core.cmdb_propagation", "all")]
+        # deduplicated: a second relevant change joins the queued job
+        for body in ({"pointed": False}, {"valid": False}):
+            r = await c.patch(f"{base}/{type_id}", json=body)
+            assert r.status_code == 200, r.text
+        async with cmdb_db.factory() as s:
+            assert await _propagation_jobs(s) == [("core.cmdb_propagation", "all")]
+
+
+async def test_itsm_link_type_patch_valid_change_queues_recompute(cmdb_db: CmdbWorld) -> None:
+    base = "/api/v1/admin/itsm/link-types"
+    async with client_for(cmdb_db, USER_ADMIN) as c:
+        r = await c.post(base, json={"name": "Cmdb4Feeds", "propagation": "both"})
+        assert r.status_code == 201, r.text
+        r = await c.patch(f"{base}/{r.json()['id']}", json={"valid": False})
+        assert r.status_code == 200, r.text
+    async with cmdb_db.factory() as s:
+        assert await _propagation_jobs(s) == [("core.cmdb_propagation", "all")]
+
+
+async def test_itsm_link_type_patch_outside_mode_b_queues_nothing(cmdb_db: CmdbWorld) -> None:
+    base = "/api/v1/admin/itsm/link-types"
+    set_mode(cmdb_db, "znuny_readthrough")
+    async with client_for(cmdb_db, USER_ADMIN) as c:
+        r = await c.post(base, json={"name": "Cmdb4Feeds", "propagation": "none"})
+        assert r.status_code == 201, r.text
+        r = await c.patch(f"{base}/{r.json()['id']}", json={"propagation": "both"})
+        assert r.status_code == 200, r.text
+    async with cmdb_db.factory() as s:
+        assert await _propagation_jobs(s) == []
+
+
+async def test_itsm_link_type_sync_without_changes_queues_nothing(cmdb_db: CmdbWorld) -> None:
+    """The sync adds Znuny's own types (``Normal``, ``ParentChild``) as new rows: new rows carry
+    no links, so no recompute; it removes only the rows it added here."""
+    async with cmdb_db.factory() as s:
+        before = set((await s.execute(text("SELECT name FROM tiqora_itsm_link_type"))).scalars())
+    try:
+        async with client_for(cmdb_db, USER_ADMIN) as c:
+            r = await c.post("/api/v1/admin/itsm/link-types/sync")
+            assert r.status_code == 200, r.text
+        async with cmdb_db.factory() as s:
+            assert await _propagation_jobs(s) == []
+    finally:
+        async with cmdb_db.factory() as s:
+            names = set((await s.execute(text("SELECT name FROM tiqora_itsm_link_type"))).scalars())
+            for name in sorted(names - before):
+                await s.execute(
+                    text("DELETE FROM tiqora_itsm_link_type WHERE name = :n"), {"n": name}
+                )
+            await s.commit()
+
+
+async def test_itsm_link_type_recompute_job_applies_the_new_direction(cmdb_db: CmdbWorld) -> None:
+    """End to end: a type that did not propagate starts to after the PATCH and the job."""
+    base = "/api/v1/admin/itsm/link-types"
+    async with client_for(cmdb_db, USER_ADMIN) as c:
+        r = await c.post(base, json={"name": "Cmdb4Feeds", "pointed": True, "propagation": "none"})
+        assert r.status_code == 201, r.text
+        type_id = r.json()["id"]
+    async with cmdb_db.factory() as s:
+        a, b = await _chain(s, ["cmdb4-a", "cmdb4-b"], link_type="Cmdb4Feeds")
+        await _set_own_incident(s, b, "incident")
+        assert await _cur(s, [a, b]) == ["operational", "incident"]
+    async with client_for(cmdb_db, USER_ADMIN) as c:
+        r = await c.patch(f"{base}/{type_id}", json={"propagation": "source"})
+        assert r.status_code == 200, r.text
+    await run_jobs_until_idle(cmdb_db)
+    async with cmdb_db.factory() as s:
+        assert await _cur(s, [a, b]) == ["warning", "incident"]
 
 
 async def test_recompute_route_enqueues_job(cmdb_db: CmdbWorld) -> None:

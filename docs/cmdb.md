@@ -153,8 +153,10 @@ Die Berechnung ist zyklensicher und begrenzt: Pro Speicherung wird nur der Berei
 berechnet, den die Änderung betrifft (der Rest bleibt unberührt, auch wenn anderswo
 Störungen laufen). Überschreitet der Bereich die Obergrenze (`propagation_node_cap`, Vorgabe
 5000) oder die Tiefe 50, schreibt Tiqora nichts halb und stößt stattdessen den Job
-`core.cmdb_propagation` an. Hat jemand die Weitergabe eines Linktyps geändert, rechnet
-ein Admin alle Zustände mit `POST /api/v1/admin/cmdb/propagation/recompute` neu (Job
+`core.cmdb_propagation` an. Ändert ein Admin unter *Admin → ITSM → Linktypen* die
+Weitergabe, die Richtung oder die Gültigkeit eines Linktyps (auch über „Aus Znuny
+aktualisieren“), stößt Tiqora in Modus B denselben Job von selbst an. Von Hand rechnet ein
+Admin alle Zustände mit `POST /api/v1/admin/cmdb/propagation/recompute` neu (Job
 `core.cmdb_propagation`, Abfrage über `/api/v1/jobs`) – in der Oberfläche über
 **Vorfallstatus neu berechnen** auf der Seite *Admin → CMDB-Klassen*. Ändert ein Admin im Katalog
 die Funktion oder Gültigkeit eines Vorfallstatus, startet diese Neuberechnung von selbst. Den

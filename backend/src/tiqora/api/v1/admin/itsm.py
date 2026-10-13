@@ -156,6 +156,22 @@ def _link_type_out(row: TiqoraItsmLinkType, znuny: ZnunyLinkType | None) -> Link
     )
 
 
+def _propagation_shape(row: TiqoraItsmLinkType) -> tuple[str, bool, bool]:
+    """What the CMDB's derived incident states depend on (R2): propagation, pointed, valid."""
+    return (str(row.propagation), bool(row.pointed), bool(row.valid))
+
+
+async def _recompute_cmdb_states(session: DbSession, *, user_id: int) -> None:
+    """In Mode B the Tiqora CMDB derives incident states along the link types: queue its full
+    recompute (``core.cmdb_propagation``, deduplicated) after a propagation-relevant change.
+    Flush only; the route commits."""
+    if (await get_itsm_mode(session)).mode != "tiqora":
+        return
+    from tiqora.cmdb.propagation import enqueue_full_recompute  # CMDB plan, Mode B only
+
+    await enqueue_full_recompute(session, user_id=user_id)
+
+
 async def _get_row(session: DbSession, link_type_id: int) -> TiqoraItsmLinkType:
     row = (
         await session.execute(
@@ -182,7 +198,12 @@ async def get_link_types(admin: AdminUser, session: DbSession) -> LinkTypeListOu
 @router.post("/link-types/sync", response_model=LinkTypeSyncOut)
 async def post_link_types_sync(admin: AdminUser, session: DbSession) -> LinkTypeSyncOut:
     """ "Aus Znuny aktualisieren": the only way the table changes besides the editor."""
+    before = {r.name: _propagation_shape(r) for r in await list_link_types(session)}
     changed = await sync_link_type_rows(session, user_id=admin.id)
+    after = {r.name: _propagation_shape(r) for r in await list_link_types(session)}
+    # new rows carry no links yet; only rows that existed before can change derived states
+    if any(after.get(name) != shape for name, shape in before.items()):
+        await _recompute_cmdb_states(session, user_id=admin.id)
     await session.commit()
     return LinkTypeSyncOut(changed=changed)
 
@@ -209,11 +230,14 @@ async def patch_link_type(
 ) -> LinkTypeOut:
     row = await _get_row(session, link_type_id)
     changes = body.model_dump(exclude_unset=True)
+    before = _propagation_shape(row)
     try:
         await update_link_type(session, row, changes, user_id=admin.id)
     except LinkTypeError as exc:
         await session.rollback()
         raise _link_type_http(exc) from exc
+    if _propagation_shape(row) != before:
+        await _recompute_cmdb_states(session, user_id=admin.id)
     catalogue = await znuny_link_types(SysConfig(session))
     out = _link_type_out(row, catalogue.get(row.name))
     await session.commit()

@@ -352,14 +352,14 @@ async def update_link_type(
 
 
 async def _link_table_in_use(session: AsyncSession, name: str) -> bool:
-    """The CMDB plan's ``tiqora_itsm_link`` (absent on this branch) keys its rows by type name."""
+    """The CMDB's ``tiqora_itsm_link`` (migration 0079) keys its rows by type name."""
 
     def _has_table(sync_session: Any) -> bool:
         return bool(inspect(sync_session.connection()).has_table("tiqora_itsm_link"))
 
     if not await session.run_sync(_has_table):
         return False
-    # Lightweight table construct: the CMDB's ORM class is not importable on this branch.
+    # Lightweight table construct: keeps this module free of the CMDB's ORM model.
     link = table("tiqora_itsm_link", column("link_type"))
     row = (
         await session.execute(select(link.c.link_type).where(link.c.link_type == name).limit(1))

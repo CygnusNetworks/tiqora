@@ -174,7 +174,10 @@ nur Bezeichnungen, Angebot (Ticket-Ticket, Ticket-CI, CI-CI, CI-Service) und Gü
 Tiqora-Typen (Vorgaben `DependsOn`, `Includes`, `ConnectedTo`, `AlternativeTo`, `RelevantTo`) und die
 Weitergabe des Incident-Status (keine, Quelle, Ziel, beide) gelten für Modus B. „Aus Znuny
 aktualisieren“ gleicht die Zeilen mit der SysConfig ab; Ticket-Ticket-Verknüpfungen können nur Typen
-nutzen, die Znuny speichern kann.
+nutzen, die Znuny speichern kann. Ändert sich in Modus B die Weitergabe, die Richtung oder die
+Gültigkeit eines Typs (im Editor oder durch „Aus Znuny aktualisieren“), berechnet die CMDB alle
+abgeleiteten Vorfallstatus im Hintergrund neu (Job `core.cmdb_propagation`, siehe
+[cmdb.md](cmdb.md)).
 
 ### Notizen an verknüpfte Tickets
 
