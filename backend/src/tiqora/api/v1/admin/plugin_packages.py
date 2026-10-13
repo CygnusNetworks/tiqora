@@ -22,7 +22,7 @@ from tiqora.api.deps import AppSettings, DbSession
 from tiqora.api.uploads import read_upload_within_limit
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.config import Settings
-from tiqora.db.tiqora.models import TiqoraRestart
+from tiqora.db.tiqora.models import TiqoraPlugin, TiqoraRestart
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.domain.schemas import UtcDateTime
 from tiqora.jobs.schemas import JobAccepted
@@ -325,6 +325,47 @@ async def install_package(
     )
     await session.commit()
     log.info("plugin_install_queued", plugin=report.plugin_id, version=report.version, job=job.id)
+    return JobAccepted(job_id=job.id, status="running" if job.status == "running" else "queued")
+
+
+class PluginUninstallIn(BaseModel):
+    delete_data: bool = False
+    restart: bool = True
+
+
+@router.post(
+    "/{plugin_id}/uninstall",
+    response_model=JobAccepted,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def uninstall_plugin(
+    plugin_id: str,
+    body: PluginUninstallIn,
+    admin: WebAdmin,
+    session: DbSession,
+    settings: AppSettings,
+) -> JobAccepted:
+    """Queue the removal ("Daten behalten" or "Daten löschen"); the UI polls ``GET /jobs/{id}``."""
+    row = await session.get(TiqoraPlugin, plugin_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Erweiterung nicht gefunden")
+    if install_jobs.in_image(settings, plugin_id):
+        await session.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, install_jobs.IN_IMAGE_MESSAGE)
+    if await active_plugin_job(session, plugin_id):
+        await session.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, ACTIVE_JOB_MESSAGE)
+    job = await enqueue_job(
+        session,
+        kind=install_jobs.PLUGIN_UNINSTALL_KIND,
+        payload=install_jobs.PluginUninstallPayload(
+            plugin_id=plugin_id, delete_data=body.delete_data, restart=body.restart
+        ),
+        created_by=admin.id,
+        dedupe_key=install_jobs.dedupe_key(plugin_id),
+    )
+    await session.commit()
+    log.info("plugin_uninstall_queued", plugin=plugin_id, delete_data=body.delete_data, job=job.id)
     return JobAccepted(job_id=job.id, status="running" if job.status == "running" else "queued")
 
 

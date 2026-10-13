@@ -11,6 +11,10 @@ Znuny table), not a security boundary: an admin who installs a plugin trusts its
 
 from __future__ import annotations
 
+import base64
+import gzip
+import io
+import json
 import os
 import re
 import subprocess
@@ -24,7 +28,8 @@ from typing import Any, Final
 from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-from sqlalchemy import update
+from fastapi.encoders import jsonable_encoder
+from sqlalchemy import MetaData, inspect, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -33,6 +38,9 @@ from tiqora.plugins.discovery import DiscoveredPlugin
 _ENV_DIR = Path(__file__).parent / "alembic_env"
 _MAX_REVISION_ID = 32  # width of the version_num column Alembic creates
 _MAX_ERROR_LEN = 2000
+#: "Daten löschen" exports the plugin's rows first; more than this (uncompressed) is refused
+EXPORT_MAX_BYTES: Final = 200 * 1024 * 1024
+_EXPORT_ROWS_PER_FETCH = 500
 
 MIGRATION_PENDING_MESSAGE: Final = (
     "Datenbank-Änderungen der Erweiterung stehen aus oder sind fehlgeschlagen"
@@ -612,3 +620,149 @@ def run_boot_migrations(
                 :_MAX_ERROR_LEN
             ]
     return results
+
+
+# --------------------------------------------------------------------------------------
+# The plugin's data: list, export, drop ("Daten behalten" / "Daten löschen", D9)
+# --------------------------------------------------------------------------------------
+
+
+class PluginExportTooLarge(PluginMigrationError):
+    """The rows of the plugin's tables exceed the export cap."""
+
+
+def _table_prefix(short_id: str) -> str:
+    """``tqp_<short_id>_``; refuses anything that is not a manifest short id."""
+    from tiqora.plugins.manifest import SHORT_ID_RE
+
+    if not SHORT_ID_RE.fullmatch(short_id):
+        raise PluginMigrationError(f"Ungültiger Kurzname „{short_id}“")
+    return f"tqp_{short_id}_"
+
+
+async def plugin_tables(session: AsyncSession, short_id: str) -> list[str]:
+    """Names of the tables starting with ``tqp_<short_id>_`` (version table included), sorted."""
+    prefix = _table_prefix(short_id)
+    names = await session.run_sync(lambda sync: inspect(sync.connection()).get_table_names())
+    return sorted(n for n in names if n.startswith(prefix))
+
+
+def _b64(value: bytes) -> str:
+    return base64.b64encode(value).decode("ascii")
+
+
+async def export_plugin_data(
+    session: AsyncSession, short_id: str, *, max_bytes: int, plugin_id: str | None = None
+) -> bytes:
+    """Gzip of JSON lines: a header, then ``{"table": ..., "row": {...}}`` per row.
+
+    Bytes values are stored as base64 text. ``max_bytes`` caps the uncompressed size
+    (memory use); more raises ``PluginExportTooLarge`` before everything is read.
+    """
+    prefix = _table_prefix(short_id)
+    tables = await plugin_tables(session, short_id)
+    metadata = MetaData()
+    if tables:
+        await session.run_sync(
+            lambda sync: metadata.reflect(sync.connection(), only=tables, resolve_fks=False)
+        )
+    header = {
+        "plugin_id": plugin_id,
+        "short_id": short_id,
+        "exported_at": jsonable_encoder(datetime.now().astimezone()),
+        "tables": tables,
+    }
+    return await _export(session, prefix, metadata, tables, header, max_bytes)
+
+
+async def _export(
+    session: AsyncSession,
+    prefix: str,
+    metadata: MetaData,
+    tables: list[str],
+    header: dict[str, Any],
+    max_bytes: int,
+) -> bytes:
+    buf = io.BytesIO()
+    total = 0
+
+    def too_large() -> PluginExportTooLarge:
+        return PluginExportTooLarge("Die Daten der Erweiterung sind größer als der Export erlaubt")
+
+    with gzip.GzipFile(fileobj=buf, mode="wb", mtime=0) as gz:
+
+        def put(obj: Any) -> None:
+            nonlocal total
+            line = (json.dumps(obj, ensure_ascii=False, separators=(",", ":")) + "\n").encode()
+            total += len(line)
+            if total > max_bytes:
+                raise too_large()
+            gz.write(line)
+
+        put(header)
+        for name in tables:
+            if not name.startswith(prefix):  # pragma: no cover - plugin_tables filtered already
+                continue
+            result = await session.stream(
+                select(metadata.tables[name]).execution_options(yield_per=_EXPORT_ROWS_PER_FETCH)
+            )
+            async for row in result:
+                put(
+                    {
+                        "table": name,
+                        "row": jsonable_encoder(dict(row._mapping), custom_encoder={bytes: _b64}),
+                    }
+                )
+    return buf.getvalue()
+
+
+async def drop_plugin_data(session: AsyncSession, short_id: str) -> list[str]:
+    """Drop every ``tqp_<short_id>_*`` table (and PostgreSQL enum type); returns the names.
+
+    Only the prefixed tables are reflected, and every name is checked against the prefix again
+    right before the ``DROP``. Does not commit.
+    """
+    prefix = _table_prefix(short_id)
+    tables = await plugin_tables(session, short_id)
+    dropped: list[str] = []
+    dialect = session.get_bind().dialect.name
+    if tables:
+        metadata = MetaData()
+        await session.run_sync(
+            lambda sync: metadata.reflect(sync.connection(), only=tables, resolve_fks=False)
+        )
+        doomed = [t.name for t in metadata.tables.values()]
+        if not doomed or any(not n.startswith(prefix) for n in doomed):
+            raise PluginMigrationError("Tabellen außerhalb des Plugin-Präfixes – abgebrochen")
+        mysql = dialect in ("mysql", "mariadb")
+        if mysql:  # foreign keys between the plugin's own tables, in any order
+            await session.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+        try:
+            await session.run_sync(lambda sync: metadata.drop_all(sync.connection()))
+        finally:
+            if mysql:
+                await session.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+        dropped.extend(sorted(doomed))
+    if dialect == "postgresql":
+        types = (
+            (
+                await session.execute(
+                    text(
+                        "SELECT t.typname FROM pg_type t "
+                        "JOIN pg_namespace n ON n.oid = t.typnamespace "
+                        "WHERE n.nspname = current_schema() AND t.typtype = 'e' "
+                        "AND substr(t.typname, 1, :n) = :prefix"
+                    ),
+                    {"n": len(prefix), "prefix": prefix},
+                )
+            )
+            .scalars()
+            .all()
+        )
+        quote = session.get_bind().dialect.identifier_preparer.quote
+        for name in sorted(types):
+            if not name.startswith(prefix):  # pragma: no cover - the query filtered already
+                continue
+            await session.execute(text(f"DROP TYPE IF EXISTS {quote(name)}"))
+            dropped.append(name)
+    return dropped

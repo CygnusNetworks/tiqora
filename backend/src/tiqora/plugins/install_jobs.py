@@ -24,11 +24,17 @@ from pydantic import BaseModel
 from sqlalchemy import delete
 
 from tiqora.config import Settings
-from tiqora.db.tiqora.models import TiqoraPlugin, TiqoraPluginData
+from tiqora.db.tiqora.models import (
+    TiqoraPlugin,
+    TiqoraPluginData,
+    TiqoraPluginHook,
+    TiqoraPluginRuntime,
+    TiqoraSettings,
+)
 from tiqora.jobs.context import JobContext, JobFailed
 from tiqora.jobs.registry import JobHandler
 from tiqora.jobs.service import utc_now
-from tiqora.plugins import packages_store
+from tiqora.plugins import migrations, packages_store, runtime
 from tiqora.plugins.inspect import PackageReport, inspect_read_package, installed_state
 from tiqora.plugins.inspect import short_id_owners as load_short_id_owners
 from tiqora.plugins.migrations import _child_env
@@ -52,6 +58,14 @@ _MAX_OUTPUT: Final = 2000
 _HEAD_RE: Final = re.compile(r", Stand (\S+)\s*$")
 
 MISSING_PACKAGE_MESSAGE: Final = "Paket nicht mehr vorhanden – bitte erneut hochladen"
+IN_IMAGE_MESSAGE: Final = (
+    "Im Image eingebaut – bitte aus plugins.txt entfernen und das Image neu bauen"
+)
+NO_SHORT_ID_MESSAGE: Final = "Kurzname unbekannt – Daten können nicht zugeordnet werden"
+EXPORT_TOO_LARGE_MESSAGE: Final = (
+    "Die Daten der Erweiterung sind größer als 200 MB. Bitte sichern Sie die Datenbank und "
+    "entfernen Sie die Tabellen tqp_{short_id}_* von Hand."
+)
 
 
 class PluginInstallPayload(BaseModel):
@@ -375,6 +389,151 @@ async def run_plugin_install(ctx: JobContext, payload: PluginInstallPayload) -> 
     }
 
 
+# ---------------------------------------------------------------- uninstall
+
+
+def in_image(settings: Settings, plugin_id: str) -> bool:
+    """The plugin is shipped in the image (decided by location, F1) and cannot be removed here."""
+    return plugin_id in runtime.image_plugin_ids(settings)
+
+
+def _discovered_short_id(plugin_id: str) -> str | None:
+    from tiqora.plugins.discovery import discovered_plugins
+
+    for found in discovered_plugins():
+        if found.plugin_id == plugin_id and found.manifest is not None:
+            return found.manifest.short_id
+    return None
+
+
+async def _delete_plugin_records(
+    ctx: JobContext,
+    row_id: str,
+    *,
+    short_id: str | None,
+    keep_data: bool,
+    delete_data: bool,
+) -> None:
+    """One write transaction: the plugin's rows go, kept data gets an owner (F2)."""
+    now = utc_now().replace(microsecond=0)
+    async with ctx.session_factory() as session, session.begin():
+        await session.execute(
+            delete(TiqoraPluginRuntime).where(TiqoraPluginRuntime.plugin_id == row_id)
+        )
+        await session.execute(delete(TiqoraPlugin).where(TiqoraPlugin.id == row_id))
+        await packages_store.unmark_packages(session, row_id)
+        if delete_data:
+            await session.execute(
+                delete(TiqoraSettings).where(
+                    TiqoraSettings.key.startswith(f"plugins.{row_id}.", autoescape=True)
+                )
+            )
+            await session.execute(
+                delete(TiqoraPluginHook).where(TiqoraPluginHook.plugin_id == row_id)
+            )
+        if short_id is not None:
+            owner = await session.get(TiqoraPluginData, short_id)
+            if keep_data:
+                if owner is None:
+                    session.add(TiqoraPluginData(short_id=short_id, plugin_id=row_id, kept_at=now))
+                elif owner.plugin_id == row_id:
+                    owner.kept_at = now
+            elif delete_data and owner is not None and owner.plugin_id == row_id:
+                await session.delete(owner)
+
+
+async def run_plugin_uninstall(ctx: JobContext, payload: PluginUninstallPayload) -> dict[str, Any]:
+    settings = ctx.settings
+    plugin_id = payload.plugin_id
+    async with ctx.session_factory() as session:
+        row = await session.get(TiqoraPlugin, plugin_id)
+        name = row.name if row is not None else ""
+        recorded_short_id = row.short_id if row is not None else None
+        await session.rollback()
+    if row is None:
+        raise JobFailed("Erweiterung ist nicht installiert")
+    if in_image(settings, plugin_id):
+        raise JobFailed(IN_IMAGE_MESSAGE)
+    short_id = recorded_short_id or _discovered_short_id(plugin_id)
+
+    deleted: list[str] = []
+    export_file_id: int | None = None
+    keep_data = False
+    if payload.delete_data:
+        if short_id is None:
+            raise JobFailed(NO_SHORT_ID_MESSAGE)
+        async with ctx.session_factory() as session:
+            tables = await migrations.plugin_tables(session, short_id)
+            data: bytes | None = None
+            if tables:
+                try:
+                    data = await migrations.export_plugin_data(
+                        session,
+                        short_id,
+                        max_bytes=migrations.EXPORT_MAX_BYTES,
+                        plugin_id=plugin_id,
+                    )
+                except migrations.PluginExportTooLarge:
+                    raise JobFailed(EXPORT_TOO_LARGE_MESSAGE.format(short_id=short_id)) from None
+            await session.rollback()
+        if data is not None:
+            export_file_id = await ctx.add_file(
+                f"{plugin_id}-daten-{utc_now().date().isoformat()}.jsonl.gz",
+                "application/gzip",
+                data,
+            )
+            await ctx.checkpoint("drop")
+            async with ctx.session_factory() as session:
+                deleted = await migrations.drop_plugin_data(session, short_id)
+                await session.commit()
+    elif short_id is not None:
+        async with ctx.session_factory() as session:
+            keep_data = bool(await migrations.plugin_tables(session, short_id))
+            await session.rollback()
+    await _delete_plugin_records(
+        ctx, plugin_id, short_id=short_id, keep_data=keep_data, delete_data=payload.delete_data
+    )
+
+    generation: int | None = None
+    if payload.restart and settings.plugins_coordinated_restart:
+        try:
+            async with ctx.session_factory() as session:
+                generation = await request_restart(
+                    session,
+                    by=ctx.created_by,
+                    reason=f"Erweiterung „{name}“ entfernt",
+                    now=utcnow().replace(microsecond=0),
+                )
+                await session.commit()
+        except Exception:
+            log.warning("plugin_uninstall_restart_request_failed", plugin=plugin_id)
+    log.info(
+        "plugin_uninstalled",
+        plugin=plugin_id,
+        data_deleted=payload.delete_data,
+        tables=len(deleted),
+        restart_generation=generation,
+    )
+    return {
+        "plugin_id": plugin_id,
+        "deleted_tables": deleted,
+        "export_file_id": export_file_id,
+        "restart_generation": generation,
+    }
+
+
+PLUGIN_UNINSTALL_JOB = JobHandler(
+    kind=PLUGIN_UNINSTALL_KIND,
+    payload_model=PluginUninstallPayload,
+    run=run_plugin_uninstall,
+    title_key="jobs.kinds.core.plugin_uninstall",
+    timeout_seconds=1500,
+    lane=PLUGIN_LANE,
+    max_attempts=1,
+    requeue_if_interrupted=False,
+    result_private=False,
+)
+
 PLUGIN_INSTALL_JOB = JobHandler(
     kind=PLUGIN_INSTALL_KIND,
     payload_model=PluginInstallPayload,
@@ -390,6 +549,7 @@ PLUGIN_INSTALL_JOB = JobHandler(
 __all__ = [
     "PLUGIN_INSTALL_JOB",
     "PLUGIN_INSTALL_KIND",
+    "PLUGIN_UNINSTALL_JOB",
     "PLUGIN_LANE",
     "PLUGIN_UNINSTALL_KIND",
     "PluginFetchPayload",
@@ -397,5 +557,7 @@ __all__ = [
     "PluginRepositoryRefreshPayload",
     "PluginUninstallPayload",
     "dedupe_key",
+    "in_image",
     "run_plugin_install",
+    "run_plugin_uninstall",
 ]

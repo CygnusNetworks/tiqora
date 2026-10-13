@@ -25127,6 +25127,22 @@
         "title": "PluginRuntimeOut",
         "type": "object"
       },
+      "PluginUninstallIn": {
+        "properties": {
+          "delete_data": {
+            "default": false,
+            "title": "Delete Data",
+            "type": "boolean"
+          },
+          "restart": {
+            "default": true,
+            "title": "Restart",
+            "type": "boolean"
+          }
+        },
+        "title": "PluginUninstallIn",
+        "type": "object"
+      },
       "PortalArticleOut": {
         "properties": {
           "content_md": {
@@ -62600,6 +62616,91 @@
           }
         },
         "summary": "Reset Plugin",
+        "tags": [
+          "admin:plugins"
+        ]
+      }
+    },
+    "/api/v1/admin/plugins/{plugin_id}/uninstall": {
+      "post": {
+        "description": "Queue the removal (\"Daten behalten\" or \"Daten l\u00f6schen\"); the UI polls ``GET /jobs/{id}``.",
+        "operationId": "uninstall_plugin_api_v1_admin_plugins__plugin_id__uninstall_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginUninstallIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Uninstall Plugin",
         "tags": [
           "admin:plugins"
         ]
