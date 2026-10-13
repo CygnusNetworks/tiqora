@@ -297,3 +297,82 @@ async def test_erasure_redacts_history_of_links_removed_earlier(
     assert lines("%Cora Customer%") == 2
     assert lines(f"%{tn}%") == 2
     assert lines(f"%{tn} cmdb4 ticket {TICKET_OPEN}") == 2  # the title is back
+
+
+class _CountingSession:
+    """Delegates to an ``AsyncSession`` and keeps every row a statement returned."""
+
+    def __init__(self, session: Any) -> None:
+        self._s = session
+        self.rows: list[Any] = []
+
+    async def execute(self, stmt: Any, *args: Any, **kw: Any) -> Any:
+        from sqlalchemy import Select
+
+        res = await self._s.execute(stmt, *args, **kw)
+        if not isinstance(stmt, Select):
+            return res
+        rows = list(res.all())
+        self.rows.extend(rows)
+        return _Rows(rows)
+
+
+class _Rows:
+    def __init__(self, rows: list[Any]) -> None:
+        self._rows = rows
+
+    def all(self) -> list[Any]:
+        return self._rows
+
+
+async def test_ticket_title_redaction_reads_only_the_erased_tickets_lines(
+    cmdb_db: CmdbWorld,
+) -> None:
+    """m4: the anonymise pass filters the history lines per chunk of ticket numbers in SQL
+    instead of loading every ticket link line of the CMDB into the erasure request."""
+    from datetime import datetime
+
+    from tiqora.cmdb.erasure import _redact_ticket_titles
+    from tiqora.db.tiqora.models import TiqoraCmdbCiHistory
+
+    mine = "RelevantTo: ticket 2026101074901 Drucker defekt"
+    others = [
+        "RelevantTo: ticket 2026101074902 Anderes Thema",
+        "RelevantTo: ticket 20261010749011 Nummer mit gleichem Anfang",
+        "RelevantTo: ticket 2026101074901",  # no title: nothing to redact
+        "RelevantTo: customer_user Cora Customer",
+    ]
+    async with cmdb_db.factory() as s:
+        cid = await make_class(s, attributes=_ATTRS)
+        a = await make_ci(s, cid, "cmdb4-a")
+        at = datetime(2026, 10, 1, 12, 0)
+        for event, detail in [("LinkAdd", mine), ("LinkDelete", mine)] + [
+            ("LinkAdd", d) for d in others
+        ]:
+            s.add(
+                TiqoraCmdbCiHistory(
+                    ci_id=a, event=event, detail=detail, created_by=USER_A, created_at=at
+                )
+            )
+        await s.commit()
+        backups: list[dict[str, Any]] = []
+
+        async def backup(table: str, pk: dict[str, Any], row: dict[str, Any]) -> None:
+            backups.append(row)
+
+        counting = _CountingSession(s)
+        # more numbers than one chunk; the erased ticket's number comes last
+        numbers = [f"30000000{i:03d}" for i in range(120)] + ["2026101074901"]
+        assert await _redact_ticket_titles(counting, backup, numbers) == 2  # type: ignore[arg-type]
+        await s.commit()
+    assert sorted(str(d) for _, d in counting.rows) == [mine, mine]
+    assert backups == [{"detail": mine}, {"detail": mine}]
+    got = sorted(
+        str(d)
+        for (d,) in cmdb_db.sql(
+            "SELECT detail FROM tiqora_cmdb_ci_history WHERE ci_id = :c"
+            " AND event IN ('LinkAdd', 'LinkDelete')",
+            c=a,
+        )
+    )
+    assert got == sorted(["RelevantTo: ticket 2026101074901 [gelöscht]"] * 2 + others)
