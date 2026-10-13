@@ -757,7 +757,11 @@ export function NewTicketPage() {
                   data-testid="new-ticket-customer-search"
                   value={customerQuery}
                   autoFocus
-                  onChange={(e) => setCustomerQuery(e.target.value)}
+                  onChange={(e) => {
+                    setCustomerQuery(e.target.value);
+                    // an import error belongs to the hits it was raised under
+                    setExternalError(null);
+                  }}
                   placeholder={t("newTicket.customerSearch")}
                   className={FIELD_CLASS}
                 />

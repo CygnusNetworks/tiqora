@@ -261,6 +261,14 @@ describe("NewTicketPage", () => {
     expect(screen.queryByTestId("new-ticket-customer-clear")).toBeNull();
   });
 
+  it("drops a stale import error once the search changes", async () => {
+    externalCustomerImport.mockRejectedValue(new ApiError(409, "conflict", "/api/v1/customers/external-import"));
+    fireEvent.click(await searchExternal());
+    await screen.findByTestId("new-ticket-customer-external-error");
+    fireEvent.change(screen.getByTestId("new-ticket-customer-search"), { target: { value: "externe" } });
+    expect(screen.queryByTestId("new-ticket-customer-external-error")).toBeNull();
+  });
+
   it("does not ask the directories below three characters", async () => {
     await renderReady();
     fireEvent.change(screen.getByTestId("new-ticket-customer-search"), { target: { value: "ab" } });

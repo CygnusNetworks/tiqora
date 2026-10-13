@@ -228,6 +228,23 @@ describe("ReportBuilderPage", () => {
     expect(ensurePluginI18n).toHaveBeenCalledWith(plugin, "de");
   });
 
+  it("editing a report that no longer exists shows the load error instead of a spinner", async () => {
+    vi.mocked(reportsApi.get).mockRejectedValue(
+      new ApiError(404, { detail: { message: "Der Bericht existiert nicht mehr." } }, "/api/v1/reports/41"),
+    );
+    renderAt("/agent/reports/41/edit", CAN);
+    expect(await screen.findByTestId("builder-load-error")).toHaveTextContent("Der Bericht existiert nicht mehr.");
+    expect(screen.queryByTestId("builder-name")).not.toBeInTheDocument();
+  });
+
+  it("a stale copy link to a plugin report shows the load error instead of a spinner", async () => {
+    vi.mocked(reportsApi.get).mockRejectedValue(
+      new ApiError(404, { detail: { message: "Unbekannter Bericht." } }, "/api/v1/reports"),
+    );
+    renderAt("/agent/reports/new?from=plugin.org.example.gone.r", CAN);
+    expect(await screen.findByTestId("builder-load-error")).toHaveTextContent("Unbekannter Bericht.");
+  });
+
   it("shows validation issues instead of a preview", async () => {
     renderAt("/agent/reports/new", CAN);
     expect(await screen.findByTestId("builder-preview-issues")).toHaveTextContent("Datenbasis");

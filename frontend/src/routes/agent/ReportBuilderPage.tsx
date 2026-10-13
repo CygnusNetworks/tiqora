@@ -351,12 +351,14 @@ export function ReportBuilderPage() {
   // A copy of a plugin report starts from its translated name: wait for the texts.
   const pluginTexts = usePluginReportTexts(useMemo(() => [report], [report]));
   const [textsSeen, setTextsSeen] = useState(false);
+  // Not while the report is still pending: `loading` is false then only because no plugin key is known yet.
+  // A failed load settles too, so the load error shows instead of an endless spinner.
+  const baseSettled = baseKey === undefined || !reportQ.isPending;
   useEffect(() => {
-    // Not while the report is still pending: `loading` is false then only because no plugin key is known yet.
-    if (!pluginTexts.loading && (baseKey === undefined || report)) setTextsSeen(true);
-  }, [pluginTexts.loading, baseKey, report]);
+    if (!pluginTexts.loading && baseSettled) setTextsSeen(true);
+  }, [pluginTexts.loading, baseSettled]);
   // Sticky: a later language change must not unmount the editor.
-  const textsReady = textsSeen || (!pluginTexts.loading && (baseKey === undefined || report !== undefined));
+  const textsReady = textsSeen || (!pluginTexts.loading && baseSettled);
   const start = useMemo(
     () => (baseKey === undefined || report ? startFrom(mode, report, t) : null),
     // the start is taken once per loaded report; a language change must not reset the editor

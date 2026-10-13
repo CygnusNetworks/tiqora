@@ -1270,6 +1270,14 @@ describe("ReplyDialog plugin channels", () => {
     );
   });
 
+  it.each(["Email", "Telegram"])("never asks for plugin channels when replying on a %s article", async (name) => {
+    wrap(<ReplyDialog ticketId={1} articleId={2} replyAll={false} open onClose={vi.fn()} channelName={name} />);
+    await waitFor(() => expect(screen.getByTestId("reply-body")).toBeTruthy());
+    await new Promise((r) => setTimeout(r, 50));
+    expect(request.mock.calls.filter((c) => c[1] === "/api/v1/channels/plugin")).toEqual([]);
+    expect(screen.queryByTestId("reply-plugin-channel")).toBeNull();
+  });
+
   it("offers attachments and the subject when the channel carries them", async () => {
     request.mockImplementation(async (_m: string, path: string) =>
       path === "/api/v1/channels/plugin"
