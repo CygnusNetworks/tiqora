@@ -30,7 +30,12 @@ from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db
 from tiqora.api.v1.admin.deps import get_admin_user
 from tiqora.config import Settings
-from tiqora.db.tiqora.models import TiqoraPlugin, TiqoraPluginHook, TiqoraPluginPackage
+from tiqora.db.tiqora.models import (
+    TiqoraPlugin,
+    TiqoraPluginHook,
+    TiqoraPluginPackage,
+    TiqoraPluginRepository,
+)
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.extensions.core import register_core, set_registry_for_tests
 from tiqora.extensions.registry import Registry
@@ -41,7 +46,7 @@ from tiqora.plugins.discovery import discover_plugins
 from tiqora.plugins.inspect import CapabilityLine, PackageReport
 from tiqora.plugins.loader import commit_registrar, import_and_register
 from tiqora.plugins.migrations import MIGRATION_PENDING_MESSAGE
-from tiqora.plugins.repositories import UpdateInfo
+from tiqora.plugins.repositories import UpdateInfo, url_key
 from tiqora.plugins.runtime import reset_dir_status_cache
 from tiqora.plugins.signing import TrustLevel
 from tiqora.plugins.state import PluginLoadResult, RuntimeState, set_loaded_plugins
@@ -335,7 +340,7 @@ async def test_disable_needs_restart(
     assert r.status_code == 200
     assert r.json()["status"] == "restart_required"
     assert r.json()["status_message"] == (
-        "Änderung wird nach einem Neustart von Tiqora wirksam. Sie können Tiqora unten neu starten."
+        "Änderung wird nach einem Neustart von Tiqora wirksam. Sie können Tiqora oben neu starten."
     )
     row = await _plugin_row(factory, PLUGIN_ID)
     assert row.enabled is False and row.changed_by == 1
@@ -554,6 +559,48 @@ async def test_runtime_plugin_fields(
     assert p["signer"] == "Example GmbH" and p["can_uninstall"] is True
 
 
+async def test_repository_plugin_names_its_repository(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    seeded_runtime: None,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """FE M9: the card names the source repository even without a pending update."""
+    await _make_runtime(factory, PLUGIN_ID)
+    image = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+    assert (image["repository_id"], image["repository_name"]) == (None, None)  # an upload
+    url = "https://plg49.example.org/index.json"
+    async with factory() as s:
+        repo = TiqoraPluginRepository(
+            name="plg49 Quelle",
+            url=url,
+            url_key=url_key(url),
+            public_key=None,
+            enabled=True,
+            origin="admin",
+            index_verified=False,
+            created_at=T0,
+            updated_at=T0,
+        )
+        s.add(repo)
+        await s.flush()
+        rid = repo.id
+        row = (
+            await s.execute(select(TiqoraPlugin).where(TiqoraPlugin.id == PLUGIN_ID))
+        ).scalar_one()
+        row.source, row.repository_id = "repository", rid
+        await s.commit()
+    try:
+        p = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+        assert (p["repository_id"], p["repository_name"]) == (rid, "plg49 Quelle")
+    finally:
+        async with factory() as s:
+            await s.execute(delete(TiqoraPluginRepository).where(TiqoraPluginRepository.id == rid))
+            await s.commit()
+    gone = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+    assert (gone["repository_id"], gone["repository_name"]) == (rid, None)
+
+
 async def test_image_row_gone_from_image_can_be_uninstalled(
     admin_client: AsyncClient, factory: async_sessionmaker[AsyncSession]
 ) -> None:
@@ -659,5 +706,5 @@ async def test_restart_required_message_mentions_restart_button(
     r = await admin_client.put(f"{BASE}/{PLUGIN_ID}/enabled", json={"enabled": False})
     assert r.json()["status"] == "restart_required"
     assert r.json()["status_message"] == (
-        "Änderung wird nach einem Neustart von Tiqora wirksam. Sie können Tiqora unten neu starten."
+        "Änderung wird nach einem Neustart von Tiqora wirksam. Sie können Tiqora oben neu starten."
     )

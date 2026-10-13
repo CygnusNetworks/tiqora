@@ -19855,6 +19855,10 @@ export interface components {
             name: string;
             /** Publisher */
             publisher: string;
+            /** Repository Id */
+            repository_id: number | null;
+            /** Repository Name */
+            repository_name: string | null;
             /** Runtime */
             runtime: components["schemas"]["PluginRuntimeOut"][];
             /** Settings Section */

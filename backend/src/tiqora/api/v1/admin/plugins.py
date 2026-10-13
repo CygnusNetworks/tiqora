@@ -24,6 +24,7 @@ from tiqora.db.tiqora.models import (
     TiqoraPlugin,
     TiqoraPluginHook,
     TiqoraPluginPackage,
+    TiqoraPluginRepository,
     TiqoraPluginRuntime,
 )
 from tiqora.domain.schemas import UtcDateTime
@@ -70,7 +71,7 @@ log = structlog.get_logger(__name__)
 router = APIRouter(prefix="/plugins", tags=["admin:plugins"])
 
 RESTART_MESSAGE: Final = (
-    "Änderung wird nach einem Neustart von Tiqora wirksam. Sie können Tiqora unten neu starten."
+    "Änderung wird nach einem Neustart von Tiqora wirksam. Sie können Tiqora oben neu starten."
 )
 #: used when the coordinated restart is switched off (the admin has to restart by hand)
 RESTART_MANUAL_MESSAGE: Final = "Änderung wird nach einem Neustart von Tiqora wirksam."
@@ -156,6 +157,9 @@ class PluginAdminOut(BaseModel):
     can_uninstall: bool
     migration_error: str | None
     update: PluginUpdateOut | None
+    #: package source of a repository plugin (None when the repository was deleted)
+    repository_id: int | None
+    repository_name: str | None
 
 
 class PluginAdminListOut(BaseModel):
@@ -283,8 +287,10 @@ def _build_one(
     coordinated: bool = True,
     update: UpdateInfo | None = None,
     package_tables: Sequence[str] | None = None,
+    repository_names: Mapping[int, str] | None = None,
 ) -> PluginAdminOut:
     manifest = found.manifest if found is not None else None
+    repository_id = row.repository_id if row is not None and row.source == "repository" else None
     registry = get_registry()
     problem = found.problem if found is not None else (activation_problem or GONE_MESSAGE)
     compat_problem = (
@@ -405,6 +411,10 @@ def _build_one(
         )
         if update is not None
         else None,
+        repository_id=repository_id,
+        repository_name=(repository_names or {}).get(repository_id)
+        if repository_id is not None
+        else None,
     )
 
 
@@ -453,6 +463,19 @@ async def _package_tables(
     return out
 
 
+async def _repository_names(session: AsyncSession, rows: Iterable[TiqoraPlugin]) -> dict[int, str]:
+    """repository id -> name for the repository plugins (an IN list, no join)."""
+    ids = sorted({r.repository_id for r in rows if r.repository_id is not None})
+    if not ids:
+        return {}
+    found = await session.execute(
+        select(TiqoraPluginRepository.id, TiqoraPluginRepository.name).where(
+            TiqoraPluginRepository.id.in_(ids)
+        )
+    )
+    return {int(rid): str(name) for rid, name in found.all()}
+
+
 async def _build_all(
     session: AsyncSession, *, safe_mode: bool, settings: Settings
 ) -> list[PluginAdminOut]:
@@ -461,6 +484,7 @@ async def _build_all(
     discovered: Mapping[str, DiscoveredPlugin] = {p.plugin_id: p for p in discovered_plugins()}
     rows = await store.list_plugin_rows(session)
     package_tables = await _package_tables(session, rows.values())
+    repository_names = await _repository_names(session, rows.values())
     runtime: dict[str, list[TiqoraPluginRuntime]] = defaultdict(list)
     for rt in await store.list_runtime_rows(session):
         runtime[rt.plugin_id].append(rt)
@@ -479,6 +503,7 @@ async def _build_all(
             coordinated=settings.plugins_coordinated_restart,
             update=updates.get(pid),
             package_tables=package_tables.get(pid),
+            repository_names=repository_names,
         )
         for pid in sorted(set(discovered) | set(rows))
     ]

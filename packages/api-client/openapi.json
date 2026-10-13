@@ -24709,6 +24709,28 @@
             "title": "Publisher",
             "type": "string"
           },
+          "repository_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository Id"
+          },
+          "repository_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository Name"
+          },
           "runtime": {
             "items": {
               "$ref": "#/components/schemas/PluginRuntimeOut"
@@ -24835,7 +24857,9 @@
           "signer",
           "can_uninstall",
           "migration_error",
-          "update"
+          "update",
+          "repository_id",
+          "repository_name"
         ],
         "title": "PluginAdminOut",
         "type": "object"
