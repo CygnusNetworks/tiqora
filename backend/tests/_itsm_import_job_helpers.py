@@ -15,6 +15,7 @@ from tiqora.itsm.importer.jobs import (
     IMPORT_DEDUPE_KEY,
     IMPORT_JOB_KIND,
     ItsmImportPayload,
+    bind_run_to_job,
     start_run,
 )
 from tiqora.jobs.context import JobContext
@@ -112,7 +113,7 @@ async def enqueue_import(
             created_by=user_id,
             dedupe_key=IMPORT_DEDUPE_KEY,
         )
-        run.job_id = job.id
+        await bind_run_to_job(session, run, job)
         run_id, job_id = run.id, job.id
         await session.commit()
     return run_id, job_id

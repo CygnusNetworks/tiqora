@@ -138,24 +138,25 @@ async def count_active_jobs(
     )
 
 
-async def find_active_job(session: AsyncSession, *, kind: str, dedupe_key: str) -> TiqoraJob | None:
-    return (
-        (
-            await session.execute(
-                select(TiqoraJob)
-                .where(
-                    TiqoraJob.kind == kind,
-                    TiqoraJob.dedupe_key == dedupe_key,
-                    TiqoraJob.status.in_(ACTIVE_STATUSES),
-                    TiqoraJob.cancel_requested.is_(False),
-                )
-                .order_by(TiqoraJob.id)
-                .limit(1)
-            )
+async def find_active_job(
+    session: AsyncSession, *, kind: str, dedupe_key: str, for_update: bool = False
+) -> TiqoraJob | None:
+    """The oldest active job; ``for_update`` makes it a locking read (current data, not the
+    transaction's REPEATABLE READ snapshot on MariaDB)."""
+    stmt = (
+        select(TiqoraJob)
+        .where(
+            TiqoraJob.kind == kind,
+            TiqoraJob.dedupe_key == dedupe_key,
+            TiqoraJob.status.in_(ACTIVE_STATUSES),
+            TiqoraJob.cancel_requested.is_(False),
         )
-        .scalars()
-        .first()
+        .order_by(TiqoraJob.id)
+        .limit(1)
     )
+    if for_update:
+        stmt = stmt.with_for_update()
+    return (await session.execute(stmt)).scalars().first()
 
 
 async def get_job(session: AsyncSession, job_id: int) -> TiqoraJob | None:

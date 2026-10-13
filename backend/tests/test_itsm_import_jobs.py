@@ -8,6 +8,7 @@ runner's own tests).
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -43,7 +44,9 @@ from tiqora.itsm.importer.jobs import (
     ITSM_SWITCH_JOB,
     SWITCH_JOB_KIND,
     ImportBusy,
+    ItsmImportPayload,
     ItsmSwitchPayload,
+    bind_run_to_job,
     finish_run,
     start_run,
 )
@@ -236,6 +239,71 @@ async def test_second_start_is_refused_while_active(world: _World) -> None:
         run = await start_run(s, kind="import", user_id=56304)
         assert run.id > run_id
         await s.commit()
+
+
+@pytest.mark.parametrize("read_first", [True, False])
+async def test_concurrent_starts_are_serialised(world: _World, read_first: bool) -> None:
+    """The second start waits for the first and is refused, even when its session read
+    something first (MariaDB REPEATABLE READ snapshot) and no settings row exists yet."""
+    async with world.factory() as a, world.factory() as b:
+        if read_first:  # what the CLI/API do: a precondition read before start_run
+            await b.execute(select(func.count()).select_from(TiqoraSettings))
+        run = await start_run(a, kind="import", user_id=56312)
+        job = await enqueue_job(
+            a,
+            kind=IMPORT_JOB_KIND,
+            payload=ItsmImportPayload(user_id=56312, dry_run=False, run_id=run.id),
+            created_by=56312,
+            dedupe_key=IMPORT_DEDUPE_KEY,
+        )
+        await bind_run_to_job(a, run, job)
+        second = asyncio.ensure_future(start_run(b, kind="import", user_id=56313))
+        await asyncio.sleep(0.5)
+        assert not second.done()  # waits on A's lock
+        await a.commit()
+        with pytest.raises(ImportBusy):
+            await second
+        await b.rollback()
+    async with world.factory() as s:
+        runs = (await s.execute(select(TiqoraItsmImportRun.id))).scalars().all()
+        jobs_n = (
+            await s.execute(
+                select(func.count()).select_from(TiqoraJob).where(TiqoraJob.kind == IMPORT_JOB_KIND)
+            )
+        ).scalar_one()
+    assert runs == [run.id] and jobs_n == 1
+
+
+async def test_deduped_job_of_another_run_is_refused(world: _World) -> None:
+    run_id, job_id = await enqueue_import(world.factory, dry_run=False, user_id=56314)
+    async with world.factory() as s:
+        orphan = TiqoraItsmImportRun(
+            kind="import",
+            status="running",
+            job_id=None,
+            started_by=56314,
+            started_at=datetime(2026, 1, 1),
+            finished_at=None,
+            profile=None,
+            summary="{}",
+            message=None,
+        )
+        s.add(orphan)
+        await s.flush()
+        job = await enqueue_job(
+            s,
+            kind=IMPORT_JOB_KIND,
+            payload=ItsmImportPayload(user_id=56314, dry_run=False, run_id=orphan.id),
+            created_by=56314,
+            dedupe_key=IMPORT_DEDUPE_KEY,
+        )
+        assert job.id == job_id  # joined the first job
+        with pytest.raises(ImportBusy):
+            await bind_run_to_job(s, orphan, job)
+        await s.commit()
+    async with world.factory() as s:
+        ids = (await s.execute(select(TiqoraItsmImportRun.id))).scalars().all()
+    assert ids == [run_id]
 
 
 async def test_failed_run_records_message(world: _World, monkeypatch: pytest.MonkeyPatch) -> None:

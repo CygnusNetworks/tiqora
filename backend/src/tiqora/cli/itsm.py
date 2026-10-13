@@ -80,6 +80,7 @@ async def _cmd_import(args: argparse.Namespace) -> int:
         IMPORT_JOB_KIND,
         ImportBusy,
         ItsmImportPayload,
+        bind_run_to_job,
         start_run,
     )
     from tiqora.jobs.service import TERMINAL_STATUSES, enqueue_job
@@ -109,7 +110,12 @@ async def _cmd_import(args: argparse.Namespace) -> int:
             created_by=ROOT_USER_ID,
             dedupe_key=IMPORT_DEDUPE_KEY,
         )
-        run.job_id = job.id
+        try:
+            await bind_run_to_job(session, run, job)
+        except ImportBusy as exc:
+            await session.rollback()
+            _err(f"{exc} Warten Sie, bis der Lauf beendet ist, oder brechen Sie ihn ab.")
+            return 1
         run_id, job_id = run.id, job.id
         await session.commit()
 

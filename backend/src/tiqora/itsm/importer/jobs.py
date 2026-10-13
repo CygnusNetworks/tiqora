@@ -18,13 +18,14 @@ from typing import Any, Final, Literal
 
 from pydantic import BaseModel
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.db.tiqora.models import TiqoraItsmImportRun, TiqoraSettings
+from tiqora.db.tiqora.models import TiqoraItsmImportRun, TiqoraJob, TiqoraSettings
 from tiqora.itsm.importer import facades
 from tiqora.itsm.importer.pipeline import ImportBlocked, run_import
 from tiqora.itsm.importer.report import ImportReport
-from tiqora.itsm.mode import SETTING_MODE, SETTING_ZNUNY_READONLY
+from tiqora.itsm.mode import SETTING_ZNUNY_READONLY
 from tiqora.jobs.context import JobCancelled, JobContext, JobFailed
 from tiqora.jobs.registry import JobHandler
 from tiqora.jobs.service import find_active_job, utc_now
@@ -65,19 +66,51 @@ class ItsmSwitchPayload(BaseModel):
     addon_installed: bool
 
 
+async def _lock_import_start(session: AsyncSession) -> None:
+    """Lock the importer-owned ``itsm.znuny_readonly`` row, creating it ("0") when absent."""
+    try:
+        async with session.begin_nested():
+            session.add(TiqoraSettings(key=SETTING_ZNUNY_READONLY, value="0"))
+            await session.flush()
+    except IntegrityError:
+        pass  # another start inserted it first
+    await session.execute(
+        select(TiqoraSettings.key)
+        .where(TiqoraSettings.key == SETTING_ZNUNY_READONLY)
+        .with_for_update()
+    )
+
+
+async def bind_run_to_job(session: AsyncSession, run: TiqoraItsmImportRun, job: TiqoraJob) -> None:
+    """Attach the enqueued job to its run; a deduped job of another run means a lost race.
+
+    The fresh run row is then dropped (flush only) and :class:`ImportBusy` raised, so no
+    ``running`` run is left bound to a job that never processes it.
+    """
+    payload = json.loads(job.payload)
+    if payload.get("run_id") != run.id:
+        await session.delete(run)
+        await session.flush()
+        raise ImportBusy("Ein ITSM-Import oder eine Umstellung läuft bereits.")
+    run.job_id = job.id
+
+
 async def start_run(session: AsyncSession, *, kind: RunKind, user_id: int) -> TiqoraItsmImportRun:
     """Create the ``running`` run row (flush only; the caller enqueues the job and commits).
 
     The first three kinds are refused with :class:`ImportBusy` while an import or switch job is
-    active. The ``itsm.mode`` settings row is locked first, so two starts cannot both pass the
-    check (the second waits for the first one's commit and then sees its job).
+    active. Two starts are serialised by a row lock on ``itsm.znuny_readonly`` (inserted when
+    absent; the importer owns that key, so the row always exists to lock) and the active-job
+    check is a locking read: on MariaDB a plain read would use the REPEATABLE READ snapshot of
+    the session's first read and miss the other start's committed job. A caller that enqueues
+    the job must pass it to :func:`bind_run_to_job`.
     """
     if kind != "rollback":
-        await session.execute(
-            select(TiqoraSettings.key).where(TiqoraSettings.key == SETTING_MODE).with_for_update()
-        )
+        await _lock_import_start(session)
         for job_kind in (IMPORT_JOB_KIND, SWITCH_JOB_KIND):
-            if await find_active_job(session, kind=job_kind, dedupe_key=IMPORT_DEDUPE_KEY):
+            if await find_active_job(
+                session, kind=job_kind, dedupe_key=IMPORT_DEDUPE_KEY, for_update=True
+            ):
                 raise ImportBusy("Ein ITSM-Import oder eine Umstellung läuft bereits.")
     run = TiqoraItsmImportRun(
         kind=kind,
