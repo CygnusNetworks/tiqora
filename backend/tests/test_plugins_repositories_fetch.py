@@ -705,6 +705,45 @@ async def test_catalog_badge_agrees_with_install_trust(
     assert await badge() is False
 
 
+async def test_stored_indexes_are_parsed_once_per_content(
+    url_fixture: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Task 20 M2: the list, catalog and key ring read every stored index on each request."""
+    rid = await _add_repo(url_fixture)
+    await _refresh(url_fixture, rid, Served(signed(make_index(name="Einmal"))))
+    repositories._PARSED.clear()
+    calls: list[int] = []
+    real = repositories.parse_index
+
+    def counting(raw: bytes) -> Any:
+        calls.append(len(raw))
+        return real(raw)
+
+    monkeypatch.setattr(repositories, "parse_index", counting)
+
+    async def browse() -> None:
+        async with url_fixture() as s:
+            out = await catalog(s, settings=_settings())
+            await s.rollback()
+        assert any(e.name == "Einmal" for e in out.entries)
+
+    await browse()
+    first = len(calls)
+    assert first >= 1
+    await browse()
+    await browse()
+    assert len(calls) == first  # served from the cache
+    # a new index (new content hash) is parsed again
+    await _refresh(
+        url_fixture, rid, Served(signed(make_index("2026-10-12T09:00:00Z", name="Zweimal")))
+    )
+    before = len(calls)
+    async with url_fixture() as s:
+        out = await catalog(s, settings=_settings())
+    assert any(e.name == "Zweimal" for e in out.entries)
+    assert len(calls) > before
+
+
 async def test_catalog_marks_yanked_and_incompatible_versions(
     url_fixture: async_sessionmaker[AsyncSession],
 ) -> None:

@@ -90,7 +90,7 @@ async def build_key_ring_named(
     names: dict[int, str] = {}
     for row in rows:
         try:
-            index = parse_index((row.index_json or "").encode())
+            index = stored_index(row)
             keys = publisher_keys(index, row.id)
         except (IndexFormatError, SignatureError, ValueError) as exc:
             log.warning(
@@ -654,13 +654,33 @@ class CatalogOut(BaseModel):
     entries: list[CatalogEntryOut]
 
 
-def _parse_or_none(raw: str | None, repo_id: int) -> RepositoryIndex | None:
-    if not raw:
+#: parsed stored indexes by ``index_sha256`` (an index is up to 5 MB; the admin list, the
+#: catalog and every upload/install read all of them). Parsed objects are never mutated.
+_PARSED: dict[str, RepositoryIndex] = {}
+_PARSED_MAX: Final = 32
+
+
+def stored_index(repo: TiqoraPluginRepository) -> RepositoryIndex:
+    """The repository's stored index, parsed once per content hash. Raises IndexFormatError."""
+    raw = repo.index_json or ""
+    sha = repo.index_sha256
+    if sha and sha in _PARSED:
+        return _PARSED[sha]
+    index = parse_index(raw.encode("utf-8"))
+    if sha and hashlib.sha256(raw.encode("utf-8")).hexdigest() == sha:
+        if len(_PARSED) >= _PARSED_MAX:
+            _PARSED.pop(next(iter(_PARSED)))
+        _PARSED[sha] = index
+    return index
+
+
+def _parse_or_none(repo: TiqoraPluginRepository) -> RepositoryIndex | None:
+    if not repo.index_json:
         return None
     try:
-        return parse_index(raw.encode("utf-8"))
+        return stored_index(repo)
     except IndexFormatError as exc:
-        log.warning("plugin_repository_index_unreadable", repository=repo_id, error=str(exc)[:200])
+        log.warning("plugin_repository_index_unreadable", repository=repo.id, error=str(exc)[:200])
         return None
 
 
@@ -789,7 +809,7 @@ async def available_updates(session: AsyncSession, *, settings: Settings) -> dic
     core = release_core_version()
     best: dict[str, tuple[Version, UpdateInfo]] = {}
     for repo in repos:
-        index = _parse_or_none(repo.index_json, repo.id)
+        index = _parse_or_none(repo)
         if index is None:
             continue
         key_ids = (
@@ -830,7 +850,7 @@ def find_index_version(
     repo: TiqoraPluginRepository, plugin_id: str, version: str
 ) -> IndexVersion | None:
     """The release ``plugin_id`` ``version`` in the repository's stored index, or None."""
-    index = _parse_or_none(repo.index_json, repo.id)
+    index = _parse_or_none(repo)
     if index is None:
         return None
     for plugin in index.plugins:
@@ -988,7 +1008,7 @@ async def catalog(
     categories: dict[str, str] = {}
     entries: list[CatalogEntryOut] = []
     for repo in repos:
-        index = _parse_or_none(repo.index_json, repo.id)
+        index = _parse_or_none(repo)
         if index is None:
             continue
         publishers = {p.id: p for p in index.publishers}
