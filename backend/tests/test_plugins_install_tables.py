@@ -6,6 +6,7 @@ Rows are deleted again by the module fixture.
 
 from __future__ import annotations
 
+import random
 from collections.abc import AsyncIterator
 
 import pytest
@@ -50,11 +51,8 @@ async def _wipe(factory: async_sessionmaker[AsyncSession]) -> None:
         await s.commit()
 
 
-@pytest.fixture(params=["mariadb_znuny_url", "postgres_znuny_url"])
-async def factory(
-    request: pytest.FixtureRequest,
-) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
-    engine = create_async_engine(to_async_url(request.getfixturevalue(request.param)))
+async def _factory_for(url: str) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+    engine = create_async_engine(to_async_url(url))
     async with engine.begin() as conn:
         await conn.run_sync(lambda c: TiqoraBase.metadata.create_all(c, checkfirst=True))
     sm = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -64,6 +62,22 @@ async def factory(
     finally:
         await _wipe(sm)
         await engine.dispose()
+
+
+@pytest.fixture(params=["mariadb_znuny_url", "postgres_znuny_url"])
+async def factory(
+    request: pytest.FixtureRequest,
+) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+    async for sm in _factory_for(request.getfixturevalue(request.param)):
+        yield sm
+
+
+@pytest.fixture
+async def maria_factory(
+    mariadb_znuny_url: str,
+) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
+    async for sm in _factory_for(mariadb_znuny_url):
+        yield sm
 
 
 def _package(**over: object) -> TiqoraPluginPackage:
@@ -104,7 +118,11 @@ async def test_package_blob_roundtrip_and_deferred(
         s.add(_package(data=blob))
         await s.commit()
     async with factory() as s:
-        row = (await s.execute(select(TiqoraPluginPackage))).scalars().one()
+        row = (
+            (await s.execute(select(TiqoraPluginPackage).where(TiqoraPluginPackage.sha256 == _SHA)))
+            .scalars()
+            .one()
+        )
         assert "data" in sa_inspect(row).unloaded
         assert row.installed_at is None and row.key_id is None
         data = (
@@ -113,6 +131,28 @@ async def test_package_blob_roundtrip_and_deferred(
             )
         ).scalar_one()
         assert data == blob
+
+
+async def test_package_blob_15_mib_fits_the_mariadb_packet(
+    maria_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """F11: the default cap (15 MB) must store under max_allowed_packet = 16 MiB.
+
+    High-entropy data on purpose: client-side escaping of NUL-heavy patterns inflates the
+    statement past the packet limit (aiomysql error 2013), which random bytes do not.
+    """
+    size = 15 * 1024 * 1024
+    blob = random.Random(62).randbytes(size)
+    async with maria_factory() as s:
+        s.add(_package(data=blob, size_bytes=size))
+        await s.commit()
+    async with maria_factory() as s:
+        data = (
+            await s.execute(
+                select(TiqoraPluginPackage.data).where(TiqoraPluginPackage.sha256 == _SHA)
+            )
+        ).scalar_one()
+        assert len(data) == size and data == blob
 
 
 async def test_package_primary_key_is_the_hash(
@@ -165,7 +205,15 @@ async def test_repository_url_key_unique(factory: async_sessionmaker[AsyncSessio
     async with factory() as s:
         s.add(_repo("plg62 one", "b" * 64))
         await s.commit()
-        row = (await s.execute(select(TiqoraPluginRepository))).scalars().first()
+        row = (
+            (
+                await s.execute(
+                    select(TiqoraPluginRepository).where(TiqoraPluginRepository.name == "plg62 one")
+                )
+            )
+            .scalars()
+            .first()
+        )
         assert row is not None and row.index_verified is False and row.index_json is None
     async with factory() as s:
         s.add(_repo("plg62 two", "b" * 64))

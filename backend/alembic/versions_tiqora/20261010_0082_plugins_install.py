@@ -14,10 +14,12 @@ by the application.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import mysql
+from sqlalchemy.types import TypeEngine
 
 revision: str = "20261010_0082"
 down_revision: str | None = "20261010_0077"
@@ -27,7 +29,7 @@ depends_on: str | Sequence[str] | None = None
 _BLOB = sa.LargeBinary().with_variant(mysql.LONGBLOB(), "mysql", "mariadb")
 _MEDIUM_TEXT = sa.Text().with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb")
 
-_PLUGIN_COLUMNS: tuple[tuple[str, sa.types.TypeEngine], ...] = (  # type: ignore[type-arg]
+_PLUGIN_COLUMNS: tuple[tuple[str, TypeEngine[Any]], ...] = (
     ("short_id", sa.String(16)),
     ("package_sha256", sa.CHAR(64)),
     ("repository_id", sa.Integer()),
