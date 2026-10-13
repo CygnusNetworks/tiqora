@@ -109,10 +109,14 @@ const SITE_DEF: CmdbDefinition = {
   ],
 };
 
-const CLASSES: CmdbClass[] = [
+const seedClasses = (): CmdbClass[] => [
   { id: 1, class_key: "server", name: "Server", icon: "server", number_prefix: "SRV", group_id: 1, group_name: "users", portal_visible: true, valid: true, position: 1, lock_version: 1, can_write: true, current_definition_version: 1, definition: SERVER_DEF },
   { id: 2, class_key: "site", name: "Standort", icon: "building", number_prefix: "LOC", group_id: 1, group_name: "users", portal_visible: false, valid: true, position: 2, lock_version: 1, can_write: true, current_definition_version: 1, definition: SITE_DEF },
 ];
+// Classes and their definition history are module state (not part of DemoCmdb): createDemoCmdb
+// puts them back to the seed, so every e2e test starts from the same classes.
+const CLASSES: CmdbClass[] = seedClasses();
+const DEFINITION_HISTORY: Record<number, CmdbDefinition[]> = {};
 const DEMO_EXT_LABELS: Record<string, Record<string, string>> = {
   ticket: { "1": "2026100801 – Datenbank antwortet nicht", "2": "2026100802 – Backup-Fenster überschritten" },
   service: { "1": "E-Mail", "2": "VPN", "3": "Arbeitsplatz" },
@@ -233,6 +237,8 @@ function finishedJob(
 }
 
 export function createDemoCmdb(): DemoCmdb {
+  CLASSES.splice(0, CLASSES.length, ...seedClasses());
+  for (const key of Object.keys(DEFINITION_HISTORY)) delete DEFINITION_HISTORY[Number(key)];
   return {
     cis: seedCis(),
     links: [
@@ -520,9 +526,7 @@ const adminStatus = (store: DemoCmdb): CmdbAdminStatus => ({
   archived_version_count: 0,
 });
 
-
 /** Definition history of the demo classes (version 1 is the seeded definition); new versions append. */
-const DEFINITION_HISTORY: Record<number, CmdbDefinition[]> = {};
 function definitionsOf(classId: number): CmdbDefinition[] {
   const cls = classOf(classId);
   const hist = (DEFINITION_HISTORY[classId] ??= cls.definition ? [cls.definition] : []);
