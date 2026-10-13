@@ -32,6 +32,7 @@ def register_core(registry: Registry) -> None:
     from tiqora.jobs.handlers.ticket_export import TICKET_EXPORT_JOB
     from tiqora.jobs.registry import JOB_HANDLERS
     from tiqora.plugins.install_jobs import (
+        PLUGIN_FETCH_JOB,
         PLUGIN_INSTALL_JOB,
         PLUGIN_REPOSITORY_REFRESH_JOB,
         PLUGIN_UNINSTALL_JOB,
@@ -51,6 +52,7 @@ def register_core(registry: Registry) -> None:
     registry.add(JOB_HANDLERS, PLUGIN_INSTALL_JOB)
     registry.add(JOB_HANDLERS, PLUGIN_UNINSTALL_JOB)
     registry.add(JOB_HANDLERS, PLUGIN_REPOSITORY_REFRESH_JOB)
+    registry.add(JOB_HANDLERS, PLUGIN_FETCH_JOB)
 
     from tiqora.reporting.semantic import REPORT_SOURCES
     from tiqora.reporting.sources import core_report_sources

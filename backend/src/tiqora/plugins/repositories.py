@@ -11,7 +11,7 @@ import asyncio
 import hashlib
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
@@ -25,7 +25,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.config import Settings
-from tiqora.db.tiqora.models import TiqoraPlugin, TiqoraPluginRepository
+from tiqora.db.tiqora.models import TiqoraPlugin, TiqoraPluginPackage, TiqoraPluginRepository
 from tiqora.domain.schemas import UtcDateTime
 from tiqora.plugins.inspect import PackageReport
 from tiqora.plugins.repo_index import (
@@ -38,6 +38,7 @@ from tiqora.plugins.repo_index import (
     newest_compatible,
     parse_index,
     publisher_keys,
+    resolve_package_url,
     verify_index,
     version_compatible,
 )
@@ -648,6 +649,282 @@ def update_binding_ok(
     return bool(installed.key_id and installed.key_id in verified_key_ids)
 
 
+async def installed_publishers(
+    session: AsyncSession, installed: dict[str, TiqoraPlugin]
+) -> dict[str, str | None]:
+    """``publisher_id`` of the installed manifests; a plugin missing here has an unknown one.
+
+    Runtime plugins: from the stored package report. Image plugins: from the discovered manifest.
+    The package lookup loads the keys first and uses an IN list (no Znuny join involved).
+    """
+    from tiqora.plugins.discovery import discovered_plugins
+
+    out: dict[str, str | None] = {}
+    shas = sorted({r.package_sha256 for r in installed.values() if r.package_sha256})
+    if shas:
+        rows = (
+            await session.execute(
+                select(TiqoraPluginPackage.sha256, TiqoraPluginPackage.report).where(
+                    TiqoraPluginPackage.sha256.in_(shas)
+                )
+            )
+        ).all()
+        reports: dict[str, str | None] = {}
+        for sha, raw in rows:
+            try:
+                data = json.loads(raw)
+            except ValueError:
+                continue
+            if isinstance(data, dict) and "publisher_id" in data:
+                value = data["publisher_id"]
+                reports[sha] = value if isinstance(value, str) else None
+        for plugin_id, row in installed.items():
+            if row.package_sha256 in reports:
+                out[plugin_id] = reports[row.package_sha256]
+    for found in discovered_plugins():
+        baked = installed.get(found.plugin_id)
+        if baked is not None and baked.source == "image" and found.manifest is not None:
+            out.setdefault(found.plugin_id, found.manifest.publisher_id)
+    return out
+
+
+def update_target(
+    plugin: IndexPlugin,
+    repo: TiqoraPluginRepository,
+    installed: TiqoraPlugin,
+    publishers_of: dict[str, str | None],
+    verified_key_ids: set[str],
+    core: Version | None,
+    sdk: str,
+) -> IndexVersion | None:
+    """The version of ``plugin`` that counts as an update for ``installed``, or None (F10).
+
+    The index entry must name the publisher of the installed manifest (when that is known), the
+    repository must be the plugin's own or vouch for the key that signed the installed version,
+    and the release must be compatible, not yanked and newer.
+    """
+    if installed.id in publishers_of and plugin.publisher_id != publishers_of[installed.id]:
+        return None
+    if not update_binding_ok(installed, repo, verified_key_ids):
+        return None
+    best = newest_compatible(plugin, core=core, sdk=sdk)
+    if best is None:
+        return None
+    try:
+        newer = Version(best.version) > Version(installed.version)
+    except InvalidVersion:
+        return None
+    return best if newer else None
+
+
+@dataclass(frozen=True)
+class UpdateInfo:
+    version: str
+    repository_id: int
+    repository_name: str
+    #: baked into the image: information only ("bitte das Image neu bauen")
+    image_plugin: bool
+
+
+async def available_updates(session: AsyncSession, *, settings: Settings) -> dict[str, UpdateInfo]:
+    """Installed plugin id -> the newest update the enabled repositories offer (no network)."""
+    from tiqora.plugins import store
+    from tiqora.plugins.compat import release_core_version
+    from tiqora.plugins.runtime import image_plugin_ids
+    from tiqora_sdk import SDK_VERSION
+
+    installed = await store.list_plugin_rows(session)
+    if not installed:
+        return {}
+    repos = (
+        (
+            await session.execute(
+                select(TiqoraPluginRepository)
+                .where(
+                    TiqoraPluginRepository.enabled.is_(True),
+                    TiqoraPluginRepository.index_json.is_not(None),
+                )
+                .order_by(TiqoraPluginRepository.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    images = image_plugin_ids(settings)
+    publishers_of = await installed_publishers(session, installed)
+    core = release_core_version()
+    best: dict[str, tuple[Version, UpdateInfo]] = {}
+    for repo in repos:
+        index = _parse_or_none(repo.index_json, repo.id)
+        if index is None:
+            continue
+        key_ids = (
+            {k.key_id for p in index.publishers for k in p.keys if not k.revoked}
+            if repo.index_verified
+            else set()
+        )
+        for plugin in index.plugins:
+            row = installed.get(plugin.id)
+            if row is None:
+                continue
+            target = update_target(plugin, repo, row, publishers_of, key_ids, core, SDK_VERSION)
+            if target is None:
+                continue
+            parsed = Version(target.version)
+            known = best.get(plugin.id)
+            if known is None or parsed > known[0]:
+                info = UpdateInfo(
+                    version=target.version,
+                    repository_id=repo.id,
+                    repository_name=repo.name,
+                    image_plugin=row.source == "image" or plugin.id in images,
+                )
+                best[plugin.id] = (parsed, info)
+    return {plugin_id: info for plugin_id, (_, info) in best.items()}
+
+
+# ---------------------------------------------------------------- download
+
+
+@dataclass(frozen=True)
+class DownloadResult:
+    package_sha256: str
+    installable: bool
+
+
+def find_index_version(
+    repo: TiqoraPluginRepository, plugin_id: str, version: str
+) -> IndexVersion | None:
+    """The release ``plugin_id`` ``version`` in the repository's stored index, or None."""
+    index = _parse_or_none(repo.index_json, repo.id)
+    if index is None:
+        return None
+    for plugin in index.plugins:
+        if plugin.id == plugin_id:
+            return next((v for v in plugin.versions if v.version == version), None)
+    return None
+
+
+NOT_IN_REPOSITORY: Final = "Version nicht in der Paketquelle"
+YANKED_MESSAGE: Final = "Diese Version wurde von der Paketquelle zurückgezogen"
+CHECKSUM_MESSAGE: Final = "Prüfsumme stimmt nicht mit der Paketquelle überein"
+SIZE_MESSAGE: Final = "Größe stimmt nicht mit der Paketquelle überein"
+ENTRY_MESSAGE: Final = (
+    "Das Paket passt nicht zum Eintrag der Paketquelle (Erweiterung oder Version)"
+)
+
+
+async def download_package(
+    factory: async_sessionmaker[AsyncSession],
+    *,
+    repository_id: int,
+    plugin_id: str,
+    version: str,
+    settings: Settings,
+    uploaded_by: int | None,
+    transport: httpx.AsyncBaseTransport | None = None,
+    resolver: HostResolver | None = None,
+) -> DownloadResult:
+    """Fetch one release of the repository's stored index and store it as a package (D8).
+
+    Only the source repository's publisher keys count (F10). The download must match the index
+    entry's sha256 and size exactly; nothing is stored otherwise. Every refusal is a German
+    ``FetchError``. No transaction is open during the network access.
+    """
+    from tiqora.plugins import packages_store
+    from tiqora.plugins.inspect import inspect_read_package, installed_state, short_id_owners
+    from tiqora.plugins.package import PackageError, read_tqplugin
+    from tiqora.plugins.runtime import runtime_dir_problem
+
+    async with factory() as session:
+        repo = await session.get(TiqoraPluginRepository, repository_id)
+        if repo is None:
+            raise FetchError("Paketquelle nicht gefunden", not_found=True)
+        if not repo.enabled:
+            raise FetchError("Die Paketquelle ist abgeschaltet")
+        entry = find_index_version(repo, plugin_id, version)
+        if entry is None:
+            raise FetchError(NOT_IN_REPOSITORY, not_found=True)
+        if entry.yanked:
+            raise FetchError(YANKED_MESSAGE)
+        repo_name, repo_url, verified = repo.name, repo.url, repo.index_verified
+        try:
+            package_url = resolve_package_url(repo_url, entry.url)
+        except IndexFormatError as exc:
+            raise FetchError(str(exc)) from None
+        problem = package_url_problem(repo_url, package_url, verified=verified)
+        if problem is not None:
+            raise FetchError(problem)
+        ring, names = await build_key_ring_named(session, settings)
+        # F10: a repository download is judged by its own publisher keys only
+        ring = replace(
+            ring, publishers=[p for p in ring.publishers if p.repository_id == repository_id]
+        )
+        names = {rid: name for rid, name in names.items() if rid == repository_id}
+        installed, images = await installed_state(session, settings)
+        owners = await short_id_owners(session)
+        await session.rollback()
+    limit = settings.plugins_max_package_bytes
+    if entry.size > limit:
+        raise FetchError(f"Das Paket ist größer als {_megabytes(limit)}")
+    data = await fetch_bytes(
+        package_url, max_bytes=limit, settings=settings, transport=transport, resolver=resolver
+    )
+    if hashlib.sha256(data).hexdigest() != entry.sha256.lower():
+        raise FetchError(CHECKSUM_MESSAGE)
+    if len(data) != entry.size:
+        raise FetchError(SIZE_MESSAGE)
+
+    def inspect() -> tuple[PackageReport, str]:
+        pkg = read_tqplugin(data, max_bytes=limit)
+        report = inspect_read_package(
+            pkg,
+            settings=settings,
+            ring=ring,
+            installed=installed,
+            image_plugin_ids=images,
+            short_id_owners=owners,
+        )
+        return report, pkg.manifest_text
+
+    try:
+        report, manifest_text = await asyncio.to_thread(inspect)
+    except PackageError as exc:
+        raise FetchError(str(exc)) from None
+    if report.plugin_id != plugin_id or report.version != version:
+        raise FetchError(ENTRY_MESSAGE)
+    report = with_repository_signer(report, ring, names)
+    now = datetime.now(UTC).replace(tzinfo=None, microsecond=0)
+    async with factory() as session:
+        try:
+            await packages_store.store_package(
+                session,
+                data=data,
+                report=report,
+                manifest_text=manifest_text,
+                source="repository",
+                repository_id=repository_id,
+                uploaded_by=uploaded_by,
+                now=now,
+            )
+            await session.commit()
+        except packages_store.PackageTooLargeForDatabase as exc:
+            await session.rollback()
+            raise FetchError(str(exc)) from None
+    log.info(
+        "plugin_package_downloaded",
+        repository=repository_id,
+        repository_name=repo_name,
+        plugin=plugin_id,
+        version=version,
+        trust=report.trust.value,
+    )
+    return DownloadResult(
+        package_sha256=report.sha256,
+        installable=report.installable and runtime_dir_problem(settings) is None,
+    )
+
+
 async def catalog(
     session: AsyncSession,
     *,
@@ -669,6 +946,7 @@ async def catalog(
     repos = (await session.execute(stmt.order_by(TiqoraPluginRepository.id))).scalars().all()
     installed = await store.list_plugin_rows(session)
     images = image_plugin_ids(settings)
+    publishers_of = await installed_publishers(session, installed)
     core = release_core_version()
     from tiqora_sdk import SDK_VERSION
 
@@ -688,6 +966,7 @@ async def catalog(
                 plugin,
                 publishers,
                 installed.get(plugin.id),
+                publishers_of,
                 plugin.id in images,
                 key_ids if repo.index_verified else set(),
                 core,
@@ -717,6 +996,7 @@ def _entry(
     plugin: IndexPlugin,
     publishers: dict[str, IndexPublisher],
     installed: TiqoraPlugin | None,
+    publishers_of: dict[str, str | None],
     image_plugin: bool,
     verified_key_ids: set[str],
     core: Version | None,
@@ -732,14 +1012,11 @@ def _entry(
         repo.index_verified and publisher is not None and plugin.id.startswith(publisher.id + ".")
     )
     installed_version = installed.version if installed is not None else None
-    update = False
-    if installed is not None and best is not None:
-        try:
-            update = Version(best.version) > Version(installed.version) and update_binding_ok(
-                installed, repo, verified_key_ids
-            )
-        except InvalidVersion:
-            update = False
+    update = (
+        installed is not None
+        and update_target(plugin, repo, installed, publishers_of, verified_key_ids, core, sdk)
+        is not None
+    )
     return CatalogEntryOut(
         repository_id=repo.id,
         repository_name=repo.name,
@@ -832,7 +1109,7 @@ async def run_repositories_tick(
             session, older_than=now - timedelta(hours=STALE_PACKAGE_HOURS)
         )
         await session.commit()
-        offered = await catalog(session, settings=settings)
+        offered = await available_updates(session, settings=settings)
         await session.rollback()
-    updates = len({e.plugin_id for e in offered.entries if e.update_available})
+    updates = len(offered)
     return {"repositories": len(ids), "failed": failed, "updates_available": updates}

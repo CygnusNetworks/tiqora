@@ -41,7 +41,9 @@ from tiqora.plugins.inspect import short_id_owners as load_short_id_owners
 from tiqora.plugins.migrations import _child_env
 from tiqora.plugins.package import PackageError, read_tqplugin
 from tiqora.plugins.repositories import (
+    FetchError,
     build_key_ring_named,
+    download_package,
     refresh_repository,
     with_repository_signer,
 )
@@ -53,6 +55,7 @@ log = structlog.get_logger(__name__)
 PLUGIN_INSTALL_KIND: Final = "core.plugin_install"
 PLUGIN_UNINSTALL_KIND: Final = "core.plugin_uninstall"
 PLUGIN_REPOSITORY_REFRESH_KIND: Final = "core.plugin_repository_refresh"
+PLUGIN_FETCH_KIND: Final = "core.plugin_fetch"
 PLUGIN_LANE: Final = "plugins"
 
 VERIFY_TIMEOUT_SECONDS: Final = 120
@@ -99,6 +102,11 @@ class PluginRepositoryRefreshPayload(BaseModel):
 def refresh_dedupe_key(repository_id: int) -> str:
     """One refresh per repository at a time (shared by the endpoint and the job)."""
     return f"repo:{repository_id}"
+
+
+def fetch_dedupe_key(repository_id: int, plugin_id: str) -> str:
+    """One download per repository and plugin at a time (shared by the endpoint and the job)."""
+    return f"fetch:{repository_id}:{plugin_id}"
 
 
 def dedupe_key(plugin_id: str) -> str:
@@ -561,6 +569,34 @@ async def run_plugin_repository_refresh(
     return {"ok": result.ok, "plugins": result.plugins, "error": result.error}
 
 
+async def run_plugin_fetch(ctx: JobContext, payload: PluginFetchPayload) -> dict[str, Any]:
+    """Download one release from a repository into the package store (D8)."""
+    try:
+        result = await download_package(
+            ctx.session_factory,
+            repository_id=payload.repository_id,
+            plugin_id=payload.plugin_id,
+            version=payload.version,
+            settings=ctx.settings,
+            uploaded_by=ctx.created_by,
+        )
+    except FetchError as exc:
+        raise JobFailed(str(exc)) from None
+    return {"package_sha256": result.package_sha256, "installable": result.installable}
+
+
+PLUGIN_FETCH_JOB = JobHandler(
+    kind=PLUGIN_FETCH_KIND,
+    payload_model=PluginFetchPayload,
+    run=run_plugin_fetch,
+    title_key="jobs.kinds.core.plugin_fetch",
+    timeout_seconds=600,
+    lane=PLUGIN_LANE,
+    max_attempts=1,
+    requeue_if_interrupted=False,
+    result_private=False,
+)
+
 PLUGIN_REPOSITORY_REFRESH_JOB = JobHandler(
     kind=PLUGIN_REPOSITORY_REFRESH_KIND,
     payload_model=PluginRepositoryRefreshPayload,
@@ -598,6 +634,8 @@ PLUGIN_INSTALL_JOB = JobHandler(
 )
 
 __all__ = [
+    "PLUGIN_FETCH_JOB",
+    "PLUGIN_FETCH_KIND",
     "PLUGIN_INSTALL_JOB",
     "PLUGIN_INSTALL_KIND",
     "PLUGIN_REPOSITORY_REFRESH_JOB",
@@ -610,8 +648,10 @@ __all__ = [
     "PluginRepositoryRefreshPayload",
     "PluginUninstallPayload",
     "dedupe_key",
+    "fetch_dedupe_key",
     "in_image",
     "refresh_dedupe_key",
+    "run_plugin_fetch",
     "run_plugin_install",
     "run_plugin_repository_refresh",
     "run_plugin_uninstall",

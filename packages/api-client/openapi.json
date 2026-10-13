@@ -14546,6 +14546,28 @@
         "title": "DimensionRef",
         "type": "object"
       },
+      "DownloadIn": {
+        "properties": {
+          "plugin_id": {
+            "maxLength": 190,
+            "minLength": 1,
+            "title": "Plugin Id",
+            "type": "string"
+          },
+          "version": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plugin_id",
+          "version"
+        ],
+        "title": "DownloadIn",
+        "type": "object"
+      },
       "DraftIn": {
         "properties": {
           "action": {
@@ -62573,6 +62595,91 @@
           }
         },
         "summary": "Update Repository",
+        "tags": [
+          "admin:plugins"
+        ]
+      }
+    },
+    "/api/v1/admin/plugin-repositories/{repo_id}/download": {
+      "post": {
+        "description": "Queue the download of one release into the package store; the UI polls ``GET /jobs/{id}``.\n\nThe result carries ``package_sha256`` for the install dialog (``GET /plugins/packages/\u2026``).",
+        "operationId": "download_from_repository_api_v1_admin_plugin_repositories__repo_id__download_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repo_id",
+            "required": true,
+            "schema": {
+              "title": "Repo Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DownloadIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download From Repository",
         "tags": [
           "admin:plugins"
         ]

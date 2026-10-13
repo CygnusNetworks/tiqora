@@ -2,7 +2,7 @@
 
 Listing syncs the environment-defined repositories first (D8). Creating, changing and removing
 need a browser session (F13): a repository vouches for publisher keys, so an integration key must
-never reach it. Refresh and catalog are here; download joins this router in a later task.
+never reach it. Refresh, catalog and download are here; refresh and download run as jobs.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from typing import Annotated, Any, Final, Literal
 
 import structlog
 from fastapi import APIRouter, HTTPException, Query, Response, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,13 +26,17 @@ from tiqora.jobs.schemas import JobAccepted
 from tiqora.jobs.service import enqueue_job, utc_now
 from tiqora.plugins import install_jobs
 from tiqora.plugins.repositories import (
+    NOT_IN_REPOSITORY,
+    YANKED_MESSAGE,
     CatalogOut,
     RepositoryInputError,
     catalog,
+    find_index_version,
     sync_env_repositories,
     url_key,
     validate_repository_input,
 )
+from tiqora.plugins.runtime import runtime_dir_problem
 
 log = structlog.get_logger(__name__)
 
@@ -249,6 +253,44 @@ async def refresh_repository_endpoint(
         payload=install_jobs.PluginRepositoryRefreshPayload(repository_id=repo_id),
         created_by=admin.id,
         dedupe_key=install_jobs.refresh_dedupe_key(repo_id),
+    )
+    await session.commit()
+    return JobAccepted(job_id=job.id, status="running" if job.status == "running" else "queued")
+
+
+class DownloadIn(BaseModel):
+    plugin_id: str = Field(min_length=1, max_length=190)
+    version: str = Field(min_length=1, max_length=64)
+
+
+@router.post(
+    "/{repo_id}/download", response_model=JobAccepted, status_code=status.HTTP_202_ACCEPTED
+)
+async def download_from_repository(
+    repo_id: int, body: DownloadIn, admin: AdminUser, session: DbSession, settings: AppSettings
+) -> JobAccepted:
+    """Queue the download of one release into the package store; the UI polls ``GET /jobs/{id}``.
+
+    The result carries ``package_sha256`` for the install dialog (``GET /plugins/packages/…``).
+    """
+    row = await _get(session, repo_id)
+    entry = find_index_version(row, body.plugin_id, body.version)
+    if entry is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, NOT_IN_REPOSITORY)
+    if entry.yanked:
+        raise HTTPException(status.HTTP_409_CONFLICT, YANKED_MESSAGE)
+    problem = runtime_dir_problem(settings)
+    if problem is not None:
+        await session.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, problem)
+    job = await enqueue_job(
+        session,
+        kind=install_jobs.PLUGIN_FETCH_KIND,
+        payload=install_jobs.PluginFetchPayload(
+            repository_id=repo_id, plugin_id=body.plugin_id, version=body.version
+        ),
+        created_by=admin.id,
+        dedupe_key=install_jobs.fetch_dedupe_key(repo_id, body.plugin_id),
     )
     await session.commit()
     return JobAccepted(job_id=job.id, status="running" if job.status == "running" else "queued")
