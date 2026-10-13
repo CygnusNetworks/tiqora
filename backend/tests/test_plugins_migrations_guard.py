@@ -26,7 +26,7 @@ G = StatementGuard("tables")
         "DELETE FROM tqp_tables_note",
         "DELETE FROM tqp_tables_note WHERE id IN (SELECT id FROM ticket)",
         "SELECT * FROM ticket",
-        "SELECT 'it''s; fine' FROM ticket",
+        "SELECT 'it''s fine' FROM ticket",
         "SHOW CREATE TABLE ticket",
         "DESCRIBE tqp_tables_alembic_version",
         "SET NAMES utf8mb4",
@@ -37,7 +37,13 @@ G = StatementGuard("tables")
         "CREATE TABLE tqp_tables_b (a_id INTEGER REFERENCES tqp_tables_note (id))",
         "DROP TABLE IF EXISTS tqp_tables_note, tqp_tables_b",
         "COMMENT ON COLUMN tqp_tables_note.body IS 'x'",
-        "SELECT 1 -- trailing comment",
+        "SET NAMES 'utf8mb4'",
+        # GUARD-STRICT-LEXICON: non-ASCII stays allowed inside '...' (German defaults)
+        "ALTER TABLE tqp_tables_note ADD COLUMN size VARCHAR(20) DEFAULT 'Größe'",
+        "INSERT INTO tqp_tables_note (body) VALUES ('Größe\tüber\nzwei Zeilen')",
+        "UPDATE tqp_tables_note SET body = 'ÄÖÜ ß €' WHERE id = 1",
+        "CREATE TABLE tqp_tables_note (\n\tid INTEGER NOT NULL,\n\tPRIMARY KEY (id)\n)",
+        "SELECT pg_catalog.pg_class.relname FROM pg_catalog.pg_class WHERE relkind = $1::VARCHAR",
     ],
 )
 def test_guard_allows(sql: str) -> None:
@@ -90,6 +96,31 @@ def test_guard_allows(sql: str) -> None:
         "DELETE tqp_tables_note FROM ticket AS tqp_tables_note",
         "SET NAMES utf8mb4, GLOBAL sql_mode = ''",
         "SELECT nextval('ticket_id_seq')",
+        # re-review 1, I3 (MariaDB): U+00A0 after ``--``; backslash inside "..."
+        "SELECT 1 --\u00a0 FROM (SELECT 2 AS \u00a0) t; TRUNCATE zz_victim",
+        'SELECT "a\\"\' " ; TRUNCATE zz_victim; -- \'',
+        # re-review 1, I4 (PostgreSQL): ``--`` comment ends at \r; nested block comments
+        "TRUNCATE tqp_tables_note -- x\r, zz_victim",
+        "DROP TABLE tqp_tables_note -- x\r, zz_victim",
+        "SELECT 1 -- x\r, setval('ticket_id_seq', 1)",
+        "TRUNCATE tqp_tables_note /* /* */ ' */ , zz_victim -- '",
+        # GUARD-STRICT-LEXICON: these tokens are refused anywhere, also inside literals
+        "SELECT 'it''s; fine' FROM ticket",
+        "SELECT 1 -- trailing comment",
+        "SELECT 'a--b' FROM ticket",
+        "SELECT '#' FROM ticket",
+        "SELECT 1 /* c */ FROM ticket",
+        "SELECT 'a */ b' FROM ticket",
+        "INSERT INTO tqp_tables_note (body) VALUES ('C:\\temp')",
+        "SELECT $q$ x $q$",
+        "INSERT INTO tqp_tables_note (body) VALUES ('a\rb')",
+        # ... and non-printable / non-ASCII characters outside '...'
+        "SELECT 1\u00a0FROM ticket",
+        'SELECT "Größe" FROM ticket',
+        "CREATE TABLE tqp_tables_größe (id INT)",
+        "SELECT 1\x0bFROM ticket",
+        # M4: a bare rename followed by another clause
+        "ALTER TABLE tqp_tables_note RENAME zz, ADD COLUMN y INT",
     ],
 )
 def test_guard_rejects(sql: str) -> None:

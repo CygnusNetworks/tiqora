@@ -6,6 +6,7 @@ Sync tests on purpose: the plugin Alembic environment runs its own event loop.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -57,6 +58,37 @@ def downgrade() -> None:
     op.drop_table("zz_plain")
 """
 
+_GOOD = """
+import sqlalchemy as sa
+from alembic import op
+
+revision = "tables_0002"
+down_revision = "tables_0001"
+
+
+def upgrade() -> None:
+    op.create_table("tqp_tables_two", sa.Column("id", sa.Integer(), primary_key=True))
+
+
+def downgrade() -> None:
+    op.drop_table("tqp_tables_two")
+"""
+
+_BAD_THIRD = """
+from alembic import op
+
+revision = "tables_0003"
+down_revision = "tables_0002"
+
+
+def upgrade() -> None:
+    op.execute("UPDATE ticket SET title = 'x'")
+
+
+def downgrade() -> None:
+    pass
+"""
+
 _SECOND_BASE = """
 revision = "tables_other"
 down_revision = None
@@ -90,9 +122,7 @@ def _drop_test_tables(engine: Engine) -> None:
             conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
 
 
-@pytest.fixture(params=["mariadb_znuny_url", "postgres_znuny_url"])
-def db(request: pytest.FixtureRequest) -> Iterator[tuple[Engine, str]]:
-    sync_url = request.getfixturevalue(request.param)
+def _open(sync_url: str) -> Iterator[tuple[Engine, str]]:
     engine = create_engine(sync_url)
     _drop_test_tables(engine)
     try:
@@ -100,6 +130,21 @@ def db(request: pytest.FixtureRequest) -> Iterator[tuple[Engine, str]]:
     finally:
         _drop_test_tables(engine)
         engine.dispose()
+
+
+@pytest.fixture(params=["mariadb_znuny_url", "postgres_znuny_url"])
+def db(request: pytest.FixtureRequest) -> Iterator[tuple[Engine, str]]:
+    yield from _open(request.getfixturevalue(request.param))
+
+
+@pytest.fixture
+def mariadb_db(mariadb_znuny_url: str) -> Iterator[tuple[Engine, str]]:
+    yield from _open(mariadb_znuny_url)
+
+
+@pytest.fixture
+def postgres_db(postgres_znuny_url: str) -> Iterator[tuple[Engine, str]]:
+    yield from _open(postgres_znuny_url)
 
 
 def _discover(
@@ -123,6 +168,8 @@ def _tables(engine: Engine) -> set[str]:
 
 
 def _version(engine: Engine, short_id: str = "tables") -> str | None:
+    if f"tqp_{short_id}_alembic_version" not in _tables(engine):
+        return None
     with engine.connect() as conn:
         return conn.execute(
             text(f"SELECT version_num FROM tqp_{short_id}_alembic_version")
@@ -130,12 +177,35 @@ def _version(engine: Engine, short_id: str = "tables") -> str | None:
 
 
 def _core_versions(engine: Engine) -> list[str]:
-    if "tiqora_alembic_version" not in _tables(engine):
-        return []
     with engine.connect() as conn:
         return sorted(
             str(r[0]) for r in conn.execute(text("SELECT version_num FROM tiqora_alembic_version"))
         )
+
+
+@contextmanager
+def _core_version_sentinel(engine: Engine) -> Iterator[None]:
+    """A core version table holding a sentinel row (the Znuny fixture DBs have none)."""
+    created = "tiqora_alembic_version" not in _tables(engine)
+    with engine.begin() as conn:
+        if created:
+            conn.execute(
+                text(
+                    "CREATE TABLE tiqora_alembic_version "
+                    "(version_num VARCHAR(32) NOT NULL PRIMARY KEY)"
+                )
+            )
+        conn.execute(text("INSERT INTO tiqora_alembic_version (version_num) VALUES ('sentinel')"))
+    try:
+        yield
+    finally:
+        with engine.begin() as conn:
+            if created:
+                conn.execute(text("DROP TABLE tiqora_alembic_version"))
+            else:
+                conn.execute(
+                    text("DELETE FROM tiqora_alembic_version WHERE version_num = 'sentinel'")
+                )
 
 
 def _titled_x(engine: Engine) -> int:
@@ -147,14 +217,15 @@ def test_upgrade_creates_prefixed_tables_and_own_version_table(
     db: tuple[Engine, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     engine, url = db
-    core_before = _core_versions(engine)
     plugin = _discover(tmp_path, monkeypatch, "tq_fixture_tables", plugin_id="org.example.tables")
     assert plugin_migration_head(plugin) == "tables_0001"
-    assert upgrade_plugin(plugin, database_url=url) == "tables_0001"
+    with _core_version_sentinel(engine):
+        core_before = _core_versions(engine)
+        assert upgrade_plugin(plugin, database_url=url) == "tables_0001"
+        assert _core_versions(engine) == core_before == ["sentinel"]  # core table never sees it
     names = _tables(engine)
     assert {"tqp_tables_note", "tqp_tables_alembic_version"} <= names
     assert _version(engine) == "tables_0001"
-    assert _core_versions(engine) == core_before  # the core version table never sees it
     with engine.begin() as conn:
         conn.execute(text("INSERT INTO tqp_tables_note (body) VALUES ('hallo')"))
 
@@ -207,11 +278,9 @@ def _upgrade_then_add_bad(
 
 
 def test_failed_run_rolls_back_on_postgres(
-    db: tuple[Engine, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    postgres_db: tuple[Engine, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    engine, url = db
-    if engine.dialect.name != "postgresql":
-        pytest.skip("transactional DDL is PostgreSQL only")
+    engine, url = postgres_db
     plugin = _upgrade_then_add_bad(url, tmp_path, monkeypatch)
     with pytest.raises(PluginMigrationError, match="nicht erlaubt"):
         upgrade_plugin(plugin, database_url=url)
@@ -222,11 +291,9 @@ def test_failed_run_rolls_back_on_postgres(
 
 
 def test_failed_run_reported_on_mariadb(
-    db: tuple[Engine, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    mariadb_db: tuple[Engine, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    engine, url = db
-    if engine.dialect.name != "mysql":
-        pytest.skip("DDL autocommit is MariaDB only")
+    engine, url = mariadb_db
     plugin = _upgrade_then_add_bad(url, tmp_path, monkeypatch)
     with pytest.raises(PluginMigrationError, match="nicht erlaubt"):
         upgrade_plugin(plugin, database_url=url)
@@ -247,8 +314,47 @@ def test_post_run_diff_catches_unprefixed_table(
         plugin_id="org.example.tables",
         extra={"0002_plain.py": _PLAIN},
     )
-    with pytest.raises(PluginMigrationError, match=r"Tabelle zz_plain "):
+    with pytest.raises(PluginMigrationError, match=r"„tables_0002“.*Tabelle zz_plain "):
         upgrade_plugin(plugin, database_url=url)
+    if engine.dialect.name == "postgresql":  # one transaction: nothing of the run survives
+        assert "zz_plain" not in _tables(engine)
+        assert _version(engine) is None
+    else:  # DDL committed implicitly; the revision's stamp is rolled back with its transaction
+        assert "zz_plain" in _tables(engine)
+        assert _version(engine) == "tables_0001"
+
+
+def _discover_three(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> DiscoveredPlugin:
+    return _discover(
+        tmp_path,
+        monkeypatch,
+        "tq_fixture_tables",
+        plugin_id="org.example.tables",
+        extra={"0002_good.py": _GOOD, "0003_bad.py": _BAD_THIRD},
+    )
+
+
+def test_failed_revision_keeps_earlier_stamps_on_mariadb(
+    mariadb_db: tuple[Engine, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    engine, url = mariadb_db
+    plugin = _discover_three(tmp_path, monkeypatch)
+    with pytest.raises(PluginMigrationError, match=r"„tables_0003“.*nicht erlaubt"):
+        upgrade_plugin(plugin, database_url=url)
+    assert {"tqp_tables_note", "tqp_tables_two"} <= _tables(engine)
+    assert _version(engine) == "tables_0002"  # committed per revision (MARIADB-STAMP)
+    assert _titled_x(engine) == 0
+
+
+def test_failed_revision_rolls_back_the_whole_run_on_postgres(
+    postgres_db: tuple[Engine, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    engine, url = postgres_db
+    plugin = _discover_three(tmp_path, monkeypatch)
+    with pytest.raises(PluginMigrationError, match=r"„tables_0003“.*nicht erlaubt"):
+        upgrade_plugin(plugin, database_url=url)
+    assert not {n for n in _tables(engine) if n.startswith("tqp_tables_")}
+    assert _titled_x(engine) == 0
 
 
 def test_plugin_without_migrations_returns_none(

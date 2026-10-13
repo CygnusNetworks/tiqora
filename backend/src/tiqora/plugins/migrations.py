@@ -55,6 +55,11 @@ _WITH_DENY = re.compile(r"\b(?:insert|update|delete|merge)\b")
 _JOIN_SPLIT = re.compile(
     r"\s*,\s*|\s+(?:(?:inner|left|right|full|cross|natural|outer)\s+)*(?:straight_)?join\s+"
 )
+# GUARD-STRICT-LEXICON: tokens on which the MariaDB and PostgreSQL lexers disagree (comments,
+# escapes, dollar quotes, line ends) are refused anywhere in the statement, also inside literals.
+_FORBIDDEN = re.compile(r";|--|#|/\*|\*/|\\|\$[A-Za-z_]*\$|\r")
+_PLAIN_CHARS = re.compile(r"[\x20-\x7e\t\n]*")
+_QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"|`[^`]*`")
 _REFERENCE_PATTERNS = (
     re.compile(rf"\breferences\s+({_NAME})"),
     re.compile(rf"\bwith table\s+({_NAME})"),
@@ -64,34 +69,33 @@ _REFERENCE_PATTERNS = (
 )
 
 
-def _normalise(sql: str, *, backslash_escapes: bool) -> str | None:
-    """Strip comments and string contents, drop identifier quoting, lower-case.
+def _strict_lexicon_ok(sql: str) -> bool:
+    """True when the statement lexes the same on MariaDB and PostgreSQL.
 
-    Returns ``None`` when the statement cannot be read safely (unterminated string/comment,
-    executable ``/*! … */`` comment). Only comments both dialects agree on are removed: anything
-    else stays visible, so the checks see a superset of what the server executes.
+    No comments, backslashes, dollar quotes or ``\\r`` anywhere; outside ``'...'`` only
+    printable ASCII, space, tab and newline (non-ASCII text such as German defaults stays allowed
+    inside single-quoted literals).
+    """
+    if _FORBIDDEN.search(sql):
+        return False
+    # blank only '...' literals; "..." and `...` stay and must be plain ('' / "" doubling just
+    # reads as two adjacent quoted runs, which is the same for this check)
+    outside = _QUOTED.sub(lambda m: "''" if m.group(0)[0] == "'" else m.group(0), sql)
+    return _PLAIN_CHARS.fullmatch(outside) is not None
+
+
+def _normalise(sql: str) -> str | None:
+    """Blank string contents, drop identifier quoting, lower-case, collapse whitespace.
+
+    Only called after ``_strict_lexicon_ok``: without comments and backslashes, ``'...'`` (with
+    ``''`` doubling), ``"..."`` and backticks lex identically on both dialects, so this sees
+    what the server parses. Returns ``None`` for an unterminated quote.
     """
     out: list[str] = []
     i, n = 0, len(sql)
     while i < n:
         ch = sql[i]
-        if ch == "'":
-            i += 1
-            while True:
-                if i >= n:
-                    return None
-                if backslash_escapes and sql[i] == "\\":
-                    i += 2
-                    continue
-                if sql[i] == "'":
-                    if i + 1 < n and sql[i + 1] == "'":
-                        i += 2
-                        continue
-                    break
-                i += 1
-            i += 1
-            out.append("''")
-        elif ch in ('"', "`"):
+        if ch in ("'", '"', "`"):
             j = i + 1
             buf: list[str] = []
             while True:
@@ -105,24 +109,8 @@ def _normalise(sql: str, *, backslash_escapes: bool) -> str | None:
                     break
                 buf.append(sql[j])
                 j += 1
-            out.append("".join(buf))
+            out.append("''" if ch == "'" else "".join(buf))
             i = j + 1
-        elif sql.startswith("/*", i):
-            if sql.startswith("/*!", i) or sql.startswith("/*M!", i):
-                return None
-            end = sql.find("*/", i + 2)
-            if end < 0:
-                return None
-            out.append(" ")
-            i = end + 2
-        elif ch == "#":  # MariaDB comment, plain character elsewhere: ambiguous
-            return None
-        elif sql.startswith("--", i):
-            if i + 2 < n and not sql[i + 2].isspace():
-                return None  # a comment on PostgreSQL, not on MariaDB: ambiguous
-            end = sql.find("\n", i)
-            out.append(" ")
-            i = n if end < 0 else end + 1
         else:
             out.append(ch)
             i += 1
@@ -150,10 +138,11 @@ class StatementGuard:
 
     def check(self, statement: str) -> None:
         """Raise ``PluginMigrationError`` unless the statement is allowed."""
-        for backslash in (True, False):  # dialects disagree on ``\'``: both readings must pass
-            norm = _normalise(statement, backslash_escapes=backslash)
-            if norm is None or not self._allowed(norm):
-                raise self._refuse(statement)
+        if not _strict_lexicon_ok(statement):
+            raise self._refuse(statement)
+        norm = _normalise(statement)
+        if norm is None or not self._allowed(norm):
+            raise self._refuse(statement)
 
     def _refuse(self, statement: str) -> PluginMigrationError:
         shown = re.sub(r"\s+", " ", statement).strip()[:80]
@@ -192,7 +181,7 @@ class StatementGuard:
 
     # ---- the grammar -------------------------------------------------------------
     def _allowed(self, s: str) -> bool:  # noqa: C901, PLR0911, PLR0912 - flat keyword table
-        if not s or ";" in s or re.search(r"\$[a-z_]*\$", s):
+        if not s:
             return False
         word = s.split(" ", 1)[0]
         if word == "show":
@@ -225,7 +214,7 @@ class StatementGuard:
         return True
 
     def _set_allowed(self, s: str) -> bool:
-        if re.fullmatch(r"set names [a-z0-9_]+(?: collate [a-z0-9_]+)?", s):
+        if re.fullmatch(r"set names (?:[a-z0-9_]+|'')(?: collate (?:[a-z0-9_]+|''))?", s):
             return True
         if re.match(r"set (?:session |local )?time zone\b", s):
             return True
@@ -264,8 +253,10 @@ class StatementGuard:
             for target in re.findall(rf"\brename (?:to|as) ({_NAME})", s):
                 if not self._ok(target):
                     return False
-            bare = re.search(rf"\brename (?!column\b|constraint\b|index\b|key\b)({_NAME})\s*$", s)
-            return bare is None or self._ok(bare.group(1))
+            bare = re.findall(
+                rf"\brename (?!(?:column|constraint|index|key|to|as)\b)({_NAME})(?= ?(?:,|$))", s
+            )
+            return all(self._ok(target) for target in bare)
         if m := re.match(r"drop (?:temporary )?table (?:if exists )?(.+)$", s):
             body = re.sub(r"\s+(?:cascade|restrict)$", "", m.group(1))
             names = self._name_list(body)
@@ -384,13 +375,16 @@ def _script(cfg: Config) -> ScriptDirectory:
     return script
 
 
+def _head(script: ScriptDirectory) -> str | None:
+    heads = script.get_heads()
+    return heads[0] if heads else None
+
+
 def plugin_migration_head(plugin: DiscoveredPlugin) -> str | None:
     """The single head revision, ``None`` without migrations; more than one head raises."""
     if migrations_dir(plugin) is None:
         return None
-    cfg = plugin_alembic_config(plugin, database_url="")
-    heads = _script(cfg).get_heads()
-    return heads[0] if heads else None
+    return _head(_script(plugin_alembic_config(plugin, database_url="")))
 
 
 def _failing_revision(script: ScriptDirectory, cfg: Config, *, upward: bool) -> str:
@@ -413,9 +407,13 @@ def _run(
     step: Callable[[Config], None],
     *,
     upward: bool = True,
-) -> None:
+) -> str | None:
+    """Run one Alembic command; returns the script's head (parsed once per run)."""
     cfg = plugin_alembic_config(plugin, database_url=database_url)
     script = _script(cfg)
+    head = _head(script)
+    if head is None:
+        return None
     try:
         step(cfg)
     except Exception as exc:
@@ -431,6 +429,7 @@ def _run(
         raise PluginMigrationError(
             f"Datenbank-Änderung „{failing}“ fehlgeschlagen: {detail}"[:2000]
         ) from exc
+    return head
 
 
 def upgrade_plugin(plugin: DiscoveredPlugin, *, database_url: str) -> str | None:
@@ -439,11 +438,9 @@ def upgrade_plugin(plugin: DiscoveredPlugin, *, database_url: str) -> str | None
     Sync; must run in a thread without a running event loop (the environment uses
     ``asyncio.run``). Every failure is a ``PluginMigrationError`` with a German message.
     """
-    head = plugin_migration_head(plugin)
-    if head is None:
+    if migrations_dir(plugin) is None:
         return None
-    _run(plugin, database_url, lambda cfg: command.upgrade(cfg, "head"))
-    return head
+    return _run(plugin, database_url, lambda cfg: command.upgrade(cfg, "head"))
 
 
 def downgrade_plugin_to_base(plugin: DiscoveredPlugin, *, database_url: str) -> None:
