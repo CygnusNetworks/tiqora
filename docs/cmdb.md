@@ -69,9 +69,13 @@ vorkommen.
 | `attachment` | Datei am CI (siehe Anhänge) |
 
 Aus Znuny übernehmen Sie eine vorhandene Klassendefinition mit **Definition importieren**
-(YAML aus Znuny 6.5 oder 7.x, auch aus der Datenbank kopiert; was Tiqora nicht abbilden kann,
-wird als Hinweis aufgelistet). Der Umfang ist begrenzt (1 MiB, 64 Ebenen), damit eine
-manipulierte Datei nichts anrichten kann.
+(YAML aus Znuny 6.5 oder 7.3, auch aus der Datenbank kopiert, oder das ältere Perl-Format; was
+Tiqora nicht abbilden kann, wird als Hinweis aufgelistet). Gelesen wird die Definition mit
+demselben Parser wie im Modus A und im ITSM-Import, also nach Znunys eigenen Regeln: fehlt
+`CountMin`, gilt 1; Schlüssel mit Leerzeichen oder Umlauten lehnt schon Znuny ab, ebenso hier.
+Verweise auf andere CIs (`CI`, `CISimple`) übernehmen die Klasse aus `CIClassName`. Der Umfang
+ist begrenzt (1 MiB, 64 Ebenen, keine YAML-Aliase), damit eine manipulierte Datei nichts
+anrichten kann.
 
 ### Vorlagen
 

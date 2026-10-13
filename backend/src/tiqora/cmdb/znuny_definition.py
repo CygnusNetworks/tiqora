@@ -1,28 +1,35 @@
-"""Import of a Znuny ITSM class definition (D2): Perl data (6.x) or YAML (7.x) -> ``AttributeDef``.
+"""Import of a Znuny ITSM class definition (D2): Znuny's definition text -> ``AttributeDef``.
 
-Pure module. The Perl text goes through the step-0 safe parser :mod:`tiqora.znuny.perl_data`
-(never evaluated), YAML through ``yaml.safe_load`` with the same 1 MiB / depth-64 bounds. Znuny
-facts: ``Kernel/System/ITSMConfigItem/Definition.pm`` (attribute hashes ``Key``, ``Name``,
-``Searchable``, ``Input``, ``CountMin/Max/Default``, ``Sub``).
+One parser for Mode A, the CMDB and the importer (R8): the text is read and prepared by the ITSM
+core's :func:`tiqora.itsm.znuny_adapter.definitions.parse_definition` (YAML in Znuny 6.5 and
+7.3, the old Perl data format through the step-0 safe parser, never evaluated; 1 MiB, depth 64,
+node limit, no YAML aliases; Znuny's ``_DefinitionPrepare`` count rules and ``DefinitionCheck``
+key rules). This module only maps the prepared :class:`AttrDef` tree onto Tiqora attributes.
+The behaviour survey found no separate 7.x layout: both lines store the same attribute list
+(``docs/itsm-import.md``, question 7).
+
+Differences to reading a stored definition row: the text comes from an admin (pasted or copied
+out of the database), so YAML without the leading ``---`` is read as YAML rather than as Znuny's
+"legacy Perl" marker, and errors carry a German message for the dialog.
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
 from typing import Any, Final, Literal
 
-import yaml
 from pydantic import ValidationError
 
 from tiqora.cmdb.definition import KEY_RE, AttributeDef, AttributeOptions
+from tiqora.itsm.znuny_adapter.definitions import AttrDef, DefinitionError, parse_definition
 from tiqora.util.perl import perl_truthy
-from tiqora.znuny.perl_data import MAX_TEXT_CHARS, PerlDataError, parse_perl_data
+from tiqora.znuny.perl_data import PerlDataError
 
-MAX_DEPTH: Final = 64
 _KEY = re.compile(KEY_RE)
 
-#: Znuny ``Input.Type`` -> Tiqora attribute type (D2)
+#: Znuny ``Input.Type`` -> Tiqora attribute type (D2; the 20 modules under ``XML/Type``)
 _TYPE_MAP: Final[dict[str, str]] = {
     "Text": "text",
     "TextArea": "textarea",
@@ -30,7 +37,9 @@ _TYPE_MAP: Final[dict[str, str]] = {
     "Date": "date",
     "DateTime": "datetime",
     "GeneralCatalog": "catalog",
-    "CIClassReference": "ci_ref",
+    "CI": "ci_ref",
+    "CISimple": "ci_ref",
+    "CIClassReference": "ci_ref",  # not a Znuny 6.5/7.3 module; kept for older exports
     "Customer": "customer_user",
     "CustomerCompany": "customer_company",
     "User": "agent",
@@ -59,79 +68,6 @@ class DefinitionImportResult:
     class_keys_used: set[str] = field(default_factory=set)
 
 
-class _NoAliasLoader(yaml.SafeLoader):
-    """SafeLoader that refuses aliases (``*x``): exponential fan-out."""
-
-    def compose_node(self, parent: Any, index: Any) -> Any:
-        if self.check_event(yaml.events.AliasEvent):
-            event = self.peek_event()  # type: ignore[no-untyped-call]
-            raise yaml.composer.ComposerError(
-                None, None, "YAML-Aliase sind nicht erlaubt", event.start_mark
-            )
-        return super().compose_node(parent, index)
-
-
-def _depth(value: Any, limit: int, level: int = 0) -> bool:
-    """True when the nested structure is deeper than ``limit`` (iterative-safe bound)."""
-    if level > limit:
-        return True
-    if isinstance(value, dict):
-        return any(_depth(v, limit, level + 1) for v in value.values())
-    if isinstance(value, list):
-        return any(_depth(v, limit, level + 1) for v in value)
-    return False
-
-
-def _load(text: str, fmt: Literal["yaml", "perl"]) -> Any:
-    if len(text) > MAX_TEXT_CHARS:
-        raise DefinitionParseError(f"Die Definition ist größer als {MAX_TEXT_CHARS} Zeichen.")
-    if fmt == "perl":
-        try:
-            return parse_perl_data(text, max_depth=MAX_DEPTH)
-        except PerlDataError as exc:
-            raise DefinitionParseError(f"Perl-Definition nicht lesbar: {exc}") from exc
-    try:
-        data = yaml.load(text, Loader=_NoAliasLoader)  # noqa: S506 - SafeLoader subclass
-    except yaml.YAMLError as exc:
-        raise DefinitionParseError(f"YAML-Definition nicht lesbar: {exc}") from exc
-    except (RecursionError, MemoryError) as exc:
-        raise DefinitionParseError("YAML-Definition ist zu tief verschachtelt.") from exc
-    # safe_load builds the tree first, so check the depth before we recurse over it
-    if _depth(data, MAX_DEPTH):
-        raise DefinitionParseError(f"Die Definition ist tiefer als {MAX_DEPTH} Ebenen.")
-    return data
-
-
-def _top_level_items(data: Any) -> list[Any]:
-    """A plain attribute list, or a 7.x document: attributes of every section's ``Content``."""
-    if isinstance(data, list):
-        return data
-    if isinstance(data, dict):
-        sections = data.get("Sections")
-        if isinstance(sections, dict):
-            out: list[Any] = []
-            for section in sections.values():
-                content = section.get("Content") if isinstance(section, dict) else None
-                if isinstance(content, list):
-                    out.extend(content)
-            return out
-        if isinstance(sections, list):
-            out = []
-            for section in sections:
-                content = section.get("Content") if isinstance(section, dict) else None
-                if isinstance(content, list):
-                    out.extend(content)
-            return out
-    raise DefinitionParseError("Die Definition enthält keine Attributliste.")
-
-
-def _int(value: Any, default: int) -> int:
-    try:
-        return int(str(value).strip())
-    except (TypeError, ValueError):
-        return default
-
-
 def _sanitise_key(raw: str, path: str, res: DefinitionImportResult) -> str:
     if _KEY.match(raw):
         return raw
@@ -143,29 +79,33 @@ def _sanitise_key(raw: str, path: str, res: DefinitionImportResult) -> str:
     return key
 
 
-def _convert(item: Any, prefix: str, res: DefinitionImportResult) -> AttributeDef | None:
-    if not isinstance(item, dict):
-        res.warnings.append(
-            f"Eintrag bei {prefix or '(Wurzel)'} ist kein Attribut und wurde übersprungen"
-        )
-        return None
-    raw_key = str(item.get("Key", "")).strip()
-    if not raw_key:
-        res.warnings.append(f"Attribut ohne Key bei {prefix or '(Wurzel)'} wurde übersprungen")
-        return None
-    key = _sanitise_key(raw_key, prefix + raw_key, res)
+def _decimal(value: Any) -> Decimal:
+    try:
+        d = Decimal(str(value).strip())
+    except InvalidOperation as exc:
+        raise ValueError(str(value)) from exc
+    if not d.is_finite():
+        raise ValueError(str(value))
+    return d
+
+
+def _referenced_classes(inp: dict[str, Any]) -> list[str]:
+    """``CI``/``CISimple``: ``CIClassName``; older exports: ``ReferencedCIClassName`` (a list)."""
+    ref = inp.get("CIClassName") or inp.get("ReferencedCIClassName")
+    names = ref if isinstance(ref, list) else ([ref] if ref else [])
+    return [str(n).strip().lower() for n in names if str(n).strip()]
+
+
+def _convert(attr: AttrDef, prefix: str, res: DefinitionImportResult) -> AttributeDef | None:
+    key = _sanitise_key(attr.key, prefix + attr.key, res)
     path = f"{prefix}{key}"
-    inp = item.get("Input")
-    inp = inp if isinstance(inp, dict) else {}
-    znuny_type = str(inp.get("Type", "Text"))
-    sub_raw = item.get("Sub")
-    if sub_raw not in (None, "") and not isinstance(sub_raw, list):
-        res.warnings.append(f"Sub bei {path} ist keine Liste und wurde ignoriert")
+    inp = dict(attr.input)
+    znuny_type = attr.input_type or "Text"
     mapped = _TYPE_MAP.get(znuny_type)
     if mapped is None:
         res.warnings.append(f"Unbekannter Typ {znuny_type} bei {path}: als Text übernommen")
         mapped = "text"
-    elif mapped == "group" and not isinstance(sub_raw, list):
+    elif mapped == "group" and not attr.sub:
         # a group without children would not validate; keep the value as text
         res.warnings.append(f"Gruppe ohne Unterattribute bei {path}: als Text übernommen")
         mapped = "text"
@@ -179,13 +119,14 @@ def _convert(item: Any, prefix: str, res: DefinitionImportResult) -> AttributeDe
         else:
             res.warnings.append(f"Katalogklasse fehlt bei {path}")
     if mapped == "ci_ref":
-        ref = inp.get("ReferencedCIClassName")
-        names = ref if isinstance(ref, list) else ([ref] if ref else [])
-        keys = [str(n).strip().lower() for n in names if str(n).strip()]
+        keys = _referenced_classes(inp)
         options.class_keys = keys
         res.class_keys_used.update(keys)
     if mapped in ("text", "textarea", "url") and "MaxLength" in inp:
-        n = _int(inp.get("MaxLength"), 0)
+        try:
+            n = int(str(inp.get("MaxLength")).strip())
+        except (TypeError, ValueError):
+            n = 0
         if n > 0:
             options.max_length = n
     if mapped in ("integer", "decimal"):
@@ -198,59 +139,49 @@ def _convert(item: Any, prefix: str, res: DefinitionImportResult) -> AttributeDe
                         f"{znuny_key} bei {path} ist keine Zahl und wurde ignoriert"
                     )
 
-    count_min = max(0, _int(item.get("CountMin"), 0))
-    count_max = max(1, _int(item.get("CountMax"), 1))
-    count_default = _int(item.get("CountDefault"), 1)
-
-    known = {"Key", "Name", "Searchable", "Input", "CountMin", "CountMax", "CountDefault", "Sub"}
-    for extra in sorted(set(item) - known):
-        res.warnings.append(f"Unbekannter Schlüssel {extra} bei {path} wurde ignoriert")
-
     sub: list[AttributeDef] = []
-    if isinstance(sub_raw, list):
-        for child in sub_raw:
-            conv = _convert(child, f"{path}.", res)
-            if conv is not None:
-                sub.append(conv)
+    for child in attr.sub:
+        conv = _convert(child, f"{path}.", res)
+        if conv is not None:
+            sub.append(conv)
 
     try:
         return AttributeDef(
             key=key,
-            name=str(item.get("Name") or key)[:200],
+            name=attr.name[:200],
             type=mapped,  # type: ignore[arg-type]
             required=perl_truthy(inp.get("Required")),
-            searchable=perl_truthy(item.get("Searchable"))
-            and mapped not in ("group", "attachment"),
-            count_min=count_min,
-            count_max=count_max,
-            count_default=min(max(count_default, count_min), count_max),
+            searchable=attr.searchable and mapped not in ("group", "attachment"),
+            # Znuny's _DefinitionPrepare already clamped the counts (CountMin defaults to 1)
+            count_min=attr.count_min,
+            count_max=attr.count_max,
+            count_default=attr.count_default,
             options=options,
             sub=sub,
         )
-    except ValidationError as exc:  # pragma: no cover - defensive
+    except ValidationError as exc:
         res.warnings.append(
             f"Attribut {path} konnte nicht übernommen werden: {exc.errors()[0]['msg']}"
         )
         return None
 
 
-def _decimal(value: Any) -> Any:
-    from decimal import Decimal, InvalidOperation
-
-    try:
-        d = Decimal(str(value).strip())
-    except InvalidOperation as exc:
-        raise ValueError(str(value)) from exc
-    if not d.is_finite():
-        raise ValueError(str(value))
-    return d
-
-
 def parse_znuny_definition(text: str, fmt: Literal["yaml", "perl"]) -> DefinitionImportResult:
-    """Map a Znuny definition to Tiqora attributes; unknown parts become warnings, not errors."""
-    data = _load(text, fmt)
+    """Map a Znuny definition to Tiqora attributes; unknown types become warnings, not errors."""
+    source = text
+    if fmt == "yaml":
+        stripped = text.lstrip()
+        # pasted YAML without the document marker is still YAML (not Znuny's legacy-Perl marker)
+        source = stripped if stripped.startswith("---") else "---\n" + text
+    try:
+        prepared = parse_definition(source, fmt)
+    except DefinitionError as exc:
+        label = "YAML" if fmt == "yaml" else "Perl"
+        # chain the Perl parser's error when there is one: the API reports its ``position``
+        cause = exc.__cause__ if isinstance(exc.__cause__, PerlDataError) else exc
+        raise DefinitionParseError(f"{label}-Definition nicht lesbar: {exc}") from cause
     res = DefinitionImportResult(attributes=[])
-    for item in _top_level_items(data):
+    for item in prepared:
         attr = _convert(item, "", res)
         if attr is not None:
             res.attributes.append(attr)

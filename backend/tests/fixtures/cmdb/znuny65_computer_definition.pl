@@ -48,6 +48,6 @@
     {
         Key   => 'Location',
         Name  => 'Location',
-        Input => { Type => 'CIClassReference', ReferencedCIClassName => 'Location' },
+        Input => { Type => 'CI', CIClassName => 'Location' },
     },
 ]

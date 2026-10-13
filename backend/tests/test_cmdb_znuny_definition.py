@@ -1,4 +1,4 @@
-"""Znuny class definition import (D2) on top of the step-0 Perl parser and yaml.safe_load."""
+"""Znuny class definition import (D2) on the ITSM core's definition parser (one parser, R8)."""
 
 from __future__ import annotations
 
@@ -10,6 +10,8 @@ from tiqora.cmdb.definition import iter_attribute_paths, validate_definition
 from tiqora.cmdb.znuny_definition import DefinitionParseError, parse_znuny_definition
 
 FIXTURES = Path(__file__).parent / "fixtures" / "cmdb"
+#: the stock class definitions of the behaviour survey (identical in Znuny 6.5 and 7.3)
+SURVEY = Path(__file__).parent / "fixtures" / "znuny-itsm" / "definitions"
 
 
 def test_perl_nested_structure_with_escapes_and_sub() -> None:
@@ -75,21 +77,60 @@ def test_znuny65_fixture_maps_types_counts_and_flags() -> None:
     )
 
 
-def test_znuny73_yaml_sections_are_merged_in_order() -> None:
-    res = parse_znuny_definition(
-        FIXTURES.joinpath("znuny73_computer_definition.yml").read_text(), "yaml"
+@pytest.mark.parametrize("line", ["itsm-6", "itsm-7"])
+def test_stock_znuny_definitions_import_without_loss(line: str) -> None:
+    """Znuny 6.5 and 7.3 store the same YAML attribute list (survey question 7): no 7.x layout."""
+    res = parse_znuny_definition(SURVEY.joinpath(line, "22_Computer.yml").read_text(), "yaml")
+    by_path = dict(iter_attribute_paths(res.attributes))
+    assert [a.key for a in res.attributes][:4] == ["Vendor", "Model", "Description", "Type"]
+    assert by_path["Type"].type == "catalog" and by_path["CustomerID"].type == "customer_company"
+    assert by_path["Owner"].type == "customer_user"
+    assert by_path["NIC.IPAddress"].count_max == 20
+    assert (by_path["NIC.IPAddress"].count_min, by_path["NIC.IPAddress"].count_default) == (0, 0)
+    assert by_path["Note"].count_min == 0 and by_path["Vendor"].count_min == 1
+    assert res.warnings == []
+    assert res.catalog_classes_used == {
+        "ITSM::ConfigItem::Computer::Type",
+        "ITSM::ConfigItem::YesNo",
+    }
+    assert (
+        validate_definition(
+            res.attributes, known_catalog_classes=res.catalog_classes_used, known_class_keys=set()
+        )
+        == []
     )
-    assert [a.key for a in res.attributes] == [
-        "Vendor",
-        "Model",
-        "Description",
-        "SerialNumber",
-        "Memory",
+    # every stock class reads (Location's "E-Mail" key is sanitised with a warning)
+    for path in sorted(SURVEY.joinpath(line).glob("*.yml")):
+        assert parse_znuny_definition(path.read_text(), "yaml").attributes, path.name
+
+
+def test_seven_x_sections_document_is_not_a_definition() -> None:
+    """The ``Sections``/``Content`` layout the plan assumed for 7.x does not exist in Znuny."""
+    with pytest.raises(DefinitionParseError):
+        parse_znuny_definition(
+            FIXTURES.joinpath("znuny73_computer_definition.yml").read_text(), "yaml"
+        )
+
+
+def test_yaml_without_document_marker_is_still_read() -> None:
+    """Pasted text: no ``---`` is not Znuny's legacy-Perl marker here (``fmt`` is explicit)."""
+    res = parse_znuny_definition("- Key: Foo\n  Name: Foo\n", "yaml")
+    assert [a.key for a in res.attributes] == ["Foo"]
+    assert parse_znuny_definition("\n  ---\n- Key: Bar\n", "yaml").attributes[0].key == "Bar"
+
+
+def test_ci_reference_types_of_znuny() -> None:
+    """``CI`` and ``CISimple`` reference one class through ``Input.CIClassName``."""
+    res = parse_znuny_definition(
+        "---\n- Key: Room\n  Input:\n    Type: CI\n    CIClassName: Location\n"
+        "- Key: Peer\n  Input:\n    Type: CISimple\n    CIClassName: Computer\n",
+        "yaml",
+    )
+    assert [(a.key, a.type, a.options.class_keys) for a in res.attributes] == [
+        ("Room", "ci_ref", ["location"]),
+        ("Peer", "ci_ref", ["computer"]),
     ]
-    memory = res.attributes[-1]
-    assert memory.type == "integer"
-    assert str(memory.options.min) == "1" and str(memory.options.max) == "4096"
-    assert res.attributes[3].required is True
+    assert res.class_keys_used == {"location", "computer"} and res.warnings == []
 
 
 def test_unknown_input_type_becomes_text_with_warning() -> None:
@@ -109,8 +150,20 @@ def test_perl_truthy_flags() -> None:
 
 
 def test_count_defaults_follow_znuny() -> None:
+    """Znuny's ``_DefinitionPrepare`` (survey question 7): CountMin 1 when absent, 0 stays."""
     a = parse_znuny_definition("[ { Key => 'A', Name => 'A' } ]", "perl").attributes[0]
-    assert (a.count_min, a.count_max, a.count_default) == (0, 1, 1)
+    assert (a.count_min, a.count_max, a.count_default) == (1, 1, 1)
+    b = parse_znuny_definition(
+        "[ { Key => 'B', CountMin => 0, CountMax => 0, CountDefault => 5 } ]", "perl"
+    ).attributes[0]
+    assert (b.count_min, b.count_max, b.count_default) == (0, 1, 1)
+
+
+def test_keys_znuny_rejects_fail_the_import() -> None:
+    """``DefinitionCheck``: keys with whitespace or non-ASCII characters are no definition."""
+    for bad in ("- Key: Serial Number\n", "- Key: Größe\n", "- Name: no key\n"):
+        with pytest.raises(DefinitionParseError):
+            parse_znuny_definition(bad, "yaml")
 
 
 def test_bad_keys_are_sanitised_with_warning() -> None:
@@ -119,10 +172,10 @@ def test_bad_keys_are_sanitised_with_warning() -> None:
     assert "1st-Disk" in res.warnings[0]
 
 
-def test_unknown_keys_warn_but_do_not_fail() -> None:
+def test_unknown_keys_do_not_fail() -> None:
+    """Znuny ignores attribute keys it does not know; so does the shared parser."""
     res = parse_znuny_definition("[ { Key => 'A', Name => 'A', Frobnicate => 1 } ]", "perl")
-    assert len(res.attributes) == 1
-    assert any("Frobnicate" in w for w in res.warnings)
+    assert [a.key for a in res.attributes] == ["A"] and res.warnings == []
 
 
 def test_document_without_attribute_list_is_rejected() -> None:
@@ -147,6 +200,11 @@ def test_yaml_alias_bomb_is_rejected_quickly() -> None:
     assert time.monotonic() - started < 2
 
 
-def test_sub_that_is_not_a_list_warns() -> None:
+def test_sub_that_is_not_a_list_is_dropped() -> None:
+    """``_DefinitionPrepare`` removes a ``Sub`` that is not a list; a ``Dummy`` group without
+    children is kept as text with a warning."""
     res = parse_znuny_definition("- Key: Foo\n  Name: Foo\n  Sub: x\n", "yaml")
-    assert any("Sub bei Foo" in w for w in res.warnings)
+    assert res.attributes[0].sub == [] and res.attributes[0].type == "text"
+    grp = parse_znuny_definition("- Key: G\n  Input:\n    Type: Dummy\n  Sub: x\n", "yaml")
+    assert grp.attributes[0].type == "text"
+    assert grp.warnings == ["Gruppe ohne Unterattribute bei G: als Text übernommen"]

@@ -1,4 +1,6 @@
-# fixture in Znuny's documented format, not copied from a Znuny install
+# Negative fixture: the Pages/Sections layout the CMDB plan assumed for Znuny 7.x. The ITSM
+# behaviour survey found no such layout (6.5 and 7.3 store a plain attribute list), so the
+# shared parser rejects it (test_seven_x_sections_document_is_not_a_definition).
 Pages:
   - Name: General
     Sections:

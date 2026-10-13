@@ -140,11 +140,15 @@ async def test_definition_import_perl_preview(cmdb_db: CmdbWorld) -> None:
 
 
 async def test_definition_import_yaml_and_json(cmdb_db: CmdbWorld) -> None:
-    yml = FIXTURES.joinpath("znuny73_computer_definition.yml").read_text()
+    # a stock Znuny 7.3 class definition (behaviour survey; 6.5 stores the same list)
+    yml = (
+        FIXTURES.parent / "znuny-itsm" / "definitions" / "itsm-7" / "22_Computer.yml"
+    ).read_text()
     async with client_for(cmdb_db, USER_ADMIN) as c:
         r = await c.post(f"{ADMIN}/definition-import", json={"format": "znuny_yaml", "text": yml})
         assert r.status_code == 200, r.text
-        assert len(r.json()["attributes"]) >= 1
+        assert [a["key"] for a in r.json()["attributes"]][:2] == ["Vendor", "Model"]
+        assert r.json()["warnings"] == []
         import json as _json
 
         j = await c.post(
