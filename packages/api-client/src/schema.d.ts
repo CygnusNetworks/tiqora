@@ -3977,6 +3977,104 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/plugin-repositories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Repositories */
+        get: operations["list_repositories_api_v1_admin_plugin_repositories_get"];
+        put?: never;
+        /** Create Repository */
+        post: operations["create_repository_api_v1_admin_plugin_repositories_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/plugin-repositories/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Catalog
+         * @description What the enabled repositories offer, from their stored indexes (no network access).
+         */
+        get: operations["get_catalog_api_v1_admin_plugin_repositories_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/plugin-repositories/{repo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Repository */
+        put: operations["update_repository_api_v1_admin_plugin_repositories__repo_id__put"];
+        post?: never;
+        /** Delete Repository */
+        delete: operations["delete_repository_api_v1_admin_plugin_repositories__repo_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/plugin-repositories/{repo_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Download From Repository
+         * @description Queue the download of one release into the package store; the UI polls ``GET /jobs/{id}``.
+         *
+         *     The result carries ``package_sha256`` for the install dialog (``GET /plugins/packages/…``).
+         */
+        post: operations["download_from_repository_api_v1_admin_plugin_repositories__repo_id__download_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/plugin-repositories/{repo_id}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Repository Endpoint
+         * @description Queue a refresh of the repository's index; the UI polls ``GET /jobs/{id}``.
+         */
+        post: operations["refresh_repository_endpoint_api_v1_admin_plugin_repositories__repo_id__refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/plugins": {
         parameters: {
             query?: never;
@@ -4113,6 +4211,26 @@ export interface paths {
         put?: never;
         /** Reset Plugin */
         post: operations["reset_plugin_api_v1_admin_plugins__plugin_id__reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/plugins/{plugin_id}/uninstall": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Uninstall Plugin
+         * @description Queue the removal ("Daten behalten" or "Daten löschen"); the UI polls ``GET /jobs/{id}``.
+         */
+        post: operations["uninstall_plugin_api_v1_admin_plugins__plugin_id__uninstall_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -13974,6 +14092,43 @@ export interface components {
             /** Tiqora Only */
             tiqora_only: boolean;
         };
+        /** CatalogEntryOut */
+        CatalogEntryOut: {
+            /** Categories */
+            categories: string[];
+            /** Description */
+            description: string;
+            /** Homepage */
+            homepage: string | null;
+            /** Icon Url */
+            icon_url: string | null;
+            /** Image Plugin */
+            image_plugin: boolean;
+            /** Installed Version */
+            installed_version: string | null;
+            /** Latest Compatible */
+            latest_compatible: string | null;
+            /** Latest Version */
+            latest_version: string;
+            /** License */
+            license: string | null;
+            /** Name */
+            name: string;
+            /** Plugin Id */
+            plugin_id: string;
+            /** Publisher */
+            publisher: string | null;
+            /** Publisher Verified */
+            publisher_verified: boolean;
+            /** Repository Id */
+            repository_id: number;
+            /** Repository Name */
+            repository_name: string;
+            /** Update Available */
+            update_available: boolean;
+            /** Versions */
+            versions: components["schemas"]["CatalogVersionOut"][];
+        };
         /** CatalogFieldOut */
         CatalogFieldOut: {
             /** Condition */
@@ -13989,6 +14144,13 @@ export interface components {
             /** Options */
             options?: components["schemas"]["ProcessDialogOptionOut"][];
         };
+        /** CatalogOut */
+        CatalogOut: {
+            /** Categories */
+            categories: string[];
+            /** Entries */
+            entries: components["schemas"]["CatalogEntryOut"][];
+        };
         /** CatalogParamOut */
         CatalogParamOut: {
             /** Kind */
@@ -14001,6 +14163,19 @@ export interface components {
             one_of: string[];
             /** Required */
             required: boolean;
+        };
+        /** CatalogVersionOut */
+        CatalogVersionOut: {
+            /** Changelog */
+            changelog: string | null;
+            /** Compatible */
+            compatible: boolean;
+            /** Released At */
+            released_at: string | null;
+            /** Version */
+            version: string;
+            /** Yanked */
+            yanked: boolean;
         };
         /** CategoryIn */
         CategoryIn: {
@@ -16120,6 +16295,13 @@ export interface components {
             key: string;
             /** Top N */
             top_n?: number | null;
+        };
+        /** DownloadIn */
+        DownloadIn: {
+            /** Plugin Id */
+            plugin_id: string;
+            /** Version */
+            version: string;
         };
         /** DraftIn */
         DraftIn: {
@@ -19628,13 +19810,25 @@ export interface components {
         };
         /** PluginAdminListOut */
         PluginAdminListOut: {
+            /** Allow Unsigned */
+            allow_unsigned: boolean;
+            /** Coordinated Restart */
+            coordinated_restart: boolean;
+            /** Max Package Mb */
+            max_package_mb: number;
             /** Plugins */
             plugins: components["schemas"]["PluginAdminOut"][];
+            /** Runtime Install */
+            runtime_install: boolean;
+            /** Runtime Install Reason */
+            runtime_install_reason: string | null;
             /** Safe Mode */
             safe_mode: boolean;
         };
         /** PluginAdminOut */
         PluginAdminOut: {
+            /** Can Uninstall */
+            can_uninstall: boolean;
             /** Capabilities */
             capabilities: components["schemas"]["PluginCapabilityOut"][];
             /** Categories */
@@ -19655,6 +19849,8 @@ export interface components {
             installed_at: string | null;
             /** License */
             license: string | null;
+            /** Migration Error */
+            migration_error: string | null;
             /** Name */
             name: string;
             /** Publisher */
@@ -19663,6 +19859,10 @@ export interface components {
             runtime: components["schemas"]["PluginRuntimeOut"][];
             /** Settings Section */
             settings_section: string | null;
+            /** Signature Status */
+            signature_status: ("official" | "verified_publisher" | "local" | "unsigned" | "invalid") | null;
+            /** Signer */
+            signer: string | null;
             /** Source */
             source: string;
             /**
@@ -19674,6 +19874,7 @@ export interface components {
             status_message: string | null;
             /** Support */
             support: string | null;
+            update: components["schemas"]["PluginUpdateOut"] | null;
             /** Version */
             version: string;
         };
@@ -19683,7 +19884,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "extension_point" | "outbound_host" | "frontend_slot";
+            kind: "extension_point" | "outbound_host" | "frontend_slot" | "table";
             /** Value */
             value: string;
         };
@@ -19869,6 +20070,30 @@ export interface components {
             updated_at: string;
             /** Version */
             version: string | null;
+        };
+        /** PluginUninstallIn */
+        PluginUninstallIn: {
+            /**
+             * Delete Data
+             * @default false
+             */
+            delete_data: boolean;
+            /**
+             * Restart
+             * @default true
+             */
+            restart: boolean;
+        };
+        /** PluginUpdateOut */
+        PluginUpdateOut: {
+            /** Image Plugin */
+            image_plugin: boolean;
+            /** Repository Id */
+            repository_id: number;
+            /** Repository Name */
+            repository_name: string;
+            /** Version */
+            version: string;
         };
         /** PortalArticleOut */
         PortalArticleOut: {
@@ -21522,6 +21747,50 @@ export interface components {
             ready: boolean;
             /** Snapshot Time Zone */
             snapshot_time_zone: string | null;
+        };
+        /** RepositoryIn */
+        RepositoryIn: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Name */
+            name: string;
+            /** Public Key */
+            public_key?: string | null;
+            /** Url */
+            url: string;
+        };
+        /** RepositoryOut */
+        RepositoryOut: {
+            /** Enabled */
+            enabled: boolean;
+            /** Id */
+            id: number;
+            /** Last Checked At */
+            last_checked_at: string | null;
+            /** Last Error */
+            last_error: string | null;
+            /** Last Ok At */
+            last_ok_at: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "admin" | "env";
+            /** Plugin Count */
+            plugin_count: number;
+            /** Public Key */
+            public_key: string | null;
+            /** Repository Name */
+            repository_name: string | null;
+            /** Url */
+            url: string;
+            /** Verified */
+            verified: boolean;
         };
         /** RequesterTransportOut */
         RequesterTransportOut: {
@@ -35514,6 +35783,259 @@ export interface operations {
             };
         };
     };
+    list_repositories_api_v1_admin_plugin_repositories_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepositoryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_repository_api_v1_admin_plugin_repositories_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepositoryIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepositoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_catalog_api_v1_admin_plugin_repositories_catalog_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                category?: string | null;
+                repository_id?: number | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_repository_api_v1_admin_plugin_repositories__repo_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                repo_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepositoryIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepositoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_repository_api_v1_admin_plugin_repositories__repo_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                repo_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_from_repository_api_v1_admin_plugin_repositories__repo_id__download_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                repo_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DownloadIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_repository_endpoint_api_v1_admin_plugin_repositories__repo_id__refresh_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                repo_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_plugins_api_v1_admin_plugins_get: {
         parameters: {
             query?: never;
@@ -35892,6 +36414,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PluginAdminOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    uninstall_plugin_api_v1_admin_plugins__plugin_id__uninstall_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                plugin_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginUninstallIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
                 };
             };
             /** @description Validation Error */

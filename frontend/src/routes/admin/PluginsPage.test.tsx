@@ -7,7 +7,7 @@ import i18n from "@/i18n";
 import type { PluginAdmin } from "@/lib/pluginsApi";
 import { PLUGIN_SAFE_MODE_KEY } from "@/plugins/safeMode";
 import { ADMIN_PAGES, rankAdminPages } from "@/lib/adminSearch";
-import { aiWorkerRuntime, syncHookRow } from "@/test/pluginFixtures";
+import { adminListFields, aiWorkerRuntime, syncHookRow } from "@/test/pluginFixtures";
 import { PluginsPage } from "./PluginsPage";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -57,6 +57,11 @@ function adminPlugin(overrides: Partial<PluginAdmin> = {}): PluginAdmin {
     status: "active",
     status_message: null,
     settings_section: "plugins.org.example.hello",
+    signature_status: null,
+    signer: null,
+    can_uninstall: false,
+    migration_error: null,
+    update: null,
     capabilities: [
       { kind: "extension_point", value: "core.events.subscribers" },
       { kind: "extension_point", value: "core.http.public_routes" },
@@ -124,7 +129,7 @@ afterEach(() => sessionStorage.clear());
 
 describe("PluginsPage", () => {
   it("lists plugins with plain-language status", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE, QUARANTINED] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE, QUARANTINED] });
     renderPage();
     expect(await screen.findByTestId("plugin-status-org.example.hello")).toHaveTextContent("Aktiv");
     expect(screen.getByTestId("plugin-status-org.example.crashy")).toHaveTextContent("Übersprungen");
@@ -134,7 +139,7 @@ describe("PluginsPage", () => {
   });
 
   it("switching off calls the API and shows the restart note", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
     setEnabled.mockResolvedValue({
       ...ACTIVE,
       enabled: false,
@@ -150,7 +155,7 @@ describe("PluginsPage", () => {
   });
 
   it("retry resets quarantine and stopped hooks", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [QUARANTINED, TRIPPED] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [QUARANTINED, TRIPPED] });
     reset.mockResolvedValue({ ...QUARANTINED, status: "disabled", status_message: null });
     renderPage();
     fireEvent.click(await screen.findByTestId("plugin-retry-org.example.crashy"));
@@ -163,7 +168,7 @@ describe("PluginsPage", () => {
   });
 
   it("shows capabilities in plain words and the trust note in the header", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
     renderPage();
     // R-TRUST-WORDING: visible before any disclosure is opened.
     expect(await screen.findByTestId("admin-plugins-trust-note")).toHaveTextContent(/keine Absicherung/);
@@ -177,7 +182,7 @@ describe("PluginsPage", () => {
   });
 
   it("settings button links to the generated form", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE, QUARANTINED] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE, QUARANTINED] });
     renderPage();
     expect(await screen.findByTestId("plugin-settings-org.example.hello")).toHaveAttribute(
       "href",
@@ -187,7 +192,7 @@ describe("PluginsPage", () => {
   });
 
   it("safe mode banner, browser-off note and empty state", async () => {
-    adminList.mockResolvedValue({ safe_mode: true, plugins: [] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: true, plugins: [] });
     sessionStorage.setItem(PLUGIN_SAFE_MODE_KEY, "1");
     renderPage();
     expect(await screen.findByTestId("admin-plugins-safe-mode")).toBeInTheDocument();
@@ -196,7 +201,7 @@ describe("PluginsPage", () => {
   });
 
   it("shows no safe-mode notes in normal operation", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
     renderPage();
     await screen.findByTestId("plugin-card-org.example.hello");
     expect(screen.queryByTestId("admin-plugins-safe-mode")).toBeNull();
@@ -204,7 +209,7 @@ describe("PluginsPage", () => {
   });
 
   it("returns focus to the switch after toggling and clears an old error on success", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
     setEnabled.mockRejectedValueOnce(new Error("x")).mockResolvedValueOnce({ ...ACTIVE, enabled: false });
     renderPage();
     const sw = await screen.findByRole("switch", { name: "Hallo-Erweiterung" });
@@ -217,7 +222,7 @@ describe("PluginsPage", () => {
   });
 
   it("moves focus to the heading when the retry button disappears", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [QUARANTINED] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [QUARANTINED] });
     reset.mockResolvedValue({ ...QUARANTINED, status: "disabled", status_message: null });
     renderPage();
     fireEvent.click(await screen.findByTestId("plugin-retry-org.example.crashy"));
@@ -228,14 +233,14 @@ describe("PluginsPage", () => {
   });
 
   it("shows restart-needed muted, not in a warning colour", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [adminPlugin({ status: "restart_required", enabled: false })] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [adminPlugin({ status: "restart_required", enabled: false })] });
     renderPage();
     const chip = await screen.findByTestId("plugin-status-org.example.hello");
     expect(chip.style.color).toBe("var(--color-muted)");
   });
 
   it("shows an error when the switch fails", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
     setEnabled.mockRejectedValue(new Error("x"));
     renderPage();
     fireEvent.click(await screen.findByRole("switch", { name: "Hallo-Erweiterung" }));
@@ -273,6 +278,7 @@ describe("admin page registry", () => {
       "Liefert Webservice-Operationen", "Liefert Webservice-Aufrufe (Invoker)", "Liefert Webservice-Zuordnungen (Mapping)",
     ];
     adminList.mockResolvedValue({
+      ...adminListFields(),
       safe_mode: false,
       plugins: [adminPlugin({ capabilities: keys.map((value) => ({ kind: "extension_point" as const, value })) })],
     });
@@ -284,6 +290,7 @@ describe("admin page registry", () => {
 
   it("shows sync hooks with their operation and the AI worker role", async () => {
     adminList.mockResolvedValue({
+      ...adminListFields(),
       safe_mode: false,
       plugins: [
         adminPlugin({
@@ -310,6 +317,7 @@ describe("admin page registry", () => {
   it("says so when the ticket number schemes cannot be loaded", async () => {
     numberGenerators.mockRejectedValue(new Error("kaputt"));
     adminList.mockResolvedValue({
+      ...adminListFields(),
       safe_mode: false,
       plugins: [
         adminPlugin({
@@ -338,6 +346,7 @@ describe("admin page registry", () => {
       new ApiError(422, { detail: reason }, "/api/v1/admin/plugins/number-generators"),
     );
     adminList.mockResolvedValue({
+      ...adminListFields(),
       safe_mode: false,
       plugins: [
         adminPlugin({
@@ -363,6 +372,7 @@ describe("admin page registry", () => {
     numberGenerators.mockResolvedValue(generators(null));
     setNumberGenerator.mockResolvedValue(generators("Plugin_points_Yearly"));
     adminList.mockResolvedValue({
+      ...adminListFields(),
       safe_mode: false,
       plugins: [
         adminPlugin({

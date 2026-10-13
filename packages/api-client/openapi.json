@@ -24559,12 +24559,39 @@
       },
       "PluginAdminListOut": {
         "properties": {
+          "allow_unsigned": {
+            "title": "Allow Unsigned",
+            "type": "boolean"
+          },
+          "coordinated_restart": {
+            "title": "Coordinated Restart",
+            "type": "boolean"
+          },
+          "max_package_mb": {
+            "title": "Max Package Mb",
+            "type": "integer"
+          },
           "plugins": {
             "items": {
               "$ref": "#/components/schemas/PluginAdminOut"
             },
             "title": "Plugins",
             "type": "array"
+          },
+          "runtime_install": {
+            "title": "Runtime Install",
+            "type": "boolean"
+          },
+          "runtime_install_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runtime Install Reason"
           },
           "safe_mode": {
             "title": "Safe Mode",
@@ -24573,13 +24600,22 @@
         },
         "required": [
           "safe_mode",
-          "plugins"
+          "plugins",
+          "runtime_install",
+          "runtime_install_reason",
+          "allow_unsigned",
+          "max_package_mb",
+          "coordinated_restart"
         ],
         "title": "PluginAdminListOut",
         "type": "object"
       },
       "PluginAdminOut": {
         "properties": {
+          "can_uninstall": {
+            "title": "Can Uninstall",
+            "type": "boolean"
+          },
           "capabilities": {
             "items": {
               "$ref": "#/components/schemas/PluginCapabilityOut"
@@ -24654,6 +24690,17 @@
             ],
             "title": "License"
           },
+          "migration_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Migration Error"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -24679,6 +24726,35 @@
               }
             ],
             "title": "Settings Section"
+          },
+          "signature_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "official",
+                  "verified_publisher",
+                  "local",
+                  "unsigned",
+                  "invalid"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature Status"
+          },
+          "signer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signer"
           },
           "source": {
             "title": "Source",
@@ -24720,6 +24796,16 @@
             ],
             "title": "Support"
           },
+          "update": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PluginUpdateOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "version": {
             "title": "Version",
             "type": "string"
@@ -24744,7 +24830,12 @@
           "hooks",
           "capabilities",
           "contributions",
-          "settings_section"
+          "settings_section",
+          "signature_status",
+          "signer",
+          "can_uninstall",
+          "migration_error",
+          "update"
         ],
         "title": "PluginAdminOut",
         "type": "object"
@@ -24755,7 +24846,8 @@
             "enum": [
               "extension_point",
               "outbound_host",
-              "frontend_slot"
+              "frontend_slot",
+              "table"
             ],
             "title": "Kind",
             "type": "string"
@@ -25376,6 +25468,34 @@
           }
         },
         "title": "PluginUninstallIn",
+        "type": "object"
+      },
+      "PluginUpdateOut": {
+        "properties": {
+          "image_plugin": {
+            "title": "Image Plugin",
+            "type": "boolean"
+          },
+          "repository_id": {
+            "title": "Repository Id",
+            "type": "integer"
+          },
+          "repository_name": {
+            "title": "Repository Name",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "repository_id",
+          "repository_name",
+          "image_plugin"
+        ],
+        "title": "PluginUpdateOut",
         "type": "object"
       },
       "PortalArticleOut": {

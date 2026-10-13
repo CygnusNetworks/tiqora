@@ -2078,6 +2078,11 @@ const demoDfPluginTypes: DynamicFieldPluginType[] = [
 /** `GET /api/v1/admin/plugins`: one active, one skipped (quarantined), one waiting for a restart. */
 const demoAdminPlugins: PluginAdminList = {
   safe_mode: false,
+  runtime_install: true,
+  runtime_install_reason: null,
+  allow_unsigned: false,
+  max_package_mb: 15,
+  coordinated_restart: true,
   plugins: [
     {
       id: "org.example.demo",
@@ -2095,6 +2100,11 @@ const demoAdminPlugins: PluginAdminList = {
       status: "active",
       status_message: null,
       settings_section: "plugins.org.example.demo",
+      signature_status: null,
+      signer: null,
+      can_uninstall: false,
+      migration_error: null,
+      update: null,
       capabilities: [
         { kind: "extension_point", value: "core.events.subscribers" },
         { kind: "extension_point", value: "core.worker.scheduled_tasks" },
@@ -2148,6 +2158,11 @@ const demoAdminPlugins: PluginAdminList = {
       status: "quarantined",
       status_message: "Beim Start wiederholt abgestürzt – wird übersprungen, bis Sie „Erneut versuchen“ wählen.",
       settings_section: null,
+      signature_status: null,
+      signer: null,
+      can_uninstall: false,
+      migration_error: null,
+      update: null,
       capabilities: [{ kind: "extension_point", value: "core.mcp.tools" }],
       contributions: [],
       hooks: [],
@@ -2171,6 +2186,11 @@ const demoAdminPlugins: PluginAdminList = {
       status: "restart_required",
       status_message: "Änderung wird nach einem Neustart von Tiqora wirksam.",
       settings_section: null,
+      signature_status: null,
+      signer: null,
+      can_uninstall: false,
+      migration_error: null,
+      update: null,
       capabilities: [{ kind: "extension_point", value: "core.http.public_routes" }],
       contributions: [],
       hooks: [],

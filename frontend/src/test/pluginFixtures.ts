@@ -71,6 +71,19 @@ export function dashboardWidget(
 }
 
 type AdminPlugin = Schemas["PluginAdminOut"];
+type AdminPluginList = Schemas["PluginAdminListOut"];
+
+/** The install-state fields of `GET /api/v1/admin/plugins` with neutral values (runtime install on, nothing unusual). */
+export function adminListFields(overrides: Partial<AdminPluginList> = {}): Omit<AdminPluginList, "safe_mode" | "plugins"> {
+  return {
+    runtime_install: true,
+    runtime_install_reason: null,
+    allow_unsigned: false,
+    max_package_mb: 15,
+    coordinated_restart: true,
+    ...overrides,
+  };
+}
 type AdminHook = AdminPlugin["hooks"][number];
 type AdminRuntime = AdminPlugin["runtime"][number];
 
