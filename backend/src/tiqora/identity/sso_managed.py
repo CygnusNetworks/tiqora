@@ -3,7 +3,9 @@
 An account that a SCIM provider manages and whose provider requires the IdP's MFA proof
 (``require_mfa_claim``) signs in through that IdP, with its step-up. A password, whichever
 link of the chain checks it (Tiqora's own ``users.pw``/``customer_user.pw``, an LDAP
-directory, a plugin password provider), must not be a way around that. The rule:
+directory, a plugin password provider) and whichever interface asks (the login routes, the
+Znuny-compat GenericInterface's ``SessionCreate`` and per-request ``UserLogin``/``Password``),
+must not be a way around that. The rule:
 
 * the mapping is active (``tiqora_scim_user.deleted`` is false), and
 * its provider is **enabled** and has ``require_mfa_claim`` set.
@@ -11,9 +13,10 @@ directory, a plugin password provider), must not be a way around that. The rule:
 A disabled provider or a deprovisioned mapping does not block: disabling the provider is the
 admin's explicit way back to passwords, and deprovisioning deactivates the account anyway.
 
-A refusal looks exactly like a wrong password (401 "Invalid credentials", counted by the rate
-limiter); only the log says why (``password_login_rejected reason=sso_managed``). The local
-and LDAP checks run only after the password was confirmed, so the answer and its timing for
+A refusal looks exactly like a wrong password (401 "Invalid credentials", or the compat
+operation's own ``AuthFail`` text; counted by the rate limiter); only the log says why
+(``password_login_rejected reason=sso_managed``). The local, LDAP and compat checks run only
+after the password was confirmed, so the answer and its timing for
 someone without the password stay the same. Only Tiqora tables, joined on the integer
 provider id: no join with a Znuny table (collations).
 """
@@ -41,7 +44,7 @@ __all__ = [
 ]
 
 UserKind = Literal["agent", "customer"]
-PasswordPath = Literal["local", "ldap", "plugin"]
+PasswordPath = Literal["local", "ldap", "plugin", "compat"]
 
 
 async def existing_account(
@@ -90,9 +93,10 @@ class SsoManagedGate:
     """One password login's check across the chain; ``refused`` stops the remaining links.
 
     The login routes hand :meth:`local` to ``authenticate_password`` (it runs after the hash
-    compare and before the opportunistic rehash, so a refused login writes nothing) and call
-    :meth:`refuses` on the account an LDAP directory resolved. Once refused, the route skips
-    every later link and answers as for a wrong password.
+    compare and before the opportunistic rehash, so a refused login writes nothing) and
+    :meth:`ldap` to ``ldap_sign_in`` (it runs between ``plan_login`` and ``apply_login``, so a
+    refused directory login writes no link, profile or role sync). Once refused, the route
+    skips every later link and answers as for a wrong password.
     """
 
     __slots__ = ("_session", "login", "refused", "user_kind")
@@ -112,3 +116,6 @@ class SsoManagedGate:
 
     async def local(self, account_id: int) -> bool:
         return await self.refuses(account_id, path="local")
+
+    async def ldap(self, account_id: int) -> bool:
+        return await self.refuses(account_id, path="ldap")

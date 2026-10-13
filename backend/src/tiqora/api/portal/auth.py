@@ -110,7 +110,12 @@ async def login(
         # Then the LDAP directories (Znuny's chained AuthModules), first bind wins.
         try:
             account_login = await ldap_sign_in(
-                session, settings, login=body.login, password=body.password, user_kind="customer"
+                session,
+                settings,
+                login=body.login,
+                password=body.password,
+                user_kind="customer",
+                refuse=gate.ldap,
             )
         except LdapSignInUnavailable as exc:
             # Counted like a failure (no free retries), but honest: try again later.
@@ -122,6 +127,8 @@ async def login(
             ) from exc
         if account_login is not None:
             customer = await auth.get_customer_by_login(account_login)
+            # gate.ldap already ran before apply_login wrote anything; this backstop covers
+            # an account apply_login only found on its race re-plan.
             if customer is not None and await gate.refuses(customer.id, path="ldap"):
                 customer = None
     if customer is None and not gate.refused:

@@ -13,7 +13,7 @@ import asyncio
 import re
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 import structlog
 from sqlalchemy import bindparam, func, select, text
@@ -105,6 +105,7 @@ from tiqora.domain.ticket_write_service import (
     unlock_ticket,
 )
 from tiqora.domain.totp import TOTPService
+from tiqora.identity.sso_managed import is_sso_managed, log_refusal
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
 from tiqora.znuny.cache_invalidation import invalidate_cache_type
@@ -186,6 +187,34 @@ def _compat_rate_limited_err(op_prefix: str, retry_after: int) -> dict[str, Any]
     return err
 
 
+async def _sso_managed_refusal(
+    session: AsyncSession,
+    *,
+    user_kind: Literal["agent", "customer"],
+    account_id: int,
+    login: str,
+    limiter: AuthRateLimiter | None,
+    ip: str,
+    op_prefix: str,
+    auth_fail: str,
+) -> dict[str, Any] | None:
+    """P2A-PM-I2b: refuse the confirmed password of an SSO-managed account.
+
+    Runs right after the password was confirmed, before the 2FA check, the limiter reset and
+    the opportunistic rehash (a refused login writes no password). The answer and the
+    failure count are those of a wrong password (``auth_fail`` is the caller's own wrong-
+    password text); only the log says why (``path=compat``). ``None``: not managed.
+    """
+    if not await is_sso_managed(session, user_kind, account_id):
+        return None
+    log_refusal(user_kind, login, "compat")
+    if limiter is not None:
+        locked = await limiter.record_failure(login=login, ip=ip)
+        if locked is not None:
+            return _compat_rate_limited_err(op_prefix, locked.retry_after)
+    return _err(f"{op_prefix}.AuthFail", auth_fail)
+
+
 async def _maybe_rehash_agent_pw(
     session: AsyncSession,
     row: Users,
@@ -236,6 +265,8 @@ async def _auth_from_params(
     - SessionID: validated against the Znuny `sessions` key-value table
     - UserLogin + Password: agent login (rejected when 2FA enabled/enforced)
     - CustomerUserLogin + Password: customer login (ownership-scoped; never agent id)
+
+    The password of an SSO-managed account (P2A-PM-I2b) is answered like a wrong one.
 
     Customer principals always return ``user_id=0`` and ``user_type=Customer``.
     They must never be elevated to the root agent (id 1).
@@ -298,6 +329,18 @@ async def _auth_from_params(
                 if locked is not None:
                     return _compat_rate_limited_err(op_prefix, locked.retry_after)
             return _err(f"{op_prefix}.AuthFail", "UserLogin or Password is invalid!")
+        refused = await _sso_managed_refusal(
+            session,
+            user_kind="agent",
+            account_id=row.id,
+            login=user_login,
+            limiter=limiter,
+            ip=ip,
+            op_prefix=op_prefix,
+            auth_fail="UserLogin or Password is invalid!",
+        )
+        if refused is not None:
+            return refused
         if await _agent_password_blocked_by_2fa(session, row.id):
             return _err(f"{op_prefix}.AuthFail", _2FA_API_KEY_MSG)
         if limiter is not None:
@@ -323,6 +366,18 @@ async def _auth_from_params(
                 if locked is not None:
                     return _compat_rate_limited_err(op_prefix, locked.retry_after)
             return _err(f"{op_prefix}.AuthFail", "CustomerUserLogin or Password is invalid!")
+        refused = await _sso_managed_refusal(
+            session,
+            user_kind="customer",
+            account_id=row2.id,
+            login=customer_login,
+            limiter=limiter,
+            ip=ip,
+            op_prefix=op_prefix,
+            auth_fail="CustomerUserLogin or Password is invalid!",
+        )
+        if refused is not None:
+            return refused
         if limiter is not None:
             await limiter.reset(login=customer_login, ip=ip)
         await _maybe_rehash_customer_pw(session, row2, password, cfg)
@@ -983,7 +1038,8 @@ async def op_session_create(
     """SessionCreate operation — returns a SessionID.
 
     Agent password auth is rejected when 2FA is enabled or enforced; non-interactive
-    callers must use a ``tiqora_*`` API key (H-1). Customer sessions use sentinel
+    callers must use a ``tiqora_*`` API key (H-1). The password of an SSO-managed agent or
+    customer is answered like a wrong one (P2A-PM-I2b). Customer sessions use sentinel
     ``user_id=0`` and must never be rewritten to the root agent (C-1).
     Password attempts are rate-limited per login/IP (M-7 / H-01).
     """
@@ -1028,6 +1084,18 @@ async def op_session_create(
                 if locked is not None:
                     return _compat_rate_limited_err("SessionCreate", locked.retry_after)
             return _err("SessionCreate.AuthFail", "SessionCreate: Authorization failing!")
+        refused = await _sso_managed_refusal(
+            session,
+            user_kind="agent",
+            account_id=row.id,
+            login=user_login,
+            limiter=limiter,
+            ip=ip,
+            op_prefix="SessionCreate",
+            auth_fail="SessionCreate: Authorization failing!",
+        )
+        if refused is not None:
+            return refused
         if await _agent_password_blocked_by_2fa(session, row.id):
             return _err("SessionCreate.AuthFail", _2FA_API_KEY_MSG)
         if limiter is not None:
@@ -1059,6 +1127,18 @@ async def op_session_create(
                 if locked is not None:
                     return _compat_rate_limited_err("SessionCreate", locked.retry_after)
             return _err("SessionCreate.AuthFail", "SessionCreate: Authorization failing!")
+        refused = await _sso_managed_refusal(
+            session,
+            user_kind="customer",
+            account_id=row2.id,
+            login=customer_login,
+            limiter=limiter,
+            ip=ip,
+            op_prefix="SessionCreate",
+            auth_fail="SessionCreate: Authorization failing!",
+        )
+        if refused is not None:
+            return refused
         if limiter is not None:
             await limiter.reset(login=customer_login, ip=ip)
         await _maybe_rehash_customer_pw(session, row2, password, cfg)

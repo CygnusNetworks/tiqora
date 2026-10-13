@@ -360,10 +360,11 @@ Fehlversuchen, Zwei-Faktor-Anmeldung und Einrichtung gelten weiter, und die
 Gesamtprüfung ist auf 20 Sekunden begrenzt. Der Kennworttext wird nicht
 protokolliert. Konten, die ein aktiver Anmeldedienst mit Pflicht zum
 Mehrfaktor-Nachweis über SCIM verwaltet, meldet keine Kennwortanmeldung an,
-weder das eigene Kennwort noch LDAP noch eine Erweiterung: Tiqora antwortet
-wie bei einem falschen Kennwort (`password_login_rejected`,
-`reason=sso_managed`), und das Kennwort eines solchen Kontos erreicht keine
-Erweiterung. Diese Konten melden sich über den Anmeldedienst an (Regel und
+weder das eigene Kennwort noch LDAP noch eine Erweiterung, auch nicht über die
+GenericInterface-Webservices (`SessionCreate` oder `UserLogin`/`Password` je
+Aufruf): Tiqora antwortet wie bei einem falschen Kennwort
+(`password_login_rejected`, `reason=sso_managed`), und das Kennwort eines
+solchen Kontos erreicht keine Erweiterung. Diese Konten melden sich über den Anmeldedienst an (Regel und
 Ausnahmen: [Identity-Provider](guide/identity-providers.md#zweiter-faktor-vom-anmeldedienst)).
 Ein nicht erreichbarer LDAP-Server antwortet weiterhin mit "nicht verfügbar",
 bevor die Erweiterung gefragt wird.
@@ -1402,9 +1403,13 @@ attempts count. Notes:
   with an active `tiqora_scim_user` row (`deleted` false) under an **enabled**
   identity provider with `require_mfa_claim` signs in through the IdP and its
   step-up only. The core checks this in `tiqora.identity.sso_managed` for every
-  password path (local password, LDAP, plugin providers) and answers like a
-  wrong password; the log line is `password_login_rejected reason=sso_managed`
-  with `path=local|ldap|plugin`. When the typed login is such an account, no
+  password path (local password, LDAP, plugin providers, and the Znuny-compat
+  GenericInterface: `SessionCreate` and per-request `UserLogin`/`CustomerUserLogin`
+  + `Password`, including plugin GI operations) and answers like a wrong password
+  (the GI's own `AuthFail` text); the log line is
+  `password_login_rejected reason=sso_managed` with `path=local|ldap|plugin|compat`.
+  The LDAP check runs between `plan_login` and `apply_login`, so a refused
+  directory login writes no link, profile or role sync. When the typed login is such an account, no
   provider is called at all, so its password never reaches a plugin. When a
   provider names such an account (a mapped login), its answer is skipped and the
   chain goes on with the next provider, whose answer is checked the same way
@@ -1412,7 +1417,12 @@ attempts count. Notes:
   deprovisioned (`DELETE`d) mapping does not block. There is no admin delete
   for a single mapping: the way back to passwords is clearing
   `require_mfa_claim` or disabling the provider (both affect every account of
-  that provider); deleting the provider drops all its mappings.
+  that provider); deleting the provider drops all its mappings. Break-glass when
+  every admin is SSO-managed and the IdP is down: agent id 1 (`root@localhost`)
+  can never be SCIM-mapped, `tiqora bootstrap --skip-schema --admin-password …`
+  resets its password (it also runs the migrations), and that admin disables
+  the provider; last resort is `tiqora_identity_provider.enabled = false` in the
+  database.
 
 ### Customer sources
 

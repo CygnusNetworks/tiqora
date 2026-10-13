@@ -30,6 +30,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import time
+from collections.abc import Awaitable, Callable
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -313,12 +314,18 @@ async def ldap_sign_in(
     login: str,
     password: str,
     user_kind: UserKind,
+    refuse: Callable[[int], Awaitable[bool]] | None = None,
 ) -> str | None:
     """Password login against the directories, then the shared login chain (link, login
     match, JIT, profile and role sync; commits). Returns the account's login, or ``None``
     for every failure: no directory accepted the password, or the plan was rejected
     (the reason is logged, never shown on the password form). Unexpected trouble AFTER a
-    directory accepted the password raises :class:`LdapSignInUnavailable` (no 500)."""
+    directory accepted the password raises :class:`LdapSignInUnavailable` (no 500).
+
+    ``refuse`` (P2A-PM-I2b, m-c) is asked about an existing account the plan resolved,
+    between ``plan_login`` and ``apply_login``: True ends the login with ``None`` before
+    anything is written (no link, no profile or role sync). A ``create`` plan is a new
+    account, which no SCIM mapping can name yet."""
     found = await ldap_password_login(
         session, settings, login=login, password=password, user_kind=user_kind
     )
@@ -329,6 +336,13 @@ async def ldap_sign_in(
         plan = await plan_login(session, record, identity, user_kind=user_kind, settings=settings)
         if plan.decision == "reject":
             logger.info("ldap_login_rejected", provider=record.slug, reason=plan.reject_code)
+            return None
+        if (
+            refuse is not None
+            and plan.decision == "login"
+            and plan.user_id is not None
+            and await refuse(plan.user_id)
+        ):
             return None
         _user_id, account_login = await apply_login(
             session, record, identity, plan, settings=settings

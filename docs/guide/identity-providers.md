@@ -461,10 +461,13 @@ Tiqora-Faktor wie bisher.
 **Kennwortanmeldung verwalteter Konten**: Ein Konto, das ein **aktiver** Anbieter mit *Zweiten Faktor
 vom Anmeldedienst verlangen* über SCIM verwaltet, meldet sich nur über den Anmeldedienst an. Jede
 Kennwortanmeldung weist es ab: das eigene Kennwort in Tiqora (Znuny), ein LDAP-Verzeichnis und ein
-Kennwort-Anbieter aus einer Erweiterung. Die Antwort ist dieselbe wie bei einem falschen Kennwort (401,
-zählt als Fehlversuch für die Sperre); im Protokoll steht `password_login_rejected` mit
-`reason=sso_managed` und `path=local`, `ldap` oder `plugin`. Das Kennwort eines solchen Kontos erreicht
-keine Erweiterung. Tiqora ändert das Kennwort in Znuny dabei nicht: ein übernommenes Konto behält sein
+Kennwort-Anbieter aus einer Erweiterung, auf der Anmeldeseite wie über die GenericInterface-Webservices
+(`SessionCreate` und `UserLogin`/`CustomerUserLogin` mit `Password` bei jedem Aufruf). Die Antwort ist
+dieselbe wie bei einem falschen Kennwort (auf der Anmeldeseite 401, im Webservice dessen `AuthFail`; zählt
+als Fehlversuch für die Sperre); im Protokoll steht `password_login_rejected` mit `reason=sso_managed`
+und `path=local`, `ldap`, `plugin` oder `compat`. Das Kennwort eines solchen Kontos erreicht keine
+Erweiterung, und eine abgewiesene LDAP-Anmeldung schreibt nichts (keine Verknüpfung, kein Abgleich von
+Profil oder Rollen). Tiqora ändert das Kennwort in Znuny dabei nicht: ein übernommenes Konto behält sein
 altes Kennwort, kann sich damit aber nicht anmelden, solange die Regel greift.
 
 Die Regel greift nur, wenn beides zutrifft:
@@ -486,6 +489,16 @@ nicht löschen. Die Kennwortanmeldung kommt nur für alle Konten eines Anbieters
 * den Anbieter löschen: entfernt auch alle seine SCIM-Zuordnungen; nur, wenn Sie ihn nicht mehr brauchen.
 
 Schalten Sie den Schalter danach wieder ein, gilt die Sperre sofort wieder.
+
+Diese Schalter brauchen eine Verwaltungsanmeldung. Ist jedes Verwaltungskonto über SCIM verwaltet und der
+Anmeldedienst nicht erreichbar, bleibt dieser Notzugang:
+
+* SCIM ordnet das Konto `root@localhost` (Agent 1) nie zu, die Regel trifft es also nie. Melden Sie sich
+  damit oder mit einem anderen Verwaltungskonto ohne SCIM-Zuordnung an und schalten Sie den Anbieter ab.
+* Kennen Sie das Kennwort von `root@localhost` nicht, setzt es
+  `tiqora bootstrap --skip-schema --admin-password '<neues Kennwort>'` auf dem Server neu (der Befehl
+  führt dabei auch die Datenbank-Migrationen aus, die ohnehin schon gelaufen sind).
+* Letzter Ausweg: in der Datenbank `tiqora_identity_provider.enabled` des Anbieters auf `false` setzen.
 
 ## Sitzungsdauer
 

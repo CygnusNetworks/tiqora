@@ -1,0 +1,328 @@
+"""P2A-PM-I2b: the SSO-managed-account check on the Znuny-compat GenericInterface and in
+``ldap_sign_in`` (both dialects, through the real routes).
+
+An account mapped by SCIM under an ENABLED provider with ``require_mfa_claim`` signs in through
+its IdP only. The compat ``SessionCreate`` and the per-request ``UserLogin``/``CustomerUserLogin``
++ ``Password`` auth answer its (right) password exactly like a wrong one: same status, same body,
+counted by the rate limiter, no session, no rehash; the log says ``path=compat``. A directory
+login of such an account is refused between ``plan_login`` and ``apply_login`` (m-c), so nothing
+is written.
+
+Reuses the seed band, the ``env`` fixture and ``_scim_map`` of ``test_plugins_auth_db``
+(55370-55389, ``pp55-*``, ``pp55scim*``); Znuny ``sessions`` rows a successful SessionCreate
+writes are deleted by their SessionID.
+"""
+
+from __future__ import annotations
+
+import hashlib
+from typing import Any
+
+import httpx
+import pytest
+from sqlalchemy import create_engine, text
+from structlog.testing import capture_logs
+
+from tests import test_plugins_auth_db as _auth_db
+from tests._plugin_points import points_behaviour
+from tests.test_auth_hardening import _MemRedis
+from tests.test_plugins_auth_db import (
+    LOCAL,
+    LOCAL_PASSWORD,
+    TWOFA,
+    Env,
+    _refusals,
+    _scim_map,
+)
+
+pytestmark = pytest.mark.db
+
+# The module fixture as an attribute, which pytest collects (an import would trip F811).
+env = _auth_db.env
+
+LEGACY = hashlib.sha256(LOCAL_PASSWORD.encode()).hexdigest()  # rehashed on a real login
+WRONG = "falsch-55"
+
+
+def _sql(url: str, sql: str, **params: Any) -> Any:
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(text(sql), params)
+            return result.scalar() if result.returns_rows else None
+    finally:
+        engine.dispose()
+
+
+def _legacy_hash(url: str, *, agent_id: int | None = None, customer: str | None = None) -> None:
+    if agent_id is not None:
+        _sql(url, "UPDATE users SET pw = :pw WHERE id = :u", pw=LEGACY, u=agent_id)
+    if customer is not None:
+        _sql(url, "UPDATE customer_user SET pw = :pw WHERE login = :l", pw=LEGACY, l=customer)
+
+
+def _agent_pw(url: str, uid: int = LOCAL) -> str:
+    return str(_sql(url, "SELECT pw FROM users WHERE id = :u", u=uid))
+
+
+def _customer_pw(url: str) -> str:
+    return str(_sql(url, "SELECT pw FROM customer_user WHERE login = 'pp55-portal'"))
+
+
+def _session_rows(url: str) -> int:
+    return int(_sql(url, "SELECT COUNT(*) FROM sessions"))
+
+
+def _drop_session(url: str, sid: str) -> None:
+    _sql(url, "DELETE FROM sessions WHERE session_id = :s", s=sid)
+
+
+async def _session_create(client: httpx.AsyncClient, kind: str, password: str) -> httpx.Response:
+    body = (
+        {"UserLogin": "pp55-local", "Password": password}
+        if kind == "agent"
+        else {"CustomerUserLogin": "pp55-portal", "Password": password}
+    )
+    return await client.post("/znuny-compat/Session", json=body)
+
+
+async def _ticket_search(client: httpx.AsyncClient, kind: str, password: str) -> httpx.Response:
+    params: dict[str, Any] = (
+        {"UserLogin": "pp55-local", "Password": password, "Limit": 1}
+        if kind == "agent"
+        else {"CustomerUserLogin": "pp55-portal", "Password": password, "Limit": 1}
+    )
+    return await client.get("/znuny-compat/TicketSearch", params=params)
+
+
+def _compat_refusals(logs: list[dict[str, Any]]) -> list[tuple[str, str, str]]:
+    return [(e["path"], e["user_kind"], e["login"]) for e in _refusals(logs)]
+
+
+@pytest.mark.parametrize("write_znuny", [True, False], ids=["znuny_sessions", "store_token"])
+async def test_session_create_refuses_sso_managed_agent(env: Env, write_znuny: bool) -> None:
+    """The right local password of an SSO-managed agent mints no compat session (neither a
+    Znuny ``sessions`` row nor a store token that would also work as a UI cookie), answers
+    exactly like a wrong password and leaves the legacy hash alone."""
+    _legacy_hash(env.url, agent_id=LOCAL)
+    _scim_map(env.url, user_kind="agent", login="pp55-local", require_mfa=True)
+    before = _session_rows(env.url)
+    with capture_logs() as logs:
+        async with env.client(compat_session_write_znuny=write_znuny) as client:
+            refused = await _session_create(client, "agent", LOCAL_PASSWORD)
+            wrong = await _session_create(client, "agent", WRONG)
+    assert "SessionID" not in refused.json(), refused.text
+    assert (refused.status_code, refused.json()) == (wrong.status_code, wrong.json())
+    assert refused.json()["Error"] == {
+        "ErrorCode": "SessionCreate.AuthFail",
+        "ErrorMessage": "SessionCreate: Authorization failing!",
+    }
+    assert refused.status_code == 401
+    assert _compat_refusals(logs) == [("compat", "agent", "pp55-local")]
+    assert _session_rows(env.url) == before
+    assert _agent_pw(env.url) == LEGACY  # no rehash on a refusal
+
+
+async def test_session_create_refuses_sso_managed_customer(env: Env) -> None:
+    _legacy_hash(env.url, customer="pp55-portal")
+    _scim_map(env.url, user_kind="customer", login="pp55-portal", require_mfa=True)
+    before = _session_rows(env.url)
+    with capture_logs() as logs:
+        async with env.client() as client:
+            refused = await _session_create(client, "customer", LOCAL_PASSWORD)
+            wrong = await _session_create(client, "customer", WRONG)
+    assert "SessionID" not in refused.json(), refused.text
+    assert (refused.status_code, refused.json()) == (wrong.status_code, wrong.json())
+    assert refused.json()["Error"]["ErrorCode"] == "SessionCreate.AuthFail"
+    assert _compat_refusals(logs) == [("compat", "customer", "pp55-portal")]
+    assert _session_rows(env.url) == before
+    assert _customer_pw(env.url) == LEGACY
+
+
+@pytest.mark.parametrize("kind", ["agent", "customer"])
+async def test_per_request_password_refuses_sso_managed_account(env: Env, kind: str) -> None:
+    """``UserLogin``/``CustomerUserLogin`` + ``Password`` on an operation (TicketSearch): the
+    same AuthFail as a wrong password, and no rehash."""
+    if kind == "agent":
+        _legacy_hash(env.url, agent_id=LOCAL)
+    else:
+        _legacy_hash(env.url, customer="pp55-portal")
+    login = "pp55-local" if kind == "agent" else "pp55-portal"
+    _scim_map(env.url, user_kind=kind, login=login, require_mfa=True)
+    with capture_logs() as logs:
+        async with env.client() as client:
+            refused = await _ticket_search(client, kind, LOCAL_PASSWORD)
+            wrong = await _ticket_search(client, kind, WRONG)
+    assert (refused.status_code, refused.json()) == (wrong.status_code, wrong.json())
+    assert refused.status_code == 401
+    assert refused.json()["Error"]["ErrorCode"] == "TicketSearch.AuthFail"
+    assert _compat_refusals(logs) == [("compat", kind, login)]
+    assert (_agent_pw(env.url) if kind == "agent" else _customer_pw(env.url)) == LEGACY
+
+
+@pytest.mark.parametrize(
+    ("enabled", "deleted"), [(False, False), (True, True)], ids=["provider_off", "deprovisioned"]
+)
+async def test_disabled_provider_or_deprovisioned_mapping_restores_compat_passwords(
+    env: Env, enabled: bool, deleted: bool
+) -> None:
+    """The narrowing of P2A-PM-I2 holds on the GenericInterface too: SessionCreate and the
+    per-request password work again, and the weak hash is rehashed (so the "no rehash"
+    assertions above are not vacuous)."""
+    _legacy_hash(env.url, agent_id=LOCAL)
+    for kind, login in (("agent", "pp55-local"), ("customer", "pp55-portal")):
+        _scim_map(
+            env.url,
+            user_kind=kind,
+            login=login,
+            require_mfa=True,
+            enabled=enabled,
+            deleted=deleted,
+        )
+    sids: list[str] = []
+    try:
+        with capture_logs() as logs:
+            async with env.client() as client:
+                agent = await _session_create(client, "agent", LOCAL_PASSWORD)
+                sids += [agent.json().get("SessionID") or ""]
+                customer = await _session_create(client, "customer", LOCAL_PASSWORD)
+                sids += [customer.json().get("SessionID") or ""]
+                search = await _ticket_search(client, "agent", LOCAL_PASSWORD)
+        assert agent.status_code == 200 and sids[0], agent.text
+        assert customer.status_code == 200 and sids[1], customer.text
+        assert search.status_code == 200 and "Error" not in search.json(), search.text
+        assert _refusals(logs) == []
+        assert _agent_pw(env.url) != LEGACY  # rehashed on success
+    finally:
+        for sid in sids:
+            if sid:
+                _drop_session(env.url, sid)
+
+
+async def test_compat_refusal_counts_as_a_failure(env: Env) -> None:
+    """Same failure count as a wrong password: the third refused SessionCreate locks."""
+    _scim_map(env.url, user_kind="agent", login="pp55-local", require_mfa=True)
+    async with env.client(
+        _MemRedis(), auth_rate_limit_enabled=True, auth_rate_limit_login_max=3
+    ) as client:
+        codes = [
+            (await _session_create(client, "agent", LOCAL_PASSWORD)).status_code for _ in range(3)
+        ]
+        locked = await _ticket_search(client, "agent", LOCAL_PASSWORD)
+    assert codes == [401, 401, 429]
+    assert locked.status_code == 429
+    assert locked.json()["Error"]["ErrorCode"].endswith(".RateLimited")
+
+
+async def test_sso_check_runs_before_the_2fa_check(env: Env) -> None:
+    """A managed agent with Tiqora TOTP gets the wrong-password text, not the 2FA hint (which
+    would tell a password holder that the password was right)."""
+    _sql(
+        env.url,
+        "UPDATE users SET pw = (SELECT pw FROM users WHERE id = :l) WHERE id = :t",
+        l=LOCAL,
+        t=TWOFA,
+    )
+    body = {"UserLogin": "pp55-2fa", "Password": LOCAL_PASSWORD}
+    async with env.client() as client:
+        unmanaged = await client.post("/znuny-compat/Session", json=body)
+        _scim_map(env.url, user_kind="agent", login="pp55-2fa", require_mfa=True)
+        managed = await client.post("/znuny-compat/Session", json=body)
+    assert "2FA" in unmanaged.json()["Error"]["ErrorMessage"]  # the hint without a mapping
+    assert managed.json()["Error"] == {
+        "ErrorCode": "SessionCreate.AuthFail",
+        "ErrorMessage": "SessionCreate: Authorization failing!",
+    }
+
+
+# --- m-c: ldap_sign_in refuses before apply_login writes anything --------------------------
+
+
+def _ldap_record(user_kind: str) -> Any:
+    from tiqora.identity.config_models import JitDefaults, LdapProviderConfig
+    from tiqora.identity.presets import get_preset
+    from tiqora.identity.store import ProviderRecord
+
+    return ProviderRecord(
+        id=955370,  # not stored: plan_login only reads links by provider id
+        slug="pp55ldap-unit",
+        kind="ldap",
+        source="db",
+        name="Verzeichnis",
+        audience=user_kind,  # type: ignore[arg-type]
+        enabled=True,
+        sort=0,
+        button_label=None,
+        button_icon=None,
+        preset="ldap",
+        config=LdapProviderConfig(host="dir.example.org"),
+        secrets_set=frozenset(),
+        match_by="login",
+        require_sso_opt_in=False,
+        attribute_map=get_preset("ldap").attribute_map,
+        jit_enabled=False,
+        jit_defaults=JitDefaults(),
+        role_rules=(),
+        sync_mode="managed",
+        metadata_xml=None,
+        metadata_fetched_at=None,
+        metadata_error=None,
+    )
+
+
+class _FakeDirectory:
+    """``ldap_password_login`` stand-in: ``ldap-geheim`` binds as ``uid``; ``apply_login`` is
+    recorded and answers like the real one would for an existing account."""
+
+    def __init__(self, uid: str, user_kind: str) -> None:
+        self.uid = uid
+        self.record = _ldap_record(user_kind)
+        self.applied: list[tuple[str, int | None]] = []
+
+    async def login(self, session: Any, settings: Any, **kw: Any) -> Any:
+        from tiqora.domain._ldap_core import LdapEntry
+        from tiqora.identity.ldap_login import identity_from_entry
+
+        if kw["password"] != "ldap-geheim":
+            return None
+        entry = LdapEntry(
+            uid=self.uid,
+            dn=f"uid={self.uid},ou=people,dc=example,dc=org",
+            attributes={"entryUUID": (f"uuid-{self.uid}",)},
+            member_group_dns=(),
+        )
+        return self.record, identity_from_entry(self.record, entry)
+
+    async def apply(self, session: Any, record: Any, identity: Any, plan: Any, **kw: Any) -> Any:
+        self.applied.append((plan.decision, plan.user_id))
+        return plan.user_id, plan.login
+
+
+@pytest.mark.parametrize("kind", ["agent", "customer"])
+async def test_ldap_refusal_writes_nothing(
+    env: Env, monkeypatch: pytest.MonkeyPatch, kind: str
+) -> None:
+    """The real ``ldap_sign_in`` asks the gate between ``plan_login`` and ``apply_login``: an
+    unmanaged account is applied and signs in; a managed one is refused before any write."""
+    from tiqora.identity import ldap_login
+
+    uid = "pp55-local" if kind == "agent" else "pp55-portal"
+    directory = _FakeDirectory(uid, kind)
+    monkeypatch.setattr(ldap_login, "ldap_password_login", directory.login)
+    monkeypatch.setattr(ldap_login, "apply_login", directory.apply)
+    path = "/api/v1/auth/login" if kind == "agent" else "/api/portal/auth/login"
+    body = {"login": uid, "password": "ldap-geheim"}
+    async with env.client() as client:
+        unmanaged = await client.post(path, json=body)
+    assert unmanaged.status_code == 200, unmanaged.text  # the fake directory works
+    assert [d for d, _ in directory.applied] == ["login"]
+    directory.applied.clear()
+    points_behaviour().CALLS.clear()
+    _scim_map(env.url, user_kind=kind, login=uid, require_mfa=True)
+    with capture_logs() as logs:
+        async with env.client() as client:
+            refused = await client.post(path, json=body)
+    assert refused.status_code == 401 and refused.json()["detail"] == "Invalid credentials"
+    assert directory.applied == []  # refused before apply_login
+    assert [(e["path"], e["user_kind"]) for e in _refusals(logs)] == [("ldap", kind)]
+    assert points_behaviour().CALLS == []
