@@ -1,0 +1,214 @@
+"""Admin API for plugin repositories (package sources), D11.
+
+Listing syncs the environment-defined repositories first (D8). Creating, changing and removing
+need a browser session (F13): a repository vouches for publisher keys, so an integration key must
+never reach it. Refresh, catalog and download join this router in later tasks.
+"""
+
+from __future__ import annotations
+
+import json
+from datetime import datetime
+from typing import Any, Final, Literal
+
+import structlog
+from fastapi import APIRouter, HTTPException, Response, status
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from tiqora.api.deps import AppSettings, DbSession
+from tiqora.api.v1.admin.deps import AdminUser
+from tiqora.api.v1.admin.plugin_packages import WebAdmin
+from tiqora.db.tiqora.models import TiqoraPluginRepository
+from tiqora.domain.schemas import UtcDateTime
+from tiqora.jobs.service import utc_now
+from tiqora.plugins.repositories import (
+    RepositoryInputError,
+    sync_env_repositories,
+    url_key,
+    validate_repository_input,
+)
+
+log = structlog.get_logger(__name__)
+
+router = APIRouter(prefix="/plugin-repositories", tags=["admin:plugins"])
+
+NOT_FOUND: Final = "Paketquelle nicht gefunden"
+ENV_READ_ONLY: Final = (
+    "Diese Paketquelle kommt aus der Server-Konfiguration und ist hier schreibgeschützt"
+)
+DUPLICATE: Final = "Diese Paketquelle ist bereits eingerichtet"
+
+
+class RepositoryOut(BaseModel):
+    id: int
+    name: str
+    url: str
+    public_key: str | None
+    enabled: bool
+    origin: Literal["admin", "env"]
+    verified: bool
+    repository_name: str | None
+    plugin_count: int
+    last_checked_at: UtcDateTime | None
+    last_ok_at: UtcDateTime | None
+    last_error: str | None
+
+
+class RepositoryIn(BaseModel):
+    name: str
+    url: str
+    public_key: str | None = None
+    enabled: bool = True
+
+
+def _index_summary(raw: str | None) -> tuple[str | None, int]:
+    """Repository name and plugin count of a stored (already accepted) index."""
+    if not raw:
+        return None, 0
+    try:
+        data = json.loads(raw)
+        repo = data.get("repository")
+        name = repo.get("name") if isinstance(repo, dict) else None
+        plugins = data.get("plugins")
+        return (name if isinstance(name, str) else None), (
+            len(plugins) if isinstance(plugins, list) else 0
+        )
+    except (ValueError, AttributeError):
+        return None, 0
+
+
+def _out(row: TiqoraPluginRepository) -> RepositoryOut:
+    repository_name, plugin_count = _index_summary(row.index_json)
+    return RepositoryOut(
+        id=row.id,
+        name=row.name,
+        url=row.url,
+        public_key=row.public_key,
+        enabled=row.enabled,
+        origin=row.origin,  # type: ignore[arg-type]
+        verified=row.index_verified,
+        repository_name=repository_name,
+        plugin_count=plugin_count,
+        last_checked_at=row.last_checked_at,
+        last_ok_at=row.last_ok_at,
+        last_error=row.last_error,
+    )
+
+
+def _validated(body: RepositoryIn) -> tuple[str, str, str | None]:
+    try:
+        return validate_repository_input(name=body.name, url=body.url, public_key=body.public_key)
+    except RepositoryInputError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
+
+
+async def _get(session: AsyncSession, repo_id: int) -> TiqoraPluginRepository:
+    row = await session.get(TiqoraPluginRepository, repo_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, NOT_FOUND)
+    return row
+
+
+async def _url_taken(session: AsyncSession, key: str, *, except_id: int | None = None) -> bool:
+    found = (
+        await session.execute(
+            select(TiqoraPluginRepository.id).where(TiqoraPluginRepository.url_key == key)
+        )
+    ).scalar_one_or_none()
+    return found is not None and found != except_id
+
+
+def _now() -> datetime:
+    return utc_now().replace(microsecond=0)  # MariaDB DATETIME has no fraction
+
+
+@router.get("", response_model=list[RepositoryOut])
+async def list_repositories(
+    admin: AdminUser, session: DbSession, settings: AppSettings
+) -> list[RepositoryOut]:
+    _ = admin
+    await sync_env_repositories(session, settings, _now())
+    await session.commit()
+    rows = (
+        (await session.execute(select(TiqoraPluginRepository).order_by(TiqoraPluginRepository.id)))
+        .scalars()
+        .all()
+    )
+    return [_out(r) for r in rows]
+
+
+@router.post("", response_model=RepositoryOut, status_code=status.HTTP_201_CREATED)
+async def create_repository(
+    body: RepositoryIn, admin: WebAdmin, session: DbSession
+) -> RepositoryOut:
+    name, url, key = _validated(body)
+    if await _url_taken(session, url_key(url)):
+        raise HTTPException(status.HTTP_409_CONFLICT, DUPLICATE)
+    now = _now()
+    row = TiqoraPluginRepository(
+        name=name,
+        url=url,
+        url_key=url_key(url),
+        public_key=key,
+        enabled=body.enabled,
+        origin="admin",
+        index_verified=False,
+        created_at=now,
+        created_by=admin.id,
+        updated_at=now,
+    )
+    session.add(row)
+    await session.commit()
+    log.info("plugin_repository_created", repository=row.id, url=url)
+    return _out(row)
+
+
+@router.put("/{repo_id}", response_model=RepositoryOut)
+async def update_repository(
+    repo_id: int, body: RepositoryIn, admin: WebAdmin, session: DbSession
+) -> RepositoryOut:
+    _ = admin
+    row = await _get(session, repo_id)
+    if row.origin == "env":
+        raise HTTPException(status.HTTP_409_CONFLICT, ENV_READ_ONLY)
+    name, url, key = _validated(body)
+    new_key = url_key(url)
+    if new_key != row.url_key:
+        if await _url_taken(session, new_key, except_id=row.id):
+            raise HTTPException(status.HTTP_409_CONFLICT, DUPLICATE)
+        # the stored index belongs to the old address
+        row.url, row.url_key = url, new_key
+        _forget_index(row)
+    elif key != row.public_key:
+        row.index_verified = False  # verified against the old key
+    row.name, row.public_key, row.enabled = name, key, body.enabled
+    row.updated_at = _now()
+    await session.commit()
+    return _out(row)
+
+
+def _forget_index(row: TiqoraPluginRepository) -> None:
+    fields: dict[str, Any] = {
+        "index_json": None,
+        "index_sha256": None,
+        "index_generated_at": None,
+        "index_verified": False,
+        "last_checked_at": None,
+        "last_ok_at": None,
+        "last_error": None,
+    }
+    for attr, value in fields.items():
+        setattr(row, attr, value)
+
+
+@router.delete("/{repo_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_repository(repo_id: int, admin: WebAdmin, session: DbSession) -> Response:
+    _ = admin
+    row = await _get(session, repo_id)
+    if row.origin == "env":
+        raise HTTPException(status.HTTP_409_CONFLICT, ENV_READ_ONLY)
+    await session.delete(row)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
