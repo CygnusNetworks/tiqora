@@ -158,7 +158,9 @@ Störungen laufen). Überschreitet der Bereich die Obergrenze (`propagation_node
 5000) oder die Tiefe 50, schreibt Tiqora nichts halb und stößt stattdessen den Job
 `core.cmdb_propagation` an. Ändert ein Admin unter *Admin → ITSM → Linktypen* die
 Weitergabe, die Richtung oder die Gültigkeit eines Linktyps (auch über „Aus Znuny
-aktualisieren“), stößt Tiqora in Modus B denselben Job von selbst an. Von Hand rechnet ein
+aktualisieren“), stößt Tiqora in Modus B denselben Job von selbst an. Läuft der Job dabei
+schon, prüft er am Ende, ob sich Linktypen oder Vorfallstatus geändert haben, und rechnet dann
+noch einmal (höchstens drei Durchläufe). Von Hand rechnet ein
 Admin alle Zustände mit `POST /api/v1/admin/cmdb/propagation/recompute` neu (Job
 `core.cmdb_propagation`, Abfrage über `/api/v1/jobs`) – in der Oberfläche über
 **Vorfallstatus neu berechnen** auf der Seite *Admin → CMDB-Klassen*. Ändert ein Admin im Katalog

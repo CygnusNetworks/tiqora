@@ -9,7 +9,8 @@ requeue after a crash simply runs it again.
 A second definition change while the job runs does not queue a new job: the enqueue joins the
 running one (dedupe ``class:<id>``). Batches done before the change were built from the older
 definition, so the job reads ``current_definition_id`` at the start and again at the end and runs
-the walk once more if it moved (ruling CMDB-FINAL-MA).
+the walk again if it moved (ruling CMDB-FINAL-MA), at most :data:`MAX_PASSES` times; a definition
+still moving after the last walk is logged as a warning (ruling CMDB-PM-I3, m5).
 """
 
 from __future__ import annotations
@@ -28,8 +29,8 @@ from tiqora.jobs.context import JobContext
 from tiqora.jobs.registry import JobHandler
 
 BATCH: Final = 1000
-#: the walk plus one more if the definition moved meanwhile (CMDB-FINAL-MA)
-MAX_PASSES: Final = 2
+#: the walk plus up to two more while the definition moved meanwhile (CMDB-FINAL-MA, CMDB-PM-I3)
+MAX_PASSES: Final = 3
 
 logger = structlog.get_logger(__name__)
 
@@ -59,7 +60,8 @@ async def reindex_class(
 ) -> int:
     """Rebuild the index of every CI of ``class_id``; returns the number of CIs rebuilt.
 
-    Walks the class again (once) when its current definition changed during the walk."""
+    Walks the class again when its current definition changed during the walk, at most
+    :data:`MAX_PASSES` walks in all."""
     done = 0
     for attempt in range(MAX_PASSES):
         started_with = await _current_definition_id(factory, class_id)
@@ -67,13 +69,16 @@ async def reindex_class(
         ended_with = await _current_definition_id(factory, class_id)
         if ended_with == started_with:
             break
-        logger.info(
-            "cmdb_reindex_definition_moved",
-            class_id=class_id,
-            pass_no=attempt + 1,
-            started_with=started_with,
-            ended_with=ended_with,
-        )
+        fields = {
+            "class_id": class_id,
+            "pass_no": attempt + 1,
+            "started_with": started_with,
+            "ended_with": ended_with,
+        }
+        if attempt + 1 < MAX_PASSES:
+            logger.info("cmdb_reindex_definition_moved", **fields)
+        else:  # its enqueue joined this job, so nothing walks the class with it
+            logger.warning("cmdb_reindex_definition_still_moving", **fields)
     return done
 
 

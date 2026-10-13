@@ -24,6 +24,7 @@ from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final
 
+import structlog
 from pydantic import BaseModel
 from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -43,7 +44,11 @@ from tiqora.jobs.service import enqueue_job
 
 PROPAGATION_JOB_KIND: Final = "core.cmdb_propagation"
 MAX_DEPTH: Final = 50
+#: a full recompute runs again while link types or the catalog moved meanwhile (CMDB-PM-I3)
+MAX_PASSES: Final = 3
 _CHUNK: Final = 1000
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -263,6 +268,12 @@ async def recompute_from(
 # --- full recompute (job) -------------------------------------------------------------------
 
 
+async def _shape(session: AsyncSession) -> tuple[dict[str, Propagating], _States]:
+    """What a full pass reads once at its start: the propagating link types and the
+    incident-state catalog."""
+    return await LinkTypeService(session).propagating(), await _states(session)
+
+
 async def recompute_all(
     session_factory: async_sessionmaker[AsyncSession],
     *,
@@ -273,11 +284,36 @@ async def recompute_all(
 
     No node cap: this runs as a job. Termination is guaranteed by the visited set (cycles).
     ``settings`` is accepted for symmetry with :func:`recompute_from`.
+
+    A link-type or catalog edit during the run enqueues this job again, but the enqueue joins
+    the running job (dedupe key ``all``), whose pass still uses the shape read at its start. So
+    the shape is read again after each pass and, if it changed, the pass runs once more, at most
+    :data:`MAX_PASSES` times; a shape still moving after that is logged (ruling CMDB-PM-I3).
     """
     _ = settings
+    updated = 0
+    for attempt in range(MAX_PASSES):
+        started_with, changed = await _recompute_pass(session_factory, progress)
+        updated += changed
+        async with session_factory() as session:
+            ended_with = await _shape(session)
+        if ended_with == started_with:
+            break
+        if attempt + 1 < MAX_PASSES:
+            logger.info("cmdb_propagation_shape_moved", pass_no=attempt + 1)
+        else:
+            logger.warning("cmdb_propagation_shape_still_moving", passes=MAX_PASSES)
+    return updated
+
+
+async def _recompute_pass(
+    session_factory: async_sessionmaker[AsyncSession],
+    progress: Callable[[int, int | None], Awaitable[None]] | None,
+) -> tuple[tuple[dict[str, Propagating], _States], int]:
+    """One full pass; returns the shape it used and the number of rows changed."""
     async with session_factory() as session:
-        states = await _states(session)
-        props = await LinkTypeService(session).propagating()
+        shape = await _shape(session)
+        props, states = shape
         graph = _Graph(session, props)
         incident = [
             int(i)
@@ -326,7 +362,7 @@ async def recompute_all(
             done += len(batch)
         if progress is not None:
             await progress(done, max(total, done))
-    return updated
+    return shape, updated
 
 
 async def run_propagation_job(ctx: JobContext, payload: PropagationPayload) -> dict[str, int]:

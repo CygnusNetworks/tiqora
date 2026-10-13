@@ -626,3 +626,58 @@ async def test_itsm_link_type_pointed_only_patch_changes_states(cmdb_db: CmdbWor
     await run_jobs_until_idle(cmdb_db)
     async with cmdb_db.factory() as s:
         assert await _cur(s, [a, b]) == ["incident", "warning"]
+
+
+# --- a change joining a running full recompute (ruling CMDB-PM-I3) --------------------------
+
+
+async def test_recompute_all_runs_again_when_a_link_type_changes_mid_run(
+    cmdb_db: CmdbWorld,
+) -> None:
+    """An admin edit enqueues the job with dedupe key ``all``, which joins the running job;
+    that job compares link types and the incident catalog at its end and runs once more."""
+    async with cmdb_db.factory() as s:
+        await make_link_type(s, SRC_ONLY, "none")
+        a, b = await _chain(s, ["cmdb4-a", "cmdb4-b"], link_type=SRC_ONLY)
+        await _set_own_incident(s, b, "incident", recompute=False)
+    starts: list[int | None] = []
+
+    async def progress(done: int, total: int | None) -> None:
+        if done == 0:
+            starts.append(total)
+            if len(starts) == 1:  # after the first BFS, before the first batch is written
+                cmdb_db.sql(
+                    "UPDATE tiqora_itsm_link_type SET propagation = 'source' WHERE name = :n",
+                    n=SRC_ONLY,
+                )
+
+    updated = await recompute_all(cmdb_db.factory, settings=CmdbSettings(), progress=progress)
+    assert updated == 1 and starts == [2, 2]
+    async with cmdb_db.factory() as s:
+        assert await _cur(s, [a, b]) == ["warning", "incident"]
+
+
+async def test_recompute_all_stops_after_three_passes_and_warns(cmdb_db: CmdbWorld) -> None:
+    """Bounded like the reindex: a shape that changes during every pass ends after three."""
+    import structlog
+
+    async with cmdb_db.factory() as s:
+        await make_link_type(s, SRC_ONLY, "none")
+        await _chain(s, ["cmdb4-a", "cmdb4-b"], link_type=SRC_ONLY)
+    starts: list[int | None] = []
+
+    async def progress(done: int, total: int | None) -> None:
+        if done == 0:
+            starts.append(total)
+            flip = "source" if len(starts) % 2 else "none"
+            cmdb_db.sql(
+                "UPDATE tiqora_itsm_link_type SET propagation = :p WHERE name = :n",
+                p=flip,
+                n=SRC_ONLY,
+            )
+
+    with structlog.testing.capture_logs() as logs:
+        await recompute_all(cmdb_db.factory, settings=CmdbSettings(), progress=progress)
+    assert len(starts) == 3
+    warnings = [e for e in logs if e["log_level"] == "warning"]
+    assert [e["event"] for e in warnings] == ["cmdb_propagation_shape_still_moving"]
