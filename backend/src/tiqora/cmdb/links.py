@@ -15,7 +15,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Final, Literal, get_args
+from typing import Any, Final, Literal, NamedTuple, get_args
 
 from sqlalchemy import and_, bindparam, delete, or_, select, text
 from sqlalchemy.exc import IntegrityError
@@ -124,6 +124,32 @@ def _url(kind: str, key: str) -> str | None:
 # --- link types (read side) ------------------------------------------------------------
 
 
+class Propagating(NamedTuple):
+    """How a propagating link type passes an incident on (ruling CMDB-PM-I2)."""
+
+    propagation: str  # ``source`` | ``target`` | ``both``
+    pointed: bool
+
+    def ci_edges(self, source: int, target: int) -> tuple[tuple[int, int], ...]:
+        """``(u, v)`` pairs for a stored CI link ``source -> target``: an incident at ``u``
+        warns ``v``.
+
+        Znuny's ``LinkKeyList`` (``LinkObject.pm``): a pointed type follows the stored
+        direction (``source``: the source end is warned when the target is in incident); an
+        unpointed type folds every neighbour into ``Source`` and none into ``Target``, so
+        ``source``/``both`` warn every neighbour and ``target`` warns none.
+        """
+        prop = self.propagation
+        if not self.pointed:
+            return ((target, source), (source, target)) if prop in ("source", "both") else ()
+        edges: list[tuple[int, int]] = []
+        if prop in ("source", "both"):
+            edges.append((target, source))
+        if prop in ("target", "both"):
+            edges.append((source, target))
+        return tuple(edges)
+
+
 class LinkTypeService:
     """Read access to ``tiqora_itsm_link_type``; the rows are edited under "ITSM" (itsm1)."""
 
@@ -155,16 +181,20 @@ class LinkTypeService:
             raise UnknownLinkType(name)
         return row
 
-    async def propagating(self) -> dict[str, str]:
-        """Name -> propagation of every valid type whose propagation is not ``none``."""
+    async def propagating(self) -> dict[str, Propagating]:
+        """Name -> (propagation, pointed) of every valid type whose propagation is not ``none``."""
         rows = (
             await self._s.execute(
-                select(TiqoraItsmLinkType.name, TiqoraItsmLinkType.propagation).where(
+                select(
+                    TiqoraItsmLinkType.name,
+                    TiqoraItsmLinkType.propagation,
+                    TiqoraItsmLinkType.pointed,
+                ).where(
                     TiqoraItsmLinkType.valid.is_(True), TiqoraItsmLinkType.propagation != "none"
                 )
             )
         ).all()
-        return {str(n): str(p) for n, p in rows}
+        return {str(n): Propagating(str(p), bool(pt)) for n, p, pt in rows}
 
 
 # --- links -----------------------------------------------------------------------------
@@ -659,6 +689,7 @@ __all__ = [
     "LinkRecord",
     "LinkService",
     "LinkTypeService",
+    "Propagating",
     "UnknownLinkType",
     "signal_ticket_link",
 ]

@@ -11,7 +11,7 @@ there is no JOIN between ``tiqora_*`` and Znuny tables (collation, error 1267).
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Final
 
 from sqlalchemy import and_, bindparam, or_, select, text
@@ -20,7 +20,7 @@ from sqlalchemy.sql.elements import TextClause
 
 from tiqora.cmdb.access import CmdbAccess, readable_class_ids, require_class_access
 from tiqora.cmdb.errors import CmdbError, CmdbNotFound
-from tiqora.cmdb.links import LinkService, LinkTypeService
+from tiqora.cmdb.links import LinkService, LinkTypeService, Propagating
 from tiqora.cmdb.propagation import MAX_DEPTH, _Graph, service_incident_states
 from tiqora.cmdb.schemas import (
     AffectedOut,
@@ -38,6 +38,7 @@ from tiqora.db.tiqora.models import (
     TiqoraItsmLink,
 )
 from tiqora.domain.queue_service import OPEN_STATE_TYPES
+from tiqora.itsm.service_state import counts_for_service
 from tiqora.permissions.engine import PermissionEngine
 
 DEPTH_MIN: Final = 1
@@ -458,18 +459,14 @@ async def _reach(session: AsyncSession, ci_id: int, cap: int) -> tuple[set[int],
 
 
 async def _affected_services(
-    session: AsyncSession, ci_ids: Sequence[int], props: dict[str, str]
+    session: AsyncSession, ci_ids: Sequence[int], props: Mapping[str, Propagating]
 ) -> list[CmdbNamedRefOut]:
     found: set[int] = set()
     for _ci, svc, name, ci_is_source in await _service_links(session, ci_ids):
-        prop = props.get(name)
-        if prop is None:
-            continue
-        # the incident travels toward the service end
-        if (
-            prop == "both"
-            or (prop == "source" and not ci_is_source)
-            or (prop == "target" and ci_is_source)
+        ltype = props.get(name)
+        # the incident travels toward the service end: the same rule as the service state (R12)
+        if ltype is not None and counts_for_service(
+            ltype.propagation, ltype.pointed, service_is_source=not ci_is_source
         ):
             found.add(svc)
     names = await _service_names(session, found)

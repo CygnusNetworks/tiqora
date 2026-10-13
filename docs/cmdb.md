@@ -140,6 +140,9 @@ eines Tickets sieht nur, wer das Ticket lesen darf.
 
 Jeder Linktyp hat eine **Weitergabe**: `none`, `source`, `target` oder `both`. `source` heißt:
 Das **Quell**-CI der Verknüpfung bekommt die Warnung, wenn das **Ziel**-CI in Störung ist.
+Ungerichtete Linktypen (Quell- und Zielname gleich, etwa `ConnectedTo`) haben keine Quelle und
+kein Ziel; hier gilt wie in Znuny: Mit `source` oder `both` bekommt jeder Nachbar die Warnung,
+mit `target` keiner.
 
 *Beispiel.* `web-01.example.org` **hängt ab von** `db-01.example.org` (Linktyp `DependsOn`,
 Quelle ist `web-01`). Setzen Sie `db-01` auf den Vorfallstatus

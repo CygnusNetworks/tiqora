@@ -24,7 +24,7 @@ from tests._cmdb_helpers import (
 )
 from tiqora.cmdb import links as links_mod
 from tiqora.cmdb.errors import CmdbNotFound
-from tiqora.cmdb.links import LinkEnd, LinkInvalid, LinkService, LinkTypeService
+from tiqora.cmdb.links import LinkEnd, LinkInvalid, LinkService, LinkTypeService, Propagating
 from tiqora.cmdb.service import system_access
 from tiqora.db.tiqora.models import TiqoraCmdbCiHistory, TiqoraItsmLink
 from tiqora.domain.api_key_scopes import path_to_area
@@ -393,7 +393,7 @@ async def test_link_type_service_reads_the_step0_table(cmdb_db: CmdbWorld) -> No
             svc = LinkTypeService(s)
             assert "Includes" not in [t.name for t in await svc.list_types()]
             assert "Includes" in [t.name for t in await svc.list_types(include_invalid=True)]
-            assert await svc.propagating() == {"DependsOn": "both"}
+            assert await svc.propagating() == {"DependsOn": Propagating("both", pointed=True)}
             row = await svc.get_by_name("DependsOn")
             assert isinstance(row, TiqoraItsmLinkType)
     finally:

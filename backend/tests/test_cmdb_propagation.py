@@ -564,3 +564,65 @@ async def test_recompute_route_enqueues_job(cmdb_db: CmdbWorld) -> None:
         assert r.json()["kind"] == "core.cmdb_propagation"
     async with client_for(cmdb_db, USER_A) as c:
         assert (await c.post("/api/v1/admin/cmdb/propagation/recompute")).status_code == 403
+
+
+# --- unpointed link types (ruling CMDB-PM-I2, Znuny LinkObject.pm LinkKeyList) ---------------
+
+#: test-own unpointed types; ``LinkService.add`` stores an unpointed CI-CI link with the smaller
+#: id as source, so in ``_chain`` the first CI is always the stored source
+UNPOINTED_SRC = "Cmdb4PeerSrc"
+UNPOINTED_TGT = "Cmdb4PeerTgt"
+
+
+async def test_unpointed_source_type_warns_every_neighbour(cmdb_db: CmdbWorld) -> None:
+    """Znuny folds every neighbour of an unpointed type into ``Source``: with propagation
+    ``source`` an incident at either end warns the other, whichever side the link was stored."""
+    async with cmdb_db.factory() as s:
+        await make_link_type(s, UNPOINTED_SRC, "source", pointed=False)
+        a, b = await _chain(s, ["cmdb4-a", "cmdb4-b"], link_type=UNPOINTED_SRC)
+        await _set_own_incident(s, a, "incident")  # a is the stored source
+        assert await _cur(s, [a, b]) == ["incident", "warning"]
+        await _set_own_incident(s, a, "operational")
+        await _set_own_incident(s, b, "incident")
+        assert await _cur(s, [a, b]) == ["warning", "incident"]
+    # the full recompute follows the same rule
+    async with cmdb_db.factory() as s:
+        await _set_own_incident(s, b, "operational", recompute=False)
+        await _set_own_incident(s, a, "incident", recompute=False)
+    await recompute_all(cmdb_db.factory, settings=CmdbSettings())
+    async with cmdb_db.factory() as s:
+        assert await _cur(s, [a, b]) == ["incident", "warning"]
+
+
+async def test_unpointed_target_type_warns_nobody(cmdb_db: CmdbWorld) -> None:
+    """Znuny returns nothing for ``Target`` on an unpointed type: no CI is warned."""
+    async with cmdb_db.factory() as s:
+        await make_link_type(s, UNPOINTED_TGT, "target", pointed=False)
+        a, b = await _chain(s, ["cmdb4-a", "cmdb4-b"], link_type=UNPOINTED_TGT)
+        await _set_own_incident(s, a, "incident")
+        assert await _cur(s, [a, b]) == ["incident", "operational"]
+        await _set_own_incident(s, a, "operational")
+        await _set_own_incident(s, b, "incident")
+        assert await _cur(s, [a, b]) == ["operational", "incident"]
+
+
+async def test_itsm_link_type_pointed_only_patch_changes_states(cmdb_db: CmdbWorld) -> None:
+    """A PATCH of ``pointed`` alone queues the recompute, and the job now changes a state."""
+    base = "/api/v1/admin/itsm/link-types"
+    async with client_for(cmdb_db, USER_ADMIN) as c:
+        body = {"name": "Cmdb4Feeds", "pointed": True, "propagation": "source"}
+        r = await c.post(base, json=body)
+        assert r.status_code == 201, r.text
+        type_id = r.json()["id"]
+    async with cmdb_db.factory() as s:
+        a, b = await _chain(s, ["cmdb4-a", "cmdb4-b"], link_type="Cmdb4Feeds")
+        await _set_own_incident(s, a, "incident")  # pointed source: a's dependency b stays
+        assert await _cur(s, [a, b]) == ["incident", "operational"]
+    async with client_for(cmdb_db, USER_ADMIN) as c:
+        r = await c.patch(f"{base}/{type_id}", json={"pointed": False})
+        assert r.status_code == 200, r.text
+    async with cmdb_db.factory() as s:
+        assert await _propagation_jobs(s) == [("core.cmdb_propagation", "all")]
+    await run_jobs_until_idle(cmdb_db)
+    async with cmdb_db.factory() as s:
+        assert await _cur(s, [a, b]) == ["incident", "warning"]

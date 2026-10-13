@@ -6,7 +6,10 @@ A CI whose *own* incident state has functionality ``incident`` puts every CI tha
 
 Edge semantics (cross ruling R1): for a link ``S -type-> T``, propagation ``source`` means the
 source end gets the warning when the target is in incident (edge T -> S), ``target`` the other
-way round, ``both`` both. ``u -> v`` below always reads "an incident at ``u`` affects ``v``".
+way round, ``both`` both. An unpointed type follows Znuny's ``LinkKeyList`` instead (ruling
+CMDB-PM-I2): ``source``/``both`` warn every neighbour, ``target`` none
+(:meth:`tiqora.cmdb.links.Propagating.ci_edges`). ``u -> v`` below always reads "an incident at
+``u`` affects ``v``".
 
 Per save (``recompute_from``) the work is bounded (F17): the *scope* is the seeds plus everything
 they affect (forward BFS); whether a scope member is warned depends only on its incident
@@ -17,7 +20,7 @@ touched. If any cap (``propagation_node_cap``, depth 50) is hit nothing is writt
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Iterable, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final
 
@@ -28,7 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.cmdb import links as links_mod
 from tiqora.cmdb import service as service_mod
 from tiqora.cmdb.catalog import CatalogMisconfigured
-from tiqora.cmdb.links import LinkService, LinkTypeService
+from tiqora.cmdb.links import LinkService, LinkTypeService, Propagating
 from tiqora.cmdb.seed import INCIDENT_STATE
 from tiqora.cmdb.settings import CmdbSettings, load_cmdb_settings
 from tiqora.db.tiqora.models import TiqoraCmdbCatalog, TiqoraCmdbCi, TiqoraItsmLink
@@ -92,7 +95,7 @@ async def _states(session: AsyncSession) -> _States:
 class _Graph:
     """Lazily loaded propagation edges between CIs (``u`` affects ``v``)."""
 
-    def __init__(self, session: AsyncSession, props: dict[str, str]) -> None:
+    def __init__(self, session: AsyncSession, props: Mapping[str, Propagating]) -> None:
         self._links = LinkService(session)
         self._props = props
         self._loaded: set[int] = set()
@@ -105,11 +108,11 @@ class _Graph:
             return
         self._loaded.update(new)
         for src, tgt, name in await self._links.ci_neighbours(new, propagating_only=True):
-            prop = self._props.get(name)
-            if prop in ("source", "both"):
-                self._edge(tgt, src)
-            if prop in ("target", "both"):
-                self._edge(src, tgt)
+            ltype = self._props.get(name)
+            if ltype is None:
+                continue
+            for u, v in ltype.ci_edges(src, tgt):
+                self._edge(u, v)
 
     def _edge(self, u: int, v: int) -> None:
         self.affects.setdefault(u, set()).add(v)
