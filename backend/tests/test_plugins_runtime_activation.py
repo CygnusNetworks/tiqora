@@ -476,9 +476,11 @@ async def test_boot_gc_waits_while_a_plugin_job_runs(
     async def busy(_session: AsyncSession) -> bool:
         return True
 
+    original = restart_mod.plugin_job_active
     monkeypatch.setattr(restart_mod, "plugin_job_active", busy)
     assert await gc_runtime_dirs_at_boot(rt_settings, factory) == 0
     assert fresh.exists()
-    monkeypatch.undo()
+    # not monkeypatch.undo(): that would also revert the autouse sys.path isolation
+    monkeypatch.setattr(restart_mod, "plugin_job_active", original)
     assert await gc_runtime_dirs_at_boot(rt_settings, factory) >= 1
     assert not fresh.exists()
