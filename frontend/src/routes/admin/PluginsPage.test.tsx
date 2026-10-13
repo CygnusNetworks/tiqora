@@ -410,14 +410,30 @@ describe("PluginsPage installed tab", () => {
     expect(await screen.findByRole("dialog", { name: "Erweiterung installieren" })).toBeInTheDocument();
   });
 
-  it("shows an error when the download job fails", async () => {
+  it("shows an error when the download job fails with its own reason", async () => {
     const withUpdate = adminPlugin({
       source: "repository",
       update: { version: "1.1.0", image_plugin: false, repository_id: 3, repository_name: "Quelle" },
     });
     adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [withUpdate] });
     download.mockResolvedValue({ job_id: 5 });
-    jobState = job({ status: "failed", error: "kaputt" });
+    jobState = job({ status: "failed", error: "Die Signatur des Pakets ist ungültig." });
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Aktualisieren" }));
+    expect(await screen.findByTestId("admin-plugins-action-error")).toHaveTextContent(
+      "Die Signatur des Pakets ist ungültig.",
+    );
+    expect(getPackage).not.toHaveBeenCalled();
+  });
+
+  it("shows the generic text when the failed download job has no reason", async () => {
+    const withUpdate = adminPlugin({
+      source: "repository",
+      update: { version: "1.1.0", image_plugin: false, repository_id: 3, repository_name: "Quelle" },
+    });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [withUpdate] });
+    download.mockResolvedValue({ job_id: 5 });
+    jobState = job({ status: "failed", error: null });
     renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Aktualisieren" }));
     expect(await screen.findByTestId("admin-plugins-action-error")).toHaveTextContent(

@@ -456,6 +456,8 @@ export function PluginsPage() {
   // Update = download the package from the repository (a job), then show it in the install dialog.
   const [downloadJobId, setDownloadJobId] = useState<number | null>(null);
   const [downloadError, setDownloadError] = useState<unknown>(null);
+  // The failed job's German, admin-facing reason (signature, hash, F19 URL rejection ...).
+  const [downloadMessage, setDownloadMessage] = useState<string | null>(null);
   const downloadM = useMutation({
     mutationFn: ({ repoId, pluginId, version }: { repoId: number; pluginId: string; version: string }) =>
       pluginsApi.download(repoId, { plugin_id: pluginId, version }),
@@ -482,6 +484,7 @@ export function PluginsPage() {
     } else if (job.status === "failed" || job.status === "cancelled") {
       handledJob.current = downloadJobId;
       setDownloadError(new Error(job.error ?? ""));
+      setDownloadMessage(job.error?.trim() || null);
       setDownloadJobId(null);
     }
   }, [download.job, downloadJobId]);
@@ -489,6 +492,7 @@ export function PluginsPage() {
   const startUpdate = (plugin: PluginAdmin) => {
     if (!plugin.update) return;
     setDownloadError(null);
+    setDownloadMessage(null);
     downloadM.mutate({ repoId: plugin.update.repository_id, pluginId: plugin.id, version: plugin.update.version });
   };
 
@@ -603,7 +607,9 @@ export function PluginsPage() {
       )}
       {actionError != null && (
         <p role="alert" className="text-sm text-danger" data-testid="admin-plugins-action-error">
-          {apiErrorMessage(actionError, downloadError ? t("admin.plugins.update.failed") : t("admin.plugins.actionError"))}
+          {actionError === downloadError && downloadMessage
+            ? downloadMessage
+            : apiErrorMessage(actionError, downloadError ? t("admin.plugins.update.failed") : t("admin.plugins.actionError"))}
         </p>
       )}
 
