@@ -35,6 +35,7 @@ import {
   PlusIcon,
   SearchIcon,
   ServerIcon,
+  StackIcon,
   ShieldIcon,
   UserIcon,
 } from "@/components/ui/icons";
@@ -42,6 +43,7 @@ import { cn } from "@/lib/cn";
 import { appVersion } from "@/lib/appVersion";
 import { SSEProvider } from "@/lib/useSSE";
 import { CallPopup } from "@/components/agent/phone/CallPopup";
+import { useCmdbStatus } from "@/lib/cmdbApi";
 import { NavItem } from "./NavItem";
 import { PluginProvider } from "@/plugins/PluginProvider";
 import { PluginNavItems, PluginSafeModeNote } from "@/plugins/slots";
@@ -281,6 +283,10 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const hasPluginGroup = useNavGroupHasItems("plugins");
+  // CMDB entry: only in Mode B (the CMDB lives in Tiqora) and for someone who can read a class or administer.
+  const cmdbStatus = useCmdbStatus().data;
+  const showCmdb =
+    cmdbStatus?.mode === "tiqora" && (cmdbStatus.readable_class_count > 0 || cmdbStatus.can_admin);
 
   const queuesQ = useQuery({
     queryKey: ["queues"],
@@ -413,6 +419,15 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             testId="agent-nav-services"
             onNavigate={onNavigate}
           />
+          {showCmdb && (
+            <NavItem
+              to="/agent/cmdb"
+              label={t("sidebar.cmdb")}
+              icon={<StackIcon />}
+              testId="agent-nav-cmdb"
+              onNavigate={onNavigate}
+            />
+          )}
           <PluginNavItems group="workspace" onNavigate={onNavigate} />
         </NavGroup>
 

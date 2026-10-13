@@ -12,8 +12,10 @@ export type FieldKind =
   | "secret"
   | "tags"
   | "customer"
-  | "ticket_attachments";
-// "customer" values are the customer user login (string); "ticket_attachments" values are the chosen option keys (string[]).
+  | "ticket_attachments"
+  | "ci_ref"
+  | "company";
+// "customer" values are the customer user login (string); "ci_ref" values are the CI id as a string; "company" values are the customer id (string); "ticket_attachments" values are the chosen option keys (string[]).
 export type FieldValue = string | number | boolean | string[] | null;
 // date: "YYYY-MM-DD"; datetime: "YYYY-MM-DDTHH:MM" (wall time in the agent's display zone)
 export type FieldValues = Record<string, FieldValue>;
@@ -35,6 +37,7 @@ export type FieldDef = {
   step?: number;
   maxLength?: number;
   secretSet?: boolean; // secret: a value is stored on the server
+  lookupClassKeys?: string[]; // ci_ref: only offer CIs of these classes (empty / unset = any)
 };
 export type FieldKindProps = {
   def: FieldDef;

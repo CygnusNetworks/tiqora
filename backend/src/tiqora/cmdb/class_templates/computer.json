@@ -1,0 +1,163 @@
+{
+ "key": "computer",
+ "name": "Computer",
+ "icon": "computer",
+ "attributes": [
+  {
+   "key": "Vendor",
+   "name": "Hersteller",
+   "type": "text",
+   "searchable": true
+  },
+  {
+   "key": "Model",
+   "name": "Modell",
+   "type": "text",
+   "searchable": true
+  },
+  {
+   "key": "Description",
+   "name": "Beschreibung",
+   "type": "textarea"
+  },
+  {
+   "key": "Type",
+   "name": "Typ",
+   "type": "catalog",
+   "options": {
+    "catalog_class": "ITSM::ConfigItem::Computer::Type"
+   },
+   "searchable": false
+  },
+  {
+   "key": "Owner",
+   "name": "Besitzer",
+   "type": "customer_user",
+   "portal": true,
+   "searchable": true
+  },
+  {
+   "key": "SerialNumber",
+   "name": "Seriennummer",
+   "type": "text",
+   "searchable": true
+  },
+  {
+   "key": "OperatingSystem",
+   "name": "Betriebssystem",
+   "type": "text",
+   "searchable": true
+  },
+  {
+   "key": "CPU",
+   "name": "Prozessor",
+   "type": "text",
+   "count_max": 16,
+   "count_default": 1,
+   "count_min": 0
+  },
+  {
+   "key": "Ram",
+   "name": "Arbeitsspeicher",
+   "type": "text",
+   "count_max": 10
+  },
+  {
+   "key": "HardDisk",
+   "name": "Festplatte",
+   "type": "text",
+   "count_max": 10,
+   "sub": [
+    {
+     "key": "Capacity",
+     "name": "Kapazität",
+     "type": "text"
+    }
+   ]
+  },
+  {
+   "key": "NIC",
+   "name": "Netzwerkkarte",
+   "type": "text",
+   "count_max": 10,
+   "sub": [
+    {
+     "key": "IPAddress",
+     "name": "IP-Adresse",
+     "type": "ip",
+     "searchable": true,
+     "count_max": 20
+    }
+   ]
+  },
+  {
+   "key": "Location",
+   "name": "Standort",
+   "type": "ci_ref",
+   "options": {
+    "class_keys": [
+     "location"
+    ]
+   }
+  },
+  {
+   "key": "WarrantyExpirationDate",
+   "name": "Garantie bis",
+   "type": "date"
+  },
+  {
+   "key": "InstallDate",
+   "name": "Installationsdatum",
+   "type": "date"
+  },
+  {
+   "key": "Note",
+   "name": "Notiz",
+   "type": "textarea"
+  }
+ ],
+ "catalog_items": [
+  {
+   "catalog_class": "ITSM::ConfigItem::Computer::Type",
+   "item_key": "desktop",
+   "name": "Desktop",
+   "functionality": null,
+   "position": 10
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Computer::Type",
+   "item_key": "laptop",
+   "name": "Laptop",
+   "functionality": null,
+   "position": 20
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Computer::Type",
+   "item_key": "server",
+   "name": "Server",
+   "functionality": null,
+   "position": 30
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Computer::Type",
+   "item_key": "tablet",
+   "name": "Tablet",
+   "functionality": null,
+   "position": 40
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Computer::Type",
+   "item_key": "virtual_machine",
+   "name": "Virtual Machine",
+   "functionality": null,
+   "position": 50
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Computer::Type",
+   "item_key": "other",
+   "name": "Other",
+   "functionality": null,
+   "position": 60
+  }
+ ]
+}

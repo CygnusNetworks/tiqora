@@ -1,0 +1,74 @@
+{
+ "key": "location",
+ "name": "Standort",
+ "icon": "location",
+ "attributes": [
+  {
+   "key": "Type",
+   "name": "Typ",
+   "type": "catalog",
+   "options": {
+    "catalog_class": "ITSM::ConfigItem::Location::Type"
+   },
+   "searchable": false
+  },
+  {
+   "key": "Phone",
+   "name": "Telefon",
+   "type": "text"
+  },
+  {
+   "key": "Address",
+   "name": "Adresse",
+   "type": "textarea",
+   "searchable": true
+  },
+  {
+   "key": "ParentLocation",
+   "name": "Übergeordneter Standort",
+   "type": "ci_ref",
+   "options": {
+    "class_keys": [
+     "location"
+    ]
+   }
+  }
+ ],
+ "catalog_items": [
+  {
+   "catalog_class": "ITSM::ConfigItem::Location::Type",
+   "item_key": "building",
+   "name": "Building",
+   "functionality": null,
+   "position": 10
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Location::Type",
+   "item_key": "office",
+   "name": "Office",
+   "functionality": null,
+   "position": 20
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Location::Type",
+   "item_key": "outlet",
+   "name": "Outlet",
+   "functionality": null,
+   "position": 30
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Location::Type",
+   "item_key": "room",
+   "name": "Room",
+   "functionality": null,
+   "position": 40
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Location::Type",
+   "item_key": "workplace",
+   "name": "Workplace",
+   "functionality": null,
+   "position": 50
+  }
+ ]
+}

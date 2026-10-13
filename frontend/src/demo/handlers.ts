@@ -8,6 +8,7 @@ import {
   demoRefine,
 } from "./mockData";
 import { demoDashboards, resolve as resolveDashboards } from "./dashboardsMock";
+import { demoCmdb, demoCmdbJob, demoCmdbReport, resolveCmdb } from "./cmdbMock";
 import { resolveKiosk } from "./kioskMock";
 import { resolveItsmData } from "./itsmMock";
 import { resolve as resolveSchedules } from "./schedulesMock";
@@ -109,6 +110,17 @@ async function schedulesResponse(request: Request): Promise<Response | undefined
   return out.status === 204 ? new HttpResponse(null, { status: 204 }) : HttpResponse.json(out.body as never, { status: out.status });
 }
 
+/** CMDB (agent, admin and portal plane): bodies, queries and an in-memory store, so it has its own handler. */
+async function cmdbResponse(request: Request): Promise<Response | undefined> {
+  const url = new URL(request.url);
+  const hasBody = request.method !== "GET" && request.method !== "DELETE";
+  const multipart = request.headers.get("content-type")?.includes("multipart") === true;
+  const body = hasBody ? (multipart ? await request.formData().catch(() => undefined) : await request.json().catch(() => ({}))) : undefined;
+  const out = resolveCmdb(demoCmdb, request.method, url.pathname, body, url.searchParams);
+  if (!out) return undefined;
+  return out.status === 204 ? new HttpResponse(null, { status: 204 }) : HttpResponse.json(out.body as never, { status: out.status });
+}
+
 /** The wallboard answers from the same demo store; the secret comes in its own header. */
 function kioskResponse(request: Request): Response | undefined {
   const out = resolveKiosk(demoDashboards, request.method, new URL(request.url).pathname, request.headers.get("X-Tiqora-Kiosk"));
@@ -122,6 +134,18 @@ export const handlers = [
     const out = resolveItsmData(url.pathname, "GET", url.search);
     return out === undefined ? HttpResponse.json({}, { status: 404 }) : HttpResponse.json(out as never);
   }),
+  // jobs of the CMDB mock (bulk edit, export); any other job id falls through to the generic resolver
+  http.get("*/api/v1/jobs/:id", ({ params }) => {
+    const job = demoCmdbJob(demoCmdb, Number(params.id));
+    return job ? HttpResponse.json(job as never) : undefined;
+  }),
+  http.get("*/api/v1/jobs/:id/files/:fid", ({ params }) => {
+    const text = demoCmdbReport(demoCmdb, Number(params.id));
+    return text === undefined ? undefined : new HttpResponse(text, { headers: { "content-type": "text/csv; charset=utf-8" } });
+  }),
+  http.all("*/api/portal/config-items*", async ({ request }) => (await cmdbResponse(request)) ?? HttpResponse.json({}, { status: 404 })),
+  http.all("*/api/v1/admin/cmdb/*", async ({ request }) => (await cmdbResponse(request)) ?? HttpResponse.json([])),
+  http.all("*/api/v1/cmdb/*", async ({ request }) => (await cmdbResponse(request)) ?? HttpResponse.json([])),
   http.all("*/api/v1/report-schedules*", async ({ request }) => (await schedulesResponse(request)) ?? HttpResponse.json([])),
   http.get("*/api/v1/report-runs/*", async ({ request }) => (await schedulesResponse(request)) ?? new HttpResponse(null, { status: 404 })),
   http.all("*/api/v1/reports/import/znuny*", async ({ request }) => (await schedulesResponse(request)) ?? HttpResponse.json({})),

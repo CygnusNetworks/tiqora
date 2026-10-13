@@ -1356,7 +1356,8 @@
       "myTickets": "Meine Tickets",
       "newTicket": "Neues Ticket",
       "kb": "Hilfeartikel",
-      "preferences": "Einstellungen"
+      "preferences": "Einstellungen",
+      "cmdb": "Meine Geräte und Systeme"
     },
     "login": {
       "stepUp": {
@@ -1452,6 +1453,26 @@
       "chooseProcess": "Prozess wählen",
       "loadError": "Prozesse konnten nicht geladen werden.",
       "submitError": "Die Anfrage konnte nicht gesendet werden."
+    },
+    "cmdb": {
+      "title": "Meine Geräte und Systeme",
+      "searchPlaceholder": "Nach Name oder Nummer suchen",
+      "empty": "Keine Geräte oder Systeme gefunden.",
+      "loadError": "Die Liste konnte nicht geladen werden.",
+      "notFound": "Dieses Gerät oder System wurde nicht gefunden.",
+      "number": "Nummer",
+      "class": "Art",
+      "deployment": "Status",
+      "back": "Zurück zu Geräten und Systemen",
+      "createTicket": "Ticket zu diesem System erstellen",
+      "noAttributes": "Keine Details verfügbar.",
+      "picker": {
+        "label": "Betroffenes Gerät oder System",
+        "hint": "Optional, bis zu {{max}}.",
+        "add": "Gerät oder System hinzufügen",
+        "remove": "{{name}} entfernen",
+        "max": "Sie können bis zu {{max}} auswählen."
+      }
     }
   },
   "admin": {
@@ -2200,6 +2221,8 @@
       "dashboardTemplates": "Dashboard-Vorlagen",
       "webservices": "Webservices",
       "dashboardKioskLinks": "Wallboard-Links",
+      "cmdbClasses": "CMDB-Klassen",
+      "cmdbCatalog": "CMDB-Auswahllisten",
       "itsm": "ITSM",
       "itsmLinkTypes": "Verknüpfungstypen"
     },
@@ -3450,6 +3473,10 @@
           "name": "Webservice-Protokoll aufräumen",
           "description": "Löscht alte Einträge des Webservice-Protokolls."
         },
+        "cmdb_version_archive": {
+          "name": "CMDB-Versionen archivieren",
+          "description": "Verschiebt alte CI-Versionen ins Archiv (wenn in den CMDB-Einstellungen eingeschaltet) und entfernt Uploads, die nie in einem CI gespeichert wurden."
+        },
         "scim_role_sync": {
           "name": "Rollen aus Gruppen der Bereitstellung",
           "description": "Überträgt Gruppenänderungen vom Anmeldedienst auf Rollen und Gruppen in Tiqora."
@@ -3843,6 +3870,8 @@
       "dashboardTemplates": "Startseiten je Rolle als Vorlage festlegen, optional verbindlich.",
       "webservices": "Webservices (GenericInterface) einsehen, ausgehende Aufrufe prüfen und Zielfreigaben verwalten.",
       "dashboardKioskLinks": "Links für Wallboards ohne Anmeldung erstellen, prüfen und widerrufen.",
+      "cmdbClasses": "Klassen von Configuration Items und ihre Attribute festlegen.",
+      "cmdbCatalog": "Auswahllisten (Allgemeiner Katalog) für CMDB-Attribute pflegen.",
       "itsm": "ITSM-Modus, Einrichtung, Prioritätsmatrix und Services",
       "itsmLinkTypes": "Verknüpfungstypen zwischen Tickets, Konfigurationselementen und Services",
       "settingsItsm": "Ticket-Typen, Workaround-Status, Grenzwerte und Znuny-Adresse für das ITSM"
@@ -4305,6 +4334,39 @@
           "deploy_from_tiqora": {
             "label": "Prozesse und ACLs in Tiqora bereitstellen (Znuny läuft nicht mehr)",
             "help": "Nur einschalten, wenn Znuny nicht mehr parallel läuft. Sonst zeigt Znuny weiter den alten Stand an."
+          }
+        }
+      },
+      "cmdb": {
+        "title": "CMDB",
+        "fields": {
+          "propagation_node_cap": {
+            "label": "Grenze für die Weitergabe",
+            "help": "Höchstzahl der CIs, deren Vorfallsstatus in einem Lauf neu berechnet wird."
+          },
+          "impact_graph_node_cap": {
+            "label": "Grenze für die Abhängigkeitsansicht",
+            "help": "Höchstzahl der Knoten in der Abhängigkeitsansicht."
+          },
+          "import_max_mb": {
+            "label": "Maximale Importgröße (MB)",
+            "help": "Größte zulässige Importdatei, höchstens 25 MB."
+          },
+          "version_archive_enabled": {
+            "label": "Alte Versionen archivieren",
+            "help": "Alte CI-Versionen im Hintergrund ins Archiv verschieben."
+          },
+          "version_archive_keep": {
+            "label": "Zu behaltende Versionen",
+            "help": "So viele der neuesten Versionen je CI bleiben immer im Verlauf."
+          },
+          "version_archive_min_age_days": {
+            "label": "Mindestalter in Tagen",
+            "help": "Nur ältere Versionen werden archiviert."
+          },
+          "access_group": {
+            "label": "CMDB-Gruppe",
+            "help": "Optionaler Gruppenname. Ist er gesetzt, dürfen nur Agenten mit Schreibrecht in dieser Gruppe die CMDB nutzen. Leer lassen, um die Sperre auszuschalten."
           }
         }
       },
@@ -5259,6 +5321,200 @@
       "deleteMessage": "Der widerrufene Link wird aus der Liste entfernt.",
       "actionFailed": "Das hat nicht geklappt. Bitte versuchen Sie es erneut."
     },
+    "cmdb": {
+      "classes": {
+        "title": "CMDB-Klassen",
+        "subtitle": "Klassen fassen Configuration Items einer Art zusammen, etwa Server oder Standorte.",
+        "new": "Neue Klasse",
+        "create": "Klasse anlegen",
+        "fromTemplate": "Aus Vorlage",
+        "settings": "Einstellungen",
+        "name": "Name",
+        "key": "Schlüssel",
+        "keyHelp": "Kleinbuchstaben, Ziffern und Unterstriche; später nicht mehr änderbar.",
+        "group": "Gruppe",
+        "groupPlaceholder": "Gruppe wählen…",
+        "groupHelp": "Wer CIs dieser Klasse sehen oder bearbeiten soll, braucht diese Gruppe.",
+        "prefix": "Nummernpräfix",
+        "prefixExample": "Beispiel: {{example}}",
+        "portal": "Im Kundenportal sichtbar",
+        "portalHelp": "Kunden sehen die CIs dieser Klasse, die ihnen zugeordnet sind.",
+        "template": "Vorlage",
+        "templateHelp": "Legt eine Klasse mit fertigen Attributen an, die Sie danach anpassen können.",
+        "applyTemplate": "Aus Vorlage anlegen",
+        "attributeCount_one": "{{count}} Attribut",
+        "attributeCount_other": "{{count}} Attribute",
+        "saveError": "Die Klasse konnte nicht gespeichert werden.",
+        "linkTypesHint": "Verknüpfungstypen zwischen CIs, Services und Tickets pflegen Sie zusammen mit den übrigen ITSM-Einstellungen.",
+        "linkTypesLink": "ITSM-Verknüpfungstypen öffnen",
+        "recompute": "Vorfallstatus neu berechnen",
+        "recomputeHint": "Berechnet den abgeleiteten Vorfallstatus aller CIs neu, etwa nach Änderungen an den Verknüpfungstypen.",
+        "recomputeError": "Die Neuberechnung ließ sich nicht starten."
+      },
+      "seed": {
+        "catalogMissing": "Die Standardeinträge des Katalogs (Zustände) fehlen.",
+        "viewsMissing": "Die Datenbank-Sichten für das Znuny-Add-on fehlen (möglicherweise fehlt das CREATE-VIEW-Recht).",
+        "button": "Standardwerte anlegen",
+        "error": "Die Standardwerte konnten nicht angelegt werden."
+      },
+      "catalog": {
+        "title": "CMDB-Katalog",
+        "subtitle": "Auswahllisten, aus denen CI-Attribute und Zustände schöpfen.",
+        "classes": "Katalogklassen",
+        "new": "Neuer Eintrag",
+        "edit": "Eintrag bearbeiten",
+        "name": "Name",
+        "key": "Schlüssel",
+        "keyHelp": "Buchstaben, Ziffern und Unterstriche; später nicht mehr änderbar.",
+        "keyLocked": "Der Schlüssel lässt sich nicht ändern.",
+        "functionality": "Funktion",
+        "functionalityPlaceholder": "Funktion wählen…",
+        "functionalityHelp": "Bestimmt, wie der Zustand zählt, zum Beispiel wenn Störungen an abhängige CIs weitergegeben werden.",
+        "functionalities": {
+          "preproductive": "Vor Produktivbetrieb",
+          "productive": "Produktiv",
+          "postproductive": "Nach Produktivbetrieb",
+          "operational": "Betriebsbereit",
+          "warning": "Warnung",
+          "incident": "Störung"
+        },
+        "position": "Position",
+        "valid": "Gültig",
+        "saveError": "Der Eintrag konnte nicht gespeichert werden."
+      },
+      "editor": {
+        "back": "Zurück zu den Klassen",
+        "subtitle": "Eigenschaften der Klasse und Aufbau ihrer Attribute. Änderungen an den Attributen gelten erst, wenn Sie sie als neue Version speichern.",
+        "loadError": "Die Klasse konnte nicht geladen werden.",
+        "classSection": "Klasse",
+        "keyReadOnly": "Der Schlüssel kann nach dem Anlegen nicht mehr geändert werden.",
+        "icon": "Symbol",
+        "valid": "Gültig",
+        "saveClass": "Klasse speichern",
+        "classSaved": "Klasse gespeichert.",
+        "definition": "Attribute",
+        "definitionHelp": "Reihenfolge, Schachtelung und Eigenschaften der Attribute eines Configuration Items dieser Klasse.",
+        "unnamed": "(ohne Namen)",
+        "addAttribute": "Attribut hinzufügen",
+        "addSub": "Unterattribut hinzufügen",
+        "moveUp": "Nach oben",
+        "moveDown": "Nach unten",
+        "remove": "Entfernen",
+        "noAttributes": "Diese Klasse hat noch keine Attribute.",
+        "selectHint": "Wählen Sie ein Attribut, um es zu bearbeiten.",
+        "groupHint": "Eine Gruppe fasst Unterattribute zusammen und kann mehrfach vorkommen (z. B. Netzwerkkarten).",
+        "attrKey": "Schlüssel",
+        "attrName": "Bezeichnung",
+        "attrType": "Typ",
+        "attrHelp": "Hilfetext",
+        "required": "Pflichtfeld",
+        "searchable": "Durchsuchbar",
+        "portal": "Im Kundenportal zeigen",
+        "countMin": "Mindestanzahl",
+        "countMax": "Höchstanzahl",
+        "countDefault": "Anzahl bei neuem CI",
+        "default": "Vorgabewert",
+        "optMaxLength": "Maximale Länge",
+        "optMultiline": "Mehrzeilig anzeigen",
+        "optMin": "Minimum",
+        "optMax": "Maximum",
+        "optCurrency": "Währung (ISO 4217)",
+        "optCatalogClass": "Katalogklasse",
+        "optCatalogPlaceholder": "Katalogklasse wählen",
+        "optClassKeys": "Erlaubte Klassen",
+        "optClassKeysHelp": "Ohne Auswahl sind alle Klassen erlaubt.",
+        "validate": "Prüfen",
+        "validateError": "Die Prüfung konnte nicht ausgeführt werden.",
+        "validateOk": "Die Definition ist gültig.",
+        "issuesTitle": "{{count}} Problem(e) gefunden",
+        "jump": "Zum Attribut springen",
+        "localIssues": "{{count}} Attribut(e) mit Problemen. Bitte beheben, bevor Sie speichern.",
+        "saveVersion": "Als neue Version speichern",
+        "issue": {
+          "bad_key": "Der Schlüssel muss mit einem Buchstaben beginnen und darf nur Buchstaben, Ziffern und Unterstriche enthalten (höchstens 64 Zeichen).",
+          "duplicate_key": "Der Schlüssel kommt auf dieser Ebene mehrfach vor.",
+          "name_empty": "Die Bezeichnung fehlt.",
+          "count_range": "Die Anzahlen passen nicht zusammen: 0 ≤ Mindestanzahl ≤ Anzahl bei neuem CI ≤ Höchstanzahl ≤ 100.",
+          "group_without_sub": "Eine Gruppe braucht mindestens ein Unterattribut."
+        },
+        "types": {
+          "text": "Text",
+          "textarea": "Mehrzeiliger Text",
+          "integer": "Ganzzahl",
+          "decimal": "Dezimalzahl",
+          "money": "Betrag",
+          "date": "Datum",
+          "datetime": "Datum und Uhrzeit",
+          "url": "Link (URL)",
+          "email": "E-Mail-Adresse",
+          "ip": "IP-Adresse",
+          "mac": "MAC-Adresse",
+          "catalog": "Katalogwert",
+          "ci_ref": "Verweis auf ein CI",
+          "customer_user": "Kundenbenutzer",
+          "customer_company": "Kundenfirma",
+          "agent": "Agent",
+          "service": "Service",
+          "sla": "SLA",
+          "queue": "Queue",
+          "priority": "Priorität",
+          "ticket_type": "Ticket-Typ",
+          "state": "Ticket-Status",
+          "attachment": "Anhang",
+          "group": "Gruppe (Unterattribute)"
+        },
+        "diff": {
+          "added": "Hinzugefügt",
+          "removed": "Entfernt",
+          "type_changed": "Typ geändert",
+          "count_changed": "Anzahl geändert",
+          "renamed_label": "Bezeichnung geändert",
+          "flags_changed": "Eigenschaften geändert"
+        },
+        "versions": {
+          "title": "Versionen",
+          "none": "Es gibt noch keine gespeicherte Version.",
+          "current": "Version {{version}}",
+          "version": "Version {{version}}",
+          "changes": "Änderungen",
+          "noChanges": "Keine Änderungen gegenüber der Vorversion.",
+          "diffError": "Die Änderungen konnten nicht geladen werden.",
+          "saveHelp": "Die Attribute werden als neue Version der Klasse gespeichert. Bestehende CIs behalten ihre Werte.",
+          "comment": "Änderungshinweis (optional)",
+          "save": "Version speichern",
+          "saved": "Neue Version gespeichert.",
+          "error": "Die Version konnte nicht gespeichert werden."
+        },
+        "import": {
+          "open": "Importieren",
+          "title": "Definition importieren",
+          "help": "Übernimmt eine Klassendefinition aus Znuny oder Tiqora in den Editor. Gespeichert wird erst mit „Als neue Version speichern“.",
+          "format": "Format",
+          "formatPerl": "Znuny 6 (Perl)",
+          "formatYaml": "Znuny 7 (YAML)",
+          "formatJson": "Tiqora (JSON)",
+          "text": "Definition einfügen",
+          "file": "Datei wählen",
+          "fileTooBig": "Die Datei ist größer als 1 MB.",
+          "preview": "Vorschau",
+          "apply": "Übernehmen",
+          "error": "Die Definition konnte nicht gelesen werden.",
+          "found": "{{count}} Attribut(e) erkannt.",
+          "warnings": "Hinweise",
+          "missingCatalog": "Fehlende Katalogklassen",
+          "missingHelp": "Legen Sie diese Katalogklassen im Katalog an, sonst bleibt die Auswahl der Attribute leer.",
+          "notSaved": "Noch nichts gespeichert.",
+          "applied": "Definition in den Editor übernommen. Noch nicht gespeichert.",
+          "fileError": "Die Datei konnte nicht gelesen werden."
+        },
+        "leave": {
+          "title": "Änderungen verwerfen?",
+          "message": "Es gibt ungespeicherte Änderungen an dieser Klasse.",
+          "confirm": "Verwerfen",
+          "stay": "Bleiben"
+        }
+      }
+    },
     "itsm": {
       "title": "ITSM",
       "settingsLink": "ITSM-Einstellungen",
@@ -6019,6 +6275,12 @@
         "gi_invoke": "Webservice-Aufruf",
         "gi_invoke_sync": "Webservice-Aufruf",
         "report_delivery": "Berichtsversand",
+        "cmdb_propagation": "CMDB-Vorfallstatus neu berechnen",
+        "cmdb_import": "CMDB-Import",
+        "cmdb_export": "CMDB-Export",
+        "cmdb_bulk": "CMDB-Sammelbearbeitung",
+        "cmdb_archive": "Alte CMDB-Versionen archivieren",
+        "cmdb_reindex": "CMDB-Suche neu aufbauen",
         "itsm_linked_articles": "Notiz an verknüpfte Tickets"
       },
       "gi_mail": "E-Mail aus einer Webservice-Anfrage versenden"
@@ -7869,6 +8131,460 @@
       "skipped_other": "{{count}} übersprungen",
       "nothingDone": "Es wurde nichts übernommen.",
       "whereToFind": "Sie finden die Suchen unter „Alle gespeicherten Suchen…“ in der Seitenleiste."
+    }
+  },
+  "cmdb": {
+    "title": "CMDB",
+    "comingSoon": "Diese Seite wird gerade erstellt.",
+    "noClasses": "Noch keine Klassen.",
+    "modeNotice": {
+      "znuny": "Die CMDB wird zurzeit in Znuny geführt. Sie sehen CIs in den Tickets; bearbeiten können Sie sie in Znuny.",
+      "off": "Die CMDB ist nicht aktiviert."
+    },
+    "state": {
+      "operational": "Betriebsbereit",
+      "warning": "Warnung",
+      "incident": "Vorfall"
+    },
+    "unknownValues": "Diese Werte kennt die Klassendefinition nicht mehr. Beim Speichern werden sie entfernt.",
+    "hiddenNode": "Kein Zugriff",
+    "form": {
+      "clear": "Leeren",
+      "noHits": "Keine Treffer.",
+      "ciSearch": "CIs nach Nummer oder Name suchen…",
+      "companySearch": "Firmen suchen…",
+      "select": "Auswählen…",
+      "addEntry": "Weiteren Eintrag hinzufügen",
+      "removeEntry": "Entfernen",
+      "upload": "Datei hochladen",
+      "empty": "—",
+      "noAttributes": "Keine Attributwerte.",
+      "removeFile": "Datei entfernen"
+    },
+    "validation": {
+      "required": "Pflichtfeld.",
+      "too_few": "Zu wenige Einträge.",
+      "too_many": "Zu viele Einträge.",
+      "bad_type": "Der Wert hat den falschen Typ.",
+      "too_long": "Der Wert ist zu lang.",
+      "out_of_range": "Der Wert liegt außerhalb des erlaubten Bereichs.",
+      "bad_format": "Der Wert hat ein ungültiges Format.",
+      "unknown_key": "Unbekanntes Attribut.",
+      "unknown_reference": "Der verknüpfte Eintrag existiert nicht.",
+      "wrong_class": "Der verknüpfte Eintrag ist hier nicht erlaubt."
+    },
+    "list": {
+      "class": "Klasse",
+      "allClasses": "Alle Klassen",
+      "searchPlaceholder": "Nummer, Name oder Attribut suchen…",
+      "search": "CIs suchen",
+      "deploymentState": "Einsatzstatus",
+      "incidentState": "Vorfallsstatus",
+      "attrFilter": "Attributfilter",
+      "attrAdd": "Bedingung hinzufügen",
+      "attrNeedsClass": "Wählen Sie eine Klasse, um nach Attributen zu filtern.",
+      "attrNone": "Diese Klasse hat keine durchsuchbaren Attribute.",
+      "attrField": "Attribut",
+      "attrOp": "Bedingung",
+      "attrValue": "Wert",
+      "attrRemove": "Bedingung entfernen",
+      "ops": {
+        "eq": "ist",
+        "neq": "ist nicht",
+        "contains": "enthält",
+        "starts_with": "beginnt mit",
+        "lt": "kleiner als",
+        "lte": "höchstens",
+        "gt": "größer als",
+        "gte": "mindestens",
+        "before": "vor",
+        "after": "nach",
+        "is_empty": "ist leer",
+        "is_not_empty": "ist nicht leer"
+      },
+      "new": "Neues CI",
+      "import": "Import",
+      "selectAll": "Alle CIs dieser Seite auswählen",
+      "select": "{{name}} auswählen",
+      "number": "Nummer",
+      "name": "Name",
+      "changed": "Geändert",
+      "total_one": "{{count}} CI",
+      "total_other": "{{count}} CIs",
+      "totalCapped": "mehr als 10 000 CIs",
+      "empty": "Keine CIs gefunden.",
+      "loadFailed": "Die CIs konnten nicht geladen werden.",
+      "paging": "Seiten",
+      "pageOf": "Seite {{page}} von {{pages}}",
+      "pageNo": "Seite {{page}}",
+      "saved": {
+        "label": "Gespeicherte Suchen",
+        "none": "Gespeicherte Suchen",
+        "sharedTag": "geteilt",
+        "save": "Suche speichern",
+        "delete": "Löschen",
+        "name": "Name",
+        "shared": "Mit allen Agenten teilen",
+        "failed": "Die Suche konnte nicht gespeichert werden."
+      },
+      "export": {
+        "button": "Export",
+        "needsClass": "Wählen Sie für den Export genau eine Klasse.",
+        "title": "CIs exportieren",
+        "description": "Exportiert die CIs des aktuellen Filters, eine Zeile je CI.",
+        "start": "Export starten",
+        "format": "Dateiformat",
+        "failed": "Der Export konnte nicht gestartet werden."
+      },
+      "bulk": {
+        "open": "Mehrere bearbeiten",
+        "title": "Mehrere CIs bearbeiten",
+        "description": "Die Änderungen gelten für {{count}} ausgewählte CIs. Felder auf „unverändert“ bleiben unberührt.",
+        "keep": "– unverändert –",
+        "start": "Starten",
+        "failed": "Die Sammelbearbeitung konnte nicht gestartet werden.",
+        "addLink": "Verknüpfung hinzufügen",
+        "targetKind": "Verknüpfungsziel",
+        "kinds": {
+          "ci": "CI",
+          "service": "Service",
+          "ticket": "Ticket"
+        },
+        "linkType": "Verknüpfungstyp",
+        "ciSide": "Das CI ist",
+        "side": {
+          "source": "Quelle",
+          "target": "Ziel"
+        },
+        "target": "Ziel",
+        "keyHint": {
+          "service": "Service-ID",
+          "ticket": "Ticket-ID"
+        },
+        "result": "{{updated}} geändert, {{skipped}} übersprungen (keine Berechtigung)"
+      }
+    },
+    "filter": {
+      "fields": {
+        "number": "Nummer",
+        "name": "Name",
+        "class": "Klasse",
+        "deployment_state": "Einsatzstatus",
+        "deployment_functionality": "Einsatzfunktion",
+        "incident_state": "Vorfallsstatus",
+        "incident_functionality": "Vorfallsfunktion",
+        "created_at": "Erstellt",
+        "changed_at": "Geändert"
+      }
+    },
+    "detail": {
+      "notFound": "CI nicht gefunden",
+      "back": "Zur Liste",
+      "edit": "Bearbeiten",
+      "delete": "Löschen",
+      "deleteTitle": "CI löschen?",
+      "deleteMessage": "Das CI {{number}} ({{name}}) wird mit allen Versionen, Verknüpfungen, Anhängen und seinem Verlauf unwiderruflich gelöscht.",
+      "deleteConfirm": "Endgültig löschen",
+      "deleteFailed": "Das CI konnte nicht gelöscht werden.",
+      "loadFailed": "Das CI konnte nicht geladen werden.",
+      "loadMore": "Weitere laden",
+      "tabsLabel": "Bereiche des CI",
+      "derivedHint": "Warnung (abgeleitet)",
+      "derivedTitle": "Der Status kommt von einem abhängigen CI mit Vorfall, nicht von diesem CI selbst.",
+      "deployment": "Einsatzstatus",
+      "incidentOwn": "Eigener Vorfallsstatus",
+      "incidentCurrent": "Aktueller Vorfallsstatus",
+      "tabs": {
+        "overview": "Übersicht",
+        "links": "Verknüpfungen",
+        "dependencies": "Abhängigkeiten",
+        "tickets": "Tickets",
+        "versions": "Versionen",
+        "history": "Verlauf"
+      },
+      "links": {
+        "empty": "Keine Verknüpfungen.",
+        "loadFailed": "Die Verknüpfungen konnten nicht geladen werden."
+      },
+      "tickets": {
+        "openOnly": "nur offene",
+        "empty": "Keine Tickets verknüpft.",
+        "loadFailed": "Die Tickets konnten nicht geladen werden.",
+        "number": "Ticket",
+        "title": "Titel",
+        "state": "Status",
+        "queue": "Queue",
+        "linkType": "Verknüpfung"
+      },
+      "versions": {
+        "empty": "Keine Versionen.",
+        "loadFailed": "Die Versionen konnten nicht geladen werden.",
+        "showChanges": "Änderungen anzeigen",
+        "pickHint": "Wählen Sie zwei Versionen aus, um sie zu vergleichen.",
+        "pick": "Version vom {{date}} auswählen",
+        "definition": "Definition {{version}}",
+        "archived": "archiviert",
+        "loadArchived": "Ältere Versionen laden ({{count}})",
+        "changes": "Änderungen",
+        "close": "Schließen"
+      },
+      "diff": {
+        "empty": "Keine Unterschiede.",
+        "attribute": "Attribut",
+        "change": "Änderung",
+        "added": "hinzugefügt",
+        "removed": "entfernt",
+        "changed": "geändert"
+      }
+    },
+    "history": {
+      "loadFailed": "Der Verlauf konnte nicht geladen werden.",
+      "empty": "Noch kein Verlauf.",
+      "when": "Zeitpunkt",
+      "who": "Von",
+      "event": "Ereignis",
+      "detail": "Details",
+      "events": {
+        "ConfigItemCreate": "CI angelegt",
+        "VersionCreate": "Neue Version",
+        "DeploymentStateUpdate": "Einsatzstatus geändert",
+        "IncidentStateUpdate": "Vorfallsstatus geändert",
+        "ConfigItemDelete": "CI gelöscht",
+        "LinkAdd": "Verknüpfung hinzugefügt",
+        "LinkDelete": "Verknüpfung entfernt",
+        "DefinitionUpdate": "Definition aktualisiert",
+        "NameUpdate": "Name geändert",
+        "ValueUpdate": "Wert geändert",
+        "AttachmentAddPost": "Anhang hinzugefügt",
+        "AttachmentDeletePost": "Anhang entfernt"
+      }
+    },
+    "edit": {
+      "titleNew": "Neues CI: {{class}}",
+      "titleEdit": "CI {{number}} bearbeiten",
+      "backToCi": "Zum CI",
+      "pickClass": "Klasse wählen",
+      "pickClassHint": "Wählen Sie die Klasse des neuen CIs.",
+      "noWritableClasses": "Sie dürfen in keiner Klasse CIs anlegen.",
+      "name": "Name",
+      "attributes": "Attribute",
+      "changeNote": "Änderungsnotiz",
+      "summary_one": "Bitte prüfen Sie die markierten Felder ({{count}} Fehler).",
+      "summary_other": "Bitte prüfen Sie die markierten Felder ({{count}} Fehler).",
+      "unknownKeys": "Betroffene Attribute: {{keys}}",
+      "dropUnknown": "Werte entfernen",
+      "unknownConfirm": "Bitte bestätigen Sie, dass die unbekannten Werte entfernt werden.",
+      "unchanged": "Keine Änderungen",
+      "saveFailed": "Das CI konnte nicht gespeichert werden.",
+      "uploadFailed": "Die Datei konnte nicht hochgeladen werden.",
+      "loadFailed": "Das CI konnte nicht geladen werden.",
+      "forbidden": "Sie dürfen dieses CI nicht bearbeiten.",
+      "forbiddenClass": "Sie dürfen in dieser Klasse keine CIs anlegen.",
+      "conflict": {
+        "title": "Inzwischen geändert",
+        "message": "Dieses CI wurde geändert, während Sie es bearbeitet haben. Beim Neuladen gehen Ihre Eingaben verloren.",
+        "reload": "Neu laden"
+      },
+      "leave": {
+        "title": "Änderungen verwerfen?",
+        "message": "Sie haben ungespeicherte Änderungen. Möchten Sie die Seite trotzdem verlassen?",
+        "confirm": "Verlassen",
+        "stay": "Bleiben"
+      },
+      "classField": "Klasse",
+      "removeFileFailed": "Die Datei ließ sich nicht entfernen."
+    },
+    "links": {
+      "add": "Verknüpfung hinzufügen",
+      "remove": "Entfernen",
+      "removeFor": "Verknüpfung mit {{label}} entfernen",
+      "removeTitle": "Verknüpfung entfernen?",
+      "removeMessage": "Die Verknüpfung „{{type}}“ mit {{label}} wird entfernt. Das Objekt selbst bleibt bestehen.",
+      "removeFailed": "Die Verknüpfung konnte nicht entfernt werden.",
+      "groups": {
+        "ci": "Konfigurationselemente",
+        "ticket": "Tickets",
+        "service": "Services",
+        "customer_user": "Kunden",
+        "customer_company": "Firmen",
+        "kb_article": "Wissensartikel"
+      },
+      "kinds": {
+        "ci": "Konfigurationselement",
+        "ticket": "Ticket",
+        "service": "Service",
+        "customer_user": "Kunde",
+        "customer_company": "Firma",
+        "kb_article": "Wissensartikel"
+      },
+      "dialog": {
+        "title": "Verknüpfung hinzufügen",
+        "kind": "Art des Objekts",
+        "target": "Objekt",
+        "type": "Verknüpfungstyp",
+        "direction": "Richtung",
+        "thisCi": "Dieses CI {{label}} …",
+        "submit": "Verknüpfen",
+        "self": "Ein CI kann nicht mit sich selbst verknüpft werden.",
+        "failed": "Die Verknüpfung konnte nicht angelegt werden. Prüfen Sie Ihre Berechtigungen und versuchen Sie es erneut.",
+        "typesFailed": "Die Verknüpfungstypen konnten nicht geladen werden.",
+        "noTypes": "Für diese Art von Objekt ist kein Verknüpfungstyp freigegeben.",
+        "pickService": "Service wählen…",
+        "ticketSearch": "Ticket nach Nummer oder Titel suchen…",
+        "kbSearch": "Wissensartikel suchen…"
+      }
+    },
+    "impact": {
+      "title": "Abhängigkeiten",
+      "depth": "Tiefe",
+      "direction": "Richtung",
+      "directions": {
+        "both": "Beide",
+        "down": "Wovon es abhängt",
+        "up": "Was davon abhängt"
+      },
+      "truncated": "Ausschnitt gekürzt: Der Graph ist größer als die Anzeigegrenze. Verringern Sie die Tiefe oder wählen Sie eine Richtung.",
+      "empty": "Dieses CI hat keine Verknüpfungen zu anderen CIs oder Services.",
+      "loadFailed": "Der Abhängigkeitsgraph konnte nicht geladen werden.",
+      "listLabel": "Abhängigkeiten als Liste",
+      "service": "Service",
+      "out": "{{type}} →",
+      "in": "← {{type}}",
+      "propagates": "gibt Störungen weiter",
+      "legend": "Durchgezogene Linien geben Störungen weiter, gestrichelte nicht. Ein Klick auf ein CI öffnet es."
+    },
+    "affected": {
+      "title": "Auswirkungen bei einer Störung",
+      "none": "Eine Störung dieses CIs würde nichts weiter betreffen.",
+      "loadFailed": "Die betroffenen Objekte konnten nicht geladen werden.",
+      "counts": {
+        "ci": "Weitere CIs",
+        "services": "Services",
+        "customers": "Kunden und Firmen",
+        "tickets": "Offene Tickets"
+      },
+      "services": "Betroffene Services",
+      "customers": "Betroffene Kunden und Firmen",
+      "tickets": "Offene Tickets zu betroffenen CIs",
+      "truncated": "Die Liste ist gekürzt: Es gibt mehr betroffene Objekte als angezeigt werden."
+    },
+    "import": {
+      "title": "CIs importieren",
+      "loadFailed": "Die Klassen konnten nicht geladen werden.",
+      "noWritableClasses": "Sie dürfen in keiner Klasse CIs anlegen, daher gibt es nichts zu importieren.",
+      "next": "Weiter",
+      "back": "Zurück",
+      "startFailed": "Der Import konnte nicht gestartet werden.",
+      "steps": {
+        "label": "Schritte",
+        "file": "Datei",
+        "mapping": "Zuordnung",
+        "dry": "Probelauf",
+        "run": "Import"
+      },
+      "file": {
+        "class": "Klasse",
+        "classPlaceholder": "Klasse wählen",
+        "template": "Zuordnungsvorlage",
+        "templatePlaceholder": "Keine Vorlage",
+        "noTemplates": "Keine Vorlagen für diese Klasse",
+        "noTemplate": "Keine Vorlage verwenden",
+        "file": "Datei (CSV oder XLSX)",
+        "hint": "Bis 25 MB. Eine aus der CMDB exportierte Datei lässt sich ohne Zuordnung wieder importieren.",
+        "encoding": "Zeichenkodierung",
+        "delimiter": "Trennzeichen",
+        "delimiters": {
+          "semicolon": "Semikolon",
+          "comma": "Komma",
+          "tab": "Tabulator",
+          "pipe": "Senkrechter Strich"
+        },
+        "sheet": "Tabellenblatt",
+        "sheetPlaceholder": "Erstes Tabellenblatt",
+        "xlsxHint": "Die Spaltenüberschriften einer Excel-Datei liest der Server. Überschriften, die selbst ein Ziel sind (wie im Export), werden automatisch zugeordnet; für andere Überschriften wählen Sie eine Vorlage.",
+        "decodeFailed": "Die Datei passt nicht zur gewählten Zeichenkodierung. Bitte wählen Sie die andere Kodierung.",
+        "empty": "Die Datei ist leer.",
+        "downloadTemplate": "Vorlage herunterladen"
+      },
+      "fixed": {
+        "number": "CI-Nummer",
+        "name": "Name",
+        "deployment_state": "Verwendungsstatus",
+        "incident_state": "Vorfallsstatus"
+      },
+      "map": {
+        "column": "Spalte",
+        "samples": "Beispiele",
+        "target": "Ziel",
+        "targetFor": "Ziel der Spalte {{column}}",
+        "unnamed": "Spalte {{n}}",
+        "skip": "Nicht importieren",
+        "taken": "bereits zugeordnet",
+        "xlsxNotice": "Die Spaltenüberschriften einer Excel-Datei liest der Server beim Start des Probelaufs. Ohne Vorlage werden Überschriften zugeordnet, die selbst ein Ziel sind (number, name, attr:…); alle anderen werden übersprungen.",
+        "identifier": "Vorhandene CIs erkennen an",
+        "identifierHint": "Das erste gewählte Feld mit einem Wert in der Zeile bestimmt, welches CI aktualisiert wird. Zeilen ohne Treffer legen ein neues CI an.",
+        "emptyCells": "Leere Zellen",
+        "emptyKeep": "Vorhandenen Wert behalten",
+        "emptyClear": "Wert löschen",
+        "onError": "Fehlerhafte Zeilen",
+        "onErrorAbort": "Abbrechen, nichts schreiben",
+        "onErrorSkip": "Fehlerhafte Zeilen überspringen",
+        "createMissing": "Noch nicht vorhandene CIs anlegen"
+      },
+      "problem": {
+        "nothingMapped": "Bitte ordnen Sie mindestens eine Spalte zu.",
+        "duplicate": "Jedes Ziel kann nur von einer Spalte gefüllt werden.",
+        "identifierUnmapped": "Eine gewählte Kennung ist keiner Spalte zugeordnet.",
+        "noIdentifier": "Bitte wählen Sie mindestens eine Kennung.",
+        "nameMissing": "Für neue CIs ordnen Sie eine Spalte dem Namen zu."
+      },
+      "template": {
+        "shared": "geteilt",
+        "saveTitle": "Zuordnung als Vorlage speichern",
+        "name": "Name der Vorlage",
+        "namePlaceholder": "Name der Vorlage",
+        "save": "Als Vorlage speichern",
+        "saved": "Vorlage „{{name}}“ gespeichert.",
+        "saveFailed": "Die Vorlage konnte nicht gespeichert werden."
+      },
+      "dry": {
+        "intro": "Der Probelauf prüft jede Zeile und zeigt, was ein Import tun würde. Es wird nichts geschrieben.",
+        "start": "Probelauf starten",
+        "again": "Probelauf wiederholen",
+        "failed": "Der Probelauf ist fehlgeschlagen.",
+        "stale": "Datei oder Zuordnung wurden geändert. Bitte wiederholen Sie den Probelauf.",
+        "blocked": "Die Datei enthält fehlerhafte Zeilen. Korrigieren Sie die Datei oder wählen Sie in der Zuordnung „Fehlerhafte Zeilen überspringen“."
+      },
+      "run": {
+        "start": "Import starten",
+        "summary": "Laut Probelauf: {{created}} neu, {{updated}} geändert, {{errors}} fehlerhaft.",
+        "failed": "Der Import ist fehlgeschlagen. Einzelheiten stehen im Bericht.",
+        "toList": "Zur Liste"
+      },
+      "counts": {
+        "created": "Neu",
+        "updated": "Geändert",
+        "unchanged": "Unverändert",
+        "errors": "Fehlerhaft",
+        "skipped": "Übersprungen"
+      },
+      "report": {
+        "title": "Bericht (erste {{count}} Zeilen)",
+        "download": "Bericht herunterladen",
+        "loadFailed": "Der Bericht kann nicht angezeigt werden. Laden Sie ihn stattdessen herunter.",
+        "empty": "Der Bericht ist leer.",
+        "row": "Zeile",
+        "status": "Status",
+        "ci": "CI",
+        "message": "Meldung",
+        "statuses": {
+          "created": "neu",
+          "updated": "geändert",
+          "unchanged": "unverändert",
+          "skipped": "übersprungen",
+          "error": "fehlerhaft"
+        }
+      }
     }
   },
   "itsm": {

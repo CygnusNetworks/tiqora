@@ -253,6 +253,16 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         interval_key=None,
         interval_settings_attr="deploy_watch_interval_seconds",
     ),
+    # Queues the CMDB version archive job (when enabled in the cmdb settings) and removes stale
+    # staged CI uploads.
+    DaemonService(
+        slug="cmdb_version_archive",
+        enabled_key=None,
+        default_enabled=True,
+        toggleable=False,
+        schedule_kind="daily",
+        daily_at="03:20",
+    ),
     DaemonService(
         slug="smime_customer_renew",
         enabled_key=KEY_SMIME_CUSTOMER_RENEW_ENABLED,

@@ -18,6 +18,7 @@ def register_core(registry: Registry) -> None:
         registry.add(CHANNELS, descriptor)
 
     from tiqora.avatars.settings import AVATARS_SECTION
+    from tiqora.cmdb.settings import CMDB_SECTION
     from tiqora.deployed.settings import PROCESS_DEPLOY_SECTION
     from tiqora.itsm.settings import ITSM_SECTION
     from tiqora.jobs.settings import JOBS_SECTION
@@ -30,15 +31,24 @@ def register_core(registry: Registry) -> None:
         PROCESS_DEPLOY_SECTION,
         REPORTING_SECTION,
         ITSM_SECTION,
+        CMDB_SECTION,
     ):
         validate_section_schema(section)
         registry.add(SETTINGS_SECTIONS, section)
 
+    from tiqora.cmdb.provider import tiqora_provider_factory
     from tiqora.itsm.providers import CI_PROVIDERS, CiProviderFactory
     from tiqora.itsm.znuny_adapter.provider import ZnunyCiProvider
 
     registry.add(CI_PROVIDERS, CiProviderFactory(mode="znuny_readthrough", create=ZnunyCiProvider))
+    registry.add(CI_PROVIDERS, tiqora_provider_factory())
 
+    from tiqora.cmdb.archive import CMDB_ARCHIVE_JOB
+    from tiqora.cmdb.propagation import CMDB_PROPAGATION_JOB
+    from tiqora.cmdb.reindex import CMDB_REINDEX_JOB
+    from tiqora.cmdb.transfer.bulk_job import CMDB_BULK_JOB
+    from tiqora.cmdb.transfer.export_job import CMDB_EXPORT_JOB
+    from tiqora.cmdb.transfer.import_job import CMDB_IMPORT_JOB
     from tiqora.gi.jobs import GI_INVOKE_JOB, GI_INVOKE_SYNC_JOB
     from tiqora.itsm.linked_articles import LINKED_ARTICLES_JOB
     from tiqora.jobs.handlers.gi_mail import GI_MAIL_JOB
@@ -57,6 +67,12 @@ def register_core(registry: Registry) -> None:
     registry.add(JOB_HANDLERS, REPORT_RUN_JOB)
     registry.add(JOB_HANDLERS, REPORT_EXPORT_JOB)
     registry.add(JOB_HANDLERS, REPORT_DELIVERY_JOB)
+    registry.add(JOB_HANDLERS, CMDB_PROPAGATION_JOB)
+    registry.add(JOB_HANDLERS, CMDB_IMPORT_JOB)
+    registry.add(JOB_HANDLERS, CMDB_EXPORT_JOB)
+    registry.add(JOB_HANDLERS, CMDB_BULK_JOB)
+    registry.add(JOB_HANDLERS, CMDB_ARCHIVE_JOB)
+    registry.add(JOB_HANDLERS, CMDB_REINDEX_JOB)
 
     from tiqora.reporting.semantic import REPORT_SOURCES
     from tiqora.reporting.sources import core_report_sources

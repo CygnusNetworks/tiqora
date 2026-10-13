@@ -21,6 +21,8 @@ follow-up reopen/reject semantics (Kernel/System/PostMaster/FollowUp.pm).
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -465,8 +467,26 @@ class PortalTicketService:
         return queue
 
     async def create_ticket(
-        self, customer: AuthenticatedCustomer, *, title: str, body: str, queue_id: int | None = None
+        self,
+        customer: AuthenticatedCustomer,
+        *,
+        title: str,
+        body: str,
+        queue_id: int | None = None,
+        config_item_ids: Sequence[int] = (),
     ) -> int:
+        from tiqora.cmdb.gate import current_itsm_mode
+        from tiqora.cmdb.portal import PortalCiInvalid, PortalCmdbService
+
+        cmdb: PortalCmdbService | None = None
+        if config_item_ids:
+            # Validate before anything is written; the links go into the same unit of work.
+            if await current_itsm_mode(self._session) != "tiqora":
+                raise PortalInvalidInput("configuration items are not available")
+            cmdb = PortalCmdbService(self._session)
+            wanted = {int(i) for i in config_item_ids}
+            if await cmdb.visible_ci_ids(customer, ci_ids=sorted(wanted)) != wanted:
+                raise PortalInvalidInput("configuration item not available")
         queue = await self._resolve_queue(queue_id)
         state_id = await self._state_id_by_name("new")
         priority_id = await self._priority_id_by_name("3 normal")
@@ -490,13 +510,19 @@ class PortalTicketService:
                 channel="note",
             ),
         )
-        return await create_ticket(
+        ticket_id = await create_ticket(
             self._session,
             self._factory,
             self._sysconfig,
             params=params,
             user_id=PORTAL_SYSTEM_USER_ID,
         )
+        if cmdb is not None:
+            try:
+                await cmdb.link_ticket_cis(ticket_id, config_item_ids, customer=customer)
+            except PortalCiInvalid as exc:
+                raise PortalInvalidInput(str(exc)) from exc
+        return ticket_id
 
     async def reply(
         self,

@@ -1,3 +1,12 @@
+import { validateCmdbListSearch } from "@/components/cmdb/ciFilterModel";
+import { validateCiDetailSearch } from "@/components/cmdb/ciDetailModel";
+import { CiDetailPage as CmdbCiDetailPage } from "@/routes/agent/cmdb/CiDetailPage";
+import { CiEditRoute, CiNewRoute } from "@/routes/agent/cmdb/CiEditPage";
+import { CmdbImportPage } from "@/routes/agent/cmdb/CmdbImportPage";
+import { CmdbListPage } from "@/routes/agent/cmdb/CmdbListPage";
+import { CmdbCatalogPage } from "@/routes/admin/cmdb/CmdbCatalogPage";
+import { CmdbClassEditorPage } from "@/routes/admin/cmdb/CmdbClassEditorPage";
+import { CmdbClassesPage } from "@/routes/admin/cmdb/CmdbClassesPage";
 import { PluginRoutePage } from "@/routes/agent/PluginRoutePage";
 import {
   Outlet,
@@ -73,7 +82,9 @@ import {
   TicketListPage,
   type PortalTicketListSearch,
 } from "@/routes/portal/TicketListPage";
-import { NewTicketPage } from "@/routes/portal/NewTicketPage";
+import { NewTicketPage, type PortalNewTicketSearch } from "@/routes/portal/NewTicketPage";
+import { PortalCisPage } from "@/routes/portal/PortalCisPage";
+import { PortalCiPage } from "@/routes/portal/PortalCiPage";
 import {
   NewProcessTicketPage as PortalNewProcessTicketPage,
   type PortalNewProcessTicketSearch,
@@ -788,6 +799,10 @@ const portalIndexRoute = createRoute({
 const portalNewTicketRoute = createRoute({
   getParentRoute: () => portalLayoutRoute,
   path: "/tickets/new",
+  validateSearch: (s: Record<string, unknown>): PortalNewTicketSearch => {
+    const n = Number(s.ci);
+    return { ci: Number.isInteger(n) && n > 0 ? n : undefined };
+  },
   component: NewTicketPage,
 });
 
@@ -1336,6 +1351,77 @@ const catchAllRoute = createRoute({
   },
 });
 
+// CMDB (wave 4).
+const agentCmdbRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/cmdb",
+  validateSearch: validateCmdbListSearch,
+  component: CmdbListPage,
+});
+
+const agentCmdbNewRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/cmdb/new",
+  validateSearch: (s: Record<string, unknown>): { class?: number } => {
+    const n = Number(s.class);
+    return Number.isInteger(n) && n > 0 ? { class: n } : {};
+  },
+  component: CiNewRoute,
+});
+
+const agentCmdbImportRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/cmdb/import",
+  validateSearch: (s: Record<string, unknown>): { class?: number } => {
+    const n = Number(s.class);
+    return Number.isInteger(n) && n > 0 ? { class: n } : {};
+  },
+  component: CmdbImportPage,
+});
+
+const agentCmdbCiRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/cmdb/$ciId",
+  validateSearch: validateCiDetailSearch,
+  component: CmdbCiDetailPage,
+});
+
+const agentCmdbCiEditRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/cmdb/$ciId/edit",
+  component: CiEditRoute,
+});
+
+const adminCmdbClassesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/cmdb/classes",
+  component: CmdbClassesPage,
+});
+
+const adminCmdbClassRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/cmdb/classes/$classId",
+  component: CmdbClassEditorPage,
+});
+
+const adminCmdbCatalogRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/cmdb/catalog",
+  component: CmdbCatalogPage,
+});
+
+const portalCmdbListRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/config-items",
+  component: PortalCisPage,
+});
+
+const portalCmdbDetailRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/config-items/$ciId",
+  component: PortalCiPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
@@ -1378,6 +1464,11 @@ const routeTree = rootRoute.addChildren([
     agentCustomerRoute,
     agentDialRoute,
     agentPluginRoute,
+    agentCmdbRoute,
+    agentCmdbNewRoute,
+    agentCmdbImportRoute,
+    agentCmdbCiRoute,
+    agentCmdbCiEditRoute,
   ]),
   portalLoginRoute,
   portalLayoutRoute.addChildren([
@@ -1389,6 +1480,8 @@ const routeTree = rootRoute.addChildren([
     portalKbArticleRoute,
     portalPreferencesRoute,
     portalSecurityRoute,
+    portalCmdbListRoute,
+    portalCmdbDetailRoute,
   ]),
   adminLayoutRoute.addChildren([
     adminIndexRoute,
@@ -1467,6 +1560,9 @@ const routeTree = rootRoute.addChildren([
     adminAiQueueEditRoute,
     adminAiAuditRoute,
     adminAiAclRoute,
+    adminCmdbClassesRoute,
+    adminCmdbClassRoute,
+    adminCmdbCatalogRoute,
   ]),
   catchAllRoute,
 ]);

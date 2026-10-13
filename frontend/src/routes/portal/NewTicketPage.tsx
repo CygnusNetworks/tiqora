@@ -1,9 +1,12 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { portalApi, ApiError } from "@/lib/portalApi";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
+import { PORTAL_CI_PICKER_MAX, usePortalCis } from "@/components/cmdb/usePortalCmdb";
+
+export type PortalNewTicketSearch = { ci?: number };
 
 export function NewTicketPage() {
   const { t } = useTranslation();
@@ -12,6 +15,12 @@ export function NewTicketPage() {
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const search = useSearch({ strict: false }) as PortalNewTicketSearch;
+  const preselect = typeof search.ci === "number" && Number.isInteger(search.ci) ? search.ci : undefined;
+  const cis = usePortalCis(preselect);
+  // `?ci=` preselects a device (loaded on its own beyond the first page); a picked id the
+  // customer may not see is dropped on submit.
+  const [picked, setPicked] = useState<number[]>(() => (preselect !== undefined ? [preselect] : []));
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -22,7 +31,13 @@ export function NewTicketPage() {
     }
     setSubmitting(true);
     try {
-      const res = await portalApi.portalCreateTicket({ title, body });
+      const offered = new Set(cis.items.map((c) => c.id));
+      const ids = cis.available ? picked.filter((id) => offered.has(id)) : [];
+      const res = await portalApi.portalCreateTicket({
+        title,
+        body,
+        ...(ids.length > 0 ? { config_item_ids: ids } : {}),
+      });
       await navigate({
         to: "/portal/tickets/$ticketId",
         params: { ticketId: String(res.ticket_id) },
@@ -69,6 +84,45 @@ export function NewTicketPage() {
             className="w-full resize-y rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
           />
         </label>
+        {cis.available && (
+          <fieldset className="space-y-2 text-sm" data-testid="portal-new-ticket-cis">
+            <legend className="mb-1 text-muted">{t("portal.cmdb.picker.label")}</legend>
+            <p className="text-xs text-muted">
+              {t("portal.cmdb.picker.hint", { max: PORTAL_CI_PICKER_MAX })}
+            </p>
+            <ul className="max-h-48 space-y-1 overflow-y-auto">
+              {cis.items.map((ci) => {
+                const checked = picked.includes(ci.id);
+                const full = !checked && picked.length >= PORTAL_CI_PICKER_MAX;
+                return (
+                  <li key={ci.id}>
+                    <label className="flex items-center gap-2 text-ink">
+                      <input
+                        type="checkbox"
+                        data-testid={`portal-new-ticket-ci-${ci.id}`}
+                        checked={checked}
+                        disabled={full}
+                        onChange={() =>
+                          setPicked((cur) =>
+                            checked ? cur.filter((x) => x !== ci.id) : [...cur, ci.id],
+                          )
+                        }
+                      />
+                      <span className="min-w-0 break-words">
+                        {ci.name} <span className="text-xs text-muted">({ci.number})</span>
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+            {picked.length >= PORTAL_CI_PICKER_MAX && (
+              <p className="text-xs text-muted">
+                {t("portal.cmdb.picker.max", { max: PORTAL_CI_PICKER_MAX })}
+              </p>
+            )}
+          </fieldset>
+        )}
         {error && (
           <p className="text-sm text-danger" data-testid="portal-new-ticket-error" role="alert">
             {error}

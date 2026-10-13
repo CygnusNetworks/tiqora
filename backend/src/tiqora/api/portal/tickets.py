@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query, status
 
+from tiqora.api.deps import DbSession
 from tiqora.api.portal.deps import CurrentCustomer, PortalService
 from tiqora.domain.portal_ticket_service import (
     PortalFollowUpRejected,
@@ -104,13 +105,20 @@ async def create_ticket(
     body: PortalTicketCreateRequest,
     customer: CurrentCustomer,
     svc: PortalService,
+    session: DbSession,
 ) -> PortalTicketCreateResponse:
     try:
         ticket_id = await svc.create_ticket(
-            customer, title=body.title, body=body.body, queue_id=body.queue_id
+            customer,
+            title=body.title,
+            body=body.body,
+            queue_id=body.queue_id,
+            config_item_ids=body.config_item_ids,
         )
     except PortalInvalidInput as exc:
         raise _map_exc(exc) from exc
+    # one unit of work: ticket, first article and CI links are stored together
+    await session.commit()
     return PortalTicketCreateResponse(ticket_id=ticket_id)
 
 

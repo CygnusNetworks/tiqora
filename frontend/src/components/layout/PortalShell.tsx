@@ -9,6 +9,7 @@ import { SelectMenu } from "@/components/ui/SelectMenu";
 import { localePickerItems, resolveLocaleCode, setAppLanguage } from "@/i18n";
 import { cn } from "@/lib/cn";
 import { portalApi } from "@/lib/portalApi";
+import { usePortalCis } from "@/components/cmdb/usePortalCmdb";
 import { PortalWebchat } from "@/components/portal/PortalWebchat";
 
 /** Header language switch: apply locally, store as the customer's UserLanguage. */
@@ -24,6 +25,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
   const { customer, logout } = useCustomerAuth();
   const { resolvedTheme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const cmdb = usePortalCis();
 
   const currentLang = resolveLocaleCode(i18n.language);
   const languageItems = localePickerItems();
@@ -98,7 +100,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
             </Button>
           </div>
         </div>
-        <nav className="mx-auto flex max-w-3xl gap-1 px-4 pb-2 text-sm">
+        <nav className="mx-auto flex max-w-3xl flex-wrap gap-1 px-4 pb-2 text-sm">
           <Link
             to="/portal"
             className="rounded px-2.5 py-1.5 text-muted transition-colors duration-100 hover:bg-surface-subtle hover:text-ink"
@@ -121,6 +123,16 @@ export function PortalShell({ children }: { children: ReactNode }) {
           >
             {t("portal.nav.kb")}
           </Link>
+          {cmdb.available && (
+            <Link
+              to="/portal/config-items"
+              className="rounded px-2.5 py-1.5 text-muted transition-colors duration-100 hover:bg-surface-subtle hover:text-ink"
+              activeProps={{ className: "bg-surface-subtle text-accent" }}
+              data-testid="portal-nav-cmdb"
+            >
+              {t("portal.nav.cmdb")}
+            </Link>
+          )}
           <Link
             to="/portal/preferences"
             className="ml-auto rounded px-2.5 py-1.5 text-muted transition-colors duration-100 hover:bg-surface-subtle hover:text-ink"

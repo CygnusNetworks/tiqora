@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import {
   RouterProvider,
@@ -108,6 +108,17 @@ const statusOf = (mode: string, ciSource: "znuny" | "tiqora" | null) => ({
   znuny: { core_installed: true, cmdb_installed: true, profile: null, packages: {} },
 });
 
+const { cmdbStatus } = vi.hoisted(() => ({ cmdbStatus: vi.fn() }));
+vi.mock("@/lib/cmdbApi", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/cmdbApi")>("@/lib/cmdbApi");
+  // useCmdbStatus closes over the real cmdbApi, so the hook is replaced rather than the method.
+  return {
+    ...actual,
+    cmdbApi: { ...actual.cmdbApi, status: cmdbStatus },
+    useCmdbStatus: () => useQuery({ queryKey: actual.cmdbStatusKey, queryFn: () => cmdbStatus() }),
+  };
+});
+
 async function renderShell(initialEntry = "/agent") {
   const rootRoute = createRootRoute({
     component: () => (
@@ -127,6 +138,7 @@ async function renderShell(initialEntry = "/agent") {
     "/agent/search",
     "/agent/customers",
     "/agent/itsm/cis",
+    "/agent/cmdb",
   ];
   const childRoutes = childPaths.map((path) =>
     createRoute({
@@ -169,6 +181,7 @@ describe("AgentShell sidebar", () => {
     searchCounts.mockReset().mockResolvedValue({ counts: {} });
     chatTopics.mockReset().mockResolvedValue([]);
     itsmStatus.mockReset().mockResolvedValue(statusOf("off", null));
+    cmdbStatus.mockReset().mockResolvedValue({ mode: "off", readable_class_count: 0, can_admin: false, views_present: true });
     window.localStorage.clear();
     authFlags.canUseDirectory = false;
     void i18n.changeLanguage("de");
@@ -416,5 +429,33 @@ describe("AgentShell sidebar", () => {
     expect(await screen.findByTestId("sidebar-search-1")).toHaveAttribute("href", "/agent/searches/1");
     fireEvent.click(screen.getByTestId("sidebar-group-searches-toggle"));
     expect(screen.queryByTestId("sidebar-search-1")).not.toBeInTheDocument();
+  });
+
+  it("hides the CMDB entry outside Tiqora mode, even for an admin", async () => {
+    cmdbStatus.mockResolvedValue({ mode: "znuny_readthrough", readable_class_count: 2, can_admin: true, views_present: true });
+    await renderShell();
+    await screen.findByTestId("agent-sidebar-nav");
+    await waitFor(() => expect(cmdbStatus).toHaveBeenCalled());
+    expect(screen.queryByTestId("agent-nav-cmdb")).toBeNull();
+  });
+
+  it("hides the CMDB entry without a readable class and without admin rights", async () => {
+    cmdbStatus.mockResolvedValue({ mode: "tiqora", readable_class_count: 0, can_admin: false, views_present: true });
+    await renderShell();
+    await screen.findByTestId("agent-sidebar-nav");
+    await waitFor(() => expect(cmdbStatus).toHaveBeenCalled());
+    expect(screen.queryByTestId("agent-nav-cmdb")).toBeNull();
+  });
+
+  it("shows the CMDB entry in Tiqora mode with a readable class, or for an admin", async () => {
+    cmdbStatus.mockResolvedValue({ mode: "tiqora", readable_class_count: 1, can_admin: false, views_present: true });
+    await renderShell();
+    expect(await screen.findByTestId("agent-nav-cmdb")).toHaveAttribute("href", "/agent/cmdb");
+  });
+
+  it("shows the CMDB entry for an admin without readable classes", async () => {
+    cmdbStatus.mockResolvedValue({ mode: "tiqora", readable_class_count: 0, can_admin: true, views_present: true });
+    await renderShell();
+    expect(await screen.findByTestId("agent-nav-cmdb")).toBeInTheDocument();
   });
 });

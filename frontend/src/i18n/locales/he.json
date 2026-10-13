@@ -1356,7 +1356,8 @@
       "myTickets": "הכרטיסים שלי",
       "newTicket": "כרטיס חדש",
       "kb": "מאמרי עזרה",
-      "preferences": "העדפות"
+      "preferences": "העדפות",
+      "cmdb": "Devices and systems"
     },
     "login": {
       "stepUp": {
@@ -1452,6 +1453,26 @@
       "chooseProcess": "Choose a process",
       "loadError": "Processes could not be loaded.",
       "submitError": "The request could not be sent."
+    },
+    "cmdb": {
+      "title": "Devices and systems",
+      "searchPlaceholder": "Search by name or number",
+      "empty": "No devices or systems found.",
+      "loadError": "The list could not be loaded.",
+      "notFound": "This device or system was not found.",
+      "number": "Number",
+      "class": "Type",
+      "deployment": "Status",
+      "back": "Back to devices and systems",
+      "createTicket": "Create a ticket for this system",
+      "noAttributes": "No details available.",
+      "picker": {
+        "label": "Affected device or system",
+        "hint": "Optional, up to {{max}}.",
+        "add": "Add a device or system",
+        "remove": "Remove {{name}}",
+        "max": "You can select up to {{max}}."
+      }
     }
   },
   "admin": {
@@ -2200,6 +2221,8 @@
       "dashboardTemplates": "Dashboard templates",
       "webservices": "Web services",
       "dashboardKioskLinks": "Wallboard links",
+      "cmdbClasses": "CMDB classes",
+      "cmdbCatalog": "CMDB catalog",
       "itsm": "ITSM",
       "itsmLinkTypes": "Link types"
     },
@@ -3442,6 +3465,10 @@
           "name": "Clean up web service log",
           "description": "Deletes old entries of the web service log."
         },
+        "cmdb_version_archive": {
+          "name": "Archive CMDB versions",
+          "description": "Moves old CI versions to the archive (when enabled in the CMDB settings) and removes uploads that were never saved to a CI."
+        },
         "scim_role_sync": {
           "name": "Roles from provisioned groups",
           "description": "Applies group changes from the identity provider to roles and groups in Tiqora."
@@ -3835,6 +3862,8 @@
       "dashboardTemplates": "Define home page dashboards per role, optionally binding.",
       "webservices": "View web services (GenericInterface), check outgoing calls and manage allowed targets.",
       "dashboardKioskLinks": "Create, check and revoke links for wallboards without sign-in.",
+      "cmdbClasses": "Define configuration item classes and their attributes.",
+      "cmdbCatalog": "Maintain the selection lists (general catalog) used by CMDB attributes.",
       "itsm": "ITSM mode, setup, priority matrix and services",
       "itsmLinkTypes": "Link types between tickets, configuration items and services",
       "settingsItsm": "Ticket types, workaround state, limits and the Znuny address for ITSM"
@@ -4297,6 +4326,39 @@
           "deploy_from_tiqora": {
             "label": "Deploy processes and ACLs in Tiqora (Znuny no longer runs)",
             "help": "Only turn this on when Znuny no longer runs in parallel. Otherwise Znuny keeps showing the old state."
+          }
+        }
+      },
+      "cmdb": {
+        "title": "CMDB",
+        "fields": {
+          "propagation_node_cap": {
+            "label": "Propagation limit",
+            "help": "Maximum number of CIs recalculated for incident states in one run."
+          },
+          "impact_graph_node_cap": {
+            "label": "Dependency graph limit",
+            "help": "Maximum number of nodes shown in the dependency graph."
+          },
+          "import_max_mb": {
+            "label": "Maximum import size (MB)",
+            "help": "Largest import file accepted, up to 25 MB."
+          },
+          "version_archive_enabled": {
+            "label": "Archive old versions",
+            "help": "Move old CI versions to the archive in the background."
+          },
+          "version_archive_keep": {
+            "label": "Versions to keep",
+            "help": "This many of the newest versions per CI always stay in the main history."
+          },
+          "version_archive_min_age_days": {
+            "label": "Minimum age in days",
+            "help": "Only versions older than this are archived."
+          },
+          "access_group": {
+            "label": "CMDB group",
+            "help": "Optional group name. If set, only agents with write access to this group may use the CMDB. Leave empty to turn the gate off."
           }
         }
       },
@@ -5251,6 +5313,200 @@
       "deleteMessage": "The revoked link is removed from the list.",
       "actionFailed": "That did not work. Please try again."
     },
+    "cmdb": {
+      "classes": {
+        "title": "CMDB classes",
+        "subtitle": "Classes group configuration items of one kind, such as servers or locations.",
+        "new": "New class",
+        "create": "Create class",
+        "fromTemplate": "From template",
+        "settings": "Settings",
+        "name": "Name",
+        "key": "Key",
+        "keyHelp": "Lower-case letters, digits and underscores; cannot be changed later.",
+        "group": "Group",
+        "groupPlaceholder": "Choose a group…",
+        "groupHelp": "Agents need this group to see or edit CIs of the class.",
+        "prefix": "Number prefix",
+        "prefixExample": "Example: {{example}}",
+        "portal": "Visible in the customer portal",
+        "portalHelp": "Customers see CIs of this class that are linked to them.",
+        "template": "Template",
+        "templateHelp": "Creates a class with ready-made attributes that you can adjust afterwards.",
+        "applyTemplate": "Create from template",
+        "attributeCount_one": "{{count}} attribute",
+        "attributeCount_other": "{{count}} attributes",
+        "saveError": "The class could not be saved.",
+        "linkTypesHint": "Link types between CIs, services and tickets are managed together with the other ITSM settings.",
+        "linkTypesLink": "Open ITSM link types",
+        "recompute": "Recalculate incident states",
+        "recomputeHint": "Recalculates the derived incident state of every CI, e.g. after link types changed.",
+        "recomputeError": "The recalculation could not be started."
+      },
+      "seed": {
+        "catalogMissing": "The standard catalog entries (states) are missing.",
+        "viewsMissing": "The database views for the Znuny add-on are missing (the CREATE VIEW privilege may be absent).",
+        "button": "Create defaults",
+        "error": "The defaults could not be created."
+      },
+      "catalog": {
+        "title": "CMDB catalog",
+        "subtitle": "Selection lists that CI attributes and states draw from.",
+        "classes": "Catalog classes",
+        "new": "New entry",
+        "edit": "Edit entry",
+        "name": "Name",
+        "key": "Key",
+        "keyHelp": "Letters, digits and underscores; cannot be changed later.",
+        "keyLocked": "The key cannot be changed.",
+        "functionality": "Function",
+        "functionalityPlaceholder": "Choose a function…",
+        "functionalityHelp": "Decides how the state counts, for example when incidents are passed on to dependent CIs.",
+        "functionalities": {
+          "preproductive": "Pre-production",
+          "productive": "Productive",
+          "postproductive": "Post-production",
+          "operational": "Operational",
+          "warning": "Warning",
+          "incident": "Incident"
+        },
+        "position": "Position",
+        "valid": "Valid",
+        "saveError": "The entry could not be saved."
+      },
+      "editor": {
+        "back": "Back to classes",
+        "subtitle": "Class settings and the structure of its attributes. Attribute changes only take effect once you save them as a new version.",
+        "loadError": "The class could not be loaded.",
+        "classSection": "Class",
+        "keyReadOnly": "The key cannot be changed after creation.",
+        "icon": "Icon",
+        "valid": "Valid",
+        "saveClass": "Save class",
+        "classSaved": "Class saved.",
+        "definition": "Attributes",
+        "definitionHelp": "Order, nesting and properties of the attributes of a configuration item of this class.",
+        "unnamed": "(unnamed)",
+        "addAttribute": "Add attribute",
+        "addSub": "Add sub attribute",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "remove": "Remove",
+        "noAttributes": "This class has no attributes yet.",
+        "selectHint": "Select an attribute to edit it.",
+        "groupHint": "A group bundles sub attributes and may occur several times (e.g. network cards).",
+        "attrKey": "Key",
+        "attrName": "Label",
+        "attrType": "Type",
+        "attrHelp": "Help text",
+        "required": "Required",
+        "searchable": "Searchable",
+        "portal": "Show in customer portal",
+        "countMin": "Minimum count",
+        "countMax": "Maximum count",
+        "countDefault": "Count on a new CI",
+        "default": "Default value",
+        "optMaxLength": "Maximum length",
+        "optMultiline": "Show multi-line",
+        "optMin": "Minimum",
+        "optMax": "Maximum",
+        "optCurrency": "Currency (ISO 4217)",
+        "optCatalogClass": "Catalog class",
+        "optCatalogPlaceholder": "Choose a catalog class",
+        "optClassKeys": "Allowed classes",
+        "optClassKeysHelp": "With no selection every class is allowed.",
+        "validate": "Check",
+        "validateError": "The check could not be run.",
+        "validateOk": "The definition is valid.",
+        "issuesTitle": "{{count}} problem(s) found",
+        "jump": "Jump to attribute",
+        "localIssues": "{{count}} attribute(s) with problems. Fix them before saving.",
+        "saveVersion": "Save as new version",
+        "issue": {
+          "bad_key": "The key must start with a letter and may contain only letters, digits and underscores (at most 64 characters).",
+          "duplicate_key": "The key occurs more than once on this level.",
+          "name_empty": "The label is missing.",
+          "count_range": "The counts do not fit together: 0 ≤ minimum ≤ count on a new CI ≤ maximum ≤ 100.",
+          "group_without_sub": "A group needs at least one sub attribute."
+        },
+        "types": {
+          "text": "Text",
+          "textarea": "Multi-line text",
+          "integer": "Integer",
+          "decimal": "Decimal number",
+          "money": "Amount",
+          "date": "Date",
+          "datetime": "Date and time",
+          "url": "Link (URL)",
+          "email": "Email address",
+          "ip": "IP address",
+          "mac": "MAC address",
+          "catalog": "Catalog value",
+          "ci_ref": "Reference to a CI",
+          "customer_user": "Customer user",
+          "customer_company": "Customer company",
+          "agent": "Agent",
+          "service": "Service",
+          "sla": "SLA",
+          "queue": "Queue",
+          "priority": "Priority",
+          "ticket_type": "Ticket type",
+          "state": "Ticket state",
+          "attachment": "Attachment",
+          "group": "Group (sub attributes)"
+        },
+        "diff": {
+          "added": "Added",
+          "removed": "Removed",
+          "type_changed": "Type changed",
+          "count_changed": "Count changed",
+          "renamed_label": "Label changed",
+          "flags_changed": "Properties changed"
+        },
+        "versions": {
+          "title": "Versions",
+          "none": "No version has been saved yet.",
+          "current": "Version {{version}}",
+          "version": "Version {{version}}",
+          "changes": "Changes",
+          "noChanges": "No changes compared with the previous version.",
+          "diffError": "The changes could not be loaded.",
+          "saveHelp": "The attributes are saved as a new version of the class. Existing CIs keep their values.",
+          "comment": "Change note (optional)",
+          "save": "Save version",
+          "saved": "New version saved.",
+          "error": "The version could not be saved."
+        },
+        "import": {
+          "open": "Import",
+          "title": "Import definition",
+          "help": "Loads a class definition from Znuny or Tiqora into the editor. Nothing is saved until you choose “Save as new version”.",
+          "format": "Format",
+          "formatPerl": "Znuny 6 (Perl)",
+          "formatYaml": "Znuny 7 (YAML)",
+          "formatJson": "Tiqora (JSON)",
+          "text": "Paste definition",
+          "file": "Choose file",
+          "fileTooBig": "The file is larger than 1 MB.",
+          "preview": "Preview",
+          "apply": "Apply",
+          "error": "The definition could not be read.",
+          "found": "{{count}} attribute(s) recognised.",
+          "warnings": "Notes",
+          "missingCatalog": "Missing catalog classes",
+          "missingHelp": "Create these catalog classes in the catalog, otherwise the attributes' choices stay empty.",
+          "notSaved": "Nothing saved yet.",
+          "applied": "Definition loaded into the editor. Not saved yet.",
+          "fileError": "The file could not be read."
+        },
+        "leave": {
+          "title": "Discard changes?",
+          "message": "This class has unsaved changes.",
+          "confirm": "Discard",
+          "stay": "Stay"
+        }
+      }
+    },
     "itsm": {
       "title": "ITSM",
       "settingsLink": "ITSM settings",
@@ -6011,6 +6267,12 @@
         "gi_invoke": "Web service call",
         "gi_invoke_sync": "Web service call",
         "report_delivery": "Report delivery",
+        "cmdb_propagation": "Recalculate CMDB incident states",
+        "cmdb_import": "Import CMDB items",
+        "cmdb_export": "Export CMDB items",
+        "cmdb_bulk": "Edit CMDB items in bulk",
+        "cmdb_archive": "Archive old CMDB versions",
+        "cmdb_reindex": "Rebuild CMDB search",
         "itsm_linked_articles": "Note to linked tickets"
       },
       "gi_mail": "Send email from a web service request"
@@ -7861,6 +8123,460 @@
       "skipped_other": "{{count}} skipped",
       "nothingDone": "Nothing was imported.",
       "whereToFind": "You will find the searches under “All saved searches…” in the sidebar."
+    }
+  },
+  "cmdb": {
+    "title": "CMDB",
+    "comingSoon": "This page is being built.",
+    "noClasses": "No classes yet.",
+    "modeNotice": {
+      "znuny": "The CMDB is currently managed in Znuny. You see CIs in the tickets; you can edit them in Znuny.",
+      "off": "The CMDB is not enabled."
+    },
+    "state": {
+      "operational": "Operational",
+      "warning": "Warning",
+      "incident": "Incident"
+    },
+    "unknownValues": "The class definition no longer has these values. Saving removes them.",
+    "hiddenNode": "No access",
+    "form": {
+      "clear": "Clear",
+      "noHits": "No matches.",
+      "ciSearch": "Search CIs by number or name…",
+      "companySearch": "Search companies…",
+      "select": "Select…",
+      "addEntry": "Add another entry",
+      "removeEntry": "Remove",
+      "upload": "Upload file",
+      "empty": "—",
+      "noAttributes": "No attribute values.",
+      "removeFile": "Remove file"
+    },
+    "validation": {
+      "required": "Required field.",
+      "too_few": "Too few entries.",
+      "too_many": "Too many entries.",
+      "bad_type": "This value has the wrong type.",
+      "too_long": "The value is too long.",
+      "out_of_range": "The value is out of range.",
+      "bad_format": "The value has an invalid format.",
+      "unknown_key": "Unknown attribute.",
+      "unknown_reference": "The referenced entry does not exist.",
+      "wrong_class": "The referenced entry is not allowed here."
+    },
+    "list": {
+      "class": "Class",
+      "allClasses": "All classes",
+      "searchPlaceholder": "Search number, name or attribute…",
+      "search": "Search CIs",
+      "deploymentState": "Deployment state",
+      "incidentState": "Incident state",
+      "attrFilter": "Attribute filter",
+      "attrAdd": "Add condition",
+      "attrNeedsClass": "Select a class to filter by attributes.",
+      "attrNone": "This class has no searchable attributes.",
+      "attrField": "Attribute",
+      "attrOp": "Condition",
+      "attrValue": "Value",
+      "attrRemove": "Remove condition",
+      "ops": {
+        "eq": "is",
+        "neq": "is not",
+        "contains": "contains",
+        "starts_with": "starts with",
+        "lt": "less than",
+        "lte": "at most",
+        "gt": "greater than",
+        "gte": "at least",
+        "before": "before",
+        "after": "after",
+        "is_empty": "is empty",
+        "is_not_empty": "is not empty"
+      },
+      "new": "New CI",
+      "import": "Import",
+      "selectAll": "Select all CIs on this page",
+      "select": "Select {{name}}",
+      "number": "Number",
+      "name": "Name",
+      "changed": "Changed",
+      "total_one": "{{count}} CI",
+      "total_other": "{{count}} CIs",
+      "totalCapped": "more than 10,000 CIs",
+      "empty": "No CIs found.",
+      "loadFailed": "The CIs could not be loaded.",
+      "paging": "Pages",
+      "pageOf": "Page {{page}} of {{pages}}",
+      "pageNo": "Page {{page}}",
+      "saved": {
+        "label": "Saved searches",
+        "none": "Saved searches",
+        "sharedTag": "shared",
+        "save": "Save search",
+        "delete": "Delete",
+        "name": "Name",
+        "shared": "Share with all agents",
+        "failed": "The search could not be saved."
+      },
+      "export": {
+        "button": "Export",
+        "needsClass": "Select one class to export.",
+        "title": "Export CIs",
+        "description": "Exports the CIs of the current filter, one row per CI.",
+        "start": "Start export",
+        "format": "File format",
+        "failed": "The export could not be started."
+      },
+      "bulk": {
+        "open": "Edit several",
+        "title": "Edit several CIs",
+        "description": "The changes apply to {{count}} selected CIs. Fields left on \"unchanged\" are not touched.",
+        "keep": "— unchanged —",
+        "start": "Start",
+        "failed": "The bulk edit could not be started.",
+        "addLink": "Add a link",
+        "targetKind": "Link target",
+        "kinds": {
+          "ci": "CI",
+          "service": "Service",
+          "ticket": "Ticket"
+        },
+        "linkType": "Link type",
+        "ciSide": "The CI is",
+        "side": {
+          "source": "Source",
+          "target": "Target"
+        },
+        "target": "Target",
+        "keyHint": {
+          "service": "Service ID",
+          "ticket": "Ticket ID"
+        },
+        "result": "{{updated}} changed, {{skipped}} skipped (no permission)"
+      }
+    },
+    "filter": {
+      "fields": {
+        "number": "Number",
+        "name": "Name",
+        "class": "Class",
+        "deployment_state": "Deployment state",
+        "deployment_functionality": "Deployment functionality",
+        "incident_state": "Incident state",
+        "incident_functionality": "Incident functionality",
+        "created_at": "Created",
+        "changed_at": "Changed"
+      }
+    },
+    "detail": {
+      "notFound": "CI not found",
+      "back": "Back to list",
+      "edit": "Edit",
+      "delete": "Delete",
+      "deleteTitle": "Delete CI?",
+      "deleteMessage": "CI {{number}} ({{name}}) will be permanently deleted with all its versions, links, attachments and history.",
+      "deleteConfirm": "Delete permanently",
+      "deleteFailed": "The CI could not be deleted.",
+      "loadFailed": "The CI could not be loaded.",
+      "loadMore": "Load more",
+      "tabsLabel": "CI sections",
+      "derivedHint": "Warning (derived)",
+      "derivedTitle": "The state comes from a dependent CI with an incident, not from this CI itself.",
+      "deployment": "Deployment state",
+      "incidentOwn": "Own incident state",
+      "incidentCurrent": "Current incident state",
+      "tabs": {
+        "overview": "Overview",
+        "links": "Links",
+        "dependencies": "Dependencies",
+        "tickets": "Tickets",
+        "versions": "Versions",
+        "history": "History"
+      },
+      "links": {
+        "empty": "No links.",
+        "loadFailed": "The links could not be loaded."
+      },
+      "tickets": {
+        "openOnly": "open only",
+        "empty": "No tickets linked.",
+        "loadFailed": "The tickets could not be loaded.",
+        "number": "Ticket",
+        "title": "Title",
+        "state": "State",
+        "queue": "Queue",
+        "linkType": "Link"
+      },
+      "versions": {
+        "empty": "No versions.",
+        "loadFailed": "The versions could not be loaded.",
+        "showChanges": "Show changes",
+        "pickHint": "Pick two versions to compare them.",
+        "pick": "Select version from {{date}}",
+        "definition": "Definition {{version}}",
+        "archived": "archived",
+        "loadArchived": "Load older versions ({{count}})",
+        "changes": "Changes",
+        "close": "Close"
+      },
+      "diff": {
+        "empty": "No differences.",
+        "attribute": "Attribute",
+        "change": "Change",
+        "added": "added",
+        "removed": "removed",
+        "changed": "changed"
+      }
+    },
+    "history": {
+      "loadFailed": "The history could not be loaded.",
+      "empty": "No history yet.",
+      "when": "When",
+      "who": "By",
+      "event": "Event",
+      "detail": "Details",
+      "events": {
+        "ConfigItemCreate": "CI created",
+        "VersionCreate": "New version",
+        "DeploymentStateUpdate": "Deployment state changed",
+        "IncidentStateUpdate": "Incident state changed",
+        "ConfigItemDelete": "CI deleted",
+        "LinkAdd": "Link added",
+        "LinkDelete": "Link removed",
+        "DefinitionUpdate": "Definition updated",
+        "NameUpdate": "Name changed",
+        "ValueUpdate": "Value changed",
+        "AttachmentAddPost": "Attachment added",
+        "AttachmentDeletePost": "Attachment removed"
+      }
+    },
+    "edit": {
+      "titleNew": "New CI: {{class}}",
+      "titleEdit": "Edit CI {{number}}",
+      "backToCi": "Back to the CI",
+      "pickClass": "Choose a class",
+      "pickClassHint": "Choose the class of the new CI.",
+      "noWritableClasses": "You may not create CIs in any class.",
+      "name": "Name",
+      "attributes": "Attributes",
+      "changeNote": "Change note",
+      "summary_one": "Please check the marked fields ({{count}} error).",
+      "summary_other": "Please check the marked fields ({{count}} errors).",
+      "unknownKeys": "Affected attributes: {{keys}}",
+      "dropUnknown": "Remove values",
+      "unknownConfirm": "Please confirm that the unknown values are removed.",
+      "unchanged": "No changes",
+      "saveFailed": "The CI could not be saved.",
+      "uploadFailed": "The file could not be uploaded.",
+      "loadFailed": "The CI could not be loaded.",
+      "forbidden": "You may not edit this CI.",
+      "forbiddenClass": "You may not create CIs in this class.",
+      "conflict": {
+        "title": "Changed in the meantime",
+        "message": "This CI was changed while you were editing it. Reloading discards your input.",
+        "reload": "Reload"
+      },
+      "leave": {
+        "title": "Discard changes?",
+        "message": "You have unsaved changes. Leave the page anyway?",
+        "confirm": "Leave",
+        "stay": "Stay"
+      },
+      "classField": "Class",
+      "removeFileFailed": "The file could not be removed."
+    },
+    "links": {
+      "add": "Add link",
+      "remove": "Remove",
+      "removeFor": "Remove link to {{label}}",
+      "removeTitle": "Remove link?",
+      "removeMessage": "The “{{type}}” link to {{label}} is removed. The object itself stays.",
+      "removeFailed": "The link could not be removed.",
+      "groups": {
+        "ci": "Configuration items",
+        "ticket": "Tickets",
+        "service": "Services",
+        "customer_user": "Customers",
+        "customer_company": "Companies",
+        "kb_article": "Knowledge articles"
+      },
+      "kinds": {
+        "ci": "Configuration item",
+        "ticket": "Ticket",
+        "service": "Service",
+        "customer_user": "Customer",
+        "customer_company": "Company",
+        "kb_article": "Knowledge article"
+      },
+      "dialog": {
+        "title": "Add link",
+        "kind": "Kind of object",
+        "target": "Object",
+        "type": "Link type",
+        "direction": "Direction",
+        "thisCi": "This CI {{label}} …",
+        "submit": "Link",
+        "self": "A CI cannot be linked to itself.",
+        "failed": "The link could not be created. Check your permissions and try again.",
+        "typesFailed": "The link types could not be loaded.",
+        "noTypes": "No link type is enabled for this kind of object.",
+        "pickService": "Choose a service…",
+        "ticketSearch": "Search tickets by number or title…",
+        "kbSearch": "Search knowledge articles…"
+      }
+    },
+    "impact": {
+      "title": "Dependencies",
+      "depth": "Depth",
+      "direction": "Direction",
+      "directions": {
+        "both": "Both",
+        "down": "What it depends on",
+        "up": "What depends on it"
+      },
+      "truncated": "Section shortened: the graph is larger than the display limit. Reduce the depth or pick a direction.",
+      "empty": "This CI has no links to other CIs or services.",
+      "loadFailed": "The dependency graph could not be loaded.",
+      "listLabel": "Dependencies as a list",
+      "service": "Service",
+      "out": "{{type}} →",
+      "in": "← {{type}}",
+      "propagates": "passes incidents on",
+      "legend": "Solid lines pass incidents on, dashed lines do not. Click a CI to open it."
+    },
+    "affected": {
+      "title": "Impact of an incident",
+      "none": "An incident on this CI would not affect anything else.",
+      "loadFailed": "The affected objects could not be loaded.",
+      "counts": {
+        "ci": "Further CIs",
+        "services": "Services",
+        "customers": "Customers and companies",
+        "tickets": "Open tickets"
+      },
+      "services": "Affected services",
+      "customers": "Affected customers and companies",
+      "tickets": "Open tickets on affected CIs",
+      "truncated": "The list is shortened: more objects are affected than shown."
+    },
+    "import": {
+      "title": "Import CIs",
+      "loadFailed": "The classes could not be loaded.",
+      "noWritableClasses": "You may not create CIs in any class, so there is nothing to import into.",
+      "next": "Next",
+      "back": "Back",
+      "startFailed": "The import could not be started.",
+      "steps": {
+        "label": "Steps",
+        "file": "File",
+        "mapping": "Mapping",
+        "dry": "Dry run",
+        "run": "Import"
+      },
+      "file": {
+        "class": "Class",
+        "classPlaceholder": "Select a class",
+        "template": "Mapping template",
+        "templatePlaceholder": "No template",
+        "noTemplates": "No templates for this class",
+        "noTemplate": "Do not use a template",
+        "file": "File (CSV or XLSX)",
+        "hint": "Up to 25 MB. A file exported from the CMDB can be imported again without a mapping.",
+        "encoding": "Encoding",
+        "delimiter": "Delimiter",
+        "delimiters": {
+          "semicolon": "Semicolon",
+          "comma": "Comma",
+          "tab": "Tab",
+          "pipe": "Pipe"
+        },
+        "sheet": "Worksheet",
+        "sheetPlaceholder": "First worksheet",
+        "xlsxHint": "The server reads the column headings of an Excel file. Headings that are targets themselves (as in an export) are mapped automatically; for other headings choose a template.",
+        "decodeFailed": "The file does not match the chosen encoding. Please choose the other one.",
+        "empty": "The file is empty.",
+        "downloadTemplate": "Download template"
+      },
+      "fixed": {
+        "number": "CI number",
+        "name": "Name",
+        "deployment_state": "Deployment state",
+        "incident_state": "Incident state"
+      },
+      "map": {
+        "column": "Column",
+        "samples": "Examples",
+        "target": "Target",
+        "targetFor": "Target of column {{column}}",
+        "unnamed": "Column {{n}}",
+        "skip": "Do not import",
+        "taken": "already used",
+        "xlsxNotice": "The column headings of an Excel file are read by the server when the dry run starts. Without a template, headings that are targets themselves (number, name, attr:…) are mapped; all others are skipped.",
+        "identifier": "Match existing CIs by",
+        "identifierHint": "The first chosen field that has a value in a row identifies the CI to update. Rows without a match create a new CI.",
+        "emptyCells": "Empty cells",
+        "emptyKeep": "Keep existing value",
+        "emptyClear": "Clear value",
+        "onError": "Faulty rows",
+        "onErrorAbort": "Abort, write nothing",
+        "onErrorSkip": "Skip faulty rows",
+        "createMissing": "Create CIs that do not exist yet"
+      },
+      "problem": {
+        "nothingMapped": "Map at least one column.",
+        "duplicate": "Each target can be used by one column only.",
+        "identifierUnmapped": "A chosen identifier is not mapped to any column.",
+        "noIdentifier": "Choose at least one identifier.",
+        "nameMissing": "To create new CIs, map a column to the name."
+      },
+      "template": {
+        "shared": "shared",
+        "saveTitle": "Save mapping as template",
+        "name": "Template name",
+        "namePlaceholder": "Template name",
+        "save": "Save as template",
+        "saved": "Template “{{name}}” saved.",
+        "saveFailed": "The template could not be saved."
+      },
+      "dry": {
+        "intro": "The dry run checks every row and shows what an import would do. Nothing is written.",
+        "start": "Start dry run",
+        "again": "Repeat dry run",
+        "failed": "The dry run failed.",
+        "stale": "The file or the mapping changed. Please repeat the dry run.",
+        "blocked": "The file contains faulty rows. Fix the file or choose “Skip faulty rows” in the mapping."
+      },
+      "run": {
+        "start": "Start import",
+        "summary": "{{created}} new, {{updated}} changed, {{errors}} faulty according to the dry run.",
+        "failed": "The import failed. Details are in the report.",
+        "toList": "Go to the list"
+      },
+      "counts": {
+        "created": "New",
+        "updated": "Changed",
+        "unchanged": "Unchanged",
+        "errors": "Faulty",
+        "skipped": "Skipped"
+      },
+      "report": {
+        "title": "Report (first {{count}} rows)",
+        "download": "Download report",
+        "loadFailed": "The report could not be shown. Download it instead.",
+        "empty": "The report is empty.",
+        "row": "Row",
+        "status": "Status",
+        "ci": "CI",
+        "message": "Message",
+        "statuses": {
+          "created": "new",
+          "updated": "changed",
+          "unchanged": "unchanged",
+          "skipped": "skipped",
+          "error": "faulty"
+        }
+      }
     }
   },
   "itsm": {

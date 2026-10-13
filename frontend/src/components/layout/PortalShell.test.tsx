@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import {
   RouterProvider,
@@ -24,6 +25,9 @@ vi.mock("@/components/portal/PortalWebchat", () => ({ PortalWebchat: () => <div 
 const { portalSetLanguage } = vi.hoisted(() => ({ portalSetLanguage: vi.fn() }));
 vi.mock("@/lib/portalApi", () => ({ portalApi: { portalSetLanguage } }));
 
+const { listCis } = vi.hoisted(() => ({ listCis: vi.fn() }));
+vi.mock("@/lib/portalCmdbApi", () => ({ portalCmdbApi: { list: listCis } }));
+
 const { toggleTheme } = vi.hoisted(() => ({ toggleTheme: vi.fn() }));
 vi.mock("@/themes/theme", () => ({
   useTheme: () => ({ theme: "dark", resolvedTheme: "dark", toggleTheme }),
@@ -44,6 +48,7 @@ async function renderShell() {
     "/portal/login",
     "/portal/preferences",
     "/portal/security",
+    "/portal/config-items",
   ];
   const childRoutes = childPaths.map((path) =>
     createRoute({ getParentRoute: () => rootRoute, path, component: () => null }),
@@ -53,11 +58,14 @@ async function renderShell() {
     history: createMemoryHistory({ initialEntries: ["/portal"] }),
   });
   await router.load();
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
-    <I18nextProvider i18n={i18n}>
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-      <RouterProvider router={router as any} />
-    </I18nextProvider>,
+    <QueryClientProvider client={queryClient}>
+      <I18nextProvider i18n={i18n}>
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        <RouterProvider router={router as any} />
+      </I18nextProvider>
+    </QueryClientProvider>,
   );
   return router;
 }
@@ -67,6 +75,7 @@ describe("PortalShell", () => {
     logout.mockReset().mockResolvedValue(undefined);
     portalSetLanguage.mockReset().mockResolvedValue({});
     toggleTheme.mockReset();
+    listCis.mockReset().mockResolvedValue({ items: [], total: 0 });
     void i18n.changeLanguage("en");
   });
 
@@ -128,5 +137,26 @@ describe("PortalShell", () => {
 
     await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(router.state.location.pathname).toBe("/portal/login"));
+  });
+
+  it("shows the devices nav entry only when the list answers with total > 0", async () => {
+    listCis.mockResolvedValue({ items: [{ id: 1 }], total: 1 });
+    await renderShell();
+    const link = await screen.findByTestId("portal-nav-cmdb");
+    expect(link).toHaveAttribute("href", "/portal/config-items");
+    expect(link).toHaveTextContent("Devices and systems");
+  });
+
+  it("hides the devices nav entry for an empty list", async () => {
+    await renderShell();
+    await waitFor(() => expect(listCis).toHaveBeenCalled());
+    expect(screen.queryByTestId("portal-nav-cmdb")).not.toBeInTheDocument();
+  });
+
+  it("hides the devices nav entry when the portal CMDB answers 404", async () => {
+    listCis.mockRejectedValue(new Error("404"));
+    await renderShell();
+    await waitFor(() => expect(listCis).toHaveBeenCalled());
+    expect(screen.queryByTestId("portal-nav-cmdb")).not.toBeInTheDocument();
   });
 });

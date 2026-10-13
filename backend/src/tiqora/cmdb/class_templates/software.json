@@ -1,0 +1,153 @@
+{
+ "key": "software",
+ "name": "Software",
+ "icon": "software",
+ "attributes": [
+  {
+   "key": "Vendor",
+   "name": "Hersteller",
+   "type": "text",
+   "searchable": true
+  },
+  {
+   "key": "Version",
+   "name": "Version",
+   "type": "text",
+   "searchable": true
+  },
+  {
+   "key": "Type",
+   "name": "Typ",
+   "type": "catalog",
+   "options": {
+    "catalog_class": "ITSM::ConfigItem::Software::Type"
+   },
+   "searchable": false
+  },
+  {
+   "key": "LicenceType",
+   "name": "Lizenztyp",
+   "type": "catalog",
+   "options": {
+    "catalog_class": "ITSM::ConfigItem::Software::LicenceType"
+   },
+   "searchable": false
+  },
+  {
+   "key": "LicenceKey",
+   "name": "Lizenzschlüssel",
+   "type": "text",
+   "count_max": 25,
+   "sub": [
+    {
+     "key": "Quantity",
+     "name": "Anzahl",
+     "type": "integer"
+    },
+    {
+     "key": "ExpirationDate",
+     "name": "Ablaufdatum",
+     "type": "date"
+    }
+   ]
+  },
+  {
+   "key": "Note",
+   "name": "Notiz",
+   "type": "textarea"
+  }
+ ],
+ "catalog_items": [
+  {
+   "catalog_class": "ITSM::ConfigItem::Software::Type",
+   "item_key": "client_application",
+   "name": "Client Application",
+   "functionality": null,
+   "position": 10
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Software::Type",
+   "item_key": "client_os",
+   "name": "Client OS",
+   "functionality": null,
+   "position": 20
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Software::Type",
+   "item_key": "database",
+   "name": "Database",
+   "functionality": null,
+   "position": 30
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Software::Type",
+   "item_key": "middleware",
+   "name": "Middleware",
+   "functionality": null,
+   "position": 40
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Software::Type",
+   "item_key": "server_application",
+   "name": "Server Application",
+   "functionality": null,
+   "position": 50
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Software::Type",
+   "item_key": "server_os",
+   "name": "Server OS",
+   "functionality": null,
+   "position": 60
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Software::Type",
+   "item_key": "other",
+   "name": "Other",
+   "functionality": null,
+   "position": 70
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Software::LicenceType",
+   "item_key": "single_licence",
+   "name": "Single Licence",
+   "functionality": null,
+   "position": 10
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Software::LicenceType",
+   "item_key": "volume_licence",
+   "name": "Volume Licence",
+   "functionality": null,
+   "position": 20
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Software::LicenceType",
+   "item_key": "enterprise_licence",
+   "name": "Enterprise Licence",
+   "functionality": null,
+   "position": 30
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Software::LicenceType",
+   "item_key": "freeware",
+   "name": "Freeware",
+   "functionality": null,
+   "position": 40
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Software::LicenceType",
+   "item_key": "time_restricted",
+   "name": "Time Restricted",
+   "functionality": null,
+   "position": 50
+  },
+  {
+   "catalog_class": "ITSM::ConfigItem::Software::LicenceType",
+   "item_key": "demo",
+   "name": "Demo",
+   "functionality": null,
+   "position": 60
+  }
+ ]
+}

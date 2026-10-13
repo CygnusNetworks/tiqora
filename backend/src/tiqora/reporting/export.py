@@ -24,7 +24,7 @@ OTHER_LABEL: Final = "Weitere"
 _WIDTH_SCAN_ROWS: Final = 500
 _ILLEGAL_XML: Final = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 _SHEET_FORBIDDEN: Final = re.compile(r"[\[\]:*?/\\]")
-_FORMULA_PREFIXES: Final = ("=", "+", "-", "@", "\t", "\r")
+FORMULA_PREFIXES: Final = ("=", "+", "-", "@", "\t", "\r")
 _NUMBER_FORMATS: Final[dict[str, str]] = {
     "count": "0",
     "id": "0",
@@ -267,7 +267,7 @@ def _csv_cell(value: Cell) -> str:
         return ""
     text = str(value)
     # intentionally also prefixes numeric-looking strings ("-5", "+49 ..."): text stays text
-    if isinstance(value, str) and text.startswith(_FORMULA_PREFIXES):
+    if isinstance(value, str) and text.startswith(FORMULA_PREFIXES):
         return "'" + text
     return text
 

@@ -2373,7 +2373,15 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/agents/online")) return onlineAgents;
   if (p.endsWith("/api/v1/agents/presence/ping") && method === "POST") return {};
   if (p.endsWith("/api/v1/search")) return searchHits;
-  if (p.endsWith("/api/v1/kb/search")) return { query: "", results: kbArticleItems };
+  if (p.endsWith("/api/v1/kb/search"))
+    return {
+      query: "",
+      estimated_total: kbArticleItems.length,
+      results: kbArticleItems,
+      hits: kbArticleItems.map((a) => ({ article_id: a.id, chunk_id: a.id * 10, title: a.title, heading_path: "", anchor: "", content: "", language: a.language, state: a.state, customer_visible: true, permission_group_ids: [], score: 1 })),
+    };
+  if (p.endsWith("/api/v1/tickets/search"))
+    return ticketItems.slice(0, 6).map((t) => ({ ticket_id: t.id, tn: t.tn, title: t.title, queue: t.queue_name, state: t.state, state_type: t.state_type }));
   if (p.endsWith("/api/v1/kb/categories")) return kbCategories;
   if (p.match(/\/api\/v1\/kb\/articles\/\d+$/) && method === "GET") return kbArticleDetail;
   if (p.endsWith("/api/v1/kb/articles")) return kbArticleItems;
