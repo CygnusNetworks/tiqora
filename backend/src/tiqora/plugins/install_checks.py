@@ -166,11 +166,17 @@ _CREATE_TABLE_RE: Final = re.compile(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)
 
 @functools.cache
 def znuny_table_names() -> frozenset[str]:
-    """Znuny table names: ``LegacyBase.metadata`` plus the packaged bootstrap schema."""
+    """Znuny table names: ``LegacyBase.metadata``, the packaged bootstrap schema, the tables
+    of later Znuny lines (``OPTIONAL_LEGACY_TABLES``, e.g. 7.x ``activity``) and every table
+    of the Znuny ITSM packages (``general_catalog``, ``configitem*``, ``cip_allocate``, ...)."""
     import tiqora.db.legacy  # noqa: F401  (registers every legacy model)
     from tiqora.db.legacy.base import LegacyBase
+    from tiqora.db.legacy.profile import OPTIONAL_LEGACY_TABLES
+    from tiqora.itsm.znuny_adapter.profiles import ZNUNY_ITSM_PACKAGE_TABLES
 
     names = {n.lower() for n in LegacyBase.metadata.tables}
+    names.update(OPTIONAL_LEGACY_TABLES)
+    names.update(ZNUNY_ITSM_PACKAGE_TABLES)
     ddl = resources.files("tiqora.bootstrap").joinpath("schema", "schema.mysql.sql")
     names.update(m.lower() for m in _CREATE_TABLE_RE.findall(ddl.read_text(encoding="utf-8")))
     return frozenset(n for n in names if not n.startswith(("tiqora_", "tqp_")))

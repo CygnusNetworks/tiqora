@@ -73,6 +73,58 @@ _READONLY_TABLES: Final[tuple[str, ...]] = (
 )
 
 
+#: Every table the Znuny ITSM packages create (``TableCreate`` of GeneralCatalog, ITSMCore,
+#: ITSMConfigurationManagement, ImportExport and ITSMChangeManagement; identical in the ITSM
+#: 6.5.3 bundle and the 7.3 packages; ITSMIncidentProblemManagement and
+#: ITSMServiceLevelManagement create none). Tiqora treats them as Znuny tables, e.g. the plugin
+#: install check warns about raw SQL on them (``tiqora.plugins.install_checks``).
+ZNUNY_ITSM_PACKAGE_TABLES: Final[frozenset[str]] = frozenset(
+    {
+        # GeneralCatalog
+        "general_catalog",
+        "general_catalog_preferences",
+        # ITSMCore
+        "cip_allocate",
+        # ITSMConfigurationManagement
+        "configitem",
+        "configitem_counter",
+        "configitem_definition",
+        "configitem_history",
+        "configitem_history_type",
+        "configitem_version",
+        # ImportExport
+        "imexport_format",
+        "imexport_mapping",
+        "imexport_mapping_format",
+        "imexport_mapping_object",
+        "imexport_object",
+        "imexport_search",
+        "imexport_template",
+        # ITSMChangeManagement
+        "change_cab",
+        "change_cip_allocate",
+        "change_condition",
+        "change_history",
+        "change_history_type",
+        "change_item",
+        "change_notification",
+        "change_notification_grps",
+        "change_notification_message",
+        "change_notification_rec",
+        "change_number_counter",
+        "change_state_machine",
+        "change_template",
+        "change_template_type",
+        "change_workorder",
+        "condition_action",
+        "condition_attribute",
+        "condition_expression",
+        "condition_object",
+        "condition_operator",
+    }
+)
+
+
 def _profile(name: str, spec: str) -> SchemaProfile:
     return SchemaProfile(
         name=name,

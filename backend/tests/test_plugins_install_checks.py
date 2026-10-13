@@ -159,3 +159,65 @@ def test_sql_variants_and_table_name_keyword() -> None:
         assert static_warnings({"a.py": f'q = "{sql}"'.encode()}, short_id="abc"), sql
     src = b'op.create_table(table_name="ticket")'
     assert migration_tables({"x/migrations/1.py": src}) == ["ticket"]
+
+
+# --- roadmap merge: the Znuny tables of the ITSM packages and of later Znuny lines ---------
+
+ITSM_ZNUNY_TABLES = (
+    "general_catalog",
+    "general_catalog_preferences",
+    "cip_allocate",
+    "configitem",
+    "configitem_version",
+    "configitem_definition",
+    "configitem_history",
+    "configitem_counter",
+    "imexport_template",
+    "change_item",
+    "change_workorder",
+    "condition_expression",
+)
+
+
+@pytest.mark.parametrize(
+    "table", [*ITSM_ZNUNY_TABLES, "activity", "article_color", "translation", "sendmail_config"]
+)
+def test_znuny_table_names_include_itsm_and_7x_tables(table: str) -> None:
+    from tiqora.plugins.install_checks import znuny_table_names
+
+    assert table in znuny_table_names()
+
+
+def test_znuny_table_names_never_name_tiqora_tables() -> None:
+    import tiqora.db.tiqora.models  # noqa: F401  (registers every tiqora model)
+    from tiqora.db.tiqora.base import TiqoraBase
+    from tiqora.plugins.install_checks import znuny_table_names
+
+    names = znuny_table_names()
+    assert not [n for n in names if n.startswith(("tiqora_", "tqp_"))]
+    assert names.isdisjoint(TiqoraBase.metadata.tables)
+
+
+@pytest.mark.parametrize(
+    ("sql", "table"),
+    [
+        ("UPDATE configitem SET name = :n WHERE id = :i", "configitem"),
+        ("DELETE FROM general_catalog WHERE id = :i", "general_catalog"),
+        ("INSERT INTO cip_allocate (criticality, impact) VALUES (:c, :i)", "cip_allocate"),
+        ("ALTER TABLE configitem_version ADD COLUMN x INT", "configitem_version"),
+        ("TRUNCATE change_item", "change_item"),
+    ],
+)
+def test_static_warnings_raw_sql_on_itsm_table(sql: str, table: str) -> None:
+    out = static_warnings({"tq_x/a.py": f"Q = {sql!r}\n".encode()}, short_id="hello")
+    assert out == [f"Greift direkt per SQL auf die Znuny-Tabelle „{table}“ zu"]
+
+
+@pytest.mark.parametrize(
+    "table",
+    ["tiqora_cmdb_ci", "tiqora_scim_user", "tiqora_itsm_import_run", "tiqora_plugin_data"],
+)
+def test_prefix_problem_for_tiqora_table(table: str) -> None:
+    src = f'from alembic import op\nop.create_table("{table}")\n'.encode()
+    problems = prefix_problems({"tq_x/migrations/0001.py": src}, "hello")
+    assert problems == [f"Tabelle „{table}“ hat nicht das Präfix tqp_hello_"]

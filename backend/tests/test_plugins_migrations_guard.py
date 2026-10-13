@@ -132,3 +132,56 @@ def test_guard_is_a_before_cursor_execute_hook() -> None:
     G(None, None, "SELECT 1", (), None, False)
     with pytest.raises(PluginMigrationError, match="nicht erlaubt: DROP TABLE ticket"):
         G(None, None, "DROP TABLE ticket", (), None, False)
+
+
+# --- roadmap merge: no plugin migration may touch a Tiqora table (incl. the wave-4 CMDB, SCIM,
+# ITSM-import and plugin tables) or a table of the Znuny ITSM packages; only tqp_<short>_ ------
+
+
+def _foreign_tables() -> list[str]:
+    import tiqora.db.tiqora.models  # noqa: F401  (registers every tiqora model)
+    from tiqora.db.tiqora.base import TiqoraBase
+    from tiqora.itsm.znuny_adapter.profiles import ZNUNY_ITSM_PACKAGE_TABLES
+
+    return sorted({*TiqoraBase.metadata.tables, *ZNUNY_ITSM_PACKAGE_TABLES})
+
+
+def test_foreign_tables_cover_the_wave4_tables() -> None:
+    tables = set(_foreign_tables())
+    for name in (
+        "tiqora_cmdb_ci",
+        "tiqora_cmdb_ci_version",
+        "tiqora_scim_user",
+        "tiqora_itsm_import_run",
+        "tiqora_itsm_import_map",
+        "tiqora_itsm_link",
+        "tiqora_plugin_data",
+        "tiqora_process",
+        "general_catalog",
+        "configitem",
+        "cip_allocate",
+    ):
+        assert name in tables
+
+
+_WRITES = (
+    "CREATE TABLE {t} (id INT)",
+    "CREATE INDEX tqp_tables_ix ON {t} (id)",
+    "ALTER TABLE {t} ADD COLUMN x INT",
+    "ALTER TABLE tqp_tables_note RENAME TO {t}",
+    "INSERT INTO {t} (id) VALUES (1)",
+    "UPDATE {t} SET id = 2",
+    "DELETE FROM {t}",
+    "DROP TABLE {t}",
+    "TRUNCATE {t}",
+    "CREATE TABLE tqp_tables_b (a_id INTEGER REFERENCES {t} (id))",
+    "DESCRIBE {t}",
+)
+
+
+@pytest.mark.parametrize("table", _foreign_tables())
+def test_guard_rejects_writes_to_tiqora_and_itsm_tables(table: str) -> None:
+    for template in _WRITES:
+        with pytest.raises(PluginMigrationError, match="nicht erlaubt"):
+            G.check(template.format(t=table))
+    G.check(f"SELECT * FROM {table}")  # reading stays allowed (D6)
