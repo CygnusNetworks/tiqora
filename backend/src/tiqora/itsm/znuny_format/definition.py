@@ -57,6 +57,13 @@ class DefinitionIssue:
 class DefinitionWithIssues:
     result: DefinitionImportResult
     issues: list[DefinitionIssue] = field(default_factory=list)
+    #: the Znuny attribute list the result was built from (invalid keys already left out)
+    znuny: list[dict[str, Any]] = field(default_factory=list)
+
+
+def definition_format(text: str) -> Literal["yaml", "perl"]:
+    """Znuny 7.x stores YAML (``---`` document marker), 6.x a Perl data literal."""
+    return "yaml" if text.lstrip().startswith("---") else "perl"
 
 
 def _read_raw(text: str, fmt: Literal["yaml", "perl"]) -> Any:
@@ -120,10 +127,10 @@ def parse_definition_with_issues(text: str, fmt: Literal["yaml", "perl"]) -> Def
         return DefinitionWithIssues(parse_znuny_definition(text, fmt), issues)
     cleaned = _scan(raw, "", issues)
     if not any(i.code == ISSUE_KEY_INVALID for i in issues):
-        return DefinitionWithIssues(parse_znuny_definition(text, fmt), issues)
+        return DefinitionWithIssues(parse_znuny_definition(text, fmt), issues, list(cleaned))
     # re-feed the cleaned tree through the one parser (as bounded YAML, never evaluated)
     dumped = "---\n" + yaml.safe_dump(cleaned, allow_unicode=True, sort_keys=False)
-    return DefinitionWithIssues(parse_znuny_definition(dumped, "yaml"), issues)
+    return DefinitionWithIssues(parse_znuny_definition(dumped, "yaml"), issues, list(cleaned))
 
 
 #: Tiqora attribute type -> Znuny ``Input.Type`` (the inverse of cmdb's map; types Znuny has no
@@ -214,6 +221,7 @@ __all__ = [
     "DefinitionIssue",
     "DefinitionParseError",
     "DefinitionWithIssues",
+    "definition_format",
     "parse_definition_with_issues",
     "parse_znuny_definition",
 ]

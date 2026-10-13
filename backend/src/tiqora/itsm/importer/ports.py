@@ -42,6 +42,8 @@ class ZnunyCatalogItem:
     valid: bool
     comment: str | None
     functionality: str | None
+    #: ``Permission`` preference of a CI class (Znuny group id); None: none or not a group id
+    permission_group: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

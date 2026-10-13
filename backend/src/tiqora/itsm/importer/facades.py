@@ -123,6 +123,12 @@ def _xml_node(xml_hash: Sequence[Any]) -> Mapping[str, Any]:
     return {}
 
 
+def _group_id(raw: str | None) -> int | None:
+    """The ``Permission`` preference of a CI class (Znuny ``ItemClassGroupCheck``): a group id."""
+    text = (raw or "").strip()
+    return int(text) if text.isdigit() else None
+
+
 class ZnunyAdapterSource:
     """:class:`ImportSource` on itsm1's Znuny adapter plus ``source_extra``."""
 
@@ -156,6 +162,7 @@ class ZnunyAdapterSource:
                 valid=r.valid_id == 1,
                 comment=r.comments,
                 functionality=r.preferences.get("Functionality") or None,
+                permission_group=_group_id(r.preferences.get("Permission")),
             )
             for r in await reader.iter_general_catalog(self._s)
         ]

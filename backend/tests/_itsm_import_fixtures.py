@@ -119,16 +119,26 @@ DEFINITION_NETWORK_V1 = """---
 CI_NUMBER_BASE = 2026101256000
 
 
+#: Znuny group ids of the class ``Permission`` preference in the sample
+GROUP_COMPUTER, GROUP_NETWORK = 56100, 56101
+
+
 def _item(
-    gc_id: int, cls: str, name: str, functionality: str | None, *, valid: bool = True
+    gc_id: int,
+    cls: str,
+    name: str,
+    functionality: str | None,
+    *,
+    valid: bool = True,
+    permission_group: int | None = None,
 ) -> ZnunyCatalogItem:
-    return ZnunyCatalogItem(gc_id, cls, name, valid, None, functionality)
+    return ZnunyCatalogItem(gc_id, cls, name, valid, None, functionality, permission_group)
 
 
 def sample_catalog() -> list[ZnunyCatalogItem]:
     return [
-        _item(GC_COMPUTER, CLASS_CATALOG, "Computer", None),
-        _item(GC_NETWORK, CLASS_CATALOG, "Network", None),
+        _item(GC_COMPUTER, CLASS_CATALOG, "Computer", None, permission_group=GROUP_COMPUTER),
+        _item(GC_NETWORK, CLASS_CATALOG, "Network", None, permission_group=GROUP_NETWORK),
         _item(GC_YES, YES_NO, "Yes", None),
         _item(GC_NO, YES_NO, "No", None),
         _item(GC_PLANNED, DEPLOYMENT, "Planned", "preproductive"),
@@ -220,6 +230,32 @@ class FakeSource(ImportSource):
             for c in self.ci_rows
         ]
         return version
+
+    def class_id(self, name: str) -> int:
+        """``general_catalog.id`` of the CI class with this name."""
+        return next(
+            i.id for i in self.catalog if i.catalog_class == CLASS_CATALOG and i.name == name
+        )
+
+    def definition_id(self, class_name: str, version: int) -> int:
+        """Znuny id of one definition version of a class."""
+        cid = self.class_id(class_name)
+        return next(d.id for d in self.definitions if d.class_id == cid and d.version == version)
+
+    def add_definition(self, class_name: str, raw: str) -> ZnunyClassDefinition:
+        """Append the next definition version of a class (next Znuny definition id)."""
+        cid = self.class_id(class_name)
+        version = max((d.version for d in self.definitions if d.class_id == cid), default=0) + 1
+        row = ZnunyClassDefinition(
+            max((d.id for d in self.definitions), default=0) + 1,
+            cid,
+            version,
+            raw,
+            T0 + timedelta(days=60 + version),
+            1,
+        )
+        self.definitions.append(row)
+        return row
 
     def rename_catalog_item(self, item_id: int, name: str) -> None:
         self.catalog = [
