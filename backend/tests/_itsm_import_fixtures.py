@@ -39,6 +39,7 @@ from tiqora.itsm.importer.ports import (
 from tiqora.itsm.importer.report import ImportReport
 from tiqora.itsm.importer.steps import StepContext
 from tiqora.itsm.importer.writer import DryRunWriter
+from tiqora.itsm.znuny_adapter.reader import CipRow, ServiceItsmRow
 
 BAND_LO, BAND_HI = 56070, 56299
 T0 = datetime(2026, 1, 5, 9, 0, 0)
@@ -168,6 +169,8 @@ class FakeSource(ImportSource):
         fail_once_after_pages: int | None = None,
         on_first_page: Callable[[], None] | None = None,
         changed_since_count: int = 0,
+        cip: Sequence[CipRow] = (),
+        services: Sequence[ServiceItsmRow] = (),
     ) -> None:
         self.catalog = list(catalog)
         self.definitions = list(definitions)
@@ -183,6 +186,8 @@ class FakeSource(ImportSource):
         self.fail_once_after_pages = fail_once_after_pages
         self.on_first_page = on_first_page
         self.changed_since_count = changed_since_count
+        self.cip = list(cip)
+        self.services = list(services)
         self.changed_since_args: list[datetime] = []
         self._page_calls = 0
         self._failed = False
@@ -341,6 +346,12 @@ class FakeSource(ImportSource):
     async def count_cis_changed_since(self, since: datetime) -> int:
         self.changed_since_args.append(since)
         return self.changed_since_count
+
+    async def cip_rows(self) -> list[CipRow]:
+        return list(self.cip)
+
+    async def service_itsm_rows(self) -> list[ServiceItsmRow]:
+        return list(self.services)
 
 
 def _computer_xml(n: int, level: int) -> dict[str, Any]:

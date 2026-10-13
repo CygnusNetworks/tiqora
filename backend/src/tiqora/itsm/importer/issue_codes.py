@@ -59,6 +59,14 @@ ISSUE_CODES: dict[str, str] = {
         "Das Konfigurationselement existiert in Znuny nicht mehr; in Tiqora bleibt es "
         "unverändert bestehen"
     ),
+    "priority_matrix_invalid": (
+        "Die Prioritätsmatrix von Znuny verweist auf eine Priorität, die es nicht gibt; die Matrix "
+        "wurde nicht übernommen"
+    ),
+    "service_unknown": (
+        "Der Service aus den ITSM-Spalten von Znuny wurde nicht gefunden; seine Angaben wurden "
+        "nicht übernommen"
+    ),
     "changes_not_imported": (
         "Änderungen (Changes) von Znuny ITSM werden nicht übernommen, es wurden nur gezählt"
     ),

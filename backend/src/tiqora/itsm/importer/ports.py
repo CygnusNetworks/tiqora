@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal, Protocol, runtime_checkable
 
+from tiqora.itsm.znuny_adapter.reader import CipRow, ServiceItsmRow
+
 #: placeholder for a Znuny timestamp that is NULL
 EPOCH = datetime(1970, 1, 1)
 
@@ -203,6 +205,8 @@ class ImportSource(Protocol):
     async def change_counts(self) -> dict[str, int]: ...
     async def max_ci_change_time(self) -> datetime | None: ...
     async def count_cis_changed_since(self, since: datetime) -> int: ...
+    async def cip_rows(self) -> list[CipRow]: ...  # Znuny's criticality x impact -> priority
+    async def service_itsm_rows(self) -> list[ServiceItsmRow]: ...  # ITSM columns of ``service``
 
 
 @runtime_checkable

@@ -17,8 +17,9 @@ C3  Znuny read adapter ``znuny_adapter.reader.ZnunyItsmReader`` via ``get_reader
                        Added by this plan in ``importer/source_extra.py``: ``links_for_cis``,
                        ``ci_count``, ``max_ci_change_time``, ``count_cis_changed_since``,
                        ``read_ci_attachments`` (``virtual_fs``, Task 11).
-                       Not available yet (Task 12): ``change_counts`` raises
-                       ``NotImplementedError``.
+                       ``change_counts`` (Task 12): ``source_extra.count_changes``;
+                       ``cip_rows`` / ``service_itsm_rows``: ``cip_allocate`` /
+                       ``service_itsm_columns`` (the delegated steps, ITSMCore alone suffices).
 C4  Definition parsing ``tiqora.cmdb.znuny_definition.parse_znuny_definition`` (R8; this plan has
                        no parser); used by Tasks 3 and 8, not by a facade.
 C5  CMDB tables        ``TiqoraCmdb*`` / ``TiqoraItsmLink`` in ``tiqora.db.tiqora.models`` (columns
@@ -97,12 +98,28 @@ from tiqora.itsm.importer.ports import (
     ZnunySourceInfo,
 )
 from tiqora.itsm.link_types import sync_link_type_rows
+from tiqora.itsm.models import TiqoraItsmServiceMeta
+from tiqora.itsm.priority import InvalidMatrix as InvalidMatrix
+from tiqora.itsm.priority import MatrixCell, replace_matrix_from_import
+from tiqora.itsm.services import ServiceMetaIn, save_service_meta
+from tiqora.itsm.services import ServiceNotFound as ServiceNotFound
 from tiqora.itsm.znuny_adapter.detect import detect_znuny_itsm
-from tiqora.itsm.znuny_adapter.reader import ZnunyItsmReader, reader_for_info
+from tiqora.itsm.znuny_adapter.profiles import PROFILES
+from tiqora.itsm.znuny_adapter.reader import (
+    CipRow,
+    ServiceItsmRow,
+    ZnunyItsmReader,
+    reader_for_info,
+)
 
 #: author recorded when Znuny stored no creator (the root agent)
 _ROOT_USER = 1
 _SEARCH_PAGE = 200
+
+#: the only two test hooks (Task 12): a replacement source for the pipeline, and the answer of
+#: ``ItsmModeFacade.znuny_itsm_present``; production code never sets them
+source_override: ImportSource | None = None
+znuny_present_override: bool | None = None
 
 
 def _author(value: int | None) -> int:
@@ -140,6 +157,13 @@ class ZnunyAdapterSource:
         # fresh detection: an import must not run on a 60 s old picture of the packages
         return reader_for_info(await detect_znuny_itsm(self._s, use_cache=False))
 
+    async def _core_reader(self) -> ZnunyItsmReader:
+        """A reader for what ITSMCore alone offers (catalog, matrix, service columns)."""
+        d = await detect_znuny_itsm(self._s, use_cache=False)
+        if d.core_installed and d.profile is not None:
+            return ZnunyItsmReader(PROFILES[d.profile])
+        return reader_for_info(d)  # raises the matching CiUnavailable
+
     async def info(self) -> ZnunySourceInfo:
         d = await detect_znuny_itsm(self._s, use_cache=False)
         return ZnunySourceInfo(
@@ -154,7 +178,7 @@ class ZnunyAdapterSource:
         return info.profile if info.core_installed else None
 
     async def catalog_items(self) -> list[ZnunyCatalogItem]:
-        reader = await self._reader()
+        reader = await self._core_reader()
         return [
             ZnunyCatalogItem(
                 id=r.id,
@@ -245,7 +269,15 @@ class ZnunyAdapterSource:
         return await source_extra.read_ci_attachments(self._s, ci_ids, with_data=with_data)
 
     async def change_counts(self) -> dict[str, int]:
-        raise NotImplementedError("change and work order counts are added by Task 12")
+        return await source_extra.count_changes(self._s)
+
+    async def cip_rows(self) -> list[CipRow]:
+        reader = await self._core_reader()
+        return await reader.cip_allocate(self._s)
+
+    async def service_itsm_rows(self) -> list[ServiceItsmRow]:
+        reader = await self._core_reader()
+        return list((await reader.service_itsm_columns(self._s)).values())
 
     async def max_ci_change_time(self) -> datetime | None:
         await self._reader()
@@ -690,6 +722,8 @@ class ItsmModeFacade:
         return (await itsm_mode.get_itsm_mode(self._s, fresh=True)).mode
 
     async def znuny_itsm_present(self) -> bool:
+        if znuny_present_override is not None:
+            return znuny_present_override
         return (await detect_znuny_itsm(self._s, use_cache=False)).core_installed
 
     async def is_switched(self) -> bool:
@@ -708,9 +742,50 @@ class ItsmModeFacade:
         return state.mode
 
 
+# --- itsm1 write functions of the delegated steps (Task 12) ------------------------------------
+
+
+def _clip(value: str | None) -> str | None:
+    return value[:200] if value else None
+
+
+async def import_priority_matrix(
+    session: AsyncSession, rows: Sequence[CipRow], *, user_id: int
+) -> int:
+    """Replace Tiqora's matrix by Znuny's ``cip_allocate`` (itsm1 ``replace_matrix_from_import``).
+
+    Raises :class:`InvalidMatrix` before anything is written. Flush only; returns the cell count.
+    """
+    cells = [MatrixCell(r.criticality, r.impact, r.priority_id) for r in rows]
+    await replace_matrix_from_import(session, cells, user_id=user_id)
+    return len(cells)
+
+
+async def import_service_meta(session: AsyncSession, row: ServiceItsmRow, *, user_id: int) -> None:
+    """Store the ITSM columns of one Znuny service as Tiqora's type and criticality.
+
+    Owner, description, portal flag and incident window of an existing meta row stay as they are
+    (``save_service_meta`` replaces the row). Raises :class:`ServiceNotFound`. Flush only.
+    """
+    current = await session.get(TiqoraItsmServiceMeta, row.service_id)
+    data = ServiceMetaIn(
+        service_type=_clip(row.type_name),
+        criticality=_clip(row.criticality),
+        owner_user_id=None if current is None else current.owner_user_id,
+        description=None if current is None else current.description,
+        portal_visible=True if current is None else bool(current.portal_visible),
+        min_minutes_between_incidents=None
+        if current is None
+        else current.min_minutes_between_incidents,
+    )
+    await save_service_meta(session, row.service_id, data, user_id=user_id, import_mode=True)
+
+
 def get_ports(session: AsyncSession) -> Ports:
     """All four ports bound to ``session`` (the caller owns the transaction)."""
-    source: ImportSource = ZnunyAdapterSource(session)
+    source: ImportSource = (
+        source_override if source_override is not None else ZnunyAdapterSource(session)
+    )
     writer: CmdbWritePort = CmdbServiceWriter(session)
     reader: CmdbReadPort = CmdbServiceReader(session)
     mode: ItsmModePort = ItsmModeFacade(session)

@@ -1,7 +1,7 @@
 """Znuny reads the itsm1 adapter does not offer (C3 fallback): links by CI id and change times.
 
 Plain ``text()`` statements with bound parameters on Znuny tables only (no ``tiqora_*`` join).
-CI attachments (``virtual_fs``, Task 11); change counts follow with Task 12.
+CI attachments (``virtual_fs``, Task 11); change and work order counts (Task 12).
 """
 
 from __future__ import annotations
@@ -12,8 +12,9 @@ import re
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import bindparam, text
+from sqlalchemy import bindparam, inspect, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from tiqora.itsm.importer.ports import EPOCH, ZnunyAttachment, ZnunyLink
 from tiqora.itsm.znuny_adapter.catalog import chunks
@@ -75,6 +76,31 @@ async def count_cis_changed_since(session: AsyncSession, since: datetime) -> int
             )
         ).scalar_one()
     )
+
+
+#: Znuny ITSMChangeManagement tables counted by :func:`count_changes`: report key -> table
+_CHANGE_TABLES = {"change": "change_item", "workorder": "change_workorder"}
+
+
+async def count_changes(session: AsyncSession) -> dict[str, int]:
+    """Changes and work orders of ITSMChangeManagement (0 when the package is not installed).
+
+    Only counted: this wave imports none of them (the report says so).
+    """
+
+    def table_names(sync_session: Session) -> set[str]:
+        return set(inspect(sync_session.connection()).get_table_names())
+
+    names = await session.run_sync(table_names)
+    out: dict[str, int] = {}
+    for key, table in _CHANGE_TABLES.items():
+        if table in names:
+            out[key] = int(
+                (await session.execute(text(f"SELECT COUNT(*) FROM {table}"))).scalar_one()
+            )
+        else:
+            out[key] = 0
+    return out
 
 
 # --- CI attachments (Znuny ITSMConfigItem::ConfigItemAttachmentAdd/List/Get) --------------------
