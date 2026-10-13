@@ -210,3 +210,37 @@ async def test_dynamic_field_helper_is_plugin_free(request, dialect: str) -> Non
             assert config_from_yaml(row.config) == {**plugin, "DefaultValue": ""}
     finally:
         await engine.dispose()
+
+
+async def test_caller_checked_keys_cannot_name_znuny_keys(request, dialect: str) -> None:
+    """P2A-PM-I1: the escape hatch is for keys Znuny does not know; naming a Znuny key (which
+    would skip its own check) is refused before anything is written."""
+    url = cleaned_plain_url(request, dialect, fields=("W4HatchText", "W4HatchDrop"))
+    engine, factory = session_factory(url)
+    try:
+        async with factory() as session:
+            with pytest.raises(
+                ValueError, match=r"must not name Znuny config keys: \['DefaultValue'\]"
+            ):
+                await create_dynamic_field_row(
+                    session, name="W4HatchText", label="x", field_type="Text",
+                    object_type="Ticket", config={"DefaultValue": ""}, field_order=904,
+                    user_id=ADMIN.id, caller_checked_keys=("DefaultValue",),
+                )  # fmt: skip
+            # on the old code this one failed for the wrong reason ("Missing required")
+            with pytest.raises(ValueError, match=r"Znuny config keys: \['PossibleValues'\]"):
+                await create_dynamic_field_row(
+                    session, name="W4HatchDrop", label="x", field_type="Dropdown",
+                    object_type="Ticket", config={"PossibleValues": {}}, field_order=905,
+                    user_id=ADMIN.id, caller_checked_keys=("PossibleValues", "TiqoraPluginType"),
+                )  # fmt: skip
+            await session.commit()
+            stored = await session.execute(
+                text(
+                    "SELECT COUNT(*) FROM dynamic_field"
+                    " WHERE name IN ('W4HatchText', 'W4HatchDrop')"
+                )
+            )
+            assert stored.scalar_one() == 0
+    finally:
+        await engine.dispose()

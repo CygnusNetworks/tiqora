@@ -103,6 +103,11 @@ _REQUIRED_KEYS: dict[str, set[str]] = {
 DYNAMIC_FIELD_TYPES = frozenset(_ALLOWED_KEYS)
 
 
+def znuny_config_keys(field_type: str) -> frozenset[str]:
+    """The config keys Znuny knows for *field_type* (empty for an unsupported type)."""
+    return frozenset(_ALLOWED_KEYS.get(field_type, ()))
+
+
 def validate_dynamic_field_config(field_type: str, config: dict[str, Any]) -> None:
     """Validate *config* keys/shape against Znuny's expectations for *field_type*.
 

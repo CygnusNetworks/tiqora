@@ -16,7 +16,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.legacy.dynamic_field import DynamicField
 from tiqora.db.legacy.ticket import TicketState, TicketType
-from tiqora.domain.dynamic_field_config import config_to_yaml, validate_dynamic_field_config
+from tiqora.domain.dynamic_field_config import (
+    config_to_yaml,
+    validate_dynamic_field_config,
+    znuny_config_keys,
+)
 from tiqora.znuny.cache_invalidation import invalidate_cache_type
 
 # Types.pm / State.pm / DynamicField.pm: ``$Self->{CacheType}`` (+ DynamicFieldValue).
@@ -121,9 +125,14 @@ async def create_dynamic_field_row(
 
     ``caller_checked_keys``: top-level keys the caller has validated itself (e.g. the admin
     route's request-shaped extras, R14). They are stored as given and left out of the Znuny
-    key check; every other key is validated as usual. The default checks every key.
+    key check; every other key is validated as usual. The default checks every key. They
+    must be keys Znuny does not know for *field_type*: naming one raises ``ValueError``
+    (P2A-PM-I1), so the escape hatch can never skip Znuny's own checks.
     """
     skip = frozenset(caller_checked_keys)
+    overlap = skip & znuny_config_keys(field_type)
+    if overlap:
+        raise ValueError(f"caller_checked_keys must not name Znuny config keys: {sorted(overlap)}")
     validate_dynamic_field_config(
         field_type, {k: v for k, v in config.items() if k not in skip} if skip else config
     )
