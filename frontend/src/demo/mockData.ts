@@ -1805,6 +1805,20 @@ const demoDaemons = {
       last_result: { mode: "live" },
       notices: [],
     },
+    {
+      slug: "plugin_repositories",
+      enabled: true,
+      toggleable: false,
+      schedule: "interval",
+      interval_seconds: 21600,
+      interval_overridden: false,
+      tick_timeout_seconds: 600,
+      last_run_at: "2026-10-08T10:00:00Z",
+      last_ok_at: "2026-10-08T10:00:00Z",
+      last_error: null,
+      last_result: { repositories: 1, failed: 0, updates_available: 1 },
+      notices: [],
+    },
   ],
 };
 
@@ -2138,6 +2152,11 @@ const demoDfPluginTypes: DynamicFieldPluginType[] = [
 /** `GET /api/v1/admin/plugins`: one active, one skipped (quarantined), one waiting for a restart. */
 const demoAdminPlugins: PluginAdminList = {
   safe_mode: false,
+  runtime_install: true,
+  runtime_install_reason: null,
+  allow_unsigned: false,
+  max_package_mb: 15,
+  coordinated_restart: true,
   plugins: [
     {
       id: "org.example.demo",
@@ -2155,6 +2174,13 @@ const demoAdminPlugins: PluginAdminList = {
       status: "active",
       status_message: null,
       settings_section: "plugins.org.example.demo",
+      signature_status: null,
+      signer: null,
+      can_uninstall: false,
+      migration_error: null,
+      repository_id: null,
+      repository_name: null,
+      update: null,
       capabilities: [
         { kind: "extension_point", value: "core.events.subscribers" },
         { kind: "extension_point", value: "core.worker.scheduled_tasks" },
@@ -2208,6 +2234,13 @@ const demoAdminPlugins: PluginAdminList = {
       status: "quarantined",
       status_message: "Beim Start wiederholt abgestürzt – wird übersprungen, bis Sie „Erneut versuchen“ wählen.",
       settings_section: null,
+      signature_status: null,
+      signer: null,
+      can_uninstall: false,
+      migration_error: null,
+      repository_id: null,
+      repository_name: null,
+      update: null,
       capabilities: [{ kind: "extension_point", value: "core.mcp.tools" }],
       contributions: [],
       hooks: [],
@@ -2231,6 +2264,13 @@ const demoAdminPlugins: PluginAdminList = {
       status: "restart_required",
       status_message: "Änderung wird nach einem Neustart von Tiqora wirksam.",
       settings_section: null,
+      signature_status: null,
+      signer: null,
+      can_uninstall: false,
+      migration_error: null,
+      repository_id: null,
+      repository_name: null,
+      update: null,
       capabilities: [{ kind: "extension_point", value: "core.http.public_routes" }],
       contributions: [],
       hooks: [],
@@ -2238,6 +2278,129 @@ const demoAdminPlugins: PluginAdminList = {
         { role: "api", state: "active", version: "2.0.0", error: null, boot_attempts: 1, updated_at: "2026-10-10T06:00:00Z" },
       ],
     },
+    {
+      id: "org.example.tables",
+      name: "Tabellen-Beispiel",
+      version: "1.0.0",
+      publisher: "Example Org",
+      description: "Speichert Beispieldaten in eigenen Tabellen.",
+      homepage: "https://plugins.example.org/tables",
+      support: null,
+      license: "MIT",
+      categories: ["Beispiele"],
+      source: "repository",
+      installed_at: "2026-10-11T09:00:00Z",
+      enabled: true,
+      status: "active",
+      status_message: null,
+      settings_section: null,
+      signature_status: "verified_publisher",
+      signer: "Example Org",
+      can_uninstall: true,
+      migration_error: null,
+      repository_id: 1,
+      repository_name: "Beispiel-Paketquelle",
+      update: { image_plugin: false, repository_id: 1, repository_name: "Beispiel-Paketquelle", version: "1.1.0" },
+      capabilities: [
+        { kind: "extension_point", value: "core.events.subscribers" },
+        { kind: "table", value: "tqp_tables_items" },
+      ],
+      contributions: [],
+      hooks: [],
+      runtime: [
+        { role: "api", state: "active", version: "1.0.0", error: null, boot_attempts: 1, updated_at: "2026-10-11T09:01:00Z" },
+      ],
+    },
+  ],
+};
+
+/** Demo data for installing plugins: restart status, package sources, catalogue and the install job. */
+const demoRestartStatus = {
+  coordinated: true,
+  failed_message: null,
+  finished_at: "2026-10-11T09:01:30Z",
+  generation: 3,
+  reason: "Erweiterung installiert",
+  requested_at: "2026-10-11T09:01:00Z",
+  roles: [
+    { role: "api", old: 3, new: 4, state: "done" },
+    { role: "worker", old: 3, new: 4, state: "done" },
+  ],
+};
+
+const demoPluginRepositories = [
+  {
+    id: 1, name: "Beispiel-Paketquelle", url: "https://plugins.example.org/index.json", enabled: true, origin: "admin",
+    public_key: "RWQexamplepublickey", verified: true, repository_name: "Example Repository", plugin_count: 3,
+    last_checked_at: "2026-10-12T08:00:00Z", last_ok_at: "2026-10-12T08:00:00Z", last_error: null,
+  },
+  {
+    id: 2, name: "Betriebs-Paketquelle", url: "https://intern.example.org/plugins/index.json", enabled: true, origin: "env",
+    public_key: null, verified: false, repository_name: null, plugin_count: 1,
+    last_checked_at: "2026-10-12T08:00:00Z", last_ok_at: "2026-10-12T08:00:00Z", last_error: null,
+  },
+];
+
+const demoCatalogVersion = (version: string) => ({
+  changelog: null, compatible: true, released_at: "2026-10-01T00:00:00Z", version, yanked: false,
+});
+
+const demoPluginCatalog = {
+  categories: ["Beispiele", "Telefonie"],
+  entries: [
+    {
+      plugin_id: "org.example.notes", name: "Notizen-Beispiel", description: "Fügt Tickets eine Notizspalte hinzu.",
+      categories: ["Beispiele"], homepage: "https://plugins.example.org/notes", icon_url: null, image_plugin: false,
+      installed_version: null, latest_compatible: "0.4.0", latest_version: "0.4.0", license: "MIT",
+      publisher: "Example Org", publisher_verified: true, repository_id: 1, repository_name: "Beispiel-Paketquelle",
+      update_available: false, versions: [demoCatalogVersion("0.4.0")],
+    },
+    {
+      plugin_id: "org.example.tables", name: "Tabellen-Beispiel", description: "Speichert Beispieldaten in eigenen Tabellen.",
+      categories: ["Beispiele"], homepage: null, icon_url: null, image_plugin: false,
+      installed_version: "1.0.0", latest_compatible: "1.1.0", latest_version: "1.1.0", license: "MIT",
+      publisher: "Example Org", publisher_verified: true, repository_id: 1, repository_name: "Beispiel-Paketquelle",
+      update_available: true, versions: [demoCatalogVersion("1.1.0"), demoCatalogVersion("1.0.0")],
+    },
+    {
+      plugin_id: "org.example.demo", name: "Demo-Erweiterung", description: "Gehört zum Tiqora-Image.",
+      categories: ["Telefonie"], homepage: null, icon_url: null, image_plugin: true,
+      installed_version: "1.0.0", latest_compatible: "1.0.0", latest_version: "1.0.0", license: null,
+      publisher: "Example Org", publisher_verified: false, repository_id: 2, repository_name: "Betriebs-Paketquelle",
+      update_available: false, versions: [demoCatalogVersion("1.0.0")],
+    },
+  ],
+};
+
+/** `POST /api/v1/admin/plugins/packages`: an unsigned package with a warning (installable only with the unsigned gate). */
+const demoUploadedPackage = {
+  action: "install", capabilities: [{ kind: "extension_point", value: "core.events.subscribers" }], categories: [],
+  changelog: null, description: "Ein ungeprüftes Beispielpaket.", homepage: null, installable: true,
+  installed_version: null, key_id: null, license: null, name: "Unsigniertes Beispiel", plugin_id: "org.example.unsigned",
+  problems: [], publisher: "Unbekannt", publisher_id: null, sha256: "b".repeat(64), short_id: "unsigned",
+  signer: null, size_bytes: 4096, source: "upload", support: null, trust: "unsigned",
+  uploaded_at: "2026-10-12T08:00:00Z", version: "0.1.0",
+  warnings: ["Das Paket ist nicht signiert. Prüfen Sie die Herkunft, bevor Sie es installieren."],
+};
+
+const demoPluginJob = {
+  ...demoReportExportJob,
+  id: 990001,
+  kind: "core.plugin_install",
+  title_key: "jobs.kinds.core.plugin_install",
+  // Stateless on purpose: one job serves download, install and uninstall. The download needs
+  // package_sha256, the dialogs follow restart_generation 3 (the restart GET already reports
+  // it as finished), and "Daten löschen" offers the backup file.
+  result: {
+    plugin_id: "org.example.tables",
+    version: "1.1.0",
+    action: "update",
+    package_sha256: "b".repeat(64),
+    restart_generation: 3,
+    migrated_head: null,
+  },
+  files: [
+    { id: 1, name: "org.example.tables-daten.jsonl.gz", content_type: "application/gzip", size_bytes: 2048 },
   ],
 };
 
@@ -2246,6 +2409,19 @@ export function resolveData(path: string, method: string): unknown | undefined {
   // Plugins: the demo plugin's list entry and its translations (code: src/demo/demoPlugin.tsx).
   if (p.endsWith("/api/v1/plugins/frontend")) return demoPluginFrontend;
   if (p.endsWith("/api/v1/admin/plugins")) return demoAdminPlugins;
+  // GET and POST both report generation 3 as finished, so the restart panel completes at once.
+  if (p.endsWith("/api/v1/admin/plugins/restart")) return demoRestartStatus;
+  if (p.endsWith("/api/v1/admin/plugins/packages") && method === "POST") return demoUploadedPackage;
+  if (/\/api\/v1\/admin\/plugins\/packages\/[^/]+$/.test(p) && method === "GET") return demoUploadedPackage;
+  if (/\/api\/v1\/admin\/plugins\/packages\/[^/]+\/install$/.test(p) && method === "POST")
+    return { job_id: 990001, status: "queued" };
+  if (/\/api\/v1\/admin\/plugins\/[^/]+\/uninstall$/.test(p) && method === "POST")
+    return { job_id: 990001, status: "queued" };
+  if (p.endsWith("/api/v1/admin/plugin-repositories") && method === "GET") return demoPluginRepositories;
+  if (p.endsWith("/api/v1/admin/plugin-repositories/catalog")) return demoPluginCatalog;
+  if (/\/api\/v1\/admin\/plugin-repositories\/\d+\/(refresh|download)$/.test(p) && method === "POST")
+    return { job_id: 990001, status: "queued" };
+  if (p.endsWith("/api/v1/jobs/990001")) return demoPluginJob;
   if (p.endsWith("/api/v1/admin/plugins/number-generators")) return demoNumberGenerators;
   if (p.endsWith("/api/v1/admin/notification-events/transports")) return demoNotificationTransports;
   if (p.endsWith("/api/v1/admin/dynamic-fields/plugin-types")) return demoDfPluginTypes;

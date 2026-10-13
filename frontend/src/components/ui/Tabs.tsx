@@ -12,14 +12,16 @@ export function Tabs({
   value,
   onChange,
   className,
+  ariaLabel,
 }: {
   items: TabItem[];
   value: string;
   onChange: (id: string) => void;
   className?: string;
+  ariaLabel?: string;
 }) {
   return (
-    <div role="tablist" className={cn("flex flex-wrap items-center gap-1.5", className)}>
+    <div role="tablist" aria-label={ariaLabel} className={cn("flex flex-wrap items-center gap-1.5", className)}>
       {items.map((item) => {
         const active = item.id === value;
         return (

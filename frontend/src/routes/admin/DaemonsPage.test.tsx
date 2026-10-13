@@ -130,6 +130,16 @@ describe("DaemonsPage", () => {
     expect(screen.getByText(/03:00/)).toBeInTheDocument();
   });
 
+  it("labels the plugin repositories service in German", async () => {
+    await i18n.changeLanguage("de");
+    getDaemons.mockResolvedValue({ services: [poller({ slug: "plugin_repositories" })] });
+    renderPage();
+    const row = await screen.findByTestId("daemon-row-plugin_repositories");
+    expect(row).toHaveTextContent("Erweiterungen: Paketquellen prüfen");
+    expect(row).toHaveTextContent("Lädt regelmäßig die Paketlisten der eingerichteten Paketquellen");
+    await i18n.changeLanguage("en");
+  });
+
   it("links the background-task row to its settings page", async () => {
     getDaemons.mockResolvedValue({ services: [poller(), postmaster({ slug: "jobs", enabled: true })] });
     renderPage();

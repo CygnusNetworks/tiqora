@@ -42,6 +42,22 @@ x-app-build: &app-build
     context: .
   image: tiqora-local:dev
 
+# Runtime plugin installs (Admin -> Erweiterungen). The packages live in the
+# database; tiqora_plugins is only the unpacked working copy, so it can be
+# shared or per container. Needs (see docs/deployment.md, "Erweiterungen zur
+# Laufzeit installieren"):
+#   - restart: unless-stopped (or always): after an install the processes exit
+#     with code 75 and rely on the restart policy. Without automatic restarts
+#     set TIQORA_PLUGINS_COORDINATED_RESTART=0 and restart by hand.
+#   - a writable plugins dir. With read_only: true mount tiqora_plugins rw, or
+#     set TIQORA_PLUGINS_RUNTIME_INSTALL=0 and bake plugins into the image.
+# Optional env vars (defaults): TIQORA_PLUGINS_DIR=/var/lib/tiqora/plugins,
+#   TIQORA_PLUGINS_RUNTIME_INSTALL=1, TIQORA_PLUGINS_ALLOW_UNSIGNED=0,
+#   TIQORA_PLUGINS_TRUSTED_KEYS=, TIQORA_PLUGINS_MAX_PACKAGE_MB=15,
+#   TIQORA_PLUGINS_COORDINATED_RESTART=1, TIQORA_PLUGINS_RESTART_TIMEOUT_SECONDS=180,
+#   TIQORA_PLUGIN_REPOSITORIES=, TIQORA_PLUGIN_REPOSITORY_FILE_ROOT=/var/lib/tiqora/plugin-repository,
+#   TIQORA_PLUGIN_REPOSITORIES_INTERVAL_SECONDS=21600
+
 services:
   mariadb:
     image: mariadb:10.11
@@ -137,6 +153,8 @@ services:
     container_name: tiqora-local-api
     restart: unless-stopped
     command: ["api"]
+    volumes:
+      - tiqora_plugins:/var/lib/tiqora/plugins
     environment:
       <<: *app-env
       # init already migrated; skip the entrypoint's migrate step to start faster.
@@ -161,37 +179,44 @@ services:
     container_name: tiqora-local-worker
     restart: unless-stopped
     command: ["worker"]
+    volumes:
+      - tiqora_plugins:/var/lib/tiqora/plugins
     environment:
       <<: *app-env
     depends_on:
       tiqora-api:
-        condition: service_started
+        condition: service_healthy
 
   tiqora-ai-worker:
     <<: *app-build
     container_name: tiqora-local-ai-worker
     restart: unless-stopped
     command: ["ai-worker"]
+    volumes:
+      - tiqora_plugins:/var/lib/tiqora/plugins
     environment:
       <<: *app-env
     depends_on:
       tiqora-api:
-        condition: service_started
+        condition: service_healthy
 
   tiqora-mcp:
     <<: *app-build
     container_name: tiqora-local-mcp
     restart: unless-stopped
     command: ["mcp"]
+    volumes:
+      - tiqora_plugins:/var/lib/tiqora/plugins
     environment:
       <<: *app-env
     ports:
       - "127.0.0.1:8001:8001"
     depends_on:
       tiqora-api:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
+  tiqora_plugins:
   tiqora_local_mariadb:
   tiqora_local_redis:
   tiqora_local_meili:

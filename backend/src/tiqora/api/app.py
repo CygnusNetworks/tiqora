@@ -25,6 +25,12 @@ from tiqora.config import Settings, get_settings
 from tiqora.db.engine import check_database, get_session_factory
 from tiqora.identity.env_providers import ensure_env_providers, env_ldap_tls_warnings
 from tiqora.logging_setup import configure_logging
+from tiqora.plugins.restart import (
+    ProcessWatch,
+    sigterm_self,
+    start_process_watch,
+    stop_process_watch,
+)
 from tiqora.webchat.public_api import CHAT_PUBLIC_PREFIX, chat_body_limit_middleware
 from tiqora.webchat.public_api import router as webchat_public_router
 from tiqora.webchat.static import NONE_CSP, mount_webchat_assets
@@ -92,6 +98,22 @@ async def _crypto_self_check(app: FastAPI, settings: Settings) -> None:
                 logger.warning("crypto_backend_unusable", backend=st.backend, problems=st.problems)
     except Exception as _exc:  # noqa: BLE001 — never block startup on the self-check
         logger.warning("crypto_self_check_skipped", error=str(_exc))
+
+
+async def _start_process_registration(app: FastAPI) -> ProcessWatch | None:
+    """Register the api in ``tiqora_process`` and follow coordinated restarts (D10).
+
+    Tests that must not have a running watch loop set ``app.state.start_restart_watch``
+    to False; the default is on.
+    """
+    if not getattr(app.state, "start_restart_watch", True):
+        return None
+    return await start_process_watch(
+        app.state.session_factory,
+        "api",
+        settings=app.state.settings,
+        on_exit=sigterm_self,
+    )
 
 
 @asynccontextmanager
@@ -208,9 +230,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             stop=reload_stop,
         )
     )
+    process_watch = await _start_process_registration(app)
     try:
         yield
     finally:
+        await stop_process_watch(process_watch)
         reload_stop.set()
         try:
             await asyncio.wait_for(reload_task, 5)

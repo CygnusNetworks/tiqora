@@ -1,0 +1,13 @@
+manifest_version = 1
+id = "org.example.tables"
+short_id = "tables"
+name = "Tabellen-Erweiterung"
+version = "1.0.0"
+publisher = "Example GmbH"
+publisher_id = "org.example"
+description = "Testerweiterung mit eigener Datenbanktabelle."
+entry = "tq_fixture_tables:plugin"
+sdk = ">=0.2,<0.3"
+
+[capabilities]
+extension_points = ["core.http.routes"]

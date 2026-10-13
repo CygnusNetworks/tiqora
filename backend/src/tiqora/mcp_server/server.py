@@ -2242,10 +2242,16 @@ async def _app_lifespan(app: Any) -> AsyncIterator[None]:
             register_plugin_mcp_tools(mcp, registry)
 
     plugin_retry = asyncio.create_task(_retry_and_bind())
+    from tiqora.plugins.restart import sigterm_self, start_process_watch, stop_process_watch
+
+    process_watch = await start_process_watch(
+        session_factory, "mcp", settings=settings, on_exit=sigterm_self
+    )
     logger.info("tiqora_mcp_started", database=settings.database_url[:30])
     try:
         yield
     finally:
+        await stop_process_watch(process_watch)
         plugin_retry.cancel()
         await asyncio.gather(plugin_retry, return_exceptions=True)
         await _mcp_state.aclose()
@@ -2277,6 +2283,10 @@ def run_mcp_server(host: str = "0.0.0.0", port: int = 8001) -> None:
     app.mount("/mcp", http_app)
 
     uvicorn.run(app, host=host, port=port, log_level="info")
+    from tiqora.plugins.restart import RESTART_EXIT_CODE, restart_requested
+
+    if restart_requested():
+        raise SystemExit(RESTART_EXIT_CODE)
 
 
 __all__ = [

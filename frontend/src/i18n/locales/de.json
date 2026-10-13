@@ -3497,6 +3497,10 @@
           "name": "Webservice-Protokoll aufräumen",
           "description": "Löscht alte Einträge des Webservice-Protokolls."
         },
+        "plugin_repositories": {
+          "name": "Erweiterungen: Paketquellen prüfen",
+          "description": "Lädt regelmäßig die Paketlisten der eingerichteten Paketquellen und sucht nach Aktualisierungen."
+        },
         "cmdb_version_archive": {
           "name": "CMDB-Versionen archivieren",
           "description": "Verschiebt alte CI-Versionen ins Archiv (wenn in den CMDB-Einstellungen eingeschaltet) und entfernt Uploads, die nie in einem CI gespeichert wurden."
@@ -5080,7 +5084,7 @@
       }
     },
     "plugins": {
-      "description": "Erweiterungen ergänzen Tiqora um zusätzliche Funktionen. Sie werden mit dem Tiqora-Image ausgeliefert; hier schalten Sie sie ein oder aus.",
+      "description": "Erweiterungen ergänzen Tiqora um zusätzliche Funktionen. Sie werden mit dem Tiqora-Image ausgeliefert oder hier als Paket installiert; hier schalten Sie sie auch ein oder aus.",
       "trustNote": "Erweiterungen laufen innerhalb von Tiqora mit vollem Zugriff. Die Angaben unten zeigen, was eine Erweiterung vorgibt zu tun – das ist keine Absicherung. Schalten Sie nur Erweiterungen ein, denen Sie vertrauen.",
       "loadError": "Die Erweiterungen konnten nicht geladen werden.",
       "actionError": "Die Änderung konnte nicht gespeichert werden.",
@@ -5176,7 +5180,9 @@
           "ticket_sidebar": "Zeigt ein Feld in der Ticketansicht",
           "widget": "Zeigt eine Kachel im Dashboard",
           "other": "Erweitert die Oberfläche ({{value}})"
-        }
+        },
+        "table": "Legt die Tabelle {{name}} an",
+        "tables": "Legt {{count}} Tabellen an"
       },
       "numberGenerator": {
         "title": "Ticketnummer-Schema",
@@ -5186,6 +5192,128 @@
         "znunyNote": "Tickets, die Znuny parallel anlegt, bekommen weiter Nummern nach dem Znuny-Schema ({{generator}}). Antworten auf beide Arten von Nummern werden erkannt.",
         "reset": "Znuny-Schema verwenden",
         "loadError": "Die Ticketnummer-Schemata dieser Erweiterung konnten nicht geladen werden."
+      },
+      "upload": "Paket hochladen",
+      "uploadHint": "Datei mit der Endung .tqplugin",
+      "uploadFailed": "Das Paket konnte nicht geprüft werden.",
+      "runtimeInstallOff": "Installation über die Oberfläche ist hier nicht möglich: {{reason}} Erweiterungen kommen über ein eigenes Image (tiqora plugins bake).",
+      "source": {
+        "image": "Im Image eingebaut",
+        "upload": "Hochgeladen",
+        "repository": "Aus Paketquelle",
+        "repositoryNamed": "Aus Paketquelle {{name}}"
+      },
+      "trust": {
+        "official": "Offiziell",
+        "verified_publisher": "Verifizierter Herausgeber",
+        "local": "Lokal signiert",
+        "unsigned": "Unsigniert",
+        "invalid": "Signatur ungültig",
+        "signedBy": "Signiert von {{signer}}"
+      },
+      "install": {
+        "title": "Erweiterung installieren",
+        "actionInstall": "Neu installieren",
+        "actionUpdate": "Aktualisieren von {{from}} auf {{to}}",
+        "actionDowngrade": "Zurückstufen von {{from}} auf {{to}}",
+        "actionReinstall": "Erneut installieren",
+        "changelog": "Änderungen",
+        "problems": "Kann nicht installiert werden",
+        "warnings": "Hinweise",
+        "enable": "Nach der Installation einschalten",
+        "restart": "Tiqora danach automatisch neu starten",
+        "trustUnsigned": "Ich vertraue diesem Paket",
+        "trustNote": "Erweiterungen laufen mit vollen Rechten in Tiqora. Die Angaben oben beschreiben, was die Erweiterung von sich sagt – sie sind keine Absicherung.",
+        "submit": "Installieren",
+        "running": "Erweiterung wird installiert …",
+        "done": "Installiert.",
+        "failed": "Die Installation wurde nicht abgeschlossen."
+      },
+      "restart": {
+        "now": "Jetzt neu starten",
+        "running": "Tiqora wird neu gestartet …",
+        "apiDown": "Weboberfläche startet neu …",
+        "apiTimeout": "Die Weboberfläche ist nach dem Neustart nicht zurückgekommen.",
+        "done": "Tiqora wurde neu gestartet.",
+        "reload": "Seite neu laden",
+        "manual": "Bitte starten Sie Tiqora neu, damit die Änderung wirksam wird.",
+        "state": {
+          "waiting": "Wartet",
+          "restarting": "Startet neu",
+          "done": "Neu gestartet",
+          "timeout": "Nicht zurückgekommen"
+        }
+      },
+      "tabs": {
+        "installed": "Installiert",
+        "available": "Verfügbar",
+        "repositories": "Paketquellen",
+        "aria": "Bereiche der Erweiterungen"
+      },
+      "update": {
+        "available": "Aktualisierung verfügbar: {{version}}",
+        "action": "Aktualisieren",
+        "running": "Paket wird heruntergeladen …",
+        "failed": "Das Paket konnte nicht heruntergeladen werden.",
+        "imageHint": "Diese Erweiterung ist im Image eingebaut. Zum Aktualisieren brauchen Sie ein neues Tiqora-Image."
+      },
+      "uninstall": {
+        "button": "Deinstallieren",
+        "title": "Erweiterung deinstallieren",
+        "dataLegend": "Daten der Erweiterung",
+        "keepData": "Daten behalten",
+        "keepHint": "Die Tabellen der Erweiterung bleiben erhalten. Wird sie später neu installiert, sind die Daten wieder da.",
+        "deleteData": "Daten löschen",
+        "deleteHint_one": "Die Tabellen der Erweiterung werden gelöscht. Vorher wird eine Sicherung angelegt, die einen Tag aufbewahrt wird.",
+        "deleteHint_other": "Die Tabellen der Erweiterung werden gelöscht. Vorher wird eine Sicherung angelegt, die {{count}} Tage aufbewahrt wird.",
+        "submit": "Deinstallieren",
+        "running": "Erweiterung wird deinstalliert …",
+        "done": "Deinstalliert.",
+        "failed": "Die Erweiterung wurde nicht deinstalliert.",
+        "backupNote_one": "Die Sicherung wird einen Tag aufbewahrt. Laden Sie sie jetzt herunter, wenn Sie die Daten noch brauchen könnten.",
+        "backupNote_other": "Die Sicherung wird {{count}} Tage aufbewahrt. Laden Sie sie jetzt herunter, wenn Sie die Daten noch brauchen könnten.",
+        "backupDownload": "Sicherung herunterladen ({{name}})"
+      },
+      "migrationError": "Fehler bei der Datenbank-Anpassung",
+      "catalog": {
+        "search": "Suchen",
+        "category": "Kategorie",
+        "allCategories": "Alle Kategorien",
+        "repository": "Paketquelle",
+        "allRepositories": "Alle Paketquellen",
+        "empty": "Keine Erweiterungen gefunden.",
+        "noRepositories": "Es ist noch keine Paketquelle eingerichtet.",
+        "install": "Installieren",
+        "installed": "Installiert",
+        "incompatible": "Passt nicht zu dieser Tiqora-Version",
+        "installedVersion": "Installiert: Version {{version}}",
+        "homepage": "Webseite",
+        "loadError": "Die Paketlisten konnten nicht geladen werden."
+      },
+      "repositories": {
+        "add": "Paketquelle hinzufügen",
+        "edit": "Bearbeiten",
+        "name": "Name",
+        "url": "Adresse der Paketliste",
+        "key": "Öffentlicher Schlüssel der Paketquelle",
+        "keyHint": "Ohne Schlüssel werden Herausgeber dieser Paketquelle nicht als verifiziert angezeigt.",
+        "enabled": "Paketquelle verwenden",
+        "disabled": "Ausgeschaltet",
+        "fromEnv": "Aus der Server-Konfiguration",
+        "check": "Jetzt prüfen",
+        "lastCheck": "Zuletzt geprüft",
+        "never": "noch nie",
+        "pluginCount_one": "{{count}} Erweiterung",
+        "pluginCount_other": "{{count}} Erweiterungen",
+        "verified": "Paketliste signiert",
+        "unverified": "Paketliste nicht signiert",
+        "delete": "Entfernen",
+        "deleteTitle": "Paketquelle entfernen",
+        "deleteMessage": "Die Paketquelle „{{name}}“ wird entfernt. Bereits installierte Erweiterungen bleiben erhalten.",
+        "deleteFailed": "Die Paketquelle konnte nicht entfernt werden.",
+        "saveFailed": "Die Paketquelle konnte nicht gespeichert werden.",
+        "checkFailed": "Die Prüfung konnte nicht gestartet werden.",
+        "loadError": "Die Paketquellen konnten nicht geladen werden."
       }
     },
     "dashboardTemplates": {
@@ -6449,6 +6577,10 @@
         "gi_invoke": "Webservice-Aufruf",
         "gi_invoke_sync": "Webservice-Aufruf",
         "report_delivery": "Berichtsversand",
+        "plugin_install": "Erweiterung installieren",
+        "plugin_uninstall": "Erweiterung deinstallieren",
+        "plugin_fetch": "Erweiterung herunterladen",
+        "plugin_repository_refresh": "Paketquelle prüfen",
         "cmdb_propagation": "CMDB-Vorfallstatus neu berechnen",
         "cmdb_import": "CMDB-Import",
         "cmdb_export": "CMDB-Export",

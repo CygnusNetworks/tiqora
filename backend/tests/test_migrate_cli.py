@@ -76,7 +76,7 @@ def test_migrate_cli_upgrade_stays_at_tiqora_head(postgres_znuny_url: str) -> No
             conn.execute(text("SELECT 1 FROM tiqora_v1_itsm_ci_links LIMIT 1"))
         engine.dispose()
 
-        assert version == "20261010_0081"
+        assert version == "20261010_0082"
         assert not any(name and name.startswith("ix_owned_") for name in ticket_idx)
     finally:
         if old_url is None:

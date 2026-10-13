@@ -1,18 +1,27 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
 import { Button } from "@/components/ui/Button";
 import { SoftChip } from "@/components/ui/StatusChip";
 import { Spinner } from "@/components/ui/Spinner";
 import { Switch } from "@/components/ui/Switch";
+import { Tabs } from "@/components/ui/Tabs";
+import { useJob } from "@/components/jobs/useJob";
 import { toBcp47 } from "@/i18n";
 import { apiErrorMessage } from "@/lib/avatarApi";
 import { formatDateTime } from "@/lib/format";
 import { pluginPointsApi } from "@/lib/pluginPointsApi";
-import { pluginsApi, type PluginAdmin } from "@/lib/pluginsApi";
+import { pluginsApi, type PluginAdmin, type PluginPackage } from "@/lib/pluginsApi";
 import { isPluginSafeMode } from "@/plugins/safeMode";
+import { capabilityText } from "./plugins/capabilities";
+import { CatalogTab } from "./plugins/CatalogTab";
+import { InstallDialog } from "./plugins/InstallDialog";
+import { RepositoriesTab } from "./plugins/RepositoriesTab";
+import { RestartPanel } from "./plugins/RestartPanel";
+import { sourceLabel, trustColor, trustLabelKey } from "./plugins/trust";
+import { PLUGIN_TABS, parsePluginTab } from "./plugins/tabs";
+import { UninstallDialog } from "./plugins/UninstallDialog";
 
 const QUERY_KEY = ["admin", "plugins"] as const;
 
@@ -30,54 +39,8 @@ const STATUS_COLOR: Record<Status, string> = {
   incompatible: "var(--color-danger)",
 };
 
-const POINT_KEYS: Record<string, string> = {
-  "core.events.subscribers": "events",
-  "core.http.routes": "routes",
-  "core.http.public_routes": "public_routes",
-  "core.mcp.tools": "mcp_tools",
-  "core.worker.scheduled_tasks": "scheduled_tasks",
-  "core.reporting.builtin_reports": "builtin_reports",
-  "core.reporting.sources": "report_sources",
-  "core.events.sync_hooks": "sync_hooks",
-  "core.process.transition_actions": "transition_actions",
-  "core.process.condition_modules": "condition_modules",
-  "core.templates.placeholders": "placeholders",
-  "core.tickets.number_generators": "number_generators",
-  "core.dynamic_fields.types": "df_types",
-  "core.mail.inbound_filters": "inbound_mail_filters",
-  "core.mail.outbound_filters": "outbound_mail_filters",
-  "core.notifications.transports": "notification_transports",
-  "core.channels.drivers": "channel_drivers",
-  "core.auth.password_providers": "password_providers",
-  "core.customers.sources": "customer_sources",
-  "core.gi.operations": "gi_operations",
-  "core.gi.invokers": "gi_invokers",
-  "core.gi.mappings": "gi_mappings",
-};
-
 const NUMBER_GENERATORS_POINT = "core.tickets.number_generators";
 const NUMBER_GENERATORS_KEY = ["admin", "plugins", "number-generators"] as const;
-
-const SLOT_KEYS: Record<string, string> = {
-  "agent.nav": "nav",
-  "agent.route": "route",
-  "ticket.sidebar": "ticket_sidebar",
-  "dashboard.widget": "widget",
-};
-
-function capabilityText(t: TFunction, cap: PluginAdmin["capabilities"][number]): string {
-  if (cap.kind === "outbound_host") return t("admin.plugins.capabilities.host", { host: cap.value });
-  if (cap.kind === "extension_point") {
-    const key = POINT_KEYS[cap.value];
-    return key
-      ? t(`admin.plugins.capabilities.point.${key}`)
-      : t("admin.plugins.capabilities.point.other", { value: cap.value });
-  }
-  const key = SLOT_KEYS[cap.value];
-  return key
-    ? t(`admin.plugins.capabilities.slot.${key}`)
-    : t("admin.plugins.capabilities.slot.other", { value: cap.value });
-}
 
 function needsRetry(plugin: PluginAdmin): boolean {
   return (
@@ -161,6 +124,15 @@ function PluginDetails({ plugin }: { plugin: PluginAdmin }) {
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {plugin.migration_error && (
+        <section data-testid={`plugin-migration-error-${plugin.id}`}>
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
+            {t("admin.plugins.migrationError")}
+          </h3>
+          <p className="break-words text-danger">{plugin.migration_error}</p>
         </section>
       )}
 
@@ -267,6 +239,9 @@ function PluginCard({
   onFocused,
   onToggle,
   onRetry,
+  updateBusy,
+  onUpdate,
+  onUninstall,
 }: {
   plugin: PluginAdmin;
   disabled: boolean;
@@ -275,6 +250,9 @@ function PluginCard({
   onFocused: () => void;
   onToggle: (enabled: boolean) => void;
   onRetry: () => void;
+  updateBusy: boolean;
+  onUpdate: () => void;
+  onUninstall: () => void;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -317,7 +295,29 @@ function PluginCard({
           <p className="mt-0.5 text-xs text-muted">
             {t("admin.plugins.version", { version: plugin.version })} · {t("admin.plugins.publisher", { publisher: plugin.publisher })}
           </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <SoftChip color="var(--color-muted)" data-testid={`plugin-source-${id}`}>
+              {sourceLabel(t, plugin)}
+            </SoftChip>
+            {plugin.signature_status && (
+              <SoftChip color={trustColor(plugin.signature_status)} data-testid={`plugin-trust-${id}`}>
+                {t(trustLabelKey(plugin.signature_status))}
+              </SoftChip>
+            )}
+          </div>
           {plugin.description && <p className="mt-1.5 text-sm text-ink">{plugin.description}</p>}
+          {plugin.update && (
+            <div className="mt-1.5 text-sm" data-testid={`plugin-update-${id}`}>
+              <span className="font-medium text-ink">
+                {t("admin.plugins.update.available", { version: plugin.update.version })}
+              </span>
+              {plugin.update.image_plugin && (
+                <p className="mt-0.5 text-xs text-muted" data-testid={`plugin-update-image-hint-${id}`}>
+                  {t("admin.plugins.update.imageHint")}
+                </p>
+              )}
+            </div>
+          )}
           {plugin.status_message && (
             <p
               className={
@@ -353,6 +353,28 @@ function PluginCard({
         {needsRetry(plugin) && (
           <Button size="sm" variant="secondary" disabled={disabled} onClick={onRetry} data-testid={`plugin-retry-${id}`}>
             {t("admin.plugins.retry")}
+          </Button>
+        )}
+        {plugin.update && !plugin.update.image_plugin && (
+          <Button
+            size="sm"
+            variant="primary"
+            disabled={disabled || updateBusy}
+            onClick={onUpdate}
+            data-testid={`plugin-update-button-${id}`}
+          >
+            {t("admin.plugins.update.action")}
+          </Button>
+        )}
+        {plugin.can_uninstall && (
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={disabled}
+            onClick={onUninstall}
+            data-testid={`plugin-uninstall-${id}`}
+          >
+            {t("admin.plugins.uninstall.button")}
           </Button>
         )}
         <Button
@@ -398,14 +420,91 @@ export function PluginsPage() {
   const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
   const clearFocus = useCallback(() => setFocusTarget(null), []);
   const run = (target: FocusTarget, start: () => void) => {
-    // A new action clears the previous error.
+    // A new action clears the previous error, including a stale download error.
     toggleM.reset();
     retryM.reset();
+    downloadM.reset();
+    setDownloadError(null);
+    setDownloadMessage(null);
     setFocusTarget(target);
     start();
   };
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [pkg, setPkg] = useState<PluginPackage | null>(null);
+  const uploadM = useMutation({
+    mutationFn: (file: File) => pluginsApi.uploadPackage(file),
+    onSuccess: setPkg,
+  });
+  const onFile = (file: File | undefined) => {
+    if (fileRef.current) fileRef.current.value = "";
+    if (file) uploadM.mutate(file);
+  };
+  // The generation the server recorded for our request: the panel follows exactly that one.
+  const [restartGeneration, setRestartGeneration] = useState<number | null>(null);
+  const restartM = useMutation({
+    mutationFn: () => pluginsApi.requestRestart(),
+    onSuccess: (status) => setRestartGeneration(status.generation),
+  });
+  const [uninstalling, setUninstalling] = useState<PluginAdmin | null>(null);
+
+  // Update = download the package from the repository (a job), then show it in the install dialog.
+  const [downloadJobId, setDownloadJobId] = useState<number | null>(null);
+  const [downloadError, setDownloadError] = useState<unknown>(null);
+  // The failed job's German, admin-facing reason (signature, hash, F19 URL rejection ...).
+  const [downloadMessage, setDownloadMessage] = useState<string | null>(null);
+  const downloadM = useMutation({
+    mutationFn: ({ repoId, pluginId, version }: { repoId: number; pluginId: string; version: string }) =>
+      pluginsApi.download(repoId, { plugin_id: pluginId, version }),
+    onSuccess: (accepted) => setDownloadJobId(accepted.job_id),
+  });
+  const download = useJob(downloadJobId);
+  const handledJob = useRef<number | null>(null);
+  useEffect(() => {
+    const job = download.job;
+    if (downloadJobId == null || !job || handledJob.current === downloadJobId) return;
+    if (job.status === "succeeded") {
+      handledJob.current = downloadJobId;
+      const sha = job.result?.package_sha256;
+      if (typeof sha !== "string") {
+        setDownloadError(new Error("no package"));
+        setDownloadJobId(null);
+        return;
+      }
+      pluginsApi
+        .getPackage(sha)
+        .then(setPkg)
+        .catch(setDownloadError)
+        .finally(() => setDownloadJobId(null));
+    } else if (job.status === "failed" || job.status === "cancelled") {
+      handledJob.current = downloadJobId;
+      setDownloadError(new Error(job.error ?? ""));
+      setDownloadMessage(job.error?.trim() || null);
+      setDownloadJobId(null);
+    }
+  }, [download.job, downloadJobId]);
+  const downloading = downloadM.isPending || downloadJobId != null;
+  // Shared by "Aktualisieren" here and the "Verfügbar" tab: the job lives on the page, so a
+  // tab switch while it runs does not lose the install dialog.
+  const startDownload = (repoId: number, pluginId: string, version: string) => {
+    setDownloadError(null);
+    setDownloadMessage(null);
+    downloadM.mutate({ repoId, pluginId, version });
+  };
+  const startUpdate = (plugin: PluginAdmin) => {
+    if (!plugin.update) return;
+    startDownload(plugin.update.repository_id, plugin.id, plugin.update.version);
+  };
+
+  const search = useSearch({ strict: false }) as { tab?: unknown };
+  const navigate = useNavigate({ from: "/admin/plugins" });
+  const tab = parsePluginTab(search.tab);
+  const setTab = (next: string) => {
+    const value = parsePluginTab(next);
+    void navigate({ to: ".", search: { tab: value === "installed" ? undefined : value }, replace: true });
+  };
+
   const busy = toggleM.isPending || retryM.isPending;
-  const actionError = toggleM.error ?? retryM.error;
+  const actionError = toggleM.error ?? retryM.error ?? restartM.error ?? downloadM.error ?? downloadError;
 
   if (listQ.isLoading) {
     return (
@@ -414,7 +513,9 @@ export function PluginsPage() {
       </div>
     );
   }
-  if (listQ.isError || !listQ.data) {
+  // Only without any data: a failed background refetch (the api restarting) keeps the page
+  // and its open dialogs and restart progress.
+  if (!listQ.data) {
     return (
       <div className="p-4 text-sm text-danger" data-testid="admin-plugins-page">
         {apiErrorMessage(listQ.error, t("admin.plugins.loadError"))}
@@ -422,11 +523,42 @@ export function PluginsPage() {
     );
   }
 
-  const { plugins, safe_mode: safeMode } = listQ.data;
+  const { plugins, safe_mode: safeMode, runtime_install: runtimeInstall } = listQ.data;
+  const coordinated = listQ.data.coordinated_restart;
+  const restartPending = plugins.some((p) => p.status === "restart_required");
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4" data-testid="admin-plugins-page">
       <div>
-        <h1 className="font-display text-xl font-semibold text-ink">{t("admin.nav.plugins")}</h1>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h1 className="font-display text-xl font-semibold text-ink">{t("admin.nav.plugins")}</h1>
+          {runtimeInstall && (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".tqplugin"
+                className="hidden"
+                data-testid="plugin-upload-input"
+                aria-label={t("admin.plugins.upload")}
+                onChange={(e) => onFile(e.target.files?.[0])}
+              />
+              <Button
+                variant="primary"
+                disabled={uploadM.isPending}
+                onClick={() => fileRef.current?.click()}
+                title={t("admin.plugins.uploadHint")}
+                data-testid="plugin-upload"
+              >
+                {t("admin.plugins.upload")}
+              </Button>
+            </>
+          )}
+        </div>
+        {!runtimeInstall && (
+          <p className="mt-1 text-sm text-muted" data-testid="plugin-runtime-install-off">
+            {t("admin.plugins.runtimeInstallOff", { reason: listQ.data.runtime_install_reason ?? "" })}
+          </p>
+        )}
         <p className="mt-1 text-sm text-muted">{t("admin.plugins.description")}</p>
         <p
           className="mt-2 rounded-lg border border-hairline bg-surface-subtle px-3 py-2 text-sm text-ink"
@@ -454,13 +586,54 @@ export function PluginsPage() {
           {t("admin.plugins.browserOff")}
         </div>
       )}
-      {actionError && (
+      {uploadM.isError && (
+        <p role="alert" className="text-sm text-danger" data-testid="plugin-upload-error">
+          {apiErrorMessage(uploadM.error, t("admin.plugins.uploadFailed"))}
+        </p>
+      )}
+      {restartPending && (
+        <div className="space-y-2 rounded-lg border border-hairline bg-surface p-3" data-testid="plugin-restart-box">
+          {restartGeneration != null ? (
+            <RestartPanel generation={restartGeneration} />
+          ) : coordinated ? (
+            <Button variant="secondary" disabled={restartM.isPending} onClick={() => restartM.mutate()} data-testid="plugin-restart-now">
+              {t("admin.plugins.restart.now")}
+            </Button>
+          ) : (
+            <p className="text-sm text-ink">{t("admin.plugins.restart.manual")}</p>
+          )}
+        </div>
+      )}
+      {actionError != null && (
         <p role="alert" className="text-sm text-danger" data-testid="admin-plugins-action-error">
-          {apiErrorMessage(actionError, t("admin.plugins.actionError"))}
+          {actionError === downloadError && downloadMessage
+            ? downloadMessage
+            : apiErrorMessage(
+                actionError,
+                actionError === downloadError || actionError === downloadM.error
+                  ? t("admin.plugins.update.failed")
+                  : t("admin.plugins.actionError"),
+              )}
         </p>
       )}
 
-      {plugins.length === 0 ? (
+      <Tabs
+        ariaLabel={t("admin.plugins.tabs.aria")}
+        items={PLUGIN_TABS.map((id) => ({ id, label: t(`admin.plugins.tabs.${id}`) }))}
+        value={tab}
+        onChange={setTab}
+      />
+      {downloading && (
+        <p className="flex items-center gap-2 text-sm text-muted" role="status" data-testid="plugin-update-running">
+          <Spinner /> {t("admin.plugins.update.running")}
+        </p>
+      )}
+
+      {tab === "available" ? (
+        <CatalogTab runtimeInstall={runtimeInstall} downloading={downloading} onDownload={startDownload} />
+      ) : tab === "repositories" ? (
+        <RepositoriesTab />
+      ) : plugins.length === 0 ? (
         <p className="rounded-xl border border-hairline bg-surface p-4 text-sm text-muted" data-testid="admin-plugins-empty">
           {t("admin.plugins.empty")}
         </p>
@@ -477,9 +650,30 @@ export function PluginsPage() {
                 run({ id: plugin.id, what: "switch" }, () => toggleM.mutate({ id: plugin.id, enabled }))
               }
               onRetry={() => run({ id: plugin.id, what: "retry" }, () => retryM.mutate(plugin.id))}
+              updateBusy={downloading}
+              onUpdate={() => startUpdate(plugin)}
+              onUninstall={() => setUninstalling(plugin)}
             />
           ))}
         </ul>
+      )}
+      {uninstalling && (
+        <UninstallDialog
+          key={uninstalling.id}
+          plugin={uninstalling}
+          open
+          onClose={() => setUninstalling(null)}
+          coordinatedRestart={coordinated}
+        />
+      )}
+      {pkg && (
+        <InstallDialog
+          key={pkg.sha256}
+          pkg={pkg}
+          open
+          onClose={() => setPkg(null)}
+          coordinatedRestart={coordinated}
+        />
       )}
     </div>
   );

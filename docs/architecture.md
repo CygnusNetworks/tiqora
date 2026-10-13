@@ -903,8 +903,9 @@ Admin view: `GET /api/v1/admin/extensions`. The frontend has a counterpart,
 **Plugins** (`tiqora.plugins`, `tiqora_sdk`; user guide: [plugins.md](plugins.md)).
 Tier-1 extensions are Python distributions with an entry point in group
 `tiqora.plugins`, a `tiqora-plugin.toml` manifest and optionally a built
-frontend (`web/`, `i18n/`). They run in-process with full trust, and are
-installed only by baking them into the image (`tiqora plugins bake`).
+frontend (`web/`, `i18n/`). They run in-process with full trust. They are
+either baked into the image (`tiqora plugins bake`) or installed at runtime as
+signed or unsigned `.tqplugin` packages (below).
 
 - *Discovery* (`discovery.py`): reads entry points and package files, never
   imports plugin code; yields `DiscoveredPlugin` with the parsed manifest, web
@@ -975,6 +976,27 @@ installed only by baking them into the image (`tiqora plugins bake`).
   switch), `tiqora_plugin_runtime` (per plugin and role: state, boot attempts,
   last error), `tiqora_plugin_hook` (cursor, failure counter and circuit
   breaker of every event subscriber and scheduled task).
+- *Runtime install and restart* (`package.py`, `signing.py`, `inspect.py`,
+  `packages_store.py`, `runtime.py`, `install_jobs.py`, `repositories.py`,
+  `repo_index.py`, `restart.py`, `migrations.py`; user guide:
+  [plugins.md](plugins.md) sections 7 to 9). A `.tqplugin` is a zip with the wheel,
+  `CHECKSUMS` and an optional Ed25519 `SIGNATURE`. `inspect_package` reads it
+  without importing code and builds one `PackageReport` (trust level, problems,
+  capabilities). The package lives in the database (`tiqora_plugin_package`);
+  every process unpacks it below `TIQORA_PLUGINS_DIR` and appends the site
+  directory to `sys.path` (never prepends) before discovery, so a plugin cannot
+  shadow core modules and image plugins win. Install and uninstall are `plugins`-lane
+  jobs (`core.plugin_install`, `core.plugin_uninstall`); migrations run in a
+  subprocess, per plugin in its own Alembic environment with the version table
+  `tqp_<short_id>_alembic_version` and a statement guard confining DDL to the
+  `tqp_<short_id>_` prefix (a protection against accidents, not a security
+  boundary). Repositories (`tiqora_plugin_repository`, daemon `plugin_repositories`,
+  jobs `core.plugin_fetch`/`core.plugin_repository_refresh`) supply signed indexes
+  and publisher keys. A coordinated restart (`tiqora_process`, `tiqora_restart`)
+  makes the processes leave with exit code 75 one after another
+  (worker, ai-worker, mcp, api) and stops when one does not return; it waits while
+  a plugins-lane job runs. Install, uninstall and repository writes require a
+  browser session (no API keys).
 - *Safe mode and quarantine*: `TIQORA_PLUGINS_SAFE_MODE` imports no plugin
   code; `TIQORA_PLUGINS_DISABLED` skips plugins by id. `mark_loading` is written
   before an import; a plugin whose boot dies three times in a row (attempts not

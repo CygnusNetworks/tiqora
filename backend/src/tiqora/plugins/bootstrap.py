@@ -32,7 +32,13 @@ from tiqora.plugins.loader import (
     import_and_register,
     run_in_daemon_thread,
 )
+from tiqora.plugins.migrations import MIGRATION_PENDING_MESSAGE, migrations_dir
 from tiqora.plugins.registrar import RegistrationRejected
+from tiqora.plugins.runtime import (
+    RuntimeActivation,
+    activate_runtime_plugins,
+    gc_runtime_dirs_at_boot,
+)
 from tiqora.plugins.state import (
     QUARANTINE_AFTER,
     PluginLoadResult,
@@ -119,7 +125,9 @@ async def init_registry(
         return _finish(registry)
     active_written: list[str] = []
     try:
-        results = await _load_plugins(registry, role, settings, session_factory, active_written)
+        results = await _load_plugins(
+            registry, role, settings, session_factory, active_written, status_only=_late
+        )
     except Exception as exc:  # R-BOOT-ANYERR: our own plugin path must not block startup
         log.error(
             "plugins_boot_failed",
@@ -236,14 +244,54 @@ def _requirement_problem(
     return None
 
 
+async def _activation_problem_entries(
+    factory: async_sessionmaker[AsyncSession],
+    activation: RuntimeActivation,
+    discovered: Sequence[DiscoveredPlugin],
+) -> list[DiscoveredPlugin]:
+    """Synthetic INVALID entries for runtime packages that could not be put on ``sys.path``."""
+    known = {p.plugin_id for p in discovered}
+    wanted = {pid: msg for pid, msg in activation.problems.items() if pid not in known}
+    if not wanted:
+        return []
+    async with factory() as session:
+        rows = await store.list_plugin_rows(session)
+    out: list[DiscoveredPlugin] = []
+    for pid, message in sorted(wanted.items()):
+        row = rows.get(pid)
+        out.append(
+            DiscoveredPlugin(
+                pid,
+                "",
+                row.name if row is not None else "",  # keeps the stored name on sync
+                row.version if row is not None else "",
+                None,
+                None,
+                None,
+                (),
+                message,
+            )
+        )
+    return out
+
+
 async def _load_plugins(
     registry: Registry,
     role: PluginRole,
     settings: Settings,
     factory: async_sessionmaker[AsyncSession],
     active_written: list[str],
+    *,
+    status_only: bool = False,
 ) -> list[PluginLoadResult]:
+    # runtime packages first: their site dirs must be on sys.path before discovery
+    activation = await activate_runtime_plugins(
+        settings, factory, materialize=True, status_only=status_only
+    )
+    if not status_only:  # F8/D9: only a booting process collects old runtime dirs
+        await gc_runtime_dirs_at_boot(settings, factory)
     plugins: Sequence[DiscoveredPlugin] = discovered_plugins()
+    plugins = [*plugins, *await _activation_problem_entries(factory, activation, plugins)]
     if not plugins:
         return []
     try:
@@ -343,6 +391,12 @@ async def _load_plugins(
         problem = _requirement_problem(p, by_id, results)
         if problem is not None:
             await record(p, RuntimeState.FAILED, problem)
+            continue
+        if migrations_dir(p) is not None and (
+            info.migrated_version != p.manifest.version or info.migration_error
+        ):
+            detail = info.migration_error or "noch nicht ausgeführt"
+            await record(p, RuntimeState.FAILED, f"{MIGRATION_PENDING_MESSAGE}: {detail}"[:2000])
             continue
         remaining = budget - (time.monotonic() - started)
         if remaining < 1:  # too little left for a meaningful import attempt

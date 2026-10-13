@@ -21,6 +21,22 @@
 # host-local scrape) can reach them. Change the bind if you intentionally
 # expose the app without a proxy (not recommended).
 
+# Runtime plugin installs (Admin -> Erweiterungen). The packages live in the
+# database; tiqora_plugins is only the unpacked working copy, so it can be
+# shared or per container. Needs (see docs/deployment.md, "Erweiterungen zur
+# Laufzeit installieren"):
+#   - restart: unless-stopped (or always): after an install the processes exit
+#     with code 75 and rely on the restart policy. Without automatic restarts
+#     set TIQORA_PLUGINS_COORDINATED_RESTART=0 and restart by hand.
+#   - a writable plugins dir. With read_only: true mount tiqora_plugins rw, or
+#     set TIQORA_PLUGINS_RUNTIME_INSTALL=0 and bake plugins into the image.
+# Optional env vars (defaults): TIQORA_PLUGINS_DIR=/var/lib/tiqora/plugins,
+#   TIQORA_PLUGINS_RUNTIME_INSTALL=1, TIQORA_PLUGINS_ALLOW_UNSIGNED=0,
+#   TIQORA_PLUGINS_TRUSTED_KEYS=, TIQORA_PLUGINS_MAX_PACKAGE_MB=15,
+#   TIQORA_PLUGINS_COORDINATED_RESTART=1, TIQORA_PLUGINS_RESTART_TIMEOUT_SECONDS=180,
+#   TIQORA_PLUGIN_REPOSITORIES=, TIQORA_PLUGIN_REPOSITORY_FILE_ROOT=/var/lib/tiqora/plugin-repository,
+#   TIQORA_PLUGIN_REPOSITORIES_INTERVAL_SECONDS=21600
+
 services:
   # --- Option A: PostgreSQL ---
   postgres:
@@ -133,6 +149,7 @@ services:
       # TIQORA_GIT_SHA: ${TIQORA_GIT_SHA:-}
       # TIQORA_BUILD_TIME: ${TIQORA_BUILD_TIME:-}
     volumes:
+      - tiqora_plugins:/var/lib/tiqora/plugins
       # OPT-IN: Docker socket for the admin System-Info page's container /
       # healthcheck view. Left commented on purpose — the page works without it
       # and only the "Container" section degrades to "socket not mounted";
@@ -172,6 +189,8 @@ services:
     image: ghcr.io/cygnusnetworks/tiqora:latest
     restart: unless-stopped
     command: ["worker"]
+    volumes:
+      - tiqora_plugins:/var/lib/tiqora/plugins
     environment:
       DATABASE_URL: postgresql+asyncpg://tiqora:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/tiqora
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379/0
@@ -183,8 +202,10 @@ services:
       # Public Tiqora URL, identical for API and worker-generated links.
       TIQORA_PUBLIC_BASE_URL: ${TIQORA_PUBLIC_BASE_URL:-https://helpdesk.example.com}
     depends_on:
-      - tiqora-api
-      - redis
+      tiqora-api:
+        condition: service_healthy
+      redis:
+        condition: service_started
     healthcheck:
       # No HTTP port — the worker touches a heartbeat file each cycle; this
       # checks it is fresh (i.e. the asyncio event loop is alive).
@@ -203,6 +224,8 @@ services:
     image: ghcr.io/cygnusnetworks/tiqora:latest
     restart: unless-stopped
     command: ["ai-worker"]
+    volumes:
+      - tiqora_plugins:/var/lib/tiqora/plugins
     environment:
       DATABASE_URL: postgresql+asyncpg://tiqora:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/tiqora
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379/0
@@ -212,8 +235,10 @@ services:
       TIQORA_ENV: production
       TIQORA_LOG_LEVEL: INFO
     depends_on:
-      - tiqora-api
-      - redis
+      tiqora-api:
+        condition: service_healthy
+      redis:
+        condition: service_started
     healthcheck:
       # No HTTP port — same heartbeat-file pattern as tiqora-worker, own file.
       test: ["CMD-SHELL", "python -c \"import os,sys,time; f=os.environ.get('TIQORA_AI_WORKER_HEARTBEAT_FILE','/tmp/tiqora-ai-worker.heartbeat'); sys.exit(0 if os.path.exists(f) and time.time()-os.path.getmtime(f) < 90 else 1)\""]
@@ -226,6 +251,8 @@ services:
     image: ghcr.io/cygnusnetworks/tiqora:latest
     restart: unless-stopped
     command: ["mcp"]
+    volumes:
+      - tiqora_plugins:/var/lib/tiqora/plugins
     environment:
       DATABASE_URL: postgresql+asyncpg://tiqora:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/tiqora
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379/0
@@ -237,7 +264,8 @@ services:
     ports:
       - "127.0.0.1:8001:8001"
     depends_on:
-      - tiqora-api
+      tiqora-api:
+        condition: service_healthy
     healthcheck:
       # FastMCP streamable-HTTP returns 404 on "/" — any HTTP response proves
       # the server is listening (a bare liveness check, not MCP-protocol auth).
@@ -254,6 +282,7 @@ services:
   #     - "127.0.0.1:1025:1025"
 
 volumes:
+  tiqora_plugins:
   tiqora_pg:
   # tiqora_mysql:
   tiqora_redis:

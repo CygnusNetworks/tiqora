@@ -1,0 +1,13 @@
+manifest_version = 1
+id = "org.example.badmig"
+short_id = "badmig"
+name = "Fehlerhafte Migration"
+version = "1.0.0"
+publisher = "Example GmbH"
+publisher_id = "org.example"
+description = "Testerweiterung, deren Datenbank-Änderung eine Znuny-Tabelle anfasst."
+entry = "tq_fixture_badmig:plugin"
+sdk = ">=0.2,<0.3"
+
+[capabilities]
+extension_points = []

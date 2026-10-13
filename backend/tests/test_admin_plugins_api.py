@@ -30,7 +30,12 @@ from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db
 from tiqora.api.v1.admin.deps import get_admin_user
 from tiqora.config import Settings
-from tiqora.db.tiqora.models import TiqoraPlugin, TiqoraPluginHook
+from tiqora.db.tiqora.models import (
+    TiqoraPlugin,
+    TiqoraPluginHook,
+    TiqoraPluginPackage,
+    TiqoraPluginRepository,
+)
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.extensions.core import register_core, set_registry_for_tests
 from tiqora.extensions.registry import Registry
@@ -38,7 +43,12 @@ from tiqora.permissions.engine import PermissionEngine
 from tiqora.plugins import store
 from tiqora.plugins.context import make_plugin_context
 from tiqora.plugins.discovery import discover_plugins
+from tiqora.plugins.inspect import CapabilityLine, PackageReport
 from tiqora.plugins.loader import commit_registrar, import_and_register
+from tiqora.plugins.migrations import MIGRATION_PENDING_MESSAGE
+from tiqora.plugins.repositories import UpdateInfo, url_key
+from tiqora.plugins.runtime import reset_dir_status_cache
+from tiqora.plugins.signing import TrustLevel
 from tiqora.plugins.state import PluginLoadResult, RuntimeState, set_loaded_plugins
 from tiqora.plugins.sync_hooks import SYNC_HOOKS, ensure_sync_hook_rows
 
@@ -62,13 +72,17 @@ def _reset_plugin_state() -> Iterator[None]:
 
 
 def _app(
-    factory: async_sessionmaker[AsyncSession], *, safe_mode: bool = False, admin: bool = True
+    factory: async_sessionmaker[AsyncSession],
+    *,
+    safe_mode: bool = False,
+    admin: bool = True,
+    **settings_kw: Any,
 ) -> Any:
     async def _db() -> Any:
         async with factory() as session:
             yield session
 
-    app = create_app(Settings(environment="test", plugins_safe_mode=safe_mode))
+    app = create_app(Settings(environment="test", plugins_safe_mode=safe_mode, **settings_kw))
     app.dependency_overrides[get_db] = _db
     if admin:
         app.dependency_overrides[get_admin_user] = lambda: ROOT
@@ -325,7 +339,9 @@ async def test_disable_needs_restart(
     r = await admin_client.put(f"{BASE}/{PLUGIN_ID}/enabled", json={"enabled": False})
     assert r.status_code == 200
     assert r.json()["status"] == "restart_required"
-    assert r.json()["status_message"] == "Änderung wird nach einem Neustart von Tiqora wirksam."
+    assert r.json()["status_message"] == (
+        "Änderung wird nach einem Neustart von Tiqora wirksam. Sie können Tiqora oben neu starten."
+    )
     row = await _plugin_row(factory, PLUGIN_ID)
     assert row.enabled is False and row.changed_by == 1
 
@@ -424,3 +440,271 @@ async def test_non_admin_403(agent_client: AsyncClient) -> None:
     put = await agent_client.put(f"{BASE}/{PLUGIN_ID}/enabled", json={"enabled": True})
     assert put.status_code == 403
     assert (await agent_client.post(f"{BASE}/{PLUGIN_ID}/reset")).status_code == 403
+
+
+# ---------------------------------------------------------------- Task 20: install state fields
+
+
+def _report(sha: str, plugin_id: str, *tables: str) -> PackageReport:
+    return PackageReport(
+        sha256=sha,
+        size_bytes=3,
+        plugin_id=plugin_id,
+        short_id="tables",
+        name="Tabellen",
+        version="1.0.0",
+        publisher="Example GmbH",
+        publisher_id="org.example",
+        description="",
+        license=None,
+        homepage=None,
+        support=None,
+        categories=[],
+        changelog=None,
+        trust=TrustLevel.VERIFIED_PUBLISHER,
+        key_id="k1",
+        signer="Example GmbH",
+        capabilities=[CapabilityLine(kind="table", value=t) for t in tables],
+        problems=[],
+        warnings=[],
+        installed_version=None,
+        action="install",
+        installable=True,
+    )
+
+
+async def _make_runtime(
+    factory: async_sessionmaker[AsyncSession], plugin_id: str, *tables: str
+) -> None:
+    """Turn the seeded row of ``plugin_id`` into an uploaded, verified runtime plugin."""
+    sha = "ab" * 32
+    async with factory() as s:
+        s.add(
+            TiqoraPluginPackage(
+                sha256=sha,
+                plugin_id=plugin_id,
+                version="1.0.0",
+                size_bytes=3,
+                data=b"abc",
+                manifest="m",
+                report=_report(sha, plugin_id, *tables).model_dump_json(),
+                signature_status="verified_publisher",
+                key_id="k1",
+                source="upload",
+                repository_id=None,
+                uploaded_by=1,
+                uploaded_at=T0,
+                installed_at=T0,
+            )
+        )
+        row = (
+            await s.execute(select(TiqoraPlugin).where(TiqoraPlugin.id == plugin_id))
+        ).scalar_one()
+        row.source = "upload"
+        row.package_sha256 = sha
+        row.signature_status = "verified_publisher"
+        row.signer = "Example GmbH"
+        await s.commit()
+
+
+@pytest.fixture(autouse=True)
+async def _drop_packages(factory: async_sessionmaker[AsyncSession]) -> AsyncIterator[None]:
+    yield
+    async with factory() as s:
+        await s.execute(delete(TiqoraPluginPackage).where(TiqoraPluginPackage.sha256 == "ab" * 32))
+        await s.commit()
+
+
+async def test_list_runtime_install_flags(
+    factory: async_sessionmaker[AsyncSession], tmp_path: Path
+) -> None:
+    reset_dir_status_cache()
+    async with _client(_app(factory, plugins_dir=str(tmp_path))) as c:
+        body = (await c.get(BASE)).json()
+    assert body["runtime_install"] is True and body["runtime_install_reason"] is None
+    assert body["allow_unsigned"] is False and body["max_package_mb"] == 15
+    assert body["coordinated_restart"] is True
+    reset_dir_status_cache()
+    missing = tmp_path / "gibt-es-nicht"
+    async with _client(
+        _app(
+            factory,
+            plugins_dir=str(missing),
+            plugins_allow_unsigned=True,
+            plugins_max_package_mb=7,
+            plugins_coordinated_restart=False,
+        )
+    ) as c:
+        body = (await c.get(BASE)).json()
+    reset_dir_status_cache()
+    assert body["runtime_install"] is False
+    assert str(missing) in body["runtime_install_reason"]
+    assert body["allow_unsigned"] is True and body["max_package_mb"] == 7
+    assert body["coordinated_restart"] is False
+
+
+async def test_runtime_plugin_fields(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    seeded_runtime: None,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    image = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+    assert image["source"] == "image" and image["signature_status"] is None
+    assert image["signer"] is None and image["can_uninstall"] is False
+    assert image["migration_error"] is None and image["update"] is None
+    await _make_runtime(factory, PLUGIN_ID)
+    p = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+    assert p["source"] == "upload" and p["signature_status"] == "verified_publisher"
+    assert p["signer"] == "Example GmbH" and p["can_uninstall"] is True
+
+
+async def test_repository_plugin_names_its_repository(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    seeded_runtime: None,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """FE M9: the card names the source repository even without a pending update."""
+    await _make_runtime(factory, PLUGIN_ID)
+    image = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+    assert (image["repository_id"], image["repository_name"]) == (None, None)  # an upload
+    url = "https://plg49.example.org/index.json"
+    async with factory() as s:
+        repo = TiqoraPluginRepository(
+            name="plg49 Quelle",
+            url=url,
+            url_key=url_key(url),
+            public_key=None,
+            enabled=True,
+            origin="admin",
+            index_verified=False,
+            created_at=T0,
+            updated_at=T0,
+        )
+        s.add(repo)
+        await s.flush()
+        rid = repo.id
+        row = (
+            await s.execute(select(TiqoraPlugin).where(TiqoraPlugin.id == PLUGIN_ID))
+        ).scalar_one()
+        row.source, row.repository_id = "repository", rid
+        await s.commit()
+    try:
+        p = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+        assert (p["repository_id"], p["repository_name"]) == (rid, "plg49 Quelle")
+    finally:
+        async with factory() as s:
+            await s.execute(delete(TiqoraPluginRepository).where(TiqoraPluginRepository.id == rid))
+            await s.commit()
+    gone = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+    assert (gone["repository_id"], gone["repository_name"]) == (rid, None)
+
+
+async def test_image_row_gone_from_image_can_be_uninstalled(
+    admin_client: AsyncClient, factory: async_sessionmaker[AsyncSession]
+) -> None:
+    await seed_plugin_row(factory, "org.example.plg49gone", enabled=True)
+    p = _by_id((await admin_client.get(BASE)).json(), "org.example.plg49gone")
+    assert p["status"] == "invalid" and p["can_uninstall"] is True
+    assert p["signature_status"] is None
+
+
+async def test_migration_error_surfaces_as_failed(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    seeded_runtime: None,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with factory() as s:
+        row = (
+            await s.execute(select(TiqoraPlugin).where(TiqoraPlugin.id == PLUGIN_ID))
+        ).scalar_one()
+        row.migration_error = "Spalte fehlt"
+        await s.commit()
+    await store.mark_result(
+        factory,
+        PLUGIN_ID,
+        "api",
+        state=RuntimeState.FAILED,
+        version="1.0.0",
+        error=f"{MIGRATION_PENDING_MESSAGE}: Spalte fehlt",
+        now=T0,
+    )
+    p = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+    assert p["status"] == "failed" and p["migration_error"] == "Spalte fehlt"
+    assert MIGRATION_PENDING_MESSAGE in p["status_message"]
+
+
+async def test_update_field(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    seeded_runtime: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake(session: AsyncSession, *, settings: Settings) -> dict[str, UpdateInfo]:
+        return {PLUGIN_ID: UpdateInfo("1.2.0", 5, "Beispiel-Quelle", False)}
+
+    monkeypatch.setattr("tiqora.api.v1.admin.plugins.available_updates", fake)
+    p = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+    assert p["update"] == {
+        "version": "1.2.0",
+        "repository_id": 5,
+        "repository_name": "Beispiel-Quelle",
+        "image_plugin": False,
+    }
+
+
+async def test_update_failure_does_not_break_the_list(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    seeded_runtime: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def boom(session: AsyncSession, *, settings: Settings) -> dict[str, UpdateInfo]:
+        raise RuntimeError("index kaputt")
+
+    monkeypatch.setattr("tiqora.api.v1.admin.plugins.available_updates", boom)
+    r = await admin_client.get(BASE)
+    assert r.status_code == 200
+    assert _by_id(r.json(), PLUGIN_ID)["update"] is None
+
+
+async def test_table_capabilities_listed(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    seeded_runtime: None,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    await _make_runtime(factory, PLUGIN_ID, "tqp_tables_note", "tqp_tables_tag")
+    p = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+    tables = [c["value"] for c in p["capabilities"] if c["kind"] == "table"]
+    assert tables == ["tqp_tables_note", "tqp_tables_tag"]
+
+
+async def test_image_plugin_table_capabilities_listed(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    # image branch: tables come from the migrations dir of the installed files
+    fixture_plugins("tq_fixture_tables", plugin_id="org.example.tables")
+    (p,) = discover_plugins()
+    async with factory() as s:
+        await store.sync_discovered(s, [p], auto_enable=True, now=T0)
+        await s.commit()
+    body = (await admin_client.get(BASE)).json()
+    plugin = _by_id(body, "org.example.tables")
+    assert plugin["signature_status"] is None
+    tables = [c["value"] for c in plugin["capabilities"] if c["kind"] == "table"]
+    assert tables == ["tqp_tables_note"]
+
+
+async def test_restart_required_message_mentions_restart_button(
+    fixture_plugins: Installer, admin_client: AsyncClient, seeded_runtime: None
+) -> None:
+    r = await admin_client.put(f"{BASE}/{PLUGIN_ID}/enabled", json={"enabled": False})
+    assert r.json()["status"] == "restart_required"
+    assert r.json()["status_message"] == (
+        "Änderung wird nach einem Neustart von Tiqora wirksam. Sie können Tiqora oben neu starten."
+    )

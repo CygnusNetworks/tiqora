@@ -7,10 +7,15 @@ import i18n from "@/i18n";
 import type { PluginAdmin } from "@/lib/pluginsApi";
 import { PLUGIN_SAFE_MODE_KEY } from "@/plugins/safeMode";
 import { ADMIN_PAGES, rankAdminPages } from "@/lib/adminSearch";
-import { aiWorkerRuntime, syncHookRow } from "@/test/pluginFixtures";
+import type { Job } from "@/lib/jobsApi";
+import { adminListFields, aiWorkerRuntime, catalogEntry, packageReport, repository, restartStatus, syncHookRow } from "@/test/pluginFixtures";
 import { PluginsPage } from "./PluginsPage";
 
+const navigate = vi.fn();
+let searchState: Record<string, unknown> = {};
 vi.mock("@tanstack/react-router", () => ({
+  useSearch: () => searchState,
+  useNavigate: () => navigate,
   Link: ({ to, params, children, ...rest }: { to: string; params?: Record<string, string>; children: ReactNode; [k: string]: unknown }) => (
     <a href={Object.entries(params ?? {}).reduce((acc, [k, v]) => acc.replace(`$${k}`, v), to)} {...rest}>
       {children}
@@ -21,13 +26,60 @@ vi.mock("@tanstack/react-router", () => ({
 const adminList = vi.fn();
 const setEnabled = vi.fn();
 const reset = vi.fn();
+const uploadPackage = vi.fn();
+const download = vi.fn();
+const getPackage = vi.fn();
+const restartStatusFn = vi.fn();
+const requestRestart = vi.fn();
+const installPackage = vi.fn();
+const repositoriesFn = vi.fn();
+const catalogFn = vi.fn();
 vi.mock("@/lib/pluginsApi", () => ({
   pluginsApi: {
+    repositories: (...a: unknown[]) => repositoriesFn(...a),
+    catalog: (...a: unknown[]) => catalogFn(...a),
+    download: (...a: unknown[]) => download(...a),
+    getPackage: (...a: unknown[]) => getPackage(...a),
+    restartStatus: (...a: unknown[]) => restartStatusFn(...a),
+    requestRestart: (...a: unknown[]) => requestRestart(...a),
+    installPackage: (...a: unknown[]) => installPackage(...a),
+    uploadPackage: (...a: unknown[]) => uploadPackage(...a),
     adminList: (...a: unknown[]) => adminList(...a),
     setEnabled: (...a: unknown[]) => setEnabled(...a),
     reset: (...a: unknown[]) => reset(...a),
   },
 }));
+
+let jobState: Job | undefined;
+vi.mock("@/components/jobs/useJob", () => ({
+  useJob: (id: number | null) => ({
+    job: id == null ? undefined : jobState,
+    isTerminal: jobState ? ["succeeded", "failed", "cancelled"].includes(jobState.status) : false,
+    cancel: vi.fn(),
+    isCancelling: false,
+  }),
+}));
+
+function job(overrides: Partial<Job> = {}): Job {
+  return {
+    cancel_requested: false,
+    created_at: UPDATED,
+    created_by: 1,
+    error: null,
+    files: [],
+    finished_at: null,
+    id: 5,
+    kind: "core.plugin_download",
+    progress_done: 0,
+    progress_message: null,
+    progress_total: null,
+    result: null,
+    started_at: UPDATED,
+    status: "running",
+    title_key: "jobs.kinds.core.plugin_download",
+    ...overrides,
+  };
+}
 
 const numberGenerators = vi.fn();
 const setNumberGenerator = vi.fn();
@@ -57,6 +109,13 @@ function adminPlugin(overrides: Partial<PluginAdmin> = {}): PluginAdmin {
     status: "active",
     status_message: null,
     settings_section: "plugins.org.example.hello",
+    signature_status: null,
+    signer: null,
+    can_uninstall: false,
+    migration_error: null,
+    update: null,
+    repository_id: null,
+    repository_name: null,
     capabilities: [
       { kind: "extension_point", value: "core.events.subscribers" },
       { kind: "extension_point", value: "core.http.public_routes" },
@@ -116,15 +175,24 @@ beforeEach(async () => {
   adminList.mockReset();
   setEnabled.mockReset();
   reset.mockReset();
+  uploadPackage.mockReset();
   numberGenerators.mockReset();
   setNumberGenerator.mockReset();
   sessionStorage.clear();
+  navigate.mockReset();
+  searchState = {};
+  jobState = undefined;
+  for (const fn of [download, getPackage, requestRestart, installPackage, repositoriesFn, catalogFn]) fn.mockReset();
+  repositoriesFn.mockResolvedValue([repository()]);
+  catalogFn.mockResolvedValue({ categories: [], entries: [catalogEntry({ name: "Katalog-Plugin" })] });
+  restartStatusFn.mockReset();
+  restartStatusFn.mockResolvedValue(restartStatus({ generation: 4 }));
 });
 afterEach(() => sessionStorage.clear());
 
 describe("PluginsPage", () => {
   it("lists plugins with plain-language status", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE, QUARANTINED] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE, QUARANTINED] });
     renderPage();
     expect(await screen.findByTestId("plugin-status-org.example.hello")).toHaveTextContent("Aktiv");
     expect(screen.getByTestId("plugin-status-org.example.crashy")).toHaveTextContent("Übersprungen");
@@ -134,7 +202,7 @@ describe("PluginsPage", () => {
   });
 
   it("switching off calls the API and shows the restart note", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
     setEnabled.mockResolvedValue({
       ...ACTIVE,
       enabled: false,
@@ -150,7 +218,7 @@ describe("PluginsPage", () => {
   });
 
   it("retry resets quarantine and stopped hooks", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [QUARANTINED, TRIPPED] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [QUARANTINED, TRIPPED] });
     reset.mockResolvedValue({ ...QUARANTINED, status: "disabled", status_message: null });
     renderPage();
     fireEvent.click(await screen.findByTestId("plugin-retry-org.example.crashy"));
@@ -163,7 +231,7 @@ describe("PluginsPage", () => {
   });
 
   it("shows capabilities in plain words and the trust note in the header", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
     renderPage();
     // R-TRUST-WORDING: visible before any disclosure is opened.
     expect(await screen.findByTestId("admin-plugins-trust-note")).toHaveTextContent(/keine Absicherung/);
@@ -177,7 +245,7 @@ describe("PluginsPage", () => {
   });
 
   it("settings button links to the generated form", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE, QUARANTINED] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE, QUARANTINED] });
     renderPage();
     expect(await screen.findByTestId("plugin-settings-org.example.hello")).toHaveAttribute(
       "href",
@@ -187,7 +255,7 @@ describe("PluginsPage", () => {
   });
 
   it("safe mode banner, browser-off note and empty state", async () => {
-    adminList.mockResolvedValue({ safe_mode: true, plugins: [] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: true, plugins: [] });
     sessionStorage.setItem(PLUGIN_SAFE_MODE_KEY, "1");
     renderPage();
     expect(await screen.findByTestId("admin-plugins-safe-mode")).toBeInTheDocument();
@@ -196,7 +264,7 @@ describe("PluginsPage", () => {
   });
 
   it("shows no safe-mode notes in normal operation", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
     renderPage();
     await screen.findByTestId("plugin-card-org.example.hello");
     expect(screen.queryByTestId("admin-plugins-safe-mode")).toBeNull();
@@ -204,7 +272,7 @@ describe("PluginsPage", () => {
   });
 
   it("returns focus to the switch after toggling and clears an old error on success", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
     setEnabled.mockRejectedValueOnce(new Error("x")).mockResolvedValueOnce({ ...ACTIVE, enabled: false });
     renderPage();
     const sw = await screen.findByRole("switch", { name: "Hallo-Erweiterung" });
@@ -217,7 +285,7 @@ describe("PluginsPage", () => {
   });
 
   it("moves focus to the heading when the retry button disappears", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [QUARANTINED] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [QUARANTINED] });
     reset.mockResolvedValue({ ...QUARANTINED, status: "disabled", status_message: null });
     renderPage();
     fireEvent.click(await screen.findByTestId("plugin-retry-org.example.crashy"));
@@ -228,14 +296,14 @@ describe("PluginsPage", () => {
   });
 
   it("shows restart-needed muted, not in a warning colour", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [adminPlugin({ status: "restart_required", enabled: false })] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [adminPlugin({ status: "restart_required", enabled: false })] });
     renderPage();
     const chip = await screen.findByTestId("plugin-status-org.example.hello");
     expect(chip.style.color).toBe("var(--color-muted)");
   });
 
   it("shows an error when the switch fails", async () => {
-    adminList.mockResolvedValue({ safe_mode: false, plugins: [ACTIVE] });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
     setEnabled.mockRejectedValue(new Error("x"));
     renderPage();
     fireEvent.click(await screen.findByRole("switch", { name: "Hallo-Erweiterung" }));
@@ -245,11 +313,323 @@ describe("PluginsPage", () => {
   });
 });
 
+describe("PluginsPage upload", () => {
+  it("uploads a file and opens the install dialog", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
+    uploadPackage.mockResolvedValue(packageReport());
+    renderPage();
+    const input = await screen.findByTestId("plugin-upload-input");
+    expect(input).toHaveAttribute("accept", ".tqplugin");
+    const file = new File(["zip"], "tables-1.0.0.tqplugin", { type: "application/octet-stream" });
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(uploadPackage).toHaveBeenCalledWith(file));
+    expect(await screen.findByRole("dialog", { name: "Erweiterung installieren" })).toBeInTheDocument();
+    expect(screen.getByText("Tabellen-Beispiel")).toBeInTheDocument();
+  });
+
+  it("shows the server's message when the package is rejected", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
+    uploadPackage.mockRejectedValue(new Error("x"));
+    renderPage();
+    fireEvent.change(await screen.findByTestId("plugin-upload-input"), {
+      target: { files: [new File(["x"], "x.tqplugin")] },
+    });
+    expect(await screen.findByTestId("plugin-upload-error")).toHaveTextContent("Das Paket konnte nicht geprüft werden.");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("shows the reason instead of the upload button when runtime install is off", async () => {
+    adminList.mockResolvedValue({
+      ...adminListFields({ runtime_install: false, runtime_install_reason: "Das Paketverzeichnis ist schreibgeschützt." }),
+      safe_mode: false,
+      plugins: [ACTIVE],
+    });
+    renderPage();
+    expect(await screen.findByTestId("plugin-runtime-install-off")).toHaveTextContent(
+      "Das Paketverzeichnis ist schreibgeschützt.",
+    );
+    expect(screen.queryByTestId("plugin-upload")).toBeNull();
+    expect(screen.queryByTestId("plugin-upload-input")).toBeNull();
+  });
+
+  it("offers a restart button while a plugin waits for a restart", async () => {
+    adminList.mockResolvedValue({
+      ...adminListFields(),
+      safe_mode: false,
+      plugins: [adminPlugin({ status: "restart_required" })],
+    });
+    renderPage();
+    expect(await screen.findByRole("button", { name: "Jetzt neu starten" })).toBeInTheDocument();
+  });
+});
+
+describe("PluginsPage installed tab", () => {
+  const UPLOADED = adminPlugin({
+    id: "org.example.tables",
+    name: "Tabellen-Beispiel",
+    source: "upload",
+    signature_status: "verified_publisher",
+    can_uninstall: true,
+    settings_section: null,
+  });
+
+  it("shows source and trust chips", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE, UPLOADED] });
+    renderPage();
+    expect(await screen.findByTestId("plugin-source-org.example.hello")).toHaveTextContent("Im Image eingebaut");
+    expect(screen.queryByTestId("plugin-trust-org.example.hello")).toBeNull();
+    expect(screen.getByTestId("plugin-source-org.example.tables")).toHaveTextContent("Hochgeladen");
+    expect(screen.getByTestId("plugin-trust-org.example.tables")).toHaveTextContent("Verifizierter Herausgeber");
+  });
+
+  it("shows a migration error in the details", async () => {
+    adminList.mockResolvedValue({
+      ...adminListFields(),
+      safe_mode: false,
+      plugins: [adminPlugin({ migration_error: "Tabelle fehlt" })],
+    });
+    renderPage();
+    expect(screen.queryByTestId("plugin-migration-error-org.example.hello")).toBeNull();
+    fireEvent.click(await screen.findByTestId("plugin-details-org.example.hello"));
+    expect(screen.getByTestId("plugin-migration-error-org.example.hello")).toHaveTextContent("Tabelle fehlt");
+  });
+
+  it("offers an update from a repository and starts the download job", async () => {
+    const withUpdate = adminPlugin({
+      source: "repository",
+      signature_status: "official",
+      can_uninstall: true,
+      repository_id: 3,
+      repository_name: "Offizielle Quelle",
+      update: { version: "1.1.0", image_plugin: false, repository_id: 3, repository_name: "Offizielle Quelle" },
+    });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [withUpdate] });
+    download.mockResolvedValue({ job_id: 5 });
+    getPackage.mockResolvedValue(packageReport({ sha256: "ab".repeat(32), action: "update", installed_version: "1.0.0", version: "1.1.0" }));
+    renderPage();
+    expect(await screen.findByTestId("plugin-update-org.example.hello")).toHaveTextContent(
+      "Aktualisierung verfügbar: 1.1.0",
+    );
+    expect(screen.getByTestId("plugin-source-org.example.hello")).toHaveTextContent("Aus Paketquelle Offizielle Quelle");
+    jobState = job({ status: "succeeded", result: { package_sha256: "ab".repeat(32) } });
+    fireEvent.click(screen.getByRole("button", { name: "Aktualisieren" }));
+    await waitFor(() =>
+      expect(download).toHaveBeenCalledWith(3, { plugin_id: "org.example.hello", version: "1.1.0" }),
+    );
+    await waitFor(() => expect(getPackage).toHaveBeenCalledWith("ab".repeat(32)));
+    expect(await screen.findByRole("dialog", { name: "Erweiterung installieren" })).toBeInTheDocument();
+  });
+
+  it("shows an error when the download job fails with its own reason", async () => {
+    const withUpdate = adminPlugin({
+      source: "repository",
+      update: { version: "1.1.0", image_plugin: false, repository_id: 3, repository_name: "Quelle" },
+    });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [withUpdate] });
+    download.mockResolvedValue({ job_id: 5 });
+    jobState = job({ status: "failed", error: "Die Signatur des Pakets ist ungültig." });
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Aktualisieren" }));
+    expect(await screen.findByTestId("admin-plugins-action-error")).toHaveTextContent(
+      "Die Signatur des Pakets ist ungültig.",
+    );
+    expect(getPackage).not.toHaveBeenCalled();
+  });
+
+  it("shows the generic text when the failed download job has no reason", async () => {
+    const withUpdate = adminPlugin({
+      source: "repository",
+      update: { version: "1.1.0", image_plugin: false, repository_id: 3, repository_name: "Quelle" },
+    });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [withUpdate] });
+    download.mockResolvedValue({ job_id: 5 });
+    jobState = job({ status: "failed", error: null });
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Aktualisieren" }));
+    expect(await screen.findByTestId("admin-plugins-action-error")).toHaveTextContent(
+      "Das Paket konnte nicht heruntergeladen werden.",
+    );
+    expect(getPackage).not.toHaveBeenCalled();
+  });
+
+  it("a later switch error after a failed download shows the switch's own text", async () => {
+    const withUpdate = adminPlugin({
+      source: "repository",
+      update: { version: "1.1.0", image_plugin: false, repository_id: 3, repository_name: "Quelle" },
+    });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [withUpdate] });
+    download.mockResolvedValue({ job_id: 5 });
+    setEnabled.mockRejectedValue(new Error("x"));
+    jobState = job({ status: "failed", error: null });
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Aktualisieren" }));
+    expect(await screen.findByTestId("admin-plugins-action-error")).toHaveTextContent(
+      "Das Paket konnte nicht heruntergeladen werden.",
+    );
+    fireEvent.click(screen.getByRole("switch", { name: "Hallo-Erweiterung" }));
+    await waitFor(() => expect(setEnabled).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-plugins-action-error")).toHaveTextContent(
+        "Die Änderung konnte nicht gespeichert werden.",
+      ),
+    );
+  });
+
+  it("a successful switch clears a stale download error", async () => {
+    const withUpdate = adminPlugin({
+      source: "repository",
+      update: { version: "1.1.0", image_plugin: false, repository_id: 3, repository_name: "Quelle" },
+    });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [withUpdate] });
+    download.mockResolvedValue({ job_id: 5 });
+    setEnabled.mockResolvedValue({ ...withUpdate, enabled: false });
+    jobState = job({ status: "failed", error: "Die Signatur des Pakets ist ungültig." });
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Aktualisieren" }));
+    expect(await screen.findByTestId("admin-plugins-action-error")).toHaveTextContent(
+      "Die Signatur des Pakets ist ungültig.",
+    );
+    fireEvent.click(screen.getByRole("switch", { name: "Hallo-Erweiterung" }));
+    await waitFor(() => expect(setEnabled).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByTestId("admin-plugins-action-error")).toBeNull());
+  });
+
+  it("shows only a hint for image plugin updates", async () => {
+    const imageUpdate = adminPlugin({
+      update: { version: "2.0.0", image_plugin: true, repository_id: 3, repository_name: "Quelle" },
+    });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [imageUpdate] });
+    renderPage();
+    expect(await screen.findByTestId("plugin-update-org.example.hello")).toHaveTextContent(
+      "Aktualisierung verfügbar: 2.0.0",
+    );
+    expect(screen.getByTestId("plugin-update-image-hint-org.example.hello")).toHaveTextContent(/neues Tiqora-Image/);
+    expect(screen.queryByRole("button", { name: "Aktualisieren" })).toBeNull();
+  });
+
+  it("hides uninstall for plugins that are in the image", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE, UPLOADED] });
+    renderPage();
+    expect(await screen.findByTestId("plugin-uninstall-org.example.tables")).toBeInTheDocument();
+    expect(screen.queryByTestId("plugin-uninstall-org.example.hello")).toBeNull();
+  });
+
+  it("offers a restart when a change needs one and follows it", async () => {
+    adminList.mockResolvedValue({
+      ...adminListFields(),
+      safe_mode: false,
+      plugins: [adminPlugin({ status: "restart_required" })],
+      coordinated_restart: true,
+    });
+    requestRestart.mockResolvedValue(restartStatus({ generation: 5, finished_at: null }));
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Jetzt neu starten" }));
+    await waitFor(() => expect(requestRestart).toHaveBeenCalled());
+    expect(await screen.findByTestId("plugin-restart-running")).toHaveTextContent("Tiqora wird neu gestartet");
+    expect(screen.queryByRole("button", { name: "Jetzt neu starten" })).toBeNull();
+  });
+
+  it("switches tabs through the URL and reads the tab from it", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
+    const first = renderPage();
+    expect(await screen.findByTestId("plugin-card-org.example.hello")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Installiert" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: "Paketquellen" }));
+    expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ search: { tab: "repositories" } }));
+    first.unmount();
+
+    searchState = { tab: "repositories" };
+    renderPage();
+    expect(await screen.findByRole("tab", { name: "Paketquellen" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByTestId("plugin-card-org.example.hello")).toBeNull();
+  });
+
+  it("fills the Verfügbar and Paketquellen tabs", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
+    searchState = { tab: "available" };
+    const first = renderPage();
+    expect(await screen.findByText("Katalog-Plugin")).toBeInTheDocument();
+    expect(screen.queryByTestId("plugin-card-org.example.hello")).toBeNull();
+    first.unmount();
+    searchState = { tab: "repositories" };
+    renderPage();
+    expect(await screen.findByTestId("repository-row-1")).toHaveTextContent("Beispiel-Paketquelle");
+  });
+
+  it("opens the install dialog for a catalogue download even after a tab switch", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
+    catalogFn.mockResolvedValue({ categories: [], entries: [catalogEntry({ plugin_id: "org.example.new", name: "Katalog-Plugin" })] });
+    download.mockResolvedValue({ job_id: 5 });
+    getPackage.mockResolvedValue(packageReport({ sha256: "cd".repeat(32) }));
+    searchState = { tab: "available" };
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const page = () => (
+      <QueryClientProvider client={qc}>
+        <I18nextProvider i18n={i18n}>
+          <PluginsPage />
+        </I18nextProvider>
+      </QueryClientProvider>
+    );
+    const view = render(page());
+    fireEvent.click(await screen.findByTestId("catalog-action-org.example.new"));
+    await waitFor(() => expect(download).toHaveBeenCalledWith(1, { plugin_id: "org.example.new", version: "1.0.0" }));
+    expect(await screen.findByTestId("plugin-update-running")).toBeInTheDocument();
+    // the admin switches to "Installiert" while the job runs; the job then finishes
+    searchState = {};
+    view.rerender(page());
+    expect(await screen.findByTestId("plugin-card-org.example.hello")).toBeInTheDocument();
+    jobState = job({ status: "succeeded", result: { package_sha256: "cd".repeat(32) } });
+    view.rerender(page());
+    await waitFor(() => expect(getPackage).toHaveBeenCalledWith("cd".repeat(32)));
+    expect(await screen.findByRole("dialog", { name: "Erweiterung installieren" })).toBeInTheDocument();
+  });
+
+  it("shows the failed catalogue download's reason", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
+    catalogFn.mockResolvedValue({ categories: [], entries: [catalogEntry({ plugin_id: "org.example.new", name: "Katalog-Plugin" })] });
+    download.mockResolvedValue({ job_id: 5 });
+    jobState = job({ status: "failed", error: "Prüfsumme stimmt nicht mit der Paketquelle überein" });
+    searchState = { tab: "available" };
+    renderPage();
+    fireEvent.click(await screen.findByTestId("catalog-action-org.example.new"));
+    expect(await screen.findByTestId("admin-plugins-action-error")).toHaveTextContent(
+      "Prüfsumme stimmt nicht mit der Paketquelle überein",
+    );
+    expect(getPackage).not.toHaveBeenCalled();
+  });
+
+  it("keeps the page when a background reload fails (the api restarting)", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <I18nextProvider i18n={i18n}>
+          <PluginsPage />
+        </I18nextProvider>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByTestId("plugin-card-org.example.hello")).toBeInTheDocument();
+    adminList.mockRejectedValue(new TypeError("Failed to fetch"));
+    await qc.invalidateQueries({ queryKey: ["admin", "plugins"] });
+    await waitFor(() => expect(adminList).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId("plugin-card-org.example.hello")).toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "Bereiche der Erweiterungen" })).toBeInTheDocument();
+  });
+
+  it("treats an unknown or non-string tab as installed", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
+    searchState = { tab: 42 };
+    renderPage();
+    expect(await screen.findByTestId("plugin-card-org.example.hello")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Installiert" })).toHaveAttribute("aria-selected", "true");
+  });
+});
+
 describe("admin page registry", () => {
   it("the palette finds the extensions page by its name and by keywords", async () => {
     await i18n.changeLanguage("de");
     const t = (key: string) => i18n.t(key);
-    for (const query of ["Erweiterungen", "safe mode", "opm"]) {
+    for (const query of ["Erweiterungen", "safe mode", "opm", "Paketquelle", "repository", "installieren", "signatur", "aktualisierung"]) {
       const hits = rankAdminPages(ADMIN_PAGES, query, t).map((page) => page.slug);
       expect(hits, query).toContain("plugins");
     }
@@ -273,6 +653,7 @@ describe("admin page registry", () => {
       "Liefert Webservice-Operationen", "Liefert Webservice-Aufrufe (Invoker)", "Liefert Webservice-Zuordnungen (Mapping)",
     ];
     adminList.mockResolvedValue({
+      ...adminListFields(),
       safe_mode: false,
       plugins: [adminPlugin({ capabilities: keys.map((value) => ({ kind: "extension_point" as const, value })) })],
     });
@@ -284,6 +665,7 @@ describe("admin page registry", () => {
 
   it("shows sync hooks with their operation and the AI worker role", async () => {
     adminList.mockResolvedValue({
+      ...adminListFields(),
       safe_mode: false,
       plugins: [
         adminPlugin({
@@ -310,6 +692,7 @@ describe("admin page registry", () => {
   it("says so when the ticket number schemes cannot be loaded", async () => {
     numberGenerators.mockRejectedValue(new Error("kaputt"));
     adminList.mockResolvedValue({
+      ...adminListFields(),
       safe_mode: false,
       plugins: [
         adminPlugin({
@@ -338,6 +721,7 @@ describe("admin page registry", () => {
       new ApiError(422, { detail: reason }, "/api/v1/admin/plugins/number-generators"),
     );
     adminList.mockResolvedValue({
+      ...adminListFields(),
       safe_mode: false,
       plugins: [
         adminPlugin({
@@ -363,6 +747,7 @@ describe("admin page registry", () => {
     numberGenerators.mockResolvedValue(generators(null));
     setNumberGenerator.mockResolvedValue(generators("Plugin_points_Yearly"));
     adminList.mockResolvedValue({
+      ...adminListFields(),
       safe_mode: false,
       plugins: [
         adminPlugin({

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 import signal
+import sys
 import time
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -239,6 +240,11 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             ),
         )
 
+    from tiqora.plugins.repositories import run_repositories_tick
+
+    async def plugin_repositories_tick() -> dict[str, int]:
+        return await run_repositories_tick(settings, get_session_factory())
+
     job_runner = JobRunner(
         session_factory=get_session_factory(), settings=settings, registry=get_registry()
     )
@@ -361,6 +367,13 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             None,
             stop,
         ),
+        _interval_loop(
+            "plugin_repositories",
+            plugin_repositories_tick,
+            settings.plugin_repositories_interval_seconds,
+            None,
+            stop,
+        ),
         _daily_loop("gdpr_retention", run_gdpr_retention_tick, "03:00", stop),
         _daily_loop("gdpr_erasure_purge", run_gdpr_erasure_purge_tick, "03:30", stop),
         _daily_loop("cmdb_version_archive", run_cmdb_version_archive_tick, "03:20", stop),
@@ -458,6 +471,21 @@ def run_worker() -> None:
         retry_plugin_boot(role="worker", settings=settings, session_factory=get_session_factory())
     )
 
+    from tiqora.plugins.restart import (
+        RESTART_EXIT_CODE,
+        restart_requested,
+        start_process_watch,
+        stop_process_watch,
+    )
+
+    # Registered after init_registry; the watch loop runs next to the daemon loops and
+    # sets ``stop`` when this process is next in a coordinated restart (D10).
+    process_watch = loop.run_until_complete(
+        start_process_watch(
+            get_session_factory(), "worker", settings=settings, on_exit=stop.set, stop=stop
+        )
+    )
+
     logger.info("tiqora_worker_starting", redis_url=settings.redis_url)
     try:
         loop.run_until_complete(_ensure_legacy_schema_at_worker_start())
@@ -468,8 +496,11 @@ def run_worker() -> None:
     finally:
         plugin_retry.cancel()
         loop.run_until_complete(asyncio.gather(plugin_retry, return_exceptions=True))
+        loop.run_until_complete(stop_process_watch(process_watch))
         loop.close()
         logger.info("tiqora_worker_stopped")
+    if restart_requested():
+        sys.exit(RESTART_EXIT_CODE)
 
 
 if __name__ == "__main__":

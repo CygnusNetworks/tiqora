@@ -55,6 +55,12 @@ def register_core(registry: Registry) -> None:
     from tiqora.jobs.handlers.gi_mail import GI_MAIL_JOB
     from tiqora.jobs.handlers.ticket_export import TICKET_EXPORT_JOB
     from tiqora.jobs.registry import JOB_HANDLERS
+    from tiqora.plugins.install_jobs import (
+        PLUGIN_FETCH_JOB,
+        PLUGIN_INSTALL_JOB,
+        PLUGIN_REPOSITORY_REFRESH_JOB,
+        PLUGIN_UNINSTALL_JOB,
+    )
     from tiqora.reporting.backfill import REPORT_BACKFILL_JOB
     from tiqora.reporting.delivery import REPORT_DELIVERY_JOB
     from tiqora.reporting.jobs import REPORT_EXPORT_JOB, REPORT_RUN_JOB
@@ -76,6 +82,10 @@ def register_core(registry: Registry) -> None:
     registry.add(JOB_HANDLERS, CMDB_REINDEX_JOB)
     registry.add(JOB_HANDLERS, ITSM_IMPORT_JOB)
     registry.add(JOB_HANDLERS, ITSM_SWITCH_JOB)
+    registry.add(JOB_HANDLERS, PLUGIN_INSTALL_JOB)
+    registry.add(JOB_HANDLERS, PLUGIN_UNINSTALL_JOB)
+    registry.add(JOB_HANDLERS, PLUGIN_REPOSITORY_REFRESH_JOB)
+    registry.add(JOB_HANDLERS, PLUGIN_FETCH_JOB)
 
     from tiqora.reporting.semantic import REPORT_SOURCES
     from tiqora.reporting.sources import core_report_sources
