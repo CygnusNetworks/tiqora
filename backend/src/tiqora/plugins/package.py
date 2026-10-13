@@ -12,6 +12,7 @@ import csv
 import email.parser
 import hashlib
 import io
+import os
 import re
 import struct
 import zipfile
@@ -505,6 +506,70 @@ def _entry_value(raw: bytes, manifest: PluginManifest) -> str:
             f"Einstiegspunkt „{value}“ stimmt nicht mit manifest.entry „{manifest.entry}“ überein"
         )
     return value
+
+
+# --- unpacking -------------------------------------------------------------------------------
+
+
+def unpack_wheel(wheel_bytes: bytes, target: Path) -> None:
+    """Write a wheel's members below ``target`` (purelib layout), re-validating first.
+
+    Nothing is written unless every member passes the D4 reader rules; each file is created
+    with ``open(..., "xb")`` and mode 0o644 (zip permissions are never kept), directories
+    get 0o755, and a resolved path outside ``target`` raises ``PackageError``. An
+    ``INSTALLER`` file with ``tiqora`` is added to the ``.dist-info``.
+    """
+    infos = _open_zip(wheel_bytes, "Das Wheel")
+    reads = _read_zip(
+        wheel_bytes,
+        infos,
+        max_members=MAX_WHEEL_MEMBERS,
+        keep=lambda _n: True,
+        what="Das Wheel",
+    )
+    dist_infos: set[str] = set()
+    for name in reads:
+        first = name.split("/", 1)[0]
+        if first.endswith(".egg-info") or first.endswith(".data"):
+            raise _member_err(name, "nicht erlaubt")
+        if "/" not in name and not name.endswith(".py"):
+            raise _member_err(name, "liegt außerhalb eines Python-Pakets")
+        if _NATIVE_RE.search(name):
+            raise _member_err(name, "native Bibliotheken sind nicht erlaubt (nur reines Python)")
+        if first.endswith(".dist-info"):
+            dist_infos.add(first)
+    if len(dist_infos) != 1:
+        raise PackageError("Das Wheel muss genau eine dist-info enthalten")
+    installer = f"{next(iter(dist_infos))}/INSTALLER"
+
+    root = target.resolve()
+    root.mkdir(parents=True, exist_ok=True)
+
+    def place(rel: str) -> Path:
+        dest = (root / rel).resolve()
+        if dest == root or not dest.is_relative_to(root):
+            raise _member_err(rel, "unzulässiger Pfad")
+        return dest
+
+    def make_dirs(directory: Path) -> None:
+        missing: list[Path] = []
+        cur = directory
+        while cur != root and not cur.exists():
+            missing.append(cur)
+            cur = cur.parent
+        for d in reversed(missing):
+            d.mkdir(mode=0o755)
+            d.chmod(0o755)  # umask must not narrow it
+
+    plan = [(place(name), name) for name in reads if name != installer]
+    plan.append((place(installer), installer))
+    for dest, name in plan:
+        make_dirs(dest.parent)
+        content = b"tiqora\n" if name == installer else (reads[name].data or b"")
+        fd = os.open(dest, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(content)
+        dest.chmod(0o644)
 
 
 # --- writing -------------------------------------------------------------------------------
