@@ -10,6 +10,10 @@ ISSUE_CODES: dict[str, str] = {
     "unsupported_object": (
         "Verknüpfung mit einem Objekt, das Tiqora (noch) nicht kennt (z. B. FAQ, Change)"
     ),
+    "unknown_link_type": (
+        "Der Verknüpfungstyp ist in Znuny nicht konfiguriert; die Verknüpfung wurde nicht "
+        "übernommen"
+    ),
     "attachment_in_filesystem": (
         "Der Anhang liegt im Dateisystem von Znuny und konnte nicht aus der Datenbank gelesen "
         "werden"
