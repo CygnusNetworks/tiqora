@@ -206,7 +206,7 @@ export function demoCmdbJob(store: DemoCmdb, id: number): DemoJob | undefined {
 
 function finishedJob(
   store: DemoCmdb,
-  kind: "cmdb_bulk" | "cmdb_export" | "cmdb_import",
+  kind: "cmdb_bulk" | "cmdb_export" | "cmdb_import" | "cmdb_propagation",
   result: Record<string, unknown> | null,
   files: DemoJob["files"],
   failure: string | null = null,
@@ -751,7 +751,10 @@ export function resolveCmdb(
       const cls = query.get("catalog_class");
       return ok(cls ? CATALOG.filter((c) => c.catalog_class === cls) : CATALOG);
     }
-    if (sub === "/propagation/recompute") return ok({ job_id: 9301, status: "queued" }, 202);
+    if (sub === "/propagation/recompute") {
+      const jobId = finishedJob(store, "cmdb_propagation", { updated: 0 }, []);
+      return ok({ job_id: jobId, status: "queued" }, 202);
+    }
     return undefined;
   }
 
