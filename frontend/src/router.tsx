@@ -1174,6 +1174,10 @@ const adminDaemonsRoute = createRoute({
 const adminPluginsRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/plugins",
+  // The router JSON-parses search values: check for a plain string, never assume one.
+  validateSearch: (s: Record<string, unknown>): { tab?: "available" | "repositories" } => ({
+    tab: s.tab === "available" || s.tab === "repositories" ? s.tab : undefined,
+  }),
   component: PluginsPage,
 });
 

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { SoftChip } from "@/components/ui/StatusChip";
 import { Spinner } from "@/components/ui/Spinner";
 import { Switch } from "@/components/ui/Switch";
+import { Tabs } from "@/components/ui/Tabs";
+import { useJob } from "@/components/jobs/useJob";
 import { toBcp47 } from "@/i18n";
 import { apiErrorMessage } from "@/lib/avatarApi";
 import { formatDateTime } from "@/lib/format";
@@ -15,8 +17,12 @@ import { isPluginSafeMode } from "@/plugins/safeMode";
 import { capabilityText } from "./plugins/capabilities";
 import { InstallDialog } from "./plugins/InstallDialog";
 import { RestartPanel } from "./plugins/RestartPanel";
+import { sourceLabel, trustColor, trustLabelKey } from "./plugins/trust";
+import { PLUGIN_TABS, parsePluginTab } from "./plugins/tabs";
+import { UninstallDialog } from "./plugins/UninstallDialog";
 
 const QUERY_KEY = ["admin", "plugins"] as const;
+
 
 type Status = PluginAdmin["status"];
 
@@ -117,6 +123,15 @@ function PluginDetails({ plugin }: { plugin: PluginAdmin }) {
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {plugin.migration_error && (
+        <section data-testid={`plugin-migration-error-${plugin.id}`}>
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
+            {t("admin.plugins.migrationError")}
+          </h3>
+          <p className="break-words text-danger">{plugin.migration_error}</p>
         </section>
       )}
 
@@ -223,6 +238,10 @@ function PluginCard({
   onFocused,
   onToggle,
   onRetry,
+  repositoryNames,
+  updateBusy,
+  onUpdate,
+  onUninstall,
 }: {
   plugin: PluginAdmin;
   disabled: boolean;
@@ -231,6 +250,10 @@ function PluginCard({
   onFocused: () => void;
   onToggle: (enabled: boolean) => void;
   onRetry: () => void;
+  repositoryNames: ReadonlyMap<number, string>;
+  updateBusy: boolean;
+  onUpdate: () => void;
+  onUninstall: () => void;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -273,7 +296,29 @@ function PluginCard({
           <p className="mt-0.5 text-xs text-muted">
             {t("admin.plugins.version", { version: plugin.version })} · {t("admin.plugins.publisher", { publisher: plugin.publisher })}
           </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <SoftChip color="var(--color-muted)" data-testid={`plugin-source-${id}`}>
+              {sourceLabel(t, plugin, repositoryNames)}
+            </SoftChip>
+            {plugin.signature_status && (
+              <SoftChip color={trustColor(plugin.signature_status)} data-testid={`plugin-trust-${id}`}>
+                {t(trustLabelKey(plugin.signature_status))}
+              </SoftChip>
+            )}
+          </div>
           {plugin.description && <p className="mt-1.5 text-sm text-ink">{plugin.description}</p>}
+          {plugin.update && (
+            <div className="mt-1.5 text-sm" data-testid={`plugin-update-${id}`}>
+              <span className="font-medium text-ink">
+                {t("admin.plugins.update.available", { version: plugin.update.version })}
+              </span>
+              {plugin.update.image_plugin && (
+                <p className="mt-0.5 text-xs text-muted" data-testid={`plugin-update-image-hint-${id}`}>
+                  {t("admin.plugins.update.imageHint")}
+                </p>
+              )}
+            </div>
+          )}
           {plugin.status_message && (
             <p
               className={
@@ -309,6 +354,28 @@ function PluginCard({
         {needsRetry(plugin) && (
           <Button size="sm" variant="secondary" disabled={disabled} onClick={onRetry} data-testid={`plugin-retry-${id}`}>
             {t("admin.plugins.retry")}
+          </Button>
+        )}
+        {plugin.update && !plugin.update.image_plugin && (
+          <Button
+            size="sm"
+            variant="primary"
+            disabled={disabled || updateBusy}
+            onClick={onUpdate}
+            data-testid={`plugin-update-button-${id}`}
+          >
+            {t("admin.plugins.update.action")}
+          </Button>
+        )}
+        {plugin.can_uninstall && (
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={disabled}
+            onClick={onUninstall}
+            data-testid={`plugin-uninstall-${id}`}
+          >
+            {t("admin.plugins.uninstall.button")}
           </Button>
         )}
         <Button
@@ -384,8 +451,57 @@ export function PluginsPage() {
     },
     onSuccess: setRestartHint,
   });
+  const [uninstalling, setUninstalling] = useState<PluginAdmin | null>(null);
+
+  // Update = download the package from the repository (a job), then show it in the install dialog.
+  const [downloadJobId, setDownloadJobId] = useState<number | null>(null);
+  const [downloadError, setDownloadError] = useState<unknown>(null);
+  const downloadM = useMutation({
+    mutationFn: ({ repoId, pluginId, version }: { repoId: number; pluginId: string; version: string }) =>
+      pluginsApi.download(repoId, { plugin_id: pluginId, version }),
+    onSuccess: (accepted) => setDownloadJobId(accepted.job_id),
+  });
+  const download = useJob(downloadJobId);
+  const handledJob = useRef<number | null>(null);
+  useEffect(() => {
+    const job = download.job;
+    if (downloadJobId == null || !job || handledJob.current === downloadJobId) return;
+    if (job.status === "succeeded") {
+      handledJob.current = downloadJobId;
+      const sha = job.result?.package_sha256;
+      if (typeof sha !== "string") {
+        setDownloadError(new Error("no package"));
+        setDownloadJobId(null);
+        return;
+      }
+      pluginsApi
+        .getPackage(sha)
+        .then(setPkg)
+        .catch(setDownloadError)
+        .finally(() => setDownloadJobId(null));
+    } else if (job.status === "failed" || job.status === "cancelled") {
+      handledJob.current = downloadJobId;
+      setDownloadError(new Error(job.error ?? ""));
+      setDownloadJobId(null);
+    }
+  }, [download.job, downloadJobId]);
+  const downloading = downloadM.isPending || downloadJobId != null;
+  const startUpdate = (plugin: PluginAdmin) => {
+    if (!plugin.update) return;
+    setDownloadError(null);
+    downloadM.mutate({ repoId: plugin.update.repository_id, pluginId: plugin.id, version: plugin.update.version });
+  };
+
+  const search = useSearch({ strict: false }) as { tab?: unknown };
+  const navigate = useNavigate();
+  const tab = parsePluginTab(search.tab);
+  const setTab = (next: string) => {
+    const value = parsePluginTab(next);
+    void navigate({ to: ".", search: { tab: value === "installed" ? undefined : value }, replace: true } as never);
+  };
+
   const busy = toggleM.isPending || retryM.isPending;
-  const actionError = toggleM.error ?? retryM.error ?? restartM.error;
+  const actionError = toggleM.error ?? retryM.error ?? restartM.error ?? downloadM.error ?? downloadError;
 
   if (listQ.isLoading) {
     return (
@@ -404,6 +520,8 @@ export function PluginsPage() {
 
   const { plugins, safe_mode: safeMode, runtime_install: runtimeInstall } = listQ.data;
   const coordinated = listQ.data.coordinated_restart;
+  const repositoryNames = new Map<number, string>();
+  for (const p of plugins) if (p.update) repositoryNames.set(p.update.repository_id, p.update.repository_name);
   const restartPending = plugins.some((p) => p.status === "restart_required");
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4" data-testid="admin-plugins-page">
@@ -483,13 +601,24 @@ export function PluginsPage() {
           )}
         </div>
       )}
-      {actionError && (
+      {actionError != null && (
         <p role="alert" className="text-sm text-danger" data-testid="admin-plugins-action-error">
-          {apiErrorMessage(actionError, t("admin.plugins.actionError"))}
+          {apiErrorMessage(actionError, downloadError ? t("admin.plugins.update.failed") : t("admin.plugins.actionError"))}
         </p>
       )}
 
-      {plugins.length === 0 ? (
+      <Tabs
+        items={PLUGIN_TABS.map((id) => ({ id, label: t(`admin.plugins.tabs.${id}`) }))}
+        value={tab}
+        onChange={setTab}
+      />
+      {downloading && (
+        <p className="flex items-center gap-2 text-sm text-muted" role="status" data-testid="plugin-update-running">
+          <Spinner /> {t("admin.plugins.update.running")}
+        </p>
+      )}
+
+      {tab !== "installed" ? null : plugins.length === 0 ? (
         <p className="rounded-xl border border-hairline bg-surface p-4 text-sm text-muted" data-testid="admin-plugins-empty">
           {t("admin.plugins.empty")}
         </p>
@@ -506,9 +635,22 @@ export function PluginsPage() {
                 run({ id: plugin.id, what: "switch" }, () => toggleM.mutate({ id: plugin.id, enabled }))
               }
               onRetry={() => run({ id: plugin.id, what: "retry" }, () => retryM.mutate(plugin.id))}
+              repositoryNames={repositoryNames}
+              updateBusy={downloading}
+              onUpdate={() => startUpdate(plugin)}
+              onUninstall={() => setUninstalling(plugin)}
             />
           ))}
         </ul>
+      )}
+      {uninstalling && (
+        <UninstallDialog
+          key={uninstalling.id}
+          plugin={uninstalling}
+          open
+          onClose={() => setUninstalling(null)}
+          coordinatedRestart={coordinated}
+        />
       )}
       {pkg && (
         <InstallDialog

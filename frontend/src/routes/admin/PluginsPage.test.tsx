@@ -7,10 +7,15 @@ import i18n from "@/i18n";
 import type { PluginAdmin } from "@/lib/pluginsApi";
 import { PLUGIN_SAFE_MODE_KEY } from "@/plugins/safeMode";
 import { ADMIN_PAGES, rankAdminPages } from "@/lib/adminSearch";
-import { adminListFields, aiWorkerRuntime, packageReport, syncHookRow } from "@/test/pluginFixtures";
+import type { Job } from "@/lib/jobsApi";
+import { adminListFields, aiWorkerRuntime, packageReport, restartStatus, syncHookRow } from "@/test/pluginFixtures";
 import { PluginsPage } from "./PluginsPage";
 
+const navigate = vi.fn();
+let searchState: Record<string, unknown> = {};
 vi.mock("@tanstack/react-router", () => ({
+  useSearch: () => searchState,
+  useNavigate: () => navigate,
   Link: ({ to, params, children, ...rest }: { to: string; params?: Record<string, string>; children: ReactNode; [k: string]: unknown }) => (
     <a href={Object.entries(params ?? {}).reduce((acc, [k, v]) => acc.replace(`$${k}`, v), to)} {...rest}>
       {children}
@@ -22,14 +27,55 @@ const adminList = vi.fn();
 const setEnabled = vi.fn();
 const reset = vi.fn();
 const uploadPackage = vi.fn();
+const download = vi.fn();
+const getPackage = vi.fn();
+const restartStatusFn = vi.fn();
+const requestRestart = vi.fn();
+const installPackage = vi.fn();
 vi.mock("@/lib/pluginsApi", () => ({
   pluginsApi: {
+    download: (...a: unknown[]) => download(...a),
+    getPackage: (...a: unknown[]) => getPackage(...a),
+    restartStatus: (...a: unknown[]) => restartStatusFn(...a),
+    requestRestart: (...a: unknown[]) => requestRestart(...a),
+    installPackage: (...a: unknown[]) => installPackage(...a),
     uploadPackage: (...a: unknown[]) => uploadPackage(...a),
     adminList: (...a: unknown[]) => adminList(...a),
     setEnabled: (...a: unknown[]) => setEnabled(...a),
     reset: (...a: unknown[]) => reset(...a),
   },
 }));
+
+let jobState: Job | undefined;
+vi.mock("@/components/jobs/useJob", () => ({
+  useJob: (id: number | null) => ({
+    job: id == null ? undefined : jobState,
+    isTerminal: jobState ? ["succeeded", "failed", "cancelled"].includes(jobState.status) : false,
+    cancel: vi.fn(),
+    isCancelling: false,
+  }),
+}));
+
+function job(overrides: Partial<Job> = {}): Job {
+  return {
+    cancel_requested: false,
+    created_at: UPDATED,
+    created_by: 1,
+    error: null,
+    files: [],
+    finished_at: null,
+    id: 5,
+    kind: "core.plugin_download",
+    progress_done: 0,
+    progress_message: null,
+    progress_total: null,
+    result: null,
+    started_at: UPDATED,
+    status: "running",
+    title_key: "jobs.kinds.core.plugin_download",
+    ...overrides,
+  };
+}
 
 const numberGenerators = vi.fn();
 const setNumberGenerator = vi.fn();
@@ -127,6 +173,12 @@ beforeEach(async () => {
   numberGenerators.mockReset();
   setNumberGenerator.mockReset();
   sessionStorage.clear();
+  navigate.mockReset();
+  searchState = {};
+  jobState = undefined;
+  for (const fn of [download, getPackage, requestRestart, installPackage]) fn.mockReset();
+  restartStatusFn.mockReset();
+  restartStatusFn.mockResolvedValue(restartStatus({ generation: 4 }));
 });
 afterEach(() => sessionStorage.clear());
 
@@ -300,6 +352,136 @@ describe("PluginsPage upload", () => {
     });
     renderPage();
     expect(await screen.findByRole("button", { name: "Jetzt neu starten" })).toBeInTheDocument();
+  });
+});
+
+describe("PluginsPage installed tab", () => {
+  const UPLOADED = adminPlugin({
+    id: "org.example.tables",
+    name: "Tabellen-Beispiel",
+    source: "upload",
+    signature_status: "verified_publisher",
+    can_uninstall: true,
+    settings_section: null,
+  });
+
+  it("shows source and trust chips", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE, UPLOADED] });
+    renderPage();
+    expect(await screen.findByTestId("plugin-source-org.example.hello")).toHaveTextContent("Im Image eingebaut");
+    expect(screen.queryByTestId("plugin-trust-org.example.hello")).toBeNull();
+    expect(screen.getByTestId("plugin-source-org.example.tables")).toHaveTextContent("Hochgeladen");
+    expect(screen.getByTestId("plugin-trust-org.example.tables")).toHaveTextContent("Verifizierter Herausgeber");
+  });
+
+  it("shows a migration error in the details", async () => {
+    adminList.mockResolvedValue({
+      ...adminListFields(),
+      safe_mode: false,
+      plugins: [adminPlugin({ migration_error: "Tabelle fehlt" })],
+    });
+    renderPage();
+    expect(screen.queryByTestId("plugin-migration-error-org.example.hello")).toBeNull();
+    fireEvent.click(await screen.findByTestId("plugin-details-org.example.hello"));
+    expect(screen.getByTestId("plugin-migration-error-org.example.hello")).toHaveTextContent("Tabelle fehlt");
+  });
+
+  it("offers an update from a repository and starts the download job", async () => {
+    const withUpdate = adminPlugin({
+      source: "repository",
+      signature_status: "official",
+      can_uninstall: true,
+      update: { version: "1.1.0", image_plugin: false, repository_id: 3, repository_name: "Offizielle Quelle" },
+    });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [withUpdate] });
+    download.mockResolvedValue({ job_id: 5 });
+    getPackage.mockResolvedValue(packageReport({ sha256: "ab".repeat(32), action: "update", installed_version: "1.0.0", version: "1.1.0" }));
+    renderPage();
+    expect(await screen.findByTestId("plugin-update-org.example.hello")).toHaveTextContent(
+      "Aktualisierung verfügbar: 1.1.0",
+    );
+    expect(screen.getByTestId("plugin-source-org.example.hello")).toHaveTextContent("Aus Paketquelle Offizielle Quelle");
+    jobState = job({ status: "succeeded", result: { package_sha256: "ab".repeat(32) } });
+    fireEvent.click(screen.getByRole("button", { name: "Aktualisieren" }));
+    await waitFor(() =>
+      expect(download).toHaveBeenCalledWith(3, { plugin_id: "org.example.hello", version: "1.1.0" }),
+    );
+    await waitFor(() => expect(getPackage).toHaveBeenCalledWith("ab".repeat(32)));
+    expect(await screen.findByRole("dialog", { name: "Erweiterung installieren" })).toBeInTheDocument();
+  });
+
+  it("shows an error when the download job fails", async () => {
+    const withUpdate = adminPlugin({
+      source: "repository",
+      update: { version: "1.1.0", image_plugin: false, repository_id: 3, repository_name: "Quelle" },
+    });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [withUpdate] });
+    download.mockResolvedValue({ job_id: 5 });
+    jobState = job({ status: "failed", error: "kaputt" });
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Aktualisieren" }));
+    expect(await screen.findByTestId("admin-plugins-action-error")).toHaveTextContent(
+      "Das Paket konnte nicht heruntergeladen werden.",
+    );
+    expect(getPackage).not.toHaveBeenCalled();
+  });
+
+  it("shows only a hint for image plugin updates", async () => {
+    const imageUpdate = adminPlugin({
+      update: { version: "2.0.0", image_plugin: true, repository_id: 3, repository_name: "Quelle" },
+    });
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [imageUpdate] });
+    renderPage();
+    expect(await screen.findByTestId("plugin-update-org.example.hello")).toHaveTextContent(
+      "Aktualisierung verfügbar: 2.0.0",
+    );
+    expect(screen.getByTestId("plugin-update-image-hint-org.example.hello")).toHaveTextContent(/neues Tiqora-Image/);
+    expect(screen.queryByRole("button", { name: "Aktualisieren" })).toBeNull();
+  });
+
+  it("hides uninstall for plugins that are in the image", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE, UPLOADED] });
+    renderPage();
+    expect(await screen.findByTestId("plugin-uninstall-org.example.tables")).toBeInTheDocument();
+    expect(screen.queryByTestId("plugin-uninstall-org.example.hello")).toBeNull();
+  });
+
+  it("offers a restart when a change needs one and follows it", async () => {
+    adminList.mockResolvedValue({
+      ...adminListFields(),
+      safe_mode: false,
+      plugins: [adminPlugin({ status: "restart_required" })],
+      coordinated_restart: true,
+    });
+    requestRestart.mockResolvedValue(restartStatus({ generation: 5, finished_at: null }));
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Jetzt neu starten" }));
+    await waitFor(() => expect(requestRestart).toHaveBeenCalled());
+    expect(await screen.findByTestId("plugin-restart-running")).toHaveTextContent("Tiqora wird neu gestartet");
+    expect(screen.queryByRole("button", { name: "Jetzt neu starten" })).toBeNull();
+  });
+
+  it("switches tabs through the URL and reads the tab from it", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
+    const first = renderPage();
+    expect(await screen.findByTestId("plugin-card-org.example.hello")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Installiert" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: "Paketquellen" }));
+    expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ search: { tab: "repositories" } }));
+    first.unmount();
+
+    searchState = { tab: "repositories" };
+    renderPage();
+    expect(await screen.findByRole("tab", { name: "Paketquellen" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByTestId("plugin-card-org.example.hello")).toBeNull();
+  });
+
+  it("treats an unknown or non-string tab as installed", async () => {
+    adminList.mockResolvedValue({ ...adminListFields(), safe_mode: false, plugins: [ACTIVE] });
+    searchState = { tab: 42 };
+    renderPage();
+    expect(await screen.findByTestId("plugin-card-org.example.hello")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Installiert" })).toHaveAttribute("aria-selected", "true");
   });
 });
 

@@ -4927,7 +4927,35 @@
           "done": "Neu gestartet",
           "timeout": "Nicht zurückgekommen"
         }
-      }
+      },
+      "tabs": {
+        "installed": "Installiert",
+        "available": "Verfügbar",
+        "repositories": "Paketquellen",
+        "aria": "Bereiche der Erweiterungen"
+      },
+      "update": {
+        "available": "Aktualisierung verfügbar: {{version}}",
+        "action": "Aktualisieren",
+        "running": "Paket wird heruntergeladen …",
+        "failed": "Das Paket konnte nicht heruntergeladen werden.",
+        "imageHint": "Diese Erweiterung ist im Image eingebaut. Zum Aktualisieren brauchen Sie ein neues Tiqora-Image."
+      },
+      "uninstall": {
+        "button": "Entfernen",
+        "title": "Erweiterung entfernen",
+        "dataLegend": "Daten der Erweiterung",
+        "keepData": "Daten behalten",
+        "keepHint": "Die Tabellen der Erweiterung bleiben erhalten. Wird sie später neu installiert, sind die Daten wieder da.",
+        "deleteData": "Daten löschen",
+        "deleteHint": "Die Tabellen der Erweiterung werden gelöscht. Vorher wird eine Sicherung angelegt, die {{count}} Tage aufbewahrt wird.",
+        "submit": "Entfernen",
+        "running": "Erweiterung wird entfernt …",
+        "done": "Entfernt.",
+        "backupNote": "Die Sicherung wird {{count}} Tage aufbewahrt. Laden Sie sie jetzt herunter, wenn Sie die Daten noch brauchen könnten.",
+        "backupDownload": "Sicherung herunterladen ({{name}})"
+      },
+      "migrationError": "Fehler bei der Datenbank-Anpassung"
     },
     "dashboardTemplates": {
       "title": "Dashboard-Vorlagen",

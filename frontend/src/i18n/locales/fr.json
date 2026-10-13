@@ -4919,7 +4919,35 @@
           "done": "Restarted",
           "timeout": "Did not come back"
         }
-      }
+      },
+      "tabs": {
+        "installed": "Installed",
+        "available": "Available",
+        "repositories": "Repositories",
+        "aria": "Extension sections"
+      },
+      "update": {
+        "available": "Update available: {{version}}",
+        "action": "Update",
+        "running": "Downloading package …",
+        "failed": "The package could not be downloaded.",
+        "imageHint": "This extension is built into the image. To update it you need a new Tiqora image."
+      },
+      "uninstall": {
+        "button": "Remove",
+        "title": "Remove extension",
+        "dataLegend": "Extension data",
+        "keepData": "Keep data",
+        "keepHint": "The extension's tables are kept. If it is installed again later, the data is back.",
+        "deleteData": "Delete data",
+        "deleteHint": "The extension's tables are deleted. A backup is made first and kept for {{count}} days.",
+        "submit": "Remove",
+        "running": "Removing extension …",
+        "done": "Removed.",
+        "backupNote": "The backup is kept for {{count}} days. Download it now if you might still need the data.",
+        "backupDownload": "Download backup ({{name}})"
+      },
+      "migrationError": "Database migration failed"
     },
     "dashboardTemplates": {
       "title": "Dashboard templates",
