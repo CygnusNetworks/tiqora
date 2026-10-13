@@ -64,6 +64,7 @@ children = _children_fixture
 PLUGINS = "/api/v1/admin/plugins"
 SETTING = f"plugins.{TABLES}.greeting"
 DECOY_SETTING = "plugins.org.example.tablesx.greeting"  # another plugin's key, same text start
+NESTED_SETTING = f"plugins.{TABLES}.extra.token"  # a plugin whose id extends this one
 DECOY_TABLES = ("tqp_tablesx_keep", "tiqora_x_keep")
 BLOB_TABLE = "tqp_tables_blob"
 
@@ -98,7 +99,9 @@ async def _drop_extra(env: Env) -> None:
         for name in (*DECOY_TABLES, BLOB_TABLE):
             await s.execute(text(f"DROP TABLE IF EXISTS {name}"))
         await s.execute(
-            delete(TiqoraSettings).where(TiqoraSettings.key.in_((SETTING, DECOY_SETTING)))
+            delete(TiqoraSettings).where(
+                TiqoraSettings.key.in_((SETTING, DECOY_SETTING, NESTED_SETTING))
+            )
         )
         await s.execute(delete(TiqoraPluginRuntime).where(TiqoraPluginRuntime.plugin_id == TABLES))
         await s.commit()
@@ -122,6 +125,7 @@ async def _install_with_data(env: Env, **kw: Any) -> None:
         )
         s.add(TiqoraSettings(key=SETTING, value="Hallo"))
         s.add(TiqoraSettings(key=DECOY_SETTING, value="bleibt"))
+        s.add(TiqoraSettings(key=NESTED_SETTING, value="geheim"))
         s.add(
             TiqoraPluginHook(
                 hook_key=f"event:{TABLES}:note",
@@ -287,6 +291,8 @@ async def test_delete_data_exports_then_drops_only_prefix(env: Env, children: li
         assert await s.get(TiqoraSettings, SETTING) is None
         decoy = await s.get(TiqoraSettings, DECOY_SETTING)
         assert decoy is not None and decoy.value == "bleibt"
+        nested = await s.get(TiqoraSettings, NESTED_SETTING)
+        assert nested is not None and nested.value == "geheim"
         assert await s.get(TiqoraPluginHook, f"event:{TABLES}:note") is None
         assert await s.get(TiqoraPluginData, "tables") is None
     files = await _files(env, job.id)

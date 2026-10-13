@@ -21,7 +21,7 @@ from typing import Any, Final
 
 import structlog
 from pydantic import BaseModel
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 from tiqora.config import Settings
 from tiqora.db.tiqora.models import (
@@ -423,11 +423,20 @@ async def _delete_plugin_records(
         await session.execute(delete(TiqoraPlugin).where(TiqoraPlugin.id == row_id))
         await packages_store.unmark_packages(session, row_id)
         if delete_data:
-            await session.execute(
-                delete(TiqoraSettings).where(
-                    TiqoraSettings.key.startswith(f"plugins.{row_id}.", autoescape=True)
+            # Only `plugins.<id>.<field>`: a longer plugin id (`<id>.extra`) shares the prefix.
+            prefix = f"plugins.{row_id}."
+            candidates = (
+                await session.scalars(
+                    select(TiqoraSettings.key).where(
+                        TiqoraSettings.key.startswith(prefix, autoescape=True)
+                    )
                 )
-            )
+            ).all()
+            own_keys = [k for k in candidates if "." not in k[len(prefix) :]]
+            if own_keys:
+                await session.execute(
+                    delete(TiqoraSettings).where(TiqoraSettings.key.in_(own_keys))
+                )
             await session.execute(
                 delete(TiqoraPluginHook).where(TiqoraPluginHook.plugin_id == row_id)
             )
@@ -483,9 +492,10 @@ async def run_plugin_uninstall(ctx: JobContext, payload: PluginUninstallPayload)
                 data,
             )
             await ctx.checkpoint("drop")
-            async with ctx.session_factory() as session:
-                deleted = await migrations.drop_plugin_data(session, short_id)
-                await session.commit()
+        # Also without tables: leftover PG enum types are dropped too.
+        async with ctx.session_factory() as session:
+            deleted = await migrations.drop_plugin_data(session, short_id)
+            await session.commit()
     elif short_id is not None:
         async with ctx.session_factory() as session:
             keep_data = bool(await migrations.plugin_tables(session, short_id))
