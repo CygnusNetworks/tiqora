@@ -311,7 +311,8 @@ def requirement_problems(requires_dist: Sequence[str],
     # version outside the specifier -> "benötigt „x“ in Version …, enthalten ist …".
     # Non-empty -> the report adds the hint "Bitte als eigenes Image einbauen (tiqora plugins bake)."
 def collision_problems(top_level: Sequence[str],
-                       taken: Mapping[str, Sequence[str]] | None = None) -> list[str]
+                       taken: Mapping[str, Sequence[str]] | None = None, *,
+                       own_dist: str | None = None) -> list[str]
     # taken: importlib.metadata.packages_distributions() of this process (minus the plugin's own runtime
     # copy when updating); also sys.stdlib_module_names; "tqp" prefix is fine. Collision ->
     # "Python-Modul „x“ gibt es in Tiqora schon (Paket y)".
