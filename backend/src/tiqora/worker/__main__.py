@@ -236,6 +236,11 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             ),
         )
 
+    from tiqora.plugins.repositories import run_repositories_tick
+
+    async def plugin_repositories_tick() -> dict[str, int]:
+        return await run_repositories_tick(settings, get_session_factory())
+
     job_runner = JobRunner(
         session_factory=get_session_factory(), settings=settings, registry=get_registry()
     )
@@ -348,6 +353,13 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             "plugin_tasks",
             plugin_tasks_tick,
             settings.plugin_tasks_interval_seconds,
+            None,
+            stop,
+        ),
+        _interval_loop(
+            "plugin_repositories",
+            plugin_repositories_tick,
+            settings.plugin_repositories_interval_seconds,
             None,
             stop,
         ),

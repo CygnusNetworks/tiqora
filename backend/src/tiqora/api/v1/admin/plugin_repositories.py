@@ -2,17 +2,17 @@
 
 Listing syncs the environment-defined repositories first (D8). Creating, changing and removing
 need a browser session (F13): a repository vouches for publisher keys, so an integration key must
-never reach it. Refresh, catalog and download join this router in later tasks.
+never reach it. Refresh and catalog are here; download joins this router in a later task.
 """
 
 from __future__ import annotations
 
 import json
 from datetime import datetime
-from typing import Any, Final, Literal
+from typing import Annotated, Any, Final, Literal
 
 import structlog
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,9 +22,13 @@ from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.plugin_packages import WebAdmin
 from tiqora.db.tiqora.models import TiqoraPluginRepository
 from tiqora.domain.schemas import UtcDateTime
-from tiqora.jobs.service import utc_now
+from tiqora.jobs.schemas import JobAccepted
+from tiqora.jobs.service import enqueue_job, utc_now
+from tiqora.plugins import install_jobs
 from tiqora.plugins.repositories import (
+    CatalogOut,
     RepositoryInputError,
+    catalog,
     sync_env_repositories,
     url_key,
     validate_repository_input,
@@ -139,6 +143,25 @@ async def list_repositories(
     return [_out(r) for r in rows]
 
 
+# declared before the ``/{repo_id}`` routes
+@router.get("/catalog", response_model=CatalogOut)
+async def get_catalog(
+    admin: AdminUser,
+    session: DbSession,
+    settings: AppSettings,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+    category: Annotated[str | None, Query(max_length=100)] = None,
+    repository_id: int | None = None,
+) -> CatalogOut:
+    """What the enabled repositories offer, from their stored indexes (no network access)."""
+    _ = admin
+    out = await catalog(
+        session, settings=settings, q=q, category=category, repository_id=repository_id
+    )
+    await session.rollback()
+    return out
+
+
 @router.post("", response_model=RepositoryOut, status_code=status.HTTP_201_CREATED)
 async def create_repository(
     body: RepositoryIn, admin: WebAdmin, session: DbSession
@@ -212,3 +235,20 @@ async def delete_repository(repo_id: int, admin: WebAdmin, session: DbSession) -
     await session.delete(row)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/{repo_id}/refresh", response_model=JobAccepted, status_code=status.HTTP_202_ACCEPTED)
+async def refresh_repository_endpoint(
+    repo_id: int, admin: AdminUser, session: DbSession
+) -> JobAccepted:
+    """Queue a refresh of the repository's index; the UI polls ``GET /jobs/{id}``."""
+    await _get(session, repo_id)
+    job = await enqueue_job(
+        session,
+        kind=install_jobs.PLUGIN_REPOSITORY_REFRESH_KIND,
+        payload=install_jobs.PluginRepositoryRefreshPayload(repository_id=repo_id),
+        created_by=admin.id,
+        dedupe_key=install_jobs.refresh_dedupe_key(repo_id),
+    )
+    await session.commit()
+    return JobAccepted(job_id=job.id, status="running" if job.status == "running" else "queued")

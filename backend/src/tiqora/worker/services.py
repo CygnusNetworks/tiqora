@@ -321,6 +321,18 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         interval_settings_attr="plugin_tasks_interval_seconds",
         tick_timeout_seconds=330,
     ),
+    # Refreshes the plugin package sources (index.json), purges old uploaded packages. No enabled
+    # source: no network access.
+    DaemonService(
+        slug="plugin_repositories",
+        enabled_key=None,
+        default_enabled=True,
+        toggleable=False,
+        schedule_kind="interval",
+        interval_key=None,
+        interval_settings_attr="plugin_repositories_interval_seconds",
+        tick_timeout_seconds=600,
+    ),
     # Ends unanswered and abandoned web chats and purges old ones (retention).
     DaemonService(
         slug="webchat_sweep",

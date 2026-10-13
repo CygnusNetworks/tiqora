@@ -1,26 +1,46 @@
-"""Package sources: configuration, environment sync and the key ring from verified indexes (D8).
+"""Package sources (D8): configuration, environment sync, fetching, refresh, daemon tick, catalog.
 
-Fetching and refresh follow in later tasks.
+The key ring is built from the publisher keys of verified indexes only. Fetching goes through
+``pin_outbound_url`` (https) or a file root (env-only ``file:///``); an index is refused when it is
+older than the stored one (rollback guard).
 """
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
+import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
-from urllib.parse import unquote, urlsplit
+from urllib.parse import SplitResult, unquote, urlsplit
 
+import httpx
 import structlog
+from packaging.version import InvalidVersion, Version
+from pydantic import BaseModel
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.config import Settings
-from tiqora.db.tiqora.models import TiqoraPluginRepository
+from tiqora.db.tiqora.models import TiqoraPlugin, TiqoraPluginRepository
+from tiqora.domain.schemas import UtcDateTime
 from tiqora.plugins.inspect import PackageReport
-from tiqora.plugins.repo_index import IndexFormatError, parse_index, publisher_keys
+from tiqora.plugins.repo_index import (
+    MAX_INDEX_BYTES,
+    IndexFormatError,
+    IndexPlugin,
+    IndexPublisher,
+    IndexVersion,
+    RepositoryIndex,
+    newest_compatible,
+    parse_index,
+    publisher_keys,
+    verify_index,
+    version_compatible,
+)
 from tiqora.plugins.signing import (
     OFFICIAL_KEYS,
     KeyRing,
@@ -30,6 +50,7 @@ from tiqora.plugins.signing import (
     local_keys,
     parse_public_key,
 )
+from tiqora.security.outbound import HostResolver, OutboundURLError, pin_outbound_url
 
 log = structlog.get_logger(__name__)
 
@@ -295,3 +316,523 @@ async def sync_env_repositories(
             row.updated_at = now
     await session.flush()
     return problems
+
+
+# ---------------------------------------------------------------- fetching
+
+#: wall clock of one download (connect + body); httpx's per-phase timeout is shorter
+TOTAL_FETCH_TIMEOUT: Final = 120.0
+PHASE_TIMEOUT: Final = 30.0
+MAX_SIGNATURE_BYTES: Final = 16 * 1024
+STALE_PACKAGE_HOURS: Final = 24
+#: the daemon tick stops starting new refreshes after this many seconds (tick timeout is 600 s)
+TICK_BUDGET_SECONDS: Final = 480.0
+MAX_ERROR_LENGTH: Final = 1000
+
+
+class FetchError(Exception):
+    """A download that failed; the message is German and shown to the admin."""
+
+    def __init__(self, message: str, *, not_found: bool = False) -> None:
+        super().__init__(message)
+        self.not_found = not_found
+
+
+def _megabytes(limit: int) -> str:
+    return f"{max(1, -(-limit // (1024 * 1024)))} MB"
+
+
+def _outbound_message(exc: OutboundURLError) -> str:
+    text = str(exc)
+    if "cannot resolve" in text or "no addresses" in text:
+        return "Der Servername der Paketquelle konnte nicht aufgelöst werden"
+    if "blocked address" in text:
+        return "Adresse der Paketquelle ist nicht erlaubt (interne oder lokale Adresse)"
+    return "Adresse der Paketquelle ist nicht erlaubt"
+
+
+async def _fetch_https(
+    url: str,
+    *,
+    max_bytes: int,
+    transport: httpx.AsyncBaseTransport | None,
+    resolver: HostResolver | None,
+) -> bytes:
+    try:
+        # the resolver blocks on getaddrinfo: keep it off the event loop (R-ASYNC-RESOLVE)
+        pinned = await asyncio.to_thread(
+            pin_outbound_url,
+            url,
+            require_https=True,
+            allow_private_networks=True,
+            resolver=resolver,
+        )
+    except OutboundURLError as exc:
+        raise FetchError(_outbound_message(exc)) from None
+    # identity: the cap counts what arrives, not a decompressed bomb
+    headers = pinned.request_headers({"Accept-Encoding": "identity"})
+    body = bytearray()
+    try:
+        async with (
+            asyncio.timeout(TOTAL_FETCH_TIMEOUT),
+            httpx.AsyncClient(
+                timeout=PHASE_TIMEOUT, follow_redirects=False, transport=transport
+            ) as client,
+            client.stream(
+                "GET", pinned.request_url, headers=headers, extensions=pinned.request_extensions()
+            ) as response,
+        ):
+            code = response.status_code
+            if 300 <= code < 400:
+                raise FetchError("Weiterleitungen werden nicht verfolgt")
+            if code == 404:
+                raise FetchError("Nicht gefunden (HTTP 404)", not_found=True)
+            if code != 200:
+                raise FetchError(f"Der Server antwortet mit HTTP {code}")
+            declared = response.headers.get("content-length", "")
+            if declared.isdigit() and int(declared) > max_bytes:
+                raise FetchError(f"Die Antwort ist zu groß (mehr als {_megabytes(max_bytes)})")
+            async for chunk in response.aiter_bytes():
+                body.extend(chunk)
+                if len(body) > max_bytes:
+                    raise FetchError(f"Die Antwort ist zu groß (mehr als {_megabytes(max_bytes)})")
+    except TimeoutError:
+        raise FetchError("Zeitüberschreitung beim Abruf der Paketquelle") from None
+    except httpx.HTTPError as exc:
+        raise FetchError(f"Paketquelle nicht erreichbar ({type(exc).__name__})") from None
+    return bytes(body)
+
+
+def _read_file_capped(url: str, file_root: Path, max_bytes: int) -> bytes:
+    parts = urlsplit(url)
+    if parts.netloc not in ("", "localhost"):
+        raise FetchError("Die file-Adresse ist ungültig")
+    try:
+        path = Path(unquote(parts.path)).resolve()
+        root = file_root.resolve()
+        if not path.is_relative_to(root):
+            raise FetchError("Die Datei liegt außerhalb des Paketquellen-Verzeichnisses")
+        if not path.is_file():
+            raise FetchError("Datei nicht gefunden", not_found=True)
+        if path.stat().st_size > max_bytes:
+            raise FetchError(f"Die Datei ist zu groß (mehr als {_megabytes(max_bytes)})")
+        with path.open("rb") as handle:
+            data = handle.read(max_bytes + 1)
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise FetchError(f"Datei nicht lesbar ({type(exc).__name__})") from None
+    if len(data) > max_bytes:
+        raise FetchError(f"Die Datei ist zu groß (mehr als {_megabytes(max_bytes)})")
+    return data
+
+
+async def fetch_bytes(
+    url: str,
+    *,
+    max_bytes: int,
+    settings: Settings,
+    transport: httpx.AsyncBaseTransport | None = None,
+    resolver: HostResolver | None = None,
+) -> bytes:
+    """Download ``url`` (never more than ``max_bytes``); every failure is a German ``FetchError``.
+
+    ``https://``: pinned to the resolved address (private networks allowed, loopback, link-local
+    and metadata blocked), redirects are not followed. ``file://``: only below
+    ``plugin_repository_file_root`` (env-defined sources). ``transport`` and ``resolver`` are
+    for tests.
+    """
+    scheme = urlsplit(url).scheme.lower()
+    if scheme == "https":
+        return await _fetch_https(url, max_bytes=max_bytes, transport=transport, resolver=resolver)
+    if scheme == "file":
+        root = Path(settings.plugin_repository_file_root)
+        return await asyncio.to_thread(_read_file_capped, url, root, max_bytes)
+    raise FetchError("Es ist nur https:// (oder file:/// aus der Server-Konfiguration) erlaubt")
+
+
+def package_url_problem(index_url: str, package_url: str, *, verified: bool) -> str | None:
+    """F20: an index without a verified key may only name package URLs on its own host.
+
+    Returns a German problem or None. ``package_url`` is the already resolved absolute URL.
+    """
+    if verified:
+        return None
+    base, given = urlsplit(index_url), urlsplit(package_url)
+    if base.scheme == "file":
+        return None  # resolve_package_url keeps file repositories below their directory
+
+    def origin(parts: SplitResult) -> tuple[str, str, int]:
+        return parts.scheme.lower(), (parts.hostname or "").lower(), parts.port or 443
+
+    if origin(base) != origin(given):
+        return (
+            "Eine Paketquelle ohne Schlüssel darf nur auf Pakete unter ihrer eigenen Adresse "
+            "verweisen. Bitte tragen Sie den Schlüssel der Paketquelle ein."
+        )
+    return None
+
+
+# ---------------------------------------------------------------- refresh
+
+
+@dataclass(frozen=True)
+class RefreshResult:
+    ok: bool
+    plugins: int
+    error: str | None
+
+
+def _sig_url(url: str) -> str:
+    parts = urlsplit(url)
+    return parts._replace(path=parts.path + ".sig").geturl()
+
+
+def _naive_utc(value: datetime) -> datetime:
+    if value.tzinfo is not None:
+        value = value.astimezone(UTC).replace(tzinfo=None)
+    return value.replace(microsecond=0)  # MariaDB DATETIME has no fraction
+
+
+async def _record_error(
+    session: AsyncSession, repo_id: int, message: str, now: datetime
+) -> RefreshResult:
+    """Keep the last good index; remember why the newest fetch was refused."""
+    row = await session.get(TiqoraPluginRepository, repo_id)
+    if row is not None:
+        row.last_error = message[:MAX_ERROR_LENGTH]
+        row.last_checked_at = now
+    log.warning("plugin_repository_refresh_failed", repository=repo_id, error=message[:200])
+    return RefreshResult(False, 0, message[:MAX_ERROR_LENGTH])
+
+
+async def refresh_repository(
+    session: AsyncSession,
+    repo: TiqoraPluginRepository,
+    *,
+    settings: Settings,
+    now: datetime,
+    transport: httpx.AsyncBaseTransport | None = None,
+    resolver: HostResolver | None = None,
+) -> RefreshResult:
+    """Fetch, verify and store one repository's index. The caller commits.
+
+    Errors never raise: the last good index stays, ``last_error`` says why (German). The store
+    step runs under a row lock and re-checks the rollback guard against the newest stored value
+    (F20: a daemon tick and a refresh job may run for one repository at the same time).
+    """
+    repo_id, url, key, url_key_at_start = repo.id, repo.url, repo.public_key, repo.url_key
+    now = now.replace(microsecond=0)
+    try:
+        raw = await fetch_bytes(
+            url,
+            max_bytes=MAX_INDEX_BYTES,
+            settings=settings,
+            transport=transport,
+            resolver=resolver,
+        )
+        raw_sig: bytes | None = None
+        if key:  # without a key the index cannot be verified: no reason to ask for a signature
+            try:
+                raw_sig = await fetch_bytes(
+                    _sig_url(url),
+                    max_bytes=MAX_SIGNATURE_BYTES,
+                    settings=settings,
+                    transport=transport,
+                    resolver=resolver,
+                )
+            except FetchError as exc:
+                if not exc.not_found:
+                    raise
+        verified = verify_index(raw, raw_sig, key)
+        index = parse_index(raw)
+    except FetchError as exc:
+        return await _record_error(session, repo_id, str(exc), now)
+    except IndexFormatError as exc:
+        return await _record_error(session, repo_id, str(exc), now)
+    generated = _naive_utc(index.repository.generated_at)
+
+    locked = await session.get(
+        TiqoraPluginRepository, repo_id, with_for_update=True, populate_existing=True
+    )
+    if locked is None:
+        return RefreshResult(False, 0, "Paketquelle nicht mehr vorhanden")
+    if locked.url_key != url_key_at_start or locked.public_key != key:
+        return await _record_error(
+            session, repo_id, "Die Paketquelle wurde während des Abrufs geändert", now
+        )
+    if locked.index_generated_at is not None and generated < locked.index_generated_at:
+        return await _record_error(
+            session,
+            repo_id,
+            "Paketquelle liefert einen älteren Stand als zuletzt – abgewiesen",
+            now,
+        )
+    locked.index_json = raw.decode("utf-8")
+    locked.index_sha256 = hashlib.sha256(raw).hexdigest()
+    locked.index_generated_at = generated
+    locked.index_verified = verified
+    locked.last_checked_at = now
+    locked.last_ok_at = now
+    locked.last_error = None
+    await session.flush()
+    log.info(
+        "plugin_repository_refreshed",
+        repository=repo_id,
+        plugins=len(index.plugins),
+        verified=verified,
+    )
+    return RefreshResult(True, len(index.plugins), None)
+
+
+# ---------------------------------------------------------------- catalog
+
+
+class CatalogVersionOut(BaseModel):
+    version: str
+    released_at: UtcDateTime | None
+    changelog: str | None
+    compatible: bool
+    yanked: bool
+
+
+class CatalogEntryOut(BaseModel):
+    repository_id: int
+    repository_name: str
+    plugin_id: str
+    name: str
+    publisher: str | None
+    publisher_verified: bool
+    description: str
+    categories: list[str]
+    license: str | None
+    homepage: str | None
+    icon_url: str | None
+    latest_version: str
+    latest_compatible: str | None
+    installed_version: str | None
+    update_available: bool
+    image_plugin: bool
+    versions: list[CatalogVersionOut]
+
+
+class CatalogOut(BaseModel):
+    categories: list[str]
+    entries: list[CatalogEntryOut]
+
+
+def _parse_or_none(raw: str | None, repo_id: int) -> RepositoryIndex | None:
+    if not raw:
+        return None
+    try:
+        return parse_index(raw.encode("utf-8"))
+    except IndexFormatError as exc:
+        log.warning("plugin_repository_index_unreadable", repository=repo_id, error=str(exc)[:200])
+        return None
+
+
+def _version_key(ver: IndexVersion) -> Version:
+    try:
+        return Version(ver.version)
+    except InvalidVersion:  # parse_index validated it; defensive
+        return Version("0")
+
+
+def update_binding_ok(
+    installed: TiqoraPlugin, repo: TiqoraPluginRepository, verified_key_ids: set[str]
+) -> bool:
+    """F10: an update comes from the plugin's own repository, or from another one only when it
+    vouches (verified index) for the key that signed the installed version."""
+    if installed.source == "image":
+        return True  # information only ("bitte das Image neu bauen")
+    if installed.repository_id is not None and installed.repository_id == repo.id:
+        return True
+    return bool(installed.key_id and installed.key_id in verified_key_ids)
+
+
+async def catalog(
+    session: AsyncSession,
+    *,
+    settings: Settings,
+    q: str | None = None,
+    category: str | None = None,
+    repository_id: int | None = None,
+) -> CatalogOut:
+    """The plugins offered by all enabled repositories, from the stored indexes (no network)."""
+    from tiqora.plugins import store
+    from tiqora.plugins.compat import release_core_version
+    from tiqora.plugins.runtime import image_plugin_ids
+
+    stmt = select(TiqoraPluginRepository).where(
+        TiqoraPluginRepository.enabled.is_(True), TiqoraPluginRepository.index_json.is_not(None)
+    )
+    if repository_id is not None:
+        stmt = stmt.where(TiqoraPluginRepository.id == repository_id)
+    repos = (await session.execute(stmt.order_by(TiqoraPluginRepository.id))).scalars().all()
+    installed = await store.list_plugin_rows(session)
+    images = image_plugin_ids(settings)
+    core = release_core_version()
+    from tiqora_sdk import SDK_VERSION
+
+    needle = (q or "").strip().casefold()
+    wanted_category = (category or "").strip().casefold()
+    categories: dict[str, str] = {}
+    entries: list[CatalogEntryOut] = []
+    for repo in repos:
+        index = _parse_or_none(repo.index_json, repo.id)
+        if index is None:
+            continue
+        publishers = {p.id: p for p in index.publishers}
+        key_ids = {k.key_id for p in index.publishers for k in p.keys if not k.revoked}
+        for plugin in index.plugins:
+            entry = _entry(
+                repo,
+                plugin,
+                publishers,
+                installed.get(plugin.id),
+                plugin.id in images,
+                key_ids if repo.index_verified else set(),
+                core,
+                SDK_VERSION,
+            )
+            if entry is None:
+                continue
+            for cat in entry.categories:
+                categories.setdefault(cat.casefold(), cat)
+            if wanted_category and wanted_category not in {c.casefold() for c in entry.categories}:
+                continue
+            if (
+                needle
+                and needle
+                not in " ".join(
+                    [entry.plugin_id, entry.name, entry.description, entry.publisher or ""]
+                ).casefold()
+            ):
+                continue
+            entries.append(entry)
+    entries.sort(key=lambda e: (e.name.casefold(), e.repository_id, e.plugin_id))
+    return CatalogOut(categories=sorted(categories.values(), key=str.casefold), entries=entries)
+
+
+def _entry(
+    repo: TiqoraPluginRepository,
+    plugin: IndexPlugin,
+    publishers: dict[str, IndexPublisher],
+    installed: TiqoraPlugin | None,
+    image_plugin: bool,
+    verified_key_ids: set[str],
+    core: Version | None,
+    sdk: str,
+) -> CatalogEntryOut | None:
+    ordered = sorted(plugin.versions, key=_version_key, reverse=True)
+    if not ordered:
+        return None
+    latest = next((v for v in ordered if not v.yanked), ordered[0])
+    best = newest_compatible(plugin, core=core, sdk=sdk)
+    publisher = publishers.get(plugin.publisher_id) if plugin.publisher_id else None
+    publisher_verified = bool(
+        repo.index_verified and publisher is not None and plugin.id.startswith(publisher.id + ".")
+    )
+    installed_version = installed.version if installed is not None else None
+    update = False
+    if installed is not None and best is not None:
+        try:
+            update = Version(best.version) > Version(installed.version) and update_binding_ok(
+                installed, repo, verified_key_ids
+            )
+        except InvalidVersion:
+            update = False
+    return CatalogEntryOut(
+        repository_id=repo.id,
+        repository_name=repo.name,
+        plugin_id=plugin.id,
+        name=plugin.name,
+        publisher=publisher.name if publisher is not None else None,
+        publisher_verified=publisher_verified,
+        description=plugin.description,
+        categories=list(plugin.categories),
+        license=plugin.license,
+        homepage=plugin.homepage,
+        icon_url=None,  # F14: icons are not loaded in this phase
+        latest_version=latest.version,
+        latest_compatible=best.version if best is not None else None,
+        installed_version=installed_version,
+        update_available=update,
+        image_plugin=image_plugin,
+        versions=[
+            CatalogVersionOut(
+                version=v.version,
+                released_at=v.released_at,
+                changelog=v.changelog,
+                compatible=version_compatible(v, core=core, sdk=sdk),
+                yanked=v.yanked,
+            )
+            for v in ordered
+        ],
+    )
+
+
+# ---------------------------------------------------------------- daemon tick
+
+
+async def run_repositories_tick(
+    settings: Settings,
+    factory: async_sessionmaker[AsyncSession],
+    *,
+    transport: httpx.AsyncBaseTransport | None = None,
+    resolver: HostResolver | None = None,
+) -> dict[str, int]:
+    """Daemon ``plugin_repositories``: env sync, refresh every enabled repository, purge old
+    packages. No enabled repository means no network access at all.
+
+    Runtime directories are NOT collected here (F8): only a booting process knows which ones
+    other processes still use.
+    """
+    from tiqora.plugins import packages_store
+
+    started = time.monotonic()
+    now = datetime.now(UTC).replace(tzinfo=None, microsecond=0)
+    async with factory() as session:
+        await sync_env_repositories(session, settings, now)
+        await session.commit()
+        ids = list(
+            (
+                await session.execute(
+                    select(TiqoraPluginRepository.id)
+                    .where(TiqoraPluginRepository.enabled.is_(True))
+                    .order_by(TiqoraPluginRepository.id)
+                )
+            ).scalars()
+        )
+    failed = 0
+    for repo_id in ids:
+        if time.monotonic() - started > TICK_BUDGET_SECONDS:
+            log.warning("plugin_repositories_tick_budget_spent", skipped_from=repo_id)
+            failed += 1
+            continue
+        try:
+            async with factory() as session:
+                repo = await session.get(TiqoraPluginRepository, repo_id)
+                if repo is None or not repo.enabled:
+                    continue
+                result = await refresh_repository(
+                    session,
+                    repo,
+                    settings=settings,
+                    now=now,
+                    transport=transport,
+                    resolver=resolver,
+                )
+                await session.commit()
+            if not result.ok:
+                failed += 1
+        except Exception:
+            log.exception("plugin_repository_refresh_crashed", repository=repo_id)
+            failed += 1
+    async with factory() as session:
+        await packages_store.purge_stale_packages(
+            session, older_than=now - timedelta(hours=STALE_PACKAGE_HOURS)
+        )
+        await session.commit()
+        offered = await catalog(session, settings=settings)
+        await session.rollback()
+    updates = len({e.plugin_id for e in offered.entries if e.update_available})
+    return {"repositories": len(ids), "failed": failed, "updates_available": updates}

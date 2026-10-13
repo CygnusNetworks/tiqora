@@ -7828,6 +7828,147 @@
         "title": "CatalogActionOut",
         "type": "object"
       },
+      "CatalogEntryOut": {
+        "properties": {
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "homepage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Homepage"
+          },
+          "icon_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon Url"
+          },
+          "image_plugin": {
+            "title": "Image Plugin",
+            "type": "boolean"
+          },
+          "installed_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installed Version"
+          },
+          "latest_compatible": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Compatible"
+          },
+          "latest_version": {
+            "title": "Latest Version",
+            "type": "string"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          },
+          "publisher_verified": {
+            "title": "Publisher Verified",
+            "type": "boolean"
+          },
+          "repository_id": {
+            "title": "Repository Id",
+            "type": "integer"
+          },
+          "repository_name": {
+            "title": "Repository Name",
+            "type": "string"
+          },
+          "update_available": {
+            "title": "Update Available",
+            "type": "boolean"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogVersionOut"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "repository_id",
+          "repository_name",
+          "plugin_id",
+          "name",
+          "publisher",
+          "publisher_verified",
+          "description",
+          "categories",
+          "license",
+          "homepage",
+          "icon_url",
+          "latest_version",
+          "latest_compatible",
+          "installed_version",
+          "update_available",
+          "image_plugin",
+          "versions"
+        ],
+        "title": "CatalogEntryOut",
+        "type": "object"
+      },
       "CatalogFieldOut": {
         "properties": {
           "condition": {
@@ -7868,6 +8009,30 @@
         "title": "CatalogFieldOut",
         "type": "object"
       },
+      "CatalogOut": {
+        "properties": {
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogEntryOut"
+            },
+            "title": "Entries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "categories",
+          "entries"
+        ],
+        "title": "CatalogOut",
+        "type": "object"
+      },
       "CatalogParamOut": {
         "properties": {
           "kind": {
@@ -7902,6 +8067,54 @@
           "list_value"
         ],
         "title": "CatalogParamOut",
+        "type": "object"
+      },
+      "CatalogVersionOut": {
+        "properties": {
+          "changelog": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changelog"
+          },
+          "compatible": {
+            "title": "Compatible",
+            "type": "boolean"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "yanked": {
+            "title": "Yanked",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "version",
+          "released_at",
+          "changelog",
+          "compatible",
+          "yanked"
+        ],
+        "title": "CatalogVersionOut",
         "type": "object"
       },
       "CategoryIn": {
@@ -62100,6 +62313,122 @@
         ]
       }
     },
+    "/api/v1/admin/plugin-repositories/catalog": {
+      "get": {
+        "description": "What the enabled repositories offer, from their stored indexes (no network access).",
+        "operationId": "get_catalog_api_v1_admin_plugin_repositories_catalog_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "in": "query",
+            "name": "repository_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Repository Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Catalog",
+        "tags": [
+          "admin:plugins"
+        ]
+      }
+    },
     "/api/v1/admin/plugin-repositories/{repo_id}": {
       "delete": {
         "operationId": "delete_repository_api_v1_admin_plugin_repositories__repo_id__delete",
@@ -62244,6 +62573,81 @@
           }
         },
         "summary": "Update Repository",
+        "tags": [
+          "admin:plugins"
+        ]
+      }
+    },
+    "/api/v1/admin/plugin-repositories/{repo_id}/refresh": {
+      "post": {
+        "description": "Queue a refresh of the repository's index; the UI polls ``GET /jobs/{id}``.",
+        "operationId": "refresh_repository_endpoint_api_v1_admin_plugin_repositories__repo_id__refresh_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repo_id",
+            "required": true,
+            "schema": {
+              "title": "Repo Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refresh Repository Endpoint",
         "tags": [
           "admin:plugins"
         ]

@@ -28,6 +28,7 @@ from tiqora.db.tiqora.models import (
     TiqoraPlugin,
     TiqoraPluginData,
     TiqoraPluginHook,
+    TiqoraPluginRepository,
     TiqoraPluginRuntime,
     TiqoraSettings,
 )
@@ -39,7 +40,11 @@ from tiqora.plugins.inspect import PackageReport, inspect_read_package, installe
 from tiqora.plugins.inspect import short_id_owners as load_short_id_owners
 from tiqora.plugins.migrations import _child_env
 from tiqora.plugins.package import PackageError, read_tqplugin
-from tiqora.plugins.repositories import build_key_ring_named, with_repository_signer
+from tiqora.plugins.repositories import (
+    build_key_ring_named,
+    refresh_repository,
+    with_repository_signer,
+)
 from tiqora.plugins.restart import request_restart, utcnow
 from tiqora.plugins.runtime import materialize, runtime_dir_problem
 
@@ -47,6 +52,7 @@ log = structlog.get_logger(__name__)
 
 PLUGIN_INSTALL_KIND: Final = "core.plugin_install"
 PLUGIN_UNINSTALL_KIND: Final = "core.plugin_uninstall"
+PLUGIN_REPOSITORY_REFRESH_KIND: Final = "core.plugin_repository_refresh"
 PLUGIN_LANE: Final = "plugins"
 
 VERIFY_TIMEOUT_SECONDS: Final = 120
@@ -88,6 +94,11 @@ class PluginFetchPayload(BaseModel):
 
 class PluginRepositoryRefreshPayload(BaseModel):
     repository_id: int
+
+
+def refresh_dedupe_key(repository_id: int) -> str:
+    """One refresh per repository at a time (shared by the endpoint and the job)."""
+    return f"repo:{repository_id}"
 
 
 def dedupe_key(plugin_id: str) -> str:
@@ -532,6 +543,36 @@ async def run_plugin_uninstall(ctx: JobContext, payload: PluginUninstallPayload)
     }
 
 
+# ---------------------------------------------------------------- repository refresh
+
+
+async def run_plugin_repository_refresh(
+    ctx: JobContext, payload: PluginRepositoryRefreshPayload
+) -> dict[str, Any]:
+    """Fetch and store one repository's index; a refused index is a result, not a failure."""
+    async with ctx.session_factory() as session:
+        repo = await session.get(TiqoraPluginRepository, payload.repository_id)
+        if repo is None:
+            raise JobFailed("Paketquelle nicht gefunden")
+        result = await refresh_repository(
+            session, repo, settings=ctx.settings, now=utc_now().replace(microsecond=0)
+        )
+        await session.commit()
+    return {"ok": result.ok, "plugins": result.plugins, "error": result.error}
+
+
+PLUGIN_REPOSITORY_REFRESH_JOB = JobHandler(
+    kind=PLUGIN_REPOSITORY_REFRESH_KIND,
+    payload_model=PluginRepositoryRefreshPayload,
+    run=run_plugin_repository_refresh,
+    title_key="jobs.kinds.core.plugin_repository_refresh",
+    timeout_seconds=300,
+    lane=PLUGIN_LANE,
+    max_attempts=1,
+    requeue_if_interrupted=False,
+    result_private=False,
+)
+
 PLUGIN_UNINSTALL_JOB = JobHandler(
     kind=PLUGIN_UNINSTALL_KIND,
     payload_model=PluginUninstallPayload,
@@ -559,6 +600,8 @@ PLUGIN_INSTALL_JOB = JobHandler(
 __all__ = [
     "PLUGIN_INSTALL_JOB",
     "PLUGIN_INSTALL_KIND",
+    "PLUGIN_REPOSITORY_REFRESH_JOB",
+    "PLUGIN_REPOSITORY_REFRESH_KIND",
     "PLUGIN_UNINSTALL_JOB",
     "PLUGIN_LANE",
     "PLUGIN_UNINSTALL_KIND",
@@ -568,6 +611,8 @@ __all__ = [
     "PluginUninstallPayload",
     "dedupe_key",
     "in_image",
+    "refresh_dedupe_key",
     "run_plugin_install",
+    "run_plugin_repository_refresh",
     "run_plugin_uninstall",
 ]

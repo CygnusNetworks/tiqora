@@ -309,26 +309,31 @@ def resolve_package_url(index_url: str, package_url: str) -> str:
     return resolved
 
 
+def version_compatible(ver: IndexVersion, *, core: Version | None, sdk: str) -> bool:
+    """Whether this release runs on the given SDK and (when known) Tiqora release."""
+    try:
+        if not SpecifierSet(ver.sdk).contains(Version(sdk), prereleases=True):
+            return False
+        return not (
+            ver.tiqora is not None
+            and core is not None
+            and not SpecifierSet(ver.tiqora).contains(core, prereleases=True)
+        )
+    except (InvalidSpecifier, InvalidVersion):
+        return False
+
+
 def newest_compatible(
     plugin: IndexPlugin, *, core: Version | None, sdk: str
 ) -> IndexVersion | None:
     """Highest non-yanked version whose ``sdk`` / ``tiqora`` ranges contain the running versions."""
     best: tuple[Version, IndexVersion] | None = None
-    sdk_version = Version(sdk)
     for ver in plugin.versions:
-        if ver.yanked:
+        if ver.yanked or not version_compatible(ver, core=core, sdk=sdk):
             continue
         try:
-            if not SpecifierSet(ver.sdk).contains(sdk_version, prereleases=True):
-                continue
-            if (
-                ver.tiqora is not None
-                and core is not None
-                and not SpecifierSet(ver.tiqora).contains(core, prereleases=True)
-            ):
-                continue
             parsed = Version(ver.version)
-        except (InvalidSpecifier, InvalidVersion):
+        except InvalidVersion:
             continue
         if best is None or parsed > best[0]:
             best = (parsed, ver)
