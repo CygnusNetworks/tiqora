@@ -58,6 +58,13 @@ vi.mock("@/lib/api", async (orig) => ({
   },
 }));
 
+const { ensurePluginI18n, pluginsFrontend } = vi.hoisted(() => ({
+  ensurePluginI18n: vi.fn(async () => undefined),
+  pluginsFrontend: vi.fn(),
+}));
+vi.mock("@/plugins/i18n", () => ({ ensurePluginI18n }));
+vi.mock("@/lib/pluginsApi", () => ({ pluginsApi: { frontend: pluginsFrontend } }));
+
 const authFlags = vi.hoisted(() => ({ canViewReports: true, canCreate: false, isAdmin: false }));
 vi.mock("@/auth/AuthContext", () => ({
   useAuth: () => ({
@@ -96,6 +103,38 @@ beforeEach(() => {
 });
 
 describe("ReportsPage", () => {
+  it("loads plugin i18n for plugin reports", async () => {
+    const plugin = { id: "org.example.points", version: "1.0.0", locales: ["de", "en"] };
+    pluginsFrontend.mockReset().mockResolvedValue([plugin]);
+    ensurePluginI18n.mockClear();
+    const base = DEMO_REPORT_CATALOGUE.reports.find((r) => r.kind === "builtin" && r.definition != null)!;
+    vi.mocked(reportsApi.catalogue).mockResolvedValue({
+      ...DEMO_REPORT_CATALOGUE,
+      reports: [
+        ...DEMO_REPORT_CATALOGUE.reports,
+        {
+          ...base,
+          key: "plugin.org.example.points.articles_by_channel",
+          title_key: "plugin.org.example.points:reports.articles_by_channel.title",
+          description_key: "plugin.org.example.points:reports.articles_by_channel.description",
+        },
+      ],
+    });
+    renderPage();
+    await waitFor(() => expect(ensurePluginI18n).toHaveBeenCalledTimes(1));
+    // The plugin object (not its id) and the active language go in.
+    expect(ensurePluginI18n).toHaveBeenCalledWith(plugin, "de");
+  });
+
+  it("asks for no plugin texts when only core reports exist", async () => {
+    pluginsFrontend.mockReset();
+    ensurePluginI18n.mockClear();
+    renderPage();
+    await screen.findByTestId("reports-catalogue");
+    expect(pluginsFrontend).not.toHaveBeenCalled();
+    expect(ensurePluginI18n).not.toHaveBeenCalled();
+  });
+
   it("offers the Znuny import to everyone with report access and schedules to creators", async () => {
     renderPage();
     fireEvent.click(await screen.findByTestId("reports-znuny-import"));

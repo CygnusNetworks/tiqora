@@ -17,6 +17,7 @@ import {
   toRunIn,
   type ReportFilterState,
 } from "@/components/reports/reportFilter";
+import { labelKeysOf, usePluginReportTexts } from "@/components/reports/usePluginReportTexts";
 import { ReportParameterControls } from "@/components/reports/ReportParameterControls";
 import { ReportsAccessGate } from "@/components/reports/ReportsAccessGate";
 import { ReportView } from "@/components/reports/ReportView";
@@ -82,6 +83,11 @@ function ReportViewPageContent() {
     enabled: hasParams,
   });
   const source = sourcesQ.data?.find((s) => s.key === definition?.source);
+  // Titles plus the source's labels (parameter controls); ReportView loads the column labels.
+  usePluginReportTexts(
+    useMemo(() => [report], [report]),
+    useMemo(() => labelKeysOf(source), [source]),
+  );
 
   const onChange = (next: ReportFilterState) => {
     void navigate({

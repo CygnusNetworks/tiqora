@@ -10,6 +10,7 @@
  */
 
 import type { FrontendPlugin, PluginAdminList } from "@/lib/pluginsApi";
+import type { DynamicFieldPluginType, NotificationTransport, NumberGenerators } from "@/lib/pluginPointsApi";
 import type { DeployStatus } from "@/lib/deployStatusApi";
 import { resolve as resolveDashboardsDemo } from "./dashboardsMock";
 import { resolveSavedRequest } from "./savedMock";
@@ -2112,6 +2113,27 @@ const demoPluginTexts = {
   },
 };
 
+/** Admin extension points of the demo plugin: number scheme, notification transport, dynamic field type. */
+const demoNumberGenerators: NumberGenerators = {
+  active: null,
+  znuny_generator: "DateChecksum",
+  available: [
+    { key: "Plugin_demo_Yearly", label: "Jahreszähler", plugin_id: "org.example.demo", example: "2026-000001" },
+  ],
+};
+const demoNotificationTransports: NotificationTransport[] = [
+  { key: "Plugin_demo_Chat", label: "Chat (Demo)", plugin_id: "org.example.demo" },
+];
+const demoDfPluginTypes: DynamicFieldPluginType[] = [
+  {
+    key: "Plugin_demo_Contract",
+    label: "Vertragsnummer (Demo)",
+    base_type: "Text",
+    plugin_id: "org.example.demo",
+    config_schema: { type: "object", properties: { prefix: { type: "string", title: "Präfix" } } },
+  },
+];
+
 /** `GET /api/v1/admin/plugins`: one active, one skipped (quarantined), one waiting for a restart. */
 const demoAdminPlugins: PluginAdminList = {
   safe_mode: false,
@@ -2135,6 +2157,10 @@ const demoAdminPlugins: PluginAdminList = {
       capabilities: [
         { kind: "extension_point", value: "core.events.subscribers" },
         { kind: "extension_point", value: "core.worker.scheduled_tasks" },
+        { kind: "extension_point", value: "core.events.sync_hooks" },
+        { kind: "extension_point", value: "core.tickets.number_generators" },
+        { kind: "extension_point", value: "core.dynamic_fields.types" },
+        { kind: "extension_point", value: "core.notifications.transports" },
         { kind: "outbound_host", value: "api.example.org" },
         { kind: "frontend_slot", value: "agent.nav" },
         { kind: "frontend_slot", value: "agent.route" },
@@ -2153,10 +2179,16 @@ const demoAdminPlugins: PluginAdminList = {
           tripped: false, consecutive_failures: 0, total_failures: 0, last_error: null,
           last_error_at: null, last_ok_at: "2026-10-10T01:00:00Z", last_run_at: "2026-10-10T01:00:00Z",
         },
+        {
+          key: "sync:org.example.demo:contract-check", kind: "sync", name: "contract-check", schedule: "ticket.create",
+          tripped: false, consecutive_failures: 0, total_failures: 0, last_error: null,
+          last_error_at: null, last_ok_at: "2026-10-10T07:50:00Z", last_run_at: "2026-10-10T07:50:00Z",
+        },
       ],
       runtime: [
         { role: "api", state: "active", version: "1.0.0", error: null, boot_attempts: 1, updated_at: "2026-10-10T06:00:00Z" },
         { role: "worker", state: "active", version: "1.0.0", error: null, boot_attempts: 1, updated_at: "2026-10-10T06:00:00Z" },
+        { role: "ai-worker", state: "active", version: "1.0.0", error: null, boot_attempts: 1, updated_at: "2026-10-10T06:00:00Z" },
       ],
     },
     {
@@ -2213,6 +2245,11 @@ export function resolveData(path: string, method: string): unknown | undefined {
   // Plugins: the demo plugin's list entry and its translations (code: src/demo/demoPlugin.tsx).
   if (p.endsWith("/api/v1/plugins/frontend")) return demoPluginFrontend;
   if (p.endsWith("/api/v1/admin/plugins")) return demoAdminPlugins;
+  if (p.endsWith("/api/v1/admin/plugins/number-generators")) return demoNumberGenerators;
+  if (p.endsWith("/api/v1/admin/notification-events/transports")) return demoNotificationTransports;
+  if (p.endsWith("/api/v1/admin/dynamic-fields/plugin-types")) return demoDfPluginTypes;
+  // No plugin channels in the demo: replies stay on e-mail.
+  if (p.endsWith("/api/v1/channels/plugin")) return [];
   if (p.endsWith("/api/v1/plugins/org.example.demo/assets/1.0.0/i18n/de.json")) return demoPluginTexts.de;
   if (p.endsWith("/api/v1/plugins/org.example.demo/assets/1.0.0/i18n/en.json")) return demoPluginTexts.en;
   const wcData = resolveWebchatData(p, method);

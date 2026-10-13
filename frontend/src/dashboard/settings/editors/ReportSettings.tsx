@@ -1,7 +1,8 @@
-import { useId } from "react";
+import { useId, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ReportParameterControls } from "@/components/reports/ReportParameterControls";
+import { labelKeysOf, usePluginReportTexts } from "@/components/reports/usePluginReportTexts";
 import { choiceIndex, hasTimeRange, runtimeParameters, type ReportParamValues } from "@/components/reports/reportFilter";
 import { isBuiltinReport, reportTitle, reportsApi, type ReportItem } from "@/lib/reportsApi";
 import { TIME_RANGE_PRESETS, timeRangeLabelKey } from "../../filters/timeRanges";
@@ -44,6 +45,7 @@ export function ReportSettingsEditor({ value, onChange, errors }: SettingsEditor
     enabled: hasParams,
   });
   const source = sources.data?.find((s) => s.key === definition?.source);
+  usePluginReportTexts(reports, useMemo(() => labelKeysOf(source), [source]));
 
   const builtin = reports.filter((r) => isBuiltinReport(r));
   const saved = reports.filter((r) => r.kind === "saved" && r.definition != null);

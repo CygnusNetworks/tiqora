@@ -8,13 +8,16 @@ from __future__ import annotations
 
 import sys
 from collections.abc import AsyncIterator, Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tests._plugin_points import PLUGIN_ID as POINTS_ID
+from tests._plugin_points import boot_points_plugin
 from tests._plugins_state_helpers import (  # noqa: F401
     T0,
     db_url_fixture,
@@ -27,7 +30,7 @@ from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db
 from tiqora.api.v1.admin.deps import get_admin_user
 from tiqora.config import Settings
-from tiqora.db.tiqora.models import TiqoraPlugin
+from tiqora.db.tiqora.models import TiqoraPlugin, TiqoraPluginHook
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.extensions.core import register_core, set_registry_for_tests
 from tiqora.extensions.registry import Registry
@@ -37,6 +40,7 @@ from tiqora.plugins.context import make_plugin_context
 from tiqora.plugins.discovery import discover_plugins
 from tiqora.plugins.loader import commit_registrar, import_and_register
 from tiqora.plugins.state import PluginLoadResult, RuntimeState, set_loaded_plugins
+from tiqora.plugins.sync_hooks import SYNC_HOOKS, ensure_sync_hook_rows
 
 pytestmark = pytest.mark.db
 
@@ -185,6 +189,33 @@ async def test_hooks_listed_with_schedule(
     assert tick["tripped"] is True and tick["last_error"] == "kaputt"
 
 
+async def test_sync_hooks_listed_with_operation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    admin_client: AsyncClient,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    registry = boot_points_plugin(tmp_path, monkeypatch)
+    (found,) = [d for d in discover_plugins() if d.plugin_id == POINTS_ID]
+    async with factory() as s:
+        await store.sync_discovered(s, [found], auto_enable=True, now=T0)
+        await s.commit()
+    await ensure_sync_hook_rows(registry, factory)
+    try:
+        hooks = _by_id((await admin_client.get(BASE)).json(), POINTS_ID)["hooks"]
+        assert {h["kind"] for h in hooks} == {"sync"}
+        by_op = {h["schedule"]: h for h in hooks}
+        assert sorted(by_op) == sorted(h.operation for h in registry.items(SYNC_HOOKS))
+        create = by_op["ticket.create"]
+        assert create["key"] == f"sync:{POINTS_ID}:ticket_create"
+        assert create["name"] == "ticket_create" and create["tripped"] is False
+    finally:
+        async with factory() as s:
+            await s.execute(delete(TiqoraPluginHook).where(TiqoraPluginHook.plugin_id == POINTS_ID))
+            await s.execute(delete(TiqoraPlugin).where(TiqoraPlugin.id == POINTS_ID))
+            await s.commit()
+
+
 async def test_runtime_roles_sorted_and_worker_failure_named(
     fixture_plugins: Installer,
     admin_client: AsyncClient,
@@ -207,6 +238,35 @@ async def test_runtime_roles_sorted_and_worker_failure_named(
     assert [r["role"] for r in p["runtime"]] == ["api", "worker", "mcp"]
     assert p["status"] == "failed"  # api active, worker failed
     assert p["status_message"] == "Hintergrunddienst: RuntimeError: kaputt"
+
+
+async def test_ai_worker_failure_named_and_sorted_last(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    seeded_runtime: None,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    await store.mark_result(
+        factory,
+        PLUGIN_ID,
+        "ai-worker",
+        state=RuntimeState.FAILED,
+        version="1.0.0",
+        error="RuntimeError: kaputt",
+        now=T0,
+    )
+    p = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+    assert [r["role"] for r in p["runtime"]] == ["api", "ai-worker"]
+    assert p["status"] == "failed"
+    assert p["status_message"] == "KI-Hintergrunddienst: RuntimeError: kaputt"
+
+
+async def test_no_ai_worker_row_is_not_a_problem(
+    fixture_plugins: Installer, admin_client: AsyncClient, seeded_runtime: None
+) -> None:
+    p = _by_id((await admin_client.get(BASE)).json(), PLUGIN_ID)
+    assert p["status"] == "active"
+    assert "ai-worker" not in {r["role"] for r in p["runtime"]}
 
 
 async def test_quarantined_worker_message(

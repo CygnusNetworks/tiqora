@@ -19,6 +19,7 @@ from collections.abc import Awaitable, Callable, Collection, Mapping
 from datetime import UTC, datetime
 from typing import Any, Final
 
+import structlog
 from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,7 +31,9 @@ from tiqora.db.tiqora.models import (
     TiqoraSavedSearch,
 )
 from tiqora.extensions.core import get_registry
-from tiqora.reporting.catalogue import BUILTIN_REPORTS
+from tiqora.reporting.catalogue import BUILTIN_REPORTS, is_catalogue_key
+
+logger = structlog.get_logger(__name__)
 
 #: Condition fields holding a customer login / company id, per kind of saved object.
 SEARCH_LOGIN_FIELDS: Final = frozenset({"customer_user_id"})
@@ -238,9 +241,15 @@ def _scrub_overrides(
 
 async def _parameter_fields(session: AsyncSession, report_key: str) -> dict[str, str]:
     """``{parameter key: report field}`` of a built-in or saved report (soft-deleted included)."""
-    if report_key.startswith("builtin."):
+    if is_catalogue_key(report_key):
+        # Unfiltered: erasure must not depend on plugin health (a plugin that failed in this
+        # process still has its definition registered).
         builtin = get_registry().get(BUILTIN_REPORTS, report_key)
-        return {p.key: p.field for p in builtin.definition.parameters} if builtin else {}
+        if builtin is None:
+            # a plugin report whose plugin is not installed: its overrides cannot be scrubbed
+            logger.warning("gdpr_report_parameters_unknown", report=report_key)
+            return {}
+        return {p.key: p.field for p in builtin.definition.parameters}
     if not report_key.isdigit():
         return {}
     raw = (

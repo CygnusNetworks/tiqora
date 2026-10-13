@@ -92,6 +92,16 @@
     "serviceHint": "Llista els tiquets assignats a un servei.",
     "pickService": "Seleccioneu un servei…"
   },
+  "customers": {
+    "external": {
+      "title": "From customer directory",
+      "source": "from {{label}}",
+      "import": "Import",
+      "imported": "Customer imported",
+      "conflict": "This email address already belongs to another customer.",
+      "error": "The customer could not be imported."
+    }
+  },
   "customerCentre": {
     "title": "Informació del client",
     "open": "Info. del client",
@@ -589,6 +599,12 @@
     "reply": "Respon",
     "replyAll": "Respon a tots",
     "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
+    "replyPluginChannel": "Reply via {{label}}",
+    "replyPluginChannelTooLong": "The message is too long for {{label}} (at most {{max}} characters).",
+    "replyPluginChannelNoAttachments": "{{label}} cannot carry attachments.",
+    "replyPluginChannelUnavailable": "This channel is currently unavailable: its extension is switched off or could not be loaded. The reply cannot be sent.",
+    "replyPluginChannelCannotReply": "Replies cannot be sent over {{label}}.",
+    "replyPluginChannelNoHandle": "The message has no sender on this channel, so there is no recipient for the reply.",
     "forward": "Endavant",
     "bounce": "Rebot",
     "splitAction": "Divideix",
@@ -2653,7 +2669,13 @@
       "possibleNone": "Permet la selecció buida",
       "defaultValue": "Valor per defecte",
       "yearsInPast": "Anys enrere",
-      "yearsInFuture": "Anys en el futur"
+      "yearsInFuture": "Anys en el futur",
+      "pluginType": "Kind from extension",
+      "pluginTypeHint": "Checked in Tiqora; in Znuny the field appears as “{{base}}”.",
+      "pluginTypeNone": "None (standard kind)",
+      "pluginTypesLoadError": "The field kinds offered by extensions could not be loaded.",
+      "pluginTypeStored": "Kind from extension: {{type}}",
+      "pluginTypeInactive": "The extension is not active right now; the field behaves like “{{base}}”."
     },
     "postmasterFilters": {
       "title_plural": "Filtres de postmaster",
@@ -3925,7 +3947,11 @@
         "backendOff": "{{backend}} està desactivat: aquesta notificació no s'envia gens fins que es torni a activar (com a Znuny).",
         "hint": "Es signa amb una clau de l'adreça del remitent (les notificacions al client prefereixen la clau de signatura per defecte de la cua) i es xifra amb la primera clau vàlida del destinatari. Znuny llegeix els mateixos paràmetres.",
         "save": "Desa"
-      }
+      },
+      "transports": "Delivery channels",
+      "transportEmail": "E-mail",
+      "transportsEmptyHint": "Select at least one delivery channel. To stop a notification, switch it off instead.",
+      "transportsLoadError": "The delivery channels offered by extensions could not be loaded; only the stored ones are shown."
     },
     "tar": {
       "title": "Relacions d'atributs de tiquet",
@@ -5075,7 +5101,8 @@
         "roles": {
           "api": "Web interface and API",
           "worker": "Background service",
-          "mcp": "AI interface (MCP)"
+          "mcp": "AI interface (MCP)",
+          "ai-worker": "AI background service"
         },
         "states": {
           "loading": "Starting",
@@ -5091,7 +5118,17 @@
         "title": "Automatic processes",
         "onTicketChange": "on ticket changes",
         "stopped": "Stopped after {{count}} errors",
-        "lastError": "Last error"
+        "lastError": "Last error",
+        "kind": {
+          "sync": "Check before saving"
+        },
+        "operation": {
+          "ticket.create": "Create ticket",
+          "article.create": "Add message/note",
+          "ticket.queue_move": "Change queue",
+          "ticket.state_change": "Change state",
+          "ticket.dynamic_fields_update": "Change dynamic fields"
+        }
       },
       "capabilities": {
         "title": "What this extension declares",
@@ -5105,7 +5142,22 @@
           "scheduled_tasks": "Runs scheduled tasks in the background",
           "builtin_reports": "Provides ready-made reports",
           "report_sources": "Provides data sources for reports",
-          "other": "Uses the extension point {{value}}"
+          "other": "Uses the extension point {{value}}",
+          "sync_hooks": "Checks ticket changes before they are saved (can reject them)",
+          "transition_actions": "Provides actions for processes",
+          "condition_modules": "Provides conditions for processes",
+          "placeholders": "Provides placeholders for templates",
+          "number_generators": "Provides a ticket number scheme",
+          "df_types": "Provides kinds of dynamic fields",
+          "inbound_mail_filters": "Processes incoming e-mails",
+          "outbound_mail_filters": "Checks outgoing e-mails (can reject sending)",
+          "notification_transports": "Provides delivery channels for notifications",
+          "channel_drivers": "Provides a channel",
+          "password_providers": "Checks passwords at sign-in",
+          "customer_sources": "Provides a customer directory",
+          "gi_operations": "Provides web service operations",
+          "gi_invokers": "Provides web service calls (invokers)",
+          "gi_mappings": "Provides web service mappings"
         },
         "slot": {
           "nav": "Adds a menu entry",
@@ -5114,6 +5166,15 @@
           "widget": "Shows a tile on the dashboard",
           "other": "Extends the interface ({{value}})"
         }
+      },
+      "numberGenerator": {
+        "title": "Ticket number scheme",
+        "use": "Use for new tickets",
+        "active": "Used for new tickets",
+        "example": "Example: {{example}}",
+        "znunyNote": "Tickets that Znuny creates in parallel keep getting numbers in the Znuny scheme ({{generator}}). Replies to both kinds of numbers are recognised.",
+        "reset": "Use Znuny scheme",
+        "loadError": "The ticket number schemes of this extension could not be loaded."
       }
     },
     "dashboardTemplates": {

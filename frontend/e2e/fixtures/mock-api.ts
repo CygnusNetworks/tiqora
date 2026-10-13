@@ -705,6 +705,21 @@ export async function mockApi(page: Page) {
       return;
     }
 
+    // Admin pages of the plugin extension points: nothing offered.
+    if (method === "GET" && path.endsWith("/api/v1/admin/plugins/number-generators")) {
+      await json(route, 200, { active: null, znuny_generator: "DateChecksum", available: [] });
+      return;
+    }
+    if (
+      method === "GET" &&
+      (path.endsWith("/api/v1/admin/notification-events/transports") ||
+        path.endsWith("/api/v1/admin/dynamic-fields/plugin-types") ||
+        path.endsWith("/api/v1/channels/plugin"))
+    ) {
+      await json(route, 200, []);
+      return;
+    }
+
     // Auth
     if (path.endsWith("/api/v1/auth/methods") && method === "GET") {
       await json(route, 200, {

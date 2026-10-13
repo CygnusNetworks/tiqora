@@ -109,6 +109,7 @@ TRANSITION_ACTIONS: ExtensionPoint[TransitionActionModule] = ExtensionPoint(
     key="core.process.transition_actions",
     item_key=lambda m: m.name,
     description="ProcessManagement transition action modules (handler + designer parameter specs)",
+    sdk_stable=True,
 )
 
 

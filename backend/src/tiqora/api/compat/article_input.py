@@ -115,7 +115,11 @@ async def _value_is_valid(
     be a key (``""`` only when it is one).
     """
     try:
-        normalize_df_values(config.field_type, values)
+        normalized = normalize_df_values(config.field_type, values)
+        if config.plugin_type is not None:
+            from tiqora.plugins.df_types import validate_plugin_values
+
+            await validate_plugin_values(config, normalized)
     except DynamicFieldValueError:
         return False
     if config.field_type not in ("Dropdown", "Multiselect"):

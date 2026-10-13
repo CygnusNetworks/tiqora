@@ -81,6 +81,7 @@ from tiqora.domain.auth import SessionStore
 from tiqora.gi.config import parse_debugger
 from tiqora.gi.debug_store import BufferedDebugSink
 from tiqora.gi.debugger import GiDebugger
+from tiqora.plugins.gi_points import PLUGIN_HANDLER_PREFIX, run_plugin_operation
 from tiqora.security.ratelimit import client_ip
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -176,6 +177,11 @@ async def _dispatch_operation(
     settings = getattr(request.app.state, "settings", None)
     # Normalize aliases (e.g. SessionDelete → SessionRemove).
     operation = _OPERATION_ALIASES.get(operation, operation)
+
+    if operation.startswith(PLUGIN_HANDLER_PREFIX):  # a GenericInterface operation of a plugin
+        return await run_plugin_operation(
+            operation, data, session, session_store, request, operation_config
+        )
 
     if operation == "SessionCreate":
         return await op_session_create(

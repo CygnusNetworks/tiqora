@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlparse
 
 import httpx
@@ -15,9 +15,12 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.db.engine import get_session_factory
+from tiqora.plugins import writes as _writes
+from tiqora.plugins.customers import PluginCustomers
 from tiqora.security.outbound import HostResolver, pin_outbound_url
 
 if TYPE_CHECKING:
+    from tiqora.plugins.channels import PluginChannels
     from tiqora.plugins.discovery import DiscoveredPlugin
 
 
@@ -112,7 +115,19 @@ _TICKET_SQL = text(
 
 
 class PluginTickets:
-    """Read-only ticket access for plugins."""
+    """Ticket access for plugins: reads, plus writes by name (see ``tiqora.plugins.writes``).
+
+    Without ``as_agent`` a write runs as the system user (no permission check, no sync
+    hooks; the plugin is trusted). With ``as_agent`` permissions are checked and hooks fire.
+    Names are exact: MariaDB matches case-insensitively, PostgreSQL case-sensitively.
+    A passed ``session`` is never committed; without one the call commits or rolls back itself.
+
+    ``plugin_id`` is the owning plugin (set by the plugin's context): article writes may then also
+    use that plugin's own channel keys. Core callers construct it without one.
+    """
+
+    def __init__(self, plugin_id: str | None = None) -> None:
+        self._plugin_id = plugin_id
 
     async def get(
         self,
@@ -152,6 +167,87 @@ class PluginTickets:
             customer_id=None if row[10] is None else str(row[10]),
         )
 
+    async def create(
+        self,
+        draft: _writes.TicketDraft,
+        *,
+        as_agent: int | None = None,
+        session: AsyncSession | None = None,
+    ) -> int:
+        """Create a ticket (queue, state, priority and type by name); returns its id.
+
+        A first article on one of the plugin's own channels is stored on that channel, never sent.
+        """
+        return await _writes.create_ticket(
+            draft, as_agent=as_agent, session=session, plugin_id=self._plugin_id
+        )
+
+    async def add_article(
+        self,
+        ticket_id: int,
+        *,
+        body: str,
+        subject: str = "",
+        sender_type: Literal["agent", "customer", "system"] = "agent",
+        channel: str = "internal",
+        visible_for_customer: bool = False,
+        from_address: str | None = None,
+        content_type: str = "text/plain; charset=utf-8",
+        as_agent: int | None = None,
+        session: AsyncSession | None = None,
+    ) -> int:
+        """Add an article on ``internal``, ``phone`` or one of the plugin's own channels.
+
+        On an own channel, ``as_agent=None`` only stores it (the plugin delivered it itself);
+        ``as_agent=<id>`` with ``sender_type="agent"`` and ``visible_for_customer=True`` sends it
+        through the channel's ``send`` first, like an agent reply (``to`` is ``None``: route by
+        ``message.ticket``). E-mail is never sent from here.
+        """
+        return await _writes.add_article(
+            ticket_id,
+            body=body,
+            subject=subject,
+            sender_type=sender_type,
+            channel=channel,
+            visible_for_customer=visible_for_customer,
+            from_address=from_address,
+            content_type=content_type,
+            as_agent=as_agent,
+            session=session,
+            plugin_id=self._plugin_id,
+        )
+
+    async def set_state(
+        self,
+        ticket_id: int,
+        state: str,
+        *,
+        as_agent: int | None = None,
+        session: AsyncSession | None = None,
+    ) -> None:
+        await _writes.set_state(ticket_id, state, as_agent=as_agent, session=session)
+
+    async def move(
+        self,
+        ticket_id: int,
+        queue: str,
+        *,
+        as_agent: int | None = None,
+        session: AsyncSession | None = None,
+    ) -> None:
+        await _writes.move(ticket_id, queue, as_agent=as_agent, session=session)
+
+    async def set_dynamic_field(
+        self,
+        ticket_id: int,
+        name: str,
+        values: Sequence[str],
+        *,
+        as_agent: int | None = None,
+        session: AsyncSession | None = None,
+    ) -> None:
+        await _writes.set_dynamic_field(ticket_id, name, values, as_agent=as_agent, session=session)
+
 
 @dataclass(frozen=True)
 class PluginContext:
@@ -159,6 +255,8 @@ class PluginContext:
     version: str
     http: PluginHttp
     tickets: PluginTickets
+    customers: PluginCustomers = field(default_factory=PluginCustomers)
+    channels: PluginChannels | None = None
 
     @property
     def logger(self) -> structlog.typing.FilteringBoundLogger:
@@ -186,7 +284,15 @@ class PluginContext:
 
 def minimal_context(plugin_id: str) -> PluginContext:
     """Fallback context for items staged without one (tests, direct construction)."""
-    return PluginContext(plugin_id, "0", http=PluginHttp([]), tickets=PluginTickets())
+    from tiqora.plugins.channels import PluginChannels  # channels imports this module
+
+    return PluginContext(
+        plugin_id,
+        "0",
+        http=PluginHttp([]),
+        tickets=PluginTickets(plugin_id),
+        channels=PluginChannels(plugin_id),
+    )
 
 
 def make_plugin_context(plugin: DiscoveredPlugin) -> PluginContext:
@@ -195,9 +301,12 @@ def make_plugin_context(plugin: DiscoveredPlugin) -> PluginContext:
         from tiqora.plugins.registrar import RegistrationRejected  # registrar imports this module
 
         raise RegistrationRejected("Erweiterung hat kein gültiges Manifest")
+    from tiqora.plugins.channels import PluginChannels  # channels imports this module
+
     return PluginContext(
         plugin_id=plugin.plugin_id,
         version=plugin.manifest.version,
         http=PluginHttp(plugin.manifest.capabilities.outbound_hosts),
-        tickets=PluginTickets(),
+        tickets=PluginTickets(plugin.plugin_id),
+        channels=PluginChannels(plugin.plugin_id),
     )

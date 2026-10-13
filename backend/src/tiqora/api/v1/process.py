@@ -41,6 +41,7 @@ from tiqora.domain.ticket_write_service import (
 )
 from tiqora.domain.ticket_write_service import TicketNotFound as WriteTicketNotFound
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.plugins.process_points import abort_on_action_timeout
 from tiqora.process.actor import ProcessActor
 from tiqora.process.availability import (
     available_dialogs,
@@ -57,6 +58,7 @@ from tiqora.process.engine import submit_activity_dialog
 from tiqora.process.exceptions import (
     ActivityDialogNotAvailable,
     ActivityDialogNotFound,
+    PluginActionTimedOut,
     ProcessNotFound,
     ProcessNotRunning,
     ProcessNotStartable,
@@ -449,6 +451,8 @@ async def create_new_process_ticket(
                 field_values=body.field_values,
                 repository=repository,
             )
+    except PluginActionTimedOut as exc:
+        raise await abort_on_action_timeout(session, exc) from exc
     except _MAPPED_ERRORS as exc:
         raise _map_exc(exc) from exc
     state = await _ticket_process_state_out(session, result.ticket_id, actor, repository)
@@ -483,6 +487,8 @@ async def start_ticket_process(
                 field_values=body.field_values,
                 repository=repository,
             )
+    except PluginActionTimedOut as exc:
+        raise await abort_on_action_timeout(session, exc) from exc
     except _MAPPED_ERRORS as exc:
         raise _map_exc(exc) from exc
     return await _ticket_process_state_out(session, ticket_id, actor, repository)
@@ -517,6 +523,8 @@ async def submit_ticket_activity_dialog(
                 actor=actor,
                 repository=repository,
             )
+    except PluginActionTimedOut as exc:
+        raise await abort_on_action_timeout(session, exc) from exc
     except _MAPPED_ERRORS as exc:
         raise _map_exc(exc) from exc
 

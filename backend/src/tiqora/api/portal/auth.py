@@ -18,6 +18,7 @@ from tiqora.domain.customer_auth import CustomerAuthService, customer_to_dict
 from tiqora.domain.schemas import CustomerLoginResponse, CustomerMe, LoginRequest, PendingLoginOut
 from tiqora.identity.ldap_login import LdapSignInUnavailable, ldap_sign_in
 from tiqora.identity.sso_routes import session_sso_state
+from tiqora.plugins.auth_providers import plugin_password_sign_in
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
 
 router = APIRouter(prefix="/auth", tags=["portal-auth"])
@@ -117,6 +118,13 @@ async def login(
             ) from exc
         if account_login is not None:
             customer = await auth.get_customer_by_login(account_login)
+    if customer is None:
+        # Last link of the chain: password auth providers from plugins (named accounts only).
+        found = await plugin_password_sign_in(
+            session, login=body.login, password=body.password, user_kind="customer", client_ip=ip
+        )
+        if found is not None:
+            customer = await auth.get_customer_by_login(found[0])
     if customer is None:
         locked = await limiter.record_failure(login=body.login, ip=ip)
         if locked is not None:

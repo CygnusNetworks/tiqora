@@ -55,6 +55,11 @@ ALL_POINTS = [
     "core.job_handlers",
     "core.mcp.tools",
     "core.http.public_routes",
+    "core.auth.password_providers",
+    "core.customers.sources",
+    "core.gi.operations",
+    "core.gi.mappings",
+    "core.gi.invokers",
 ]
 
 
@@ -72,7 +77,7 @@ def _registrar(
             "version": "1.0.0",
             "publisher": "Example GmbH",
             "entry": "x:plugin",
-            "sdk": ">=0.1,<0.2",
+            "sdk": ">=0.2,<0.3",
             "capabilities": {"extension_points": ALL_POINTS if points is None else points},
         }
     )
@@ -362,3 +367,266 @@ def test_mcp_tool_with_unsupported_signature_rejected(registrar: PluginRegistrar
     with pytest.raises(RegistrationRejected, match="hello_ot.*Signatur"):
         registrar.mcp_tool("ot", odd_type, description="x")
     assert len(registrar.staged) == 0
+
+
+async def _filter(ctx: Any, mail: Any) -> None:
+    return None
+
+
+def test_mail_filter_stage_picks_the_point() -> None:
+    from tiqora.plugins.mail_filters import INBOUND_MAIL_FILTERS, OUTBOUND_MAIL_FILTERS
+
+    reg = _registrar(points=["core.mail.inbound_filters", "core.mail.outbound_filters"])
+    reg.mail_filter("vorher", "pre", _filter)
+    reg.mail_filter("nachher", "post", _filter)
+    reg.mail_filter("raus", "outbound", _filter)
+    points = [(p.key, p.item_key(i)) for p, i in reg.staged]
+    assert points == [
+        (INBOUND_MAIL_FILTERS.key, "org.example.hello:vorher"),
+        (INBOUND_MAIL_FILTERS.key, "org.example.hello:nachher"),
+        (OUTBOUND_MAIL_FILTERS.key, "org.example.hello:raus"),
+    ]
+
+
+def test_mail_filter_needs_the_capability_of_its_stage() -> None:
+    reg = _registrar(points=["core.mail.inbound_filters"])
+    with pytest.raises(RegistrationRejected, match="core.mail.outbound_filters"):
+        reg.mail_filter("raus", "outbound", _filter)
+    reg = _registrar(points=["core.mail.outbound_filters"])
+    with pytest.raises(RegistrationRejected, match="core.mail.inbound_filters"):
+        reg.mail_filter("vorher", "pre", _filter)
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"stage": "mid"}, "Unbekannte Stufe"),
+        ({"name": "X"}, "Ungültiger Name"),
+        ({"run": lambda ctx, mail: None}, "async"),
+        ({"timeout_seconds": 31}, "1 und 30"),
+        ({"timeout_seconds": 0}, "1 und 30"),
+        ({"order": 1001}, "0 und 1000"),
+    ],
+)
+def test_mail_filter_rejects_bad_arguments(kwargs: dict[str, Any], message: str) -> None:
+    reg = _registrar(points=["core.mail.inbound_filters", "core.mail.outbound_filters"])
+    args: dict[str, Any] = {"name": "pruefer", "stage": "pre", "run": _filter}
+    args.update(kwargs)
+    with pytest.raises(RegistrationRejected, match=message):
+        reg.mail_filter(args.pop("name"), args.pop("stage"), args.pop("run"), **args)
+    assert reg.staged == ()
+
+
+async def _auth(ctx: Any, check: Any) -> str | None:
+    return None
+
+
+def _auth_sync(ctx: Any, check: Any) -> str | None:
+    return None
+
+
+def test_password_provider_audience_is_required(registrar: PluginRegistrar) -> None:
+    with pytest.raises(TypeError):
+        registrar.password_provider("pp", _auth)  # type: ignore[call-arg]
+
+
+@pytest.mark.parametrize(
+    ("name", "fn", "kwargs", "match"),
+    [
+        ("Bad Name", _auth, {}, "Name"),
+        ("pp", _auth_sync, {}, "async"),
+        ("pp", _auth, {"audience": "admin"}, "Zielgruppe"),
+        ("pp", _auth, {"timeout_seconds": 0}, "Zeitlimit"),
+        ("pp", _auth, {"timeout_seconds": 16}, "Zeitlimit"),
+        ("pp", _auth, {"timeout_seconds": True}, "Zeitlimit"),
+        ("pp", _auth, {"order": -1}, "Reihenfolge"),
+        ("pp", _auth, {"order": 1001}, "Reihenfolge"),
+    ],
+)
+def test_password_provider_rejects(
+    registrar: PluginRegistrar, name: str, fn: Any, kwargs: dict[str, Any], match: str
+) -> None:
+    args: dict[str, Any] = {"audience": "both", **kwargs}
+    with pytest.raises(RegistrationRejected, match=match):
+        registrar.password_provider(name, fn, **args)
+    assert registrar.staged == ()
+
+
+def test_password_provider_staged(registrar: PluginRegistrar) -> None:
+    registrar.password_provider("pp", _auth, audience="agent")
+    ((_, item),) = registrar.staged
+    assert item.key == "org.example.hello:pp" and item.audience == "agent"
+
+
+async def _cs_search(ctx: Any, q: str, limit: int) -> list[Any]:
+    return []
+
+
+async def _cs_lookup(ctx: Any, key: str) -> None:
+    return None
+
+
+def _cs_sync(ctx: Any, key: str) -> None:
+    return None
+
+
+@pytest.mark.parametrize(
+    ("name", "kwargs", "match"),
+    [
+        ("Bad Name", {}, "Name"),
+        ("cs", {"label": " "}, "Bezeichnung"),
+        ("cs", {"search": _cs_sync}, "async"),
+        ("cs", {"by_login": _cs_sync}, "async"),
+        ("cs", {"by_email": _cs_sync}, "async"),
+        ("cs", {"materialize_on_inbound": True}, "by_email"),
+        ("cs", {"timeout_seconds": 0}, "Zeitlimit"),
+        ("cs", {"timeout_seconds": 11}, "Zeitlimit"),
+        ("cs", {"timeout_seconds": True}, "Zeitlimit"),
+    ],
+)
+def test_customer_source_rejects(
+    registrar: PluginRegistrar, name: str, kwargs: dict[str, Any], match: str
+) -> None:
+    args: dict[str, Any] = {
+        "label": "Verzeichnis",
+        "search": _cs_search,
+        "by_login": _cs_lookup,
+        **kwargs,
+    }
+    with pytest.raises(RegistrationRejected, match=match):
+        registrar.customer_source(name, **args)
+    assert registrar.staged == ()
+
+
+def test_customer_source_staged(registrar: PluginRegistrar) -> None:
+    registrar.customer_source(
+        "cs",
+        label="Verzeichnis",
+        search=_cs_search,
+        by_login=_cs_lookup,
+        by_email=_cs_lookup,
+        materialize_on_inbound=True,
+    )
+    ((point, item),) = registrar.staged
+    assert point.key == "core.customers.sources"
+    assert item.key == "org.example.hello:cs" and item.timeout_seconds == 3
+    assert item.materialize_on_inbound is True and item.by_email is _cs_lookup
+
+
+def test_gi_operation_registers_qualified_type(registrar: PluginRegistrar) -> None:
+    async def run(ctx: Any, data: dict[str, Any]) -> dict[str, Any]:
+        return {"Success": 1}
+
+    assert registrar.gi_operation("Echo", run, timeout_seconds=45) == "Plugin_hello::Echo"
+    ((point, item),) = registrar.staged
+    assert point.key == "core.gi.operations"
+    assert (item.type, item.timeout_seconds, item.plugin_id) == (
+        "Plugin_hello::Echo",
+        45,
+        "org.example.hello",
+    )
+
+
+@pytest.mark.parametrize("timeout", [0, 46, True, 1.5])
+def test_gi_operation_timeout_bounds(registrar: PluginRegistrar, timeout: Any) -> None:
+    async def run(ctx: Any, data: dict[str, Any]) -> dict[str, Any]:
+        return {}
+
+    with pytest.raises(RegistrationRejected, match="Zeitlimit"):
+        registrar.gi_operation("Echo", run, timeout_seconds=timeout)
+    assert registrar.staged == ()
+
+
+def test_gi_operation_must_be_async(registrar: PluginRegistrar) -> None:
+    def run(ctx: Any, data: dict[str, Any]) -> dict[str, Any]:
+        return {}
+
+    with pytest.raises(RegistrationRejected, match="async"):
+        registrar.gi_operation("Echo", run)  # type: ignore[arg-type]
+
+
+def test_gi_mapping_registers_and_rejects_async(registrar: PluginRegistrar) -> None:
+    def factory(config: dict[str, Any] | None) -> Any:
+        return object()
+
+    async def bad(config: dict[str, Any] | None) -> Any:
+        return object()
+
+    assert registrar.gi_mapping("Upper", factory) == "Plugin_hello_Upper"
+    with pytest.raises(RegistrationRejected, match="gewöhnliche Funktion"):
+        registrar.gi_mapping("Other", bad)  # type: ignore[arg-type]
+    with pytest.raises(RegistrationRejected, match="bereits registriert"):
+        registrar.gi_mapping("Upper", factory)
+
+
+def test_gi_points_need_manifest_declaration() -> None:
+    async def run(ctx: Any, data: dict[str, Any]) -> dict[str, Any]:
+        return {}
+
+    with pytest.raises(RegistrationRejected, match="core.gi.operations"):
+        _registrar(points=[]).gi_operation("Echo", run)
+    with pytest.raises(RegistrationRejected, match="core.gi.mappings"):
+        _registrar(points=[]).gi_mapping("Echo", lambda config: object())  # type: ignore[arg-type,return-value]
+
+
+def test_gi_invoker_registers_qualified_type(registrar: PluginRegistrar) -> None:
+    async def prepare(ctx: Any, data: dict[str, Any]) -> dict[str, Any] | None:
+        return data
+
+    async def handle(ctx: Any, response: Any) -> None:
+        return None
+
+    assert (
+        registrar.gi_invoker("Sync", prepare, handle, timeout_seconds=120) == "Plugin_hello::Sync"
+    )
+    ((point, item),) = registrar.staged
+    assert point.key == "core.gi.invokers"
+    assert (item.type, item.timeout_seconds, item.handle_response) == (
+        "Plugin_hello::Sync",
+        120,
+        handle,
+    )
+
+
+@pytest.mark.parametrize("timeout", [0, 121, True, 1.5])
+def test_gi_invoker_timeout_bounds(registrar: PluginRegistrar, timeout: Any) -> None:
+    async def prepare(ctx: Any, data: dict[str, Any]) -> dict[str, Any] | None:
+        return data
+
+    with pytest.raises(RegistrationRejected, match="Zeitlimit"):
+        registrar.gi_invoker("Sync", prepare, timeout_seconds=timeout)
+    assert registrar.staged == ()
+
+
+def test_gi_invoker_must_be_async_and_named(registrar: PluginRegistrar) -> None:
+    async def prepare(ctx: Any, data: dict[str, Any]) -> dict[str, Any] | None:
+        return data
+
+    def sync_fn(*args: Any) -> Any:
+        return None
+
+    with pytest.raises(RegistrationRejected, match="async"):
+        registrar.gi_invoker("Sync", sync_fn)  # type: ignore[arg-type]
+    with pytest.raises(RegistrationRejected, match="async"):
+        registrar.gi_invoker("Sync", prepare, sync_fn)  # type: ignore[arg-type]
+    with pytest.raises(RegistrationRejected, match="Ungültiger Name"):
+        registrar.gi_invoker("Ticket::Generic", prepare)
+    assert registrar.staged == ()
+    with pytest.raises(RegistrationRejected, match="core.gi.invokers"):
+        _registrar(points=[]).gi_invoker("Sync", prepare)
+
+
+def test_builtin_report_key_over_120_chars_rejected() -> None:
+    from tiqora.reporting.definition import ReportDefinition
+
+    long_id = ".".join(["a" * 24] * 3 + ["a" * 25])  # 100 chars, a legal plugin id
+    assert len(long_id) == 100
+    reg = _registrar(
+        plugin_id=long_id, points=["core.reporting.sources", "core.reporting.builtin_reports"]
+    )
+    definition = ReportDefinition.model_validate(
+        {"source": "tickets", "dimensions": [], "measures": [{"key": "count"}]}
+    )
+    name = "n" * 30  # key = 7 + 100 + 1 + 30 = 138
+    with pytest.raises(RegistrationRejected, match="länger als 120 Zeichen"):
+        reg.builtin_report(name, category="volume", definition=definition)

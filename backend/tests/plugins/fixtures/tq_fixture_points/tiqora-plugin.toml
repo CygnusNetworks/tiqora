@@ -1,0 +1,37 @@
+manifest_version = 1
+id = "org.example.points"
+short_id = "points"
+name = "Erweiterungspunkte-Test"
+version = "1.0.0"
+publisher = "Example GmbH"
+publisher_id = "org.example"
+description = "Testerweiterung für die Erweiterungspunkte der Phase 2a."
+license = "MIT"
+homepage = "https://example.org/points"
+support = "support@example.org"
+categories = ["tickets"]
+entry = "tq_fixture_points:plugin"
+sdk = ">=0.2,<0.3"
+
+[capabilities]
+extension_points = [
+  "core.events.sync_hooks",
+  "core.process.transition_actions",
+  "core.process.condition_modules",
+  "core.templates.placeholders",
+  "core.tickets.number_generators",
+  "core.dynamic_fields.types",
+  "core.mail.inbound_filters",
+  "core.mail.outbound_filters",
+  "core.notifications.transports",
+  "core.channels.drivers",
+  "core.auth.password_providers",
+  "core.customers.sources",
+  "core.gi.operations",
+  "core.gi.mappings",
+  "core.gi.invokers",
+  "core.reporting.sources",
+  "core.reporting.builtin_reports",
+  "core.http.routes",
+  "core.http.public_routes",
+]

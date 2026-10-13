@@ -910,8 +910,8 @@ installed only by baking them into the image (`tiqora plugins bake`).
   imports plugin code; yields `DiscoveredPlugin` with the parsed manifest, web
   manifest, locales and a German `problem` when the package is unusable.
 - *Bootstrap* (`bootstrap.init_registry`, called by api, worker and mcp before
-  anything captures `get_registry()`; the ai-worker does not): builds the core
-  registry, then for each enabled, compatible plugin in dependency order
+  anything captures `get_registry()`; the ai-worker too since 0.2.0): builds the
+  core registry, then for each enabled, compatible plugin in dependency order
   (`requires`) imports it in a daemon thread with a timeout
   (`TIQORA_PLUGINS_IMPORT_TIMEOUT_SECONDS`, total `..._BOOT_BUDGET_SECONDS`),
   calls `register(registrar)`, and commits the staged items atomically with the
@@ -934,8 +934,43 @@ installed only by baking them into the image (`tiqora plugins bake`).
   frontend slots declared in `web/manifest.json`.
 - *Process roles*: the **api** serves routes, asset files and the frontend list;
   the **worker** runs two extra tick loops (`plugin_events`, `plugin_tasks`; see
-  `worker/services.py`) and the job runner; **mcp** binds the tools. Each
-  process loads plugins on its own and records the result per role.
+  `worker/services.py`) and the job runner; **mcp** binds the tools; the
+  **ai-worker** (role `ai-worker`, a member of `PLUGIN_ROLES`) hosts no
+  subscribers, tasks or routes, but loads the registry so that AI sends pass
+  the same hooks, placeholders and channels. Each process loads plugins on its
+  own and records the result per role.
+- *Points added in SDK 0.2.0* (each module in `tiqora/plugins/`, named
+  `Plugin_<short_id>_<Name>` by `naming.py`, called only through
+  `calls.call_plugin`). The choke point is where core code consults the
+  registry:
+  - `sync_hooks.SYNC_HOOKS`: `TicketWriteService.{create_ticket, add_article,
+    move_queue, change_state, update_dynamic_field(s)}` (and the reply route's
+    state pre-flight); breaker state in `tiqora_plugin_hook` kind `sync`.
+  - `process_points`: `TRANSITION_ACTIONS` / `CONDITION_MODULES`
+    (`process/actions/registry.resolve_action`, `process/condition_modules`).
+  - `placeholders.PLACEHOLDERS`: `_resolve_tag_raw` in
+    `channels/email/placeholder.py`.
+  - `number_generators`: `znuny/ticket_number.ticket_number_build` and the
+    patterns in `znuny/followup.get_tn_by_string`.
+  - `df_types.DYNAMIC_FIELD_TYPES`: `domain/dynamic_field_values`
+    (`set_ticket_dynamic_field`, `df_display_value`), admin DF routes.
+  - `mail_filters`: inbound `pre` after `apply_filters` and `post` after the
+    commit in the mail pipeline (`worker/postmaster.py`); outbound first in
+    `SmtpMailSender.send`.
+  - `notification_transports`: `worker/notifications.process_event`.
+  - `channels.CHANNEL_DRIVERS`: `TicketWriteService.add_article`
+    (`deliver_plugin_channel_reply`), `PluginChannels.ingest`, `ai/gate`
+    (`is_tiqora_only_channel`), `GET /api/v1/channels/plugin`.
+  - `auth_providers`: `api/v1/auth.py` and `api/portal/auth.py` after the LDAP
+    block.
+  - `customer_sources`: customer search, `customers/external-import`, the mail
+    pipeline's `_resolve_customer`; `domain/customer_company_service`.
+  - `gi_points`: `api/compat/webservices.py` handler lookup,
+    `router._dispatch_operation`, `mapping.build_mapper`, `gi/requester`.
+  - reporting: `reporting/semantic.REPORT_SOURCES` and
+    `reporting/catalogue.BUILTIN_REPORTS` (`sdk_stable=True`).
+  The process-action, condition-module, reporting and plugin-contributed
+  points are `sdk_stable=True`; no `core.cmdb.*` point is open to plugins.
 - *State* (Tiqora-owned tables): `tiqora_plugin` (installed rows, the on/off
   switch), `tiqora_plugin_runtime` (per plugin and role: state, boot attempts,
   last error), `tiqora_plugin_hook` (cursor, failure counter and circuit

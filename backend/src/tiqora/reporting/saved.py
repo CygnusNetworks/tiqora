@@ -24,7 +24,7 @@ from tiqora.extensions.registry import Registry
 from tiqora.jobs.service import utc_now
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.permissions.sharing import ShareGroupError, check_share_groups
-from tiqora.reporting.catalogue import BUILTIN_REPORTS, BuiltinReport
+from tiqora.reporting.catalogue import BuiltinReport, active_builtin, is_catalogue_key
 from tiqora.reporting.definition import DefinitionError, ReportDefinition, validate_definition
 from tiqora.reporting.rights import ReportRights
 
@@ -424,8 +424,8 @@ async def resolve_report_ref(
     (callers answer 422 with the German message).
     """
     reg = registry or get_registry()
-    if key.startswith("builtin."):
-        builtin = reg.get(BUILTIN_REPORTS, key)
+    if is_catalogue_key(key):
+        builtin = active_builtin(reg, key)
         if builtin is None:
             raise ReportNotFound(key)
         return ResolvedReport(key=key, definition=builtin.definition, builtin=builtin, saved=None)

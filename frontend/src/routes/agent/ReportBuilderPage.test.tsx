@@ -24,6 +24,10 @@ import { ReportViewPage } from "./ReportViewPage";
 const auth = vi.hoisted(() => ({ user: {} as Record<string, boolean> }));
 vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: auth.user }) }));
 
+const { ensurePluginI18n, pluginsFrontend } = vi.hoisted(() => ({ ensurePluginI18n: vi.fn(), pluginsFrontend: vi.fn() }));
+vi.mock("@/plugins/i18n", () => ({ ensurePluginI18n }));
+vi.mock("@/lib/pluginsApi", () => ({ pluginsApi: { frontend: pluginsFrontend } }));
+
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<typeof import("@/lib/api")>()),
   api: {
@@ -200,6 +204,45 @@ describe("ReportBuilderPage", () => {
     renderAt("/agent/reports/new?from=builtin.volume", CAN);
     expect(await screen.findByTestId("builder-name")).toHaveValue("Kopie von Erstellte und geschlossene Tickets");
     expect(screen.getByTestId("builder-source")).toHaveTextContent("Ticketereignisse");
+  });
+
+  it("names a deep-linked copy of a plugin report only after the plugin texts are loaded", async () => {
+    const plugin = { id: "org.example.points", version: "1.0.0", locales: ["de"] };
+    pluginsFrontend.mockReset().mockResolvedValue([plugin]);
+    ensurePluginI18n.mockReset().mockImplementation(async () => {
+      await new Promise((r) => setTimeout(r, 60));
+      i18n.addResourceBundle("de", "plugin.org.example.points", { reports: { r: { title: "Punkte je Queue" } } }, true, true);
+    });
+    vi.mocked(reportsApi.get).mockImplementation(async (key: string) =>
+      ({
+        ...demoReport("builtin.volume")!,
+        key,
+        kind: "plugin",
+        name: null,
+        title_key: "plugin.org.example.points:reports.r.title",
+        description_key: null,
+      }) as unknown as ReportItem,
+    );
+    renderAt("/agent/reports/new?from=plugin.org.example.points.r", CAN);
+    expect(await screen.findByTestId("builder-name")).toHaveValue("Kopie von Punkte je Queue");
+    expect(ensurePluginI18n).toHaveBeenCalledWith(plugin, "de");
+  });
+
+  it("editing a report that no longer exists shows the load error instead of a spinner", async () => {
+    vi.mocked(reportsApi.get).mockRejectedValue(
+      new ApiError(404, { detail: { message: "Der Bericht existiert nicht mehr." } }, "/api/v1/reports/41"),
+    );
+    renderAt("/agent/reports/41/edit", CAN);
+    expect(await screen.findByTestId("builder-load-error")).toHaveTextContent("Der Bericht existiert nicht mehr.");
+    expect(screen.queryByTestId("builder-name")).not.toBeInTheDocument();
+  });
+
+  it("a stale copy link to a plugin report shows the load error instead of a spinner", async () => {
+    vi.mocked(reportsApi.get).mockRejectedValue(
+      new ApiError(404, { detail: { message: "Unbekannter Bericht." } }, "/api/v1/reports"),
+    );
+    renderAt("/agent/reports/new?from=plugin.org.example.gone.r", CAN);
+    expect(await screen.findByTestId("builder-load-error")).toHaveTextContent("Unbekannter Bericht.");
   });
 
   it("shows validation issues instead of a preview", async () => {

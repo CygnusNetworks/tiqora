@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { labelKeysOf, usePluginReportTexts } from "@/components/reports/usePluginReportTexts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -347,11 +348,26 @@ export function ReportBuilderPage() {
     enabled: allowed,
   });
   const report = reportQ.data;
+  // A copy of a plugin report starts from its translated name: wait for the texts.
+  // Also the labels of every source (fields panel, preview): a plugin source must not show raw keys.
+  const pluginTexts = usePluginReportTexts(
+    useMemo(() => [report], [report]),
+    useMemo(() => labelKeysOf(sourcesQ.data), [sourcesQ.data]),
+  );
+  const [textsSeen, setTextsSeen] = useState(false);
+  // Not while the report is still pending: `loading` is false then only because no plugin key is known yet.
+  // A failed load settles too, so the load error shows instead of an endless spinner.
+  const baseSettled = baseKey === undefined || !reportQ.isPending;
+  useEffect(() => {
+    if (!pluginTexts.loading && baseSettled) setTextsSeen(true);
+  }, [pluginTexts.loading, baseSettled]);
+  // Sticky: a later language change must not unmount the editor.
+  const textsReady = textsSeen || (!pluginTexts.loading && baseSettled);
   const start = useMemo(
     () => (baseKey === undefined || report ? startFrom(mode, report, t) : null),
     // the start is taken once per loaded report; a language change must not reset the editor
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mode, report],
+    [mode, report, textsReady],
   );
 
   if (!allowed) {
@@ -361,7 +377,7 @@ export function ReportBuilderPage() {
       </Notice>
     );
   }
-  if (builtinEdit || (baseKey !== undefined && reportQ.isPending) || sourcesQ.isPending) {
+  if (builtinEdit || (baseKey !== undefined && reportQ.isPending) || sourcesQ.isPending || !textsReady) {
     return (
       <div className="flex justify-center py-16">
         <Spinner />

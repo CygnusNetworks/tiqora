@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.api.deps import CurrentUser, DbSession, RedisDep
 from tiqora.domain.ticket_write_service import TicketAccessDenied, TicketNotFound
 from tiqora.jobs.service import utc_now
+from tiqora.plugins.sync_hooks import OperationVetoed
 from tiqora.webchat.agent import (
     ChatNotLive,
     RwQueues,
@@ -189,6 +190,12 @@ async def post_chat_end(
             close_ticket=bool(body and body.close_ticket),
             now=utc_now(),
         )
+    except OperationVetoed as exc:
+        # A plugin refused closing the ticket: nothing of the end is stored.
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     except ChatError as exc:
         await _refuse(db, exc)
     await db.commit()

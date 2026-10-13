@@ -721,7 +721,21 @@ async def add_article(
         "webchat": "WebChat",
     }
     ch_name = channel_name_map.get(article.channel.lower(), "Internal")
-    if ch_name == "WebChat":
+    plugin_channel = None
+    if article.channel.lower() not in channel_name_map:
+        # A channel a plugin registered (D11): its own row, never the Internal fallback.
+        from tiqora.plugins.channels import driver_for
+
+        plugin_channel = driver_for(article.channel)
+        if plugin_channel is None and article.channel.lower().startswith("plugin_"):
+            # The plugin is disabled, failed or not loaded in this process: storing the
+            # article as Internal would look like a delivered reply that never left.
+            raise InvalidInput(f"Kanal „{article.channel}“ ist derzeit nicht verfügbar")
+    if plugin_channel is not None:
+        from tiqora.plugins.channels import ensure_tiqora_channel_row
+
+        comm_channel_id = await ensure_tiqora_channel_row(session, plugin_channel.name)
+    elif ch_name == "WebChat":
         # Never fall back to Internal for a chat line (``_channel_id`` would):
         # register the row on first use (idempotent; cache cleanup inside).
         from tiqora.channels.common import ensure_webchat_channel_row
@@ -851,7 +865,9 @@ async def add_article(
             from tiqora.znuny.history import TYPE_PHONE_CALL_CUSTOMER
 
             history_type = TYPE_PHONE_CALL_CUSTOMER
-    elif channel_lower in _CHAT_CHANNELS and article.is_visible_for_customer:
+    elif (
+        channel_lower in _CHAT_CHANNELS or plugin_channel is not None
+    ) and article.is_visible_for_customer:
         # Znuny has no chat history types; a chat message is a web request.
         # Customer: the first message opens the ticket (NotificationNewTicket),
         # later ones are follow-ups (NotificationFollowUp) -- as AddNote they
@@ -2853,6 +2869,24 @@ async def link_tickets(
 # ---------------------------------------------------------------------------
 
 
+def _article_op(ticket_id: int | None, article: ArticleIn) -> Any:
+    """The hook-facing view of an article (no addresses besides to/cc, no attachment bytes)."""
+    from tiqora.plugins.sync_hooks import ArticleOp
+
+    return ArticleOp(
+        ticket_id=ticket_id,
+        channel=article.channel,
+        sender_type=article.sender_type,
+        visible_for_customer=article.is_visible_for_customer,
+        subject=article.subject,
+        body=article.body,
+        content_type=article.content_type,
+        to=article.to_address,
+        cc=article.cc,
+        attachment_names=tuple(a[0] for a in article.attachments),
+    )
+
+
 class TicketWriteService:
     """Session-scoped service for all ticket mutations, with permission checks."""
 
@@ -2892,8 +2926,60 @@ class TicketWriteService:
         """
         return self._mail_sender
 
+    # -- plugin before-hooks (D4): only here, never in the module-level write functions ------
+
+    async def _hook_ticket(self, ticket_id: int) -> Any:
+        from tiqora.plugins.context import PluginTickets
+
+        summary = await PluginTickets().get(ticket_id, session=self._session)
+        if summary is None:  # cannot happen after _ticket_must_exist
+            raise TicketNotFound(ticket_id)
+        return summary
+
+    async def _hook_create_ticket(self, user_id: int, params: TicketIn) -> TicketIn:
+        """``ticket.create``: run the hooks, apply the (validated) enrichment to ``params``."""
+        from tiqora.plugins.sync_hooks import TicketCreateOp, run_sync_hooks
+
+        session = self._session
+        art = params.article
+        op = TicketCreateOp(
+            queue_id=params.queue_id,
+            queue=await _queue_name(session, params.queue_id),
+            title=params.title,
+            state=await _state_name(session, params.state_id),
+            priority=await _priority_name(session, params.priority_id),
+            type=(
+                str((await _lookup_row(session, "ticket_type", "id", params.type_id))["name"])
+                if params.type_id is not None
+                else None
+            ),
+            customer_user=params.customer_user_id,
+            customer_id=params.customer_id,
+            dynamic_fields={k: tuple(v) for k, v in params.dynamic_fields.items()},
+            article=_article_op(None, art) if art is not None else None,
+        )
+        new = await run_sync_hooks("ticket.create", op, agent_id=user_id, session=session)
+        changes: dict[str, Any] = {}
+        if new.title != op.title:
+            changes["title"] = new.title
+        if new.priority != op.priority:
+            changes["priority_id"] = int(
+                (await _lookup_row(session, "ticket_priority", "name", new.priority))["id"]
+            )
+        if new.type != op.type and new.type is not None:
+            changes["type_id"] = int(
+                (await _lookup_row(session, "ticket_type", "name", new.type))["id"]
+            )
+        if dict(new.dynamic_fields) != dict(op.dynamic_fields):
+            changes["dynamic_fields"] = {k: list(v) for k, v in new.dynamic_fields.items()}
+        return replace(params, **changes) if changes else params
+
     async def create_ticket(self, user_id: int, params: TicketIn) -> int:
         await self._assert_create(user_id, params.queue_id)
+        from tiqora.plugins.sync_hooks import has_sync_hooks
+
+        if has_sync_hooks("ticket.create"):
+            params = await self._hook_create_ticket(user_id, params)
         return await create_ticket(
             self._session,
             self._factory,
@@ -2906,6 +2992,31 @@ class TicketWriteService:
         t = await _ticket_must_exist(self._session, ticket_id)
         # Znuny: reply / note require the ``note`` permission key (rw implies).
         await self._assert(user_id, int(t["queue_id"]), "note")
+        # Plugin before-hooks run before ANY branch below: email/Telegram/chat are
+        # send-then-store, so a veto after the send could not be undone.
+        from tiqora.plugins.sync_hooks import has_sync_hooks, run_sync_hooks
+
+        if has_sync_hooks("article.create"):
+            await run_sync_hooks(
+                "article.create",
+                _article_op(ticket_id, article),
+                agent_id=user_id,
+                session=self._session,
+            )
+        # Outgoing agent reply on a plugin channel (D11): the plugin sends, then we store.
+        if article.sender_type == "agent" and article.is_visible_for_customer:
+            from tiqora.plugins.channels import deliver_plugin_channel_reply, driver_for
+
+            plugin_driver = driver_for(article.channel)
+            if plugin_driver is not None:
+                return await deliver_plugin_channel_reply(
+                    self._session,
+                    self._sysconfig,
+                    plugin_driver,
+                    ticket_id=ticket_id,
+                    user_id=user_id,
+                    article=article,
+                )
         # Outgoing agent email: SMTP deliver then store (see outbound_reply).
         if article.channel.lower() == "email" and article.sender_type == "agent":
             from tiqora.channels.email.outbound_reply import deliver_agent_email_reply
@@ -2971,6 +3082,19 @@ class TicketWriteService:
         await self._assert(user_id, int(t["queue_id"]), "move_into")
         await _queue_name(self._session, new_queue_id)
         await self._assert(user_id, new_queue_id, "move_into")
+        from tiqora.plugins.sync_hooks import QueueMoveOp, has_sync_hooks, run_sync_hooks
+
+        if has_sync_hooks("ticket.queue_move"):
+            await run_sync_hooks(
+                "ticket.queue_move",
+                QueueMoveOp(
+                    ticket=await self._hook_ticket(ticket_id),
+                    new_queue_id=new_queue_id,
+                    new_queue=await _queue_name(self._session, new_queue_id),
+                ),
+                agent_id=user_id,
+                session=self._session,
+            )
         await move_queue(
             self._session,
             ticket_id=ticket_id,
@@ -2985,8 +3109,13 @@ class TicketWriteService:
         ticket_id: int,
         new_state_id: int,
         pending_time: datetime | None = None,
+        run_hooks: bool = False,
     ) -> None:
         """Pre-flight :meth:`change_state` without writing anything.
+
+        ``run_hooks=True`` also runs the plugins' ``ticket.state_change`` before-hooks (a veto
+        raises ``OperationVetoed``); the caller then passes ``hooks_checked=True`` to
+        :meth:`change_state` so they do not fire twice.
 
         Used by "reply + next state" (``POST /tickets/{id}/articles`` with
         ``state_id``) so a bad state is rejected BEFORE the article is sent —
@@ -3001,6 +3130,34 @@ class TicketWriteService:
         new_state_type = await _state_type_name(self._session, new_state_id)
         if new_state_type.lower().startswith("pending") and pending_time is None:
             raise InvalidInput(f"pending_time is required for pending state {new_state_id}")
+        if run_hooks:
+            await self._hook_state_change(
+                user_id, ticket_id, new_state_id, new_state_type, pending_time
+            )
+
+    async def _hook_state_change(
+        self,
+        user_id: int,
+        ticket_id: int,
+        new_state_id: int,
+        new_state_type: str,
+        pending_time: datetime | None,
+    ) -> None:
+        from tiqora.plugins.sync_hooks import StateChangeOp, has_sync_hooks, run_sync_hooks
+
+        if not has_sync_hooks("ticket.state_change"):
+            return
+        await run_sync_hooks(
+            "ticket.state_change",
+            StateChangeOp(
+                ticket=await self._hook_ticket(ticket_id),
+                new_state=await _state_name(self._session, new_state_id),
+                new_state_type=new_state_type,
+                pending_until=pending_time,
+            ),
+            agent_id=user_id,
+            session=self._session,
+        )
 
     async def change_state(
         self,
@@ -3008,7 +3165,13 @@ class TicketWriteService:
         ticket_id: int,
         new_state_id: int,
         pending_time: datetime | None = None,
+        hooks_checked: bool = False,
     ) -> None:
+        """Change the state; plugins' ``ticket.state_change`` before-hooks run for every caller
+        (REST, MCP, webchat close, plugin ``as_agent``) and a veto raises ``OperationVetoed``.
+
+        ``hooks_checked=True``: ``validate_state_change(..., run_hooks=True)`` already ran
+        the plugin before-hooks for exactly this change (reply + next state)."""
         t = await _ticket_must_exist(self._session, ticket_id)
         await self._assert_rw(user_id, int(t["queue_id"]))
         # Frontend close parity (AgentTicketActionCommon): the close screen
@@ -3017,6 +3180,10 @@ class TicketWriteService:
         # unlocked again. Workers/process/AI call the module-level change_state
         # and stay core-faithful (no lock/owner side effects).
         new_state_type = await _state_type_name(self._session, new_state_id)
+        if not hooks_checked:
+            await self._hook_state_change(
+                user_id, ticket_id, new_state_id, new_state_type, pending_time
+            )
         closing = new_state_type.lower().startswith("close")
         if closing:
             await acquire_lock(
@@ -3218,6 +3385,23 @@ class TicketWriteService:
             sysconfig=self._sysconfig,
         )
 
+    async def _hook_dynamic_fields(
+        self, user_id: int, ticket_id: int, values: Mapping[str, Sequence[str]]
+    ) -> None:
+        from tiqora.plugins.sync_hooks import DynamicFieldsOp, has_sync_hooks, run_sync_hooks
+
+        if not has_sync_hooks("ticket.dynamic_fields_update"):
+            return
+        await run_sync_hooks(
+            "ticket.dynamic_fields_update",
+            DynamicFieldsOp(
+                ticket=await self._hook_ticket(ticket_id),
+                values={k: tuple(v) for k, v in values.items()},
+            ),
+            agent_id=user_id,
+            session=self._session,
+        )
+
     async def update_dynamic_field(
         self,
         user_id: int,
@@ -3228,6 +3412,7 @@ class TicketWriteService:
     ) -> None:
         t = await _ticket_must_exist(self._session, ticket_id)
         await self._assert_rw(user_id, int(t["queue_id"]))
+        await self._hook_dynamic_fields(user_id, ticket_id, {field_name: values})
         await update_dynamic_fields_strict(
             self._session, ticket_id=ticket_id, values={field_name: values}, user_id=user_id
         )
@@ -3245,6 +3430,7 @@ class TicketWriteService:
         """
         t = await _ticket_must_exist(self._session, ticket_id)
         await self._assert_rw(user_id, int(t["queue_id"]))
+        await self._hook_dynamic_fields(user_id, ticket_id, values)
         await update_dynamic_fields_strict(
             self._session, ticket_id=ticket_id, values=values, user_id=user_id
         )

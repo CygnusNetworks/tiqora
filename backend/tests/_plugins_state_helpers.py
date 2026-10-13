@@ -89,7 +89,7 @@ def discovered(plugin_id: str, version: str = "1.0.0") -> DiscoveredPlugin:
         f'version = "{version}"\n'
         'publisher = "Example GmbH"\n'
         'entry = "mod_unused:plugin"\n'
-        'sdk = ">=0.1,<0.2"\n'
+        'sdk = ">=0.2,<0.3"\n'
     )
     return DiscoveredPlugin(
         plugin_id=plugin_id,

@@ -27,10 +27,13 @@ import zoneinfo
 from datetime import UTC, datetime
 from typing import Any
 
+import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.znuny.sysconfig import SysConfig
+
+logger = structlog.get_logger(__name__)
 
 # Short generator names (last segment of the Perl package name).
 GENERATOR_AUTO_INCREMENT = "AutoIncrement"
@@ -287,7 +290,31 @@ async def ticket_number_build(
     sysconfig: SysConfig,
     offset: int = 0,
 ) -> str:
-    """Build one ticket number using the configured generator (no collision check)."""
+    """Build one ticket number using the configured generator (no collision check).
+
+    A generator selected from a plugin goes first; whatever goes wrong with it (it raises, hangs,
+    returns an invalid number, or collided :data:`MAX_PLUGIN_COLLISIONS` times) falls through to
+    the Znuny generator below, so a ticket is always created.
+    """
+    # lazy: the plugin module imports this one for the counter
+    from tiqora.plugins.number_generators import (
+        MAX_PLUGIN_COLLISIONS,
+        active_generator,
+        build_with_plugin,
+    )
+
+    plugin_gen = await active_generator(session_factory)
+    if plugin_gen is not None:
+        if offset >= MAX_PLUGIN_COLLISIONS:
+            if offset == MAX_PLUGIN_COLLISIONS:  # once per collision run, not per iteration
+                logger.warning(
+                    "plugin_ticket_number_collisions", plugin=plugin_gen.plugin_id, offset=offset
+                )
+        else:
+            plugin_tn = await build_with_plugin(plugin_gen, session_factory, sysconfig, offset)
+            if plugin_tn is not None:
+                return plugin_tn
+
     generator = await sysconfig.ticket_number_generator()
     system_id = await sysconfig.system_id()
     short = generator_short_name(generator)

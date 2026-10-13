@@ -40,8 +40,9 @@ from tiqora.channels.email.placeholder import (
     load_placeholder_context,
 )
 from tiqora.domain.dynamic_field_config import config_from_yaml
-from tiqora.domain.dynamic_field_values import df_display_value, df_readable_value
+from tiqora.domain.dynamic_field_values import df_readable_value
 from tiqora.domain.quoting import clean_subject
+from tiqora.plugins.df_types import display_value_bounded
 from tiqora.process.conditions import ConditionData, get_condition_data
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -276,7 +277,7 @@ async def _replace_ticket_attributes(
                 stored = data.get(f"DynamicField_{name}")
                 keys = [stored] if isinstance(stored, str) else list(stored or [])
                 rendered = (
-                    df_display_value(field_type, df_config, keys)
+                    await display_value_bounded(field_type, df_config, keys)
                     if display_match is not None
                     else df_readable_value(field_type, keys)
                 )

@@ -36,7 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.api.compat.mapping import DataInclude, Mapper
 from tiqora.api.compat.webservices import run_mapper
 from tiqora.config import Settings
-from tiqora.gi.config import DebuggerConfig, InvokerConfig
+from tiqora.gi.config import SUPPORTED_INVOKER_TYPES, DebuggerConfig, InvokerConfig
 from tiqora.gi.debugger import DebugSink, GiDebugger
 from tiqora.gi.egress import EgressPolicy, load_policy
 from tiqora.gi.error_handling import PastExecutionData, RetryDecision
@@ -52,6 +52,14 @@ from tiqora.gi.transport_rest import (
     rest_perform_request,
 )
 from tiqora.gi.transport_soap import soap_perform_request
+from tiqora.plugins.calls import call_plugin
+from tiqora.plugins.gi_points import (
+    MAX_INVOKER_TIMEOUT,
+    GiInvoker,
+    InvokerResponse,
+    invoker_context,
+    plugin_invoker,
+)
 from tiqora.security.outbound import HostResolver
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -157,10 +165,19 @@ async def run_requester(
     await debugger.debug(f"Using invoker '{invoker}'")
 
     invoker_config: InvokerConfig | None = ws.requester.invokers.get(invoker)
-    if invoker_config is None or not invoker_config.supported or invoker_config.mapping_error:
+    # A plugin invoker (D14) is looked up again: the plugin may have been disabled since the
+    # webservice snapshot was parsed. Core types never go through the registry.
+    plugin_item: GiInvoker | None = None
+    if invoker_config is not None and invoker_config.type not in SUPPORTED_INVOKER_TYPES:
+        plugin_item = plugin_invoker(invoker_config.type)
+    if (
+        invoker_config is None
+        or (invoker_config.type not in SUPPORTED_INVOKER_TYPES and plugin_item is None)
+        or invoker_config.mapping_error
+    ):
         if invoker_config is None:
             reason = f"Invoker '{invoker}' ist nicht konfiguriert."
-        elif not invoker_config.supported:
+        elif invoker_config.type not in SUPPORTED_INVOKER_TYPES and plugin_item is None:
             reason = f"Invoker-Typ '{invoker_config.type}' wird von Tiqora nicht unterstützt."
         else:
             reason = invoker_config.mapping_error or ""
@@ -172,6 +189,25 @@ async def run_requester(
     clock = _naive_utc(now)
     enqueue_fn: Enqueue = enqueue or _no_enqueue
     ticket_id = _ticket_id(data)
+
+    async def _plugin_response(response: InvokerResponse, failure_summary: str) -> str | None:
+        """The plugin's ``handle_response``; the error text on failure or timeout, else None."""
+        if plugin_item is None or plugin_item.handle_response is None:
+            return None
+        handler = plugin_item.handle_response
+        ictx = invoker_context(
+            plugin_item, webservice_id=ws.id, invoker=invoker, ticket_id=ticket_id
+        )
+        result = await call_plugin(
+            plugin_item.plugin_id,
+            f"gi_invoker_response {plugin_item.type}",
+            lambda: handler(ictx, response),
+            timeout=min(plugin_item.timeout_seconds, MAX_INVOKER_TIMEOUT),
+        )
+        if result.ok:
+            return None
+        await debugger.error(failure_summary, result.error)
+        return result.error or failure_summary
 
     async def handle_failure(stage: str, summary: str, error_data: Any) -> RequesterOutcome:
         """``_HandleError``: error handling modules, then the invoker's ``HandleError``."""
@@ -217,6 +253,14 @@ async def run_requester(
                 return outcome
             fault = mapped
             await debugger.debug("Error data after mapping", fault)
+        if plugin_item is not None:
+            # a failing response handler is not reported to itself again
+            if stage != "RequesterResponseProcess":
+                await _plugin_response(
+                    InvokerResponse(False, fault, outcome.error_message or summary),
+                    "Error handling error data in Invoker",
+                )
+            return outcome
         async with session_factory() as session:
             handled = await invoker_handle_error(
                 session,
@@ -235,18 +279,44 @@ async def run_requester(
         return outcome
 
     # ---- 3. prepare ---------------------------------------------------------------------
-    try:
-        async with session_factory() as session:
-            prepared = await prepare_request(
-                session,
-                invoker_name=invoker,
-                invoker=invoker_config,
-                data=data,
-                sysconfig=sysconfig_factory(session),
-            )
-    except Exception as exc:
-        summary = str(exc) or "InvokerObject returned an error, cancelling Request"
-        return await handle_failure("RequesterRequestPrepare", summary, summary)
+    if plugin_item is not None:
+        prepare = plugin_item.prepare
+        pctx = invoker_context(
+            plugin_item, webservice_id=ws.id, invoker=invoker, ticket_id=ticket_id
+        )
+        event_copy = copy.deepcopy(data)
+        called = await call_plugin(
+            plugin_item.plugin_id,
+            f"gi_invoker_prepare {plugin_item.type}",
+            lambda: prepare(pctx, event_copy),
+            timeout=min(plugin_item.timeout_seconds, MAX_INVOKER_TIMEOUT),
+        )
+        if not called.ok:
+            summary = "InvokerObject returned an error, cancelling Request"
+            await debugger.error(summary, called.error)
+            return await handle_failure("RequesterRequestPrepare", summary, summary)
+        if called.value is None:
+            # Znuny's StopCommunication: success, nothing is sent, nothing is retried
+            await debugger.notice("Erweiterung hat den Aufruf übersprungen")
+            return RequesterOutcome(True, None, None, None, communication_id)
+        if not isinstance(called.value, dict):
+            summary = "InvokerObject returned an error, cancelling Request"
+            await debugger.error(summary, "Ergebnis der Erweiterung ist kein Dictionary")
+            return await handle_failure("RequesterRequestPrepare", summary, summary)
+        prepared = copy.deepcopy(called.value)
+    else:
+        try:
+            async with session_factory() as session:
+                prepared = await prepare_request(
+                    session,
+                    invoker_name=invoker,
+                    invoker=invoker_config,
+                    data=data,
+                    sysconfig=sysconfig_factory(session),
+                )
+        except Exception as exc:
+            summary = str(exc) or "InvokerObject returned an error, cancelling Request"
+            return await handle_failure("RequesterRequestPrepare", summary, summary)
     include["RequesterRequestPrepareOutput"] = copy.deepcopy(prepared)
 
     # ---- 4. outbound mapping ------------------------------------------------------------
@@ -339,6 +409,14 @@ async def run_requester(
             await debugger.debug("Incoming data after mapping", incoming)
 
     # ---- 8. response actions ------------------------------------------------------------
+    if plugin_item is not None:
+        failed = await _plugin_response(
+            InvokerResponse(True, incoming, None), "Error handling response data in Invoker"
+        )
+        if failed is not None:
+            summary = "InvokerObject returned an error, cancelling Request"
+            return await handle_failure("RequesterResponseProcess", summary, summary)
+        return RequesterOutcome(True, None, incoming, None, communication_id)
     async with session_factory() as session:
         handled = await handle_response(
             session,

@@ -23,7 +23,7 @@ import { Switch as HostSwitch } from "@/components/ui/Switch";
 import { PluginInstanceContext } from "./instanceContext";
 
 /** Same number as the npm package version and Python `tiqora_sdk.SDK_VERSION`. */
-export const SDK_VERSION = "0.1.0" as const;
+export const SDK_VERSION = "0.2.0" as const;
 
 export function definePlugin(def: PluginDefinition): PluginDefinition {
   return def;

@@ -63,7 +63,7 @@ from tiqora.reporting.run_service import (
     parse_dimension_choices,
     prepare_ref,
 )
-from tiqora.reporting.semantic import REPORT_SOURCES, Dimension
+from tiqora.reporting.semantic import Dimension, active_source
 from tiqora.reporting.settings import load_reporting_settings
 from tiqora.reporting.sources._common import OPEN_TYPES
 
@@ -204,7 +204,7 @@ def point_filter(
     not name dimensions of this report.
     """
     when = now if now is not None else utc_now()
-    src = get_registry().get(REPORT_SOURCES, definition.source)
+    src = active_source(get_registry(), definition.source)
     if src is None:
         raise DrillNotPossible
     effective, param_conds = effective_definition(definition, src, params)

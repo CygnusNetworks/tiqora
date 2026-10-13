@@ -13,6 +13,7 @@ import base64
 import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -749,6 +750,69 @@ async def test_invalid_state_refused_before_the_implicit_accept(env: Env) -> Non
     assert res.status_code == 422, res.text
     assert (await _chat(env, chat.id)).status == "waiting"
     assert [m["sender"] for m in await _messages(env, chat.id)] == ["visitor"]
+
+
+async def _plugin_state_hook(
+    env: Env, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, veto: bool
+) -> tuple[Any, int]:
+    from tests._plugin_points import boot_points_plugin, points_behaviour
+    from tiqora.plugins.sync_hooks import SyncBreaker
+
+    SyncBreaker.reset_for_tests()
+    SyncBreaker.persistence = False
+    boot_points_plugin(tmp_path, monkeypatch)
+    if veto:
+        points_behaviour().MODE["hook.ticket.state_change"] = "veto"
+    closed = (await _rows(env, "SELECT id FROM ticket_state WHERE name = 'closed successful'"))[0][
+        0
+    ]
+    return points_behaviour(), int(closed)
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_state_veto_refused_before_the_implicit_accept(
+    env: Env, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from tiqora.plugins.sync_hooks import SyncBreaker
+
+    chat, _token = await _start(env, 27)
+    try:
+        behaviour, closed = await _plugin_state_hook(env, monkeypatch, tmp_path, veto=True)
+        articles = await _article_count(env, chat.ticket_id)
+        async with _client(env) as client:
+            res = await client.post(
+                f"/api/v1/tickets/{chat.ticket_id}/articles", json=_reply(state_id=closed)
+            )
+        assert res.status_code == 422, res.text
+        assert res.json()["detail"] == "Vertragsnummer fehlt"
+        assert (await _chat(env, chat.id)).status == "waiting"  # the accept never happened
+        assert [m["sender"] for m in await _messages(env, chat.id)] == ["visitor"]
+        assert await _article_count(env, chat.ticket_id) == articles
+        assert len([n for n, _ in behaviour.CALLS if n == "hook.ticket.state_change"]) == 1
+    finally:
+        SyncBreaker.reset_for_tests()
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_chat_reply_with_state_fires_the_state_hook_once(
+    env: Env, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from tiqora.plugins.sync_hooks import SyncBreaker
+
+    chat, _token = await _start(env, 28)
+    try:
+        behaviour, closed = await _plugin_state_hook(env, monkeypatch, tmp_path, veto=False)
+        async with _client(env) as client:
+            res = await client.post(
+                f"/api/v1/tickets/{chat.ticket_id}/articles", json=_reply(state_id=closed)
+            )
+        assert res.status_code == 201, res.text
+        assert (await _chat(env, chat.id)).status == "active"
+        assert len([n for n, _ in behaviour.CALLS if n == "hook.ticket.state_change"]) == 1
+    finally:
+        SyncBreaker.reset_for_tests()
 
 
 @pytest.mark.asyncio

@@ -42,7 +42,7 @@ checks the result.
 ## Stability
 
 `@tiqora/plugin-sdk` and `tiqora_sdk` are the only API a plugin may use. Both
-carry the same version (`0.1.0`, also `SDK_VERSION`); tests on both sides pin
+carry the same version (`0.2.0`, also `SDK_VERSION`); tests on both sides pin
 it and the exact surface. Until SDK 1.0, a 0.x minor may break plugins. Every
 change to either surface bumps the version on both sides together and updates
 the surface tests.

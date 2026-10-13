@@ -6,6 +6,7 @@ mode), the database rows of all process roles and this process's registry.
 
 from __future__ import annotations
 
+import asyncio
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from typing import Final, Literal
@@ -19,14 +20,32 @@ from tiqora.api.deps import AppSettings, DbSession
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.db.tiqora.models import TiqoraPlugin, TiqoraPluginHook, TiqoraPluginRuntime
 from tiqora.domain.schemas import UtcDateTime
+from tiqora.domain.settings_store import set_setting
 from tiqora.extensions.core import get_registry
 from tiqora.jobs.service import utc_now
 from tiqora.plugins import store
 from tiqora.plugins.compat import check_compat, release_core_version
 from tiqora.plugins.discovery import DiscoveredPlugin, discovered_plugins
-from tiqora.plugins.state import PLUGIN_ROLES, PluginStatus, RuntimeState, summarize_status
+from tiqora.plugins.number_generators import (
+    SETTING_KEY as NUMBER_GENERATOR_SETTING,
+)
+from tiqora.plugins.number_generators import (
+    TICKET_NUMBER_GENERATORS,
+    active_generator_in,
+    build_example,
+)
+from tiqora.plugins.state import (
+    PLUGIN_ROLES,
+    PluginStatus,
+    RuntimeState,
+    is_active,
+    summarize_status,
+)
+from tiqora.plugins.sync_hooks import SYNC_HOOKS
 from tiqora.plugins.tasks import SCHEDULED_TASKS
 from tiqora.settings_sections.section import SETTINGS_SECTIONS
+from tiqora.znuny.sysconfig import SysConfig
+from tiqora.znuny.ticket_number import generator_short_name, is_date_based
 
 log = structlog.get_logger(__name__)
 
@@ -43,11 +62,12 @@ _ROLE_LABELS: Final = {
     "api": "Weboberfläche und Schnittstelle",
     "worker": "Hintergrunddienst",
     "mcp": "KI-Schnittstelle (MCP)",
+    "ai-worker": "KI-Hintergrunddienst",
 }
 
 
 class PluginRuntimeOut(BaseModel):
-    role: Literal["api", "worker", "mcp"]
+    role: Literal["api", "worker", "mcp", "ai-worker"]
     state: str
     version: str | None
     error: str | None
@@ -57,7 +77,7 @@ class PluginRuntimeOut(BaseModel):
 
 class PluginHookOut(BaseModel):
     key: str
-    kind: Literal["event", "task"]
+    kind: Literal["event", "task", "sync"]
     name: str
     schedule: str | None
     tripped: bool
@@ -151,7 +171,7 @@ def _hook_out(hook: TiqoraPluginHook, schedule: str | None) -> PluginHookOut:
     name = hook.hook_key.removeprefix(prefix)
     return PluginHookOut(
         key=hook.hook_key,
-        kind="task" if hook.kind == "task" else "event",
+        kind="task" if hook.kind == "task" else "sync" if hook.kind == "sync" else "event",
         name=name,
         schedule=schedule,
         tripped=hook.tripped_at is not None,
@@ -231,6 +251,9 @@ def _build_one(
         if hook.kind == "task":
             task = registry.get(SCHEDULED_TASKS, hook.hook_key.removeprefix("task:"))
             schedule = task.schedule.describe() if task is not None else None
+        elif hook.kind == "sync":  # the "schedule" of a sync hook is its operation
+            sync = registry.get(SYNC_HOOKS, hook.hook_key.removeprefix("sync:"))
+            schedule = sync.operation if sync is not None else None
         hook_rows.append(_hook_out(hook, schedule))
 
     return PluginAdminOut(
@@ -297,6 +320,89 @@ async def _one(session: AsyncSession, plugin_id: str, *, safe_mode: bool) -> Plu
         if plugin.id == plugin_id:
             return plugin
     raise HTTPException(status.HTTP_404_NOT_FOUND, "Erweiterung nicht gefunden")
+
+
+class NumberGeneratorOut(BaseModel):
+    key: str
+    label: str
+    plugin_id: str
+    example: str | None
+
+
+class NumberGeneratorsOut(BaseModel):
+    active: str | None
+    znuny_generator: str
+    available: list[NumberGeneratorOut]
+
+
+class NumberGeneratorIn(BaseModel):
+    key: str | None = None
+
+
+async def _number_generators_out(session: AsyncSession) -> NumberGeneratorsOut:
+    sysconfig = SysConfig(session)
+    znuny = generator_short_name(await sysconfig.ticket_number_generator())
+    system_id = await sysconfig.system_id()
+    active = await active_generator_in(session)
+    generators = [
+        gen
+        for gen in sorted(
+            get_registry().items(TICKET_NUMBER_GENERATORS), key=lambda g: (g.label.lower(), g.key)
+        )
+        if is_active(gen.plugin_id)
+    ]
+    # In parallel: each example is capped at 1 s, so the page takes ~1 s, not N x 1 s.
+    examples = await asyncio.gather(*(build_example(g, system_id=system_id) for g in generators))
+    available = [
+        NumberGeneratorOut(key=gen.key, label=gen.label, plugin_id=gen.plugin_id, example=example)
+        for gen, example in zip(generators, examples, strict=True)
+    ]
+    return NumberGeneratorsOut(
+        active=active.key if active is not None else None,
+        znuny_generator=znuny,
+        available=available,
+    )
+
+
+@router.get("/number-generators", response_model=NumberGeneratorsOut)
+async def get_number_generators(admin: AdminUser, session: DbSession) -> NumberGeneratorsOut:
+    _ = admin
+    return await _number_generators_out(session)
+
+
+@router.put("/number-generators", response_model=NumberGeneratorsOut)
+async def put_number_generator(
+    body: NumberGeneratorIn, admin: AdminUser, session: DbSession
+) -> NumberGeneratorsOut:
+    if body.key is None or body.key == "":
+        await set_setting(session, NUMBER_GENERATOR_SETTING, "")
+        log.info("plugin_number_generator_changed", generator=None, by=admin.id)
+        return await _number_generators_out(session)
+    gen = next(
+        (g for g in get_registry().items(TICKET_NUMBER_GENERATORS) if g.key == body.key), None
+    )
+    if gen is None or not is_active(gen.plugin_id):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Dieses Ticketnummer-Schema gibt es nicht oder seine Erweiterung ist nicht aktiv.",
+        )
+    znuny = await SysConfig(session).ticket_number_generator()
+    if (
+        gen.uses_counter
+        and generator_short_name(znuny) != "Random"
+        and gen.date_based != is_date_based(znuny)
+    ):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Dieses Ticketnummer-Schema zählt "
+            + ("täglich neu" if gen.date_based else "durchgehend")
+            + f", das Znuny-Schema „{generator_short_name(znuny)}“ dagegen "
+            + ("durchgehend" if gen.date_based else "täglich neu")
+            + ". Beide teilen sich denselben Zähler; wählen Sie ein Schema mit gleicher Zählweise.",
+        )
+    await set_setting(session, NUMBER_GENERATOR_SETTING, gen.key)
+    log.info("plugin_number_generator_changed", generator=gen.key, by=admin.id)
+    return await _number_generators_out(session)
 
 
 @router.get("", response_model=PluginAdminListOut)

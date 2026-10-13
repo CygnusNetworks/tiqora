@@ -45,6 +45,7 @@ from tiqora.db.legacy.user import GroupCustomerUser, PermissionGroups
 from tiqora.db.tiqora.models import TiqoraCustomerPasskey
 from tiqora.domain import user_provisioning as provisioning
 from tiqora.domain.customer_auth import CustomerSessionStore
+from tiqora.domain.customer_company_service import ensure_customer_company
 from tiqora.domain.session_revocation import end_customer_sessions
 from tiqora.domain.totp import TOTPService
 from tiqora.domain.two_factor_subject import CUSTOMER_2FA
@@ -399,17 +400,12 @@ async def get_customer_company(
 async def create_customer_company(
     body: CustomerCompanyCreate, admin: AdminUser, session: DbSession
 ) -> CustomerCompany:
-    ts = now()
-    co = CustomerCompany(
-        **body.model_dump(),
-        create_time=ts,
-        create_by=admin.id,
-        change_time=ts,
-        change_by=admin.id,
-    )
-    session.add(co)
-    await invalidate_znuny_cache_types(session, CUSTOMER_COMPANY_CACHE_TYPES)
+    inserted = await ensure_customer_company(session, actor_id=admin.id, **body.model_dump())
+    if not inserted:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Company already exists")
     await session.commit()
+    co = await session.get(CustomerCompany, body.customer_id)
+    assert co is not None
     await session.refresh(co)
     return co
 

@@ -14527,6 +14527,14 @@
             },
             "title": "Contacts",
             "type": "array"
+          },
+          "external": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExternalContactOut"
+            },
+            "title": "External",
+            "type": "array"
           }
         },
         "required": [
@@ -17762,6 +17770,17 @@
             "title": "Object Type",
             "type": "string"
           },
+          "plugin_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plugin Type"
+          },
           "valid_id": {
             "default": 1,
             "title": "Valid Id",
@@ -17790,6 +17809,17 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "plugin_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plugin Type"
           },
           "possible_values": {
             "anyOf": [
@@ -17879,6 +17909,17 @@
             "title": "Object Type",
             "type": "string"
           },
+          "plugin_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plugin Type"
+          },
           "valid_id": {
             "title": "Valid Id",
             "type": "integer"
@@ -17898,6 +17939,46 @@
           "change_time"
         ],
         "title": "DynamicFieldOut",
+        "type": "object"
+      },
+      "DynamicFieldPluginTypeOut": {
+        "properties": {
+          "base_type": {
+            "title": "Base Type",
+            "type": "string"
+          },
+          "config_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Schema"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "base_type",
+          "plugin_id"
+        ],
+        "title": "DynamicFieldPluginTypeOut",
         "type": "object"
       },
       "DynamicFieldUpdate": {
@@ -18664,6 +18745,79 @@
           "items"
         ],
         "title": "ExtensionPointOut",
+        "type": "object"
+      },
+      "ExternalContactOut": {
+        "description": "A hit from a plugin customer directory; not stored until an agent imports it.",
+        "properties": {
+          "company_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Name"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_label": {
+            "title": "Source Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "source_label",
+          "login",
+          "email",
+          "first_name",
+          "last_name"
+        ],
+        "title": "ExternalContactOut",
+        "type": "object"
+      },
+      "ExternalImportRequest": {
+        "properties": {
+          "login": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Login",
+            "type": "string"
+          },
+          "source": {
+            "description": "Customer source key",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "login"
+        ],
+        "title": "ExternalImportRequest",
         "type": "object"
       },
       "FactsStatusOut": {
@@ -27771,6 +27925,121 @@
         "title": "NotificationMessageIn",
         "type": "object"
       },
+      "NotificationTransportOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "plugin_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plugin Id"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "plugin_id"
+        ],
+        "title": "NotificationTransportOut",
+        "type": "object"
+      },
+      "NumberGeneratorIn": {
+        "properties": {
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          }
+        },
+        "title": "NumberGeneratorIn",
+        "type": "object"
+      },
+      "NumberGeneratorOut": {
+        "properties": {
+          "example": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Example"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "plugin_id",
+          "example"
+        ],
+        "title": "NumberGeneratorOut",
+        "type": "object"
+      },
+      "NumberGeneratorsOut": {
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active"
+          },
+          "available": {
+            "items": {
+              "$ref": "#/components/schemas/NumberGeneratorOut"
+            },
+            "title": "Available",
+            "type": "array"
+          },
+          "znuny_generator": {
+            "title": "Znuny Generator",
+            "type": "string"
+          }
+        },
+        "required": [
+          "active",
+          "znuny_generator",
+          "available"
+        ],
+        "title": "NumberGeneratorsOut",
+        "type": "object"
+      },
       "OAuth2TokenConfigCreate": {
         "properties": {
           "client_id": {
@@ -30134,6 +30403,78 @@
         "title": "PluginCapabilityOut",
         "type": "object"
       },
+      "PluginChannelCapabilitiesOut": {
+        "properties": {
+          "attachments": {
+            "title": "Attachments",
+            "type": "boolean"
+          },
+          "html": {
+            "title": "Html",
+            "type": "boolean"
+          },
+          "max_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Length"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "subject",
+          "html",
+          "attachments",
+          "max_length"
+        ],
+        "title": "PluginChannelCapabilitiesOut",
+        "type": "object"
+      },
+      "PluginChannelOut": {
+        "properties": {
+          "can_reply": {
+            "title": "Can Reply",
+            "type": "boolean"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/PluginChannelCapabilitiesOut"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "label",
+          "plugin_id",
+          "capabilities",
+          "can_reply"
+        ],
+        "title": "PluginChannelOut",
+        "type": "object"
+      },
       "PluginContributionOut": {
         "properties": {
           "key": {
@@ -30264,7 +30605,8 @@
           "kind": {
             "enum": [
               "event",
-              "task"
+              "task",
+              "sync"
             ],
             "title": "Kind",
             "type": "string"
@@ -30377,7 +30719,8 @@
             "enum": [
               "api",
               "worker",
-              "mcp"
+              "mcp",
+              "ai-worker"
             ],
             "title": "Role",
             "type": "string"
@@ -64461,6 +64804,76 @@
         ]
       }
     },
+    "/api/v1/admin/dynamic-fields/plugin-types": {
+      "get": {
+        "description": "Field types plugins offer (registered by a loaded plugin), for the create dialog.",
+        "operationId": "list_plugin_types_api_v1_admin_dynamic_fields_plugin_types_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DynamicFieldPluginTypeOut"
+                  },
+                  "title": "Response List Plugin Types Api V1 Admin Dynamic Fields Plugin Types Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Plugin Types",
+        "tags": [
+          "admin:dynamic-fields"
+        ]
+      }
+    },
     "/api/v1/admin/dynamic-fields/{field_id}": {
       "delete": {
         "description": "Soft-invalidate \u2014 dynamic field values referencing this field must survive.",
@@ -70553,6 +70966,76 @@
         ]
       }
     },
+    "/api/v1/admin/notification-events/transports": {
+      "get": {
+        "description": "The ways a notification can be delivered: ``Email`` plus the loaded plugins' transports.",
+        "operationId": "list_notification_transports_api_v1_admin_notification_events_transports_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationTransportOut"
+                  },
+                  "title": "Response List Notification Transports Api V1 Admin Notification Events Transports Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Notification Transports",
+        "tags": [
+          "admin:notification-events"
+        ]
+      }
+    },
     "/api/v1/admin/notification-events/{notification_id}": {
       "delete": {
         "operationId": "deactivate_notification_event_api_v1_admin_notification_events__notification_id__delete",
@@ -71478,6 +71961,144 @@
           }
         },
         "summary": "List Plugins",
+        "tags": [
+          "admin:plugins"
+        ]
+      }
+    },
+    "/api/v1/admin/plugins/number-generators": {
+      "get": {
+        "operationId": "get_number_generators_api_v1_admin_plugins_number_generators_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumberGeneratorsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Number Generators",
+        "tags": [
+          "admin:plugins"
+        ]
+      },
+      "put": {
+        "operationId": "put_number_generator_api_v1_admin_plugins_number_generators_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NumberGeneratorIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumberGeneratorsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Number Generator",
         "tags": [
           "admin:plugins"
         ]
@@ -87499,6 +88120,76 @@
         ]
       }
     },
+    "/api/v1/channels/plugin": {
+      "get": {
+        "description": "The channels of loaded, enabled plugins an agent can answer on or at least see.",
+        "operationId": "list_plugin_channels_api_v1_channels_plugin_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PluginChannelOut"
+                  },
+                  "title": "Response List Plugin Channels Api V1 Channels Plugin Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Plugin Channels",
+        "tags": [
+          "channels:plugin"
+        ]
+      }
+    },
     "/api/v1/channels/sms/inbound": {
       "post": {
         "description": "Receive one inbound SMS from the configured gateway driver.",
@@ -93204,6 +93895,82 @@
           }
         },
         "summary": "Company Vcards",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/api/v1/customers/external-import": {
+      "post": {
+        "description": "Take over one customer from a plugin directory (once; never updated afterwards).\n\nAn already known login is returned unchanged. 404 when the source or the login is\nunknown, 409 when the e-mail address belongs to another customer or the data is unusable.",
+        "operationId": "import_external_customer_api_v1_customers_external_import_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerUserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import External Customer",
         "tags": [
           "customers"
         ]
@@ -101186,6 +101953,18 @@
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "description": "Also ask plugin customer directories (only when fewer than limit local contacts match; the client sets this after a debounce and from 3 characters)",
+            "in": "query",
+            "name": "external",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Also ask plugin customer directories (only when fewer than limit local contacts match; the client sets this after a debounce and from 3 characters)",
+              "title": "External",
+              "type": "boolean"
             }
           },
           {
@@ -110746,7 +111525,7 @@
         ]
       },
       "post": {
-        "description": "Add an article to a ticket. Requires ``rw`` permission.\n\nAgent email replies (``channel=email``, ``sender_type=agent``) are SMTP-\ndelivered then stored (send-then-store). Delivery failure returns HTTP 502\nand does not leave a silent no-op 201.\n\nTelegram replies may carry ``attachments``, ``telegram_buttons`` and\n``telegram_reply_to_article_id`` (422 on any other channel); a failed\nTelegram send returns 409 with nothing stored. Outgoing agent email may\ncarry ``attachments`` as well (413 over the upload limit).\n\nWith ``state_id`` the ticket's state is changed after the article, in the\nsame transaction (PATCH semantics). The state change is validated before\nthe article is created, so an invalid one returns 403/404/422 without\nsending or storing anything.\n\nWeb chat (``channel=webchat``, agent, visible for the customer): the reply is also posted\ninto the ticket's live chat. A chat nobody accepted yet is accepted first, in its own\ntransaction (R-REPLY-ACCEPT-FIRST); a refused accept refuses the reply (409\n``at_capacity`` / ``already_taken``, 403 ``forbidden``). No live chat \u2192 409\n``chat_not_live``; nothing is stored in either case. The text and ``state_id`` are\nvalidated before the implicit accept. ``attachments`` are allowed.",
+        "description": "Add an article to a ticket. Requires ``rw`` permission.\n\nAgent email replies (``channel=email``, ``sender_type=agent``) are SMTP-\ndelivered then stored (send-then-store). Delivery failure returns HTTP 502\nand does not leave a silent no-op 201.\n\nTelegram replies may carry ``attachments``, ``telegram_buttons`` and\n``telegram_reply_to_article_id`` (422 on any other channel); a failed\nTelegram send returns 409 with nothing stored. Outgoing agent email may\ncarry ``attachments`` as well (413 over the upload limit).\n\nWith ``state_id`` the ticket's state is changed after the article, in the\nsame transaction (PATCH semantics). The state change is validated before\nthe article is created, so an invalid one returns 403/404/422 without\nsending or storing anything.\n\nWeb chat (``channel=webchat``, agent, visible for the customer): the reply is also posted\ninto the ticket's live chat. A chat nobody accepted yet is accepted first, in its own\ntransaction (R-REPLY-ACCEPT-FIRST); a refused accept refuses the reply (409\n``at_capacity`` / ``already_taken``, 403 ``forbidden``). No live chat \u2192 409\n``chat_not_live``; nothing is stored in either case. The text and ``state_id`` (including\nthe plugins' ``ticket.state_change`` before-hooks) are validated before the implicit accept;\nan ``article.create`` veto can only come after it. ``attachments`` are allowed.",
         "operationId": "create_article_api_v1_tickets__ticket_id__articles_post",
         "parameters": [
           {

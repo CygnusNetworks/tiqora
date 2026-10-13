@@ -301,7 +301,7 @@ async def test_reference_customer_search_short_query_returns_empty(
     await engine.dispose()
     assert resp.status_code == 200
     body = resp.json()
-    assert body == {"companies": [], "contacts": []}
+    assert body == {"companies": [], "contacts": [], "external": []}
 
 
 @pytest.mark.asyncio

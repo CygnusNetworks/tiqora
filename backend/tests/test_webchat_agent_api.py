@@ -10,6 +10,7 @@ import asyncio
 import json
 from collections.abc import AsyncIterator, Awaitable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -637,6 +638,34 @@ async def test_accept_forbidden_without_rw(env: Env) -> None:
 
 
 # -- end ------------------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@parametrize_db
+async def test_end_with_close_plugin_veto_is_422_and_stores_nothing(
+    env: Env, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from tests._plugin_points import boot_points_plugin, points_behaviour
+    from tiqora.plugins.sync_hooks import SyncBreaker
+
+    chat = await _start(env, 72)
+    SyncBreaker.reset_for_tests()
+    SyncBreaker.persistence = False
+    try:
+        async with _client(env, AGENT_A) as client:
+            assert (await client.post(f"/api/v1/chat/sessions/{chat.id}/accept")).status_code == 200
+            state_before = (await _ticket(env, chat.ticket_id))["state"]
+            boot_points_plugin(tmp_path, monkeypatch)
+            points_behaviour().MODE["hook.ticket.state_change"] = "veto"
+            res = await client.post(
+                f"/api/v1/chat/sessions/{chat.id}/end", json={"close_ticket": True}
+            )
+            assert res.status_code == 422, res.text
+            assert res.json()["detail"] == "Vertragsnummer fehlt"
+            assert (await _chat(env, chat.id)).status == "active"  # rolled back, not ended
+            assert (await _ticket(env, chat.ticket_id))["state"] == state_before
+    finally:
+        SyncBreaker.reset_for_tests()
 
 
 @pytest.mark.asyncio

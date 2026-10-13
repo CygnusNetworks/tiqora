@@ -3407,6 +3407,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/dynamic-fields/plugin-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Plugin Types
+         * @description Field types plugins offer (registered by a loaded plugin), for the create dialog.
+         */
+        get: operations["list_plugin_types_api_v1_admin_dynamic_fields_plugin_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/dynamic-fields/{field_id}": {
         parameters: {
             query?: never;
@@ -4401,6 +4421,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/notification-events/transports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Notification Transports
+         * @description The ways a notification can be delivered: ``Email`` plus the loaded plugins' transports.
+         */
+        get: operations["list_notification_transports_api_v1_admin_notification_events_transports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/notification-events/{notification_id}": {
         parameters: {
             query?: never;
@@ -4518,6 +4558,24 @@ export interface paths {
         /** List Plugins */
         get: operations["list_plugins_api_v1_admin_plugins_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/plugins/number-generators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Number Generators */
+        get: operations["get_number_generators_api_v1_admin_plugins_number_generators_get"];
+        /** Put Number Generator */
+        put: operations["put_number_generator_api_v1_admin_plugins_number_generators_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -7179,6 +7237,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/channels/plugin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Plugin Channels
+         * @description The channels of loaded, enabled plugins an agent can answer on or at least see.
+         */
+        get: operations["list_plugin_channels_api_v1_channels_plugin_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/channels/sms/inbound": {
         parameters: {
             query?: never;
@@ -8277,6 +8355,29 @@ export interface paths {
         get: operations["company_vcards_api_v1_customers_companies__customer_id__vcards_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/external-import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import External Customer
+         * @description Take over one customer from a plugin directory (once; never updated afterwards).
+         *
+         *     An already known login is returned unchanged. 404 when the source or the login is
+         *     unknown, 409 when the e-mail address belongs to another customer or the data is unusable.
+         */
+        post: operations["import_external_customer_api_v1_customers_external_import_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -11607,8 +11708,9 @@ export interface paths {
          *     into the ticket's live chat. A chat nobody accepted yet is accepted first, in its own
          *     transaction (R-REPLY-ACCEPT-FIRST); a refused accept refuses the reply (409
          *     ``at_capacity`` / ``already_taken``, 403 ``forbidden``). No live chat → 409
-         *     ``chat_not_live``; nothing is stored in either case. The text and ``state_id`` are
-         *     validated before the implicit accept. ``attachments`` are allowed.
+         *     ``chat_not_live``; nothing is stored in either case. The text and ``state_id`` (including
+         *     the plugins' ``ticket.state_change`` before-hooks) are validated before the implicit accept;
+         *     an ``article.create`` veto can only come after it. ``attachments`` are allowed.
          */
         post: operations["create_article_api_v1_tickets__ticket_id__articles_post"];
         delete?: never;
@@ -17824,6 +17926,11 @@ export interface components {
             companies: components["schemas"]["CustomerCompanyRefOut"][];
             /** Contacts */
             contacts: components["schemas"]["CustomerContactRefOut"][];
+            /**
+             * External
+             * @default []
+             */
+            external: components["schemas"]["ExternalContactOut"][];
         };
         /** CustomerShortlist */
         CustomerShortlist: {
@@ -18853,6 +18960,8 @@ export interface components {
              * @enum {string}
              */
             object_type: "Ticket" | "Article" | "CustomerUser" | "CustomerCompany";
+            /** Plugin Type */
+            plugin_type?: string | null;
             /**
              * Valid Id
              * @default 1
@@ -18867,6 +18976,8 @@ export interface components {
             label: string;
             /** Name */
             name: string;
+            /** Plugin Type */
+            plugin_type?: string | null;
             /** Possible Values */
             possible_values: {
                 [key: string]: string;
@@ -18898,8 +19009,25 @@ export interface components {
             name: string;
             /** Object Type */
             object_type: string;
+            /** Plugin Type */
+            plugin_type?: string | null;
             /** Valid Id */
             valid_id: number;
+        };
+        /** DynamicFieldPluginTypeOut */
+        DynamicFieldPluginTypeOut: {
+            /** Base Type */
+            base_type: string;
+            /** Config Schema */
+            config_schema?: {
+                [key: string]: unknown;
+            } | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Plugin Id */
+            plugin_id: string;
         };
         /** DynamicFieldUpdate */
         DynamicFieldUpdate: {
@@ -19171,6 +19299,36 @@ export interface components {
             key: string;
             /** Sdk Stable */
             sdk_stable: boolean;
+        };
+        /**
+         * ExternalContactOut
+         * @description A hit from a plugin customer directory; not stored until an agent imports it.
+         */
+        ExternalContactOut: {
+            /** Company Name */
+            company_name?: string | null;
+            /** Email */
+            email: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Login */
+            login: string;
+            /** Source */
+            source: string;
+            /** Source Label */
+            source_label: string;
+        };
+        /** ExternalImportRequest */
+        ExternalImportRequest: {
+            /** Login */
+            login: string;
+            /**
+             * Source
+             * @description Customer source key
+             */
+            source: string;
         };
         /**
          * FactsStatusOut
@@ -22288,6 +22446,40 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** NotificationTransportOut */
+        NotificationTransportOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Plugin Id */
+            plugin_id: string | null;
+        };
+        /** NumberGeneratorIn */
+        NumberGeneratorIn: {
+            /** Key */
+            key?: string | null;
+        };
+        /** NumberGeneratorOut */
+        NumberGeneratorOut: {
+            /** Example */
+            example: string | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Plugin Id */
+            plugin_id: string;
+        };
+        /** NumberGeneratorsOut */
+        NumberGeneratorsOut: {
+            /** Active */
+            active: string | null;
+            /** Available */
+            available: components["schemas"]["NumberGeneratorOut"][];
+            /** Znuny Generator */
+            znuny_generator: string;
+        };
         /** OAuth2TokenConfigCreate */
         OAuth2TokenConfigCreate: {
             /** Client Id */
@@ -23141,6 +23333,31 @@ export interface components {
             /** Value */
             value: string;
         };
+        /** PluginChannelCapabilitiesOut */
+        PluginChannelCapabilitiesOut: {
+            /** Attachments */
+            attachments: boolean;
+            /** Html */
+            html: boolean;
+            /** Max Length */
+            max_length: number | null;
+            /** Subject */
+            subject: boolean;
+        };
+        /** PluginChannelOut */
+        PluginChannelOut: {
+            /** Can Reply */
+            can_reply: boolean;
+            capabilities: components["schemas"]["PluginChannelCapabilitiesOut"];
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Name */
+            name: string;
+            /** Plugin Id */
+            plugin_id: string;
+        };
         /** PluginContributionOut */
         PluginContributionOut: {
             /** Key */
@@ -23182,7 +23399,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "event" | "task";
+            kind: "event" | "task" | "sync";
             /** Last Error */
             last_error: string | null;
             /** Last Error At */
@@ -23210,7 +23427,7 @@ export interface components {
              * Role
              * @enum {string}
              */
-            role: "api" | "worker" | "mcp";
+            role: "api" | "worker" | "mcp" | "ai-worker";
             /** State */
             state: string;
             /**
@@ -37512,6 +37729,39 @@ export interface operations {
             };
         };
     };
+    list_plugin_types_api_v1_admin_dynamic_fields_plugin_types_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DynamicFieldPluginTypeOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_dynamic_field_api_v1_admin_dynamic_fields__field_id__get: {
         parameters: {
             query?: never;
@@ -40243,6 +40493,39 @@ export interface operations {
             };
         };
     };
+    list_notification_transports_api_v1_admin_notification_events_transports_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationTransportOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_notification_event_api_v1_admin_notification_events__notification_id__get: {
         parameters: {
             query?: never;
@@ -40656,6 +40939,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PluginAdminListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_number_generators_api_v1_admin_plugins_number_generators_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NumberGeneratorsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_number_generator_api_v1_admin_plugins_number_generators_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NumberGeneratorIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NumberGeneratorsOut"];
                 };
             };
             /** @description Validation Error */
@@ -48036,6 +48389,39 @@ export interface operations {
             };
         };
     };
+    list_plugin_channels_api_v1_channels_plugin_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginChannelOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     inbound_sms_api_v1_channels_sms_inbound_post: {
         parameters: {
             query?: never;
@@ -50651,6 +51037,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_external_customer_api_v1_customers_external_import_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExternalImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerUserOut"];
                 };
             };
             /** @description Validation Error */
@@ -54193,6 +54616,8 @@ export interface operations {
                 /** @description Substring matched against company name/id or contact login/email/name */
                 q?: string;
                 limit?: number;
+                /** @description Also ask plugin customer directories (only when fewer than limit local contacts match; the client sets this after a debounce and from 3 characters) */
+                external?: boolean;
             };
             header?: {
                 authorization?: string | null;

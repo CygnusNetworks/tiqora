@@ -3,6 +3,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type NotificationEventOut } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
+import { pluginPointsApi } from "@/lib/pluginPointsApi";
+import { NotificationTransports } from "./NotificationTransports";
 import { NotificationEmailSecurity, type EnabledBackends } from "./NotificationEmailSecurity";
 import { securityLevel } from "./notificationSecurityItems";
 
@@ -58,6 +60,19 @@ export function NotificationEventsPage() {
     pgp: Boolean(cryptoQ.data?.find((s) => s.backend === "pgp")?.enabled),
     smime: Boolean(cryptoQ.data?.find((s) => s.backend === "smime")?.enabled),
   };
+  const transportsQ = useQuery({
+    queryKey: ["admin", "notification-transports"],
+    queryFn: ({ signal }) => pluginPointsApi.notificationTransports(signal),
+  });
+  const [transportsOpen, setTransportsOpen] = useState<number | null>(null);
+  const transportsM = useMutation({
+    mutationFn: ({ id, items }: { id: number; items: Record<string, string[]> }) =>
+      api.updateNotificationEvent(id, { items }),
+    onSuccess: () => {
+      setTransportsOpen(null);
+      void qc.invalidateQueries({ queryKey: ["admin", "notification-events"] });
+    },
+  });
   const [securityOpen, setSecurityOpen] = useState<number | null>(null);
   const securityM = useMutation({
     mutationFn: ({ id, items }: { id: number; items: Record<string, string[]> }) =>
@@ -154,6 +169,15 @@ export function NotificationEventsPage() {
                     type="button"
                     variant="ghost"
                     size="sm"
+                    aria-expanded={transportsOpen === r.id}
+                    onClick={() => setTransportsOpen(transportsOpen === r.id ? null : r.id)}
+                  >
+                    {t("admin.notificationEvents.transports")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
                     aria-expanded={securityOpen === r.id}
                     onClick={() => setSecurityOpen(securityOpen === r.id ? null : r.id)}
                   >
@@ -169,6 +193,17 @@ export function NotificationEventsPage() {
                   </Button>
                 </div>
               </div>
+              {transportsOpen === r.id && (
+                <NotificationTransports
+                  current={r.items?.Transports ?? []}
+                  transports={transportsQ.data ?? []}
+                  loadFailed={transportsQ.isError}
+                  saving={transportsM.isPending}
+                  onSave={(next) =>
+                    transportsM.mutate({ id: r.id, items: { ...(r.items ?? {}), Transports: next } })
+                  }
+                />
+              )}
               {securityOpen === r.id && (
                 <NotificationEmailSecurity
                   items={r.items ?? {}}

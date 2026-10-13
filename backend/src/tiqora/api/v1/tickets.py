@@ -110,6 +110,7 @@ from tiqora.jobs.service import (
     utc_now,
 )
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.plugins.channels import ChannelDeliveryError, driver_for
 from tiqora.reporting.settings import load_reporting_settings
 from tiqora.reporting.sql import ReportQueryTimeout, invalidate_quietly, statement_timeout
 from tiqora.webchat.agent import accept_waiting_chat_for_reply, agent_chat_body
@@ -311,6 +312,9 @@ def _map_exc(exc: Exception) -> HTTPException:
         )
     if isinstance(exc, TelegramDeliveryError):
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    if isinstance(exc, ChannelDeliveryError):
+        # the message is German and written by us (never the plugin's own error text)
+        return HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
     return HTTPException(status_code=500, detail="Internal error")
 
 
@@ -350,7 +354,8 @@ def _telegram_extras(
     """Validate and decode the chat-composer fields of an article request.
 
     Returns the decoded attachments and the send options (``None`` when the
-    request uses none of them). 422 when they are used off Telegram, on bad
+    request uses none of them). Web chat, agent email and plugin channels carry files
+    only (no buttons/quotes). 422 when they are used off Telegram, on bad
     base64, or when the decoded total exceeds Telegram's 50 MB upload limit.
     """
     if _is_chat_reply(body):
@@ -365,6 +370,15 @@ def _telegram_extras(
     if body.attachments and body.channel.lower() == "email" and body.sender_type == "agent":
         # Outgoing agent email carries files too (reply dialog); buttons and
         # quotes stay Telegram-only.
+        if body.telegram_buttons or body.telegram_reply_to_article_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="buttons/quotes are only supported for Telegram replies",
+            )
+        return decode_attachments(body.attachments), None
+    if body.attachments and body.sender_type == "agent" and driver_for(body.channel) is not None:
+        # Plugin channel: decode here, the capability check (and its German 422) is
+        # deliver_plugin_channel_reply's job. Buttons/quotes stay Telegram-only.
         if body.telegram_buttons or body.telegram_reply_to_article_id is not None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -1757,8 +1771,9 @@ async def create_article(
     into the ticket's live chat. A chat nobody accepted yet is accepted first, in its own
     transaction (R-REPLY-ACCEPT-FIRST); a refused accept refuses the reply (409
     ``at_capacity`` / ``already_taken``, 403 ``forbidden``). No live chat → 409
-    ``chat_not_live``; nothing is stored in either case. The text and ``state_id`` are
-    validated before the implicit accept. ``attachments`` are allowed.
+    ``chat_not_live``; nothing is stored in either case. The text and ``state_id`` (including
+    the plugins' ``ticket.state_change`` before-hooks) are validated before the implicit accept;
+    an ``article.create`` veto can only come after it. ``attachments`` are allowed.
     """
     attachments, telegram_options = _telegram_extras(body)
     wants_security = body.email_security is not None and body.email_security.active
@@ -1770,10 +1785,15 @@ async def create_article(
     svc = _write_service(session, settings)
     chat_reply = _is_chat_reply(body)
     if chat_reply and body.state_id is not None:
-        # The implicit accept below commits; an invalid next state must refuse first.
+        # The implicit accept below commits; an invalid next state (or a plugin veto, run
+        # here once) must refuse first.
         try:
             await svc.validate_state_change(
-                user.id, ticket_id, body.state_id, pending_time=body.pending_time
+                user.id,
+                ticket_id,
+                body.state_id,
+                pending_time=body.pending_time,
+                run_hooks=True,
             )
         except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
             await session.rollback()
@@ -1794,8 +1814,14 @@ async def create_article(
     try:
         async with session.begin():
             if body.state_id is not None:
+                # run_hooks: plugin veto of the state change must come before the send
+                # (email/Telegram are send-then-store); change_state below skips them.
                 await svc.validate_state_change(
-                    user.id, ticket_id, body.state_id, pending_time=body.pending_time
+                    user.id,
+                    ticket_id,
+                    body.state_id,
+                    pending_time=body.pending_time,
+                    run_hooks=not chat_reply,  # chat replies ran the hook before the accept
                 )
             aid = await svc.add_article(
                 user.id,
@@ -1824,7 +1850,11 @@ async def create_article(
             )
             if body.state_id is not None:
                 await svc.change_state(
-                    user.id, ticket_id, body.state_id, pending_time=body.pending_time
+                    user.id,
+                    ticket_id,
+                    body.state_id,
+                    pending_time=body.pending_time,
+                    hooks_checked=True,
                 )
     except (
         WriteAccessDenied,
@@ -1832,6 +1862,7 @@ async def create_article(
         InvalidInput,
         OutboundMailError,
         TelegramDeliveryError,
+        ChannelDeliveryError,
     ) as exc:
         refusal = _chat_reply_refusal(exc) if chat_reply and isinstance(exc, InvalidInput) else None
         raise (refusal or _map_exc(exc)) from exc

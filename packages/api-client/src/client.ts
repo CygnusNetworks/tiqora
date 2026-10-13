@@ -1832,7 +1832,7 @@ export class ApiClient {
    * Distinct from ``searchReferenceCustomers`` (contacts only).
    */
   customerQuickSearch(
-    params: { q?: string; limit?: number } = {},
+    params: { q?: string; limit?: number; external?: boolean } = {},
     signal?: AbortSignal,
   ) {
     return this.request<CustomerSearchOut>("GET", "/api/v1/reference/customer-search", {

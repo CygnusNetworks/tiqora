@@ -17,6 +17,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from dataclasses import field as dc_field
 from datetime import datetime
 from typing import Any
 
@@ -47,6 +48,13 @@ class DynamicFieldConfig:
     name: str
     field_type: str
     object_type: str = "Ticket"
+    #: the field's config; filled by ``_load_field`` only for plugin-typed fields (D8)
+    config: Mapping[str, Any] = dc_field(default_factory=dict, compare=False)
+
+    @property
+    def plugin_type(self) -> str | None:
+        key = self.config.get("TiqoraPluginType")
+        return key if isinstance(key, str) and key else None
 
 
 def _parse_datetime(raw: str) -> datetime | None:
@@ -103,7 +111,7 @@ async def _load_field(
     row = (
         await session.execute(
             text(
-                "SELECT id, name, field_type, object_type FROM dynamic_field"
+                "SELECT id, name, field_type, object_type, config FROM dynamic_field"
                 " WHERE name = :n AND object_type IN :ot AND valid_id = 1 LIMIT 1"
             ).bindparams(bindparam("ot", expanding=True)),
             {"n": name, "ot": list(object_types)},
@@ -111,8 +119,22 @@ async def _load_field(
     ).first()
     if row is None:
         return None
+    raw = row[4]
+    if isinstance(raw, memoryview | bytearray):
+        raw = bytes(raw)
+    raw_text = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else raw
+    # core fields pay no YAML parse on every write: only a plugin-typed field carries the key
+    config: dict[str, Any] = {}
+    if isinstance(raw_text, str) and "TiqoraPluginType" in raw_text:
+        from tiqora.domain.dynamic_field_config import config_from_yaml
+
+        config = config_from_yaml(raw_text)
     return DynamicFieldConfig(
-        id=int(row[0]), name=str(row[1]), field_type=str(row[2]), object_type=str(row[3])
+        id=int(row[0]),
+        name=str(row[1]),
+        field_type=str(row[2]),
+        object_type=str(row[3]),
+        config=config,
     )
 
 
@@ -269,9 +291,16 @@ def readable_history_value(field_type: str, values: Sequence[str]) -> str:
 
 
 def df_display_value(
-    field_type: str, config: Mapping[str, Any], stored: str | Sequence[str] | None
+    field_type: str,
+    config: Mapping[str, Any],
+    stored: str | Sequence[str] | None,
+    *,
+    plugin: bool = False,
 ) -> str:
     """Display value of a stored dynamic-field value (``..._Value`` smart tags, templates).
+
+    ``plugin=True`` runs a plugin type's display inline with no time limit: for tests and
+    synchronous contexts only. Async callers use ``plugins.df_types.display_value_bounded``.
 
     ``Backend->ValueLookup`` followed by ``ReadableValueRender``, without a language object:
     Dropdown / Multiselect keys map through ``PossibleValues`` (``BaseSelect.pm:806-836``,
@@ -281,6 +310,12 @@ def df_display_value(
     ``ReadableValueRender`` joining a Multiselect with ``", "`` and cutting a Date to its day.
     """
     keys = [stored] if isinstance(stored, str) else [str(v) for v in (stored or [])]
+    if plugin:
+        from tiqora.plugins.df_types import display_plugin_value
+
+        shown_by_plugin = display_plugin_value(config, keys)
+        if shown_by_plugin is not None:
+            return shown_by_plugin
     if field_type in ("Dropdown", "Multiselect"):
         raw = config.get("PossibleValues")
         possible = {str(k): v for k, v in raw.items()} if isinstance(raw, dict) else {}
@@ -362,6 +397,24 @@ async def _replace_df_rows(
         )
 
 
+async def _normalize_and_validate(field: DynamicFieldConfig, values: Sequence[str]) -> list[str]:
+    """Znuny's value rules first, then the plugin type's validator (D8)."""
+    new = normalize_df_values(field.field_type, values)
+    if field.config.get("TiqoraPluginType"):
+        from tiqora.plugins.df_types import validate_plugin_values
+
+        new = await validate_plugin_values(field, new)
+    return new
+
+
+async def validated_df_values(field: DynamicFieldConfig, values: Sequence[str]) -> list[str]:
+    """The values ``set_ticket_dynamic_field`` would store; ``DynamicFieldValueError`` if invalid.
+
+    For callers that must check a value before the write (a sync hook's create patch).
+    """
+    return await _normalize_and_validate(field, values)
+
+
 async def set_ticket_dynamic_field(
     session: AsyncSession,
     *,
@@ -373,7 +426,7 @@ async def set_ticket_dynamic_field(
     """Write ``values``; returns False (and writes nothing) when unchanged."""
     from tiqora.domain.ticket_write_service import _emit_event
 
-    new = normalize_df_values(field.field_type, values)
+    new = await _normalize_and_validate(field, values)
     old, legacy = await _read_df_values(session, field, ticket_id)
     # A legacy value_text row of a typed field counts as changed so it is
     # rewritten into the typed column (only the stored form differs).
@@ -438,7 +491,7 @@ async def set_article_dynamic_field(
     if owner is None or int(owner) != ticket_id:
         raise InvalidInput("article_id does not belong to this ticket")
 
-    new = normalize_df_values(field.field_type, values)
+    new = await _normalize_and_validate(field, values)
     old, legacy = await _read_df_values(session, field, article_id)
     if not legacy and not df_values_differ(old, new):
         return False

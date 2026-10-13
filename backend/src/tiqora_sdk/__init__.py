@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import typing as _t
 
-SDK_VERSION: _t.Final = "0.1.0"
+SDK_VERSION: _t.Final = "0.2.0"
 
 # ruff: noqa: E402  (SDK_VERSION must exist before the imports below, see tiqora.plugins.compat)
 from collections import abc as _abc
@@ -33,6 +33,22 @@ if _t.TYPE_CHECKING:
     from fastapi import APIRouter
     from pydantic import BaseModel
 
+    from tiqora.api.compat.mapping import Mapper
+    from tiqora.plugins.auth_providers import PasswordAuthenticate
+    from tiqora.plugins.channels import ChannelCapabilities, ChannelSend
+    from tiqora.plugins.customer_sources import CustomerLookup, CustomerSearch
+    from tiqora.plugins.df_types import DfBaseType, DfDisplay, DfValidate
+    from tiqora.plugins.gi_points import GiOperationRun, InvokerHandle, InvokerPrepare
+    from tiqora.plugins.mail_filters import MailFilterStage
+    from tiqora.plugins.notification_transports import TransportSend
+    from tiqora.plugins.number_generators import NumberBuild
+    from tiqora.plugins.placeholders import PlaceholderResolve
+    from tiqora.plugins.process_points import ConditionRun, TransitionActionRun
+    from tiqora.plugins.sync_hooks import SyncHandler, SyncOperation
+    from tiqora.process.actions.registry import ActionParam
+    from tiqora.reporting.catalogue import ReportCategory
+    from tiqora.reporting.definition import ReportDefinition
+    from tiqora.reporting.semantic import ReportSource
     from tiqora.settings_sections.section import SettingsSection
 
 __all__ = [
@@ -106,6 +122,126 @@ class PluginRegistry(_t.Protocol):
         description: str,
         write: bool = False,
         timeout_seconds: int = 60,
+    ) -> None: ...
+
+    def before(
+        self,
+        operation: SyncOperation,
+        name: str,
+        handler: SyncHandler,
+        *,
+        timeout_ms: int = 1000,
+        on_error: _t.Literal["allow", "deny"] = "allow",
+        order: int = 100,
+    ) -> None: ...
+
+    def transition_action(
+        self,
+        name: str,
+        run: TransitionActionRun,
+        *,
+        params: _abc.Iterable[ActionParam] = (),
+        timeout_seconds: int = 5,
+    ) -> str: ...
+
+    def condition_module(self, name: str, run: ConditionRun) -> str: ...
+
+    def placeholder(
+        self, name: str, resolve: PlaceholderResolve, *, timeout_ms: int = 500
+    ) -> str: ...
+
+    def number_generator(
+        self,
+        name: str,
+        build: NumberBuild,
+        *,
+        label: str,
+        pattern: str,
+        uses_counter: bool = True,
+        date_based: bool = False,
+    ) -> str: ...
+
+    def dynamic_field_type(
+        self,
+        name: str,
+        *,
+        label: str,
+        base_type: DfBaseType,
+        validate: DfValidate | None = None,
+        display: DfDisplay | None = None,
+        config_model: type[BaseModel] | None = None,
+    ) -> str: ...
+
+    def mail_filter(
+        self,
+        name: str,
+        stage: MailFilterStage,
+        run: _abc.Callable[..., _abc.Awaitable[None]],
+        *,
+        order: int = 100,
+        timeout_seconds: int = 5,
+    ) -> None: ...
+
+    def notification_transport(
+        self, name: str, send: TransportSend, *, label: str, timeout_seconds: int = 15
+    ) -> str: ...
+
+    def channel(
+        self,
+        name: str,
+        *,
+        label: str,
+        capabilities: ChannelCapabilities = ...,
+        send: ChannelSend | None = None,
+        timeout_seconds: int = 20,
+    ) -> str: ...
+
+    def password_provider(
+        self,
+        name: str,
+        authenticate: PasswordAuthenticate,
+        *,
+        audience: _t.Literal["agent", "customer", "both"],
+        order: int = 100,
+        timeout_seconds: int = 5,
+    ) -> None: ...
+
+    def customer_source(
+        self,
+        name: str,
+        *,
+        label: str,
+        search: CustomerSearch,
+        by_login: CustomerLookup,
+        by_email: CustomerLookup | None = None,
+        materialize_on_inbound: bool = False,
+        timeout_seconds: int = 3,
+    ) -> None: ...
+
+    def gi_operation(self, name: str, run: GiOperationRun, *, timeout_seconds: int = 30) -> str: ...
+
+    def gi_mapping(
+        self, name: str, factory: _abc.Callable[[dict[str, _t.Any] | None], Mapper]
+    ) -> str: ...
+
+    def gi_invoker(
+        self,
+        name: str,
+        prepare: InvokerPrepare,
+        handle_response: InvokerHandle | None = None,
+        *,
+        timeout_seconds: int = 30,
+    ) -> str: ...
+
+    def report_source(self, source: ReportSource) -> None: ...
+
+    def builtin_report(
+        self,
+        name: str,
+        *,
+        category: ReportCategory,
+        definition: ReportDefinition,
+        overview: bool = False,
     ) -> None: ...
 
 

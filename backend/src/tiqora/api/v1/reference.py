@@ -38,6 +38,7 @@ from tiqora.domain.ticket_service import TicketAccessDenied, TicketNotFound
 from tiqora.domain.ticket_write_service import InvalidInput
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.permissions.sharing import share_groups_for
+from tiqora.plugins.customer_sources import search_sources
 from tiqora.znuny.sysconfig import SysConfig
 
 router = APIRouter(prefix="/reference", tags=["reference"])
@@ -105,9 +106,22 @@ class CustomerContactRefOut(BaseModel):
     company_name: str | None = None
 
 
+class ExternalContactOut(BaseModel):
+    """A hit from a plugin customer directory; not stored until an agent imports it."""
+
+    source: str
+    source_label: str
+    login: str
+    email: str
+    first_name: str
+    last_name: str
+    company_name: str | None = None
+
+
 class CustomerSearchOut(BaseModel):
     companies: list[CustomerCompanyRefOut]
     contacts: list[CustomerContactRefOut]
+    external: list[ExternalContactOut] = []
 
 
 class CallerCustomerOut(BaseModel):
@@ -151,6 +165,8 @@ class DynamicFieldDefOut(BaseModel):
     required: bool
     #: Dropdown/Multiselect options ``{key: display value}``, else ``None``.
     possible_values: dict[str, str] | None
+    #: plugin field type (D8); the input of the base ``field_type`` is used either way
+    plugin_type: str | None = None
 
 
 class ComposeContextOut(BaseModel):
@@ -305,6 +321,11 @@ async def customer_search(
         "", description="Substring matched against company name/id or contact login/email/name"
     ),
     limit: int = Query(10, ge=1, le=25),
+    external: bool = Query(
+        False,
+        description="Also ask plugin customer directories (only when fewer than limit local"
+        " contacts match; the client sets this after a debounce and from 3 characters)",
+    ),
 ) -> CustomerSearchOut:
     """Quick search across customer companies and contacts.
 
@@ -315,6 +336,28 @@ async def customer_search(
     """
     _ = user
     companies, contacts = await CustomerService(session).quick_search(q, limit)
+    external_hits: list[ExternalContactOut] = []
+    if external and len(contacts) < limit and len(q.strip()) >= 2:
+        known = {c.login.lower() for c in contacts}
+        room = limit - len(contacts)
+        for source, hit in await search_sources(q.strip(), room):
+            if len(external_hits) >= room:
+                break  # each source got the whole room; the combined list must still fit
+            login_key = hit.login.strip().lower()
+            if login_key in known:
+                continue
+            known.add(login_key)  # the first source (registration order) wins a shared login
+            external_hits.append(
+                ExternalContactOut(
+                    source=source.key,
+                    source_label=source.label,
+                    login=hit.login,
+                    email=hit.email,
+                    first_name=hit.first_name,
+                    last_name=hit.last_name,
+                    company_name=hit.company.name if hit.company else None,
+                )
+            )
     return CustomerSearchOut(
         companies=[
             CustomerCompanyRefOut(customer_id=c.customer_id, name=c.name) for c in companies
@@ -330,6 +373,7 @@ async def customer_search(
             )
             for c in contacts
         ],
+        external=external_hits,
     )
 
 
@@ -480,6 +524,11 @@ async def screen_dynamic_fields(
                 possible_values=(
                     {str(k): str(v) for k, v in possible.items()}
                     if isinstance(possible, dict)
+                    else None
+                ),
+                plugin_type=(
+                    config["TiqoraPluginType"]
+                    if isinstance(config.get("TiqoraPluginType"), str)
                     else None
                 ),
             )

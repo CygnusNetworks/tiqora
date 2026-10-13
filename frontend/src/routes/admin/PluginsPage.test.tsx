@@ -7,6 +7,7 @@ import i18n from "@/i18n";
 import type { PluginAdmin } from "@/lib/pluginsApi";
 import { PLUGIN_SAFE_MODE_KEY } from "@/plugins/safeMode";
 import { ADMIN_PAGES, rankAdminPages } from "@/lib/adminSearch";
+import { aiWorkerRuntime, syncHookRow } from "@/test/pluginFixtures";
 import { PluginsPage } from "./PluginsPage";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -25,6 +26,15 @@ vi.mock("@/lib/pluginsApi", () => ({
     adminList: (...a: unknown[]) => adminList(...a),
     setEnabled: (...a: unknown[]) => setEnabled(...a),
     reset: (...a: unknown[]) => reset(...a),
+  },
+}));
+
+const numberGenerators = vi.fn();
+const setNumberGenerator = vi.fn();
+vi.mock("@/lib/pluginPointsApi", () => ({
+  pluginPointsApi: {
+    numberGenerators: (...a: unknown[]) => numberGenerators(...a),
+    setNumberGenerator: (...a: unknown[]) => setNumberGenerator(...a),
   },
 }));
 
@@ -106,6 +116,8 @@ beforeEach(async () => {
   adminList.mockReset();
   setEnabled.mockReset();
   reset.mockReset();
+  numberGenerators.mockReset();
+  setNumberGenerator.mockReset();
   sessionStorage.clear();
 });
 afterEach(() => sessionStorage.clear());
@@ -242,5 +254,134 @@ describe("admin page registry", () => {
       expect(hits, query).toContain("plugins");
     }
     expect(ADMIN_PAGES.find((page) => page.slug === "plugins")?.route).toBe("/admin/plugins");
+  });
+
+  it("labels every phase-2 capability", async () => {
+    const keys = [
+      "core.events.sync_hooks", "core.process.transition_actions", "core.process.condition_modules",
+      "core.templates.placeholders", "core.tickets.number_generators", "core.dynamic_fields.types",
+      "core.mail.inbound_filters", "core.mail.outbound_filters", "core.notifications.transports",
+      "core.channels.drivers", "core.auth.password_providers", "core.customers.sources",
+      "core.gi.operations", "core.gi.invokers", "core.gi.mappings",
+    ];
+    const texts = [
+      "Prüft Ticketänderungen vor dem Speichern (kann sie ablehnen)", "Liefert Aktionen für Prozesse",
+      "Liefert Bedingungen für Prozesse", "Liefert Platzhalter für Vorlagen", "Liefert ein Ticketnummer-Schema",
+      "Liefert Arten von Zusatzfeldern", "Bearbeitet eingehende E-Mails",
+      "Prüft ausgehende E-Mails (kann den Versand ablehnen)", "Liefert Versandwege für Benachrichtigungen",
+      "Liefert einen Kanal", "Prüft Kennwörter bei der Anmeldung", "Liefert ein Kundenverzeichnis",
+      "Liefert Webservice-Operationen", "Liefert Webservice-Aufrufe (Invoker)", "Liefert Webservice-Zuordnungen (Mapping)",
+    ];
+    adminList.mockResolvedValue({
+      safe_mode: false,
+      plugins: [adminPlugin({ capabilities: keys.map((value) => ({ kind: "extension_point" as const, value })) })],
+    });
+    renderPage();
+    fireEvent.click(await screen.findByTestId("plugin-details-org.example.hello"));
+    for (const text of texts) expect(await screen.findByText(text)).toBeInTheDocument();
+    expect(screen.queryByText(/Nutzt den Erweiterungspunkt/)).not.toBeInTheDocument();
+  });
+
+  it("shows sync hooks with their operation and the AI worker role", async () => {
+    adminList.mockResolvedValue({
+      safe_mode: false,
+      plugins: [
+        adminPlugin({
+          runtime: [aiWorkerRuntime()],
+          hooks: [
+            syncHookRow("org.example.hello", "before-create", "ticket.create", {
+              tripped: true, consecutive_failures: 5, total_failures: 5, last_error: "boom", last_error_at: UPDATED,
+            }),
+          ],
+        }),
+      ],
+    });
+    renderPage();
+    fireEvent.click(await screen.findByTestId("plugin-details-org.example.hello"));
+    const hook = screen.getByTestId("plugin-hook-org.example.hello-sync:org.example.hello:before-create");
+    expect(hook).toHaveTextContent("Prüfung vor dem Speichern");
+    expect(hook).toHaveTextContent("Ticket anlegen");
+    expect(hook).toHaveTextContent("Angehalten nach 5 Fehlern");
+    expect(screen.getByTestId("plugin-retry-org.example.hello")).toHaveTextContent("Erneut versuchen");
+    expect(screen.getByText("KI-Hintergrunddienst")).toBeInTheDocument();
+    expect(screen.queryByText("ai-worker")).not.toBeInTheDocument();
+  });
+
+  it("says so when the ticket number schemes cannot be loaded", async () => {
+    numberGenerators.mockRejectedValue(new Error("kaputt"));
+    adminList.mockResolvedValue({
+      safe_mode: false,
+      plugins: [
+        adminPlugin({
+          capabilities: [{ kind: "extension_point", value: "core.tickets.number_generators" }],
+        }),
+      ],
+    });
+    renderPage();
+    expect(await screen.findByTestId("plugin-number-generator-error-org.example.hello")).toHaveTextContent(
+      "Die Ticketnummer-Schemata dieser Erweiterung konnten nicht geladen werden.",
+    );
+  });
+
+  it("shows the backend's refusal of a scheme (F14)", async () => {
+    const { ApiError } = await import("@/lib/api");
+    const reason =
+      "Dieses Schema zählt nicht wie das Znuny-Schema (Datum); bei gemeinsamem Zähler nicht möglich.";
+    numberGenerators.mockResolvedValue({
+      active: null,
+      znuny_generator: "AutoIncrement",
+      available: [
+        { key: "Plugin_points_Daily", label: "Tageszähler", plugin_id: "org.example.hello", example: "20261013-1" },
+      ],
+    });
+    setNumberGenerator.mockRejectedValue(
+      new ApiError(422, { detail: reason }, "/api/v1/admin/plugins/number-generators"),
+    );
+    adminList.mockResolvedValue({
+      safe_mode: false,
+      plugins: [
+        adminPlugin({
+          capabilities: [{ kind: "extension_point", value: "core.tickets.number_generators" }],
+        }),
+      ],
+    });
+    renderPage();
+    await screen.findByTestId("plugin-number-generator-org.example.hello");
+    fireEvent.click(screen.getByRole("button", { name: "Für neue Tickets verwenden" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(reason);
+  });
+
+  it("switches the ticket number scheme", async () => {
+    const generators = (active: string | null) => ({
+      active,
+      znuny_generator: "DateChecksum",
+      available: [
+        { key: "Plugin_points_Yearly", label: "Jahreszähler", plugin_id: "org.example.hello", example: "2026-000001" },
+        { key: "Plugin_other_Seq", label: "Fortlaufend", plugin_id: "org.example.other", example: "000001" },
+      ],
+    });
+    numberGenerators.mockResolvedValue(generators(null));
+    setNumberGenerator.mockResolvedValue(generators("Plugin_points_Yearly"));
+    adminList.mockResolvedValue({
+      safe_mode: false,
+      plugins: [
+        adminPlugin({
+          capabilities: [{ kind: "extension_point", value: "core.tickets.number_generators" }],
+        }),
+      ],
+    });
+    renderPage();
+    const box = await screen.findByTestId("plugin-number-generator-org.example.hello");
+    expect(box).toHaveTextContent("Ticketnummer-Schema");
+    expect(box).toHaveTextContent("Beispiel: 2026-000001");
+    expect(box).not.toHaveTextContent("Fortlaufend");
+    fireEvent.click(screen.getByRole("button", { name: "Für neue Tickets verwenden" }));
+    await waitFor(() => expect(setNumberGenerator).toHaveBeenCalledWith("Plugin_points_Yearly"));
+    expect(await screen.findByText("Wird für neue Tickets verwendet")).toBeInTheDocument();
+    expect(box).toHaveTextContent("Tickets, die Znuny parallel anlegt");
+    expect(box).toHaveTextContent("(DateChecksum)");
+    setNumberGenerator.mockResolvedValue(generators(null));
+    fireEvent.click(screen.getByRole("button", { name: "Znuny-Schema verwenden" }));
+    await waitFor(() => expect(setNumberGenerator).toHaveBeenLastCalledWith(null));
   });
 });

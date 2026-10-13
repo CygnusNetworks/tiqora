@@ -65,3 +65,12 @@ class ProcessNotStartable(Exception):
 class ProcessNotRunning(Exception):
     """The ticket's process is Inactive, so none of its dialogs may be submitted (HTTP 409).
     FadeAway processes keep running; only new starts are refused."""
+
+
+class PluginActionTimedOut(Exception):
+    """A plugin transition action did not finish in time (HTTP 422).
+
+    The action may have been cancelled in the middle of a database statement, so the engine
+    session is not safe to continue: callers roll back and ``session.invalidate()``; nothing
+    of the dialog submit is stored. The message is German and shown to the user.
+    """

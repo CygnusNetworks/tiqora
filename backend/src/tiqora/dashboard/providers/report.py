@@ -40,10 +40,12 @@ from tiqora.dashboard.settings_models import (
     ReportWidgetSettings,
     SlaGaugeSettings,
 )
+from tiqora.extensions.core import get_registry
 from tiqora.filters import AllOf, AnyOf, Condition, Filter, FilterError, Not
 from tiqora.filters.model import FilterNode
 from tiqora.reporting.access import has_report_access
 from tiqora.reporting.cache import ReportCache, read_cache_generation
+from tiqora.reporting.catalogue import active_builtin
 from tiqora.reporting.definition import DefinitionError, ReportDefinition, TimeRange
 from tiqora.reporting.engine import QueryBudget
 from tiqora.reporting.run_service import (
@@ -185,6 +187,10 @@ def _report_meta(report_key: str | None, saved_name: str | None) -> dict[str, An
     if report_key.startswith("builtin."):
         name = report_key.removeprefix("builtin.")
         return {"key": report_key, "kind": "builtin", "title_key": f"reports.builtin.{name}.title"}
+    if report_key.startswith("plugin."):
+        report = active_builtin(get_registry(), report_key)
+        if report is not None:
+            return {"key": report_key, "kind": "builtin", "title_key": report.title_key}
     return {"key": report_key, "kind": "saved", "name": saved_name}
 
 

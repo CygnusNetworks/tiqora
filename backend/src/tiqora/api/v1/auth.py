@@ -78,6 +78,7 @@ from tiqora.identity.sso_routes import (
 )
 from tiqora.identity.types import ENV_OIDC_SLUG
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.plugins.auth_providers import plugin_password_sign_in
 from tiqora.reporting.rights import report_rights
 from tiqora.reporting.settings import load_reporting_settings
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
@@ -453,6 +454,13 @@ async def login(
             ) from exc
         if account_login is not None:
             user = await auth.get_user_by_login(account_login, auth_method="ldap")
+    if user is None:
+        # Last link of the chain: password auth providers from plugins (named accounts only).
+        found = await plugin_password_sign_in(
+            session, login=body.login, password=body.password, user_kind="agent", client_ip=ip
+        )
+        if found is not None:
+            user = await auth.get_user_by_login(found[0], auth_method="plugin")
     if user is None:
         locked = await limiter.record_failure(login=body.login, ip=ip)
         if locked is not None:

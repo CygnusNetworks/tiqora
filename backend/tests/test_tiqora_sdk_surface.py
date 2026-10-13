@@ -5,10 +5,23 @@ from pathlib import Path
 
 from tiqora.channels.registry import CHANNELS
 from tiqora.jobs.registry import JOB_HANDLERS
+from tiqora.plugins.auth_providers import AUTH_PROVIDERS
+from tiqora.plugins.channels import CHANNEL_DRIVERS
+from tiqora.plugins.customer_sources import CUSTOMER_SOURCES
+from tiqora.plugins.df_types import DYNAMIC_FIELD_TYPES
 from tiqora.plugins.events import EVENT_SUBSCRIBERS
+from tiqora.plugins.gi_points import GI_INVOKERS, GI_MAPPINGS, GI_OPERATIONS
+from tiqora.plugins.mail_filters import INBOUND_MAIL_FILTERS, OUTBOUND_MAIL_FILTERS
 from tiqora.plugins.mcp import MCP_TOOLS
+from tiqora.plugins.number_generators import TICKET_NUMBER_GENERATORS
+from tiqora.plugins.placeholders import PLACEHOLDERS
 from tiqora.plugins.routes import PLUGIN_ROUTES
+from tiqora.plugins.sync_hooks import SYNC_HOOKS
 from tiqora.plugins.tasks import SCHEDULED_TASKS
+from tiqora.process.actions.registry import TRANSITION_ACTIONS
+from tiqora.process.condition_modules import CONDITION_MODULES
+from tiqora.reporting.catalogue import BUILTIN_REPORTS
+from tiqora.reporting.semantic import REPORT_SOURCES
 from tiqora.settings_sections.section import SETTINGS_SECTIONS
 
 EXPECTED = {
@@ -42,7 +55,101 @@ def test_surface_is_exactly_the_planned_one() -> None:
     assert len(tiqora_sdk.__all__) == len(EXPECTED)
     for name in EXPECTED:
         assert getattr(tiqora_sdk, name) is not None
-    assert tiqora_sdk.SDK_VERSION == "0.1.0"
+    assert tiqora_sdk.SDK_VERSION == "0.2.0"
+
+
+#: exact ``__all__`` of every SDK submodule; later tasks add one entry each
+SUBMODULES: dict[str, set[str]] = {
+    "tiqora_sdk.tickets": {
+        "TicketDraft",
+        "PluginWriteError",
+        "PluginPermissionDenied",
+        "CustomerSummary",
+    },
+    "tiqora_sdk.hooks": {
+        "SyncOperation",
+        "HookContext",
+        "TicketCreateOp",
+        "ArticleOp",
+        "QueueMoveOp",
+        "StateChangeOp",
+        "DynamicFieldsOp",
+        "TicketCreatePatch",
+        "OperationVetoed",
+        "SyncHandler",
+    },
+    "tiqora_sdk.process": {"ActionContext", "ActionParam", "ConditionRun", "TransitionActionRun"},
+    "tiqora_sdk.templates": {
+        "PlaceholderRequest",
+        "PlaceholderResolve",
+        "NumberRequest",
+        "NumberBuild",
+    },
+    "tiqora_sdk.fields": {"DfBaseType", "DfValidate", "DfDisplay"},
+    "tiqora_sdk.mail": {
+        "InboundMail",
+        "InboundMailResult",
+        "OutboundMail",
+        "MailVetoed",
+        "MailFilterStage",
+        "MailFilterContext",
+    },
+    "tiqora_sdk.notifications": {
+        "NotificationRecipient",
+        "NotificationMessage",
+        "TransportContext",
+        "TransportSend",
+    },
+    "tiqora_sdk.channels": {
+        "ChannelCapabilities",
+        "ChannelContext",
+        "OutboundChannelMessage",
+        "DeliveryResult",
+        "InboundChannelMessage",
+        "IngestResult",
+        "ChannelSend",
+        "verify_shared_secret",
+    },
+    "tiqora_sdk.auth": {"AuthContext", "PasswordCheck", "PasswordAuthenticate"},
+    "tiqora_sdk.gi": {
+        "GiPrincipal",
+        "GiOperationContext",
+        "GiOperationRun",
+        "InvokerContext",
+        "InvokerResponse",
+        "InvokerPrepare",
+        "InvokerHandle",
+        "Mapper",
+        "MappingError",
+    },
+    "tiqora_sdk.reporting": {
+        "CompileContext",
+        "Dimension",
+        "FilterOnlyField",
+        "Measure",
+        "ReportCategory",
+        "ReportDefinition",
+        "ReportSource",
+    },
+    "tiqora_sdk.customers": {
+        "CustomerLookup",
+        "CustomerSearch",
+        "CustomerSourceContext",
+        "ExternalCompany",
+        "ExternalCustomer",
+    },
+}
+
+
+def test_submodules_are_exact() -> None:
+    import importlib
+
+    for module_name, expected in SUBMODULES.items():
+        module = importlib.import_module(module_name)
+        assert set(module.__all__) == expected, module_name
+        assert len(module.__all__) == len(expected), module_name
+        for name in expected:
+            assert getattr(module, name) is not None, (module_name, name)
 
 
 def test_registry_protocol_matches_registrar() -> None:
@@ -63,6 +170,22 @@ def test_registry_protocol_matches_registrar() -> None:
             "scheduled_task",
             "job_handler",
             "mcp_tool",
+            "before",
+            "transition_action",
+            "condition_module",
+            "placeholder",
+            "number_generator",
+            "dynamic_field_type",
+            "mail_filter",
+            "notification_transport",
+            "channel",
+            "password_provider",
+            "customer_source",
+            "gi_operation",
+            "gi_mapping",
+            "gi_invoker",
+            "report_source",
+            "builtin_report",
         }
     )
 
@@ -83,6 +206,22 @@ def test_phase1_points_are_sdk_stable() -> None:
             EVENT_SUBSCRIBERS,
             SCHEDULED_TASKS,
             MCP_TOOLS,
+            SYNC_HOOKS,
+            TRANSITION_ACTIONS,
+            CONDITION_MODULES,
+            PLACEHOLDERS,
+            TICKET_NUMBER_GENERATORS,
+            DYNAMIC_FIELD_TYPES,
+            INBOUND_MAIL_FILTERS,
+            OUTBOUND_MAIL_FILTERS,
+            CHANNEL_DRIVERS,
+            AUTH_PROVIDERS,
+            CUSTOMER_SOURCES,
+            GI_OPERATIONS,
+            GI_MAPPINGS,
+            GI_INVOKERS,
+            REPORT_SOURCES,
+            BUILTIN_REPORTS,
         )
     )
     assert CHANNELS.sdk_stable is False
@@ -104,8 +243,9 @@ def test_no_unexported_public_names() -> None:
     import tiqora_sdk
 
     public = {n for n in dir(tiqora_sdk) if not n.startswith("_")}
-    # "annotations" comes from `from __future__`; "mcp" is the helper submodule.
-    assert public <= set(tiqora_sdk.__all__) | {"annotations", "mcp"}
+    # "annotations" comes from `from __future__`; "mcp" and the SUBMODULES are submodules.
+    submodules = {name.split(".", 1)[1] for name in SUBMODULES}
+    assert public <= set(tiqora_sdk.__all__) | {"annotations", "mcp"} | submodules
 
 
 def test_python_and_npm_sdk_versions_match() -> None:

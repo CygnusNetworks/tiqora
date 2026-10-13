@@ -10,6 +10,7 @@ are registered but *not valid* by default — out of scope for Phase 4a).
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +21,7 @@ from tiqora.znuny.ticket_number import generator_short_name
 _MERGE_NAME_RE = re.compile(r"^.*%%\d+?%%(\d+?)$")
 
 
-def get_tn_by_string(
+def get_tn_candidates(
     subject: str,
     *,
     hook: str,
@@ -29,15 +30,17 @@ def get_tn_by_string(
     system_id: str,
     check_system_id: bool = False,
     min_counter_size: int = 5,
-) -> str | None:
-    """Extract a ticket number from *subject* (or any free string).
+    extra_patterns: Sequence[str] = (),
+) -> list[str]:
+    """Every ticket number found in *subject*, plugin patterns first, then the Znuny generator's.
 
-    Mirrors ``AutoIncrement.pm`` / ``Date.pm`` / ``DateChecksum.pm``
-    ``GetTNByString``: two accepted shapes —
-    ``<Hook><HookDivider><digits>`` and ``<Hook>: <digits>`` (0-2 spaces).
+    Mirrors ``AutoIncrement.pm`` / ``Date.pm`` / ``DateChecksum.pm`` ``GetTNByString``: two
+    accepted shapes — ``<Hook><HookDivider><number>`` and ``<Hook>: <number>`` (0-2 spaces).
+    *extra_patterns* are the regexes of a plugin ticket number scheme (no capturing groups);
+    the caller keeps the first candidate that is an existing ticket.
     """
     if not subject:
-        return None
+        return []
 
     sid = system_id if check_system_id else ""
     short = generator_short_name(generator)
@@ -50,16 +53,49 @@ def get_tn_by_string(
         max_size = min_counter_size + 5
         digit_pattern = rf"{re.escape(sid)}\d{{{min_counter_size},{max_size}}}"
 
+    from tiqora.plugins.number_generators import anchored_pattern
+
     hooked = re.escape(hook) + re.escape(hook_divider)
-    match = re.search(hooked + rf"({digit_pattern})", subject, re.IGNORECASE)
-    if match:
-        return match.group(1)
+    colon = re.escape(hook) + r":\s{0,2}"
+    candidates: list[str] = []
 
-    match = re.search(re.escape(hook) + rf":\s{{0,2}}({digit_pattern})", subject, re.IGNORECASE)
-    if match:
-        return match.group(1)
+    def collect(prefix: str, pattern: str) -> None:
+        match = re.search(prefix + pattern, subject, re.IGNORECASE)
+        if match and match.group(1) not in candidates:
+            candidates.append(match.group(1))
 
-    return None
+    for extra in extra_patterns:
+        wrapped = anchored_pattern(extra)
+        collect(hooked, wrapped)
+        collect(colon, wrapped)
+    collect(hooked, f"({digit_pattern})")
+    collect(colon, f"({digit_pattern})")
+    return candidates
+
+
+def get_tn_by_string(
+    subject: str,
+    *,
+    hook: str,
+    hook_divider: str,
+    generator: str,
+    system_id: str,
+    check_system_id: bool = False,
+    min_counter_size: int = 5,
+    extra_patterns: Sequence[str] = (),
+) -> str | None:
+    """The first ticket number :func:`get_tn_candidates` finds in *subject*, or ``None``."""
+    found = get_tn_candidates(
+        subject,
+        hook=hook,
+        hook_divider=hook_divider,
+        generator=generator,
+        system_id=system_id,
+        check_system_id=check_system_id,
+        min_counter_size=min_counter_size,
+        extra_patterns=extra_patterns,
+    )
+    return found[0] if found else None
 
 
 async def ticket_check_number(session: AsyncSession, tn: str) -> int | None:
@@ -157,7 +193,9 @@ async def detect_followup(
         await sysconfig.get("Ticket::NumberGenerator::AutoIncrement::MinCounterSize", 5) or 5
     )
 
-    tn = get_tn_by_string(
+    from tiqora.plugins.number_generators import plugin_tn_patterns
+
+    candidates = get_tn_candidates(
         subject,
         hook=hook,
         hook_divider=hook_divider,
@@ -165,8 +203,9 @@ async def detect_followup(
         system_id=system_id,
         check_system_id=check_system_id,
         min_counter_size=min_counter_size,
+        extra_patterns=await plugin_tn_patterns(session),
     )
-    if tn:
+    for tn in candidates:
         ticket_id = await ticket_check_number(session, tn)
         if ticket_id is not None:
             return tn, ticket_id

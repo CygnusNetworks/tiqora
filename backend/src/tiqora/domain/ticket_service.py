@@ -90,6 +90,8 @@ logger = logging.getLogger(__name__)
 
 #: Body Znuny's EmailParser stores when a mail has no text part (S/MIME, PGP/MIME).
 _NO_TEXT_BODY = "- no text message => see attachment -"
+# plugin placeholders of all templates of one template list together
+TEMPLATE_LIST_PLUGIN_BUDGET_SECONDS = 3.0
 
 #: Named ``state_type`` query-param views resolved to one-or-more
 #: ``ticket_state_type.name`` values. Mirrors Znuny's
@@ -2203,6 +2205,7 @@ class TicketService:
         text verbatim.
         """
         from tiqora.channels.email.placeholder import expand_placeholders
+        from tiqora.plugins.placeholders import placeholder_budget_scope
         from tiqora.znuny.sysconfig import SysConfig
 
         ticket = await self._assert_ticket_ro(user_id, ticket_id)
@@ -2227,22 +2230,25 @@ class TicketService:
         )
         sysconfig = SysConfig(self._session)
         out: list[TemplateOut] = []
-        for r in rows:
-            raw = r.text or ""
-            expanded = await expand_placeholders(
-                self._session,
-                sysconfig,
-                raw,
-                ticket_id=ticket_id,
-                user_id=user_id,
-            )
-            out.append(
-                TemplateOut(
-                    id=r.id,
-                    name=r.name,
-                    text=expanded,
-                    content_type=r.content_type,
-                    template_type=r.template_type,
+        # The composer opens with this list: all plugin placeholders of all templates together
+        # get one budget, a slow tag renders "" once it is used up.
+        with placeholder_budget_scope(TEMPLATE_LIST_PLUGIN_BUDGET_SECONDS):
+            for r in rows:
+                raw = r.text or ""
+                expanded = await expand_placeholders(
+                    self._session,
+                    sysconfig,
+                    raw,
+                    ticket_id=ticket_id,
+                    user_id=user_id,
                 )
-            )
+                out.append(
+                    TemplateOut(
+                        id=r.id,
+                        name=r.name,
+                        text=expanded,
+                        content_type=r.content_type,
+                        template_type=r.template_type,
+                    )
+                )
         return out

@@ -532,6 +532,8 @@ async def _item_title(session: AsyncSession, key: str, texts: ReportTexts) -> st
     if key.startswith("builtin."):
         name = key.removeprefix("builtin.")
         return texts.t(f"reports.builtin.{name}.title", default=name)
+    if key.startswith("plugin."):  # a plugin's texts are not part of the report texts bundle
+        return key.rsplit(".", 1)[-1]
     if key.isdigit():
         found = (
             await session.execute(select(TiqoraReport.name).where(TiqoraReport.id == int(key)))

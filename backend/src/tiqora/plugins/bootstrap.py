@@ -40,6 +40,7 @@ from tiqora.plugins.state import (
     RuntimeState,
     set_loaded_plugins,
 )
+from tiqora.plugins.sync_hooks import ensure_sync_hook_rows
 
 log = structlog.get_logger(__name__)
 
@@ -133,6 +134,7 @@ async def init_registry(
         set_loaded_plugins([])
         return _finish(_core_only())  # drop anything a half-finished load committed
     _tables_missing = False
+    await _ensure_sync_hook_rows(registry, session_factory)
     if _late:
         current = get_registry()
         if all(r.owner == "core" for r in current.registrations()):
@@ -143,6 +145,16 @@ async def init_registry(
         return current
     set_loaded_plugins(results)
     return _finish(registry)
+
+
+async def _ensure_sync_hook_rows(
+    registry: Registry, factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """Best effort: a ``sync`` state row per registered hook (every role, idempotent)."""
+    try:
+        await ensure_sync_hook_rows(registry, factory)
+    except Exception as exc:  # noqa: BLE001 - the rows only feed the admin page
+        log.warning("plugin_sync_hook_rows_failed", error=f"{type(exc).__name__}: {exc}"[:300])
 
 
 async def _correct_active_rows(
@@ -176,7 +188,7 @@ async def retry_plugin_boot(
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     clock: Callable[[], float] = time.monotonic,
 ) -> bool:
-    """Worker/mcp that booted before the api migrated: retry until the tables exist.
+    """Worker/mcp/ai-worker that booted before the api migrated: retry until the tables exist.
 
     Every ``interval`` seconds (60) for up to ``max_seconds`` (30 min). The api never
     retries (it runs the migration). Returns True once plugins were loaded.

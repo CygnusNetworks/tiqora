@@ -11,7 +11,10 @@ tree (``BaseText.pm``, ``TextArea.pm``, ``Checkbox.pm``, ``BaseSelect.pm``/
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, status
+from pydantic import ValidationError
 from sqlalchemy import select
 
 from tiqora.api.deps import DbSession
@@ -25,6 +28,7 @@ from tiqora.api.v1.admin.pagination import ListParamsDep, Page, apply_valid_filt
 from tiqora.api.v1.admin.schemas import (
     DynamicFieldCreate,
     DynamicFieldOut,
+    DynamicFieldPluginTypeOut,
     DynamicFieldUpdate,
 )
 from tiqora.db.legacy.dynamic_field import DynamicField
@@ -33,12 +37,67 @@ from tiqora.domain.dynamic_field_config import (
     config_to_yaml,
     validate_dynamic_field_config,
 )
-from tiqora.domain.znuny_admin_writes import create_dynamic_field_row
+from tiqora.extensions.core import get_registry
+from tiqora.plugins.df_types import (
+    DYNAMIC_FIELD_TYPES as PLUGIN_DF_TYPES,
+)
+from tiqora.plugins.df_types import (
+    PLUGIN_CONFIG_KEY,
+    PLUGIN_TYPE_CONFIG_KEY,
+    DynamicFieldType,
+)
+from tiqora.plugins.state import is_active
 
 router = APIRouter(prefix="/dynamic-fields", tags=["admin:dynamic-fields"])
 
 
+_PLUGIN_KEYS = (PLUGIN_TYPE_CONFIG_KEY, PLUGIN_CONFIG_KEY)
+
+
+def _unprocessable(detail: str) -> HTTPException:
+    return HTTPException(status_code=422, detail=detail)
+
+
+def _active_plugin_types() -> list[DynamicFieldType]:
+    return [t for t in get_registry().items(PLUGIN_DF_TYPES) if is_active(t.plugin_id)]
+
+
+def _validated_plugin_settings(item: DynamicFieldType, raw: Any) -> dict[str, Any]:
+    """``TiqoraPluginConfig`` checked against the type's ``config_model`` (German 422)."""
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise _unprocessable("Einstellungen der Erweiterung: erwartet wird ein Objekt")
+    if item.config_model is None:
+        if raw:
+            raise _unprocessable(
+                "Einstellungen der Erweiterung: dieser Feldtyp hat keine Einstellungen"
+            )
+        return {}
+    try:
+        # JSON mode: the settings go to YAML, which cannot hold Enum/Decimal/UUID/SecretStr
+        return item.config_model.model_validate(raw).model_dump(mode="json")
+    except ValidationError as exc:
+        problems = "; ".join(
+            f"{'.'.join(str(p) for p in err['loc']) or 'Wert'}: {err['msg']}"
+            for err in exc.errors()
+        )
+        raise _unprocessable(f"Einstellungen der Erweiterung: {problems}"[:500]) from exc
+
+
+def _core_config(field_type: str, config: dict[str, Any]) -> None:
+    """Validate the Znuny part of ``config`` (the plugin keys are checked separately)."""
+    try:
+        validate_dynamic_field_config(
+            field_type, {k: v for k, v in config.items() if k not in _PLUGIN_KEYS}
+        )
+    except ValueError as exc:
+        raise _unprocessable(str(exc)) from exc
+
+
 def _to_out(row: DynamicField) -> DynamicFieldOut:
+    config = config_from_yaml(row.config)
+    plugin_type = config.get(PLUGIN_TYPE_CONFIG_KEY)
     return DynamicFieldOut(
         id=row.id,
         internal_field=row.internal_field,
@@ -47,7 +106,8 @@ def _to_out(row: DynamicField) -> DynamicFieldOut:
         field_order=row.field_order,
         field_type=row.field_type,
         object_type=row.object_type,
-        config=config_from_yaml(row.config),
+        config=config,
+        plugin_type=plugin_type if isinstance(plugin_type, str) else None,
         valid_id=row.valid_id,
         create_time=row.create_time,
         change_time=row.change_time,
@@ -71,6 +131,22 @@ async def list_dynamic_fields(
     )
 
 
+@router.get("/plugin-types", response_model=list[DynamicFieldPluginTypeOut])
+async def list_plugin_types(admin: AdminUser) -> list[DynamicFieldPluginTypeOut]:
+    """Field types plugins offer (registered by a loaded plugin), for the create dialog."""
+    _ = admin
+    return [
+        DynamicFieldPluginTypeOut(
+            key=t.key,
+            label=t.label,
+            base_type=t.base_type,
+            plugin_id=t.plugin_id,
+            config_schema=t.config_model.model_json_schema() if t.config_model else None,
+        )
+        for t in sorted(_active_plugin_types(), key=lambda t: t.key)
+    ]
+
+
 @router.get("/{field_id}", response_model=DynamicFieldOut)
 async def get_dynamic_field(field_id: int, admin: AdminUser, session: DbSession) -> DynamicFieldOut:
     _ = admin
@@ -84,25 +160,81 @@ async def get_dynamic_field(field_id: int, admin: AdminUser, session: DbSession)
 async def create_dynamic_field(
     body: DynamicFieldCreate, admin: AdminUser, session: DbSession
 ) -> DynamicFieldOut:
-    try:
-        row = await create_dynamic_field_row(
-            session,
-            name=body.name,
-            label=body.label,
-            field_type=body.field_type,
-            object_type=body.object_type,
-            config=body.config,
-            field_order=body.field_order,
-            valid_id=body.valid_id,
-            user_id=admin.id,
-        )
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        ) from exc
+    config = dict(body.config)
+    if body.plugin_type is not None:
+        # D8 / F10: the plugin keys exist only on plugin-typed fields and are set here, not
+        # taken from the body; the field is stored as the type's base type
+        item = next((t for t in _active_plugin_types() if t.key == body.plugin_type), None)
+        if item is None:
+            raise _unprocessable(
+                f"Der Feldtyp „{body.plugin_type}“ ist nicht verfügbar "
+                "(Erweiterung nicht geladen oder Typ unbekannt)"
+            )
+        if body.object_type not in ("Ticket", "Article"):
+            raise _unprocessable("Feldtypen von Erweiterungen gibt es nur für Ticket und Artikel")
+        if body.field_type != item.base_type:
+            raise _unprocessable(
+                f"Der Feldtyp „{item.key}“ wird als „{item.base_type}“ gespeichert; "
+                f"field_type „{body.field_type}“ passt nicht"
+            )
+        if PLUGIN_TYPE_CONFIG_KEY in config:
+            raise _unprocessable("TiqoraPluginType wird über plugin_type gesetzt")
+        settings = _validated_plugin_settings(item, config.pop(PLUGIN_CONFIG_KEY, None))
+        _core_config(item.base_type, config)
+        config[PLUGIN_TYPE_CONFIG_KEY] = item.key
+        config[PLUGIN_CONFIG_KEY] = settings
+    else:
+        _core_config(body.field_type, config)
+        if any(k in config for k in _PLUGIN_KEYS):
+            raise _unprocessable(
+                "TiqoraPluginType und TiqoraPluginConfig gibt es nur bei Feldern mit plugin_type"
+            )
+
+    ts = now()
+    row = DynamicField(
+        internal_field=0,
+        name=body.name,
+        label=body.label,
+        field_order=body.field_order,
+        field_type=body.field_type,
+        object_type=body.object_type,
+        config=config_to_yaml(config),
+        valid_id=body.valid_id,
+        create_time=ts,
+        create_by=admin.id,
+        change_time=ts,
+        change_by=admin.id,
+    )
+    session.add(row)
+    await invalidate_znuny_cache_types(session, DYNAMIC_FIELD_CACHE_TYPES)
     await session.commit()
     await session.refresh(row)
     return _to_out(row)
+
+
+def _patched_config(row: DynamicField, incoming: dict[str, Any]) -> dict[str, Any]:
+    """The new config of a PATCH: the stored plugin type (and settings, unless sent) stay."""
+    stored = config_from_yaml(row.config)
+    stored_type = stored.get(PLUGIN_TYPE_CONFIG_KEY)
+    config = dict(incoming)
+    if not isinstance(stored_type, str) or not stored_type:
+        if any(k in config for k in _PLUGIN_KEYS):
+            raise _unprocessable(
+                "TiqoraPluginType und TiqoraPluginConfig gibt es nur bei Feldern mit plugin_type"
+            )
+        _core_config(row.field_type, config)
+        return config
+    if config.setdefault(PLUGIN_TYPE_CONFIG_KEY, stored_type) != stored_type:
+        raise _unprocessable("Der Feldtyp einer Erweiterung kann nicht geändert werden")
+    _core_config(row.field_type, config)
+    item = next((t for t in _active_plugin_types() if t.key == stored_type), None)
+    if PLUGIN_CONFIG_KEY not in config:
+        if PLUGIN_CONFIG_KEY in stored:
+            config[PLUGIN_CONFIG_KEY] = stored[PLUGIN_CONFIG_KEY]
+    elif item is not None:
+        config[PLUGIN_CONFIG_KEY] = _validated_plugin_settings(item, config[PLUGIN_CONFIG_KEY])
+    # a type whose plugin is not loaded cannot be checked: the settings are kept as sent
+    return config
 
 
 @router.patch("/{field_id}", response_model=DynamicFieldOut)
@@ -115,13 +247,7 @@ async def update_dynamic_field(
 
     data = body.model_dump(exclude_unset=True)
     if "config" in data and data["config"] is not None:
-        try:
-            validate_dynamic_field_config(row.field_type, data["config"])
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-            ) from exc
-        row.config = config_to_yaml(data.pop("config"))
+        row.config = config_to_yaml(_patched_config(row, data.pop("config")))
     for field, value in data.items():
         setattr(row, field, value)
     row.change_time = now()

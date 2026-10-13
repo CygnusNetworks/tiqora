@@ -33,7 +33,7 @@ from tiqora.domain.user_preferences import bulk_get_preferences
 from tiqora.extensions.core import get_registry
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.permissions.sharing import ShareGroupError, check_share_groups
-from tiqora.reporting.catalogue import BUILTIN_REPORTS
+from tiqora.reporting.catalogue import active_builtin, is_catalogue_key
 from tiqora.reporting.definition import DefinitionError
 from tiqora.reporting.labels import resolve_labels
 from tiqora.reporting.recurrence import Recurrence, describe, next_occurrence
@@ -934,8 +934,8 @@ async def schedule_list_out(
         for item in schedule.items:
             title: str | None = None
             title_key: str | None = None
-            if item.report_key.startswith("builtin."):
-                builtin = registry.get(BUILTIN_REPORTS, item.report_key)
+            if is_catalogue_key(item.report_key):
+                builtin = active_builtin(registry, item.report_key)
                 title_key = builtin.title_key if builtin is not None else None
             elif SAVED_KEY_RE.fullmatch(item.report_key):
                 title = names.get(int(item.report_key))
