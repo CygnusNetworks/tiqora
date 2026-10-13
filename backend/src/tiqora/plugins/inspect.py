@@ -14,6 +14,9 @@ from typing import Literal
 from packaging.specifiers import SpecifierSet
 from packaging.version import InvalidVersion, Version
 from pydantic import BaseModel
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.config import Settings
 from tiqora.plugins.compat import check_compat, release_core_version
@@ -24,7 +27,7 @@ from tiqora.plugins.install_checks import (
     requirement_problems,
     static_warnings,
 )
-from tiqora.plugins.package import read_tqplugin
+from tiqora.plugins.package import TqPackage, read_tqplugin
 from tiqora.plugins.repo_index import safe_url
 from tiqora.plugins.signing import KeyRing, TrustLevel, resolve_trust
 
@@ -115,6 +118,26 @@ def inspect_package(
     the file is not a readable ``.tqplugin``.
     """
     pkg = read_tqplugin(data, max_bytes=settings.plugins_max_package_bytes)
+    return inspect_read_package(
+        pkg,
+        settings=settings,
+        ring=ring,
+        installed=installed,
+        image_plugin_ids=image_plugin_ids,
+        short_id_owners=short_id_owners,
+    )
+
+
+def inspect_read_package(
+    pkg: TqPackage,
+    *,
+    settings: Settings,
+    ring: KeyRing,
+    installed: Mapping[str, InstalledPlugin],
+    image_plugin_ids: frozenset[str],
+    short_id_owners: Mapping[str, str] | None = None,
+) -> PackageReport:
+    """``inspect_package`` for a package that was read already (the caller keeps the manifest)."""
     manifest = pkg.manifest
     wheel = pkg.wheel
     problems: list[str] = []
@@ -240,3 +263,97 @@ def inspect_package(
         action=action,
         installable=not problems,
     )
+
+
+# --- database side: what is installed, who owns which short id (F1, F2) ---------------------
+
+_VERSION_TABLE_PREFIX = "tqp_"
+_VERSION_TABLE_SUFFIX = "_alembic_version"
+UNKNOWN_DATA_OWNER = "einer entfernten Erweiterung (vorhandene Daten)"
+
+
+def _runtime_top_level(
+    settings: Settings, plugin_id: str, version: str, sha256: str | None
+) -> tuple[str, ...]:
+    """Top-level names of the unpacked runtime copy (empty when it is not on disk)."""
+    from tiqora.plugins.runtime import version_dir
+
+    if sha256 is None:
+        return ()
+    try:
+        site = version_dir(settings, plugin_id, version, sha256) / "site"
+        names = sorted(
+            entry.name
+            for entry in site.iterdir()
+            if not entry.name.endswith((".dist-info", ".data")) and entry.name != "__pycache__"
+        )
+    except (OSError, ValueError):
+        return ()
+    return tuple(n.removesuffix(".py") for n in names)
+
+
+async def installed_state(
+    session: AsyncSession, settings: Settings
+) -> tuple[dict[str, InstalledPlugin], frozenset[str]]:
+    """Installed plugins by id, and the ids that live in the image (decided by location, F1)."""
+    from tiqora.plugins import store
+    from tiqora.plugins.discovery import discovered_plugins
+    from tiqora.plugins.runtime import image_plugin_ids
+
+    images = frozenset(image_plugin_ids(settings))
+    rows = await store.list_plugin_rows(session)
+    discovered = {p.plugin_id: p for p in discovered_plugins()}
+    out: dict[str, InstalledPlugin] = {}
+    for plugin_id, row in rows.items():
+        if plugin_id in images or row.source == "image":
+            found = discovered.get(plugin_id)
+            top: tuple[str, ...] = (found.package_dir.name,) if found and found.package_dir else ()
+            out[plugin_id] = InstalledPlugin(plugin_id, row.version, "image", None, top)
+        else:
+            top = _runtime_top_level(settings, plugin_id, row.version, row.package_sha256)
+            out[plugin_id] = InstalledPlugin(
+                plugin_id, row.version, row.source, row.package_sha256, top
+            )
+    for plugin_id, found in discovered.items():
+        if plugin_id in out:
+            continue
+        top = (found.package_dir.name,) if found.package_dir else ()
+        out[plugin_id] = InstalledPlugin(
+            plugin_id,
+            found.dist_version,
+            "image" if plugin_id in images else "upload",
+            None,
+            top,
+        )
+    return out, images
+
+
+async def short_id_owners(session: AsyncSession) -> dict[str, str]:
+    """Short id -> the plugin id that owns it: installed, discovered, or holding kept data (F2).
+
+    A ``tqp_<short>_alembic_version`` table nobody claims blocks the short id as well.
+    """
+    from tiqora.db.tiqora.models import TiqoraPlugin, TiqoraPluginData
+    from tiqora.plugins.discovery import discovered_plugins
+
+    owners: dict[str, str] = {}
+    kept = (await session.execute(select(TiqoraPluginData))).scalars().all()
+    for data_row in kept:
+        owners[data_row.short_id] = data_row.plugin_id
+    for plugin_id, short_id in (
+        await session.execute(
+            select(TiqoraPlugin.id, TiqoraPlugin.short_id).where(TiqoraPlugin.short_id.is_not(None))
+        )
+    ).all():
+        if short_id:
+            owners[short_id] = plugin_id
+    for found in discovered_plugins():
+        if found.manifest is not None:
+            owners[found.manifest.short_id] = found.plugin_id
+
+    names = await session.run_sync(lambda sync: sa_inspect(sync.connection()).get_table_names())
+    for name in names:
+        if name.startswith(_VERSION_TABLE_PREFIX) and name.endswith(_VERSION_TABLE_SUFFIX):
+            short_id = name[len(_VERSION_TABLE_PREFIX) : -len(_VERSION_TABLE_SUFFIX)]
+            owners.setdefault(short_id, UNKNOWN_DATA_OWNER)
+    return owners

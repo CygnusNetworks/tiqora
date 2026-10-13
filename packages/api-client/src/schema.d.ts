@@ -4012,6 +4012,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/plugins/packages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload Package */
+        post: operations["upload_package_api_v1_admin_plugins_packages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/plugins/packages/{sha256}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Package */
+        get: operations["get_package_api_v1_admin_plugins_packages__sha256__get"];
+        put?: never;
+        post?: never;
+        /** Delete Package */
+        delete: operations["delete_package_api_v1_admin_plugins_packages__sha256__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/plugins/restart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Restart */
+        get: operations["get_restart_api_v1_admin_plugins_restart_get"];
+        put?: never;
+        /** Post Restart */
+        post: operations["post_restart_api_v1_admin_plugins_restart_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/plugins/{plugin_id}/enabled": {
         parameters: {
             query?: never;
@@ -13798,6 +13851,11 @@ export interface components {
             /** File */
             file: string;
         };
+        /** Body_upload_package_api_v1_admin_plugins_packages_post */
+        Body_upload_package_api_v1_admin_plugins_packages_post: {
+            /** File */
+            file: string;
+        };
         /** BounceRequest */
         BounceRequest: {
             /** Note */
@@ -13872,6 +13930,16 @@ export interface components {
             title: string;
             /** Tn */
             tn: string;
+        };
+        /** CapabilityLineOut */
+        CapabilityLineOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "extension_point" | "outbound_host" | "frontend_slot" | "table";
+            /** Value */
+            value: string;
         };
         /** CatalogActionOut */
         CatalogActionOut: {
@@ -19683,6 +19751,71 @@ export interface components {
             /** Tripped */
             tripped: boolean;
         };
+        /** PluginPackageOut */
+        PluginPackageOut: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "install" | "update" | "reinstall" | "downgrade" | "blocked_image";
+            /** Capabilities */
+            capabilities: components["schemas"]["CapabilityLineOut"][];
+            /** Categories */
+            categories: string[];
+            /** Changelog */
+            changelog: string | null;
+            /** Description */
+            description: string;
+            /** Homepage */
+            homepage: string | null;
+            /** Installable */
+            installable: boolean;
+            /** Installed Version */
+            installed_version: string | null;
+            /** Key Id */
+            key_id: string | null;
+            /** License */
+            license: string | null;
+            /** Name */
+            name: string;
+            /** Plugin Id */
+            plugin_id: string;
+            /** Problems */
+            problems: string[];
+            /** Publisher */
+            publisher: string;
+            /** Publisher Id */
+            publisher_id: string | null;
+            /** Sha256 */
+            sha256: string;
+            /** Short Id */
+            short_id: string;
+            /** Signer */
+            signer: string | null;
+            /** Size Bytes */
+            size_bytes: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "upload" | "repository";
+            /** Support */
+            support: string | null;
+            /**
+             * Trust
+             * @enum {string}
+             */
+            trust: "official" | "verified_publisher" | "local" | "unsigned" | "invalid";
+            /**
+             * Uploaded At
+             * Format: date-time
+             */
+            uploaded_at: string;
+            /** Version */
+            version: string;
+            /** Warnings */
+            warnings: string[];
+        };
         /** PluginRuntimeOut */
         PluginRuntimeOut: {
             /** Boot Attempts */
@@ -21378,6 +21511,48 @@ export interface components {
             label: string | null;
             /** Url */
             url: string | null;
+        };
+        /** RestartIn */
+        RestartIn: {
+            /** Reason */
+            reason?: string | null;
+        };
+        /** RestartRoleOut */
+        RestartRoleOut: {
+            /** New */
+            new: number;
+            /** Old */
+            old: number;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "api" | "worker" | "mcp" | "ai-worker";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "waiting" | "restarting" | "done" | "timeout";
+        };
+        /** RestartStatusOut */
+        RestartStatusOut: {
+            /** Coordinated */
+            coordinated: boolean;
+            /** Failed Message */
+            failed_message: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Generation */
+            generation: number;
+            /** Reason */
+            reason: string;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /** Roles */
+            roles: components["schemas"]["RestartRoleOut"][];
         };
         /** RestoreIn */
         RestoreIn: {
@@ -35396,6 +35571,181 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NumberGeneratorsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_package_api_v1_admin_plugins_packages_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_package_api_v1_admin_plugins_packages_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginPackageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_package_api_v1_admin_plugins_packages__sha256__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                sha256: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginPackageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_package_api_v1_admin_plugins_packages__sha256__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                sha256: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_restart_api_v1_admin_plugins_restart_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestartStatusOut"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_restart_api_v1_admin_plugins_restart_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestartStatusOut"];
                 };
             };
             /** @description Validation Error */

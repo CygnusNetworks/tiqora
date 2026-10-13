@@ -7524,6 +7524,20 @@
         "title": "Body_upload_customer_avatar_api_v1_customers__login__avatar_put",
         "type": "object"
       },
+      "Body_upload_package_api_v1_admin_plugins_packages_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_package_api_v1_admin_plugins_packages_post",
+        "type": "object"
+      },
       "BounceRequest": {
         "properties": {
           "note": {
@@ -7752,6 +7766,30 @@
           "changed"
         ],
         "title": "CallerTicketOut",
+        "type": "object"
+      },
+      "CapabilityLineOut": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "extension_point",
+              "outbound_host",
+              "frontend_slot",
+              "table"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "value"
+        ],
+        "title": "CapabilityLineOut",
         "type": "object"
       },
       "CatalogActionOut": {
@@ -24792,6 +24830,226 @@
           "last_run_at"
         ],
         "title": "PluginHookOut",
+        "type": "object"
+      },
+      "PluginPackageOut": {
+        "properties": {
+          "action": {
+            "enum": [
+              "install",
+              "update",
+              "reinstall",
+              "downgrade",
+              "blocked_image"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityLineOut"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "changelog": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changelog"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "homepage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Homepage"
+          },
+          "installable": {
+            "title": "Installable",
+            "type": "boolean"
+          },
+          "installed_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installed Version"
+          },
+          "key_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Id"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "plugin_id": {
+            "title": "Plugin Id",
+            "type": "string"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "publisher": {
+            "title": "Publisher",
+            "type": "string"
+          },
+          "publisher_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher Id"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "short_id": {
+            "title": "Short Id",
+            "type": "string"
+          },
+          "signer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signer"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "source": {
+            "enum": [
+              "upload",
+              "repository"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "support": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Support"
+          },
+          "trust": {
+            "enum": [
+              "official",
+              "verified_publisher",
+              "local",
+              "unsigned",
+              "invalid"
+            ],
+            "title": "Trust",
+            "type": "string"
+          },
+          "uploaded_at": {
+            "format": "date-time",
+            "title": "Uploaded At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sha256",
+          "size_bytes",
+          "plugin_id",
+          "short_id",
+          "name",
+          "version",
+          "publisher",
+          "publisher_id",
+          "description",
+          "license",
+          "homepage",
+          "support",
+          "categories",
+          "changelog",
+          "trust",
+          "key_id",
+          "signer",
+          "capabilities",
+          "problems",
+          "warnings",
+          "installed_version",
+          "action",
+          "installable",
+          "source",
+          "uploaded_at"
+        ],
+        "title": "PluginPackageOut",
         "type": "object"
       },
       "PluginRuntimeOut": {
@@ -61723,6 +61981,220 @@
           }
         },
         "summary": "Put Number Generator",
+        "tags": [
+          "admin:plugins"
+        ]
+      }
+    },
+    "/api/v1/admin/plugins/packages": {
+      "post": {
+        "operationId": "upload_package_api_v1_admin_plugins_packages_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_package_api_v1_admin_plugins_packages_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginPackageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Package",
+        "tags": [
+          "admin:plugins"
+        ]
+      }
+    },
+    "/api/v1/admin/plugins/packages/{sha256}": {
+      "delete": {
+        "operationId": "delete_package_api_v1_admin_plugins_packages__sha256__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sha256",
+            "required": true,
+            "schema": {
+              "title": "Sha256",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Package",
+        "tags": [
+          "admin:plugins"
+        ]
+      },
+      "get": {
+        "operationId": "get_package_api_v1_admin_plugins_packages__sha256__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sha256",
+            "required": true,
+            "schema": {
+              "title": "Sha256",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginPackageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Package",
         "tags": [
           "admin:plugins"
         ]
