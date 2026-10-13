@@ -259,3 +259,27 @@ async def test_env_sync_never_takes_over_an_admin_row(
         await s.commit()
     row = (await _rows(factory))[U3]
     assert (row.origin, row.enabled, row.name) == ("admin", False, "plg62240 mine")
+
+
+@pytest.mark.db
+async def test_env_sync_unreadable_value_keeps_env_rows_enabled(
+    url_fixture: async_sessionmaker[AsyncSession],
+) -> None:
+    factory = url_fixture
+    now = utc_now()
+    async with factory() as s:
+        await sync_env_repositories(s, _env({"name": "plg62240 one", "url": U1}), now)
+        await s.commit()
+    for broken in ('[{"name":"plg62240 one",', '{"name": "x"}', '"text"'):
+        async with factory() as s:
+            problems = await sync_env_repositories(
+                s, Settings(environment="test", plugin_repositories=broken), now
+            )
+            await s.commit()
+        assert problems
+        assert (await _rows(factory))[U1].enabled is True
+    # an empty value is a deliberate "no env repositories": the row is disabled
+    async with factory() as s:
+        await sync_env_repositories(s, Settings(environment="test", plugin_repositories=""), now)
+        await s.commit()
+    assert (await _rows(factory))[U1].enabled is False

@@ -233,6 +233,16 @@ def parse_env_repositories(raw: str, *, file_root: Path) -> tuple[list[EnvReposi
     return repos, problems
 
 
+def env_value_unreadable(raw: str) -> bool:
+    """True when the whole value is unreadable (bad JSON, not a list); empty is readable."""
+    if not raw or not raw.strip():
+        return False
+    try:
+        return not isinstance(json.loads(raw), list)
+    except ValueError:
+        return True
+
+
 async def sync_env_repositories(
     session: AsyncSession, settings: Settings, now: datetime
 ) -> list[str]:
@@ -275,6 +285,10 @@ async def sync_env_repositories(
         row.name, row.public_key, row.enabled = repo.name, repo.public_key, True
         if changed:
             row.updated_at = now
+    if env_value_unreadable(settings.plugin_repositories):
+        # a typo in the whole value must not switch off every env source: rows have not left the env
+        await session.flush()
+        return problems
     for key, row in by_key.items():
         if row.origin == "env" and key not in wanted and row.enabled:
             row.enabled = False
