@@ -319,7 +319,8 @@ async def sync_env_repositories(
             )
             continue
         if row.origin != "env":
-            log.warning("plugin_env_repository_shadowed_by_admin", url=repo.url)
+            # the id, not the URL: a private index may carry a token in its query
+            log.warning("plugin_env_repository_shadowed_by_admin", repository=row.id)
             continue
         changed = (row.name, row.public_key, row.enabled) != (repo.name, repo.public_key, True)
         if row.public_key != repo.public_key:
@@ -349,6 +350,8 @@ STALE_PACKAGE_HOURS: Final = 24
 #: the daemon tick stops starting new refreshes after this many seconds (tick timeout is 600 s)
 TICK_BUDGET_SECONDS: Final = 480.0
 MAX_ERROR_LENGTH: Final = 1000
+#: an index may be dated this far ahead of our clock (clock skew); later is refused
+FUTURE_TOLERANCE: Final = timedelta(days=1)
 
 
 class FetchError(Exception):
@@ -536,12 +539,17 @@ async def refresh_repository(
 ) -> RefreshResult:
     """Fetch, verify and store one repository's index. The caller commits.
 
-    Errors never raise: the last good index stays, ``last_error`` says why (German). The store
-    step runs under a row lock and re-checks the rollback guard against the newest stored value
-    (F20: a daemon tick and a refresh job may run for one repository at the same time).
+    Errors never raise: the last good index stays, ``last_error`` says why (German). The session's
+    transaction is rolled back before the fetch, so nothing is held open during the network
+    access; pass a session without pending changes. An index dated more than a day ahead is
+    refused (a stored one would block every later index). The store step runs under a row lock
+    and re-checks the rollback guard against the newest stored value (F20: a daemon tick and a
+    refresh job may run for one repository at the same time).
     """
     repo_id, url, key, url_key_at_start = repo.id, repo.url, repo.public_key, repo.url_key
     now = now.replace(microsecond=0)
+    # no transaction stays open during the network access (up to 2 x TOTAL_FETCH_TIMEOUT)
+    await session.rollback()
     try:
         raw = await fetch_bytes(
             url,
@@ -570,6 +578,11 @@ async def refresh_repository(
     except IndexFormatError as exc:
         return await _record_error(session, repo_id, str(exc), now)
     generated = _naive_utc(index.repository.generated_at)
+    if generated > now + FUTURE_TOLERANCE:
+        # stored, it would make the rollback guard refuse every later index for good
+        return await _record_error(
+            session, repo_id, "Paketquelle meldet einen Stand aus der Zukunft – abgewiesen", now
+        )
 
     locked = await session.get(
         TiqoraPluginRepository, repo_id, with_for_update=True, populate_existing=True
@@ -580,7 +593,8 @@ async def refresh_repository(
         return await _record_error(
             session, repo_id, "Die Paketquelle wurde während des Abrufs geändert", now
         )
-    if locked.index_generated_at is not None and generated < locked.index_generated_at:
+    stored = locked.index_generated_at
+    if stored is not None and stored <= now + FUTURE_TOLERANCE and generated < stored:
         return await _record_error(
             session,
             repo_id,

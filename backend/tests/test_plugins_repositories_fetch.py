@@ -320,6 +320,56 @@ async def test_index_rollback_refused(url_fixture: async_sessionmaker[AsyncSessi
     assert (await _refresh(url_fixture, rid, same)).ok is True
 
 
+async def test_index_from_the_future_refused_and_never_blocks(
+    url_fixture: async_sessionmaker[AsyncSession],
+) -> None:
+    """Task 18 M3: a far-future generated_at must not lock the repository for good."""
+    rid = await _add_repo(url_fixture)
+    future = await _refresh(url_fixture, rid, Served(signed(make_index("2099-01-01T00:00:00Z"))))
+    assert future.ok is False and future.error is not None and "Zukunft" in future.error
+    assert (await _row(url_fixture, rid)).index_json is None
+    # one day of clock skew is fine
+    skewed = Served(signed(make_index("2026-10-14T08:00:00Z")))
+    assert (await _refresh(url_fixture, rid, skewed)).ok is True
+    # a future value stored before this check existed does not block later indexes
+    async with url_fixture() as s:
+        row = await s.get(TiqoraPluginRepository, rid)
+        assert row is not None
+        row.index_generated_at = datetime(2099, 1, 1)
+        await s.commit()
+    assert (await _refresh(url_fixture, rid, Served(signed(make_index())))).ok is True
+    assert (await _row(url_fixture, rid)).index_generated_at == datetime(2026, 10, 12, 8, 0, 0)
+
+
+async def test_no_transaction_is_open_during_the_fetch(
+    url_fixture: async_sessionmaker[AsyncSession],
+) -> None:
+    """Task 18 M4: the fetch can take minutes; no row or snapshot is held meanwhile."""
+    rid = await _add_repo(url_fixture)
+    files = signed(make_index())
+    seen: list[bool] = []
+    async with url_fixture() as s:
+        repo = await s.get(TiqoraPluginRepository, rid)
+        assert repo is not None and s.in_transaction()
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.append(s.in_transaction())
+            status, body = files.get(request.url.path, (404, b""))
+            return httpx.Response(status, content=body)
+
+        result = await refresh_repository(
+            s,
+            repo,
+            settings=_settings(),
+            now=NOW,
+            transport=httpx.MockTransport(handler),
+            resolver=private_resolver,
+        )
+        await s.commit()
+    assert result.ok is True
+    assert seen == [False, False]  # index and signature
+
+
 async def test_redirect_not_followed(url_fixture: async_sessionmaker[AsyncSession]) -> None:
     rid = await _add_repo(url_fixture, public_key=None)
     served = Served(

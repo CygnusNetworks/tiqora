@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tests._plugins_state_helpers import to_async_url
@@ -33,6 +34,7 @@ from tiqora.db.tiqora.models import (
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.jobs.service import utc_now
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.plugins import packages_store
 from tiqora.plugins.inspect import InstalledPlugin, PackageReport, installed_state, short_id_owners
 from tiqora.plugins.repositories import build_key_ring, with_repository_signer
 from tiqora.plugins.signing import TrustLevel
@@ -161,6 +163,27 @@ async def test_upload_same_file_twice_200(
         again = await client.post(BASE, files=_files(data))
     assert (first.status_code, again.status_code) == (201, 200)
     assert first.json()["sha256"] == again.json()["sha256"]
+    assert await _count(factory) == 1
+
+
+async def test_upload_race_on_the_same_file_is_200(
+    factory: async_sessionmaker[AsyncSession], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Task 14 M2: a concurrent upload of the same file wins the INSERT -> 200, not a 500."""
+    real_store = packages_store.store_package
+
+    async def racing_store(session: AsyncSession, **kw: Any) -> Any:
+        async with factory() as other:  # the other request commits first
+            await real_store(other, **kw)
+            await other.commit()
+        raise IntegrityError("INSERT INTO tiqora_plugin_package", {}, Exception("duplicate"))
+
+    monkeypatch.setattr(packages_store, "store_package", racing_store)
+    data = _package(tmp_path)
+    async with _client(_app(factory, plugins_dir=str(tmp_path))) as client:
+        r = await client.post(BASE, files=_files(data))
+    assert r.status_code == 200, r.text
+    assert r.json()["sha256"] == hashlib.sha256(data).hexdigest()
     assert await _count(factory) == 1
 
 

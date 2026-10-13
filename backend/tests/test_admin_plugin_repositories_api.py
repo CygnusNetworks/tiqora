@@ -18,6 +18,7 @@ from tests._plugins_state_helpers import to_async_url
 from tests.plugins.package_builder import make_keypair
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db
+from tiqora.api.v1.admin import plugin_repositories
 from tiqora.api.v1.admin.deps import get_admin_user
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
@@ -119,6 +120,25 @@ async def test_create_repository_validates(
         assert r.status_code == 409
     row = await _row(url_fixture, U1)
     assert row.url_key == url_key(U1) and row.created_by == 1 and row.index_verified is False
+
+
+async def test_create_race_on_the_same_address_is_409(
+    url_fixture: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Task 17 M1: two requests pass the pre-check at once; the unique index decides -> 409."""
+
+    async def never_taken(*_a: Any, **_kw: Any) -> bool:
+        return False
+
+    monkeypatch.setattr(plugin_repositories, "_url_taken", never_taken)
+    async with _client(url_fixture) as c:
+        assert (await c.post(BASE, json=_body())).status_code == 201
+        r = await c.post(BASE, json=_body(name="plg62240 two"))
+        assert r.status_code == 409 and r.json()["detail"] == plugin_repositories.DUPLICATE
+        other = await c.post(BASE, json=_body(U2, name="plg62240 three"))
+        assert other.status_code == 201
+        r = await c.put(f"{BASE}/{other.json()['id']}", json=_body(name="plg62240 three"))
+        assert r.status_code == 409
 
 
 async def test_write_endpoints_refuse_api_keys_and_non_admins(

@@ -15,6 +15,7 @@ import structlog
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.deps import AppSettings, DbSession
@@ -187,9 +188,18 @@ async def create_repository(
         updated_at=now,
     )
     session.add(row)
-    await session.commit()
-    log.info("plugin_repository_created", repository=row.id, url=url)
+    await _commit_unique(session)
+    log.info("plugin_repository_created", repository=row.id)  # the URL may carry a token
     return _out(row)
+
+
+async def _commit_unique(session: AsyncSession) -> None:
+    """Commit; a concurrent request that stored the same address first is a 409, not a 500."""
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, DUPLICATE) from None
 
 
 @router.put("/{repo_id}", response_model=RepositoryOut)
@@ -212,7 +222,7 @@ async def update_repository(
         row.index_verified = False  # verified against the old key
     row.name, row.public_key, row.enabled = name, key, body.enabled
     row.updated_at = _now()
-    await session.commit()
+    await _commit_unique(session)
     return _out(row)
 
 

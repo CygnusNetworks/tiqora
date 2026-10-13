@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.deps import AppSettings, DbSession
@@ -223,7 +224,17 @@ async def upload_package(
         except packages_store.PackageTooLargeForDatabase as exc:
             await session.rollback()
             raise HTTPException(413, str(exc)) from None
-        response.status_code = status.HTTP_201_CREATED
+        except IntegrityError:
+            # a concurrent upload of the same file stored it first (sha256 primary key)
+            await session.rollback()
+            raced = await packages_store.get_package(session, report.sha256)
+            if raced is None:
+                raise
+            source, uploaded_at = raced.source, raced.uploaded_at
+            await session.rollback()
+            response.status_code = status.HTTP_200_OK
+        else:
+            response.status_code = status.HTTP_201_CREATED
     return _package_out(
         report,
         source=source,
