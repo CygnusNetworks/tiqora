@@ -352,10 +352,11 @@ export function ReportBuilderPage() {
   const pluginTexts = usePluginReportTexts(useMemo(() => [report], [report]));
   const [textsSeen, setTextsSeen] = useState(false);
   useEffect(() => {
-    if (!pluginTexts.loading) setTextsSeen(true);
-  }, [pluginTexts.loading]);
+    // Not while the report is still pending: `loading` is false then only because no plugin key is known yet.
+    if (!pluginTexts.loading && (baseKey === undefined || report)) setTextsSeen(true);
+  }, [pluginTexts.loading, baseKey, report]);
   // Sticky: a later language change must not unmount the editor.
-  const textsReady = textsSeen || !pluginTexts.loading;
+  const textsReady = textsSeen || (!pluginTexts.loading && (baseKey === undefined || report !== undefined));
   const start = useMemo(
     () => (baseKey === undefined || report ? startFrom(mode, report, t) : null),
     // the start is taken once per loaded report; a language change must not reset the editor
