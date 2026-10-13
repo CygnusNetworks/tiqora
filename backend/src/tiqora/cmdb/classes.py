@@ -30,7 +30,7 @@ from tiqora.jobs.service import UnknownJobKind, enqueue_job, utc_now
 logger = structlog.get_logger(__name__)
 
 CLASS_KEY_RE: Final = re.compile(r"^[a-z][a-z0-9_]{1,49}$")
-#: handler: Task 8; rebuilds the search index of one class in batches of 1000
+#: handler ``tiqora.cmdb.reindex.CMDB_REINDEX_JOB``: rebuilds one class's index, 1000 CIs a batch
 CMDB_REINDEX_KIND: Final = "core.cmdb_reindex"
 _DEF_CACHE: Final = "cmdb_definitions"
 

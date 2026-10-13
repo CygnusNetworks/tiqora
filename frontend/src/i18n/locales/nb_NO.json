@@ -3449,6 +3449,10 @@
         "gi_debug_cleanup": {
           "name": "Clean up web service log",
           "description": "Deletes old entries of the web service log."
+        },
+        "cmdb_version_archive": {
+          "name": "Archive CMDB versions",
+          "description": "Moves old CI versions to the archive (when enabled in the CMDB settings) and removes uploads that were never saved to a CI."
         }
       },
       "takeoverBadge": "Overtakelse",
@@ -5881,7 +5885,8 @@
         "cmdb_import": "Import CMDB items",
         "cmdb_export": "Export CMDB items",
         "cmdb_bulk": "Edit CMDB items in bulk",
-        "cmdb_archive": "Archive old CMDB versions"
+        "cmdb_archive": "Archive old CMDB versions",
+        "cmdb_reindex": "Rebuild CMDB search"
       },
       "gi_mail": "Send email from a web service request"
     },

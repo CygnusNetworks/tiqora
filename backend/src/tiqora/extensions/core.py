@@ -36,6 +36,7 @@ def register_core(registry: Registry) -> None:
 
     from tiqora.cmdb.archive import CMDB_ARCHIVE_JOB
     from tiqora.cmdb.propagation import CMDB_PROPAGATION_JOB
+    from tiqora.cmdb.reindex import CMDB_REINDEX_JOB
     from tiqora.cmdb.transfer.bulk_job import CMDB_BULK_JOB
     from tiqora.cmdb.transfer.export_job import CMDB_EXPORT_JOB
     from tiqora.cmdb.transfer.import_job import CMDB_IMPORT_JOB
@@ -60,6 +61,7 @@ def register_core(registry: Registry) -> None:
     registry.add(JOB_HANDLERS, CMDB_EXPORT_JOB)
     registry.add(JOB_HANDLERS, CMDB_BULK_JOB)
     registry.add(JOB_HANDLERS, CMDB_ARCHIVE_JOB)
+    registry.add(JOB_HANDLERS, CMDB_REINDEX_JOB)
 
     from tiqora.cmdb.provider import tiqora_provider_factory
     from tiqora.itsm.providers import CI_PROVIDERS

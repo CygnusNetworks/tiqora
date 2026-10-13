@@ -3457,6 +3457,10 @@
         "gi_debug_cleanup": {
           "name": "Webservice-Protokoll aufräumen",
           "description": "Löscht alte Einträge des Webservice-Protokolls."
+        },
+        "cmdb_version_archive": {
+          "name": "CMDB-Versionen archivieren",
+          "description": "Verschiebt alte CI-Versionen ins Archiv (wenn in den CMDB-Einstellungen eingeschaltet) und entfernt Uploads, die nie in einem CI gespeichert wurden."
         }
       },
       "takeoverBadge": "Übernahme",
@@ -5889,7 +5893,8 @@
         "cmdb_import": "CMDB-Import",
         "cmdb_export": "CMDB-Export",
         "cmdb_bulk": "CMDB-Sammelbearbeitung",
-        "cmdb_archive": "Alte CMDB-Versionen archivieren"
+        "cmdb_archive": "Alte CMDB-Versionen archivieren",
+        "cmdb_reindex": "CMDB-Suche neu aufbauen"
       },
       "gi_mail": "E-Mail aus einer Webservice-Anfrage versenden"
     },

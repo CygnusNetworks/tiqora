@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import BaseModel
 from sqlalchemy import select
 
 from tests import _cmdb_helpers
@@ -14,8 +13,10 @@ from tests._cmdb_helpers import (
     CmdbWorld,
     _dep,
     _inc,
+    make_ci,
     make_class,
     parse_attrs,
+    run_jobs_until_idle,
 )
 from tiqora.cmdb.catalog import CatalogItemExists, CatalogMisconfigured, CatalogService
 from tiqora.cmdb.classes import (
@@ -30,10 +31,12 @@ from tiqora.cmdb.classes import (
 )
 from tiqora.cmdb.definition import AttributeDef
 from tiqora.cmdb.errors import CmdbNotFound
+from tiqora.cmdb.reindex import CMDB_REINDEX_JOB
 from tiqora.cmdb.seed import DEPLOYMENT_STATE, INCIDENT_STATE
 from tiqora.db.tiqora.models import TiqoraCmdbCatalog, TiqoraCmdbCi, TiqoraJob
+from tiqora.extensions import get_registry
 from tiqora.extensions.registry import Registry
-from tiqora.jobs.registry import JOB_HANDLERS, JobHandler
+from tiqora.jobs.registry import JOB_HANDLERS
 from tiqora.jobs.service import utc_now
 
 pytestmark = pytest.mark.db
@@ -42,26 +45,9 @@ cmdb_db = _cmdb_helpers.cmdb_db
 _cmdb_rows_reset = _cmdb_helpers._cmdb_rows_reset
 
 
-class _ReindexPayload(BaseModel):
-    class_id: int
-
-
-async def _noop(ctx: object, payload: object) -> None:
-    return None
-
-
 def _registry() -> Registry:
-    reg = Registry()
-    reg.add(
-        JOB_HANDLERS,
-        JobHandler(
-            kind=CMDB_REINDEX_KIND,
-            payload_model=_ReindexPayload,
-            run=_noop,
-            title_key="jobs.kinds.core.cmdb_reindex",
-        ),
-    )
-    return reg
+    """The real process registry: the reindex kind must be registered there (F10)."""
+    return get_registry()
 
 
 async def test_definition_versions_and_current(cmdb_db: CmdbWorld) -> None:
@@ -294,3 +280,60 @@ async def test_class_without_cis_needs_no_reindex(cmdb_db: CmdbWorld) -> None:
             cid, changed, comment=None, user_id=USER_ADMIN
         )
         assert (await s.execute(select(TiqoraJob.id))).first() is None
+
+
+def test_reindex_job_is_registered() -> None:
+    assert get_registry().get(JOB_HANDLERS, CMDB_REINDEX_KIND) is CMDB_REINDEX_JOB
+    assert CMDB_REINDEX_JOB.title_key == "jobs.kinds.core.cmdb_reindex"
+
+
+async def test_searchable_change_reindexes_existing_cis(cmdb_db: CmdbWorld) -> None:
+    """F10 end to end: Model becomes searchable, the job runs, old CIs are found."""
+    from tiqora.cmdb.access import load_access
+    from tiqora.cmdb.index import rebuild_index
+    from tiqora.cmdb.reindex import reindex_class
+    from tiqora.cmdb.schemas import CiSearchIn
+    from tiqora.cmdb.search import search_cis
+    from tiqora.filters.model import Filter
+
+    async with cmdb_db.factory() as s:
+        cid = await make_class(s, key="cmdb4rix")
+        a = await make_ci(s, cid, "cmdb4-rix-a", attributes={"Model": [{"v": "R740"}]})
+        b = await make_ci(s, cid, "cmdb4-rix-b", attributes={"Model": [{"v": "R750"}]})
+        acc = await load_access(s, USER_ADMIN)
+
+    def by_model(value: str) -> CiSearchIn:
+        flt = {"field": "attr.Model", "op": "eq", "value": value}
+        return CiSearchIn(
+            class_ids=[cid], filter=Filter.model_validate({"version": 1, "where": flt})
+        )
+
+    async with cmdb_db.factory() as s:
+        base = parse_attrs(SERVER_ATTRS)
+        changed = [base[0], base[1].model_copy(update={"searchable": True}), *base[2:]]
+        await ClassService(s).add_definition(cid, changed, comment=None, user_id=USER_ADMIN)
+        await s.commit()
+        # before the job: the filter exists but the old CIs have no index rows for it
+        assert (await search_cis(s, acc, by_model("R740"))).items == []
+        assert [i.id for i in (await search_cis(s, acc, CiSearchIn(q="R74"))).items] == []
+
+    await run_jobs_until_idle(cmdb_db)
+
+    async with cmdb_db.factory() as s:
+        assert [i.id for i in (await search_cis(s, acc, by_model("R740"))).items] == [a]
+        assert [i.id for i in (await search_cis(s, acc, CiSearchIn(q="R75"))).items] == [b]
+        job = (
+            await s.execute(select(TiqoraJob).where(TiqoraJob.kind == CMDB_REINDEX_KIND))
+        ).scalar_one()
+        assert job.status == "succeeded"
+
+    # Model is not searchable any more: the stale rows go with the next rebuild
+    async with cmdb_db.factory() as s:
+        await ClassService(s).add_definition(cid, base, comment=None, user_id=USER_ADMIN)
+        await s.commit()
+    await run_jobs_until_idle(cmdb_db)
+    async with cmdb_db.factory() as s:
+        assert [i.id for i in (await search_cis(s, acc, CiSearchIn(q="R74"))).items] == []
+        # batching: a batch size of 1 walks every CI and rebuilds both
+        assert await reindex_class(cmdb_db.factory, cid, batch=1) == 2
+        assert await rebuild_index(s, []) == 0
