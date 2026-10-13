@@ -221,6 +221,48 @@ function ciPage(params: URLSearchParams): CiPage {
   return { items, total: items.length, truncated: false };
 }
 
+const ADMIN_LINK_TYPES = LINK_TYPES.map((o, i) => ({
+  id: i + 1, name: o.name, origin: o.origin, source_label: o.source_label, target_label: o.target_label, pointed: o.pointed,
+  propagation: o.propagation, offer_ticket_ticket: true, offer_ticket_ci: i === 0, offer_ci_ci: true, offer_ci_service: false,
+  position: i, valid: true, znuny_source_name: o.source_name, znuny_target_name: o.target_name,
+}));
+
+/** `/api/v1/admin/itsm/*` for the admin pages (read answers, writes echo the current data). */
+function resolveAdminItsm(path: string, method: string, mode: DemoItsmMode): unknown | undefined {
+  const at = path.indexOf("/api/v1/admin/itsm");
+  if (at < 0) return undefined;
+  const rest = path.slice(at + "/api/v1/admin/itsm".length);
+  if (rest === "" || rest === "/mode") {
+    const st = status(mode);
+    return {
+      mode, source: "auto", stored: false, changed_at: null, changed_by: null, import_run_id: null, previous_mode: null,
+      switched: false, switch: null, cmdb_empty: true,
+      detected: { ...st.znuny, change_installed: false, unsupported_reason: null },
+      allowed_transitions: mode === "off" ? ["znuny_readthrough"] : ["off"],
+    };
+  }
+  if (rest === "/setup") {
+    return {
+      complete: true,
+      items: [
+        { group: "incident_problem", kind: "ticket_type", name: "Incident", status: "present", detail: null },
+        { group: "incident_problem", kind: "ticket_type", name: "Problem", status: "present", detail: null },
+        { group: "incident_problem", kind: "dynamic_field", name: "ITSMCriticality", status: "present", detail: null },
+        { group: "change", kind: "ticket_type", name: "Change", status: "missing", detail: null },
+      ],
+    };
+  }
+  if (rest === "/priority-matrix") {
+    return { ...MATRIX, source: mode === "tiqora" ? "tiqora" : "znuny", editable: mode === "tiqora", enabled: true };
+  }
+  if (rest === "/link-types") return { items: ADMIN_LINK_TYPES, missing_from_table: [] };
+  if (rest === "/link-types/sync") return { changed: 0 };
+  const link = rest.match(/^\/link-types\/(\d+)$/);
+  if (link && method === "PATCH") return ADMIN_LINK_TYPES.find((l) => l.id === Number(link[1]));
+  if (/^\/services\/\d+\/meta$/.test(rest)) return { ...SERVICE, znuny_owned: mode === "znuny_readthrough" };
+  return undefined;
+}
+
 /**
  * Answers the ITSM demo paths; `search` is the query string of the request (optional). `mode`
  * defaults to the demo build's stored mode; the e2e fixture runs in Node and passes the page's.
@@ -232,6 +274,8 @@ export function resolveItsmData(
   mode: DemoItsmMode = demoItsmMode(),
 ): unknown | undefined {
   const params = new URLSearchParams(search);
+  const admin = resolveAdminItsm(path, method, mode);
+  if (admin !== undefined) return admin;
   if (path.endsWith("/api/v1/itsm/status")) return status(mode);
   if (path.endsWith("/api/v1/itsm/catalog")) return demoItsmCatalog;
   if (path.endsWith("/api/v1/itsm/cis") && method === "GET") return ciPage(params);

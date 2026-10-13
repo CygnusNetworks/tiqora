@@ -5093,7 +5093,136 @@
     "itsm": {
       "title": "ITSM",
       "linkTypes": {
-        "title": "Verknüpfungstypen"
+        "title": "Verknüpfungstypen",
+        "editTitle": "Verknüpfungstyp {{name}}",
+        "sourceLabel": "Bezeichnung (Quelle)",
+        "targetLabel": "Bezeichnung (Ziel)",
+        "offer": "Angeboten für",
+        "flags": {
+          "offer_ticket_ticket": "Ticket zu Ticket",
+          "offer_ticket_ci": "Ticket zu Konfigurationselement",
+          "offer_ci_ci": "Konfigurationselement zu Konfigurationselement",
+          "offer_ci_service": "Konfigurationselement zu Service"
+        },
+        "flagsShort": {
+          "offer_ticket_ticket": "Ticket-Ticket",
+          "offer_ticket_ci": "Ticket-CI",
+          "offer_ci_ci": "CI-CI",
+          "offer_ci_service": "CI-Service"
+        },
+        "propagation": "Weitergabe des Incident-Status",
+        "propagations": {
+          "none": "keine",
+          "source": "von der Quelle",
+          "target": "vom Ziel",
+          "both": "in beide Richtungen"
+        },
+        "valid": "Angeboten (gültig)",
+        "name": "Name",
+        "origin": "Herkunft",
+        "labels": "Bezeichnungen",
+        "hidden": "ausgeblendet",
+        "origins": {
+          "znuny": "aus Znuny",
+          "tiqora": "Tiqora"
+        },
+        "sync": "Aus Znuny aktualisieren",
+        "synced": "{{count}} Zeilen aktualisiert.",
+        "missing": "Aus Znuny angeboten, noch ohne Zeile: {{names}}. „Aus Znuny aktualisieren“ legt die Zeilen an.",
+        "errors": {
+          "generic": "Der Verknüpfungstyp konnte nicht gespeichert werden.",
+          "znuny_link_type_read_only": "Bei einem Znuny-Verknüpfungstyp lassen sich nur Bezeichnungen, Angebot und Gültigkeit ändern.",
+          "link_type_name_immutable": "Der Name lässt sich nicht ändern.",
+          "invalid_propagation": "Diese Weitergabe ist nicht gültig.",
+          "offer_ticket_ticket_not_allowed": "Die Weitergabe braucht einen Typ, der für Ticket-Verknüpfungen angeboten wird."
+        }
+      },
+      "error": "Die ITSM-Einstellungen konnten nicht geladen oder gespeichert werden.",
+      "mode": {
+        "title": "ITSM-Modus",
+        "names": {
+          "off": "Aus",
+          "znuny_readthrough": "Znuny führt das ITSM (Durchlesen)",
+          "tiqora": "Tiqora führt das ITSM"
+        },
+        "sources": {
+          "auto": "automatisch erkannt",
+          "admin": "vom Administrator",
+          "importer": "durch den Import"
+        },
+        "descriptions": {
+          "off": "Das ITSM ist ausgeschaltet: keine Konfigurationselemente, keine ITSM-Dialoge.",
+          "znuny_readthrough": "Konfigurationselemente werden aus Znuny gelesen und hier nicht geändert. Änderungen erfolgen in Znuny.",
+          "tiqora": "Tiqora hält die ITSM-Daten selbst."
+        },
+        "detected": "In Znuny installiert",
+        "detectedCore": "ITSM-Kern",
+        "detectedNone": "kein Znuny-ITSM gefunden",
+        "unsupported": "Diese Znuny-ITSM-Version wird nicht unterstützt ({{reason}}). Der ITSM-Import bietet ein Umstellen ohne CI-Daten an.",
+        "importHint": "Der Wechsel zu „Tiqora führt das ITSM“ erfolgt über den ITSM-Import.",
+        "importLink": "ITSM-Import öffnen",
+        "switchTo": {
+          "off": "ITSM ausschalten",
+          "znuny_readthrough": "Znuny führen lassen (Durchlesen)",
+          "tiqora": "Tiqora führen lassen"
+        },
+        "transitionRefused": "Dieser Wechsel ist nicht möglich: {{reason}}",
+        "reasons": {
+          "unknown": "im aktuellen Zustand nicht erlaubt",
+          "already_in_mode": "dieser Modus ist bereits aktiv",
+          "off_returns_to_tiqora_while_switched": "nach dem Import kann nur Tiqora wieder übernehmen",
+          "off_returns_to_previous_mode": "das ITSM kehrt in den vorherigen Modus zurück",
+          "znuny_to_tiqora_importer_only": "der Wechsel zu Tiqora erfolgt über den ITSM-Import",
+          "tiqora_to_znuny_importer_only": "der Weg zurück zu Znuny erfolgt über den ITSM-Import",
+          "znuny_itsm_not_detected": "es wurde kein Znuny-ITSM erkannt",
+          "tiqora_cmdb_not_empty": "die Tiqora-CMDB enthält bereits Konfigurationselemente"
+        }
+      },
+      "setup": {
+        "title": "Einrichtung",
+        "intro": "Ticket-Typen, Status und Felder, die die ITSM-Dialoge brauchen. Fehlende Teile werden so angelegt, wie Znuny sie anlegt.",
+        "groups": {
+          "incident_problem": "Incident- und Problem-Management",
+          "change": "Change-Management (optional)"
+        },
+        "kinds": {
+          "ticket_type": "Ticket-Typ",
+          "ticket_state": "Ticket-Status",
+          "dynamic_field": "Dynamisches Feld"
+        },
+        "status": {
+          "present": "vorhanden",
+          "missing": "fehlt",
+          "conflict": "Konflikt",
+          "invalid": "ungültig"
+        },
+        "apply": "Einrichten",
+        "complete": "Alles für Incident- und Problem-Management ist vorhanden."
+      },
+      "matrix": {
+        "title": "Prioritätsmatrix",
+        "empty": "Es sind noch keine Kritikalitäts- oder Auswirkungswerte definiert.",
+        "criticality": "Kritikalität",
+        "impact": "Auswirkung",
+        "save": "Matrix speichern",
+        "readOnly": "Diese Matrix gehört Znuny. In Znuny bearbeiten."
+      },
+      "service": {
+        "menu": "ITSM-Daten",
+        "title": "ITSM-Daten von {{name}}",
+        "znunyOwned": "Typ und Kritikalität stammen aus Znuny und sind hier schreibgeschützt.",
+        "type": "Service-Typ",
+        "criticality": "Kritikalität",
+        "description": "Beschreibung",
+        "owner": "Verantwortlich: {{name}}",
+        "portalVisible": "Im Portal sichtbar",
+        "minMinutes": "Minuten zwischen Incidents",
+        "minMinutesHelp": "Leer nutzt den Standard aus den ITSM-Einstellungen; 0 schaltet die Prüfung aus.",
+        "errors": {
+          "read_only": "Typ und Kritikalität werden in Znuny gepflegt.",
+          "service_not_found": "Der Service wurde nicht gefunden.",
+          "generic": "Die ITSM-Daten konnten nicht gespeichert werden."
+        }
       }
     }
   },

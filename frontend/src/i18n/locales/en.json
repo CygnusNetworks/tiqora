@@ -5093,7 +5093,136 @@
     "itsm": {
       "title": "ITSM",
       "linkTypes": {
-        "title": "Link types"
+        "title": "Link types",
+        "editTitle": "Link type {{name}}",
+        "sourceLabel": "Label (source)",
+        "targetLabel": "Label (target)",
+        "offer": "Offered for",
+        "flags": {
+          "offer_ticket_ticket": "Ticket to ticket",
+          "offer_ticket_ci": "Ticket to configuration item",
+          "offer_ci_ci": "Configuration item to configuration item",
+          "offer_ci_service": "Configuration item to service"
+        },
+        "flagsShort": {
+          "offer_ticket_ticket": "Ticket-Ticket",
+          "offer_ticket_ci": "Ticket-CI",
+          "offer_ci_ci": "CI-CI",
+          "offer_ci_service": "CI-Service"
+        },
+        "propagation": "Incident state propagation",
+        "propagations": {
+          "none": "none",
+          "source": "from source",
+          "target": "from target",
+          "both": "both ways"
+        },
+        "valid": "Offered (valid)",
+        "name": "Name",
+        "origin": "Origin",
+        "labels": "Labels",
+        "hidden": "hidden",
+        "origins": {
+          "znuny": "from Znuny",
+          "tiqora": "Tiqora"
+        },
+        "sync": "Update from Znuny",
+        "synced": "{{count}} rows updated.",
+        "missing": "Offered from Znuny without a row yet: {{names}}. “Update from Znuny” creates the rows.",
+        "errors": {
+          "generic": "The link type could not be saved.",
+          "znuny_link_type_read_only": "Only labels, offer settings and validity of a Znuny link type can be changed.",
+          "link_type_name_immutable": "The name cannot be changed.",
+          "invalid_propagation": "This propagation is not valid.",
+          "offer_ticket_ticket_not_allowed": "Propagation needs a type offered for ticket links."
+        }
+      },
+      "error": "The ITSM settings could not be loaded or saved.",
+      "mode": {
+        "title": "ITSM mode",
+        "names": {
+          "off": "Off",
+          "znuny_readthrough": "Znuny leads the ITSM (read-through)",
+          "tiqora": "Tiqora leads the ITSM"
+        },
+        "sources": {
+          "auto": "detected automatically",
+          "admin": "set by an administrator",
+          "importer": "set by the import"
+        },
+        "descriptions": {
+          "off": "The ITSM is switched off: no CIs, no ITSM dialogs.",
+          "znuny_readthrough": "Configuration items are read from Znuny and stay read-only here. Changes are made in Znuny.",
+          "tiqora": "Tiqora keeps the ITSM data itself."
+        },
+        "detected": "Installed in Znuny",
+        "detectedCore": "ITSM core",
+        "detectedNone": "no Znuny ITSM found",
+        "unsupported": "This Znuny ITSM version is not supported ({{reason}}). The ITSM import offers a switch without CI data.",
+        "importHint": "The switch to “Tiqora leads the ITSM” is made through the ITSM import.",
+        "importLink": "Open the ITSM import",
+        "switchTo": {
+          "off": "Switch ITSM off",
+          "znuny_readthrough": "Let Znuny lead (read-through)",
+          "tiqora": "Let Tiqora lead"
+        },
+        "transitionRefused": "This change is not possible: {{reason}}",
+        "reasons": {
+          "unknown": "not allowed in the current state",
+          "already_in_mode": "this mode is already active",
+          "off_returns_to_tiqora_while_switched": "after the import only Tiqora can take over again",
+          "off_returns_to_previous_mode": "the ITSM returns to the mode it had before",
+          "znuny_to_tiqora_importer_only": "the switch to Tiqora is made through the ITSM import",
+          "tiqora_to_znuny_importer_only": "going back to Znuny is made through the ITSM import",
+          "znuny_itsm_not_detected": "no Znuny ITSM was detected",
+          "tiqora_cmdb_not_empty": "the Tiqora CMDB already holds configuration items"
+        }
+      },
+      "setup": {
+        "title": "Setup",
+        "intro": "Ticket types, states and fields the ITSM dialogs need. Missing parts are created like Znuny creates them.",
+        "groups": {
+          "incident_problem": "Incident and problem management",
+          "change": "Change management (optional)"
+        },
+        "kinds": {
+          "ticket_type": "Ticket type",
+          "ticket_state": "Ticket state",
+          "dynamic_field": "Dynamic field"
+        },
+        "status": {
+          "present": "present",
+          "missing": "missing",
+          "conflict": "conflict",
+          "invalid": "invalid"
+        },
+        "apply": "Set up",
+        "complete": "Everything for incident and problem management is present."
+      },
+      "matrix": {
+        "title": "Priority matrix",
+        "empty": "No criticality or impact values are defined yet.",
+        "criticality": "Criticality",
+        "impact": "Impact",
+        "save": "Save matrix",
+        "readOnly": "This matrix is Znuny's. Edit it in Znuny."
+      },
+      "service": {
+        "menu": "ITSM data",
+        "title": "ITSM data of {{name}}",
+        "znunyOwned": "Type and criticality come from Znuny and are read-only here.",
+        "type": "Service type",
+        "criticality": "Criticality",
+        "description": "Description",
+        "owner": "Owner: {{name}}",
+        "portalVisible": "Visible in the portal",
+        "minMinutes": "Minutes between incidents",
+        "minMinutesHelp": "Empty uses the default of the ITSM settings; 0 switches the check off.",
+        "errors": {
+          "read_only": "Type and criticality are managed in Znuny.",
+          "service_not_found": "The service was not found.",
+          "generic": "The ITSM data could not be saved."
+        }
       }
     }
   },
