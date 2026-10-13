@@ -20,7 +20,8 @@ mapping and the transport. ``handle_response(ctx, response)`` is optional and re
 ``InvokerResponse`` with the mapped answer or the error; it can get ``success=False`` after any
 earlier stage, but a failure raised by ``handle_response`` itself is not passed back to it.
 ``prepare`` must have no side effects: it also runs for the admin dry run. An exception or timeout
-(at most 120 seconds) in ``prepare`` runs the webservice's error handling (retries) like a core invoker.
+(at most 120 seconds) in ``prepare`` runs the webservice's error handling (retries) like a core
+invoker.
 """
 
 from __future__ import annotations
