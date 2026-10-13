@@ -109,7 +109,7 @@ class DryRunWriter(CmdbWritePort):
         change_note: str | None = None,
         write_index: bool = True,
     ) -> int | None:
-        canon = _canon(attributes)
+        canon = _canon((name, deployment_state_id, incident_state_id, attributes))
         if self._last_attrs.get(ci_id) == canon:
             return None
         self._last_attrs[ci_id] = canon

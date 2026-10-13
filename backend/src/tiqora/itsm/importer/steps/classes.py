@@ -66,6 +66,8 @@ class ClassMaps:
     class_ids: dict[int, int] = field(default_factory=dict)
     #: Znuny definition id -> its Tiqora counterpart (unreadable definitions are absent)
     definitions: dict[int, DefinitionTarget] = field(default_factory=dict)
+    #: dry run only: Znuny CI id -> (fake) Tiqora CI id, handed from CI pass 1 to pass 2
+    dry_ci_ids: dict[int, int] = field(default_factory=dict)
 
 
 def class_key(name: str, znuny_id: int) -> str:
