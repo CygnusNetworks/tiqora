@@ -458,6 +458,31 @@ async def test_hanging_display_is_bounded_across_a_chain(env: Env, admin: AsyncC
     assert set(outs) == {"V-12"}  # the core display once the budget is used up
 
 
+async def test_placeholder_context_bounds_many_plugin_displays(
+    env: Env, admin: AsyncClient
+) -> None:
+    """F6: loading the placeholder maps runs every plugin DF display before expand_placeholders
+    sets its budget; four hanging fields must share one budget, not cost 4 x 1 s."""
+    from tiqora.channels.email.placeholder import load_placeholder_context
+
+    names = [FIELD, f"{FIELD}B", f"{FIELD}C", f"{FIELD}D"]
+    for i, name in enumerate(names):
+        await _create(admin, name=name, field_order=9955 + i)
+    async with env.factory() as session:
+        for name in names:
+            await update_dynamic_field(
+                session, ticket_id=TICKET, field_name=name, values=["V-12"], user_id=1
+            )
+        await session.commit()
+    points_behaviour().MODE["df.display"] = "hang"
+    started = time.monotonic()
+    async with env.factory() as session:
+        ctx = await load_placeholder_context(session, ticket_id=TICKET, user_id=1)
+    assert time.monotonic() - started < 3.2  # budget 2 s; 4 x 1 s without it
+    values = {k: v for k, v in ctx.ticket.items() if k.startswith("dynamicfield_pp55vertrag")}
+    assert {values[f"dynamicfield_{n.lower()}_value"] for n in names} == {"V-12"}
+
+
 # -- registration --------------------------------------------------------------------------------
 
 

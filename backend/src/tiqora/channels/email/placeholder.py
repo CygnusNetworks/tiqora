@@ -33,7 +33,11 @@ from tiqora.domain.settings_store import get_setting_bool
 from tiqora.domain.timezones import format_in_zone, resolve_user_time_zone
 from tiqora.plugins.calls import PluginCallBudget
 from tiqora.plugins.df_types import display_value_bounded
-from tiqora.plugins.placeholders import EXPAND_BUDGET_SECONDS, current_scope_budget
+from tiqora.plugins.placeholders import (
+    EXPAND_BUDGET_SECONDS,
+    current_scope_budget,
+    placeholder_budget_scope,
+)
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -398,15 +402,19 @@ async def _fetch_ticket_df_entries(session: AsyncSession, ticket_id: int) -> dic
     }
     values = await get_df_values_bulk(session, [f for f, _ in fields.values()], [ticket_id])
     out: dict[str, str] = {}
-    for field_id, (df, raw_config) in fields.items():
-        stored = [v for v in values.get((field_id, ticket_id), []) if v != ""]
-        if not stored:
-            continue
-        key = f"dynamicfield_{df.name.lower()}"
-        out[key] = df_readable_value(df.field_type, stored)
-        out[f"{key}_value"] = await display_value_bounded(
-            df.field_type, config_from_yaml(raw_config), stored
-        )
+    # Plugin DF displays (1 s each) share one budget: this runs before expand_placeholders sets
+    # its own, so N plugin fields would otherwise cost N x 1 s per expansion (F6). Inside a
+    # caller's scope (template list, notifications) the outer budget is joined.
+    with placeholder_budget_scope(EXPAND_BUDGET_SECONDS):
+        for field_id, (df, raw_config) in fields.items():
+            stored = [v for v in values.get((field_id, ticket_id), []) if v != ""]
+            if not stored:
+                continue
+            key = f"dynamicfield_{df.name.lower()}"
+            out[key] = df_readable_value(df.field_type, stored)
+            out[f"{key}_value"] = await display_value_bounded(
+                df.field_type, config_from_yaml(raw_config), stored
+            )
     return out
 
 

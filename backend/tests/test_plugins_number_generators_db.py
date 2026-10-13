@@ -387,6 +387,26 @@ def _znuny_generator(monkeypatch: pytest.MonkeyPatch, full_name: str) -> None:
     monkeypatch.setattr(SysConfig, "ticket_number_generator", fake)
 
 
+async def test_admin_examples_are_built_in_parallel(
+    env: Env, admin: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F6: the examples share one wait (each capped at 1 s), not N x 1 s in a row."""
+    import asyncio
+
+    from tiqora.api.v1.admin import plugins as admin_plugins
+
+    async def slow_example(gen: Any, **kwargs: Any) -> str:
+        await asyncio.sleep(0.4)
+        return "EX-1"
+
+    _znuny_generator(monkeypatch, ZNUNY_AUTO)
+    monkeypatch.setattr(admin_plugins, "build_example", slow_example)
+    started = time.monotonic()
+    body = (await admin.get(BASE)).json()
+    assert time.monotonic() - started < 0.9  # three generators: 1.2 s one after the other
+    assert [a["example"] for a in body["available"]] == ["EX-1", "EX-1", "EX-1"]
+
+
 async def test_admin_endpoints(
     env: Env, admin: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

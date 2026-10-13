@@ -6,6 +6,7 @@ mode), the database rows of all process roles and this process's registry.
 
 from __future__ import annotations
 
+import asyncio
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from typing import Final, Literal
@@ -343,17 +344,18 @@ async def _number_generators_out(session: AsyncSession) -> NumberGeneratorsOut:
     znuny = generator_short_name(await sysconfig.ticket_number_generator())
     system_id = await sysconfig.system_id()
     active = await active_generator_in(session)
-    available = [
-        NumberGeneratorOut(
-            key=gen.key,
-            label=gen.label,
-            plugin_id=gen.plugin_id,
-            example=await build_example(gen, system_id=system_id),
-        )
+    generators = [
+        gen
         for gen in sorted(
             get_registry().items(TICKET_NUMBER_GENERATORS), key=lambda g: (g.label.lower(), g.key)
         )
         if is_active(gen.plugin_id)
+    ]
+    # In parallel: each example is capped at 1 s, so the page takes ~1 s, not N x 1 s.
+    examples = await asyncio.gather(*(build_example(g, system_id=system_id) for g in generators))
+    available = [
+        NumberGeneratorOut(key=gen.key, label=gen.label, plugin_id=gen.plugin_id, example=example)
+        for gen, example in zip(generators, examples, strict=True)
     ]
     return NumberGeneratorsOut(
         active=active.key if active is not None else None,
