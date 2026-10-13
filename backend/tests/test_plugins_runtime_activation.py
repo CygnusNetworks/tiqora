@@ -31,18 +31,21 @@ from tiqora.api.app import create_app
 from tiqora.api.deps import get_db
 from tiqora.api.v1.admin.deps import get_admin_user
 from tiqora.config import Settings
-from tiqora.db.tiqora.models import TiqoraPlugin, TiqoraPluginPackage
+from tiqora.db.tiqora.models import TiqoraPlugin, TiqoraPluginPackage, TiqoraProcess
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.extensions import set_registry_for_tests
 from tiqora.plugins import packages_store
+from tiqora.plugins import restart as restart_mod
 from tiqora.plugins.bootstrap import init_registry
 from tiqora.plugins.discovery import clear_discovery_cache, discover_plugins
 from tiqora.plugins.inspect import PackageReport
 from tiqora.plugins.package import read_tqplugin
+from tiqora.plugins.restart import register_process, utcnow
 from tiqora.plugins.runtime import (
     MISSING_PACKAGE_TEXT,
     NEXT_START_TEXT,
     activate_runtime_plugins,
+    gc_runtime_dirs_at_boot,
     image_plugin_ids,
     materialize,
     reset_dir_status_cache,
@@ -421,3 +424,61 @@ async def test_admin_list_after_update_without_restart(
     assert [p for p in sys.path if p.startswith(root)] == [str(first.site_dirs[PID])]
     row = await _row(factory)
     assert row.source == "upload" and row.package_sha256 == sha2 and row.version == "1.1.0"
+
+
+async def test_boot_collects_stale_runtime_dirs(
+    factory: async_sessionmaker[AsyncSession],
+    rt_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    """F8/D9: a booting process removes old version dirs, keeps what is installed or in use."""
+    data, sha = _package(tmp_path)
+    await _install_row(factory, sha, data=data)
+    root = Path(rt_settings.plugins_dir)
+    stale = root / PID / "0.9.0-aaaaaaaaaaaa" / "site"
+    in_use = root / PID / "0.8.0-cccccccccccc" / "site"
+    gone = root / "org.example.gone" / "1.0.0-bbbbbbbbbbbb" / "site"
+    old_tmp = root / ".tmp-old"
+    for path in (stale, in_use, gone, old_tmp):
+        path.mkdir(parents=True)
+    os.utime(old_tmp, (1_000_000, 1_000_000))
+    host = "gc-test.example.org"
+    await register_process(
+        factory,
+        "worker",
+        now=utcnow(),
+        hostname=host,
+        pid=7,
+        loaded_packages=[f"{PID}@cccccccccccc"],
+    )
+    try:
+        await init_registry(role="api", settings=rt_settings, session_factory=factory)
+    finally:
+        async with factory() as s:
+            await s.execute(delete(TiqoraProcess).where(TiqoraProcess.hostname == host))
+            await s.commit()
+    assert (version_dir(rt_settings, PID, "1.0.0", sha) / "COMPLETE").exists()
+    assert in_use.exists()  # a live worker still has it on sys.path
+    assert not stale.parent.exists()
+    assert not gone.parent.parent.exists()
+    assert not old_tmp.exists()
+
+
+async def test_boot_gc_waits_while_a_plugin_job_runs(
+    factory: async_sessionmaker[AsyncSession],
+    rt_settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An install may have unpacked a dir its plugin row does not name yet."""
+    fresh = Path(rt_settings.plugins_dir) / "org.example.fresh" / "1.0.0-dddddddddddd" / "site"
+    fresh.mkdir(parents=True)
+
+    async def busy(_session: AsyncSession) -> bool:
+        return True
+
+    monkeypatch.setattr(restart_mod, "plugin_job_active", busy)
+    assert await gc_runtime_dirs_at_boot(rt_settings, factory) == 0
+    assert fresh.exists()
+    monkeypatch.undo()
+    assert await gc_runtime_dirs_at_boot(rt_settings, factory) >= 1
+    assert not fresh.exists()

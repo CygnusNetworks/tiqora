@@ -215,6 +215,47 @@ def gc_runtime_dirs(settings: Settings, keep: Mapping[str, Sequence[str]]) -> in
     return removed
 
 
+async def gc_runtime_dirs_at_boot(
+    settings: Settings, factory: async_sessionmaker[AsyncSession]
+) -> int:
+    """F8/D9: at boot, remove the version dirs nobody needs any more.
+
+    Kept: the current and the previously installed package of every installed runtime plugin
+    (``keep_shas``), every ``id@sha`` a live process reported (``tiqora_process``) and what
+    this process has on ``sys.path``. Nothing is removed while a plugins-lane job is queued
+    or running: an install may have unpacked a directory its plugin row does not name yet.
+    Best effort: any error is logged and ignored, the boot goes on.
+    """
+    from tiqora.plugins import packages_store, restart
+
+    if not settings.plugins_dir or not plugins_dir_status(settings).writable:
+        return 0
+    try:
+        async with factory() as session:
+            if await restart.plugin_job_active(session):
+                await session.rollback()
+                log.info("plugin_runtime_gc_skipped", reason="plugin job active")
+                return 0
+            keep = await packages_store.keep_shas(session)
+            live = await restart.live_loaded_packages(session, now=restart.utcnow())
+            await session.rollback()
+        wanted: dict[str, set[str]] = {pid: set(shas) for pid, shas in keep.items()}
+        for pid, shas in live.items():
+            wanted.setdefault(pid, set()).update(shas)
+        for entry in restart.loaded_packages_from_sys_path(settings.plugins_dir):
+            pid, _, sha = entry.partition("@")
+            wanted.setdefault(pid, set()).add(sha)
+        removed = await asyncio.to_thread(
+            gc_runtime_dirs, settings, {pid: sorted(shas) for pid, shas in wanted.items()}
+        )
+    except Exception as exc:  # noqa: BLE001 - cleanup must never stop a boot
+        log.warning("plugin_runtime_gc_failed", error=f"{type(exc).__name__}: {exc}"[:300])
+        return 0
+    if removed:
+        log.info("plugin_runtime_gc", removed=removed)
+    return removed
+
+
 # --- activation (D5, F1) --------------------------------------------------------------------
 
 MISSING_PACKAGE_TEXT: Final = "Paketdateien fehlen – bitte erneut installieren"

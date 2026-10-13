@@ -34,7 +34,11 @@ from tiqora.plugins.loader import (
 )
 from tiqora.plugins.migrations import MIGRATION_PENDING_MESSAGE, migrations_dir
 from tiqora.plugins.registrar import RegistrationRejected
-from tiqora.plugins.runtime import RuntimeActivation, activate_runtime_plugins
+from tiqora.plugins.runtime import (
+    RuntimeActivation,
+    activate_runtime_plugins,
+    gc_runtime_dirs_at_boot,
+)
 from tiqora.plugins.state import (
     QUARANTINE_AFTER,
     PluginLoadResult,
@@ -284,6 +288,8 @@ async def _load_plugins(
     activation = await activate_runtime_plugins(
         settings, factory, materialize=True, status_only=status_only
     )
+    if not status_only:  # F8/D9: only a booting process collects old runtime dirs
+        await gc_runtime_dirs_at_boot(settings, factory)
     plugins: Sequence[DiscoveredPlugin] = discovered_plugins()
     plugins = [*plugins, *await _activation_problem_entries(factory, activation, plugins)]
     if not plugins:
