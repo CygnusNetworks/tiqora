@@ -25,6 +25,20 @@ def _toml_value(v: Any) -> str:
     return str(v)
 
 
+def apply_manifest_overrides(path: Path, overrides: Mapping[str, Any]) -> None:
+    """Rewrite a fixture ``tiqora-plugin.toml`` with top-level keys / tables replaced."""
+    data = tomllib.loads(path.read_text())
+    top = {k: v for k, v in data.items() if not isinstance(v, dict)}
+    top.update({k: v for k, v in overrides.items() if not isinstance(v, dict)})
+    tables = {k: v for k, v in data.items() if isinstance(v, dict)}
+    tables.update({k: v for k, v in overrides.items() if isinstance(v, dict)})
+    lines = [f"{k} = {_toml_value(v)}" for k, v in top.items()]
+    for name, table in tables.items():
+        lines.append(f"[{name}]")
+        lines.extend(f'"{k}" = {_toml_value(v)}' for k, v in table.items())
+    path.write_text("\n".join(lines) + "\n")
+
+
 def install_fixture_plugin(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -45,17 +59,7 @@ def install_fixture_plugin(
     for rel in drop:
         (pkg_dir / rel).unlink()
     if manifest_overrides:
-        path = pkg_dir / "tiqora-plugin.toml"
-        data = tomllib.loads(path.read_text())
-        top = {k: v for k, v in data.items() if not isinstance(v, dict)}
-        top.update({k: v for k, v in manifest_overrides.items() if not isinstance(v, dict)})
-        tables = {k: v for k, v in data.items() if isinstance(v, dict)}
-        tables.update({k: v for k, v in manifest_overrides.items() if isinstance(v, dict)})
-        lines = [f"{k} = {_toml_value(v)}" for k, v in top.items()]
-        for name, table in tables.items():
-            lines.append(f"[{name}]")
-            lines.extend(f'"{k}" = {_toml_value(v)}' for k, v in table.items())
-        path.write_text("\n".join(lines) + "\n")
+        apply_manifest_overrides(pkg_dir / "tiqora-plugin.toml", manifest_overrides)
     dist = dist_name or package.replace("_", "-")
     info = site / f"{dist.replace('-', '_')}-{version}.dist-info"
     info.mkdir()
