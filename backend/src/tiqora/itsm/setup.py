@@ -19,7 +19,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Final, Literal
 
-from sqlalchemy import select
+from sqlalchemy import bindparam, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.legacy.dynamic_field import DynamicField
@@ -284,3 +284,21 @@ async def _next_field_order(session: AsyncSession) -> int:
 
     top = (await session.execute(select(func.max(DynamicField.field_order)))).scalar_one_or_none()
     return int(top or 0) + 1
+
+
+async def setup_complete(session: AsyncSession, cfg: ItsmSettings) -> bool:
+    """The types, the workaround state and the two matrix fields exist and are valid."""
+
+    async def present(table: str, names: set[str]) -> bool:
+        stmt = text(f"SELECT name FROM {table} WHERE valid_id = 1 AND name IN :n").bindparams(  # noqa: S608
+            bindparam("n", expanding=True)
+        )
+        found = {str(r[0]) for r in (await session.execute(stmt, {"n": sorted(names)})).all()}
+        return names <= found
+
+    types = {cfg.incident_type, cfg.major_incident_type, cfg.service_request_type, cfg.problem_type}
+    return (
+        await present("ticket_type", types)
+        and await present("ticket_state", {cfg.workaround_state})
+        and await present("dynamic_field", {cfg.criticality_field, cfg.impact_field})
+    )

@@ -414,6 +414,9 @@ DynamicFieldScreen = Literal[
     "AgentTicketPhoneOutbound",
     # Znuny's "Freie Felder": which fields are editable in the ticket zoom.
     "AgentTicketFreeText",
+    # Znuny ITSM dialogs; without the packages Tiqora uses their shipped field lists.
+    "AgentTicketAddtlITSMField",
+    "AgentTicketDecision",
 ]
 _EDITABLE_DF_TYPES = frozenset(
     {"Text", "TextArea", "Dropdown", "Multiselect", "Checkbox", "Date", "DateTime"}
@@ -438,17 +441,10 @@ async def screen_dynamic_fields(
     _ = user
     from tiqora.db.legacy.dynamic_field import DynamicField
     from tiqora.domain.dynamic_field_config import config_from_yaml
+    from tiqora.itsm.summary import ITSM_SCREEN_DEFAULTS, screen_field_levels
 
-    raw = await SysConfig(session).get(f"Ticket::Frontend::{screen}###DynamicField", {})
-    configured: dict[str, int] = {}
-    if isinstance(raw, dict):
-        for name, value in raw.items():
-            try:
-                level = int(value)
-            except (TypeError, ValueError):
-                continue
-            if level > 0:
-                configured[str(name)] = level
+    itsm_screen = screen in ITSM_SCREEN_DEFAULTS
+    configured = await screen_field_levels(session, screen)
 
     if not configured:
         return []
@@ -460,7 +456,8 @@ async def screen_dynamic_fields(
                     DynamicField.name.in_(list(configured)),
                     DynamicField.valid_id == _VALID,
                     DynamicField.object_type == "Ticket",
-                    DynamicField.internal_field == 0,
+                    # the Znuny ITSM packages ship their fields as internal
+                    *([] if itsm_screen else [DynamicField.internal_field == 0]),
                 )
                 .order_by(DynamicField.field_order, DynamicField.name)
             )

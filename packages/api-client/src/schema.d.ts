@@ -11158,6 +11158,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/itsm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ticket Itsm
+         * @description What the ticket zoom shows about the ITSM side. No gate: while ITSM is off or not set up
+         *     the answer is ``enabled=false``. Needs ``ro`` on the ticket (404 otherwise).
+         */
+        get: operations["get_ticket_itsm_api_v1_tickets__ticket_id__itsm_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/link-graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ticket Link Graph
+         * @description Linked tickets (and CIs while ITSM is on) around the ticket. No gate. Tickets and CIs the
+         *     caller may not read are left out; 404 when the ticket itself is not readable.
+         */
+        get: operations["get_ticket_link_graph_api_v1_tickets__ticket_id__link_graph_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/linked-articles": {
         parameters: {
             query?: never;
@@ -18482,6 +18524,57 @@ export interface components {
             /** Supported */
             supported: boolean;
         };
+        /** LinkGraphEdgeOut */
+        LinkGraphEdgeOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "ticket_ticket" | "ticket_ci";
+            /** Link Type */
+            link_type: string;
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+        };
+        /** LinkGraphNodeOut */
+        LinkGraphNodeOut: {
+            /** Class Name */
+            class_name: string | null;
+            /** Depth */
+            depth: number;
+            /** Incident Functionality */
+            incident_functionality: string | null;
+            /** Incident State */
+            incident_state: string | null;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "ticket" | "ci";
+            /** Number */
+            number: string;
+            /** State */
+            state: string | null;
+            /** State Type */
+            state_type: string | null;
+            /** Title */
+            title: string;
+        };
+        /** LinkGraphOut */
+        LinkGraphOut: {
+            /** Edges */
+            edges: components["schemas"]["LinkGraphEdgeOut"][];
+            /** Nodes */
+            nodes: components["schemas"]["LinkGraphNodeOut"][];
+            /** Root */
+            root: string;
+            /** Truncated */
+            truncated: boolean;
+        };
         /** LinkTypeCreateIn */
         LinkTypeCreateIn: {
             /** Name */
@@ -19240,6 +19333,25 @@ export interface components {
             security?: ("none" | "starttls" | "ssl") | null;
             /** Timeout Seconds */
             timeout_seconds?: number | null;
+        };
+        /**
+         * MajorBannerOut
+         * @description An active major incident the ticket is linked to (and the caller may read).
+         */
+        MajorBannerOut: {
+            /**
+             * Declared At
+             * Format: date-time
+             */
+            declared_at: string;
+            /** Summary */
+            summary: string | null;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
         };
         /** MajorIncidentDeclareIn */
         MajorIncidentDeclareIn: {
@@ -20982,6 +21094,17 @@ export interface components {
             ticket_id: number;
             /** Workaround */
             workaround: string | null;
+        };
+        /** ProblemRefOut */
+        ProblemRefOut: {
+            /** Known Error */
+            known_error: boolean;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
         };
         /**
          * ProcessActivityOut
@@ -24642,6 +24765,42 @@ export interface components {
         TicketFilterCountOut: {
             /** Count */
             count: number;
+        };
+        /** TicketItsmDialogsOut */
+        TicketItsmDialogsOut: {
+            /** Decision */
+            decision: boolean;
+            /** Itsm Fields */
+            itsm_fields: boolean;
+        };
+        /**
+         * TicketItsmOut
+         * @description ``GET /tickets/{id}/itsm``: ``enabled=false`` while ITSM is off or not set up.
+         */
+        TicketItsmOut: {
+            /** Ci Count */
+            ci_count: number | null;
+            /** Criticality */
+            criticality: string | null;
+            dialogs: components["schemas"]["TicketItsmDialogsOut"];
+            /** Enabled */
+            enabled: boolean;
+            /** Impact */
+            impact: string | null;
+            major_banner: components["schemas"]["MajorBannerOut"] | null;
+            major_incident: components["schemas"]["MajorIncidentOut"] | null;
+            /** Matrix Priority Id */
+            matrix_priority_id: number | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "off" | "znuny_readthrough" | "tiqora";
+            problem: components["schemas"]["ProblemRefOut"] | null;
+            recent_incident: components["schemas"]["RecentIncidentOut"] | null;
+            /** Role */
+            role: ("incident" | "major_incident" | "service_request" | "problem" | "change" | "change_task") | null;
+            service: components["schemas"]["ServiceItsmOut"] | null;
         };
         /** TicketLinkCreateRequest */
         TicketLinkCreateRequest: {
@@ -48902,7 +49061,7 @@ export interface operations {
         parameters: {
             query: {
                 /** @description Znuny frontend module */
-                screen: "AgentTicketPhone" | "AgentTicketPhoneInbound" | "AgentTicketPhoneOutbound" | "AgentTicketFreeText";
+                screen: "AgentTicketPhone" | "AgentTicketPhoneInbound" | "AgentTicketPhoneOutbound" | "AgentTicketFreeText" | "AgentTicketAddtlITSMField" | "AgentTicketDecision";
             };
             header?: {
                 authorization?: string | null;
@@ -53440,6 +53599,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HistoryEntry"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ticket_itsm_api_v1_tickets__ticket_id__itsm_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketItsmOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ticket_link_graph_api_v1_tickets__ticket_id__link_graph_get: {
+        parameters: {
+            query?: {
+                /** @description Hops from the ticket */
+                depth?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkGraphOut"];
                 };
             };
             /** @description Validation Error */

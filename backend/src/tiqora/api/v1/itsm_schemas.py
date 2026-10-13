@@ -356,3 +356,81 @@ class MajorIncidentOut(BaseModel):
 class MajorIncidentUpdateOut(BaseModel):
     update: MajorTimelineEntryOut
     job_id: int | None = None
+
+
+# --- ticket ITSM summary and link graph (Task 21) ------------------------------------------
+
+
+class ProblemRefOut(BaseModel):
+    ticket_id: int
+    tn: str
+    title: str
+    known_error: bool
+
+
+class MajorBannerOut(BaseModel):
+    """An active major incident the ticket is linked to (and the caller may read)."""
+
+    ticket_id: int
+    tn: str
+    title: str
+    summary: str | None
+    declared_at: UtcDateTime
+
+
+class TicketItsmDialogsOut(BaseModel):
+    #: ``AgentTicketAddtlITSMField`` has at least one configured, usable field
+    itsm_fields: bool
+    #: ``AgentTicketDecision`` has at least one configured, usable field
+    decision: bool
+
+
+class TicketItsmOut(BaseModel):
+    """``GET /tickets/{id}/itsm``: ``enabled=false`` while ITSM is off or not set up."""
+
+    enabled: bool
+    mode: Literal["off", "znuny_readthrough", "tiqora"]
+    role: (
+        Literal["incident", "major_incident", "service_request", "problem", "change", "change_task"]
+        | None
+    )
+    criticality: str | None
+    impact: str | None
+    matrix_priority_id: int | None
+    service: ServiceItsmOut | None
+    major_incident: MajorIncidentOut | None
+    major_banner: MajorBannerOut | None
+    problem: ProblemRefOut | None
+    #: ``None`` while no CI provider serves
+    ci_count: int | None
+    recent_incident: RecentIncidentOut | None
+    dialogs: TicketItsmDialogsOut
+
+
+class LinkGraphNodeOut(BaseModel):
+    #: ``ticket:123`` or the CI reference form ``znuny:45``
+    key: str
+    kind: Literal["ticket", "ci"]
+    depth: int
+    number: str
+    title: str
+    state: str | None
+    state_type: str | None
+    class_name: str | None
+    incident_state: str | None
+    incident_functionality: str | None
+
+
+class LinkGraphEdgeOut(BaseModel):
+    source: str
+    target: str
+    link_type: str
+    kind: Literal["ticket_ticket", "ticket_ci"]
+
+
+class LinkGraphOut(BaseModel):
+    root: str
+    nodes: list[LinkGraphNodeOut]
+    edges: list[LinkGraphEdgeOut]
+    #: the node cap was hit; some linked tickets or CIs are not shown
+    truncated: bool

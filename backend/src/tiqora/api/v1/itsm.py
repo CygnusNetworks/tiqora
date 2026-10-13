@@ -27,7 +27,11 @@ from tiqora.api.v1.itsm_schemas import (
     ItsmStatusOut,
     ItsmZnunyInfoOut,
     LinkedArticlesIn,
+    LinkGraphEdgeOut,
+    LinkGraphNodeOut,
+    LinkGraphOut,
     LinkTypeOptionOut,
+    MajorBannerOut,
     MajorIncidentDeclareIn,
     MajorIncidentOut,
     MajorIncidentUpdateIn,
@@ -38,9 +42,12 @@ from tiqora.api.v1.itsm_schemas import (
     ProblemIn,
     ProblemIncidentsIn,
     ProblemOut,
+    ProblemRefOut,
     RecentIncidentOut,
     ServiceIncidentStateOut,
     ServiceItsmOut,
+    TicketItsmDialogsOut,
+    TicketItsmOut,
     incident_state_out,
     matrix_out,
     service_out,
@@ -63,6 +70,7 @@ from tiqora.itsm.ci_provider import (
     CiUnavailable,
     CiVersionInfo,
 )
+from tiqora.itsm.link_graph import TicketNotReadable, link_graph
 from tiqora.itsm.link_types import LinkPair, offered_link_types
 from tiqora.itsm.linked_articles import (
     LinkedArticlesPayload,
@@ -99,6 +107,8 @@ from tiqora.itsm.services import (
     service_info,
 )
 from tiqora.itsm.settings import ItsmSettings, load_itsm_settings
+from tiqora.itsm.setup import setup_complete
+from tiqora.itsm.summary import ticket_itsm_summary
 from tiqora.jobs.schemas import JobAccepted
 from tiqora.kb.service import KbService
 from tiqora.permissions.engine import PermissionEngine
@@ -281,24 +291,6 @@ async def _readable_tickets(
     return out
 
 
-async def _setup_complete(session: AsyncSession, cfg: ItsmSettings) -> bool:
-    """The types, the workaround state and the two matrix fields exist and are valid."""
-
-    async def present(table: str, names: set[str]) -> bool:
-        stmt = text(f"SELECT name FROM {table} WHERE valid_id = 1 AND name IN :n").bindparams(  # noqa: S608
-            bindparam("n", expanding=True)
-        )
-        found = {str(r[0]) for r in (await session.execute(stmt, {"n": sorted(names)})).all()}
-        return names <= found
-
-    types = {cfg.incident_type, cfg.major_incident_type, cfg.service_request_type, cfg.problem_type}
-    return (
-        await present("ticket_type", types)
-        and await present("ticket_state", {cfg.workaround_state})
-        and await present("dynamic_field", {cfg.criticality_field, cfg.impact_field})
-    )
-
-
 async def _status(session: AsyncSession, state: ItsmModeState, cfg: ItsmSettings) -> ItsmStatusOut:
     provider = get_ci_provider(state.mode, SysConfig(session)) if state.mode != "off" else None
     unavailable: str | None = None
@@ -323,7 +315,7 @@ async def _status(session: AsyncSession, state: ItsmModeState, cfg: ItsmSettings
             profile=info.profile,
             packages=dict(info.packages),
         ),
-        setup_complete=await _setup_complete(session, cfg),
+        setup_complete=await setup_complete(session, cfg),
     )
 
 
@@ -909,4 +901,97 @@ async def get_recent_incident(
         created_at=found.created_at,
         minutes_ago=found.minutes_ago,
         window_minutes=found.window_minutes,
+    )
+
+
+# --- ticket ITSM summary and link graph (Task 21) ------------------------------------------
+
+
+@ticket_router.get("/{ticket_id}/itsm", response_model=TicketItsmOut)
+async def get_ticket_itsm(
+    ticket_id: int, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> TicketItsmOut:
+    """What the ticket zoom shows about the ITSM side. No gate: while ITSM is off or not set up
+    the answer is ``enabled=false``. Needs ``ro`` on the ticket (404 otherwise)."""
+    cfg = await load_itsm_settings(session, settings)
+    try:
+        s = await ticket_itsm_summary(session, ticket_id, user_id=user.id, cfg=cfg)
+    except TicketNotReadable:
+        _refuse("ticket_not_found", status.HTTP_404_NOT_FOUND)
+    banner = s.major_banner
+    problem = s.problem
+    recent = s.recent_incident
+    return TicketItsmOut(
+        enabled=s.enabled,
+        mode=s.mode,
+        role=s.role,
+        criticality=s.criticality,
+        impact=s.impact,
+        matrix_priority_id=s.matrix_priority_id,
+        service=None
+        if s.service is None
+        else service_out(s.service, default_minutes=cfg.min_minutes_between_incidents),
+        major_incident=None if s.major_incident is None else _major_out(s.major_incident),
+        major_banner=None if banner is None else MajorBannerOut.model_validate(banner.model_dump()),
+        problem=None
+        if problem is None
+        else ProblemRefOut(
+            ticket_id=problem.ticket_id,
+            tn=problem.tn,
+            title=problem.title,
+            known_error=problem.known_error,
+        ),
+        ci_count=s.ci_count,
+        recent_incident=None
+        if recent is None
+        else RecentIncidentOut(
+            ticket_id=recent.ticket_id,
+            tn=recent.tn,
+            title=recent.title,
+            type_name=recent.type_name,
+            created_at=recent.created_at,
+            minutes_ago=recent.minutes_ago,
+            window_minutes=recent.window_minutes,
+        ),
+        dialogs=TicketItsmDialogsOut(
+            itsm_fields=s.dialogs.itsm_fields, decision=s.dialogs.decision
+        ),
+    )
+
+
+@ticket_router.get("/{ticket_id}/link-graph", response_model=LinkGraphOut)
+async def get_ticket_link_graph(
+    ticket_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    depth: Annotated[int, Query(ge=1, le=3, description="Hops from the ticket")] = 2,
+) -> LinkGraphOut:
+    """Linked tickets (and CIs while ITSM is on) around the ticket. No gate. Tickets and CIs the
+    caller may not read are left out; 404 when the ticket itself is not readable."""
+    try:
+        graph = await link_graph(session, ticket_id, user_id=user.id, depth=depth)
+    except TicketNotReadable:
+        _refuse("ticket_not_found", status.HTTP_404_NOT_FOUND)
+    return LinkGraphOut(
+        root=graph.root,
+        nodes=[
+            LinkGraphNodeOut(
+                key=n.key,
+                kind=n.kind,
+                depth=n.depth,
+                number=n.number,
+                title=n.title,
+                state=n.state,
+                state_type=n.state_type,
+                class_name=n.class_name,
+                incident_state=n.incident_state,
+                incident_functionality=n.incident_functionality,
+            )
+            for n in graph.nodes
+        ],
+        edges=[
+            LinkGraphEdgeOut(source=e.source, target=e.target, link_type=e.link_type, kind=e.kind)
+            for e in graph.edges
+        ],
+        truncated=graph.truncated,
     )

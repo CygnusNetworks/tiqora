@@ -19681,6 +19681,169 @@
         "title": "LegacySchemaOut",
         "type": "object"
       },
+      "LinkGraphEdgeOut": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "ticket_ticket",
+              "ticket_ci"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "link_type": {
+            "title": "Link Type",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "target",
+          "link_type",
+          "kind"
+        ],
+        "title": "LinkGraphEdgeOut",
+        "type": "object"
+      },
+      "LinkGraphNodeOut": {
+        "properties": {
+          "class_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Name"
+          },
+          "depth": {
+            "title": "Depth",
+            "type": "integer"
+          },
+          "incident_functionality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incident Functionality"
+          },
+          "incident_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incident State"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "ticket",
+              "ci"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "state_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Type"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "depth",
+          "number",
+          "title",
+          "state",
+          "state_type",
+          "class_name",
+          "incident_state",
+          "incident_functionality"
+        ],
+        "title": "LinkGraphNodeOut",
+        "type": "object"
+      },
+      "LinkGraphOut": {
+        "properties": {
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/LinkGraphEdgeOut"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/LinkGraphNodeOut"
+            },
+            "title": "Nodes",
+            "type": "array"
+          },
+          "root": {
+            "title": "Root",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "root",
+          "nodes",
+          "edges",
+          "truncated"
+        ],
+        "title": "LinkGraphOut",
+        "type": "object"
+      },
       "LinkTypeCreateIn": {
         "additionalProperties": false,
         "properties": {
@@ -22117,6 +22280,48 @@
           }
         },
         "title": "MailOutboundUpdate",
+        "type": "object"
+      },
+      "MajorBannerOut": {
+        "description": "An active major incident the ticket is linked to (and the caller may read).",
+        "properties": {
+          "declared_at": {
+            "format": "date-time",
+            "title": "Declared At",
+            "type": "string"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tn": {
+            "title": "Tn",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "tn",
+          "title",
+          "summary",
+          "declared_at"
+        ],
+        "title": "MajorBannerOut",
         "type": "object"
       },
       "MajorIncidentDeclareIn": {
@@ -27158,6 +27363,34 @@
           "change_by"
         ],
         "title": "ProblemOut",
+        "type": "object"
+      },
+      "ProblemRefOut": {
+        "properties": {
+          "known_error": {
+            "title": "Known Error",
+            "type": "boolean"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tn": {
+            "title": "Tn",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "tn",
+          "title",
+          "known_error"
+        ],
+        "title": "ProblemRefOut",
         "type": "object"
       },
       "ProcessActivityOut": {
@@ -38389,6 +38622,175 @@
           "count"
         ],
         "title": "TicketFilterCountOut",
+        "type": "object"
+      },
+      "TicketItsmDialogsOut": {
+        "properties": {
+          "decision": {
+            "title": "Decision",
+            "type": "boolean"
+          },
+          "itsm_fields": {
+            "title": "Itsm Fields",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "itsm_fields",
+          "decision"
+        ],
+        "title": "TicketItsmDialogsOut",
+        "type": "object"
+      },
+      "TicketItsmOut": {
+        "description": "``GET /tickets/{id}/itsm``: ``enabled=false`` while ITSM is off or not set up.",
+        "properties": {
+          "ci_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ci Count"
+          },
+          "criticality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criticality"
+          },
+          "dialogs": {
+            "$ref": "#/components/schemas/TicketItsmDialogsOut"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "impact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Impact"
+          },
+          "major_banner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MajorBannerOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "major_incident": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MajorIncidentOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "matrix_priority_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matrix Priority Id"
+          },
+          "mode": {
+            "enum": [
+              "off",
+              "znuny_readthrough",
+              "tiqora"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProblemRefOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recent_incident": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecentIncidentOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "incident",
+                  "major_incident",
+                  "service_request",
+                  "problem",
+                  "change",
+                  "change_task"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "service": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceItsmOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "enabled",
+          "mode",
+          "role",
+          "criticality",
+          "impact",
+          "matrix_priority_id",
+          "service",
+          "major_incident",
+          "major_banner",
+          "problem",
+          "ci_count",
+          "recent_incident",
+          "dialogs"
+        ],
+        "title": "TicketItsmOut",
         "type": "object"
       },
       "TicketLinkCreateRequest": {
@@ -90689,7 +91091,9 @@
                 "AgentTicketPhone",
                 "AgentTicketPhoneInbound",
                 "AgentTicketPhoneOutbound",
-                "AgentTicketFreeText"
+                "AgentTicketFreeText",
+                "AgentTicketAddtlITSMField",
+                "AgentTicketDecision"
               ],
               "title": "Screen",
               "type": "string"
@@ -102844,6 +103248,170 @@
         "summary": "Ticket History",
         "tags": [
           "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/itsm": {
+      "get": {
+        "description": "What the ticket zoom shows about the ITSM side. No gate: while ITSM is off or not set up\nthe answer is ``enabled=false``. Needs ``ro`` on the ticket (404 otherwise).",
+        "operationId": "get_ticket_itsm_api_v1_tickets__ticket_id__itsm_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketItsmOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ticket Itsm",
+        "tags": [
+          "itsm"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/link-graph": {
+      "get": {
+        "description": "Linked tickets (and CIs while ITSM is on) around the ticket. No gate. Tickets and CIs the\ncaller may not read are left out; 404 when the ticket itself is not readable.",
+        "operationId": "get_ticket_link_graph_api_v1_tickets__ticket_id__link_graph_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Hops from the ticket",
+            "in": "query",
+            "name": "depth",
+            "required": false,
+            "schema": {
+              "default": 2,
+              "description": "Hops from the ticket",
+              "maximum": 3,
+              "minimum": 1,
+              "title": "Depth",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkGraphOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ticket Link Graph",
+        "tags": [
+          "itsm"
         ]
       }
     },
