@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
@@ -47,14 +47,18 @@ function run(over: Partial<ImportRunOut> = {}): ImportRunOut {
 
 function renderReport(r: ImportRunOut) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const tree = (x: ImportRunOut) => (
     <QueryClientProvider client={qc}>
       <I18nextProvider i18n={i18n}>
-        <ImportRunReport run={r} />
+        <ImportRunReport run={x} />
       </I18nextProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const view = render(tree(r));
+  return { ...view, rerenderRun: (x: ImportRunOut) => view.rerender(tree(x)) };
 }
+
+const CSV = { id: 3, name: "itsm-import-bericht.csv", content_type: "text/csv", size_bytes: 10 };
 
 describe("ImportRunReport", () => {
   beforeEach(async () => {
@@ -121,5 +125,28 @@ describe("ImportRunReport", () => {
     expect(screen.getAllByRole("listitem")).toHaveLength(200);
     const link = await screen.findByRole("link", { name: "Vollständiger Bericht (CSV)" });
     expect(link).toHaveAttribute("href", "/api/v1/jobs/7/files/3");
+  });
+
+  it("gains the CSV link when the run it was opened for finishes", async () => {
+    jobGet.mockReset().mockResolvedValue({ id: 7, files: [] });
+    const { rerenderRun } = renderReport(run({ job_id: 7, status: "running" }));
+    await waitFor(() => expect(jobGet).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("link", { name: "Vollständiger Bericht (CSV)" })).toBeNull();
+    jobGet.mockResolvedValue({ id: 7, files: [CSV] });
+    rerenderRun(run({ job_id: 7, status: "done" }));
+    expect(await screen.findByRole("link", { name: "Vollständiger Bericht (CSV)" })).toHaveAttribute(
+      "href",
+      "/api/v1/jobs/7/files/3",
+    );
+  });
+
+  it("links no other file of the job as the report", async () => {
+    jobGet.mockReset().mockResolvedValue({
+      id: 7,
+      files: [{ id: 4, name: "something-else.json", content_type: "application/json", size_bytes: 2 }],
+    });
+    renderReport(run({ job_id: 7 }));
+    await waitFor(() => expect(jobGet).toHaveBeenCalled());
+    expect(screen.queryByRole("link", { name: "Vollständiger Bericht (CSV)" })).toBeNull();
   });
 });

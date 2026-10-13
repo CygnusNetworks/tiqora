@@ -15,13 +15,15 @@ export function ImportRunReport({ run }: { run: ImportRunOut }) {
   const shown = run.issues.slice(0, IMPORT_ISSUE_DISPLAY_LIMIT);
 
   // The CSV lives on the job; the job may be gone (retention), then there is simply no link.
+  // Keyed on the run status: the file only appears when the run ends, so a report opened while
+  // the run was still going fetches the job again once the run list shows the new status.
   const jobQ = useQuery({
-    queryKey: ["admin", "itsm-import", "job", run.job_id],
+    queryKey: ["admin", "itsm-import", "job", run.job_id, run.status],
     queryFn: ({ signal }) => jobsApi.get(run.job_id as number, signal),
     enabled: run.job_id != null,
     retry: false,
   });
-  const csv = jobQ.data?.files.find((f) => f.name === CSV_NAME) ?? jobQ.data?.files[0];
+  const csv = jobQ.data?.files.find((f) => f.name === CSV_NAME);
 
   return (
     <div className="space-y-3" data-testid={`itsm-import-report-${run.id}`}>

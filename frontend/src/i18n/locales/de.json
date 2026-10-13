@@ -5705,8 +5705,8 @@
         "banner": "Tiqora führt das ITSM seit {{date}}.",
         "bannerBy": "Tiqora führt das ITSM seit {{date}} (umgestellt von {{name}}).",
         "bannerNoDate": "Tiqora führt das ITSM.",
-        "drift_one": "Seit der Umstellung wurde in Znuny {{count}} CI geändert. Diese Änderung ist in Tiqora nicht enthalten.",
-        "drift_other": "Seit der Umstellung wurden in Znuny {{count}} CIs geändert. Diese Änderungen sind in Tiqora nicht enthalten.",
+        "drift_one": "Seit der Umstellung wurde in Znuny {{count}} CI oder CI-Verknüpfung geändert. Diese Änderung ist in Tiqora nicht enthalten.",
+        "drift_other": "Seit der Umstellung wurden in Znuny {{count}} CIs oder CI-Verknüpfungen geändert. Diese Änderungen sind in Tiqora nicht enthalten.",
         "driftDocs": "Was jetzt?"
       },
       "rollback": {

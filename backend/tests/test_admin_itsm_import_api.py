@@ -483,6 +483,10 @@ async def test_rollback_when_not_switched_is_a_conflict(
     assert resp.json()["detail"] == "Die ITSM-Daten wurden nicht auf Tiqora umgestellt."
     wrong = await admin.client.post(f"{BASE}/rollback", json={"confirm": "x"})
     assert wrong.status_code == 400
+    # the confirm word passes the 400 check decomposed (U + U+0308) and in ASCII spelling
+    for word in ("ZURU\u0308CK", " ZURUECK "):
+        other = await admin.client.post(f"{BASE}/rollback", json={"confirm": word})
+        assert other.status_code == 409, word
 
 
 async def test_rollback_after_the_switch_returns_the_status(

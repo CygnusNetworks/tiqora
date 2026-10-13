@@ -9,6 +9,14 @@ import { itsmImportApi, itsmImportKeys } from "@/lib/itsmImportApi";
 
 /** The word the admin has to type; the API checks the same string. */
 export const ROLLBACK_CONFIRM_WORD = "ZURÜCK";
+/** Accepted as well, for keyboards without Ü (the API accepts it too). */
+export const ROLLBACK_CONFIRM_ASCII = "ZURUECK";
+
+/** The typed word as the API compares it: NFC (a pasted decomposed Ü), trimmed, ASCII spelling mapped. */
+function normaliseConfirmWord(raw: string): string {
+  const word = raw.normalize("NFC").trim();
+  return word === ROLLBACK_CONFIRM_ASCII ? ROLLBACK_CONFIRM_WORD : word;
+}
 
 /** Back from Tiqora to Znuny (Mode A). Refreshes the import status and the run list on success. */
 export function RollbackDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -17,7 +25,7 @@ export function RollbackDialog({ open, onClose }: { open: boolean; onClose: () =
   const [word, setWord] = useState("");
 
   const rollback = useMutation({
-    mutationFn: () => itsmImportApi.rollback({ confirm: word.trim() }),
+    mutationFn: () => itsmImportApi.rollback({ confirm: normaliseConfirmWord(word) }),
     onSuccess: async (status) => {
       qc.setQueryData(itsmImportKeys.status(), status);
       await qc.invalidateQueries({ queryKey: itsmImportKeys.status() });
@@ -47,7 +55,7 @@ export function RollbackDialog({ open, onClose }: { open: boolean; onClose: () =
             variant="danger"
             size="sm"
             onClick={() => rollback.mutate()}
-            disabled={word.trim() !== ROLLBACK_CONFIRM_WORD || rollback.isPending}
+            disabled={normaliseConfirmWord(word) !== ROLLBACK_CONFIRM_WORD || rollback.isPending}
             data-testid="itsm-rollback-submit"
           >
             {rollback.isPending ? <Spinner /> : t("admin.itsmImport.rollback.submit")}

@@ -93,7 +93,7 @@ export function ItsmImportPage() {
           {s.mode === "tiqora" && (
             <div className="space-y-2">
               <p
-                className="rounded-lg border border-success bg-success/10 p-3 text-sm text-ink"
+                className="rounded-lg border border-green bg-green/10 p-3 text-sm text-ink"
                 data-testid="itsm-switched-banner"
               >
                 {s.switched?.switched_at
@@ -123,9 +123,12 @@ export function ItsmImportPage() {
                   </a>
                 </p>
               )}
-              <Button variant="ghost" size="sm" onClick={() => setRollingBack(true)} data-testid="itsm-rollback-open">
-                {t("admin.itsmImport.rollback.open")}
-              </Button>
+              {/* only a switch can be rolled back; a site that started in Mode B has none */}
+              {s.switched != null && (
+                <Button variant="ghost" size="sm" onClick={() => setRollingBack(true)} data-testid="itsm-rollback-open">
+                  {t("admin.itsmImport.rollback.open")}
+                </Button>
+              )}
             </div>
           )}
 
@@ -134,7 +137,8 @@ export function ItsmImportPage() {
               {reason}
             </p>
           )}
-          {s.readonly_flag && s.mode !== "tiqora" && (
+          {/* while a job runs it owns the flag (the backend answers 409) */}
+          {s.readonly_flag && s.mode !== "tiqora" && s.active_job_id == null && (
             <div className="flex items-center gap-3">
               <Button
                 variant="secondary"
@@ -184,7 +188,7 @@ export function ItsmImportPage() {
               </Button>
             )}
           </div>
-          {inModeA && switchReason && (
+          {inModeA && switchReason && switchReason !== reason && (
             <p className="text-sm text-muted" data-testid="itsm-switch-blocked">
               {switchReason}
             </p>

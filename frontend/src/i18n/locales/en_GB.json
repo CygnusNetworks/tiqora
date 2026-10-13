@@ -5705,8 +5705,8 @@
         "banner": "Tiqora has run the ITSM since {{date}}.",
         "bannerBy": "Tiqora has run the ITSM since {{date}} (switched by {{name}}).",
         "bannerNoDate": "Tiqora runs the ITSM.",
-        "drift_one": "Since the switch, {{count}} CI was changed in Znuny. This change is not included in Tiqora.",
-        "drift_other": "Since the switch, {{count}} CIs were changed in Znuny. These changes are not included in Tiqora.",
+        "drift_one": "Since the switch, {{count}} CI or CI link was changed in Znuny. This change is not included in Tiqora.",
+        "drift_other": "Since the switch, {{count}} CIs or CI links were changed in Znuny. These changes are not included in Tiqora.",
         "driftDocs": "What now?"
       },
       "rollback": {

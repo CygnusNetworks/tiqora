@@ -54,6 +54,16 @@ describe("RollbackDialog", () => {
     expect(screen.getByTestId("itsm-rollback-submit")).toBeEnabled();
   });
 
+  it("accepts a decomposed Ü and the spelling ZURUECK, and sends ZURÜCK", async () => {
+    renderDialog();
+    type("ZURU\u0308CK");
+    expect(screen.getByTestId("itsm-rollback-submit")).toBeEnabled();
+    type(" ZURUECK ");
+    expect(screen.getByTestId("itsm-rollback-submit")).toBeEnabled();
+    fireEvent.click(screen.getByTestId("itsm-rollback-submit"));
+    await waitFor(() => expect(rollback).toHaveBeenCalledWith({ confirm: "ZURÜCK" }));
+  });
+
   it("sends the confirmation and refreshes the status and the runs", async () => {
     const { qc, invalidate } = renderDialog();
     type("ZURÜCK");

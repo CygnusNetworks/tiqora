@@ -141,6 +141,30 @@ describe("ItsmImportPage", () => {
     await waitFor(() => expect(releaseLock).toHaveBeenCalled());
   });
 
+  it("does not offer to release the lock while the switch job holds it", async () => {
+    status.mockResolvedValue(
+      statusFixture({ readonly_flag: true, active_job_id: 11, can_import: false, blocked_reason: "Es läuft bereits." }),
+    );
+    renderPage();
+    expect(await screen.findByTestId("itsm-import-blocked")).toBeInTheDocument();
+    expect(screen.queryByTestId("itsm-import-release-lock")).not.toBeInTheDocument();
+  });
+
+  it("shows a reason once when import and switch are blocked for the same reason", async () => {
+    const reason = "Ein ITSM-Import oder eine Umstellung läuft bereits.";
+    status.mockResolvedValue(statusFixture({ can_import: false, can_switch: false, blocked_reason: reason, active_job_id: 4 }));
+    renderPage();
+    expect(await screen.findByTestId("itsm-import-blocked")).toHaveTextContent(reason);
+    expect(screen.getAllByText(reason)).toHaveLength(1);
+    expect(screen.queryByTestId("itsm-switch-blocked")).not.toBeInTheDocument();
+  });
+
+  it("shows the switch reason when only the switch is blocked", async () => {
+    status.mockResolvedValue(statusFixture({ can_switch: false, blocked_reason: null }));
+    renderPage();
+    expect(await screen.findByTestId("itsm-switch-blocked")).toBeInTheDocument();
+  });
+
   it("disables the switch button with the reason when switching is not possible", async () => {
     status.mockResolvedValue(statusFixture({ can_switch: false, blocked_reason: "Es läuft bereits ein Import." }));
     renderPage();
@@ -197,11 +221,28 @@ describe("ItsmImportPage", () => {
     expect(screen.queryByTestId("itsm-drift-warning")).not.toBeInTheDocument();
   });
 
+  it("shows the switched banner in green", async () => {
+    status.mockResolvedValue(statusFixture({ ...SWITCHED, znuny_changes_since_switch: 0 }));
+    renderPage();
+    const banner = await screen.findByTestId("itsm-switched-banner");
+    expect(banner.className).toContain("border-green");
+    expect(banner.className).toContain("bg-green/10");
+  });
+
+  it("offers no rollback on a site that never switched (native Mode B)", async () => {
+    status.mockResolvedValue(
+      statusFixture({ mode: "tiqora", switched: null, can_import: false, blocked_reason: "Nicht vorhanden." }),
+    );
+    renderPage();
+    expect(await screen.findByTestId("itsm-switched-banner")).toHaveTextContent("Tiqora führt das ITSM.");
+    expect(screen.queryByTestId("itsm-rollback-open")).not.toBeInTheDocument();
+  });
+
   it("warns about CIs changed in Znuny since the switch", async () => {
     status.mockResolvedValue(statusFixture({ ...SWITCHED, znuny_changes_since_switch: 3 }));
     renderPage();
     const warn = await screen.findByTestId("itsm-drift-warning");
-    expect(warn).toHaveTextContent("Seit der Umstellung wurden in Znuny 3 CIs geändert.");
+    expect(warn).toHaveTextContent("Seit der Umstellung wurden in Znuny 3 CIs oder CI-Verknüpfungen geändert.");
     expect(warn).toHaveTextContent("Diese Änderungen sind in Tiqora nicht enthalten.");
     expect(screen.getByTestId("itsm-drift-docs").getAttribute("href")).toContain("docs/itsm.md#zurück-zu-modus-a");
   });

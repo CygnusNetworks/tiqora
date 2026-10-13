@@ -6,6 +6,7 @@ enqueue the job and return 202. The admin page polls ``GET /status`` and ``GET /
 
 from __future__ import annotations
 
+import unicodedata
 from typing import Final
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -51,6 +52,8 @@ router = APIRouter(prefix="/itsm/import", tags=["admin:itsm-import"])
 
 SWITCH_CONFIRM: Final = "UMSTELLEN"
 ROLLBACK_CONFIRM: Final = "ZURÜCK"
+#: the same word without the umlaut, for keyboards without Ü
+ROLLBACK_CONFIRM_ASCII: Final = "ZURUECK"
 RUN_NOT_FOUND: Final = "Der Lauf wurde nicht gefunden."
 DEFAULT_PAGE_SIZE: Final = 500
 
@@ -199,7 +202,11 @@ async def rollback_switch(
     body: ItsmImportRollbackIn, admin: AdminUser, session: DbSession
 ) -> ItsmImportStatusOut:
     """Back to Znuny (Mode A): two setting writes and a run row, so no job."""
-    if body.confirm != ROLLBACK_CONFIRM:
+    # NFC: a pasted or IME-typed Ü may arrive decomposed (U + combining diaeresis)
+    if unicodedata.normalize("NFC", body.confirm).strip() not in (
+        ROLLBACK_CONFIRM,
+        ROLLBACK_CONFIRM_ASCII,
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Zur Bestätigung muss „{ROLLBACK_CONFIRM}“ eingegeben werden.",
