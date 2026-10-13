@@ -16,6 +16,7 @@ from tests._cmdb_helpers import (
     USER_ADMIN,
     USER_B,
     CmdbWorld,
+    client_for,
     make_class,
     set_mode,
 )
@@ -34,6 +35,7 @@ from tiqora.cmdb.gate import (
 )
 from tiqora.cmdb.settings import CMDB_SECTION, CmdbSettings, load_cmdb_settings
 from tiqora.extensions import get_registry
+from tiqora.itsm.mode import get_itsm_mode
 from tiqora.settings_sections.section import SETTINGS_SECTIONS
 from tiqora.settings_sections.store import save_section_values
 
@@ -133,6 +135,8 @@ async def test_mode_seam_defaults_to_tiqora_and_reads_setting(cmdb_db: CmdbWorld
     set_mode(cmdb_db, "znuny_readthrough")
     async with cmdb_db.factory() as s:
         assert await current_itsm_mode(s) == "znuny_readthrough"
+        state = await get_itsm_mode(s)  # the gate is the ITSM core's resolver, nothing of its own
+        assert state.stored and state.mode == "znuny_readthrough"
         with pytest.raises(CmdbUnavailable) as e:
             await require_tiqora_cmdb(s)
     assert e.value.mode == "znuny_readthrough"
@@ -161,6 +165,11 @@ async def test_mode_seam_detects_znuny_itsm_marker_tables(cmdb_db: CmdbWorld) ->
         try:
             async with cmdb_db.factory() as s:
                 assert await current_itsm_mode(s) == "znuny_readthrough"
+                state = await get_itsm_mode(s)
+                assert not state.stored and state.detected.core_installed
+            async with client_for(cmdb_db, USER_A) as c:  # auto default Mode A: CMDB routes 409
+                r = await c.get("/api/v1/cmdb/classes")
+            assert r.status_code == 409, r.text
             set_mode(cmdb_db, "tiqora")  # a stored mode wins over detection
             async with cmdb_db.factory() as s:
                 assert await current_itsm_mode(s) == "tiqora"
@@ -174,20 +183,25 @@ async def test_mode_seam_detects_znuny_itsm_marker_tables(cmdb_db: CmdbWorld) ->
 async def test_mode_seam_caches_the_marker_table_check(
     cmdb_db: CmdbWorld, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from tiqora.cmdb import gate
+    """The ITSM core's detection is cached: gated requests do not inspect the schema each time."""
+    from tiqora.itsm.znuny_adapter import detect
 
     calls: list[int] = []
-    real = gate._znuny_itsm_installed
+    real = detect._table_flags
 
-    def counting(conn: Any) -> bool:
+    def counting(conn: Any) -> Any:
         calls.append(1)
         return real(conn)
 
-    monkeypatch.setattr(gate, "_znuny_itsm_installed", counting)
+    monkeypatch.setattr(detect, "_table_flags", counting)
     reset_mode_cache()
     for _ in range(3):
         async with cmdb_db.factory() as s:
             assert await current_itsm_mode(s) == "tiqora"
+    set_mode(cmdb_db, "tiqora")  # a stored mode needs no extra probe either
+    for _ in range(3):
+        async with cmdb_db.factory() as s:
+            await require_tiqora_cmdb(s)
     assert len(calls) == 1
     reset_mode_cache()
 
