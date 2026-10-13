@@ -32,6 +32,7 @@ from tiqora.jobs.service import count_active_jobs, enqueue_job, lock_user_job_qu
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.reporting.access import require_report_access
 from tiqora.reporting.cache import ReportCache
+from tiqora.reporting.catalogue import is_catalogue_key
 from tiqora.reporting.compiler import RunParams
 from tiqora.reporting.definition import DefinitionError, ReportDefinition, TimeRange
 from tiqora.reporting.engine import QueryBudget, estimate_rows, execute_and_store, plan_report
@@ -46,7 +47,7 @@ from tiqora.reporting.schemas import (
     ReportResultOut,
     ReportRunIn,
 )
-from tiqora.reporting.semantic import REPORT_SOURCES, ReportSource
+from tiqora.reporting.semantic import ReportSource, active_source
 from tiqora.reporting.settings import ReportingSettings
 from tiqora.reporting.sql import Grain
 from tiqora.znuny.sysconfig import SysConfig
@@ -237,7 +238,7 @@ async def prepare_ref(
         try:
             resolved = await resolve_report_ref(session, report_key, user_id, admin=admin)
         except ReportNotFound:
-            if report_key.startswith("builtin."):
+            if is_catalogue_key(report_key):
                 raise RequestError(
                     f"Unbekannter Bericht „{report_key}“.",
                     path="report_key",
@@ -257,7 +258,7 @@ async def prepare_ref(
     else:
         assert definition is not None
         defn = definition
-    source = get_registry().get(REPORT_SOURCES, defn.source)
+    source = active_source(get_registry(), defn.source)
     if source is None:
         raise DefinitionError(f"Unbekannte Datenbasis „{defn.source}“.", path="source")
     narrowing, ignored = common_filter(source, overrides.common)

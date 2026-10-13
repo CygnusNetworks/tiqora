@@ -20,6 +20,8 @@ from tiqora.plugins.sync_hooks import SYNC_HOOKS
 from tiqora.plugins.tasks import SCHEDULED_TASKS
 from tiqora.process.actions.registry import TRANSITION_ACTIONS
 from tiqora.process.condition_modules import CONDITION_MODULES
+from tiqora.reporting.catalogue import BUILTIN_REPORTS
+from tiqora.reporting.semantic import REPORT_SOURCES
 from tiqora.settings_sections.section import SETTINGS_SECTIONS
 
 EXPECTED = {
@@ -120,6 +122,15 @@ SUBMODULES: dict[str, set[str]] = {
         "Mapper",
         "MappingError",
     },
+    "tiqora_sdk.reporting": {
+        "CompileContext",
+        "Dimension",
+        "FilterOnlyField",
+        "Measure",
+        "ReportCategory",
+        "ReportDefinition",
+        "ReportSource",
+    },
     "tiqora_sdk.customers": {
         "CustomerLookup",
         "CustomerSearch",
@@ -173,6 +184,8 @@ def test_registry_protocol_matches_registrar() -> None:
             "gi_operation",
             "gi_mapping",
             "gi_invoker",
+            "report_source",
+            "builtin_report",
         }
     )
 
@@ -207,6 +220,8 @@ def test_phase1_points_are_sdk_stable() -> None:
             GI_OPERATIONS,
             GI_MAPPINGS,
             GI_INVOKERS,
+            REPORT_SOURCES,
+            BUILTIN_REPORTS,
         )
     )
     assert CHANNELS.sdk_stable is False

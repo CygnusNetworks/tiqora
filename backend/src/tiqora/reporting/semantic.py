@@ -18,9 +18,11 @@ from sqlalchemy import ColumnElement, FromClause
 
 from tiqora.extensions.registry import ExtensionPoint
 from tiqora.filters import FieldType, FilterFieldSpec
+from tiqora.plugins.state import is_active
 from tiqora.reporting.sql import TzSegment
 
 if TYPE_CHECKING:
+    from tiqora.extensions.registry import Registry
     from tiqora.reporting.definition import TimeWindow
 
 DimensionKind = Literal["id", "string", "enum", "date", "local_date", "hour", "weekday"]
@@ -182,4 +184,24 @@ REPORT_SOURCES: ExtensionPoint[ReportSource] = ExtensionPoint(
     key="core.reporting.sources",
     item_key=lambda s: s.key,
     description="Report sources (FROM clause, dimensions, measures) for the report engine.",
+    sdk_stable=True,
 )
+
+
+def owner_is_active(owner: str) -> bool:
+    """Core items always count; a plugin's items only while that plugin is loaded (D15)."""
+    return owner == "core" or is_active(owner)
+
+
+def active_source(registry: Registry, key: str) -> ReportSource | None:
+    """The source ``key`` unless it belongs to a plugin that is not active in this process."""
+    for reg in registry.registrations(REPORT_SOURCES):
+        if reg.key == key:
+            source: ReportSource = reg.item
+            return source if owner_is_active(reg.owner) else None
+    return None
+
+
+def active_sources(registry: Registry) -> list[ReportSource]:
+    """Sources in registration order, without those of inactive plugins."""
+    return [r.item for r in registry.registrations(REPORT_SOURCES) if owner_is_active(r.owner)]

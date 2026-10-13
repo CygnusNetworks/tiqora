@@ -15,7 +15,7 @@ from tiqora.domain.timezones import valid_time_zone
 from tiqora.extensions.registry import Registry
 from tiqora.filters import Filter, FilterError, validate_filter
 from tiqora.filters.catalog import MAX_IN_VALUES, MAX_STRING_LENGTH
-from tiqora.reporting.semantic import REPORT_SOURCES
+from tiqora.reporting.semantic import active_source
 from tiqora.reporting.sql import Grain
 
 if TYPE_CHECKING:
@@ -262,7 +262,7 @@ def _check_parameter(src: ReportSource, p: ReportParameter, path: str) -> None:
 
 def validate_definition(defn: ReportDefinition, registry: Registry) -> ReportSource:
     """Check ``defn`` against its source; returns the source or raises :class:`DefinitionError`."""
-    src = registry.get(REPORT_SOURCES, defn.source)
+    src = active_source(registry, defn.source)
     if src is None:
         raise DefinitionError(f"Unbekannte Datenquelle „{defn.source}“.", path="source")
 

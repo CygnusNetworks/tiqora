@@ -7,15 +7,25 @@ this module only carries the keys, so the catalogue stays language-neutral.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from tiqora.extensions.registry import ExtensionPoint
 from tiqora.reporting.definition import ReportDefinition
+from tiqora.reporting.semantic import owner_is_active
+
+if TYPE_CHECKING:
+    from tiqora.extensions.registry import Registry
 
 ReportCategory = Literal[
     "overview", "volume", "backlog", "sla", "quality", "agents", "time", "customers", "patterns"
 ]
 _PREFIX = "builtin."
+PLUGIN_PREFIX = "plugin."
+
+
+def is_catalogue_key(key: str) -> bool:
+    """``builtin.<name>`` or ``plugin.<plugin id>.<name>``: a catalogue report, not a saved one."""
+    return key.startswith((_PREFIX, PLUGIN_PREFIX))
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,17 +34,26 @@ class BuiltinReport:
     category: ReportCategory
     definition: ReportDefinition
     overview: bool = False  # shown in the overview section of /agent/reports
+    #: owning plugin; its key is ``plugin.<plugin id>.<name>`` and its texts live in the
+    #: plugin's own i18n namespace (D15)
+    plugin_id: str | None = None
 
     @property
     def name(self) -> str:
+        if self.plugin_id is not None:
+            return self.key.rsplit(".", 1)[-1]
         return self.key.removeprefix(_PREFIX)
 
     @property
     def title_key(self) -> str:
+        if self.plugin_id is not None:
+            return f"plugin.{self.plugin_id}:reports.{self.name}.title"
         return f"reports.builtin.{self.name}.title"
 
     @property
     def description_key(self) -> str:
+        if self.plugin_id is not None:
+            return f"plugin.{self.plugin_id}:reports.{self.name}.description"
         return f"reports.builtin.{self.name}.description"
 
 
@@ -42,7 +61,23 @@ BUILTIN_REPORTS: ExtensionPoint[BuiltinReport] = ExtensionPoint(
     key="core.reporting.builtin_reports",
     item_key=lambda r: r.key,
     description="Built-in reports of the report catalogue.",
+    sdk_stable=True,
 )
+
+
+def active_builtin(registry: Registry, key: str) -> BuiltinReport | None:
+    """The catalogue report ``key`` unless its plugin is not active in this process."""
+    for reg in registry.registrations(BUILTIN_REPORTS):
+        if reg.key == key:
+            report: BuiltinReport = reg.item
+            return report if owner_is_active(reg.owner) else None
+    return None
+
+
+def active_builtins(registry: Registry) -> list[BuiltinReport]:
+    """Catalogue reports in registration order, without those of inactive plugins."""
+    return [r.item for r in registry.registrations(BUILTIN_REPORTS) if owner_is_active(r.owner)]
+
 
 #: Field of the ``queues`` runtime parameter per source (every built-in is queue-scoped).
 QUEUE_PARAM_FIELD = {
@@ -94,14 +129,18 @@ def _report(
                 "dimensions": dims,
                 "measures": [{"key": m} for m in measures],
                 "filter": {"version": 1, "where": filter_where} if filter_where else None,
-                "parameters": [
-                    {
-                        "key": "queues",
-                        "field": QUEUE_PARAM_FIELD[source],
-                        "op": "in",
-                        "label_key": "reports.parameters.queues",
-                    }
-                ],
+                "parameters": (
+                    [
+                        {
+                            "key": "queues",
+                            "field": QUEUE_PARAM_FIELD[source],
+                            "op": "in",
+                            "label_key": "reports.parameters.queues",
+                        }
+                    ]
+                    if source in QUEUE_PARAM_FIELD
+                    else []
+                ),
                 "time_field": time_field,
                 "time_range": time_range,
                 "visualization": viz,

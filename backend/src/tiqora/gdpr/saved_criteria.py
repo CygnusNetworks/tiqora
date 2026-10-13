@@ -30,7 +30,7 @@ from tiqora.db.tiqora.models import (
     TiqoraSavedSearch,
 )
 from tiqora.extensions.core import get_registry
-from tiqora.reporting.catalogue import BUILTIN_REPORTS
+from tiqora.reporting.catalogue import active_builtin, is_catalogue_key
 
 #: Condition fields holding a customer login / company id, per kind of saved object.
 SEARCH_LOGIN_FIELDS: Final = frozenset({"customer_user_id"})
@@ -238,8 +238,8 @@ def _scrub_overrides(
 
 async def _parameter_fields(session: AsyncSession, report_key: str) -> dict[str, str]:
     """``{parameter key: report field}`` of a built-in or saved report (soft-deleted included)."""
-    if report_key.startswith("builtin."):
-        builtin = get_registry().get(BUILTIN_REPORTS, report_key)
+    if is_catalogue_key(report_key):
+        builtin = active_builtin(get_registry(), report_key)
         return {p.key: p.field for p in builtin.definition.parameters} if builtin else {}
     if not report_key.isdigit():
         return {}

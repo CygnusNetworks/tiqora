@@ -31,7 +31,12 @@ from tiqora.jobs.service import enqueue_job
 from tiqora.permissions.sharing import ShareGroupError
 from tiqora.reporting.access import require_report_access
 from tiqora.reporting.cache import CacheBackend, ReportCache, read_cache_generation
-from tiqora.reporting.catalogue import BUILTIN_REPORTS, BuiltinReport
+from tiqora.reporting.catalogue import (
+    BuiltinReport,
+    active_builtin,
+    active_builtins,
+    is_catalogue_key,
+)
 from tiqora.reporting.compiler import RunParams
 from tiqora.reporting.definition import DefinitionError, ReportDefinition, validate_definition
 from tiqora.reporting.engine import QueryBudget, plan_report
@@ -86,7 +91,7 @@ from tiqora.reporting.schemas import (
     SourceDimensionOut,
     SourceMeasureOut,
 )
-from tiqora.reporting.semantic import REPORT_SOURCES, ReportSource
+from tiqora.reporting.semantic import ReportSource, active_sources
 from tiqora.reporting.settings import ReportingSettings, load_reporting_settings
 from tiqora.reporting.sql import ReportQueryTimeout
 from tiqora.reporting.state import facts_status
@@ -296,7 +301,7 @@ async def list_reports(
         session, user.id, admin=rights.admin, include_others_private=all_ and rights.admin
     )
     names = await _owner_names(session, saved)
-    reports = [_builtin_out(r) for r in get_registry().items(BUILTIN_REPORTS)]
+    reports = [_builtin_out(r) for r in active_builtins(get_registry())]
     reports.extend(_saved_out(r, rights, user.id, names) for r in saved)
     return ReportCatalogueOut(reports=reports, facts=await facts_status(session))
 
@@ -501,8 +506,8 @@ async def _load_for_view(
     session: AsyncSession, user: AuthenticatedUser, reporting: ReportingSettings, report_key: str
 ) -> tuple[ReportOut, ReportRights]:
     rights = await report_rights(session, user.id, reporting)
-    if report_key.startswith("builtin."):
-        report = get_registry().get(BUILTIN_REPORTS, report_key)
+    if is_catalogue_key(report_key):
+        report = active_builtin(get_registry(), report_key)
         if report is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -613,7 +618,7 @@ async def list_sources(
 ) -> list[ReportSourceOut]:
     """Report sources with their dimensions, measures and filter fields (builder, filters)."""
     await _access(session, user, settings)
-    return [_source_out(s) for s in get_registry().items(REPORT_SOURCES)]
+    return [_source_out(s) for s in active_sources(get_registry())]
 
 
 @sources_router.get("/status", response_model=FactsStatusOut)

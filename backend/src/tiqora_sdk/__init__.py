@@ -46,6 +46,9 @@ if _t.TYPE_CHECKING:
     from tiqora.plugins.process_points import ConditionRun, TransitionActionRun
     from tiqora.plugins.sync_hooks import SyncHandler, SyncOperation
     from tiqora.process.actions.registry import ActionParam
+    from tiqora.reporting.catalogue import ReportCategory
+    from tiqora.reporting.definition import ReportDefinition
+    from tiqora.reporting.semantic import ReportSource
     from tiqora.settings_sections.section import SettingsSection
 
 __all__ = [
@@ -229,6 +232,17 @@ class PluginRegistry(_t.Protocol):
         *,
         timeout_seconds: int = 30,
     ) -> str: ...
+
+    def report_source(self, source: ReportSource) -> None: ...
+
+    def builtin_report(
+        self,
+        name: str,
+        *,
+        category: ReportCategory,
+        definition: ReportDefinition,
+        overview: bool = False,
+    ) -> None: ...
 
 
 class Plugin(_t.Protocol):

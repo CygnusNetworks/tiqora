@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import re
 from collections.abc import Mapping
 from enum import Enum
@@ -10,7 +11,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import text
+from sqlalchemy import column, table, text
 
 from tiqora_sdk import PluginRegistry
 from tiqora_sdk.auth import AuthContext, PasswordCheck
@@ -40,6 +41,13 @@ from tiqora_sdk.mail import (
 )
 from tiqora_sdk.notifications import NotificationMessage, TransportContext
 from tiqora_sdk.process import ActionContext
+from tiqora_sdk.reporting import (
+    CompileContext,
+    Dimension,
+    Measure,
+    ReportDefinition,
+    ReportSource,
+)
 from tiqora_sdk.templates import NumberRequest, PlaceholderRequest
 from tiqora_sdk.tickets import PluginWriteError
 
@@ -582,6 +590,92 @@ def _register_gi(registry: PluginRegistry) -> None:
     )
 
 
+_LABELS = "plugin.org.example.points:reports"
+_ARTICLE = table("article", column("id"), column("ticket_id"), column("communication_channel_id"))
+_TICKET = table("ticket", column("id"), column("queue_id"))
+
+
+def _channel_dimension() -> Dimension:
+    return Dimension(
+        key="channel",
+        label_key=f"{_LABELS}.dimensions.channel",
+        kind="id",
+        expr=lambda ctx: _ARTICLE.c.communication_channel_id,
+    )
+
+
+def _count_measure() -> Measure:
+    return Measure(key="count", label_key=f"{_LABELS}.measures.count", agg="count")
+
+
+def _source(key: str, from_table: Any, ticket_join: Any = None) -> ReportSource:
+    def from_clause(ctx: CompileContext) -> Any:
+        return from_table if ticket_join is None else from_table.join(_TICKET, ticket_join)
+
+    return ReportSource(
+        key=key,
+        label_key=f"{_LABELS}.sources.{key.rsplit('.', 1)[-1]}",
+        from_clause=from_clause,
+        scope_column=lambda ctx: _TICKET.c.queue_id,
+        dimensions=(_channel_dimension(),),
+        measures=(_count_measure(),),
+        requires_facts=False,
+    )
+
+
+def articles_per_channel_source() -> ReportSource:
+    """Znuny ``article`` joined to ``ticket`` (integer join): articles per channel, queue-scoped."""
+    return _source(
+        "plugin.points.articles_per_channel", _ARTICLE, _ARTICLE.c.ticket_id == _TICKET.c.id
+    )
+
+
+# Sources kept OUT of ``register()``: negative tests feed them to a registrar (D15 table check).
+def own_source() -> ReportSource:
+    """Only the plugin's own table (it need not exist at registration)."""
+    own = table("tqp_points_x", column("id"), column("communication_channel_id"))
+    return dataclasses.replace(
+        _source("plugin.points.own", own),
+        scope_column=lambda ctx: own.c.id,
+        dimensions=(
+            dataclasses.replace(
+                _channel_dimension(), expr=lambda ctx: own.c.communication_channel_id
+            ),
+        ),
+    )
+
+
+def mixed_source() -> ReportSource:
+    """Znuny ``article`` next to the plugin's own table: refused (collation 1267)."""
+    own = table("tqp_points_x", column("article_id"))
+    return _source("plugin.points.mixed", _ARTICLE, _ARTICLE.c.id == own.c.article_id)
+
+
+def tiqora_source() -> ReportSource:
+    fact = table("tiqora_report_fact", column("ticket_id"))
+    return _source("plugin.points.facts", _ARTICLE, _ARTICLE.c.ticket_id == fact.c.ticket_id)
+
+
+def other_plugin_source() -> ReportSource:
+    other = table("tqp_other_x", column("article_id"))
+    return _source("plugin.points.other", _ARTICLE, _ARTICLE.c.id == other.c.article_id)
+
+
+def _register_reports(registry: PluginRegistry) -> None:
+    registry.report_source(articles_per_channel_source())
+    registry.builtin_report(
+        "articles_by_channel",
+        category="volume",
+        definition=ReportDefinition.model_validate(
+            {
+                "source": "plugin.points.articles_per_channel",
+                "dimensions": [{"key": "channel"}],
+                "measures": [{"key": "count"}],
+            }
+        ),
+    )
+
+
 class PointsPlugin:
     def register(self, registry: PluginRegistry) -> None:
         # Each task of the plugin-points plan adds its ``_register_<point>(registry)`` call here.
@@ -597,6 +691,7 @@ class PointsPlugin:
         _register_auth(registry)
         _register_customer_source(registry)
         _register_gi(registry)
+        _register_reports(registry)
 
 
 plugin = PointsPlugin()

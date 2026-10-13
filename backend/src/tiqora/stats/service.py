@@ -222,7 +222,11 @@ def _inline(
             "source": source,
             "dimensions": [{"key": d} for d in dimensions or []],
             "measures": [{"key": m} for m in measures],
-            "parameters": [{"key": "queues", "field": QUEUE_PARAM_FIELD[source], "op": "in"}],
+            "parameters": (
+                [{"key": "queues", "field": QUEUE_PARAM_FIELD[source], "op": "in"}]
+                if source in QUEUE_PARAM_FIELD
+                else []
+            ),
         }
     )
 

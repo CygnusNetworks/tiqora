@@ -13,7 +13,7 @@ import inspect
 import re
 from collections.abc import Awaitable, Callable, Iterable
 from datetime import UTC, datetime
-from typing import Any, Final, Literal
+from typing import Any, Final, Literal, get_args
 
 from fastapi import APIRouter
 from fastapi.routing import APIRoute
@@ -106,6 +106,7 @@ from tiqora.plugins.process_points import (
     stage_action,
     stage_condition,
 )
+from tiqora.plugins.report_points import check_plugin_source
 from tiqora.plugins.routes import PLUGIN_ROUTES, PluginRoute
 from tiqora.plugins.sync_hooks import (
     SYNC_HOOKS,
@@ -117,6 +118,9 @@ from tiqora.plugins.sync_hooks import (
 from tiqora.plugins.tasks import SCHEDULED_TASKS, Schedule, ScheduledTask, TaskRun
 from tiqora.process.actions.registry import TRANSITION_ACTIONS, ActionParam
 from tiqora.process.condition_modules import CONDITION_MODULES, ZNUNY_VALIDATION_PREFIX
+from tiqora.reporting.catalogue import BUILTIN_REPORTS, BuiltinReport, ReportCategory
+from tiqora.reporting.definition import DefinitionError, ReportDefinition, validate_definition
+from tiqora.reporting.semantic import REPORT_SOURCES, ReportSource
 from tiqora.settings_sections.section import (
     SETTINGS_SECTIONS,
     SettingsSection,
@@ -1137,6 +1141,99 @@ class PluginRegistrar:
         )
         self._stage(GI_INVOKERS, item, check=check)
         return qname
+
+    def report_source(self, source: ReportSource) -> None:
+        """Stage the report source ``plugin.<short_id>.<name>`` (D15).
+
+        Labels must live in the plugin's i18n namespace (``plugin.<plugin id>:...``). The source
+        reads Znuny tables or the plugin's own ``tqp_<short_id>_*`` tables, never ``tiqora_*``
+        tables and never a mix; the queue scope column is enforced by the report compiler.
+        """
+        short_id = self._manifest.short_id
+        label_prefix = f"plugin.{self.plugin_id}:"
+        key_prefix = f"plugin.{short_id}."
+
+        def check() -> None:
+            if not isinstance(source, ReportSource):
+                raise RegistrationRejected("Die Berichtsquelle ist keine ReportSource")
+            if not source.key.startswith(key_prefix):
+                raise RegistrationRejected(
+                    f"Der Schlüssel der Berichtsquelle „{source.key}“ muss mit "
+                    f"„{key_prefix}“ beginnen"
+                )
+            self._check_name(source.key.removeprefix(key_prefix), "die Berichtsquelle")
+            labels = [
+                source.label_key,
+                *(d.label_key for d in source.dimensions),
+                *(m.label_key for m in source.measures),
+                *(f.label_key for f in source.filter_fields),
+            ]
+            for label in labels:
+                if not isinstance(label, str) or not label.startswith(label_prefix):
+                    raise RegistrationRejected(
+                        f"Beschriftung „{label}“ der Berichtsquelle „{source.key}“ muss mit "
+                        f"„{label_prefix}“ beginnen"
+                    )
+            if source.requires_facts:
+                raise RegistrationRejected(
+                    f"Die Berichtsquelle „{source.key}“ darf keine Auswertungstabellen "
+                    "(requires_facts) benötigen"
+                )
+            check_plugin_source(source, short_id)
+
+        self._stage(REPORT_SOURCES, source, check=check)
+
+    def builtin_report(
+        self,
+        name: str,
+        *,
+        category: ReportCategory,
+        definition: ReportDefinition,
+        overview: bool = False,
+    ) -> None:
+        """Stage the built-in report ``plugin.<plugin id>.<name>`` for the report catalogue (D15).
+
+        Its source is a core source or one of this plugin's sources (registered first); texts
+        come from ``plugin.<plugin id>:reports.<name>.title`` / ``.description``.
+        """
+        key = f"plugin.{self.plugin_id}.{name}"
+
+        def check() -> None:
+            from tiqora.extensions.registry import Registry  # noqa: PLC0415
+            from tiqora.reporting.sources import core_report_sources  # noqa: PLC0415
+
+            self._check_name(name, "den Bericht")
+            if category not in get_args(ReportCategory):
+                raise RegistrationRejected(f"Unbekannte Berichtskategorie „{category}“")
+            if not isinstance(definition, ReportDefinition):
+                raise RegistrationRejected("Die Berichtsdefinition ist keine ReportDefinition")
+            scratch = Registry()
+            for core in core_report_sources():
+                scratch.add(REPORT_SOURCES, core)
+            for point, item in self._staged:
+                if point is REPORT_SOURCES:
+                    # owner "core": the plugin is not active yet while it registers
+                    scratch.add(REPORT_SOURCES, item)
+            if scratch.get(REPORT_SOURCES, definition.source) is None:
+                raise RegistrationRejected(
+                    f"Der Bericht „{name}“ nutzt die Datenquelle „{definition.source}“; erlaubt "
+                    "sind Kerndatenquellen und eigene, zuvor registrierte Berichtsquellen"
+                )
+            try:
+                validate_definition(definition, scratch)
+            except DefinitionError as exc:
+                raise RegistrationRejected(
+                    f"Die Definition des Berichts „{name}“ ist ungültig: {exc.message}"
+                ) from exc
+
+        item = BuiltinReport(
+            key=key,
+            category=category,
+            definition=definition,
+            overview=overview,
+            plugin_id=self.plugin_id,
+        )
+        self._stage(BUILTIN_REPORTS, item, check=check)
 
 
 _NUMBER_REASONS: Final = {
