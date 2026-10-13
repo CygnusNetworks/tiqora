@@ -496,6 +496,7 @@ async def test_phone_screen_dynamic_fields_report_optional_and_required(
         "field_type": "Text",
         "required": False,
         "possible_values": None,
+        "plugin_type": None,
     }
     # Znuny's internal process-management fields are never offered.
     assert not any(n.startswith("ProcessManagement") for n in by_name)
