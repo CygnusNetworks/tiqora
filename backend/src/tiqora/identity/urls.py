@@ -38,6 +38,16 @@ def base_url(settings: Settings) -> str:
     raise IdentityUrlsUnavailable("TIQORA_PUBLIC_BASE_URL is not set")
 
 
+def scim_base_url(settings: Settings) -> str | None:
+    """The SCIM endpoint shown to admins; ``None`` without ``TIQORA_PUBLIC_BASE_URL``.
+
+    Deliberately no CORS-origin fallback: an identity provider must get the real public address.
+    """
+    if not settings.public_base_url.strip():
+        return None
+    return base_url(settings) + "/scim/v2"
+
+
 def _empty_urls(redirect_uri: str) -> ProviderUrls:
     return ProviderUrls(
         agent_redirect_uri=redirect_uri,

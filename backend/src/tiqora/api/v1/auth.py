@@ -48,6 +48,7 @@ from tiqora.domain.schemas import (
     PasskeyOut,
     PasskeyRegisterFinishIn,
     PasskeyStatusOut,
+    PendingLoginOut,
     TOTPCodeIn,
     TOTPEnrollIn,
     TOTPEnrollOut,
@@ -391,6 +392,30 @@ async def complete_password_setup(
     except Exception as exc:  # noqa: BLE001 — password already committed
         logger.warning("password_setup_session_revoke_failed", user_id=user_id, error=str(exc))
     await limiter.reset(login="__password_setup__", ip=ip)
+
+
+@router.get("/pending", response_model=PendingLoginOut)
+async def pending_login(
+    request: Request,
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+    totp: TOTPServiceDep,
+    webauthn: WebAuthnServiceDep,
+    settings: AppSettings,
+) -> PendingLoginOut:
+    """State of the login behind the session cookie (read-only; never touches TTLs)."""
+    token = request.cookies.get(settings.session_cookie_name)
+    if not token:
+        return PendingLoginOut(state="none")
+    pending = await auth.get_pending_session(token)
+    if pending is not None:
+        return PendingLoginOut(
+            state="pending_2fa",
+            totp_enrolled=await totp.is_enabled(pending[0]),
+            passkey_enrolled=await webauthn.has_passkey(pending[0]),
+        )
+    if await auth.get_enroll_session(token) is not None:
+        return PendingLoginOut(state="must_enroll_2fa")
+    return PendingLoginOut(state="none")
 
 
 @router.post("/login", response_model=LoginResponse)

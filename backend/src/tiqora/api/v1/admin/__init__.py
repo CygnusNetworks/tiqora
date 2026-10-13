@@ -37,6 +37,7 @@ from tiqora.api.v1.admin import (
     generic_agent,
     groups,
     identity_providers,
+    identity_scim,
     mail_accounts,
     mail_log,
     mail_outbound,
@@ -118,6 +119,7 @@ admin_router.include_router(avatars.router)
 admin_router.include_router(extensions.router)
 admin_router.include_router(settings_sections.router)
 admin_router.include_router(identity_providers.router)
+admin_router.include_router(identity_scim.router)
 admin_router.include_router(reporting.router)
 admin_router.include_router(dashboard_templates.router)
 admin_router.include_router(dashboard_kiosk_links.router)

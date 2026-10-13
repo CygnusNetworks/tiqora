@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import type { LoginPlan } from "@/lib/identityApi";
+import type { IdentityTestMfa, LoginPlan } from "@/lib/identityApi";
 
 function NameList({ testId, title, items }: { testId: string; title: string; items: string[] }) {
   if (items.length === 0) return null;
@@ -16,7 +16,7 @@ function NameList({ testId, title, items }: { testId: string; title: string; ite
 }
 
 /** What a sign-in with the received values would do: account, creation, rejection, role changes. */
-export function LoginPlanView({ plan }: { plan: LoginPlan }) {
+export function LoginPlanView({ plan, mfa }: { plan: LoginPlan; mfa?: IdentityTestMfa | null }) {
   const { t } = useTranslation();
   const changes = Object.entries(plan.profile_changes);
   return (
@@ -42,6 +42,14 @@ export function LoginPlanView({ plan }: { plan: LoginPlan }) {
             <p className="text-muted">{t(`admin.identity.plan.matchedBy.${plan.matched_by}`)}</p>
           )}
         </div>
+      )}
+      {mfa && (
+        <p data-testid="identity-plan-mfa" className="text-sm text-ink">
+          <span className="text-muted">{t("admin.identity.test.mfa.label")}: </span>
+          <span className="font-medium">
+            {t(`admin.identity.test.mfa.${!mfa.required ? "notRequired" : mfa.satisfied ? "satisfied" : "unsatisfied"}`)}
+          </span>
+        </p>
       )}
       {changes.length > 0 && (
         <div data-testid="identity-plan-profile">

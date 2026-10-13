@@ -16,6 +16,10 @@ MatchBy = Literal["login", "email"]
 GroupPermission = Literal["ro", "move_into", "create", "note", "owner", "priority", "rw"]
 
 SSO_KINDS: Final = frozenset({"oidc", "saml"})
+SCIM_KINDS: Final = SSO_KINDS  # oidc, saml: LDAP and env rows never get SCIM/step-up/lifetime
+SESSION_IDLE_MIN: Final = 300
+SESSION_ABSOLUTE_MIN: Final = 900
+SESSION_FLOOR_SECONDS: Final = 60  # never issue a session shorter than this
 SLUG_RE: Final = re.compile(r"^[a-z0-9][a-z0-9-]{1,62}$")
 RESERVED_SLUGS: Final = frozenset({"env-oidc", "env-ldap", "env-customer-ldap", "logout", "login"})
 ENV_OIDC_SLUG: Final = "env-oidc"

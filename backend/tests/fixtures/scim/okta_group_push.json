@@ -1,0 +1,25 @@
+{
+  "description": "Okta group push: create with members, rename via PATCH, member list via PUT, delete; roles follow the group name.",
+  "steps": [
+    {"name": "user", "method": "POST", "path": "/Users",
+     "body": {"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "userName": "sc63conf.okta2@example.test", "active": true,
+              "name": {"givenName": "Paul", "familyName": "Beispiel"},
+              "emails": [{"value": "sc63conf.okta2@example.test", "type": "work", "primary": true}]},
+     "status": 201, "capture": {"user_id": "id"}},
+    {"name": "push group with members", "method": "POST", "path": "/Groups",
+     "body": {"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"], "displayName": "Support", "members": [{"value": "{user_id}", "display": "Paul Beispiel"}]},
+     "status": 201, "capture": {"group_id": "id"}, "expect": {"displayName": "Support", "members": [{"value": "{user_id}"}]}},
+    {"name": "role arrived", "action": "role_sync_tick", "users": ["sc63conf.okta2@example.test"], "role": "present"},
+    {"name": "rename away from the rule value", "method": "PATCH", "path": "/Groups/{group_id}",
+     "body": {"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "replace", "path": "displayName", "value": "Other"}]},
+     "status": 200, "expect": {"displayName": "Other"}},
+    {"name": "role gone after rename", "action": "role_sync_tick", "users": ["sc63conf.okta2@example.test"], "role": "absent"},
+    {"name": "put restores name and members", "method": "PUT", "path": "/Groups/{group_id}",
+     "body": {"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"], "id": "{group_id}", "displayName": "Support", "members": [{"value": "{user_id}"}]},
+     "status": 200, "expect": {"displayName": "Support", "members": [{"value": "{user_id}"}]}},
+    {"name": "role back", "action": "role_sync_tick", "users": ["sc63conf.okta2@example.test"], "role": "present"},
+    {"name": "delete group", "method": "DELETE", "path": "/Groups/{group_id}", "status": 204},
+    {"name": "role gone after delete", "action": "role_sync_tick", "users": ["sc63conf.okta2@example.test"], "role": "absent"},
+    {"name": "group is gone", "method": "GET", "path": "/Groups/{group_id}", "status": 404}
+  ]
+}

@@ -19,7 +19,7 @@ from tiqora.api.v1.admin.pagination import ListParams
 from tiqora.api.v1.admin.schemas import UserCreate, UserUpdate
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
-from tiqora.domain import welcome_invite
+from tiqora.domain import session_revocation, welcome_invite
 from tiqora.domain.auth import AuthenticatedUser, SessionStore
 from tiqora.domain.password_setup import redeem_token, resolve_token
 from tiqora.domain.schemas import UserLanguageUpdate
@@ -1032,7 +1032,7 @@ async def test_admin_password_reset_redis_revoke_runs_when_db_delete_fails(
     async def _boom(session: Any, user_id: int) -> int:
         raise RuntimeError("sessions table unavailable")
 
-    monkeypatch.setattr(admin_users, "delete_agent_sessions", _boom)
+    monkeypatch.setattr(session_revocation, "delete_agent_sessions", _boom)
     try:
         async with factory() as session:
             created = await admin_users.create_user(

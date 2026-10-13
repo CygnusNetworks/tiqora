@@ -1554,6 +1554,27 @@ async def run_erasure(
                 {"ids": [int(c.id) for c in ordered]},
             )
 
+        # SCIM provisioning rows (id mapping, group memberships, re-sync queue) of the
+        # customer: purge in both modes. ``tiqora_scim_event`` stays (ids only, no PII).
+        if await _table_exists(session, "tiqora_scim_user"):
+            scim_ids = [int(c.id) for c in ordered]
+            scim_subq = (
+                "SELECT id FROM tiqora_scim_user WHERE user_kind = 'customer' AND user_id IN :ids"
+            )
+            if await _table_exists(session, "tiqora_scim_group_member"):
+                await session.execute(
+                    text(
+                        f"DELETE FROM tiqora_scim_group_member WHERE member_id IN ({scim_subq})"  # noqa: S608
+                    ).bindparams(bindparam("ids", expanding=True)),
+                    {"ids": scim_ids},
+                )
+            await session.execute(
+                text(
+                    "DELETE FROM tiqora_scim_user WHERE user_kind = 'customer' AND user_id IN :ids"
+                ).bindparams(bindparam("ids", expanding=True)),
+                {"ids": scim_ids},
+            )
+
         # Portal second factors (TOTP secret, passkeys) belong to the person: purge
         # in both modes (tiqora-owned, no backup; an anonymized account must not
         # keep a working authenticator). Keyed by customer_user.id, not by login.

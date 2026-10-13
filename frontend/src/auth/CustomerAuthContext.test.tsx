@@ -13,6 +13,7 @@ const {
   passkeyBeginMock,
   passkeyFinishMock,
   startAuthenticationMock,
+  pendingLoginMock,
 } = vi.hoisted(() => ({
     portalMeMock: vi.fn(),
     portalLoginMock: vi.fn(),
@@ -22,7 +23,10 @@ const {
     passkeyBeginMock: vi.fn(),
     passkeyFinishMock: vi.fn(),
     startAuthenticationMock: vi.fn(),
+    pendingLoginMock: vi.fn(),
   }));
+
+vi.mock("@/lib/identityApi", () => ({ getPortalPendingLogin: pendingLoginMock }));
 
 vi.mock("@/lib/portalSecurityApi", () => ({
   customerSecurityApi: {
@@ -280,6 +284,33 @@ describe("CustomerAuthContext", () => {
 
     await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
     expect(result.current.customer).toEqual(authedCustomer);
+  });
+
+  it("refreshPending() enters the second-factor step for a pending_2fa state", async () => {
+    pendingLoginMock.mockResolvedValue({
+      state: "pending_2fa",
+      totp_enrolled: false,
+      passkey_enrolled: true,
+    });
+    const { result } = renderHook(() => useCustomerAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await act(async () => {
+      expect(await result.current.refreshPending()).toBe("pending_2fa");
+    });
+    expect(result.current.pending2fa).toBe(true);
+    expect(result.current.pendingFactors).toEqual({ totp: false, passkey: true });
+  });
+
+  it("refreshPending() keeps the form for state none or a failed request", async () => {
+    const { result } = renderHook(() => useCustomerAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    pendingLoginMock.mockResolvedValueOnce({ state: "none" });
+    pendingLoginMock.mockRejectedValueOnce(new Error("offline"));
+    await act(async () => {
+      expect(await result.current.refreshPending()).toBe("none");
+      expect(await result.current.refreshPending()).toBe("none");
+    });
+    expect(result.current.pending2fa).toBe(false);
   });
 
   it("throws when useCustomerAuth is used outside a CustomerAuthProvider", () => {

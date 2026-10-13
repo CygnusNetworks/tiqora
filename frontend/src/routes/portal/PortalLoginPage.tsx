@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useCustomerAuth } from "@/auth/CustomerAuthContext";
@@ -14,12 +14,14 @@ import { Spinner } from "@/components/ui/Spinner";
 
 export function PortalLoginPage() {
   const { t } = useTranslation();
-  const { login, pending2fa, pendingFactors, isAuthenticated, isLoading } = useCustomerAuth();
+  const { login, pending2fa, pendingFactors, isAuthenticated, isLoading, refreshPending } =
+    useCustomerAuth();
   const navigate = useNavigate();
   const search = useSearch({ from: "/portal/login" }) as {
     next?: string;
     sso_error?: string;
     logged_out?: string;
+    sso_step_up?: string;
   };
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -52,6 +54,17 @@ export function PortalLoginPage() {
     }
   }, [isLoading, isAuthenticated, pending2fa, next, navigate]);
 
+  // Back from a single sign-on that still owes a second factor: ask the backend
+  // what the portal cookie is waiting for, once per mount.
+  const stepUp = search.sso_step_up === "1";
+  const stepUpChecked = useRef(false);
+  useEffect(() => {
+    if (!stepUp || stepUpChecked.current) return;
+    stepUpChecked.current = true;
+    // Nothing pending any more (expired): the normal form says so.
+    void refreshPending().then((state) => setExpired(state === "none"));
+  }, [stepUp, refreshPending]);
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -78,6 +91,11 @@ export function PortalLoginPage() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-4">
         <div className="w-full max-w-sm rounded-xl border border-hairline bg-surface p-8">
+          {stepUp && (
+            <p className="mb-4 text-center text-sm text-muted" data-testid="sso-step-up-hint">
+              {t("portal.login.stepUp.hint")}
+            </p>
+          )}
           <PortalTwoFactorStep
             factors={pendingFactors ?? { totp: true, passkey: false }}
             onDone={() => void navigate({ to: next })}

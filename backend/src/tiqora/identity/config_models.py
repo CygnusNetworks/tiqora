@@ -12,7 +12,7 @@ import ssl
 from collections.abc import Mapping
 from typing import Annotated, Any, Final, Literal
 
-from pydantic import BaseModel, Field, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 from tiqora.identity.types import GroupPermission, ProviderKind
 from tiqora.settings_sections.section import SECRET_MASK, field_kind
@@ -152,6 +152,57 @@ class RoleRule(BaseModel):
     value: str = Field(min_length=1, max_length=500)  # compared case-insensitively after strip
     role_ids: list[DbId] = Field(default_factory=list)
     groups: list[GroupGrant] = Field(default_factory=list)
+
+
+_MS_CLAIMS: Final = "http://schemas.microsoft.com/claims/"
+DEFAULT_SAML_MFA_CLASSES: Final = (
+    f"{_MS_CLAIMS}multipleauthn",
+    "https://refeds.org/profile/mfa",
+    "urn:oasis:names:tc:SAML:2.0:ac:classes:MobileTwoFactorContract",
+    "urn:oasis:names:tc:SAML:2.0:ac:classes:TimeSyncToken",
+)
+# local_second_factor: agents/customers with TOTP/passkey get the second-factor step, everyone
+# without a factor is refused; reject: refuse everyone without IdP proof; the "_or_enroll" variant
+# (explicit opt-in, never the default) lets an agent without a factor enrol one without proof.
+MfaFallback = Literal["local_second_factor", "reject", "local_second_factor_or_enroll"]
+
+_MFA_LIST_MAX: Final = 20
+_MFA_ITEM_MAX: Final = 300
+
+
+class MfaPolicy(BaseModel):
+    """What counts as an IdP-side second factor and what happens without proof."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    fallback: MfaFallback = "local_second_factor"
+    oidc_amr_values: list[str] = Field(default_factory=lambda: ["mfa"])  # any in id_token amr
+    oidc_acr_values: list[str] = Field(default_factory=list)  # id_token acr equal to one
+    oidc_request_acr_values: str = Field(default="", max_length=500)  # sent as acr_values when set
+    saml_authn_context_classes: list[str] = Field(
+        default_factory=lambda: list(DEFAULT_SAML_MFA_CLASSES)
+    )
+    saml_mfa_attribute: str = Field(default=f"{_MS_CLAIMS}authnmethodsreferences", max_length=200)
+    saml_mfa_attribute_values: list[str] = Field(
+        default_factory=lambda: [f"{_MS_CLAIMS}multipleauthn"]
+    )
+    # sends RequestedAuthnContext(comparison="minimum") with the classes
+    saml_request_authn_context: bool = False
+
+    @field_validator(
+        "oidc_amr_values",
+        "oidc_acr_values",
+        "saml_authn_context_classes",
+        "saml_mfa_attribute_values",
+    )
+    @classmethod
+    def _clean_list(cls, value: list[str]) -> list[str]:
+        out = list(dict.fromkeys(v.strip() for v in value if v.strip()))
+        if len(out) > _MFA_LIST_MAX or any(len(v) > _MFA_ITEM_MAX for v in out):
+            raise ValueError(
+                f"Höchstens {_MFA_LIST_MAX} Einträge mit je höchstens {_MFA_ITEM_MAX} Zeichen."
+            )
+        return out
 
 
 class JitDefaults(BaseModel):

@@ -23,6 +23,7 @@ export const SSO_ERROR_CODES: readonly string[] = [
   "saml_invalid",
   "oidc_failed",
   "idp_error",
+  "mfa_required",
 ];
 
 /**

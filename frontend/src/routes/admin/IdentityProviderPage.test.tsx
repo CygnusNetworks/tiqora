@@ -94,6 +94,14 @@ describe("IdentityProviderPage", () => {
     expect(await screen.findByTestId(testId)).toBeVisible();
   });
 
+  it.each(["provisioning", "session"])("falls back to the connection tab for ?tab=%s on LDAP", async (tab) => {
+    search = { tab };
+    get.mockResolvedValue(makeProvider({ kind: "ldap" }));
+    wrap(<IdentityProviderPage />);
+    expect(await screen.findByTestId("identity-connection")).toBeVisible();
+    expect(screen.getByRole("tab", { selected: true })).toHaveTextContent("Verbindung");
+  });
+
   it("switches tabs through the URL search", async () => {
     wrap(<IdentityProviderPage />);
     await screen.findByTestId("identity-connection");

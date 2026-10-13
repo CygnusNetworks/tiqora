@@ -1,0 +1,26 @@
+{
+  "description": "Okta SCIM 2.0 app: user import check, create, full-document PUT, deactivate via PATCH without a path.",
+  "steps": [
+    {"name": "lookup with paging", "method": "GET", "path": "/Users",
+     "query": {"filter": "userName eq \"sc63conf.okta1@example.test\"", "startIndex": "1", "count": "100"},
+     "status": 200, "expect": {"totalResults": 0, "startIndex": 1, "Resources": []}},
+    {"name": "create", "method": "POST", "path": "/Users",
+     "body": {"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "userName": "sc63conf.okta1@example.test", "active": true,
+              "name": {"givenName": "Olga", "familyName": "Beispiel", "formatted": "Olga Beispiel"},
+              "emails": [{"value": "sc63conf.okta1@example.test", "type": "work", "primary": true}]},
+     "status": 201, "capture": {"user_id": "id"}, "expect": {"active": true}},
+    {"name": "full document update", "method": "PUT", "path": "/Users/{user_id}",
+     "body": {"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "id": "{user_id}", "userName": "sc63conf.okta1@example.test", "active": true,
+              "name": {"givenName": "Olga", "familyName": "Neumann", "formatted": "Olga Neumann"},
+              "emails": [{"value": "sc63conf.okta1@example.test", "type": "work", "primary": true}]},
+     "status": 200, "expect": {"id": "{user_id}", "name": {"familyName": "Neumann"}, "active": true}},
+    {"name": "deactivate", "method": "PATCH", "path": "/Users/{user_id}",
+     "body": {"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "replace", "value": {"active": false}}]},
+     "status": 200, "expect": {"active": false, "name": {"familyName": "Neumann"}}},
+    {"name": "read inactive", "method": "GET", "path": "/Users/{user_id}", "status": 200,
+     "expect": {"active": false}},
+    {"name": "reactivate", "method": "PATCH", "path": "/Users/{user_id}",
+     "body": {"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "replace", "value": {"active": true}}]},
+     "status": 200, "expect": {"active": true}}
+  ]
+}

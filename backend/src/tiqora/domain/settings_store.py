@@ -168,6 +168,12 @@ KEY_REPORT_SCHEDULER_ENABLED = "daemon.report_scheduler.enabled"
 KEY_REPORT_SCHEDULER_INTERVAL_SECONDS = "daemon.report_scheduler.interval_seconds"
 KEY_REPORT_RUNS_PURGE_ENABLED = "daemon.report_runs_purge.enabled"
 
+# SCIM provisioning log retention purge (identity wave 4); default ON, writes tiqora_* only.
+KEY_SCIM_EVENTS_PURGE_ENABLED = "daemon.scim_events_purge.enabled"
+# Role sync from provisioned SCIM groups (applies the pending queue); default ON.
+KEY_SCIM_ROLE_SYNC_ENABLED = "daemon.scim_role_sync.enabled"
+KEY_SCIM_ROLE_SYNC_INTERVAL_SECONDS = "daemon.scim_role_sync.interval_seconds"
+
 # Web chat sweep (waiting timeouts, idle chats, retention). Default ON: it only writes
 # tiqora_chat_* rows.
 KEY_WEBCHAT_SWEEP_ENABLED = "daemon.webchat_sweep.enabled"

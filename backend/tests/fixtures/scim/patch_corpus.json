@@ -1,0 +1,2139 @@
+[
+ {
+  "name": "entra_replace_active_false_string",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Replace",
+     "path": "active",
+     "value": "False"
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": false,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": [
+   "active"
+  ]
+ },
+ {
+  "name": "entra_replace_active_true_string",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": false,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Replace",
+     "path": "active",
+     "value": "True"
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": [
+   "active"
+  ]
+ },
+ {
+  "name": "entra_replace_work_email_filter",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Replace",
+     "path": "emails[type eq \"work\"].value",
+     "value": "neu@example.test"
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "neu@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": [
+   "emails"
+  ]
+ },
+ {
+  "name": "entra_add_work_email_when_missing",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   }
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Add",
+     "path": "emails[type eq \"work\"].value",
+     "value": "neu@example.test"
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "type": "work",
+     "value": "neu@example.test"
+    }
+   ]
+  },
+  "touched": [
+   "emails"
+  ]
+ },
+ {
+  "name": "entra_replace_given_name",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Replace",
+     "path": "name.givenName",
+     "value": "Erika-Maria"
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika-Maria",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": [
+   "name"
+  ]
+ },
+ {
+  "name": "entra_replace_family_name",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Replace",
+     "path": "name.familyName",
+     "value": "Beispiel"
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Beispiel"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": [
+   "name"
+  ]
+ },
+ {
+  "name": "entra_replace_username",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Replace",
+     "path": "userName",
+     "value": "erika.neu@example.test"
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika.neu@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": [
+   "userName"
+  ]
+ },
+ {
+  "name": "entra_replace_external_id",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Replace",
+     "path": "externalId",
+     "value": "ext-77"
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ],
+   "externalId": "ext-77"
+  },
+  "touched": [
+   "externalId"
+  ]
+ },
+ {
+  "name": "entra_add_mobile_phone",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Add",
+     "path": "phoneNumbers[type eq \"mobile\"].value",
+     "value": "+4930123456"
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ],
+   "phoneNumbers": [
+    {
+     "type": "mobile",
+     "value": "+4930123456"
+    }
+   ]
+  },
+  "touched": [
+   "phoneNumbers"
+  ]
+ },
+ {
+  "name": "entra_enterprise_department_ignored",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Add",
+     "path": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department",
+     "value": "IT"
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": []
+ },
+ {
+  "name": "entra_title_ignored",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Replace",
+     "path": "title",
+     "value": "Chef"
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": []
+ },
+ {
+  "name": "entra_name_formatted_ignored",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Replace",
+     "path": "name.formatted",
+     "value": "Erika Muster"
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": []
+ },
+ {
+  "name": "entra_multiple_ops",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Replace",
+     "path": "active",
+     "value": "False"
+    },
+    {
+     "op": "Replace",
+     "path": "displayName",
+     "value": "Erika M."
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": false,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ],
+   "displayName": "Erika M."
+  },
+  "touched": [
+   "active",
+   "displayName"
+  ]
+ },
+ {
+  "name": "okta_lowercase_replace_path_value",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "replace",
+     "path": "active",
+     "value": false
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": false,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": [
+   "active"
+  ]
+ },
+ {
+  "name": "okta_valueless_path_dict",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "replace",
+     "value": {
+      "active": false
+     }
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": false,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": [
+   "active"
+  ]
+ },
+ {
+  "name": "okta_valueless_path_multiple_keys",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "replace",
+     "value": {
+      "active": true,
+      "displayName": "E. Muster",
+      "name.givenName": "Eri"
+     }
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Eri",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ],
+   "displayName": "E. Muster"
+  },
+  "touched": [
+   "active",
+   "displayName",
+   "name"
+  ]
+ },
+ {
+  "name": "okta_valueless_path_nested_name",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "replace",
+     "value": {
+      "name": {
+       "givenName": "Eri"
+      }
+     }
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Eri",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": [
+   "name"
+  ]
+ },
+ {
+  "name": "okta_replace_emails_list",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "replace",
+     "path": "emails",
+     "value": [
+      {
+       "value": "x@example.test",
+       "type": "work",
+       "primary": true
+      }
+     ]
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "x@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": [
+   "emails"
+  ]
+ },
+ {
+  "name": "okta_remove_display_name",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ],
+   "displayName": "Erika"
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "remove",
+     "path": "displayName"
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": [
+   "displayName"
+  ]
+ },
+ {
+  "name": "okta_primary_email_filter",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "replace",
+     "path": "emails[primary eq true].value",
+     "value": "p@example.test"
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "p@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": [
+   "emails"
+  ]
+ },
+ {
+  "name": "error_remove_username",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "remove",
+     "path": "userName"
+    }
+   ]
+  },
+  "error": {
+   "status": 400,
+   "scimType": "mutability"
+  }
+ },
+ {
+  "name": "error_unknown_path",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "replace",
+     "path": "nickName",
+     "value": "x"
+    }
+   ]
+  },
+  "error": {
+   "status": 400,
+   "scimType": "invalidPath"
+  }
+ },
+ {
+  "name": "error_active_not_boolean",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "replace",
+     "path": "active",
+     "value": "maybe"
+    }
+   ]
+  },
+  "error": {
+   "status": 400,
+   "scimType": "invalidValue"
+  }
+ },
+ {
+  "name": "error_remove_without_path",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "remove"
+    }
+   ]
+  },
+  "error": {
+   "status": 400,
+   "scimType": "noTarget"
+  }
+ },
+ {
+  "name": "error_bad_path_filter",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "replace",
+     "path": "emails[type co \"w\"].value",
+     "value": "x"
+    }
+   ]
+  },
+  "error": {
+   "status": 400,
+   "scimType": "invalidPath"
+  }
+ },
+ {
+  "name": "entra_add_members",
+  "kind": "group",
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Add",
+     "path": "members",
+     "value": [
+      {
+       "value": "a"
+      },
+      {
+       "value": "b"
+      }
+     ]
+    }
+   ]
+  },
+  "expect": {
+   "add": [
+    "a",
+    "b"
+   ],
+   "remove": [],
+   "replace_all": null,
+   "display_name": null,
+   "external_id": false
+  }
+ },
+ {
+  "name": "entra_remove_members_value_list",
+  "kind": "group",
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Remove",
+     "path": "members",
+     "value": [
+      {
+       "value": "a"
+      }
+     ]
+    }
+   ]
+  },
+  "expect": {
+   "add": [],
+   "remove": [
+    "a"
+   ],
+   "replace_all": null,
+   "display_name": null,
+   "external_id": false
+  }
+ },
+ {
+  "name": "entra_replace_display_name",
+  "kind": "group",
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Replace",
+     "path": "displayName",
+     "value": "Support Team"
+    }
+   ]
+  },
+  "expect": {
+   "add": [],
+   "remove": [],
+   "replace_all": null,
+   "display_name": "Support Team",
+   "external_id": false
+  }
+ },
+ {
+  "name": "entra_replace_external_id",
+  "kind": "group",
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Replace",
+     "path": "externalId",
+     "value": "grp-9"
+    }
+   ]
+  },
+  "expect": {
+   "add": [],
+   "remove": [],
+   "replace_all": null,
+   "display_name": null,
+   "external_id": "grp-9"
+  }
+ },
+ {
+  "name": "entra_remove_all_members",
+  "kind": "group",
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Remove",
+     "path": "members"
+    }
+   ]
+  },
+  "expect": {
+   "add": [],
+   "remove": [],
+   "replace_all": [],
+   "display_name": null,
+   "external_id": false
+  }
+ },
+ {
+  "name": "okta_add_members_lowercase",
+  "kind": "group",
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "add",
+     "path": "members",
+     "value": [
+      {
+       "value": "c",
+       "display": "C"
+      }
+     ]
+    }
+   ]
+  },
+  "expect": {
+   "add": [
+    "c"
+   ],
+   "remove": [],
+   "replace_all": null,
+   "display_name": null,
+   "external_id": false
+  }
+ },
+ {
+  "name": "okta_remove_member_filter",
+  "kind": "group",
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "remove",
+     "path": "members[value eq \"c\"]"
+    }
+   ]
+  },
+  "expect": {
+   "add": [],
+   "remove": [
+    "c"
+   ],
+   "replace_all": null,
+   "display_name": null,
+   "external_id": false
+  }
+ },
+ {
+  "name": "okta_replace_members",
+  "kind": "group",
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "replace",
+     "path": "members",
+     "value": [
+      {
+       "value": "a"
+      },
+      {
+       "value": "b"
+      }
+     ]
+    }
+   ]
+  },
+  "expect": {
+   "add": [],
+   "remove": [],
+   "replace_all": [
+    "a",
+    "b"
+   ],
+   "display_name": null,
+   "external_id": false
+  }
+ },
+ {
+  "name": "okta_valueless_path_display_name",
+  "kind": "group",
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "replace",
+     "value": {
+      "displayName": "Ops"
+     }
+    }
+   ]
+  },
+  "expect": {
+   "add": [],
+   "remove": [],
+   "replace_all": null,
+   "display_name": "Ops",
+   "external_id": false
+  }
+ },
+ {
+  "name": "add_then_remove_same_member",
+  "kind": "group",
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "add",
+     "path": "members",
+     "value": [
+      {
+       "value": "a"
+      }
+     ]
+    },
+    {
+     "op": "remove",
+     "path": "members[value eq \"a\"]"
+    }
+   ]
+  },
+  "expect": {
+   "add": [],
+   "remove": [
+    "a"
+   ],
+   "replace_all": null,
+   "display_name": null,
+   "external_id": false
+  }
+ },
+ {
+  "name": "replace_then_add",
+  "kind": "group",
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "replace",
+     "path": "members",
+     "value": [
+      {
+       "value": "a"
+      }
+     ]
+    },
+    {
+     "op": "add",
+     "path": "members",
+     "value": [
+      {
+       "value": "b"
+      }
+     ]
+    }
+   ]
+  },
+  "expect": {
+   "add": [],
+   "remove": [],
+   "replace_all": [
+    "a",
+    "b"
+   ],
+   "display_name": null,
+   "external_id": false
+  }
+ },
+ {
+  "name": "error_group_unknown_path",
+  "kind": "group",
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "replace",
+     "path": "description",
+     "value": "x"
+    }
+   ]
+  },
+  "error": {
+   "status": 400,
+   "scimType": "invalidPath"
+  }
+ },
+ {
+  "name": "error_member_without_value",
+  "kind": "group",
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "add",
+     "path": "members",
+     "value": [
+      {
+       "display": "x"
+      }
+     ]
+    }
+   ]
+  },
+  "error": {
+   "status": 400,
+   "scimType": "invalidValue"
+  }
+ },
+ {
+  "name": "okta_password_sync_ignored",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "replace",
+     "value": {
+      "password": "s3cret-example"
+     }
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": []
+ },
+ {
+  "name": "okta_user_value_with_id_and_groups_ignored",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "replace",
+     "value": {
+      "id": "u1",
+      "groups": [],
+      "meta": {},
+      "active": false
+     }
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": false,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": [
+   "active"
+  ]
+ },
+ {
+  "name": "entra_deactivate_with_address_change",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "Replace",
+     "path": "active",
+     "value": "False"
+    },
+    {
+     "op": "Add",
+     "path": "addresses[type eq \"work\"].locality",
+     "value": "Musterstadt"
+    },
+    {
+     "op": "Replace",
+     "path": "preferredLanguage",
+     "value": "de-DE"
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": false,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": [
+   "active"
+  ]
+ },
+ {
+  "name": "user_bare_enterprise_urn_ignored",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "add",
+     "value": {
+      "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+       "department": "IT"
+      }
+     }
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": []
+ },
+ {
+  "name": "user_name_formatted_object_untouched",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "replace",
+     "value": {
+      "name": {
+       "formatted": "Erika Muster"
+      }
+     }
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "touched": []
+ },
+ {
+  "name": "user_new_primary_email_demotes_old",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "add",
+     "path": "emails",
+     "value": [
+      {
+       "value": "e2@example.test",
+       "type": "home",
+       "primary": true
+      }
+     ]
+    }
+   ]
+  },
+  "expect": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": false
+    },
+    {
+     "value": "e2@example.test",
+     "type": "home",
+     "primary": true
+    }
+   ]
+  },
+  "touched": [
+   "emails"
+  ]
+ },
+ {
+  "name": "error_nickname_invalid_path",
+  "kind": "user",
+  "resource": {
+   "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+   ],
+   "id": "u1",
+   "userName": "erika@example.test",
+   "active": true,
+   "name": {
+    "givenName": "Erika",
+    "familyName": "Muster"
+   },
+   "emails": [
+    {
+     "value": "erika@example.test",
+     "type": "work",
+     "primary": true
+    }
+   ]
+  },
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "replace",
+     "path": "nickName",
+     "value": "x"
+    }
+   ]
+  },
+  "error": {
+   "status": 400,
+   "scimType": "invalidPath"
+  }
+ },
+ {
+  "name": "okta_group_rename_with_id",
+  "kind": "group",
+  "patch": {
+   "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+   ],
+   "Operations": [
+    {
+     "op": "replace",
+     "value": {
+      "id": "g1",
+      "displayName": "Support Team"
+     }
+    }
+   ]
+  },
+  "expect": {
+   "add": [],
+   "remove": [],
+   "replace_all": null,
+   "display_name": "Support Team",
+   "external_id": false
+  }
+ }
+]

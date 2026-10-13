@@ -173,7 +173,8 @@ Key endpoints: `/auth/login|me|logout`, `/queues`, `/tickets`,
   to the normal session-resolve path (`get_current_user`) and cannot touch
   any other endpoint. `POST /api/v1/auth/totp/verify` (±1 step / ~90s
   window) promotes it to a full session. **SSO/SPNEGO is the strong factor and
-  skips 2FA entirely** (including enforced enrollment) — the `effective_enforce`
+  skips 2FA** (for SSO providers with `require_mfa_claim` only when the IdP proved a second factor,
+  see Step-up MFA below) (including enforced enrollment) — the `effective_enforce`
   gate applies only to the password path. `GET /api/v1/auth/totp/enroll/qr`
   renders the pending enrollment's `otpauth://` URI as an `image/svg+xml` QR
   code (`qrcode` lib, SVG factory — no `PIL` dependency); the agent security
@@ -261,6 +262,38 @@ assertions must be signed; SHA-1 is rejected unless the provider opts in (`allow
 redirect `SigAlg` is limited to `rsa-sha256/384/512`; solicited responses are bound to the browser
 cookie. IdP metadata comes from a URL (daily worker tick, 04:30 UTC, last good copy kept on error) or
 upload. **Per-process cache**: the OIDC JWKS is cached in each API process.
+
+**SCIM provisioning** (`identity/scim/`, `api/scim/`): `/scim/v2` is a separate router (own bearer auth,
+no cookie session, no CSRF). `tokens.py` authenticates first by one indexed lookup of the sha256 of
+the bearer token (`AuthOutcome`); only failed attempts are counted per IP and locked, a valid token never is.
+`users.py` / `groups.py` implement the resources on `user_provisioning` / `identity.provisioning`
+(the only Znuny writes, including `set_agent_validity` / `set_customer_validity`); the SCIM tables
+`tiqora_scim_token`, `tiqora_scim_user`, `tiqora_scim_group`, `tiqora_scim_group_member`,
+`tiqora_scim_pending_sync` and `tiqora_scim_event` hold mapping, group state and the audit log. Lookups
+compare sha256 columns (`*_fold_hash`), never collated text, and never JOIN `tiqora_*` with Znuny tables.
+Deactivation sets `valid_id = 2` and ends the account's sessions (`end_agent_sessions`,
+`end_customer_sessions`) after the commit; accounts are never deleted. Group pushes only write
+`tiqora_scim_*` (at most 5000 members per request).
+
+**SCIM role-sync loop** (`role_sync.py`): group or membership changes call `enqueue_role_sync`, which
+upserts `tiqora_scim_pending_sync` with `generation = old + 1`. The daemon `scim_role_sync` (default 15 s)
+reads the oldest rows, evaluates the provider's role rules with the pseudo attributes `scim:groups` /
+`scim:group_ids` and applies the diff through `apply_assignments` (same managed/authoritative semantics
+as login sync), then deletes `WHERE generation = <read>` so an enqueue that happened meanwhile survives.
+`scim_events_purge` removes audit rows past the retention.
+
+**Step-up MFA** (`step_up.py`): the OIDC and SAML adapters inject `oidc:amr`, `oidc:acr` and
+`saml:authn_context` from the verified id_token / assertion only; `check_mfa` compares them with the
+provider's `MfaPolicy`. When the provider requires proof and none came, `MfaPolicy.fallback` decides:
+`local_second_factor` (default; agents and customers with TOTP or a passkey get the second-factor step,
+everyone else is refused with `mfa_required`), `reject`, or `local_second_factor_or_enroll` (explicit
+opt-in that allows enrolment without proof). The verdict is computed right after `plan_login`; a refused
+login is raised before `apply_login`, so it writes nothing.
+
+**Session lifetime** (`session_lifetime.py`): `effective_lifetime` returns `(idle, absolute)` as the
+global TTLs shortened by the provider's `session_idle_seconds` / `session_absolute_seconds` and by a SAML
+`SessionNotOnOrAfter`, never below 60 s. The index sets for SSO logout live at least as long as the
+longest member session, so IdP logout still finds long sessions.
 
 
 ### AI subsystem (`tiqora.ai.*`)

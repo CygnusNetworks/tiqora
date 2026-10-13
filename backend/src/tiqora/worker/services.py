@@ -41,6 +41,9 @@ from tiqora.domain.settings_store import (
     KEY_REPORT_RUNS_PURGE_ENABLED,
     KEY_REPORT_SCHEDULER_ENABLED,
     KEY_REPORT_SCHEDULER_INTERVAL_SECONDS,
+    KEY_SCIM_EVENTS_PURGE_ENABLED,
+    KEY_SCIM_ROLE_SYNC_ENABLED,
+    KEY_SCIM_ROLE_SYNC_INTERVAL_SECONDS,
     KEY_SMIME_CUSTOMER_RENEW_ENABLED,
     KEY_TELEGRAM_POLLER_ENABLED,
     KEY_TELEGRAM_POLLER_INTERVAL_SECONDS,
@@ -265,6 +268,24 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         toggleable=True,
         schedule_kind="daily",
         daily_at="04:30",
+    ),
+    # Applies SCIM group changes to Znuny roles/groups through the role rules (scim:groups).
+    DaemonService(
+        slug="scim_role_sync",
+        enabled_key=KEY_SCIM_ROLE_SYNC_ENABLED,
+        default_enabled=True,
+        toggleable=True,
+        schedule_kind="interval",
+        interval_key=KEY_SCIM_ROLE_SYNC_INTERVAL_SECONDS,
+        interval_settings_attr="scim_role_sync_interval_seconds",
+    ),
+    DaemonService(
+        slug="scim_events_purge",
+        enabled_key=KEY_SCIM_EVENTS_PURGE_ENABLED,
+        default_enabled=True,
+        toggleable=True,
+        schedule_kind="daily",
+        daily_at="04:40",
     ),
     # Keeps the report data (facts, events, daily snapshots) current after the backfill.
     DaemonService(

@@ -34,6 +34,9 @@ from tiqora.domain.oidc import (
     OIDCService,
     oidc_client_config,
 )
+from tiqora.domain.passkey import WebAuthnService
+from tiqora.domain.totp import TOTPService
+from tiqora.domain.two_factor_subject import CUSTOMER_2FA
 from tiqora.identity import flow_state, oidc_backchannel
 from tiqora.identity.config_models import OidcProviderConfig, SamlProviderConfig
 from tiqora.identity.env_providers import (
@@ -75,7 +78,15 @@ from tiqora.identity.saml_sp import (
     SamlServiceProvider,
     decode_saml_b64,
 )
+from tiqora.identity.session_lifetime import effective_lifetime
 from tiqora.identity.sso_sessions import SsoSessionInfo, load_sso, revoke_sso_sessions
+from tiqora.identity.step_up import (
+    OIDC_ACR_ATTR,
+    OIDC_AMR_ATTR,
+    SAML_AUTHN_CONTEXT_ATTR,
+    STEP_UP_ATTRS,
+    check_mfa,
+)
 from tiqora.identity.store import (
     ProviderRecord,
     ProviderValidationError,
@@ -138,6 +149,14 @@ def _reject_fail(code: str, *, value: str = "") -> _Fail:
     if code == "sso_not_enabled":
         return _Fail(
             code, http_status=status.HTTP_403_FORBIDDEN, detail="SSO not enabled for this account"
+        )
+    if code == "mfa_required":
+        # 403 like every other policy refusal here: the identity provider authenticated the
+        # person, Tiqora's step-up policy refuses the login (401 would read as "no session").
+        return _Fail(
+            code,
+            http_status=status.HTTP_403_FORBIDDEN,
+            detail="The identity provider did not confirm a second factor",
         )
     return _Fail(
         code,
@@ -318,7 +337,12 @@ async def start_sso_login(
         # PKCE per provider setting; the verifier lives server-side under the state key,
         # so it never touches the browser and only the initiating flow can redeem the code.
         verifier = secrets.token_urlsafe(64) if await oidc.use_pkce() else None
-        url = await oidc.authorize_url(state, code_verifier=verifier, nonce=nonce)
+        url = await oidc.authorize_url(
+            state,
+            code_verifier=verifier,
+            nonce=nonce,
+            acr_values=record.mfa_policy.oidc_request_acr_values or None,
+        )
     except (OIDCError, httpx.HTTPError, ValueError, KeyError) as exc:
         logger.warning("oidc_discovery_failed", slug=slug, error=str(exc))
         return fail("idp_error")
@@ -409,6 +433,22 @@ async def _start_saml_login(
         path="/",
     )
     return resp
+
+
+def _oidc_mfa_attributes(id_token_claims: dict[str, Any] | None) -> dict[str, tuple[str, ...]]:
+    """``amr`` / ``acr`` of the verified id_token as pseudo attributes (none without id_token)."""
+    out: dict[str, tuple[str, ...]] = {}
+    if not id_token_claims:
+        return out
+    amr = id_token_claims.get("amr")
+    if isinstance(amr, str):
+        amr = [amr]
+    if isinstance(amr, list):
+        out[OIDC_AMR_ATTR] = tuple(v for v in amr if isinstance(v, str) and v)
+    acr = id_token_claims.get("acr")
+    if isinstance(acr, str) and acr:
+        out[OIDC_ACR_ATTR] = (acr,)
+    return out
 
 
 def _picture(claims: dict[str, Any]) -> str | None:
@@ -596,6 +636,11 @@ async def _finish_oidc_callback(
         else ""
     )
     attributes = dict(normalize_attributes(claims))
+    # MFA proof comes from the VERIFIED id_token only: whatever userinfo says about amr/acr
+    # (or about our pseudo attributes) is dropped so it cannot be spoofed, then injected.
+    for spoofable in ("amr", "acr", *STEP_UP_ATTRS):
+        attributes.pop(spoofable, None)
+    attributes.update(_oidc_mfa_attributes(result.id_token_claims))
     if record.source == "env":
         # Production env OIDC: the configured login claim is mandatory, and a
         # provider without "sub" falls back to its value as the link subject.
@@ -673,6 +718,45 @@ async def complete_login(
         )
 
 
+async def _second_factors(
+    session: AsyncSession,
+    redis: Any,
+    settings: Settings,
+    *,
+    user_kind: UserKind,
+    user_id: int | None,
+) -> tuple[bool, bool]:
+    """``(has_totp, has_passkey)`` of the account; ``(False, False)`` for a not-yet-created one."""
+    if user_id is None:
+        return False, False
+    subject = {} if user_kind == "agent" else {"subject": CUSTOMER_2FA}
+    totp = TOTPService(session, settings, redis, **subject)
+    webauthn = WebAuthnService(session, redis, settings, **subject)
+    return await totp.is_enabled(user_id), await webauthn.has_passkey(user_id)
+
+
+def _step_up_response(
+    token: str,
+    *,
+    user_kind: UserKind,
+    next_path: str,
+    settings: Settings,
+    landing_html: bool,
+) -> Response:
+    """Answer an SSO login that still owes a second factor: cookie holds a PENDING/ENROLL token."""
+    # Env-configured providers cannot require an IdP-side factor, so a step-up is always
+    # a browser flow (redirect); there is no JSON variant.
+    base = "/login" if user_kind == "agent" else "/portal/login"
+    target = f"{base}?sso_step_up=1&next={quote(next_path, safe='')}"
+    response: Response = (
+        login_landing_response(target)
+        if landing_html
+        else RedirectResponse(target, status_code=status.HTTP_302_FOUND)
+    )
+    set_session_cookie(response, settings, token, user_kind=user_kind)
+    return response
+
+
 async def _complete_login(
     request: Request,
     *,
@@ -689,6 +773,7 @@ async def _complete_login(
 ) -> Response:
     redis = await get_redis(request)
     plan = await plan_login(session, record, identity, user_kind=user_kind, settings=settings)
+    check = check_mfa(record, identity.attributes)
 
     if test_id:
         # Admin test: show what WOULD happen; never apply, never create a session.
@@ -702,6 +787,11 @@ async def _complete_login(
             subject=identity.subject,
             attributes={k: list(v) for k, v in identity.attributes.items()},
             plan=plan_to_dict(plan),
+            mfa={
+                "required": check.required,
+                "satisfied": check.satisfied,
+                "evidence": list(check.evidence),
+            },
         )
         await flow_state.put_test(redis, test_id, run, secret_key=settings.secret_key)
         return _admin_test_redirect(record.id, test_id)
@@ -710,12 +800,35 @@ async def _complete_login(
         raise _reject_fail(
             plan.reject_code or "no_match", value=plan.profile.login or identity.subject
         )
+
+    # Step-up MFA is decided before anything is written: a refused login must not provision.
+    step_up = "none"  # "none" (full session) | "pending" | "enroll"
+    if not check.satisfied:
+        fallback = record.mfa_policy.fallback
+        if fallback == "reject":
+            raise _reject_fail("mfa_required")
+        has_totp, has_passkey = await _second_factors(
+            session, redis, settings, user_kind=user_kind, user_id=plan.user_id
+        )
+        if has_totp or has_passkey:
+            step_up = "pending"
+        elif user_kind == "agent" and fallback == "local_second_factor_or_enroll":
+            step_up = "enroll"
+        else:
+            raise _reject_fail("mfa_required")
+
     try:
         user_id, _login = await apply_login(session, record, identity, plan, settings=settings)
     except LoginRejected as exc:
         raise _reject_fail(exc.reject_code, value=plan.profile.login or identity.subject) from exc
 
     draft = identity.sso or SsoSessionDraft()
+    idle, absolute = effective_lifetime(
+        record,
+        settings,
+        not_on_or_after=draft.session_not_on_or_after,
+        now=datetime.now(UTC),
+    )
     sso = SsoSessionInfo(
         provider_id=record.id,
         slug=record.slug,
@@ -728,15 +841,21 @@ async def _complete_login(
         sp_name_qualifier=draft.sp_name_qualifier,
         sid=draft.sid,
         id_token_hint=draft.id_token_hint,
+        idle_ttl=idle,
+        absolute_ttl=absolute,
     )
-    # SSO is the strong factor: no TOTP/passkey step, a full session right away.
     agent_user = None
     if user_kind == "agent":
         auth = AuthService(session, SessionStore(redis, settings), settings)
         agent_user = await auth.get_user_by_id(user_id)
         if agent_user is None:
             raise _reject_fail("user_invalid")
-        token = await auth.create_session(agent_user, avatar_url=avatar_url, sso=sso)
+        if step_up == "pending":
+            token = await auth.create_pending_session(agent_user, sso=sso)
+        elif step_up == "enroll":
+            token = await auth.create_enroll_session(agent_user, sso=sso)
+        else:
+            token = await auth.create_session(agent_user, avatar_url=avatar_url, sso=sso)
     else:
         customer_auth = CustomerAuthService(
             session, CustomerSessionStore(redis, settings), settings
@@ -744,7 +863,19 @@ async def _complete_login(
         customer = await customer_auth.get_customer_by_id(user_id)
         if customer is None:
             raise _reject_fail("user_invalid")
-        token = await customer_auth.create_session(customer, sso=sso)
+        if step_up == "pending":
+            token = await customer_auth.create_pending_session(customer, sso=sso)
+        else:
+            token = await customer_auth.create_session(customer, sso=sso)
+
+    if step_up != "none":
+        return _step_up_response(
+            token,
+            user_kind=user_kind,
+            next_path=next_path,
+            settings=settings,
+            landing_html=landing_html,
+        )
 
     response: Response
     if json_response and agent_user is not None:
@@ -996,8 +1127,16 @@ async def _finish_saml_acs(
     identity = ExternalIdentity(
         provider_id=record.id,
         subject=result.name_id,
-        attributes=result.attributes,
+        attributes={
+            **result.attributes,
+            **(
+                {SAML_AUTHN_CONTEXT_ATTR: result.authn_context_class_refs}
+                if result.authn_context_class_refs
+                else {}
+            ),
+        },
         sso=SsoSessionDraft(
+            session_not_on_or_after=result.session_not_on_or_after,
             session_index=result.session_index,
             name_id=result.name_id,
             name_id_format=result.name_id_format,

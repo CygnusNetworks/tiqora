@@ -14,6 +14,7 @@ import {
 } from "@simplewebauthn/browser";
 import { portalApi, ApiError, type CustomerMe } from "@/lib/portalApi";
 import { customerSecurityApi, type CustomerLoginResponse } from "@/lib/portalSecurityApi";
+import { getPortalPendingLogin } from "@/lib/identityApi";
 import { submitSsoLogout } from "@/lib/ssoLogout";
 import { setAppLanguage } from "@/i18n";
 
@@ -43,6 +44,8 @@ type CustomerAuthContextValue = {
   cancelPending: () => void;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  /** Read the login state behind the portal cookie and enter a pending second-factor step. */
+  refreshPending: () => Promise<"none" | "pending_2fa" | "must_enroll_2fa">;
 };
 
 const CustomerAuthContext = createContext<CustomerAuthContextValue | null>(null);
@@ -134,6 +137,22 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     setPendingFactors(null);
   }, []);
 
+  const refreshPending = useCallback(async () => {
+    try {
+      const res = await getPortalPendingLogin();
+      if (res.state === "pending_2fa") {
+        setPending2fa(true);
+        setPendingFactors({
+          totp: Boolean(res.totp_enrolled),
+          passkey: Boolean(res.passkey_enrolled),
+        });
+      }
+      return res.state;
+    } catch {
+      return "none" as const;
+    }
+  }, []);
+
   const ssoLogout = meQuery.data?.sso_logout === true;
 
   const logout = useCallback(async () => {
@@ -173,6 +192,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
       cancelPending,
       logout,
       refresh,
+      refreshPending,
     }),
     [
       meQuery.data,
@@ -186,6 +206,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
       cancelPending,
       logout,
       refresh,
+      refreshPending,
     ],
   );
 

@@ -42,6 +42,10 @@ OWNED: tuple[tuple[str, str], ...] = (
     # (agent kind only -- customer ids live in the same column space).
     ("tiqora_identity_managed_assignment", "user_id"),
     ("tiqora_identity_link", "user_id"),
+    # SCIM: the re-sync queue and the id mapping (agent kind only). Group memberships are
+    # removed by an explicit step in delete_user_rows before the mapping row goes.
+    ("tiqora_scim_pending_sync", "user_id"),
+    ("tiqora_scim_user", "user_id"),
     ("tiqora_form_draft", "user_id"),
     ("tiqora_standard_template_user", "user_id"),
     ("tiqora_api_key", "user_id"),
@@ -54,7 +58,7 @@ OWNED: tuple[tuple[str, str], ...] = (
 )
 _OWNED_KEYS = frozenset(OWNED)
 # Tables whose user_id column is shared by agents and customers, told apart by user_kind.
-_KIND_SCOPED = frozenset({"tiqora_identity_link"})
+_KIND_SCOPED = frozenset({"tiqora_identity_link", "tiqora_scim_user"})
 
 # `tiqora_*` tables have no FK constraints, so information_schema does not
 # report them. These are the ones that must BLOCK a delete (things the agent
@@ -152,6 +156,17 @@ async def delete_user_rows(session: AsyncSession, user_id: int) -> None:
     :func:`blocking_references` first and owns the transaction."""
     dialect = session.bind.dialect.name if session.bind is not None else ""
     await _delete_report_schedules(session, user_id)
+    if await _table_exists(session, "tiqora_scim_group_member") and await _table_exists(
+        session, "tiqora_scim_user"
+    ):
+        # Explicit (children first), the FK cascade stays as a backstop. Tiqora tables only.
+        await session.execute(
+            text(
+                "DELETE FROM tiqora_scim_group_member WHERE member_id IN"
+                " (SELECT id FROM tiqora_scim_user WHERE user_kind = 'agent' AND user_id = :uid)"
+            ),
+            {"uid": user_id},
+        )
     for table, column in OWNED:
         if not await _table_exists(session, table):
             continue

@@ -165,10 +165,14 @@ class SamlTestIdp:
         sign_response: bool = False,
         encrypt_for_cert: str | None = None,
         sha1: bool = False,
+        class_ref: str = "urn:oasis:names:tc:SAML:2.0:ac:classes:Password",
+        session_not_on_or_after: str | None = None,
     ) -> str:
         from saml2.saml import NameID  # noqa: PLC0415
 
         kwargs: dict[str, Any] = {}
+        if session_not_on_or_after is not None:
+            kwargs["session_not_on_or_after"] = session_not_on_or_after
         if sha1:
             kwargs["sign_alg"] = SIG_RSA_SHA1
             kwargs["digest_alg"] = DIGEST_SHA1
@@ -185,7 +189,7 @@ class SamlTestIdp:
             sign_assertion=sign_assertion,
             sign_response=sign_response,
             authn={
-                "class_ref": "urn:oasis:names:tc:SAML:2.0:ac:classes:Password",
+                "class_ref": class_ref,
                 "authn_auth": self.entity_id,
             },
             **kwargs,

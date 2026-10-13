@@ -236,6 +236,10 @@
     "kerberosReauthCountdown": "Kerberos-Anmeldung wird in {{seconds}}s erneuert…",
     "kerberosReauthNow": "Jetzt anmelden",
     "ssoFailed": "SSO fehlgeschlagen — bitte per Passwort anmelden.",
+    "stepUp": {
+      "hint": "Ihr Anmeldedienst hat keinen zweiten Faktor bestätigt. Bitte bestätigen Sie ihn hier, um die Anmeldung abzuschließen.",
+      "expired": "Die Anmeldung ist abgelaufen. Bitte melden Sie sich erneut an."
+    },
     "mustEnroll": {
       "title": "Zwei-Faktor-Authentifizierung einrichten",
       "hint": "2FA ist für dieses Konto erforderlich — bitte jetzt einrichten.",
@@ -265,7 +269,8 @@
       "state": "Die Anmeldung hat zu lange gedauert oder wurde in einem anderen Fenster begonnen. Bitte erneut versuchen.",
       "saml_invalid": "Die Antwort des Anmeldedienstes war ungültig. Bitte erneut versuchen.",
       "oidc_failed": "Die Anmeldung beim Anmeldedienst ist fehlgeschlagen. Bitte erneut versuchen.",
-      "idp_error": "Der Anmeldedienst hat die Anmeldung abgelehnt."
+      "idp_error": "Der Anmeldedienst hat die Anmeldung abgelehnt.",
+      "mfa_required": "Ihr Anmeldedienst hat keine Anmeldung mit zweitem Faktor bestätigt. Bitte melden Sie sich dort mit zweitem Faktor an. Falls das nicht möglich ist, wenden Sie sich an Ihre Administration."
     },
     "loggedOut": "Sie wurden abgemeldet."
   },
@@ -1349,6 +1354,9 @@
       "preferences": "Einstellungen"
     },
     "login": {
+      "stepUp": {
+        "hint": "Ihr Anmeldedienst hat keinen zweiten Faktor bestätigt. Bitte bestätigen Sie ihn hier, um die Anmeldung abzuschließen."
+      },
       "subtitle": "Bei Ihrem Support-Konto anmelden",
       "email": "E-Mail oder Benutzername",
       "ssoDivider": "oder",
@@ -3434,6 +3442,14 @@
         "gi_debug_cleanup": {
           "name": "Webservice-Protokoll aufräumen",
           "description": "Löscht alte Einträge des Webservice-Protokolls."
+        },
+        "scim_role_sync": {
+          "name": "Rollen aus Gruppen der Bereitstellung",
+          "description": "Überträgt Gruppenänderungen vom Anmeldedienst auf Rollen und Gruppen in Tiqora."
+        },
+        "scim_events_purge": {
+          "name": "Bereitstellungsprotokoll aufräumen",
+          "description": "Löscht Einträge des SCIM-Protokolls nach Ablauf der Aufbewahrungsfrist."
         }
       },
       "takeoverBadge": "Übernahme",
@@ -4342,7 +4358,9 @@
         "mapping": "Zuordnung",
         "roles": "Rollen aus dem Anmeldedienst",
         "test": "Testanmeldung",
-        "links": "Verknüpfungen"
+        "links": "Verknüpfungen",
+        "provisioning": "Bereitstellung (SCIM)",
+        "session": "Sitzung & zweiter Faktor"
       },
       "sections": {
         "general": "Allgemein",
@@ -4412,7 +4430,14 @@
         "timeout": "Das Ergebnis ist nach zwei Minuten nicht eingetroffen. Bitte die Testanmeldung erneut starten.",
         "subject": "Kennung",
         "attributesHeading": "Vom Anmeldedienst übermittelte Werte",
-        "useForPreview": "Werte für die Vorschau übernehmen"
+        "useForPreview": "Werte für die Vorschau übernehmen",
+        "mfa": {
+          "label": "Zweiter Faktor vom Anmeldedienst",
+          "satisfied": "bestätigt",
+          "unsatisfied": "nicht bestätigt",
+          "notRequired": "nicht verlangt",
+          "evidence": "Nachweis des zweiten Faktors"
+        }
       },
       "plan": {
         "rejected": "Die Anmeldung würde abgelehnt:",
@@ -4667,7 +4692,8 @@
         "managedAssignment": "Zuordnung",
         "managedSince": "Seit",
         "managedRole": "Rolle {{name}}",
-        "managedGroup": "Gruppe {{name}} ({{permission}})"
+        "managedGroup": "Gruppe {{name}} ({{permission}})",
+        "scimHint": "Für Gruppen aus der Bereitstellung: Attribut scim:groups (Gruppenname) oder scim:group_ids (Kennung beim Anmeldedienst)."
       },
       "links": {
         "intro": "Diese Konten haben sich über diesen Anmeldedienst angemeldet. Wird eine Verknüpfung gelöst, wird bei der nächsten Anmeldung neu zugeordnet, sofern das Konto wieder gefunden wird oder automatisches Anlegen aktiv ist. Sonst wird die Anmeldung abgewiesen.",
@@ -4686,6 +4712,144 @@
           "agent": "Agent",
           "customer": "Kunde"
         }
+      },
+      "scim": {
+        "title": "Bereitstellung (SCIM)",
+        "intro": "Der Anmeldedienst legt Konten und Gruppen automatisch an, ändert und deaktiviert sie. Tragen Sie dort die SCIM-Adresse und einen Schlüssel ein.",
+        "enabled": "Bereitstellung aktiv",
+        "enabledHelp": "Solange die Bereitstellung aus ist, weist Tiqora alle SCIM-Anfragen ab.",
+        "adopt": "Vorhandene Konten übernehmen",
+        "adoptHelp": "Ein Konto mit gleichem Anmeldenamen wird beim ersten Abgleich vom Anmeldedienst verwaltet – auch deaktiviert. Das Systemkonto (ID 1) wird nie übernommen. Übernommene Administratoren kann der Anmeldedienst deaktivieren.",
+        "baseUrl": "SCIM-Adresse",
+        "baseUrlMissing": "Die öffentliche Adresse von Tiqora ist nicht eingestellt (TIQORA_PUBLIC_BASE_URL). Tragen Sie beim Anmeldedienst die externe Adresse Ihrer Installation mit dem Zusatz /scim/v2 ein.",
+        "unavailable": "Die Bereitstellung ist nur für OpenID-Connect- und SAML-Anmeldedienste aus der Verwaltung möglich, nicht für LDAP.",
+        "envReadOnly": "Dieser Anmeldedienst ist über Umgebungsvariablen eingerichtet. Die Bereitstellung steht nur für Anmeldedienste aus der Verwaltung zur Verfügung; legen Sie den Dienst dort neu an.",
+        "loadError": "Die Bereitstellung konnte nicht geladen werden.",
+        "range": "{{from}}–{{to}} von {{total}}",
+        "prev": "Zurück",
+        "next": "Weiter",
+        "kinds": {
+          "agent": "Agenten",
+          "customer": "Kunden"
+        },
+        "tokens": {
+          "title": "Schlüssel",
+          "empty": "Noch kein Schlüssel erzeugt.",
+          "create": "Schlüssel erzeugen",
+          "createdTitle": "Schlüssel erzeugt",
+          "name": "Name",
+          "userKind": "Art",
+          "hint": "Schlüssel",
+          "expiresInDays": "Gültigkeit in Tagen",
+          "daysRange": "Bitte geben Sie eine ganze Zahl von 1 bis {{max}} ein.",
+          "created": "Erzeugt",
+          "copyHint": "Der Schlüssel wird nur jetzt angezeigt. Bitte kopieren Sie ihn und tragen Sie ihn beim Anmeldedienst ein.",
+          "done": "Fertig",
+          "cancel": "Abbrechen",
+          "createError": "Der Schlüssel konnte nicht erzeugt werden.",
+          "revoke": "Widerrufen",
+          "revokeTitle": "Schlüssel widerrufen?",
+          "revokeConfirm": "Der Schlüssel „{{name}}“ wird sofort ungültig. Der Anmeldedienst kann danach keine Konten mehr abgleichen.",
+          "revokeError": "Der Schlüssel konnte nicht widerrufen werden.",
+          "expires": "Gültig bis",
+          "lastUsed": "Zuletzt benutzt",
+          "never": "nie",
+          "status": "Status",
+          "activeState": "Aktiv",
+          "revoked": "Widerrufen",
+          "expired": "Abgelaufen"
+        },
+        "counts": {
+          "users": "Konten",
+          "active": "davon aktiv",
+          "groups": "Gruppen",
+          "pending": "Rollenabgleich offen",
+          "lastActivity": "Letzte Aktivität"
+        },
+        "accounts": {
+          "title": "Bereitgestellte Konten",
+          "search": "Suchen",
+          "empty": "Keine Konten gefunden.",
+          "active": "Aktiv",
+          "inactive": "Deaktiviert",
+          "deleted": "Gelöscht",
+          "login": "Konto",
+          "userName": "Benutzername",
+          "externalId": "Kennung beim Anmeldedienst",
+          "changed": "Geändert",
+          "showDeleted": "Gelöschte anzeigen"
+        },
+        "groups": {
+          "title": "Gruppen vom Anmeldedienst",
+          "empty": "Noch keine Gruppen übertragen.",
+          "name": "Name",
+          "members": "Mitglieder",
+          "rulesHint": "Gruppen wirken über Regeln mit dem Attribut scim:groups im Reiter „Rollen aus dem Anmeldedienst“."
+        },
+        "events": {
+          "title": "Protokoll",
+          "empty": "Keine Einträge.",
+          "failuresOnly": "Nur Fehler",
+          "more": "Weitere laden",
+          "loadError": "Das Protokoll konnte nicht geladen werden.",
+          "time": "Zeit",
+          "request": "Anfrage",
+          "operationLabel": "Vorgang",
+          "status": "Status",
+          "operation": {
+            "create": "Angelegt",
+            "adopt": "Übernommen",
+            "revive": "Wieder angelegt",
+            "replace": "Ersetzt",
+            "patch": "Geändert",
+            "deactivate": "Deaktiviert",
+            "reactivate": "Reaktiviert",
+            "delete": "Gelöscht",
+            "conflict": "Konflikt",
+            "rejected": "Abgewiesen",
+            "auth_failed": "Anmeldung fehlgeschlagen",
+            "rate_limited": "Begrenzt",
+            "token_create": "Schlüssel erzeugt",
+            "token_revoke": "Schlüssel widerrufen",
+            "group_create": "Gruppe angelegt",
+            "group_replace": "Gruppe ersetzt",
+            "group_patch": "Gruppe geändert",
+            "group_delete": "Gruppe gelöscht"
+          }
+        }
+      },
+      "session": {
+        "envReadOnly": "Dieser Anbieter stammt aus Umgebungsvariablen. Sitzungseinstellungen setzen einen im Adminbereich angelegten Anbieter voraus; legen Sie ihn im Adminbereich neu an.",
+        "loadError": "Die Einstellungen konnten nicht geladen werden.",
+        "requireMfa": "Zweiten Faktor vom Anmeldedienst verlangen",
+        "requireMfaHelp": "Anmeldungen ohne Nachweis eines zweiten Faktors vom Anmeldedienst werden nicht als vertrauenswürdig behandelt. Entra ID meldet ihn als amr \"mfa\", Okta als amr \"mfa\" oder \"otp\", Keycloak als acr \"2\" (mit Step-up-Flows). Verglichen wird genau: Tragen Sie jede zulässige Stufe ein, zum Beispiel 2 und 3.",
+        "fallback": {
+          "title": "Ohne Bestätigung",
+          "local_second_factor": "Zweiten Faktor in Tiqora abfragen",
+          "reject": "Anmeldung ablehnen",
+          "local_second_factor_or_enroll": "In Tiqora abfragen oder Einrichtung eines Faktors erlauben",
+          "enrollHelp": "Ermöglicht Ersteinrichtung ohne Nachweis. Wer nur das Kennwort des Anmeldedienstes kennt, kann dann einen Faktor registrieren.",
+          "localHelp": "Personen ohne eingerichteten zweiten Faktor werden abgelehnt."
+        },
+        "oidcAmr": "amr-Werte",
+        "oidcAmrHelp": "Methoden, die als zweiter Faktor gelten, zum Beispiel mfa, otp, hwk. Entra ID: mfa. Okta: mfa, otp. Keycloak: meist stattdessen acr.",
+        "oidcAcr": "acr-Werte",
+        "oidcAcrHelp": "Authentifizierungsklassen, die als zweiter Faktor gelten, zum Beispiel 2 (Keycloak-Vertrauensstufe).",
+        "oidcRequestAcr": "acr_values anfordern",
+        "oidcRequestAcrHelp": "Wird mit der Anmeldeanfrage gesendet, damit der Anmeldedienst den Faktor abfragt. Leer lassen, um nichts zu senden.",
+        "samlClasses": "Authentifizierungsklassen",
+        "samlClassesHelp": "AuthnContext-Klassen, die als zweiter Faktor gelten, zum Beispiel urn:oasis:names:tc:SAML:2.0:ac:classes:TimeSyncToken.",
+        "samlAttribute": "MFA-Attribut",
+        "samlAttributeHelp": "Attribut, das die Methoden enthält. Entra ID und AD FS verwenden den Claim authnmethodsreferences.",
+        "samlAttributeValues": "Werte des MFA-Attributs",
+        "samlRequest": "Authentifizierungsklasse anfordern",
+        "lifetime": "Sitzungsdauer",
+        "useGlobal": "Allgemeine Einstellung verwenden",
+        "idle": "Abmeldung nach Inaktivität (Minuten)",
+        "absolute": "Spätestens abmelden nach (Stunden)",
+        "idleRange": "Zwischen {{min}} und {{max}} Minuten.",
+        "absoluteRange": "Zwischen {{min}} und {{max}} Stunden.",
+        "lifetimeHelp": "Die allgemeine Einstellung ist die Obergrenze: bis zu {{idle}} Minuten Inaktivität und {{hours}} Stunden insgesamt."
       }
     },
     "reporting": {

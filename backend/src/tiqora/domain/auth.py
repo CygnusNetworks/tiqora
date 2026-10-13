@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.config import Settings
 from tiqora.db.legacy.user import UserPreferences, Users
 from tiqora.db.tiqora.models import TiqoraApiKey
+from tiqora.identity.session_lifetime import born_value, idle_from_born
 from tiqora.identity.sso_sessions import SsoSessionInfo, drop_sso, load_sso, store_sso
 from tiqora.znuny.password import hash_password, is_weak_scheme, needs_rehash, verify_password
 
@@ -198,24 +199,29 @@ class SessionStore:
     ) -> str:
         token = secrets.token_urlsafe(32)
         payload = f"{user_id}:{login}"
-        await self._client.set(self._key(token), payload, ex=self._ttl)
-        # Absolute-lifetime marker: fixed TTL, never renewed by touch(), so the
-        # session dies session_absolute_ttl_seconds after creation regardless of
-        # activity (L-2).
-        await self._client.set(self._born_key(token), "1", ex=self._absolute_ttl)
-        # Authentication timestamp for step-up checks (H-2), same fixed TTL.
-        await self._client.set(
-            self._auth_at_key(token), str(int(time.time())), ex=self._absolute_ttl
+        # A provider can only shorten the global lifetimes (S10).
+        idle = min(sso.idle_ttl or self._ttl, self._ttl) if sso is not None else self._ttl
+        absolute = (
+            min(sso.absolute_ttl or self._absolute_ttl, self._absolute_ttl)
+            if sso is not None
+            else self._absolute_ttl
         )
+        await self._client.set(self._key(token), payload, ex=idle)
+        # Absolute-lifetime marker: fixed TTL, never renewed by touch(), so the
+        # session dies at its absolute lifetime after creation regardless of
+        # activity (L-2). The value carries the idle TTL that touch() renews with.
+        await self._client.set(self._born_key(token), born_value(idle), ex=absolute)
+        # Authentication timestamp for step-up checks (H-2), same fixed TTL.
+        await self._client.set(self._auth_at_key(token), str(int(time.time())), ex=absolute)
         # Reverse index so revoke_user_sessions() can find this token (M-2).
         with contextlib.suppress(Exception):
             index_key = self._user_index_key(user_id)
             await self._client.sadd(index_key, token)
             await self._client.expire(index_key, self._absolute_ttl)
         if avatar_url:
-            await self._client.set(self._avatar_key(token), avatar_url, ex=self._ttl)
+            await self._client.set(self._avatar_key(token), avatar_url, ex=idle)
         if sso is not None:
-            await store_sso(self._client, "a", token, sso, self._absolute_ttl)
+            await store_sso(self._client, "a", token, sso, absolute)
         return token
 
     async def get_sso(self, token: str) -> SsoSessionInfo | None:
@@ -320,8 +326,9 @@ class SessionStore:
 
     async def touch(self, token: str) -> None:
         """Sliding renewal: reset TTL if the session still exists."""
-        await self._client.expire(self._key(token), self._ttl)
-        await self._client.expire(self._avatar_key(token), self._ttl)
+        idle = idle_from_born(await self._client.get(self._born_key(token)), self._ttl)
+        await self._client.expire(self._key(token), idle)
+        await self._client.expire(self._avatar_key(token), idle)
 
     async def delete(self, token: str) -> None:
         await self._client.delete(
@@ -332,7 +339,14 @@ class SessionStore:
         )
         await drop_sso(self._client, "a", token)
 
-    async def create_pending(self, user_id: int, login: str, ttl_seconds: int) -> str:
+    async def create_pending(
+        self,
+        user_id: int,
+        login: str,
+        ttl_seconds: int,
+        *,
+        sso: SsoSessionInfo | None = None,
+    ) -> str:
         """Create a short-lived 'pending 2FA' session (not resolvable by :meth:`get`).
 
         The payload is tagged with a ``PENDING:`` prefix so that
@@ -349,6 +363,9 @@ class SessionStore:
             index_key = self._user_index_key(user_id)
             await self._client.sadd(index_key, token)
             await self._client.expire(index_key, self._absolute_ttl)
+        if sso is not None:
+            # An IdP logout during the second-factor step must kill the pending token too.
+            await store_sso(self._client, "a", token, sso, ttl_seconds)
         return token
 
     async def get_pending(self, token: str) -> tuple[int, str] | None:
@@ -371,14 +388,22 @@ class SessionStore:
         if data is None:
             return None
         user_id, login = data
+        sso = await load_sso(self._client, "a", token)  # before delete() drops it
         # DEL's reply is the atomic claim: of two parallel promotions only one
         # sees the key (a fake returning None counts as "removed").
         if await self._client.delete(self._key(token)) == 0:
             return None
         await self.delete(token)
-        return await self.create(user_id, login, avatar_url=avatar_url)
+        return await self.create(user_id, login, avatar_url=avatar_url, sso=sso)
 
-    async def create_enroll(self, user_id: int, login: str, ttl_seconds: int) -> str:
+    async def create_enroll(
+        self,
+        user_id: int,
+        login: str,
+        ttl_seconds: int,
+        *,
+        sso: SsoSessionInfo | None = None,
+    ) -> str:
         """Create a short-lived 'must-enroll-2FA' session (not resolvable by :meth:`get`).
 
         Mirrored after :meth:`create_pending`: the ``ENROLL:`` prefix makes the
@@ -395,6 +420,8 @@ class SessionStore:
             index_key = self._user_index_key(user_id)
             await self._client.sadd(index_key, token)
             await self._client.expire(index_key, self._absolute_ttl)
+        if sso is not None:
+            await store_sso(self._client, "a", token, sso, ttl_seconds)
         return token
 
     async def get_enroll(self, token: str) -> tuple[int, str] | None:
@@ -417,13 +444,14 @@ class SessionStore:
         if data is None:
             return None
         user_id, login = data
+        sso = await load_sso(self._client, "a", token)  # before delete() drops it
         # Atomic claim, as in promote_pending: only one of two parallel promotions wins.
         if await self._client.delete(self._key(token)) == 0:
             return None
         await self.delete(token)
         with contextlib.suppress(Exception):
             await self._client.srem(self._user_index_key(user_id), token)
-        return await self.create(user_id, login, avatar_url=avatar_url)
+        return await self.create(user_id, login, avatar_url=avatar_url, sso=sso)
 
 
 def hash_api_key(raw_key: str) -> str:
@@ -666,7 +694,11 @@ class AuthService:
         return await self._sessions.get_pending(token)
 
     async def create_pending_session(
-        self, user: AuthenticatedUser, *, avatar_url: str | None = None
+        self,
+        user: AuthenticatedUser,
+        *,
+        avatar_url: str | None = None,
+        sso: SsoSessionInfo | None = None,
     ) -> str:
         """Create a short-lived pending-2FA session (password/SSO/SPNEGO step 1).
 
@@ -676,7 +708,7 @@ class AuthService:
         """
         _ = avatar_url
         return await self._sessions.create_pending(
-            user.id, user.login, self._settings.totp_pending_ttl_seconds
+            user.id, user.login, self._settings.totp_pending_ttl_seconds, sso=sso
         )
 
     async def promote_pending_session(
@@ -706,10 +738,12 @@ class AuthService:
     async def get_enroll_session(self, token: str) -> tuple[int, str] | None:
         return await self._sessions.get_enroll(token)
 
-    async def create_enroll_session(self, user: AuthenticatedUser) -> str:
+    async def create_enroll_session(
+        self, user: AuthenticatedUser, *, sso: SsoSessionInfo | None = None
+    ) -> str:
         """Create a short-lived must-enroll-2FA session (password login step)."""
         return await self._sessions.create_enroll(
-            user.id, user.login, self._settings.totp_pending_ttl_seconds
+            user.id, user.login, self._settings.totp_pending_ttl_seconds, sso=sso
         )
 
     async def promote_enroll_session(

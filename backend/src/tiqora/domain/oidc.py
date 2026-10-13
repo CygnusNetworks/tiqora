@@ -470,7 +470,12 @@ class OIDCService:
         return value if isinstance(value, str) and value else None
 
     async def authorize_url(
-        self, state: str, *, code_verifier: str | None = None, nonce: str | None = None
+        self,
+        state: str,
+        *,
+        code_verifier: str | None = None,
+        nonce: str | None = None,
+        acr_values: str | None = None,
     ) -> str:
         """Build the authorization URL, binding *code_verifier* via PKCE S256.
 
@@ -489,6 +494,8 @@ class OIDCService:
         )
         try:
             extra: dict[str, str] = {"nonce": nonce} if nonce else {}
+            if acr_values:
+                extra["acr_values"] = acr_values
             url, _ = client.create_authorization_url(
                 disc["authorization_endpoint"], state=state, code_verifier=code_verifier, **extra
             )

@@ -42,6 +42,7 @@ export function LoginPage() {
     completeEnrollPasskey,
     pending2fa,
     pendingFactors,
+    refreshPending,
     mustEnroll2fa,
     isAuthenticated,
     isLoading,
@@ -52,6 +53,7 @@ export function LoginPage() {
     next?: string;
     sso_error?: string;
     logged_out?: string;
+    sso_step_up?: string;
   };
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -105,6 +107,18 @@ export function LoginPage() {
     history,
   ]);
 
+  // Back from a single sign-on that still owes a second factor: ask the backend
+  // what the session cookie is waiting for, once per mount.
+  const stepUp = search.sso_step_up === "1";
+  const stepUpChecked = useRef(false);
+  // The pending login expired (or was never there): say so above the normal form.
+  const [stepUpExpired, setStepUpExpired] = useState(false);
+  useEffect(() => {
+    if (!stepUp || stepUpChecked.current) return;
+    stepUpChecked.current = true;
+    void refreshPending().then((state) => setStepUpExpired(state === "none"));
+  }, [stepUp, refreshPending]);
+
   // Seamless SSO re-auth: when an expired session bounced the agent here (a
   // `next` target is present) and Kerberos/SPNEGO is available, start a short
   // countdown then enter the handshake so a valid ticket lands them back
@@ -129,6 +143,9 @@ export function LoginPage() {
 
   useEffect(() => {
     if (autoSsoTriggered.current) return;
+    // Back from a single sign-on step-up: the second factor is asked for here,
+    // never a Kerberos handshake (pending2fa is still false until /auth/pending answers).
+    if (stepUp) return;
     if (isLoading || isAuthenticated || pending2fa || mustEnroll2fa) return;
     if (ssoErrorFlag || !spnegoEnabled) return;
     if (!isSafeNextPath(search.next)) return;
@@ -140,6 +157,7 @@ export function LoginPage() {
     reauthNextRef.current = search.next;
     setKerberosReauthSeconds(KERBEROS_REAUTH_DELAY_S);
   }, [
+    stepUp,
     isLoading,
     isAuthenticated,
     pending2fa,
@@ -148,6 +166,11 @@ export function LoginPage() {
     spnegoEnabled,
     search.next,
   ]);
+
+  // A second-factor step that appears while the countdown runs cancels it.
+  useEffect(() => {
+    if (pending2fa || mustEnroll2fa) setKerberosReauthSeconds(null);
+  }, [pending2fa, mustEnroll2fa]);
 
   // Tick the countdown once per second; redirect when it hits zero.
   useEffect(() => {
@@ -296,6 +319,14 @@ export function LoginPage() {
           <h1 className="text-center font-display text-2xl font-bold tracking-tight text-ink">
             {t("auth.mustEnroll.title")}
           </h1>
+          {stepUp && (
+            <p
+              className="mt-3 text-center text-sm text-muted"
+              data-testid="sso-step-up-hint"
+            >
+              {t("auth.stepUp.hint")}
+            </p>
+          )}
           <p
             className="mt-1.5 text-center text-sm text-muted"
             data-testid="must-enroll-hint"
@@ -425,6 +456,14 @@ export function LoginPage() {
           <p className="mt-1.5 text-center text-sm text-muted">
             {totpAvailable ? t("auth.totpHint") : t("auth.passkeyOnlyHint")}
           </p>
+          {stepUp && (
+            <p
+              className="mt-3 text-center text-sm text-muted"
+              data-testid="sso-step-up-hint"
+            >
+              {t("auth.stepUp.hint")}
+            </p>
+          )}
           {totpAvailable && (
             <form
               onSubmit={(e) => void onVerifyTotp(e)}
@@ -533,6 +572,15 @@ export function LoginPage() {
             data-testid="logged-out-note"
           >
             {t("auth.loggedOut")}
+          </p>
+        )}
+        {stepUpExpired && !ssoErrorMessageKey && (
+          <p
+            className="mt-3 rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-sm text-muted"
+            role="status"
+            data-testid="sso-step-up-expired"
+          >
+            {t("auth.stepUp.expired")}
           </p>
         )}
         {ssoErrorMessageKey && (

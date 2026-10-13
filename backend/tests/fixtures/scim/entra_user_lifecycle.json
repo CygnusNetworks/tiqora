@@ -1,0 +1,32 @@
+{
+  "description": "Microsoft Entra ID provisioning cycle for one user (made-up data, request shapes as Entra sends them).",
+  "steps": [
+    {"name": "lookup before create", "method": "GET", "path": "/Users",
+     "query": {"filter": "userName eq \"sc63conf.entra1@example.test\""},
+     "status": 200, "expect": {"totalResults": 0, "Resources": []}},
+    {"name": "create", "method": "POST", "path": "/Users",
+     "body": {"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "externalId": "entra-obj-0001", "userName": "sc63conf.entra1@example.test", "active": true,
+              "displayName": "Erika Muster", "name": {"givenName": "Erika", "familyName": "Muster"},
+              "emails": [{"type": "work", "value": "sc63conf.entra1@example.test", "primary": true}]},
+     "status": 201, "capture": {"user_id": "id"},
+     "expect": {"userName": "sc63conf.entra1@example.test", "active": true, "name": {"givenName": "Erika"}}},
+    {"name": "lookup after create", "method": "GET", "path": "/Users",
+     "query": {"filter": "userName eq \"sc63conf.entra1@example.test\""},
+     "status": 200, "expect": {"totalResults": 1, "Resources": [{"id": "{user_id}"}]}},
+    {"name": "read", "method": "GET", "path": "/Users/{user_id}", "status": 200,
+     "expect": {"id": "{user_id}", "userName": "sc63conf.entra1@example.test", "active": true}},
+    {"name": "replace given name and work email", "method": "PATCH", "path": "/Users/{user_id}",
+     "body": {"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [
+       {"op": "Replace", "path": "name.givenName", "value": "Erna"},
+       {"op": "Replace", "path": "emails[type eq \"work\"].value", "value": "sc63conf.entra1@example.test"}]},
+     "status": 200, "expect": {"name": {"givenName": "Erna", "familyName": "Muster"}, "active": true}},
+    {"name": "deactivate with the string False", "method": "PATCH", "path": "/Users/{user_id}",
+     "body": {"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{"op": "Replace", "path": "active", "value": "False"}]},
+     "status": 200, "expect": {"active": false}},
+    {"name": "still readable while inactive", "method": "GET", "path": "/Users/{user_id}", "status": 200,
+     "expect": {"active": false}},
+    {"name": "delete", "method": "DELETE", "path": "/Users/{user_id}", "status": 204},
+    {"name": "gone", "method": "GET", "path": "/Users/{user_id}", "status": 404,
+     "expect": {"status": "404"}}
+  ]
+}

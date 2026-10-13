@@ -31,6 +31,7 @@ _OPTIONAL_FIELDS = (
     "sid",
     "id_token_hint",
 )
+_TTL_FIELDS = ("idle_ttl", "absolute_ttl")
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +47,8 @@ class SsoSessionInfo:
     sp_name_qualifier: str | None = None
     sid: str | None = None
     id_token_hint: str | None = field(default=None, repr=False)
+    idle_ttl: int | None = None  # seconds; already capped to the global value
+    absolute_ttl: int | None = None  # seconds; already capped (global, provider, SAML)
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), separators=(",", ":"))
@@ -75,6 +78,13 @@ class SsoSessionInfo:
                 if value is not None and not isinstance(value, str):
                     return None
                 optional[name] = value
+            for name in _TTL_FIELDS:
+                ttl = data.get(name)
+                if ttl is not None and (
+                    not isinstance(ttl, int) or isinstance(ttl, bool) or ttl <= 0
+                ):
+                    return None
+                optional[name] = ttl
             return cls(
                 provider_id=provider_id,
                 slug=slug,
@@ -114,10 +124,13 @@ async def store_sso(
     redis: Any, audience: AudienceKey, token: str, info: SsoSessionInfo, ttl: int
 ) -> None:
     await redis.set(sso_key(audience, token), info.to_json(), ex=ttl)
-    with contextlib.suppress(Exception):
-        for key in _index_keys(audience, info):
+    for key in _index_keys(audience, info):
+        with contextlib.suppress(Exception):
             await redis.sadd(key, token)
-            await redis.expire(key, ttl)
+            # The shared index outlives its longest-lived member: a short-lived (pending)
+            # token must not shorten the revocation lookup of a full session.
+            current = await redis.ttl(key)
+            await redis.expire(key, max(ttl, current) if isinstance(current, int) else ttl)
 
 
 async def load_sso(redis: Any, audience: AudienceKey, token: str) -> SsoSessionInfo | None:

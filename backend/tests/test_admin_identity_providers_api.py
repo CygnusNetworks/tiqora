@@ -922,3 +922,77 @@ async def test_stored_draft_keeps_unset_fields(env: Env) -> None:
     assert record is not None
     drafted = record_with_changes(record, back.draft)
     assert (drafted.name, drafted.button_label) == ("Neuer Name", "Mein Login")
+
+
+# --------------------------------------------------------------------------- phase 3 fields
+
+
+async def test_patch_provider_step_up_and_lifetime(env: Env) -> None:
+    created = await env.oidc_provider("stepup")
+    assert created["require_mfa_claim"] is False
+    assert created["mfa_policy"]["fallback"] == "local_second_factor"
+    assert created["session_idle_seconds"] is None
+    assert created["scim_enabled"] is False
+
+    resp = await env.patch(
+        created["id"],
+        {
+            "require_mfa_claim": True,
+            "mfa_policy": {"fallback": "reject"},
+            "session_idle_seconds": 900,
+            "scim_enabled": True,
+            "scim_adopt_existing": True,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    shown = (await env.client.get(f"{BASE}/{created['id']}")).json()
+    assert shown["require_mfa_claim"] is True
+    assert shown["session_idle_seconds"] == 900
+    assert shown["session_absolute_seconds"] is None
+    assert shown["scim_enabled"] is True
+    assert shown["scim_adopt_existing"] is True
+    assert shown["mfa_policy"]["fallback"] == "reject"
+    assert shown["mfa_policy"]["oidc_amr_values"] == ["mfa"]  # other fields keep their defaults
+
+    # a partial policy is merged onto the stored one, not onto the defaults
+    resp = await env.patch(created["id"], {"mfa_policy": {"oidc_acr_values": ["urn:mfa"]}})
+    assert resp.status_code == 200, resp.text
+    merged = resp.json()["mfa_policy"]
+    assert merged["fallback"] == "reject"
+    assert merged["oidc_acr_values"] == ["urn:mfa"]
+
+    # an explicit null resets a lifetime to the global value
+    resp = await env.patch(created["id"], {"session_idle_seconds": None})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["session_idle_seconds"] is None
+
+
+async def test_patch_provider_phase3_validation(env: Env) -> None:
+    created = await env.oidc_provider("stepval")
+    cases: list[tuple[dict[str, Any], str]] = [
+        ({"session_idle_seconds": 10}, "session_idle_seconds"),
+        ({"session_absolute_seconds": 10**9}, "session_absolute_seconds"),
+        (
+            {"session_idle_seconds": 3600, "session_absolute_seconds": 1000},
+            "session_idle_seconds",
+        ),
+        ({"mfa_policy": {"oidc_amr_values": [f"v{i}" for i in range(21)]}}, "mfa_policy"),
+    ]
+    for body, field in cases:
+        resp = await env.patch(created["id"], body)
+        assert resp.status_code == 422, (body, resp.text)
+        assert field in resp.json()["detail"]["errors"], (body, resp.text)
+    unknown = await env.patch(created["id"], {"mfa_policy": {"no_such_field": 1}})
+    assert unknown.status_code == 422
+    shown = (await env.client.get(f"{BASE}/{created['id']}")).json()
+    assert shown["session_idle_seconds"] is None  # nothing was saved
+    assert shown["mfa_policy"]["oidc_amr_values"] == ["mfa"]
+
+
+async def test_capabilities_include_limits_and_scim_url(env: Env) -> None:
+    resp = await env.client.get(f"{BASE}/capabilities")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["session_idle_max_seconds"] == env.settings.session_ttl_seconds
+    assert body["session_absolute_max_seconds"] == env.settings.session_absolute_ttl_seconds
+    assert body["scim_base_url"] == "https://helpdesk.example.org/scim/v2"

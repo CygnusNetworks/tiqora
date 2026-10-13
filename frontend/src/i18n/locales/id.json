@@ -236,6 +236,10 @@
     "kerberosReauthCountdown": "Memperbarui proses masuk Kerberos dalam {{seconds}}s…",
     "kerberosReauthNow": "Masuk sekarang",
     "ssoFailed": "SSO gagal — silakan masuk dengan kata sandi Anda.",
+    "stepUp": {
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in.",
+      "expired": "The sign-in has expired. Please sign in again."
+    },
     "mustEnroll": {
       "title": "Siapkan autentikasi dua faktor",
       "hint": "2FA diperlukan untuk akun ini — silakan atur sekarang.",
@@ -265,7 +269,8 @@
       "state": "The sign-in took too long or was started in another window. Please try again.",
       "saml_invalid": "The response of the sign-in service was invalid. Please try again.",
       "oidc_failed": "Signing in with the sign-in service failed. Please try again.",
-      "idp_error": "The sign-in service rejected the sign-in."
+      "idp_error": "The sign-in service rejected the sign-in.",
+      "mfa_required": "Your sign-in service did not confirm a sign-in with a second factor. Please sign in there with a second factor. If that is not possible, contact your administrator."
     },
     "loggedOut": "You have been signed out."
   },
@@ -1349,6 +1354,9 @@
       "preferences": "Preferensi"
     },
     "login": {
+      "stepUp": {
+        "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      },
       "subtitle": "Masuk ke akun dukungan Anda",
       "email": "Email atau nama pengguna",
       "ssoDivider": "or",
@@ -3426,6 +3434,14 @@
         "gi_debug_cleanup": {
           "name": "Clean up web service log",
           "description": "Deletes old entries of the web service log."
+        },
+        "scim_role_sync": {
+          "name": "Roles from provisioned groups",
+          "description": "Applies group changes from the identity provider to roles and groups in Tiqora."
+        },
+        "scim_events_purge": {
+          "name": "Clean up provisioning log",
+          "description": "Deletes SCIM log entries after the retention period."
         }
       },
       "takeoverBadge": "Pengambilalihan",
@@ -4334,7 +4350,9 @@
         "mapping": "Mapping",
         "roles": "Roles from the sign-in service",
         "test": "Test sign-in",
-        "links": "Links"
+        "links": "Links",
+        "provisioning": "Provisioning (SCIM)",
+        "session": "Session & second factor"
       },
       "sections": {
         "general": "General",
@@ -4404,7 +4422,14 @@
         "timeout": "No result arrived within two minutes. Please start the test sign-in again.",
         "subject": "Identifier",
         "attributesHeading": "Values sent by the sign-in service",
-        "useForPreview": "Use these values for the preview"
+        "useForPreview": "Use these values for the preview",
+        "mfa": {
+          "label": "Second factor from the sign-in service",
+          "satisfied": "confirmed",
+          "unsatisfied": "not confirmed",
+          "notRequired": "not required",
+          "evidence": "Second-factor evidence"
+        }
       },
       "plan": {
         "rejected": "The sign-in would be rejected:",
@@ -4659,7 +4684,8 @@
         "managedAssignment": "Assignment",
         "managedSince": "Since",
         "managedRole": "Role {{name}}",
-        "managedGroup": "Group {{name}} ({{permission}})"
+        "managedGroup": "Group {{name}} ({{permission}})",
+        "scimHint": "For groups from provisioning: attribute scim:groups (group name) or scim:group_ids (ID at the identity provider)."
       },
       "links": {
         "intro": "These accounts signed in through this sign-in service. When a link is removed, the account is matched again on its next sign-in.",
@@ -4678,6 +4704,144 @@
           "agent": "Agent",
           "customer": "Customer"
         }
+      },
+      "scim": {
+        "title": "Provisioning (SCIM)",
+        "intro": "The identity provider creates, changes and deactivates accounts and groups automatically. Enter the SCIM address and a key there.",
+        "enabled": "Provisioning active",
+        "enabledHelp": "While provisioning is off, Tiqora rejects every SCIM request.",
+        "adopt": "Adopt existing accounts",
+        "adoptHelp": "An account with the same login name is managed by the identity provider from the first sync on, even if it is deactivated. The system account (ID 1) is never adopted. The identity provider can deactivate adopted administrators.",
+        "baseUrl": "SCIM address",
+        "baseUrlMissing": "The public address of Tiqora is not set (TIQORA_PUBLIC_BASE_URL). Enter the external address of your installation plus /scim/v2 at the identity provider.",
+        "unavailable": "Provisioning is only available for OpenID Connect and SAML providers created in the admin area, not for LDAP.",
+        "envReadOnly": "This identity provider is configured through environment variables. Provisioning is only available for providers created in the admin area; re-create the provider there.",
+        "loadError": "Provisioning could not be loaded.",
+        "range": "{{from}}–{{to}} of {{total}}",
+        "prev": "Previous",
+        "next": "Next",
+        "kinds": {
+          "agent": "Agents",
+          "customer": "Customers"
+        },
+        "tokens": {
+          "title": "Keys",
+          "empty": "No key created yet.",
+          "create": "Create key",
+          "createdTitle": "Key created",
+          "name": "Name",
+          "userKind": "Kind",
+          "hint": "Key",
+          "expiresInDays": "Valid for (days)",
+          "daysRange": "Enter a whole number from 1 to {{max}}.",
+          "created": "Created",
+          "copyHint": "The key is shown only now. Please copy it and enter it at the identity provider.",
+          "done": "Done",
+          "cancel": "Cancel",
+          "createError": "The key could not be created.",
+          "revoke": "Revoke",
+          "revokeTitle": "Revoke key?",
+          "revokeConfirm": "The key \"{{name}}\" becomes invalid immediately. The identity provider can no longer sync accounts afterwards.",
+          "revokeError": "The key could not be revoked.",
+          "expires": "Valid until",
+          "lastUsed": "Last used",
+          "never": "never",
+          "status": "Status",
+          "activeState": "Active",
+          "revoked": "Revoked",
+          "expired": "Expired"
+        },
+        "counts": {
+          "users": "Accounts",
+          "active": "of which active",
+          "groups": "Groups",
+          "pending": "Role sync pending",
+          "lastActivity": "Last activity"
+        },
+        "accounts": {
+          "title": "Provisioned accounts",
+          "search": "Search",
+          "empty": "No accounts found.",
+          "active": "Active",
+          "inactive": "Deactivated",
+          "deleted": "Deleted",
+          "login": "Account",
+          "userName": "User name",
+          "externalId": "ID at the identity provider",
+          "changed": "Changed",
+          "showDeleted": "Show deleted"
+        },
+        "groups": {
+          "title": "Groups from the identity provider",
+          "empty": "No groups pushed yet.",
+          "name": "Name",
+          "members": "Members",
+          "rulesHint": "Groups take effect through rules with the attribute scim:groups on the \"Roles from the sign-in service\" tab."
+        },
+        "events": {
+          "title": "Log",
+          "empty": "No entries.",
+          "failuresOnly": "Errors only",
+          "more": "Load more",
+          "loadError": "The log could not be loaded.",
+          "time": "Time",
+          "request": "Request",
+          "operationLabel": "Operation",
+          "status": "Status",
+          "operation": {
+            "create": "Created",
+            "adopt": "Adopted",
+            "revive": "Re-created",
+            "replace": "Replaced",
+            "patch": "Changed",
+            "deactivate": "Deactivated",
+            "reactivate": "Reactivated",
+            "delete": "Deleted",
+            "conflict": "Conflict",
+            "rejected": "Rejected",
+            "auth_failed": "Authentication failed",
+            "rate_limited": "Rate limited",
+            "token_create": "Key created",
+            "token_revoke": "Key revoked",
+            "group_create": "Group created",
+            "group_replace": "Group replaced",
+            "group_patch": "Group changed",
+            "group_delete": "Group deleted"
+          }
+        }
+      },
+      "session": {
+        "envReadOnly": "This provider comes from environment variables. Session settings need a provider created here in the admin area; recreate it to use them.",
+        "loadError": "The settings could not be loaded.",
+        "requireMfa": "Require a second factor from the sign-in service",
+        "requireMfaHelp": "Sign-ins without proof of a second factor from the sign-in service are not trusted. Entra ID reports it as amr \"mfa\", Okta as amr \"mfa\" or \"otp\", Keycloak as acr \"2\" (with step-up flows). Values are compared exactly: list every accepted level, for example 2 and 3.",
+        "fallback": {
+          "title": "Without proof",
+          "local_second_factor": "Ask for the second factor in Tiqora",
+          "reject": "Reject the sign-in",
+          "local_second_factor_or_enroll": "Ask in Tiqora, or let users set up a second factor",
+          "enrollHelp": "Allows first-time setup without proof. Anyone who knows only the password of the sign-in service can then register a factor.",
+          "localHelp": "People without a second factor set up in Tiqora are refused."
+        },
+        "oidcAmr": "amr values",
+        "oidcAmrHelp": "Methods that count as a second factor, for example mfa, otp, hwk. Entra ID: mfa. Okta: mfa, otp. Keycloak: usually acr instead.",
+        "oidcAcr": "acr values",
+        "oidcAcrHelp": "Authentication classes that count as a second factor, for example 2 (Keycloak level of assurance).",
+        "oidcRequestAcr": "Request acr_values",
+        "oidcRequestAcrHelp": "Sent with the sign-in request so the sign-in service asks for the factor. Leave empty to send nothing.",
+        "samlClasses": "Authentication classes",
+        "samlClassesHelp": "AuthnContext classes that count as a second factor, for example urn:oasis:names:tc:SAML:2.0:ac:classes:TimeSyncToken.",
+        "samlAttribute": "MFA attribute",
+        "samlAttributeHelp": "Attribute that carries the methods. Entra ID and AD FS use the authnmethodsreferences claim.",
+        "samlAttributeValues": "Values of the MFA attribute",
+        "samlRequest": "Request an authentication class",
+        "lifetime": "Session duration",
+        "useGlobal": "Use the general setting",
+        "idle": "Sign out after inactivity (minutes)",
+        "absolute": "Sign out after at most (hours)",
+        "idleRange": "Between {{min}} and {{max}} minutes.",
+        "absoluteRange": "Between {{min}} and {{max}} hours.",
+        "lifetimeHelp": "The general setting is the upper limit: up to {{idle}} minutes of inactivity and {{hours}} hours in total."
       }
     },
     "reporting": {

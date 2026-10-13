@@ -198,6 +198,46 @@ Public URL and SAML:
 * The worker refreshes SAML IdP metadata URLs daily (04:30 UTC) and keeps the
   last good metadata when a fetch fails.
 
+### SCIM provisioning
+
+Identity providers can push accounts and groups to `/scim/v2` (guide:
+[guide/identity-providers.md](guide/identity-providers.md#bereitstellung-mit-scim)). **Deploy blockers**
+for the Puppet-managed nginx (not inspectable from this repository, so a checklist item):
+
+```nginx
+location /scim/ {
+    proxy_pass http://tiqora-api;   # same upstream as /api/
+    # same proxy_set_header lines as the /api/ block: the per-IP lockout and the
+    # Location/meta.location fallback (no TIQORA_PUBLIC_BASE_URL) read them
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 2m;
+    proxy_read_timeout 90s;
+}
+```
+
+Without this block `/scim/` is not reachable (the IdP's "test connection" fails with 404 or an HTML page).
+`TIQORA_TRUSTED_PROXIES` (and `TIQORA_FORWARDED_ALLOW_IPS`) must be set as well: the failed-token lockout is
+per client IP, so behind an unconfigured proxy every bad token counts against the proxy address.
+A request with a valid token is never subject to that lockout.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `TIQORA_SCIM_RATE_LIMIT_ENABLED` | `true` | per-token request throttle |
+| `TIQORA_SCIM_RATE_LIMIT_MAX` / `TIQORA_SCIM_RATE_LIMIT_WINDOW` | `600` / `60` | requests per window and token |
+| `TIQORA_SCIM_AUTH_FAIL_MAX` / `TIQORA_SCIM_AUTH_FAIL_WINDOW` | `10` / `600` | failed token attempts per IP and window before the lockout |
+| `TIQORA_SCIM_AUTH_LOCKOUT` | `900` | lockout seconds (429 for bad tokens only) |
+| `TIQORA_SCIM_MAX_BODY_BYTES` | `2097152` | largest accepted request body |
+| `TIQORA_SCIM_MAX_MEMBERS` | `5000` | members a group request may carry |
+| `TIQORA_SCIM_ROLE_SYNC_INTERVAL` | `15` | seconds between role-sync ticks (daemon `scim_role_sync`) |
+| `TIQORA_SCIM_EVENT_RETENTION_DAYS` | `180` | audit retention (daemon `scim_events_purge`) |
+
+Release checklist: the `/scim/` nginx block exists, `TIQORA_TRUSTED_PROXIES` is set, `TIQORA_PUBLIC_BASE_URL`
+is set. Each SCIM request is bounded work on `tiqora_scim_*` tables; Znuny role writes happen in the
+`scim_role_sync` worker, so no request approaches the 90 s limit.
+
 ## Kerberos / SPNEGO configuration
 
 Optional. The **production Docker image** already includes the `kerberos`
@@ -687,4 +727,5 @@ Known examples:
 - [ ] Network isolation: DB not public
 - [ ] MCP API keys rotated and scoped
 - [ ] AGPL obligations understood for network-facing deployments
+- [ ] SCIM: nginx `location /scim/` ([SCIM provisioning](#scim-provisioning)), `TIQORA_TRUSTED_PROXIES` set
 - [ ] Web chat: `TIQORA_PUBLIC_BASE_URL`, `TIQORA_TRUSTED_PROXIES` set; [post-deploy check](#post-deploy-check-run-once-on-production) done

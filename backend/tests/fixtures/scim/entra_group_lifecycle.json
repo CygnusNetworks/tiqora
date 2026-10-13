@@ -1,0 +1,37 @@
+{
+  "description": "Microsoft Entra ID group sync: lookup, create, add members, remove members with a value list; role arrives via the rule engine.",
+  "steps": [
+    {"name": "user one", "method": "POST", "path": "/Users",
+     "body": {"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "userName": "sc63conf.entra2@example.test", "active": true,
+              "name": {"givenName": "Max", "familyName": "Muster"},
+              "emails": [{"type": "work", "value": "sc63conf.entra2@example.test", "primary": true}]},
+     "status": 201, "capture": {"user_id": "id"}},
+    {"name": "user two", "method": "POST", "path": "/Users",
+     "body": {"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "userName": "sc63conf.entra3@example.test", "active": true,
+              "name": {"givenName": "Eva", "familyName": "Muster"},
+              "emails": [{"type": "work", "value": "sc63conf.entra3@example.test", "primary": true}]},
+     "status": 201, "capture": {"user2_id": "id"}},
+    {"name": "group lookup without members", "method": "GET", "path": "/Groups",
+     "query": {"filter": "displayName eq \"Support\"", "excludedAttributes": "members"},
+     "status": 200, "expect": {"totalResults": 0, "Resources": []}},
+    {"name": "create group", "method": "POST", "path": "/Groups",
+     "body": {"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"], "externalId": "entra-grp-0001", "displayName": "Support", "members": []},
+     "status": 201, "capture": {"group_id": "id"}, "expect": {"displayName": "Support"}},
+    {"name": "add both members", "method": "PATCH", "path": "/Groups/{group_id}",
+     "body": {"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [
+       {"op": "Add", "path": "members", "value": [{"value": "{user_id}"}, {"value": "{user2_id}"}]}]},
+     "status": 200, "expect": {"displayName": "Support"}},
+    {"name": "members now hold the rule role", "action": "role_sync_tick",
+     "users": ["sc63conf.entra2@example.test", "sc63conf.entra3@example.test"], "role": "present"},
+    {"name": "read with members", "method": "GET", "path": "/Groups/{group_id}", "status": 200,
+     "expect": {"id": "{group_id}", "members": [{"value": "{user_id}"}, {"value": "{user2_id}"}]}},
+    {"name": "remove one member with a value list", "method": "PATCH", "path": "/Groups/{group_id}",
+     "body": {"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [
+       {"op": "Remove", "path": "members", "value": [{"value": "{user2_id}"}]}]},
+     "status": 200, "expect": {"members": [{"value": "{user_id}"}]}},
+    {"name": "second member lost the role", "action": "role_sync_tick",
+     "users": ["sc63conf.entra3@example.test"], "role": "absent"},
+    {"name": "first member keeps it", "action": "role_sync_tick",
+     "users": ["sc63conf.entra2@example.test"], "role": "present"}
+  ]
+}

@@ -19,7 +19,7 @@ import httpx
 import redis.asyncio as redis
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from pydantic import BaseModel, SecretStr
+from pydantic import BaseModel, SecretStr, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,13 +33,16 @@ from tiqora.api.v1.admin.identity_schemas import (
     IdentityPresetOut,
     IdentityProviderCreate,
     IdentityProviderOut,
+    IdentityProviderPatch,
     IdentityProviderSummaryOut,
+    IdentityTestMfaOut,
     IdentityTestResultOut,
     IdentityTestStartIn,
     IdentityTestStartOut,
     LoginPlanOut,
     ManagedAssignmentOut,
     MappingPreviewIn,
+    MfaPolicyOut,
     NamedRefOut,
     ProviderEndpointsOut,
 )
@@ -52,6 +55,7 @@ from tiqora.identity.config_models import (
     CONFIG_MODELS,
     HIDDEN_CONFIG_FIELDS,
     READ_ONLY_CONFIG_FIELDS,
+    MfaPolicy,
     SamlProviderConfig,
     secret_fields,
 )
@@ -78,7 +82,7 @@ from tiqora.identity.store import (
     validate_changes,
 )
 from tiqora.identity.types import audience_includes
-from tiqora.identity.urls import IdentityUrlsUnavailable, provider_urls
+from tiqora.identity.urls import IdentityUrlsUnavailable, provider_urls, scim_base_url
 from tiqora.settings_sections.section import SECRET_MASK
 
 logger = structlog.get_logger(__name__)
@@ -239,6 +243,12 @@ async def _out(
         sync_mode=record.sync_mode,
         metadata_fetched_at=record.metadata_fetched_at,
         endpoints=_endpoints(record, settings),
+        require_mfa_claim=record.require_mfa_claim,
+        mfa_policy=MfaPolicyOut.model_validate(record.mfa_policy.model_dump()),
+        session_idle_seconds=record.session_idle_seconds,
+        session_absolute_seconds=record.session_absolute_seconds,
+        scim_enabled=record.scim_enabled,
+        scim_adopt_existing=record.scim_adopt_existing,
     )
 
 
@@ -395,6 +405,9 @@ async def identity_capabilities(admin: AdminUser, settings: AppSettings) -> Iden
         saml_missing=availability.missing,
         public_base_url_set=bool(settings.public_base_url.strip()),
         webauthn=webauthn_enabled(settings),
+        session_idle_max_seconds=settings.session_ttl_seconds,
+        session_absolute_max_seconds=settings.session_absolute_ttl_seconds,
+        scim_base_url=scim_base_url(settings),
     )
 
 
@@ -431,18 +444,45 @@ async def get_identity_provider(
     return await _out(session, settings, await _require(session, settings, provider_id))
 
 
+def _merged_changes(patch: IdentityProviderPatch, before: ProviderRecord | None) -> ProviderChanges:
+    """The PATCH body as ``ProviderChanges``, its partial MFA policy merged onto the stored one.
+
+    The merged policy is validated here (the only write path), so out-of-range lists answer
+    422 with the field name instead of a 500.
+    """
+    data = patch.model_dump(exclude_unset=True)
+    given = data.pop("mfa_policy", None)
+    if given is not None:
+        base = before.mfa_policy if before is not None else MfaPolicy()
+        updates = {k: v for k, v in given.items() if v is not None}
+        try:
+            data["mfa_policy"] = MfaPolicy.model_validate(
+                base.model_copy(update=updates).model_dump()
+            )
+        except ValidationError as exc:
+            msg = "; ".join(str(e["msg"]).removeprefix("Value error, ") for e in exc.errors())
+            raise _validation_error(ProviderValidationError({"mfa_policy": msg})) from exc
+    return ProviderChanges.model_validate(data)
+
+
 @router.patch("/{provider_id}", response_model=IdentityProviderOut)
 async def update_identity_provider(
     provider_id: int,
-    body: ProviderChanges,
+    patch: IdentityProviderPatch,
     admin: AdminUser,
     session: DbSession,
     settings: AppSettings,
 ) -> IdentityProviderOut:
     try:
         before = await get_provider(session, provider_id, secret_key=settings.secret_key)
+        body = _merged_changes(patch, before)
         record = await update_provider(
-            session, provider_id, body, secret_key=settings.secret_key, actor_id=admin.id
+            session,
+            provider_id,
+            body,
+            secret_key=settings.secret_key,
+            actor_id=admin.id,
+            settings=settings,
         )
         if body.config is not None and before is not None and _metadata_stale(before, record):
             record = await _check_metadata(session, settings, record)
@@ -514,7 +554,7 @@ def _login_url(slug: str, audience: str, test_id: str) -> str:
 
 
 async def _check_draft(
-    session: AsyncSession, record: ProviderRecord, draft: ProviderChanges | None
+    session: AsyncSession, settings: Settings, record: ProviderRecord, draft: ProviderChanges | None
 ) -> ProviderRecord:
     """The record with the (validated) unsaved draft applied; env rows take no draft."""
     if draft is None:
@@ -522,7 +562,7 @@ async def _check_draft(
     if record.read_only:
         raise _read_only()
     try:
-        await validate_changes(session, draft)
+        await validate_changes(session, draft, settings=settings, record=record)
         return record_with_changes(record, draft)
     except ProviderValidationError as exc:
         raise _validation_error(exc) from exc
@@ -545,7 +585,7 @@ async def start_identity_test(
         )
     if not audience_includes(record.audience, body.audience):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"message": MSG_AUDIENCE})
-    await _check_draft(session, record, body.draft)
+    await _check_draft(session, settings, record, body.draft)
     test_id = secrets.token_urlsafe(24)
     await flow_state.put_test(
         redis_client,
@@ -579,6 +619,7 @@ async def get_identity_test(
         subject=result.subject if result else None,
         attributes=result.attributes if result else {},
         plan=await plan_to_out(session, result.plan) if result else None,
+        mfa=IdentityTestMfaOut.model_validate(result.mfa) if result and result.mfa else None,
     )
 
 
@@ -595,7 +636,7 @@ async def preview_identity_mapping(
     record = await _require(session, settings, provider_id)
     if not audience_includes(record.audience, body.audience):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"message": MSG_AUDIENCE})
-    record = await _check_draft(session, record, body.draft)
+    record = await _check_draft(session, settings, record, body.draft)
     identity = ExternalIdentity(
         provider_id=record.id,
         subject=body.subject,

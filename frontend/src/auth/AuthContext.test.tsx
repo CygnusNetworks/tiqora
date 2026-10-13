@@ -19,6 +19,7 @@ const {
   rememberLoginMethodMock,
   clearLoginMethodMock,
   submitSsoLogoutMock,
+  pendingLoginMock,
 } = vi.hoisted(() => ({
   meMock: vi.fn(),
   loginMock: vi.fn(),
@@ -34,7 +35,10 @@ const {
   rememberLoginMethodMock: vi.fn(),
   clearLoginMethodMock: vi.fn(),
   submitSsoLogoutMock: vi.fn(),
+  pendingLoginMock: vi.fn(),
 }));
+
+vi.mock("@/lib/identityApi", () => ({ getPendingLogin: pendingLoginMock }));
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>();
@@ -362,6 +366,50 @@ describe("AuthContext", () => {
     });
     expect(logoutMock).toHaveBeenCalled();
     expect(submitSsoLogoutMock).not.toHaveBeenCalled();
+  });
+
+  it("refreshPending() enters the TOTP step for a pending_2fa state", async () => {
+    pendingLoginMock.mockResolvedValue({
+      state: "pending_2fa",
+      totp_enrolled: true,
+      passkey_enrolled: false,
+    });
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    let state: string | undefined;
+    await act(async () => {
+      state = await result.current.refreshPending();
+    });
+    expect(state).toBe("pending_2fa");
+    expect(result.current.pending2fa).toBe(true);
+    expect(result.current.pendingFactors).toEqual({ totp: true, passkey: false });
+    expect(result.current.mustEnroll2fa).toBe(false);
+  });
+
+  it("refreshPending() enters enrolment for must_enroll_2fa", async () => {
+    pendingLoginMock.mockResolvedValue({ state: "must_enroll_2fa" });
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await act(async () => {
+      await result.current.refreshPending();
+    });
+    expect(result.current.mustEnroll2fa).toBe(true);
+    expect(result.current.pending2fa).toBe(false);
+  });
+
+  it("refreshPending() leaves everything alone for state none or a failed request", async () => {
+    const { result } = renderHook(() => useAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    pendingLoginMock.mockResolvedValueOnce({ state: "none" });
+    await act(async () => {
+      expect(await result.current.refreshPending()).toBe("none");
+    });
+    pendingLoginMock.mockRejectedValueOnce(new Error("offline"));
+    await act(async () => {
+      expect(await result.current.refreshPending()).toBe("none");
+    });
+    expect(result.current.pending2fa).toBe(false);
+    expect(result.current.mustEnroll2fa).toBe(false);
   });
 
   it("refresh() re-fetches /me", async () => {

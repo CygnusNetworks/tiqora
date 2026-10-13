@@ -1,7 +1,19 @@
 import type { Schemas } from "@tiqora/api-client";
 import { ApiError, api } from "./api";
+import { portalApi } from "./portalApi";
 
 export type LoginProvider = Schemas["LoginProviderOut"];
+export type PendingLogin = Schemas["PendingLoginOut"];
+
+/** State of the agent login behind the session cookie (a second factor after single sign-on). */
+export function getPendingLogin(): Promise<PendingLogin> {
+  return api.request<PendingLogin>("GET", "/api/v1/auth/pending");
+}
+
+/** State of the customer login behind the portal cookie. */
+export function getPortalPendingLogin(): Promise<PendingLogin> {
+  return portalApi.request<PendingLogin>("GET", "/api/portal/auth/pending");
+}
 
 function loginUrl(base: string, slug: string, next?: string): string {
   const url = `${base}/${encodeURIComponent(slug)}/login`;
@@ -28,6 +40,8 @@ export type IdentityCapabilities = Schemas["IdentityCapabilitiesOut"];
 export type ProviderChanges = Schemas["ProviderChanges"];
 export type ProviderCreate = Schemas["IdentityProviderCreate"];
 export type IdentityTestStart = Schemas["IdentityTestStartOut"];
+export type MfaPolicy = Schemas["MfaPolicyOut"];
+export type IdentityTestMfa = Schemas["IdentityTestMfaOut"];
 export type IdentityTestResult = Schemas["IdentityTestResultOut"];
 export type LoginPlan = Schemas["LoginPlanOut"];
 export type ProviderEndpoints = Schemas["ProviderEndpointsOut"];
@@ -39,10 +53,29 @@ export type GroupPermission = NonNullable<GroupGrant["permissions"]>[number];
 export type ManagedAssignment = Schemas["ManagedAssignmentOut"];
 export type IdentityLink = Schemas["IdentityLinkOut"];
 export type MappingPreviewBody = Schemas["MappingPreviewIn"];
+export type ScimStatus = Schemas["ScimStatusOut"];
+export type ScimToken = Schemas["ScimTokenOut"];
+export type ScimTokenCreate = Schemas["ScimTokenCreateIn"];
+export type ScimTokenCreated = Schemas["ScimTokenCreatedOut"];
+export type ScimAccountPage = Schemas["ScimAccountPageOut"];
+export type ScimAccount = Schemas["ScimAccountOut"];
+export type ScimGroupPage = Schemas["ScimGroupPageOut"];
+export type ScimGroup = Schemas["ScimGroupOut"];
+export type ScimEvent = Schemas["ScimEventOut"];
 export type ProviderAudience = "agent" | "customer" | "both";
 export type TestAudience = "agent" | "customer";
 
 const BASE = "/api/v1/admin/identity-providers";
+
+function queryString(params: Record<string, string | number | boolean | undefined>): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || v === "" || v === false) continue;
+    q.set(k, String(v));
+  }
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
 
 export const identityApi = {
   list(signal?: AbortSignal) {
@@ -86,6 +119,32 @@ export const identityApi = {
   },
   removeLink(id: number, linkId: number) {
     return api.request<void>("DELETE", `${BASE}/${id}/links/${linkId}`);
+  },
+  getScimStatus(id: number, signal?: AbortSignal) {
+    return api.request<ScimStatus>("GET", `${BASE}/${id}/scim`, { signal });
+  },
+  createScimToken(id: number, body: ScimTokenCreate) {
+    return api.request<ScimTokenCreated>("POST", `${BASE}/${id}/scim/tokens`, { body });
+  },
+  revokeScimToken(id: number, tokenId: number) {
+    return api.request<void>("DELETE", `${BASE}/${id}/scim/tokens/${tokenId}`);
+  },
+  listScimAccounts(
+    id: number,
+    params: { offset?: number; limit?: number; q?: string; include_deleted?: boolean },
+    signal?: AbortSignal,
+  ) {
+    return api.request<ScimAccountPage>("GET", `${BASE}/${id}/scim/accounts${queryString(params)}`, { signal });
+  },
+  listScimGroups(id: number, params: { offset?: number; limit?: number }, signal?: AbortSignal) {
+    return api.request<ScimGroupPage>("GET", `${BASE}/${id}/scim/groups${queryString(params)}`, { signal });
+  },
+  listScimEvents(
+    id: number,
+    params: { before_id?: number; limit?: number; failures_only?: boolean },
+    signal?: AbortSignal,
+  ) {
+    return api.request<ScimEvent[]>("GET", `${BASE}/${id}/scim/events${queryString(params)}`, { signal });
   },
   testResult(id: number, testId: string, signal?: AbortSignal) {
     return api.request<IdentityTestResult>("GET", `${BASE}/${id}/tests/${encodeURIComponent(testId)}`, {

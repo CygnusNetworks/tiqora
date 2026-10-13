@@ -41,6 +41,14 @@ beforeEach(async () => {
 });
 
 describe("RolesTab", () => {
+  it("hints at the SCIM attributes only when a rule uses scim:", async () => {
+    const { unmount } = wrap(<RolesTab provider={makeProvider({ role_rules: [rule] })} onSaved={vi.fn()} />);
+    expect(screen.queryByTestId("identity-scim-hint")).toBeNull();
+    unmount();
+    wrap(<RolesTab provider={makeProvider({ role_rules: [{ ...rule, attribute: "scim:groups" }] })} onSaved={vi.fn()} />);
+    expect(screen.getByTestId("identity-scim-hint")).toHaveTextContent("scim:group_ids");
+  });
+
   it("renders rules with role chips, group permissions and the rw hint", async () => {
     wrap(<RolesTab provider={makeProvider({ role_rules: [rule] })} onSaved={vi.fn()} />);
     expect(screen.getByTestId("identity-rule-0-attribute")).toHaveValue("groups");

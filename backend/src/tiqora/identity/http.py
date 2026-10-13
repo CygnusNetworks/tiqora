@@ -6,7 +6,7 @@ every ``RejectCode`` of ``identity.login`` (no_subject, no_match, user_invalid,
 sso_not_enabled, email_unverified, ambiguous_email, login_taken, jit_missing_fields,
 email_invalid, email_in_use, jit_domain_not_allowed, provider_disabled) plus
 unknown_provider, config, saml_unavailable, state, saml_invalid, oidc_failed,
-idp_error. The legacy value ``1`` (SPNEGO) stays a generic failure.
+idp_error, mfa_required. The legacy value ``1`` (SPNEGO) stays a generic failure.
 The frontend mirrors this list.
 """
 
@@ -32,6 +32,7 @@ SSO_ERROR_CODES: Final[tuple[str, ...]] = (
     "saml_invalid",
     "oidc_failed",
     "idp_error",
+    "mfa_required",
 )
 
 

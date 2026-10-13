@@ -1033,6 +1033,20 @@ class TiqoraIdentityProvider(TiqoraBase):
     metadata_xml: Mapped[str | None] = mapped_column(IDENTITY_METADATA_TEXT, nullable=True)
     metadata_fetched_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     metadata_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    #: Step-up MFA: require an MFA proof from the IdP (JSON ``mfa_policy``; NULL = defaults).
+    require_mfa_claim: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    mfa_policy: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: Per-IdP session lifetimes in seconds; NULL = the global setting.
+    session_idle_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    session_absolute_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    scim_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    scim_adopt_existing: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     create_by: Mapped[int] = mapped_column(Integer, nullable=False)
     create_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     change_by: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -1073,6 +1087,158 @@ class TiqoraIdentityLink(TiqoraBase):
             "provider_id", "user_kind", "subject_hash", name="uq_tiqora_identity_link_subject"
         ),
         Index("ix_tiqora_identity_link_user", "user_kind", "user_id"),
+    )
+
+
+def _scim_provider_fk(name: str) -> ForeignKey:
+    return ForeignKey("tiqora_identity_provider.id", ondelete="CASCADE", name=name)
+
+
+class TiqoraScimToken(TiqoraBase):
+    """A SCIM bearer token (sha256 hex only; the raw token is shown once)."""
+
+    __tablename__ = "tiqora_scim_token"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    provider_id: Mapped[int] = mapped_column(
+        Integer, _scim_provider_fk("fk_tiqora_scim_token_provider"), nullable=False
+    )
+    user_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    token_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
+    token_hint: Mapped[str] = mapped_column(String(8), nullable=False)
+    created_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("token_hash", name="uq_tiqora_scim_token_hash"),
+        Index("ix_tiqora_scim_token_provider", "provider_id"),
+    )
+
+
+class TiqoraScimUser(TiqoraBase):
+    """Maps a SCIM user id to a local account (``user_id`` is a soft reference)."""
+
+    __tablename__ = "tiqora_scim_user"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    provider_id: Mapped[int] = mapped_column(
+        Integer, _scim_provider_fk("fk_tiqora_scim_user_provider"), nullable=False
+    )
+    user_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    scim_id: Mapped[str] = mapped_column(CHAR(36), nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    user_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    user_name_fold: Mapped[str] = mapped_column(String(255), nullable=False)
+    user_name_fold_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
+    external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    external_id_hash: Mapped[str | None] = mapped_column(CHAR(64), nullable=True)
+    deleted: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    changed: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("scim_id", name="uq_tiqora_scim_user_scim_id"),
+        UniqueConstraint("user_kind", "user_id", name="uq_tiqora_scim_user_account"),
+        Index("ix_tiqora_scim_user_name", "provider_id", "user_kind", "user_name_fold_hash"),
+        Index("ix_tiqora_scim_user_ext", "provider_id", "user_kind", "external_id_hash"),
+    )
+
+
+class TiqoraScimGroup(TiqoraBase):
+    """A SCIM group pushed by the IdP; drives role rules via its members."""
+
+    __tablename__ = "tiqora_scim_group"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    provider_id: Mapped[int] = mapped_column(
+        Integer, _scim_provider_fk("fk_tiqora_scim_group_provider"), nullable=False
+    )
+    scim_id: Mapped[str] = mapped_column(CHAR(36), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    display_name_fold: Mapped[str] = mapped_column(String(255), nullable=False)
+    display_name_fold_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
+    external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    external_id_hash: Mapped[str | None] = mapped_column(CHAR(64), nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    created: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    changed: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("scim_id", name="uq_tiqora_scim_group_scim_id"),
+        Index("ix_tiqora_scim_group_name", "provider_id", "display_name_fold_hash"),
+        Index("ix_tiqora_scim_group_ext", "provider_id", "external_id_hash"),
+    )
+
+
+class TiqoraScimGroupMember(TiqoraBase):
+    __tablename__ = "tiqora_scim_group_member"
+
+    group_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "tiqora_scim_group.id", ondelete="CASCADE", name="fk_tiqora_scim_group_member_group"
+        ),
+        primary_key=True,
+    )
+    member_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "tiqora_scim_user.id", ondelete="CASCADE", name="fk_tiqora_scim_group_member_member"
+        ),
+        primary_key=True,
+    )
+
+    __table_args__ = (Index("ix_tiqora_scim_group_member_member", "member_id"),)
+
+
+class TiqoraScimPendingSync(TiqoraBase):
+    """An agent whose role assignments must be re-evaluated by the ``scim_role_sync`` loop.
+
+    ``generation`` increases on every enqueue; the worker deletes ``WHERE generation = <read>``
+    so a newer enqueue survives (integer equality is dialect-independent).
+    """
+
+    __tablename__ = "tiqora_scim_pending_sync"
+
+    provider_id: Mapped[int] = mapped_column(
+        Integer, _scim_provider_fk("fk_tiqora_scim_pending_sync_provider"), primary_key=True
+    )
+    user_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    queued_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    generation: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+    __table_args__ = (Index("ix_tiqora_scim_pending_sync_queued", "queued_at"),)
+
+
+class TiqoraScimEvent(TiqoraBase):
+    """SCIM audit log. No FK: the log outlives a deleted provider. Never stores values."""
+
+    __tablename__ = "tiqora_scim_event"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    provider_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    token_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    created: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    method: Mapped[str] = mapped_column(String(8), nullable=False)
+    resource: Mapped[str] = mapped_column(String(8), nullable=False)
+    operation: Mapped[str] = mapped_column(String(24), nullable=False)
+    scim_id: Mapped[str | None] = mapped_column(CHAR(36), nullable=True)
+    user_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    detail: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    actor_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    __table_args__ = (
+        Index("ix_tiqora_scim_event_provider", "provider_id", "id"),
+        Index("ix_tiqora_scim_event_created", "created"),
     )
 
 

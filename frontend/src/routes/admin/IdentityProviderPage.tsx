@@ -5,7 +5,9 @@ import { useTranslation } from "react-i18next";
 import { ConnectionTab } from "@/components/admin/identity/ConnectionTab";
 import { LinksTab } from "@/components/admin/identity/LinksTab";
 import { MappingTab } from "@/components/admin/identity/MappingTab";
+import { ProvisioningTab } from "@/components/admin/identity/ProvisioningTab";
 import { RolesTab } from "@/components/admin/identity/RolesTab";
+import { SessionTab } from "@/components/admin/identity/SessionTab";
 import { TestTab } from "@/components/admin/identity/TestTab";
 import { ProviderIcon } from "@/components/auth/ProviderIcon";
 import { Badge } from "@/components/ui/Badge";
@@ -15,10 +17,10 @@ import { apiErrorMessage } from "@/lib/avatarApi";
 import { identityApi, type IdentityProvider, type ProviderChanges } from "@/lib/identityApi";
 import { IDENTITY_LIST_KEY } from "./IdentityProvidersPage";
 
-export type IdentityProviderTab = "connection" | "mapping" | "roles" | "test" | "links";
+export type IdentityProviderTab = "connection" | "mapping" | "roles" | "provisioning" | "session" | "test" | "links";
 export type IdentityProviderSearch = { tab?: IdentityProviderTab; test?: string };
 
-const TABS: IdentityProviderTab[] = ["connection", "mapping", "roles", "test", "links"];
+const TABS: IdentityProviderTab[] = ["connection", "mapping", "roles", "provisioning", "session", "test", "links"];
 const ROUTE = "/admin/identity-providers/$providerId" as const;
 
 export function IdentityProviderPage() {
@@ -46,8 +48,13 @@ export function IdentityProviderPage() {
     queryFn: ({ signal }) => identityApi.capabilities(signal),
   });
 
-  const tab: IdentityProviderTab = search.test ? "test" : (search.tab ?? "connection");
   const provider = providerQ.data;
+  // LDAP has no provisioning or session tab: a link to one opens the connection tab.
+  const offered = TABS.filter(
+    (id) => (id !== "provisioning" && id !== "session") || provider?.kind !== "ldap",
+  );
+  const wanted: IdentityProviderTab = search.test ? "test" : (search.tab ?? "connection");
+  const tab: IdentityProviderTab = offered.includes(wanted) ? wanted : "connection";
   useEffect(() => {
     setVisited((cur) => (cur.has(tab) ? cur : new Set(cur).add(tab)));
   }, [tab]);
@@ -92,7 +99,7 @@ export function IdentityProviderPage() {
       </div>
 
       <Tabs
-        items={TABS.map((id) => ({ id, label: t(`admin.identity.tabs.${id}`) }))}
+        items={offered.map((id) => ({ id, label: t(`admin.identity.tabs.${id}`) }))}
         value={tab}
         onChange={(next) =>
           navigate({
@@ -123,6 +130,12 @@ export function IdentityProviderPage() {
         <div hidden={tab !== "roles"}>
           <RolesTab key={provider.id} provider={provider} sampleAttributes={sample} onSaved={onSaved} />
         </div>
+      )}
+      {tab === "provisioning" && provider.kind !== "ldap" && (
+        <ProvisioningTab key={provider.id} provider={provider} onSaved={onSaved} />
+      )}
+      {tab === "session" && provider.kind !== "ldap" && (
+        <SessionTab key={provider.id} provider={provider} onSaved={onSaved} />
       )}
       {tab === "test" && (
         <TestTab

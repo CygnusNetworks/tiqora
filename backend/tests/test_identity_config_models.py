@@ -7,18 +7,22 @@ import stat
 from pathlib import Path
 
 import pytest
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
 from tiqora.identity.config_models import (
     CONFIG_MODELS,
+    DEFAULT_SAML_MFA_CLASSES,
     HIDDEN_CONFIG_FIELDS,
     READ_ONLY_CONFIG_FIELDS,
     LdapProviderConfig,
+    MfaPolicy,
     OidcProviderConfig,
+    RoleRule,
     SamlProviderConfig,
     merge_config,
     secret_fields,
 )
+from tiqora.identity.mapping import rules_use_scim
 from tiqora.identity.presets import PRESETS, get_preset
 from tiqora.identity.saml_keys import generate_sp_keypair, materialize_keypair
 from tiqora.settings_sections.section import SECRET_MASK, SettingsSection, validate_section_schema
@@ -136,3 +140,34 @@ def test_allowed_email_domains_reject_malformed_entries(bad: str) -> None:
 
     with pytest.raises(ValidationError):
         JitDefaults(allowed_email_domains=[bad])
+
+
+def test_mfa_policy_defaults_and_cleaning() -> None:
+    p = MfaPolicy.model_validate({"oidc_amr_values": [" mfa ", "", "mfa", "otp"]})
+    assert p.oidc_amr_values == ["mfa", "otp"]
+    assert p.fallback == "local_second_factor"
+    assert "http://schemas.microsoft.com/claims/multipleauthn" in p.saml_authn_context_classes
+    assert tuple(MfaPolicy().saml_authn_context_classes) == DEFAULT_SAML_MFA_CLASSES
+    with pytest.raises(ValidationError):
+        MfaPolicy.model_validate({"fallback": "allow"})
+    with pytest.raises(ValidationError):
+        MfaPolicy.model_validate({"oidc_amr_values": [f"x{i}" for i in range(21)]})
+    with pytest.raises(ValidationError):
+        MfaPolicy.model_validate({"oidc_acr_values": ["x" * 301]})
+    with pytest.raises(ValidationError):
+        MfaPolicy.model_validate({"unknown": 1})
+
+
+def test_mfa_policy_enrol_fallback_is_explicit_opt_in() -> None:
+    assert MfaPolicy().fallback == "local_second_factor"
+    assert MfaPolicy(fallback="local_second_factor_or_enroll").fallback == (
+        "local_second_factor_or_enroll"
+    )
+    assert MfaPolicy(fallback="reject").fallback == "reject"
+
+
+def test_rules_use_scim() -> None:
+    assert rules_use_scim([RoleRule(attribute=" scim:groups ", value="Support", role_ids=[1])])
+    assert rules_use_scim([RoleRule(attribute="SCIM:group_ids", value="x", role_ids=[1])])
+    assert not rules_use_scim([RoleRule(attribute="groups", value="x", role_ids=[1])])
+    assert not rules_use_scim([])

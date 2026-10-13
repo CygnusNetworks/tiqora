@@ -62,6 +62,9 @@ export const capabilities: IdentityCapabilities = {
   saml_missing: null,
   public_base_url_set: true,
   webauthn: true,
+  session_idle_max_seconds: 28800,
+  session_absolute_max_seconds: 86400,
+  scim_base_url: "https://tickets.example.org/scim/v2",
 };
 
 export const presets: IdentityPreset[] = [
@@ -119,6 +122,21 @@ export function makeProvider(over: Partial<IdentityProvider> = {}): IdentityProv
     },
     role_rules: [], sync_mode: "managed", metadata_fetched_at: null,
     endpoints: { ...endpoints },
+    require_mfa_claim: false,
+    mfa_policy: {
+      fallback: "local_second_factor",
+      oidc_amr_values: ["mfa"],
+      oidc_acr_values: [],
+      oidc_request_acr_values: "",
+      saml_authn_context_classes: [],
+      saml_mfa_attribute: "http://schemas.microsoft.com/claims/authnmethodsreferences",
+      saml_mfa_attribute_values: ["http://schemas.microsoft.com/claims/multipleauthn"],
+      saml_request_authn_context: false,
+    },
+    session_idle_seconds: null,
+    session_absolute_seconds: null,
+    scim_enabled: false,
+    scim_adopt_existing: false,
     ...over,
   };
 }

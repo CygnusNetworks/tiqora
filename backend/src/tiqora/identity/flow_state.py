@@ -225,6 +225,8 @@ class TestResultData(BaseModel):
     subject: str
     attributes: dict[str, list[str]]
     plan: dict[str, Any]
+    # Step-up MFA verdict of the test login: {"required", "satisfied", "evidence"}.
+    mfa: dict[str, Any] | None = None
 
 
 class TestRun(BaseModel):

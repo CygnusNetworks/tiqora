@@ -43,20 +43,20 @@ from tiqora.channels.phone.cti import PHONE_EXTENSION_PREF
 from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.user import GroupRole, GroupUser, PermissionGroups, Roles, RoleUser, Users
 from tiqora.domain import user_provisioning as provisioning
-from tiqora.domain.auth import SessionStore, normalize_language_code
+from tiqora.domain.auth import normalize_language_code
 from tiqora.domain.password_setup import (
     InviteStatus,
     bulk_latest_invite,
     unusable_password_hash,
 )
 from tiqora.domain.schemas import UserLanguageUpdate
+from tiqora.domain.session_revocation import end_agent_sessions
 from tiqora.domain.user_delete import blocking_references, delete_user_rows
 from tiqora.domain.user_preferences import bulk_get_preferences, get_preference, set_preference
 from tiqora.domain.welcome_invite import send_setup_invite
 from tiqora.domain.welcome_mail import WelcomeMailError
 from tiqora.permissions.engine import PERMISSION_KEYS
 from tiqora.znuny.password import hash_password
-from tiqora.znuny.sessions import delete_agent_sessions
 
 logger = structlog.get_logger(__name__)
 
@@ -270,6 +270,12 @@ async def update_user(
             password_changed = True
     first_name = data.pop("first_name", None)
     last_name = data.pop("last_name", None)
+    valid_set = "valid_id" in data
+    validity_changed = False
+    if valid_set:
+        validity_changed = await provisioning.set_agent_validity(
+            session, user, valid_id=data.pop("valid_id"), actor_id=admin.id
+        )
     for field, value in data.items():
         setattr(user, field, value)
     try:
@@ -291,7 +297,7 @@ async def update_user(
     if extension_set:
         await set_preference(session, user_id, PHONE_EXTENSION_PREF, extension)
 
-    if not profile_changed:
+    if not profile_changed and not validity_changed:
         await invalidate_znuny_cache_types(session, USER_CACHE_TYPES)
     await session.commit()
     await session.refresh(user)
@@ -302,9 +308,15 @@ async def update_user(
     # ends its sessions too. Never let a Redis hiccup fail the write that already
     # committed.
     if password_changed:
-        await _revoke_agent_sessions(session, request, settings, user, reason="password_changed")
-    elif "valid_id" in data and user.valid_id != 1:
-        await _revoke_agent_sessions(session, request, settings, user, reason="account_disabled")
+        await end_agent_sessions(
+            session, await get_redis(request), settings, user_id, reason="password_changed"
+        )
+        await session.refresh(user)  # a rollback inside the service expires loaded attributes
+    elif valid_set and user.valid_id != 1:
+        await end_agent_sessions(
+            session, await get_redis(request), settings, user_id, reason="account_disabled"
+        )
+        await session.refresh(user)
 
     out_email = (
         (email or None) if email_set else await get_preference(session, user_id, "UserEmail")
@@ -318,28 +330,6 @@ async def update_user(
     return _with_preferences(user, out_email, out_mobile, phone_extension=out_extension)
 
 
-async def _revoke_agent_sessions(
-    session: DbSession, request: Request, settings: AppSettings, user: Users, *, reason: str
-) -> None:
-    """End every session of *user*: Znuny ``sessions`` rows first (own try + rollback),
-    then Redis - a Redis outage must not skip the DB rows and vice versa."""
-    user_id = user.id
-    try:
-        await delete_agent_sessions(session, user_id)
-        await session.commit()
-    except Exception as exc:  # noqa: BLE001 — the account change already committed
-        await session.rollback()
-        await session.refresh(user)  # rollback expires loaded attributes
-        logger.warning("admin.users.znuny_session_revoke_failed", user_id=user_id, error=str(exc))
-    try:
-        revoked = await SessionStore(await get_redis(request), settings).revoke_user_sessions(
-            user_id
-        )
-        logger.info("admin.users.sessions_revoked", user_id=user_id, revoked=revoked, reason=reason)
-    except Exception as exc:  # noqa: BLE001 — the account change already committed
-        logger.warning("admin.users.session_revoke_failed", user_id=user_id, error=str(exc))
-
-
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def deactivate_user(
     user_id: int, request: Request, admin: AdminUser, session: DbSession, settings: AppSettings
@@ -349,12 +339,11 @@ async def deactivate_user(
     user = await session.get(Users, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    user.valid_id = 2
-    user.change_time = now()
-    user.change_by = admin.id
-    await invalidate_znuny_cache_types(session, USER_CACHE_TYPES)
+    await provisioning.set_agent_validity(session, user, valid_id=2, actor_id=admin.id)
     await session.commit()
-    await _revoke_agent_sessions(session, request, settings, user, reason="account_disabled")
+    await end_agent_sessions(
+        session, await get_redis(request), settings, user_id, reason="account_disabled"
+    )
 
 
 @router.get("/{user_id}/groups", response_model=list[GroupOut])
