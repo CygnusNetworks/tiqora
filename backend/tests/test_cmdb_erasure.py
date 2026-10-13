@@ -200,6 +200,10 @@ async def test_erasure_scrubs_cmdb_data_and_rollback_restores_it(
     }
     assert "RelevantTo: customer_user [gelöscht]" in redacted
     assert ("RelevantTo: ticket [gelöscht]" in redacted) is delete_mode
+    # M-B: a ticket that stays (anonymize) keeps its number, not its (anonymised) title
+    tn = f"2026101074{TICKET_OPEN}"
+    assert (f"RelevantTo: ticket {tn} [gelöscht]" in redacted) is not delete_mode
+    assert not any(f"cmdb4 ticket {TICKET_OPEN}" in d for d in redacted)
 
     await rollback_job(
         cmdb_db.factory, Settings(), result.job_id, force_parallel=True, actor="test"
@@ -236,7 +240,8 @@ async def test_erasure_redacts_history_of_links_removed_earlier(
     cmdb_db: CmdbWorld, delete_mode: bool
 ) -> None:
     """A link removed before the erasure still left the customer's name (and the ticket's
-    number and title) in the CI history; the erasure must redact those lines too."""
+    number and title) in the CI history; the erasure must redact those lines too. In anonymise
+    mode the ticket stays, so its number stays and only the title goes (M-B)."""
     async with cmdb_db.factory() as s:
         cid = await make_class(s, attributes=_ATTRS)
         a = await make_ci(s, cid, "cmdb4-a")
@@ -279,7 +284,10 @@ async def test_erasure_redacts_history_of_links_removed_earlier(
 
     assert lines("%Cora Customer%") == 0
     assert lines("%: customer_user [gelöscht]") == 2
-    # a ticket that stays (anonymize) keeps its line; a hard-deleted one is redacted
+    # the ticket's title goes in both modes (M-B): a ticket that stays (anonymize) keeps its
+    # number, a hard-deleted one loses it too
+    assert lines(f"%cmdb4 ticket {TICKET_OPEN}%") == 0
+    assert lines(f"%: ticket {tn} [gelöscht]") == (0 if delete_mode else 2)
     assert lines(f"%{tn}%") == (0 if delete_mode else 2)
     assert lines("%: ticket [gelöscht]") == (2 if delete_mode else 0)
 
@@ -288,3 +296,4 @@ async def test_erasure_redacts_history_of_links_removed_earlier(
     )
     assert lines("%Cora Customer%") == 2
     assert lines(f"%{tn}%") == 2
+    assert lines(f"%{tn} cmdb4 ticket {TICKET_OPEN}") == 2  # the title is back

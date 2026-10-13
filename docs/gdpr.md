@@ -307,6 +307,24 @@ history and `tiqora_mail_log` rows of deliveries contain no recipient addresses 
 Scheduled mails do not redact personal columns for external recipients; whoever may
 share reports decides what leaves the system.
 
+### CMDB (Mode B)
+
+When the Tiqora CMDB holds data (`tiqora_itsm_link`, `tiqora_cmdb_*`), every
+mode also erases it (`tiqora.cmdb.erasure`), with backups for the rollback:
+
+- links whose end is an erased customer user (and, with `delete_tickets`, a
+  hard-deleted ticket) are deleted;
+- `customer_user` attribute values holding the login get the same token as the
+  tickets: the current version through a new system version (change note
+  `Datenschutz`), older and archived versions in place; the search index is
+  rebuilt; CI history lines with the login get the token;
+- link history lines (`LinkAdd`/`LinkDelete`, which name the other end) are
+  redacted on every CI, also for links removed before the erasure: the
+  customer's display name becomes `customer_user [gelöscht]`, a hard-deleted
+  ticket `ticket [gelöscht]`. In `anonymize` mode the tickets stay with an
+  anonymised title, so their lines keep the ticket number and lose the title
+  (`ticket <tn> [gelöscht]`).
+
 ### Caveats
 
 - **Parallel operation with Znuny.** The admin API bypasses the ownership

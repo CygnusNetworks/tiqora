@@ -2146,6 +2146,10 @@ async def run_erasure(
                     deleted_ticket_numbers=(
                         [str(r.tn) for r in ticket_rows] if do_ticket_delete else []
                     ),
+                    # anonymize rewrites the titles above; the CMDB link history drops them too
+                    anonymised_ticket_numbers=(
+                        [str(r.tn) for r in ticket_rows] if mode == "anonymize" else []
+                    ),
                 )
             )
         # GenericInterface debugger lines hold payloads of these tickets (customer names,
