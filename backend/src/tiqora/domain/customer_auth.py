@@ -11,7 +11,7 @@ from __future__ import annotations
 import contextlib
 import secrets
 import time
-from collections.abc import Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -270,11 +270,16 @@ class CustomerAuthService:
         self._settings = settings
 
     async def authenticate_password(
-        self, login: str, password: str
+        self,
+        login: str,
+        password: str,
+        *,
+        refuse: Callable[[int], Awaitable[bool]] | None = None,
     ) -> AuthenticatedCustomer | None:
         """Verify customer credentials against ``customer_user.pw`` (valid_id must be 1).
 
-        Mirrors agent rehash-on-login for weak/legacy schemes (H-06).
+        Mirrors agent rehash-on-login for weak/legacy schemes (H-06), and the agent's
+        ``refuse`` hook (after the password matched, before the rehash; P2A-PM-I2).
         """
         result = await self._session.execute(
             select(CustomerUser).where(CustomerUser.login == login, CustomerUser.valid_id == 1)
@@ -288,6 +293,8 @@ class CustomerAuthService:
         if reject_weak and is_weak_scheme(stored):
             return None
         if not verify_password(password, stored):
+            return None
+        if refuse is not None and await refuse(user.id):
             return None
         if rehash_on and needs_rehash(stored):
             user.pw = hash_password(password)

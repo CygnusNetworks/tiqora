@@ -358,10 +358,13 @@ Eine Erweiterung kann zusätzlich Kennwörter prüfen (zum Beispiel gegen ein
 Verzeichnis). Sie ersetzt nie die Sicherheitsfunktionen: Sperre nach
 Fehlversuchen, Zwei-Faktor-Anmeldung und Einrichtung gelten weiter, und die
 Gesamtprüfung ist auf 20 Sekunden begrenzt. Der Kennworttext wird nicht
-protokolliert. Konten, die über SCIM von einem Anmeldedienst mit Pflicht zum
-Mehrfaktor-Nachweis verwaltet werden, meldet eine Kennwort-Erweiterung nicht
-an: Tiqora weist die Anmeldung ab (`plugin_auth_rejected`,
-`reason=sso_managed`); diese Konten melden sich über den Anmeldedienst an.
+protokolliert. Konten, die ein aktiver Anmeldedienst mit Pflicht zum
+Mehrfaktor-Nachweis über SCIM verwaltet, meldet keine Kennwortanmeldung an,
+weder das eigene Kennwort noch LDAP noch eine Erweiterung: Tiqora antwortet
+wie bei einem falschen Kennwort (`password_login_rejected`,
+`reason=sso_managed`), und das Kennwort eines solchen Kontos erreicht keine
+Erweiterung. Diese Konten melden sich über den Anmeldedienst an (Regel und
+Ausnahmen: [Identity-Provider](guide/identity-providers.md#zweiter-faktor-vom-anmeldedienst)).
 Ein nicht erreichbarer LDAP-Server antwortet weiterhin mit "nicht verfügbar",
 bevor die Erweiterung gefragt wird.
 
@@ -1395,12 +1398,18 @@ attempts count. Notes:
 - An LDAP sign-in that raises `LdapSignInUnavailable` answers 503 before the
   plugin chain runs.
 - Plugin logins are `auth_method="plugin"` (no local password change).
-- **SCIM-managed accounts (R15):** when the account a provider names (agent or
-  customer) has a `tiqora_scim_user` row whose identity provider has
-  `require_mfa_claim`, the core skips that provider's answer and logs
-  `plugin_auth_rejected reason=sso_managed`; the chain goes on with the next
-  provider, whose answer is checked the same way. Deprovisioned mappings count
-  too (fail closed). Such accounts sign in through the IdP and its step-up.
+- **SSO-managed accounts (R15, P2A-PM-I2):** an account (agent or customer)
+  with an active `tiqora_scim_user` row (`deleted` false) under an **enabled**
+  identity provider with `require_mfa_claim` signs in through the IdP and its
+  step-up only. The core checks this in `tiqora.identity.sso_managed` for every
+  password path (local password, LDAP, plugin providers) and answers like a
+  wrong password; the log line is `password_login_rejected reason=sso_managed`
+  with `path=local|ldap|plugin`. When the typed login is such an account, no
+  provider is called at all, so its password never reaches a plugin. When a
+  provider names such an account (a mapped login), its answer is skipped and the
+  chain goes on with the next provider, whose answer is checked the same way
+  (naming the same account again is refused again). A disabled provider or a
+  deprovisioned (`DELETE`d) mapping does not block.
 
 ### Customer sources
 

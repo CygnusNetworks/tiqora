@@ -459,10 +459,16 @@ async def _directory(ctx: AuthContext, check: PasswordCheck) -> str | None:
 
 
 async def _backup(ctx: AuthContext, check: PasswordCheck) -> str | None:
-    """Second provider (both): says no; hangs when ``MODE["auth.backup"] == "hang"``."""
+    """Second provider (both): says no; ``MODE["auth.backup"]``: hang | other_login (names
+    ``pp55-agent2``) | typed_login (names the typed login)."""
     behaviour.CALLS.append(("auth.backup", (check.login, check.user_kind)))
-    if behaviour.MODE.get("auth.backup") == "hang":
+    mode = behaviour.MODE.get("auth.backup")
+    if mode == "hang":
         await asyncio.sleep(30)
+    if mode == "other_login":
+        return "pp55-agent2"
+    if mode == "typed_login":
+        return check.login
     return None
 
 

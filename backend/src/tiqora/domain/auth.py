@@ -6,7 +6,7 @@ import contextlib
 import hashlib
 import secrets
 import time
-from collections.abc import Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -612,13 +612,22 @@ class AuthService:
             avatar_url=avatar_url,
         )
 
-    async def authenticate_password(self, login: str, password: str) -> AuthenticatedUser | None:
+    async def authenticate_password(
+        self,
+        login: str,
+        password: str,
+        *,
+        refuse: Callable[[int], Awaitable[bool]] | None = None,
+    ) -> AuthenticatedUser | None:
         """Verify agent credentials against ``users.pw`` (valid_id must be 1).
 
         On success, weak/legacy hashes (SHA1, md5-crypt, DES, plain SHA-*) are
         transparently rehashed to Znuny ``BCRYPT:`` when
         ``password_rehash_on_login`` is enabled (H-06). When
         ``password_reject_weak_hashes`` is set, weak schemes are refused entirely.
+
+        ``refuse(user_id)`` runs after the password matched and before the rehash; True
+        turns the login into a failure (an SSO-managed account, P2A-PM-I2) that writes nothing.
         """
         result = await self._session.execute(
             select(Users).where(Users.login == login, Users.valid_id == 1)
@@ -634,6 +643,8 @@ class AuthService:
         if reject_weak and is_weak_scheme(stored):
             return None
         if not verify_password(password, stored):
+            return None
+        if refuse is not None and await refuse(user.id):
             return None
         if rehash_on and needs_rehash(stored):
             user.pw = hash_password(password)

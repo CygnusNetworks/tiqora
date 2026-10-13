@@ -458,11 +458,23 @@ Eine abgewiesene Anmeldung ändert nichts (kein Konto, keine Verknüpfung, keine
 und die Werte, die der Anmeldedienst geliefert hat. Ist der Nachweis erbracht, überspringt die Anmeldung den
 Tiqora-Faktor wie bisher.
 
-**Hinweis zu Plugin-Anmeldeanbietern**: Ein Passwort-Anbieter aus einem Plugin meldet **kein** Konto an,
-das über SCIM von einem Anbieter mit Pflicht zum Mehrfaktor-Nachweis verwaltet wird (auch nicht nach der
-Deprovisionierung). Solche Konten melden sich über den Anmeldedienst an; der abgewiesene Versuch steht im
-Protokoll als `plugin_auth_rejected` mit `reason=sso_managed`. Konten anderer SCIM-Anbieter und lokale
-Konten prüft der Plugin-Anbieter wie bisher.
+**Kennwortanmeldung verwalteter Konten**: Ein Konto, das ein **aktiver** Anbieter mit *Zweiten Faktor
+vom Anmeldedienst verlangen* über SCIM verwaltet, meldet sich nur über den Anmeldedienst an. Jede
+Kennwortanmeldung weist es ab: das eigene Kennwort in Tiqora (Znuny), ein LDAP-Verzeichnis und ein
+Kennwort-Anbieter aus einer Erweiterung. Die Antwort ist dieselbe wie bei einem falschen Kennwort (401,
+zählt als Fehlversuch für die Sperre); im Protokoll steht `password_login_rejected` mit
+`reason=sso_managed` und `path=local`, `ldap` oder `plugin`. Das Kennwort eines solchen Kontos erreicht
+keine Erweiterung. Tiqora ändert das Kennwort in Znuny dabei nicht: ein übernommenes Konto behält sein
+altes Kennwort, kann sich damit aber nicht anmelden, solange die Regel greift.
+
+Die Regel greift nur, wenn beides zutrifft:
+
+* die SCIM-Zuordnung besteht (das Konto wurde nicht per SCIM-`DELETE` vom Anmeldedienst gelöst), und
+* der Anbieter ist **aktiv** und verlangt den zweiten Faktor vom Anmeldedienst.
+
+Ein abgeschalteter Anbieter oder eine gelöste Zuordnung sperrt die Kennwortanmeldung nicht mehr. Ob die
+*Bereitstellung* (SCIM) des Anbieters gerade an ist, spielt keine Rolle. Konten anderer Anbieter und
+Konten ohne SCIM-Zuordnung melden sich mit Kennwort an wie bisher.
 
 ## Sitzungsdauer
 

@@ -2,9 +2,9 @@
 
 Seed band 55370-55389: agents 55370 ``pp55-agent`` (a password nobody types), 55371 ``pp55-2fa``
 (TOTP enabled), 55372 ``pp55-agent2``, 55373 ``pp55-invalid`` (valid_id 2), 55374 ``pp55-local``
-(a real local password); the customer ``pp55-portal`` is removed by its login; SCIM
-providers ``pp55scim*`` and their mappings (R15) by slug. The rate limiter
-is off except in the test that exercises it, which uses an in-memory Redis.
+(a real local password); the customer ``pp55-portal`` (the same local password) is removed by
+its login; SCIM providers ``pp55scim*`` and their mappings (R15, P2A-PM-I2) by slug. The rate
+limiter is off except in the tests that exercise it, which use an in-memory Redis.
 """
 
 from __future__ import annotations
@@ -92,9 +92,10 @@ def _seed(url: str) -> None:
             text(
                 "INSERT INTO customer_user (login, email, customer_id, first_name, last_name,"
                 " pw, valid_id, create_time, create_by, change_time, change_by)"
-                " VALUES ('pp55-portal', 'portal@example.org', 'pp55', 'Carla', 'Kunde', 'x', 1,"
+                " VALUES ('pp55-portal', 'portal@example.org', 'pp55', 'Carla', 'Kunde', :pw, 1,"
                 " current_timestamp, 1, current_timestamp, 1)"
-            )
+            ),
+            {"pw": local_hash},
         )
     engine.dispose()
 
@@ -275,7 +276,15 @@ async def test_chain_budget(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
     assert _calls("auth.backup") == []
 
 
-def _scim_map(url: str, *, user_kind: str, login: str, require_mfa: bool) -> None:
+def _scim_map(
+    url: str,
+    *,
+    user_kind: str,
+    login: str,
+    require_mfa: bool,
+    enabled: bool = True,
+    deleted: bool = False,
+) -> None:
     """A SCIM mapping for ``login`` under a new provider (R15 seed; made-up values)."""
     import hashlib
     import uuid
@@ -291,10 +300,10 @@ def _scim_map(url: str, *, user_kind: str, login: str, require_mfa: bool) -> Non
                 " enabled, sort, config, match_by, require_sso_opt_in, attribute_map,"
                 " jit_enabled, jit_defaults, role_rules, sync_mode, require_mfa_claim,"
                 " scim_enabled, create_by, create_time, change_by, change_time)"
-                " VALUES (:slug, 'oidc', 'db', 'pp55 idp', 'both', :t, 10, '{}', 'login', :f,"
-                " '{}', :f, '{}', '[]', 'managed', :mfa, :t, 1, :now, 1, :now)"
+                " VALUES (:slug, 'oidc', 'db', 'pp55 idp', 'both', :en, 10, '{}', 'login', :f,"
+                " '{}', :f, '{}', '[]', 'managed', :mfa, :en, 1, :now, 1, :now)"
             ),
-            {"slug": slug, "t": True, "f": False, "mfa": require_mfa, "now": now},
+            {"slug": slug, "en": enabled, "f": False, "mfa": require_mfa, "now": now},
         )
         provider_id = conn.execute(
             text("SELECT id FROM tiqora_identity_provider WHERE slug = :s"), {"s": slug}
@@ -309,7 +318,7 @@ def _scim_map(url: str, *, user_kind: str, login: str, require_mfa: bool) -> Non
             text(
                 "INSERT INTO tiqora_scim_user (provider_id, user_kind, scim_id, user_id,"
                 " user_name, user_name_fold, user_name_fold_hash, deleted, version, created,"
-                " changed) VALUES (:p, :k, :sid, :u, :n, :fold, :h, :f, 1, :now, :now)"
+                " changed) VALUES (:p, :k, :sid, :u, :n, :fold, :h, :d, 1, :now, :now)"
             ),
             {
                 "p": provider_id,
@@ -319,26 +328,30 @@ def _scim_map(url: str, *, user_kind: str, login: str, require_mfa: bool) -> Non
                 "n": login,
                 "fold": fold,
                 "h": hashlib.sha256(fold.encode()).hexdigest(),
-                "f": False,
+                "d": deleted,
                 "now": now,
             },
         )
     engine.dispose()
 
 
+def _refusals(logs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [e for e in logs if e["event"] == "password_login_rejected"]
+
+
 async def test_scim_mfa_managed_agent_is_refused(env: Env) -> None:
-    """R15: a plugin password provider cannot sign in an agent whose SCIM provider requires
-    the IdP's MFA proof (that agent signs in through the IdP's step-up)."""
+    """R15 + m2: a plugin password provider cannot sign in an agent whose SCIM provider
+    requires the IdP's MFA proof, and the typed password never reaches the plugin."""
     _scim_map(env.url, user_kind="agent", login="pp55-agent", require_mfa=True)
     with capture_logs() as logs:
         async with env.client() as client:
             r = await _agent(client)
     assert r.status_code == 401 and r.json()["detail"] == "Invalid credentials"
     assert "tiqora_session" not in r.cookies
-    rejected = [e for e in logs if e["event"] == "plugin_auth_rejected"]
-    assert rejected and {e["reason"] for e in rejected} == {"sso_managed"}
-    assert rejected[0]["login"] == "pp55-agent"
-    assert len(_calls("auth.directory")) == 1  # the provider said yes; the core refused
+    (refused,) = _refusals(logs)
+    assert refused["reason"] == "sso_managed" and refused["path"] == "plugin"
+    assert refused["login"] == "pp55-agent" and refused["user_kind"] == "agent"
+    assert points_behaviour().CALLS == []  # checked before any provider was asked
 
 
 async def test_scim_mapping_without_mfa_requirement_still_signs_in(env: Env) -> None:
@@ -349,15 +362,82 @@ async def test_scim_mapping_without_mfa_requirement_still_signs_in(env: Env) -> 
     assert r.json()["user"]["login"] == "pp55-agent"
 
 
+@pytest.mark.parametrize(
+    ("enabled", "deleted"), [(False, False), (True, True)], ids=["provider_off", "deprovisioned"]
+)
+async def test_disabled_provider_or_deprovisioned_mapping_does_not_block(
+    env: Env, enabled: bool, deleted: bool
+) -> None:
+    """P2A-PM-I2 narrows R15: only an active mapping under an ENABLED provider blocks; turning
+    the provider off is the admin's way back to passwords (plugin and local alike)."""
+    _scim_map(
+        env.url,
+        user_kind="agent",
+        login="pp55-agent",
+        require_mfa=True,
+        enabled=enabled,
+        deleted=deleted,
+    )
+    _scim_map(
+        env.url,
+        user_kind="agent",
+        login="pp55-local",
+        require_mfa=True,
+        enabled=enabled,
+        deleted=deleted,
+    )
+    with capture_logs() as logs:
+        async with env.client() as client:
+            via_plugin = await _agent(client)
+            local = await _agent(client, "pp55-local", LOCAL_PASSWORD)
+    assert via_plugin.status_code == 200, via_plugin.text
+    assert via_plugin.json()["user"]["login"] == "pp55-agent"
+    assert local.status_code == 200, local.text
+    assert local.json()["user"]["login"] == "pp55-local"
+    assert _refusals(logs) == []
+
+
 async def test_scim_mfa_check_applies_to_the_mapped_account(env: Env) -> None:
-    """The check looks at the account the provider names, not at the typed login."""
+    """The check also looks at the account the provider names, not only at the typed login."""
     _scim_map(env.url, user_kind="agent", login="pp55-agent2", require_mfa=True)
     points_behaviour().MODE["auth"] = "other_login"
     with capture_logs() as logs:
         async with env.client() as client:
             r = await _agent(client, password="irgendwas")
     assert r.status_code == 401
-    assert "sso_managed" in {e.get("reason") for e in logs}
+    (refused,) = _refusals(logs)
+    assert refused["path"] == "plugin" and refused["account"] == "pp55-agent2"
+    assert refused["provider"] == "org.example.points:directory"
+
+
+async def test_later_provider_cannot_sign_in_the_refused_account(env: Env) -> None:
+    """The chain goes on after a refusal, but a later provider naming the same SSO-managed
+    account is refused as well."""
+    _scim_map(env.url, user_kind="agent", login="pp55-agent2", require_mfa=True)
+    points_behaviour().MODE["auth"] = "other_login"
+    points_behaviour().MODE["auth.backup"] = "other_login"
+    with capture_logs() as logs:
+        async with env.client() as client:
+            r = await _agent(client, password="irgendwas")
+    assert r.status_code == 401 and r.json()["detail"] == "Invalid credentials"
+    assert "tiqora_session" not in r.cookies
+    assert [e["provider"] for e in _refusals(logs)] == [
+        "org.example.points:directory",
+        "org.example.points:backup",
+    ]
+
+
+async def test_chain_goes_on_to_an_unmanaged_account(env: Env) -> None:
+    """m1: the first provider names a managed account (refused), the second an unmanaged one,
+    which signs in."""
+    _scim_map(env.url, user_kind="agent", login="pp55-agent2", require_mfa=True)
+    points_behaviour().MODE["auth"] = "other_login"
+    points_behaviour().MODE["auth.backup"] = "typed_login"
+    async with env.client() as client:
+        r = await _agent(client, password="irgendwas")
+    assert r.status_code == 200, r.text
+    assert r.json()["user"]["login"] == "pp55-agent"
+    assert len(_calls("auth.backup")) == 1
 
 
 async def test_scim_mfa_managed_customer_is_refused(env: Env) -> None:
@@ -366,4 +446,130 @@ async def test_scim_mfa_managed_customer_is_refused(env: Env) -> None:
         async with env.client() as client:
             r = await _portal(client)
     assert r.status_code == 401 and r.json()["detail"] == "Invalid credentials"
-    assert "sso_managed" in {e.get("reason") for e in logs}
+    assert [(e["path"], e["user_kind"]) for e in _refusals(logs)] == [("plugin", "customer")]
+    assert points_behaviour().CALLS == []
+
+
+# --- P2A-PM-I2: local password and LDAP refuse SSO-managed accounts too ----------------------
+
+
+class _LdapSpy:
+    """Stands in for ``ldap_sign_in`` in a login route: password ``ldap-geheim`` binds and
+    resolves to ``account``."""
+
+    def __init__(self, account: str) -> None:
+        self.account = account
+        self.calls: list[str] = []
+
+    async def __call__(self, session: Any, settings: Any, **kw: Any) -> str | None:
+        self.calls.append(kw["login"])
+        return self.account if kw["password"] == "ldap-geheim" else None
+
+
+def _pw_of(url: str, uid: int) -> str:
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        pw = conn.execute(text("SELECT pw FROM users WHERE id = :u"), {"u": uid}).scalar_one()
+    engine.dispose()
+    return str(pw)
+
+
+async def test_local_password_of_sso_managed_agent_is_refused(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The right local password of an SSO-managed agent is a wrong password: 401, no session,
+    no later link asked (LDAP, plugins), and the opportunistic rehash does not write."""
+    import hashlib
+
+    from tiqora.api.v1 import auth as agent_auth
+
+    legacy = hashlib.sha256(LOCAL_PASSWORD.encode()).hexdigest()  # rehashed on a real login
+    engine = create_engine(env.url)
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE users SET pw = :pw WHERE id = :u"), {"pw": legacy, "u": LOCAL})
+    engine.dispose()
+    ldap = _LdapSpy("pp55-local")
+    monkeypatch.setattr(agent_auth, "ldap_sign_in", ldap)
+    _scim_map(env.url, user_kind="agent", login="pp55-local", require_mfa=True)
+    with capture_logs() as logs:
+        async with env.client() as client:
+            r = await _agent(client, "pp55-local", LOCAL_PASSWORD)
+    assert r.status_code == 401 and r.json()["detail"] == "Invalid credentials"
+    assert "tiqora_session" not in r.cookies
+    (refused,) = _refusals(logs)
+    assert (refused["path"], refused["login"], refused["user_kind"]) == (
+        "local",
+        "pp55-local",
+        "agent",
+    )
+    assert ldap.calls == [] and points_behaviour().CALLS == []
+    assert _pw_of(env.url, LOCAL) == legacy
+
+
+async def test_local_password_of_sso_managed_customer_is_refused(env: Env) -> None:
+    _scim_map(env.url, user_kind="customer", login="pp55-portal", require_mfa=True)
+    with capture_logs() as logs:
+        async with env.client() as client:
+            r = await _portal(client, password=LOCAL_PASSWORD)
+    assert r.status_code == 401 and r.json()["detail"] == "Invalid credentials"
+    assert "tiqora_customer_session" not in r.cookies
+    assert [(e["path"], e["user_kind"]) for e in _refusals(logs)] == [("local", "customer")]
+    assert points_behaviour().CALLS == []
+
+
+async def test_local_password_of_unmanaged_customer_signs_in(env: Env) -> None:
+    async with env.client() as client:
+        r = await _portal(client, password=LOCAL_PASSWORD)
+    assert r.status_code == 200, r.text
+    assert r.json()["customer"]["login"] == "pp55-portal"
+
+
+async def test_sso_managed_refusal_counts_as_a_failure(env: Env) -> None:
+    """Same failure count as a wrong password: the third refusal of the right password locks."""
+    _scim_map(env.url, user_kind="agent", login="pp55-local", require_mfa=True)
+    async with env.client(
+        _MemRedis(), auth_rate_limit_enabled=True, auth_rate_limit_login_max=3
+    ) as client:
+        codes = [(await _agent(client, "pp55-local", LOCAL_PASSWORD)).status_code for _ in range(3)]
+    assert codes == [401, 401, 429]
+
+
+async def test_ldap_login_of_sso_managed_agent_is_refused(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A directory that accepts the password of an SSO-managed agent does not sign it in, and
+    the plugins are not asked afterwards."""
+    from tiqora.api.v1 import auth as agent_auth
+
+    ldap = _LdapSpy("pp55-agent")
+    monkeypatch.setattr(agent_auth, "ldap_sign_in", ldap)
+    async with env.client() as client:
+        unmanaged = await _agent(client, password="ldap-geheim")
+    assert unmanaged.status_code == 200, unmanaged.text  # the fake directory works
+    assert unmanaged.json()["user"]["login"] == "pp55-agent"
+    points_behaviour().CALLS.clear()
+    _scim_map(env.url, user_kind="agent", login="pp55-agent", require_mfa=True)
+    with capture_logs() as logs:
+        async with env.client() as client:
+            r = await _agent(client, password="ldap-geheim")
+    assert r.status_code == 401 and r.json()["detail"] == "Invalid credentials"
+    assert "tiqora_session" not in r.cookies
+    assert [e["path"] for e in _refusals(logs)] == ["ldap"]
+    assert ldap.calls == ["pp55-agent", "pp55-agent"]
+    assert points_behaviour().CALLS == []
+
+
+async def test_ldap_login_of_sso_managed_customer_is_refused(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tiqora.api.portal import auth as portal_auth
+
+    ldap = _LdapSpy("pp55-portal")
+    monkeypatch.setattr(portal_auth, "ldap_sign_in", ldap)
+    _scim_map(env.url, user_kind="customer", login="pp55-portal", require_mfa=True)
+    with capture_logs() as logs:
+        async with env.client() as client:
+            r = await _portal(client, password="ldap-geheim")
+    assert r.status_code == 401 and r.json()["detail"] == "Invalid credentials"
+    assert [(e["path"], e["user_kind"]) for e in _refusals(logs)] == [("ldap", "customer")]
+    assert ldap.calls == ["pp55-portal"] and points_behaviour().CALLS == []

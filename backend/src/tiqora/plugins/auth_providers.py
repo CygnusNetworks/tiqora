@@ -8,8 +8,10 @@ session creation behind the login stay exactly as they are.
 
 Anything but a valid account login counts as "no" and the next provider is asked: a provider
 that raises, hangs, returns something else or names an unknown or invalid account never lets
-anyone in. The password is handed to the provider and nowhere else: it is not logged, and it is
-scrubbed from the error text of a failing provider before that text is logged.
+anyone in. An SSO-managed account (:mod:`tiqora.identity.sso_managed`) is never signed in: a
+typed login that is one never reaches a provider, and a provider that names one is a "no".
+The password is handed to the provider and nowhere else: it is not logged, and it is scrubbed
+from the error text of a failing provider before that text is logged.
 """
 
 from __future__ import annotations
@@ -20,14 +22,11 @@ from dataclasses import dataclass, field
 from typing import Final, Literal
 
 import structlog
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.db.legacy.customer import CustomerUser
-from tiqora.db.legacy.user import Users
-from tiqora.db.tiqora.models import TiqoraIdentityProvider, TiqoraScimUser
 from tiqora.extensions.core import get_registry
 from tiqora.extensions.registry import ExtensionPoint
+from tiqora.identity.sso_managed import existing_account, is_sso_managed, log_refusal
 from tiqora.plugins.calls import PluginCallBudget, call_plugin
 from tiqora.plugins.context import PluginContext, minimal_context
 from tiqora.plugins.state import is_active
@@ -96,42 +95,6 @@ def _providers(user_kind: Literal["agent", "customer"]) -> list[PasswordAuthProv
     return found
 
 
-async def _existing_account(
-    session: AsyncSession, user_kind: Literal["agent", "customer"], named: str
-) -> tuple[str, int] | None:
-    """The stored spelling and id of a valid account login, or None."""
-    if user_kind == "agent":
-        stmt = select(Users.login, Users.id).where(Users.login == named, Users.valid_id == 1)
-    else:
-        stmt = select(CustomerUser.login, CustomerUser.id).where(
-            CustomerUser.login == named, CustomerUser.valid_id == 1
-        )
-    row = (await session.execute(stmt)).first()
-    return None if row is None else (str(row[0]), int(row[1]))
-
-
-async def _sso_managed(
-    session: AsyncSession, user_kind: Literal["agent", "customer"], account_id: int
-) -> bool:
-    """R15: the account has a SCIM mapping whose provider requires the IdP's MFA proof.
-
-    Such an account signs in through its IdP (step-up); a plugin password provider must not
-    be a way around that. Deprovisioned mappings count as well (fail closed). Only Tiqora
-    tables, joined on the integer provider id: no join with a Znuny table (collations).
-    """
-    stmt = (
-        select(TiqoraScimUser.id)
-        .join(TiqoraIdentityProvider, TiqoraIdentityProvider.id == TiqoraScimUser.provider_id)
-        .where(
-            TiqoraScimUser.user_kind == user_kind,
-            TiqoraScimUser.user_id == account_id,
-            TiqoraIdentityProvider.require_mfa_claim.is_(True),
-        )
-        .limit(1)
-    )
-    return (await session.execute(stmt)).first() is not None
-
-
 async def plugin_password_sign_in(
     session: AsyncSession,
     *,
@@ -150,6 +113,11 @@ async def plugin_password_sign_in(
         return None
     providers = _providers(user_kind)
     if not providers:
+        return None
+    # P2A-PM-I2 / m2: the password of an SSO-managed account never reaches a plugin
+    typed = await existing_account(session, user_kind, login)
+    if typed is not None and await is_sso_managed(session, user_kind, typed[1]):
+        log_refusal(user_kind, login, "plugin")
         return None
     budget = PluginCallBudget(CHAIN_BUDGET_SECONDS)
     check = PasswordCheck(login=login, password=password, user_kind=user_kind, client_ip=client_ip)
@@ -194,7 +162,7 @@ async def plugin_password_sign_in(
                 reason="bad_result",
             )
             continue
-        found = await _existing_account(session, user_kind, named)
+        found = await existing_account(session, user_kind, named)
         if found is None:
             logger.warning(
                 "plugin_auth_rejected",
@@ -205,13 +173,16 @@ async def plugin_password_sign_in(
             )
             continue
         account, account_id = found
-        if await _sso_managed(session, user_kind, account_id):
-            logger.warning(
-                "plugin_auth_rejected",
+        if await is_sso_managed(session, user_kind, account_id):
+            # a mapped account (the provider named another login): refused like the typed one;
+            # the chain goes on, but every later provider naming this account is refused too
+            log_refusal(
+                user_kind,
+                login,
+                "plugin",
+                account=account,
                 plugin=provider.plugin_id,
                 provider=provider.key,
-                login=login,
-                reason="sso_managed",
             )
             continue
         if account != login:

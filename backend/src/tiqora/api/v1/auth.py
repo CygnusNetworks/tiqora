@@ -71,6 +71,7 @@ from tiqora.identity.http import safe_next as _safe_next
 from tiqora.identity.ldap_login import LdapSignInUnavailable, ldap_sign_in
 from tiqora.identity.login_providers import login_providers
 from tiqora.identity.saml_runtime import saml_availability
+from tiqora.identity.sso_managed import SsoManagedGate
 from tiqora.identity.sso_routes import (
     finish_oidc_callback,
     session_sso_state,
@@ -437,8 +438,11 @@ async def login(
     if not pre.allowed:
         raise _rate_limit_http_exception(pre)
 
-    user = await auth.authenticate_password(body.login, body.password)
-    if user is None:
+    # P2A-PM-I2: an SSO-managed account signs in through its IdP; every link refuses it and a
+    # refusal ends the chain (answered like a wrong password).
+    gate = SsoManagedGate(session, "agent", body.login)
+    user = await auth.authenticate_password(body.login, body.password, refuse=gate.local)
+    if user is None and not gate.refused:
         # Then the LDAP directories (Znuny's chained AuthModules), first bind wins.
         try:
             account_login = await ldap_sign_in(
@@ -454,7 +458,9 @@ async def login(
             ) from exc
         if account_login is not None:
             user = await auth.get_user_by_login(account_login, auth_method="ldap")
-    if user is None:
+            if user is not None and await gate.refuses(user.id, path="ldap"):
+                user = None
+    if user is None and not gate.refused:
         # Last link of the chain: password auth providers from plugins (named accounts only).
         found = await plugin_password_sign_in(
             session, login=body.login, password=body.password, user_kind="agent", client_ip=ip
