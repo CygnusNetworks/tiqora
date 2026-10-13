@@ -103,6 +103,18 @@ describe("ItsmDialogs", () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["tickets"] });
   });
 
+  it("says so while the fields load and when the screen has none to edit", async () => {
+    let answer: (defs: unknown[]) => void = () => {};
+    screenDynamicFields.mockImplementation(() => new Promise((resolve) => (answer = resolve)));
+    renderDialogs();
+    fireEvent.click(screen.getByTestId("itsm-open-itsm_fields"));
+    expect(await screen.findByTestId("ticket-df-loading")).toBeTruthy();
+    answer([]);
+    expect(await screen.findByTestId("ticket-df-empty")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("ticket-df-cancel"));
+    await waitFor(() => expect(screen.queryByTestId("itsm-dialog-itsm_fields")).toBeNull());
+  });
+
   it("closes on cancel without saving", async () => {
     renderDialogs();
     fireEvent.click(screen.getByTestId("itsm-open-itsm_fields"));

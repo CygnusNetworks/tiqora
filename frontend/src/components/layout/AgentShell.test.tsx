@@ -99,6 +99,8 @@ const statusOf = (mode: string, ciSource: "znuny" | "tiqora" | null) => ({
   mode,
   source: "auto",
   setup_complete: true,
+  criticality_field: "ITSMCriticality",
+  impact_field: "ITSMImpact",
   ci_available: ciSource !== null,
   ci_read_only: ciSource === "znuny",
   ci_source: ciSource,

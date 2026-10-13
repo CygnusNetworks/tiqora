@@ -21,22 +21,32 @@ function roleLabelKey(link: TicketLink): string {
  * "Linked tickets" row of the ticket-zoom header: one chip per link with the
  * relation (parent / child / related), number, title and state of the other
  * ticket. Shares its query key with the link dialog, so adding a link there
- * shows up here without a reload. Renders nothing when there are no links.
+ * shows up here without a reload. "Notiz an verknüpfte Tickets" and the graph
+ * are general ticket features and stay in every ITSM mode. Renders nothing when
+ * the ticket has neither ticket nor CI links.
  */
-export function LinkedTickets({ ticketId, ticketTn }: { ticketId: number; ticketTn?: string }) {
+export function LinkedTickets({
+  ticketId,
+  ticketTn,
+  canWrite = true,
+}: {
+  ticketId: number;
+  ticketTn?: string;
+  /** `rw` on the ticket: removing a link and the linked note need it. */
+  canWrite?: boolean;
+}) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [removing, setRemoving] = useState<TicketLink | null>(null);
   const [noteOpen, setNoteOpen] = useState(false);
   const [showGraph, setShowGraph] = useState(false);
-  // "Note to linked tickets" is an ITSM feature: only offered when the ITSM is on.
-  const statusQ = useQuery({
-    queryKey: itsmKeys.status(),
-    queryFn: ({ signal }) => itsmApi.status(signal),
+  // Shared with the ITSM chips: a ticket with only CI links still offers the graph.
+  const itsmQ = useQuery({
+    queryKey: itsmKeys.ticketItsm(ticketId),
+    queryFn: ({ signal }) => itsmApi.ticketItsm(ticketId, signal),
     retry: false,
-    staleTime: 60_000,
   });
-  const itsmOn = !!statusQ.data && statusQ.data.mode !== "off";
+  const ciCount = itsmQ.data?.ci_count ?? 0;
   const linksQ = useQuery({
     queryKey: ["tickets", ticketId, "links"],
     queryFn: () => api.listTicketLinks(ticketId),
@@ -49,7 +59,7 @@ export function LinkedTickets({ ticketId, ticketTn }: { ticketId: number; ticket
     },
   });
   const links = linksQ.data ?? [];
-  if (links.length === 0) return null;
+  if (links.length === 0 && ciCount === 0) return null;
 
   return (
     <div
@@ -78,19 +88,21 @@ export function LinkedTickets({ ticketId, ticketTn }: { ticketId: number; ticket
           <span className="min-w-0 max-w-[28ch] truncate text-ink">{l.other_title}</span>
           <span className="flex-none text-muted">· {stateLabel(t, l.other_state)}</span>
         </Link>
-        <button
-          type="button"
-          className="flex-none rounded px-1 text-muted hover:text-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-          aria-label={t("ticket.links.remove")}
-          title={t("ticket.links.remove")}
-          onClick={() => setRemoving(l)}
-          data-testid={`linked-ticket-remove-${l.other_ticket_id}`}
-        >
-          ×
-        </button>
+        {canWrite && (
+          <button
+            type="button"
+            className="flex-none rounded px-1 text-muted hover:text-danger focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            aria-label={t("ticket.links.remove")}
+            title={t("ticket.links.remove")}
+            onClick={() => setRemoving(l)}
+            data-testid={`linked-ticket-remove-${l.other_ticket_id}`}
+          >
+            ×
+          </button>
+        )}
         </span>
       ))}
-      {itsmOn && (
+      {canWrite && links.length > 0 && (
         <button
           type="button"
           className="text-accent hover:underline"

@@ -270,3 +270,9 @@ export const itsmApi = {
     },
   },
 };
+
+/** Dropdown label of an offered link type: "Übergeordnet / Untergeordnet" for pointed ones. */
+export function linkTypeLabel(o: LinkTypeOption): string {
+  if (o.pointed && o.source_label && o.target_label) return `${o.source_label} / ${o.target_label}`;
+  return o.source_label ?? o.name;
+}

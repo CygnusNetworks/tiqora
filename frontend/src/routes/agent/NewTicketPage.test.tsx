@@ -152,8 +152,15 @@ function wrap(ui: React.ReactElement) {
   );
 }
 
-function itsmStatusOf(mode: "off" | "znuny_readthrough") {
+function itsmStatusOf(
+  mode: "off" | "znuny_readthrough",
+  fields: { criticality_field: string; impact_field: string } = {
+    criticality_field: "ITSMCriticality",
+    impact_field: "ITSMImpact",
+  },
+) {
   return {
+    ...fields,
     mode,
     source: mode === "off" ? "none" : "znuny",
     ci_available: mode !== "off",
@@ -1247,6 +1254,23 @@ describe("NewTicketPage ITSM", () => {
     await waitFor(() => expect(itsmSuggestion).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 20));
     expect(screen.getByTestId("new-ticket-priority-value")).toHaveTextContent("normal");
+  });
+
+  it("reads the matrix fields the admin configured", async () => {
+    screenDynamicFields.mockResolvedValue([
+      { name: "SiteCriticality", label: "Criticality", field_type: "Text", required: true, possible_values: null },
+      { name: "SiteImpact", label: "Impact", field_type: "Text", required: true, possible_values: null },
+    ]);
+    itsmStatus.mockResolvedValue(
+      itsmStatusOf("znuny_readthrough", { criticality_field: "SiteCriticality", impact_field: "SiteImpact" }),
+    );
+    wrap(<NewTicketPage />);
+    fireEvent.click(await screen.findByTestId("new-ticket-skip-customer"));
+    const crit = await screen.findByTestId("new-ticket-df-required-SiteCriticality");
+    fireEvent.change(crit, { target: { value: "5 very high" } });
+    fireEvent.change(screen.getByTestId("new-ticket-df-required-SiteImpact"), { target: { value: "4 high" } });
+    await waitFor(() => expect(itsmSuggestion).toHaveBeenCalledWith("5 very high", "4 high", expect.anything()));
+    await waitFor(() => expect(screen.getByTestId("new-ticket-priority-value")).toHaveTextContent("very low"));
   });
 
   it("does not ask the matrix while the ITSM is off", async () => {

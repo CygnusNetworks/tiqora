@@ -39,6 +39,28 @@ function renderDialog(onClose = vi.fn()) {
 }
 
 describe("ServiceItsmDialog", () => {
+  it("suggests Znuny's service types and the matrix criticalities (free text stays)", async () => {
+    vi.spyOn(api, "request").mockResolvedValue(service() as never);
+    renderDialog();
+    const type = await screen.findByTestId("service-itsm-type");
+    const types = screen.getByTestId("service-itsm-type-suggestions");
+    expect(type.getAttribute("list")).toBe(types.id);
+    const typeValues = [...types.querySelectorAll("option")].map((o) => o.getAttribute("value"));
+    expect(typeValues).toContain("End User Service");
+    expect(typeValues).toContain("Underpinning Contract");
+    expect(typeValues).toHaveLength(11);
+    const crit = screen.getByTestId("service-itsm-criticality");
+    const crits = screen.getByTestId("service-itsm-criticality-suggestions");
+    expect(crit.getAttribute("list")).toBe(crits.id);
+    expect([...crits.querySelectorAll("option")].map((o) => o.getAttribute("value"))).toEqual([
+      "1 very low",
+      "2 low",
+      "3 normal",
+      "4 high",
+      "5 very high",
+    ]);
+  });
+
   it("saves the meta and keeps the owner", async () => {
     const spy = vi.spyOn(api, "request").mockImplementation((async (method: string, path: string, opts?: { body?: unknown }) => {
       if (method === "GET") return service();

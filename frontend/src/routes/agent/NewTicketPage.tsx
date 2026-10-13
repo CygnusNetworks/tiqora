@@ -60,9 +60,6 @@ import { useEmailSecurity } from "@/components/agent/useEmailSecurity";
 import { RecentIncidentWarning } from "@/components/itsm/RecentIncidentWarning";
 import { itsmApi, itsmKeys } from "@/lib/itsmApi";
 
-/** Names of the dynamic fields the ITSM priority matrix reads (the `ItsmSettings` defaults). */
-const ITSM_CRITICALITY_FIELD = "ITSMCriticality";
-const ITSM_IMPACT_FIELD = "ITSMImpact";
 
 const FIELD_CLASS =
   "w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-[13.5px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent";
@@ -256,11 +253,16 @@ export function NewTicketPage() {
     staleTime: 60_000,
   });
   const itsmOn = !!itsmStatusQ.data && itsmStatusQ.data.mode !== "off";
+  // The dynamic fields the matrix reads are an admin setting (default ITSMCriticality/ITSMImpact).
+  const criticalityField = itsmStatusQ.data?.criticality_field ?? "";
+  const impactField = itsmStatusQ.data?.impact_field ?? "";
   const hasMatrixFields =
-    phoneDfs.some((f) => f.name === ITSM_CRITICALITY_FIELD) &&
-    phoneDfs.some((f) => f.name === ITSM_IMPACT_FIELD);
-  const criticality = phoneFields.dfValues[ITSM_CRITICALITY_FIELD]?.[0] ?? null;
-  const impact = phoneFields.dfValues[ITSM_IMPACT_FIELD]?.[0] ?? null;
+    !!criticalityField &&
+    !!impactField &&
+    phoneDfs.some((f) => f.name === criticalityField) &&
+    phoneDfs.some((f) => f.name === impactField);
+  const criticality = phoneFields.dfValues[criticalityField]?.[0] ?? null;
+  const impact = phoneFields.dfValues[impactField]?.[0] ?? null;
   const matrixQ = useQuery({
     queryKey: itsmKeys.prioritySuggestion(criticality, impact),
     queryFn: ({ signal }) => itsmApi.prioritySuggestion(criticality, impact, signal),

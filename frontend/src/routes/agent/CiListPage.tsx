@@ -7,6 +7,7 @@ import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
 import { ciDetailHref } from "@/lib/itsmRoutes";
 import { itsmApi, itsmErrorKey, itsmKeys, type CiListQuery, type CiSource } from "@/lib/itsmApi";
+import { RouterAnchor } from "@/components/ui/RouterAnchor";
 
 const PAGE = 25;
 const DEBOUNCE_MS = 300;
@@ -150,9 +151,9 @@ export function CiListPage() {
               {items.map((ci) => (
                 <tr key={ci.ref} data-testid={`ci-row-${ci.id}`}>
                   <td className="px-3 py-2 font-mono text-xs">
-                    <a href={ciDetailHref(ci.source as CiSource, ci.id)} className="text-accent hover:underline">
+                    <RouterAnchor href={ciDetailHref(ci.source as CiSource, ci.id)} className="text-accent hover:underline">
                       {ci.number}
-                    </a>
+                    </RouterAnchor>
                   </td>
                   <td className="px-3 py-2 text-ink">{ci.name}</td>
                   <td className="px-3 py-2 text-muted">{ci.class_name}</td>

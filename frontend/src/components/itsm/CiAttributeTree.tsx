@@ -1,13 +1,14 @@
 import { useTranslation } from "react-i18next";
 import { ciRefHref, safeHref } from "@/lib/ciDisplay";
 import type { CiAttribute } from "@/lib/itsmApi";
+import { RouterAnchor } from "@/components/ui/RouterAnchor";
 
 function Value({ attr, onNavigate }: { attr: CiAttribute; onNavigate?: (href: string) => void }) {
   const text = attr.display || attr.raw || "";
   const ciHref = attr.kind === "ci" ? ciRefHref(attr.ref) : null;
   if (ciHref) {
     return (
-      <a
+      <RouterAnchor
         href={ciHref}
         className="text-accent hover:underline"
         data-testid="ci-attr-ci-link"
@@ -18,7 +19,7 @@ function Value({ attr, onNavigate }: { attr: CiAttribute; onNavigate?: (href: st
         }}
       >
         {text}
-      </a>
+      </RouterAnchor>
     );
   }
   if (attr.kind === "url" || attr.kind === "email") {

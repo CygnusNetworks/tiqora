@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { itsmApi, itsmKeys } from "@/lib/itsmApi";
+import { RouterAnchor } from "@/components/ui/RouterAnchor";
 
 /** Banner on a ticket linked to an active major incident (one the caller may read). */
 export function MajorIncidentBanner({ ticketId }: { ticketId: number }) {
@@ -19,13 +20,13 @@ export function MajorIncidentBanner({ ticketId }: { ticketId: number }) {
       data-testid="major-banner"
     >
       <span className="font-medium">{t("itsm.major.banner")}</span>{" "}
-      <a
+      <RouterAnchor
         href={`/agent/tickets/${banner.ticket_id}`}
         className="font-mono text-accent hover:underline"
         data-testid="major-banner-link"
       >
         {banner.tn}
-      </a>{" "}
+      </RouterAnchor>{" "}
       <span>{banner.title}</span>
       {banner.summary && (
         <p className="mt-1 text-xs text-muted" data-testid="major-banner-summary">

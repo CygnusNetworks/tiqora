@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
-import { itsmApi, itsmErrorCode, itsmKeys, type LinkType, type LinkTypePatchIn } from "@/lib/itsmApi";
+import { itsmApi, itsmErrorCode, itsmErrorKey, itsmKeys, type LinkType, type LinkTypePatchIn } from "@/lib/itsmApi";
 
 type Propagation = LinkType["propagation"];
 const PROPAGATIONS: Propagation[] = ["none", "source", "target", "both"];
@@ -175,6 +175,11 @@ export function LinkTypesPage() {
       {list.isError && (
         <p role="alert" className="text-sm text-danger">
           {t("admin.itsm.error")}
+        </p>
+      )}
+      {sync.isError && (
+        <p role="alert" className="text-sm text-danger" data-testid="link-types-sync-error">
+          {t(itsmErrorKey(sync.error))}
         </p>
       )}
       {sync.isSuccess && (

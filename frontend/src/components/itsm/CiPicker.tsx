@@ -5,16 +5,10 @@ import { CiStateBadge } from "@/components/itsm/CiStateBadge";
 import { Dialog } from "@/components/ui/Dialog";
 import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
-import { itsmApi, itsmErrorKey, itsmKeys, type CiSummary, type LinkTypeOption } from "@/lib/itsmApi";
+import { itsmApi, itsmErrorKey, itsmKeys, linkTypeLabel, type CiSummary } from "@/lib/itsmApi";
 
 const PAGE = 20;
 const DEBOUNCE_MS = 250;
-
-/** Dropdown label of an offered link type: "Übergeordnet / Untergeordnet" for pointed ones. */
-function linkTypeLabel(o: LinkTypeOption): string {
-  if (o.pointed && o.source_label && o.target_label) return `${o.source_label} / ${o.target_label}`;
-  return o.source_label ?? o.name;
-}
 
 /**
  * "CI verknüpfen": search (debounced) with class filter and link-type select; arrow keys move

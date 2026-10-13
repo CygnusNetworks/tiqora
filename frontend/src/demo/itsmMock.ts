@@ -27,6 +27,7 @@ import type {
   TicketItsm,
   TicketLinkTarget,
 } from "@/lib/itsmApi";
+import type { Job } from "@/lib/jobsApi";
 import { demoItsmMode, type DemoItsmMode } from "./itsmMode";
 
 const T0 = "2026-10-11T08:00:00Z";
@@ -199,6 +200,7 @@ function graph(id: number): LinkGraph {
 function status(mode: DemoItsmMode): ItsmStatus {
   return {
     mode, source: "auto", setup_complete: true,
+    criticality_field: "ITSMCriticality", impact_field: "ITSMImpact",
     ci_available: mode !== "off",
     ci_read_only: mode === "znuny_readthrough",
     ci_source: mode === "off" ? null : mode === "tiqora" ? "tiqora" : "znuny",
@@ -264,6 +266,48 @@ function resolveAdminItsm(path: string, method: string, mode: DemoItsmMode): unk
   return undefined;
 }
 
+/** The one background job the ITSM demo writes start (note to linked tickets, close with workaround,
+ * major-incident update): it is done at once. */
+export const DEMO_ITSM_JOB_ID = 9451;
+
+const ITSM_JOB: Job = {
+  id: DEMO_ITSM_JOB_ID,
+  kind: "core.itsm_linked_articles",
+  status: "succeeded",
+  title_key: "jobs.kinds.core.itsm_linked_articles",
+  progress_done: 2,
+  progress_total: 2,
+  progress_message: null,
+  cancel_requested: false,
+  error: null,
+  result: { done: [101, 102], skipped: [] },
+  files: [],
+  created_by: 1,
+  created_at: T0,
+  started_at: T0,
+  finished_at: T0,
+};
+
+const TICKET_WRITE =
+  /\/api\/v1\/tickets\/(\d+)\/(links\/\d+|cis(?:\/(?:znuny|tiqora)\/\d+)?|linked-articles|problem(?:\/incidents|\/known-error|\/close-incidents)?|major-incident(?:\/updates)?)$/;
+
+/** Stateless answers to the ticket-scoped ITSM writes, so demo clicks get a plausible reply
+ * (the e2e suite keeps its own stateful store). `null` = 204. */
+function ticketWrite(path: string, method: string): unknown | undefined {
+  const w = path.match(TICKET_WRITE);
+  if (!w || method === "GET") return undefined;
+  const id = Number(w[1]);
+  const what = w[2];
+  if (what.startsWith("links/") || what.startsWith("cis/")) return null;
+  if (what === "cis") return { ...LINKS[0], ticket_id: id };
+  if (what === "linked-articles" || what === "problem/close-incidents") return { job_id: DEMO_ITSM_JOB_ID, status: "queued" };
+  if (what === "problem/known-error") return { ...PROBLEM, ticket_id: id, known_error: true, known_error_since: T0 };
+  if (what.startsWith("problem")) return { ...PROBLEM, ticket_id: id };
+  if (what === "major-incident/updates") return { job_id: DEMO_ITSM_JOB_ID, update: MAJOR.timeline[1] };
+  if (method === "DELETE") return { ...MAJOR, ticket_id: id, active: false, ended_at: T0, ended_by: 1 };
+  return { ...MAJOR, ticket_id: id };
+}
+
 /**
  * Answers the ITSM demo paths; `search` is the query string of the request (optional). `mode`
  * defaults to the demo build's stored mode; the e2e fixture runs in Node and passes the page's.
@@ -302,6 +346,9 @@ export function resolveItsmData(
   if (/\/api\/v1\/itsm\/services\/\d+\/cis$/.test(path)) return demoCis.slice(0, 2);
   if (/\/api\/v1\/itsm\/services\/\d+$/.test(path)) return SERVICE;
 
+  if (path.endsWith(`/api/v1/jobs/${DEMO_ITSM_JOB_ID}`) && method === "GET") return ITSM_JOB;
+  const written = ticketWrite(path, method);
+  if (written !== undefined) return written;
   const t = path.match(/\/api\/v1\/tickets\/(\d+)\/(cis|itsm|link-graph|problem|major-incident)$/);
   if (t && method === "GET") {
     const id = Number(t[1]);

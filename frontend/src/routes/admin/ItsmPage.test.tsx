@@ -7,6 +7,18 @@ import { api, ApiError } from "@/lib/api";
 import type { ItsmAdmin, PriorityMatrix, SetupPlan } from "@/lib/itsmApi";
 import { ItsmPage } from "./ItsmPage";
 
+vi.mock("@tanstack/react-router", async () => {
+  const actual = await vi.importActual<typeof import("@tanstack/react-router")>("@tanstack/react-router");
+  return {
+    ...actual,
+    Link: ({ children, params, to, ...rest }: { children: React.ReactNode; to: string; params?: Record<string, string> }) => (
+      <a href={to.replace("$section", params?.section ?? "")} {...rest}>
+        {children}
+      </a>
+    ),
+  };
+});
+
 const admin = (over: Partial<ItsmAdmin> = {}): ItsmAdmin => ({
   mode: "znuny_readthrough",
   source: "auto",
@@ -93,6 +105,8 @@ describe("ItsmPage", () => {
     // Mode A: the explanation names the importer; the link stays hidden while its route does not exist
     expect(screen.getByTestId("itsm-mode-a-note")).toHaveTextContent(i18n.t("admin.itsm.mode.importHint"));
     expect(screen.queryByTestId("itsm-import-link")).toBeNull();
+    // I14: the page links its settings section
+    expect(screen.getByTestId("admin-itsm-settings").getAttribute("href")).toBe("/admin/settings/itsm");
   });
 
   it("states how the mode was set for admin and importer", async () => {

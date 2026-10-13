@@ -1,12 +1,25 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { DEMO_ITSM_MODE_KEY } from "./itsmMode";
-import { resolveItsmData } from "./itsmMock";
+import { DEMO_ITSM_JOB_ID, resolveItsmData } from "./itsmMock";
 import { resolveData } from "./mockData";
 import type { CiDetail, CiPage, CiSummary, ItsmStatus, Problem, TicketItsm } from "@/lib/itsmApi";
 
 afterEach(() => localStorage.removeItem(DEMO_ITSM_MODE_KEY));
 
 describe("itsm demo mock (Mode A data)", () => {
+  it("answers the ticket ITSM writes so demo clicks do not fail", () => {
+    expect(resolveItsmData("/api/v1/tickets/100/links/101", "DELETE")).toBeNull();
+    expect(resolveItsmData("/api/v1/tickets/100/cis/znuny/201", "DELETE")).toBeNull();
+    expect(resolveItsmData("/api/v1/tickets/100/linked-articles", "POST")).toEqual({ job_id: DEMO_ITSM_JOB_ID, status: "queued" });
+    expect(resolveItsmData(`/api/v1/jobs/${DEMO_ITSM_JOB_ID}`, "GET")).toMatchObject({ status: "succeeded" });
+    expect((resolveItsmData("/api/v1/tickets/101/problem", "PUT") as Problem).ticket_id).toBe(101);
+    expect(resolveItsmData("/api/v1/tickets/101/problem/known-error", "POST")).toMatchObject({ known_error: true });
+    expect(resolveItsmData("/api/v1/tickets/101/problem/close-incidents", "POST")).toMatchObject({ job_id: DEMO_ITSM_JOB_ID });
+    expect(resolveItsmData("/api/v1/tickets/100/major-incident", "POST")).toMatchObject({ ticket_id: 100, active: true });
+    expect(resolveItsmData("/api/v1/tickets/100/major-incident", "DELETE")).toMatchObject({ active: false });
+    expect(resolveItsmData("/api/v1/tickets/100/major-incident/updates", "POST")).toMatchObject({ job_id: DEMO_ITSM_JOB_ID });
+  });
+
   it("answers /itsm/status from the demo mode", () => {
     expect((resolveItsmData("/api/v1/itsm/status", "GET") as ItsmStatus).mode).toBe("tiqora");
     localStorage.setItem(DEMO_ITSM_MODE_KEY, "znuny_readthrough");

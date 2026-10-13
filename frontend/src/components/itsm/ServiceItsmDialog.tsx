@@ -1,10 +1,28 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Spinner } from "@/components/ui/Spinner";
 import { itsmApi, itsmErrorCode, itsmKeys, type ServiceItsm } from "@/lib/itsmApi";
+
+/** Znuny's default `ITSM::Service::Type` names (surveyed on 6.5 and 7.3): suggestions, free text allowed (D8). */
+const SERVICE_TYPE_SUGGESTIONS = [
+  "End User Service",
+  "Front End",
+  "Back End",
+  "IT Management",
+  "Reporting",
+  "IT Operational",
+  "Demonstration",
+  "Project",
+  "Training",
+  "Underpinning Contract",
+  "Other",
+] as const;
+
+/** The `ITSMCriticality` values the priority matrix uses. */
+const CRITICALITY_SUGGESTIONS = ["1 very low", "2 low", "3 normal", "4 high", "5 very high"] as const;
 
 type Draft = {
   service_type: string;
@@ -25,6 +43,7 @@ const draftOf = (s: ServiceItsm): Draft => ({
 function Form({ service, onClose }: { service: ServiceItsm; onClose: () => void }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const listId = useId();
   const [draft, setDraft] = useState<Draft>(() => draftOf(service));
   const readOnlyKinds = service.znuny_owned;
   const minutes = draft.min_minutes.trim() === "" ? null : Number(draft.min_minutes);
@@ -63,8 +82,14 @@ function Form({ service, onClose }: { service: ServiceItsm; onClose: () => void 
           value={draft.service_type}
           disabled={readOnlyKinds}
           onChange={(e) => set("service_type", e.target.value)}
+          list={`${listId}-type`}
           data-testid="service-itsm-type"
         />
+        <datalist id={`${listId}-type`} data-testid="service-itsm-type-suggestions">
+          {SERVICE_TYPE_SUGGESTIONS.map((v) => (
+            <option key={v} value={v} />
+          ))}
+        </datalist>
       </label>
       <label className="block">
         <span className="text-xs text-muted">{t("admin.itsm.service.criticality")}</span>
@@ -73,8 +98,14 @@ function Form({ service, onClose }: { service: ServiceItsm; onClose: () => void 
           value={draft.criticality}
           disabled={readOnlyKinds}
           onChange={(e) => set("criticality", e.target.value)}
+          list={`${listId}-criticality`}
           data-testid="service-itsm-criticality"
         />
+        <datalist id={`${listId}-criticality`} data-testid="service-itsm-criticality-suggestions">
+          {CRITICALITY_SUGGESTIONS.map((v) => (
+            <option key={v} value={v} />
+          ))}
+        </datalist>
       </label>
       <label className="block">
         <span className="text-xs text-muted">{t("admin.itsm.service.description")}</span>

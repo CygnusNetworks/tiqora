@@ -11,6 +11,7 @@ import { api, type TicketDetail } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/avatarApi";
 import { itsmApi, itsmErrorCode, itsmKeys, type Problem } from "@/lib/itsmApi";
 import { ticketPerms } from "@/lib/ticket";
+import { RouterAnchor } from "@/components/ui/RouterAnchor";
 
 const KB_STATES = new Set(["draft", "review", "published", "archived"]);
 const inputCls =
@@ -305,9 +306,9 @@ function ProblemBody({ ticket, categoryConfigured }: { ticket: TicketDetail; cat
           <ul className="divide-y divide-hairline" data-testid="problem-incidents">
             {problem.incidents.map((i) => (
               <li key={i.ticket_id} className="flex items-center gap-3 py-1.5" data-testid={`problem-incident-${i.ticket_id}`}>
-                <a href={`/agent/tickets/${i.ticket_id}`} className="font-mono text-xs text-accent hover:underline">
+                <RouterAnchor href={`/agent/tickets/${i.ticket_id}`} className="font-mono text-xs text-accent hover:underline">
                   {i.tn}
-                </a>
+                </RouterAnchor>
                 <span className="min-w-0 flex-1 truncate text-ink">{i.title}</span>
                 <Badge tone={i.closed ? "default" : "accent"}>{i.state}</Badge>
               </li>
@@ -320,9 +321,9 @@ function ProblemBody({ ticket, categoryConfigured }: { ticket: TicketDetail; cat
         {problem.known_error && <Badge tone="warn" data-testid="problem-known-error-badge">{t("itsm.problem.knownError.badge")}</Badge>}
         {problem.known_error_article_id != null && (
           <span className="text-xs text-muted" data-testid="problem-article">
-            <a href={`/agent/kb/${problem.known_error_article_id}`} className="text-accent hover:underline">
+            <RouterAnchor href={`/agent/kb/${problem.known_error_article_id}`} className="text-accent hover:underline">
               {t("itsm.problem.knownError.article")}
-            </a>{" "}
+            </RouterAnchor>{" "}
             {articleState && (
               <Badge data-testid="problem-article-state">
                 {KB_STATES.has(articleState) ? t(`itsm.problem.knownError.states.${articleState}`) : articleState}

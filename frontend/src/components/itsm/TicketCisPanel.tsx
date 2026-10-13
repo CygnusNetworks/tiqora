@@ -11,6 +11,7 @@ import { safeHref } from "@/lib/ciDisplay";
 import { itsmApi, itsmErrorKey, itsmKeys, type CiTicketLink } from "@/lib/itsmApi";
 import { apiErrorMessage } from "@/lib/avatarApi";
 import { ticketPerms } from "@/lib/ticket";
+import { RouterAnchor } from "@/components/ui/RouterAnchor";
 
 /**
  * "Betroffene CIs" of the ticket zoom: the linked configuration items with their states, linking
@@ -111,9 +112,9 @@ export function TicketCisPanel({ ticket }: { ticket: TicketDetail }) {
                 className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5"
                 data-testid={`ticket-ci-${l.ci.id}`}
               >
-                <a href={ciDetailHref(l.ci.source, l.ci.id)} className="font-mono text-xs text-accent hover:underline">
+                <RouterAnchor href={ciDetailHref(l.ci.source, l.ci.id)} className="font-mono text-xs text-accent hover:underline">
                   {l.ci.number}
-                </a>
+                </RouterAnchor>
                 <span className="min-w-0 flex-1 truncate text-ink">{l.ci.name}</span>
                 <span className="text-xs text-muted">{l.ci.class_name}</span>
                 <span className="flex items-center gap-1 text-xs text-muted">

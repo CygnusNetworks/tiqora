@@ -170,6 +170,36 @@ export function TicketDynamicFields({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readyToEdit]);
 
+  // Dialog mode before the form opens: say what is going on instead of an empty body.
+  if (embedded && !editing) {
+    // nothing to edit: no rw/ACL, the screen lookup failed, or the screen has no fields;
+    // otherwise the definitions are loading or the form opens with the next render
+    const nothing = !canEdit || defsQ.isError || (defsQ.isSuccess && defs.length === 0);
+    return (
+      <div className="space-y-3 text-sm" data-testid="ticket-df">
+        {!nothing ? (
+          <p role="status" className="text-muted" data-testid="ticket-df-loading">
+            {t("common.loading")}
+          </p>
+        ) : (
+          <>
+            <p className="text-muted" data-testid="ticket-df-empty">
+              {t("ticket.dynamicFieldsEdit.noFields")}
+            </p>
+            <button
+              type="button"
+              data-testid="ticket-df-cancel"
+              onClick={() => onCancel?.()}
+              className="rounded border border-hairline px-3 py-1 text-xs"
+            >
+              {t("ticket.dynamicFieldsEdit.cancel")}
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
+
   const shown = ticket.dynamic_fields ?? [];
   const showEdit = canEdit && defs.length > 0 && !editing;
   if (shown.length === 0 && !showEdit && !editing) return null;

@@ -13,7 +13,7 @@ const { ci, ciVersions, ciTickets, params } = vi.hoisted(() => ({
   ciTickets: vi.fn(),
   params: { current: { source: "znuny", ciId: "201" } },
 }));
-vi.mock("@tanstack/react-router", () => ({ useParams: () => params.current }));
+vi.mock("@tanstack/react-router", () => ({ useParams: () => params.current, useRouter: () => null }));
 vi.mock("@/lib/itsmApi", async () => {
   const actual = await vi.importActual<typeof import("@/lib/itsmApi")>("@/lib/itsmApi");
   return { ...actual, itsmApi: { ...actual.itsmApi, ci, ciVersions, ciTickets } };

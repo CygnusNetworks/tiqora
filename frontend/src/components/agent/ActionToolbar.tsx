@@ -15,7 +15,7 @@ import { stateLabel } from "@/lib/status";
 import { ticketPerms, usePatchTicket } from "@/lib/ticket";
 import { fromZonedInputValue } from "@/lib/timeZone";
 import { useAgentOptions } from "@/lib/agentOptions";
-import { itsmApi, itsmKeys, type LinkTypeOption } from "@/lib/itsmApi";
+import { itsmApi, itsmKeys, linkTypeLabel } from "@/lib/itsmApi";
 
 
 // The ticket's customer dialog lives with the other customer components.
@@ -675,12 +675,6 @@ function ticketRefErrorMessage(err: unknown, ref: string, t: TFunction): string 
 
 const FALLBACK_LINK_TYPES = ["Normal", "ParentChild"];
 
-/** Dropdown label of an offered link type: "Übergeordnet / Untergeordnet" for pointed ones. */
-function linkTypeLabel(o: LinkTypeOption): string {
-  if (o.pointed && o.source_label && o.target_label) return `${o.source_label} / ${o.target_label}`;
-  return o.source_label ?? o.name;
-}
-
 export function LinkDialog({
   ticketId,
   onClose,
@@ -702,6 +696,8 @@ export function LinkDialog({
     typesQ.data && typesQ.data.length > 0
       ? typesQ.data.map((o) => ({ value: o.name, label: linkTypeLabel(o) }))
       : FALLBACK_LINK_TYPES.map((n) => ({ value: n, label: n }));
+  // The admin may hide "Normal": then the first type actually offered is the default.
+  const chosenType = typeItems.some((o) => o.value === linkType) ? linkType : (typeItems[0]?.value ?? linkType);
 
   const linksQ = useQuery({
     queryKey: ["tickets", ticketId, "links"],
@@ -712,7 +708,7 @@ export function LinkDialog({
     mutationFn: async () =>
       api.createTicketLink(ticketId, {
         target_ticket_id: await resolveTicketRef(targetId, ticketId),
-        link_type: linkType,
+        link_type: chosenType,
       }),
     onSuccess: () => {
       setTargetId("");
@@ -751,7 +747,7 @@ export function LinkDialog({
           {t("ticket.dialog.linkType")}
           <SelectField
             items={typeItems}
-            value={linkType}
+            value={chosenType}
             onChange={setLinkType}
             testId="link-type-select"
           />

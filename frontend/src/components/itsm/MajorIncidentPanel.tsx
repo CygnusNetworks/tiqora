@@ -216,7 +216,8 @@ export function MajorIncidentPanel({ ticket }: { ticket: TicketDetail }) {
     >
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-medium text-ink">{t("itsm.major.title")}</h2>
-        {canWrite && !major && (
+        {/* an ended one can be declared again: the backend starts a new run */}
+        {canWrite && !major?.active && (
           <Button size="sm" onClick={() => setDeclaring(true)} data-testid="major-declare">
             {t("itsm.major.declare.open")}
           </Button>

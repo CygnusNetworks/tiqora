@@ -1,20 +1,20 @@
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
 import { LinkedTickets } from "./LinkedTickets";
 
-const { listTicketLinks, unlinkTicket, linkGraph, itsmStatus } = vi.hoisted(() => ({
+const { listTicketLinks, unlinkTicket, linkGraph, ticketItsm } = vi.hoisted(() => ({
   listTicketLinks: vi.fn(),
   unlinkTicket: vi.fn(),
   linkGraph: vi.fn(),
-  itsmStatus: vi.fn(),
+  ticketItsm: vi.fn(),
 }));
 
 vi.mock("@/lib/itsmApi", async () => {
   const actual = await vi.importActual<typeof import("@/lib/itsmApi")>("@/lib/itsmApi");
-  return { ...actual, itsmApi: { ...actual.itsmApi, unlinkTicket, linkGraph, status: itsmStatus } };
+  return { ...actual, itsmApi: { ...actual.itsmApi, unlinkTicket, linkGraph, ticketItsm } };
 });
 
 vi.mock("@/lib/api", async () => {
@@ -51,6 +51,11 @@ function wrap(ui: React.ReactElement) {
 }
 
 describe("LinkedTickets", () => {
+  beforeEach(() => {
+    // ITSM off: no CI links, and the row's own features stay
+    ticketItsm.mockReset().mockResolvedValue({ enabled: false, mode: "off", ci_count: null });
+  });
+
   it("renders nothing without links", async () => {
     listTicketLinks.mockReset().mockResolvedValue([]);
     wrap(<LinkedTickets ticketId={7} />);
@@ -89,7 +94,6 @@ describe("LinkedTickets", () => {
   it("removes a link after confirming, via DELETE, and refreshes the list", async () => {
     listTicketLinks.mockReset().mockResolvedValue([LINK]);
     unlinkTicket.mockReset().mockResolvedValue(undefined);
-    itsmStatus.mockReset().mockResolvedValue({ mode: "off" });
     wrap(<LinkedTickets ticketId={7} ticketTn="2026092610000011" />);
     fireEvent.click(await screen.findByTestId("linked-ticket-remove-9"));
     const dlg = await screen.findByTestId("confirm-dialog");
@@ -102,23 +106,32 @@ describe("LinkedTickets", () => {
     await waitFor(() => expect(screen.queryByTestId("linked-tickets")).toBeNull());
   });
 
-  it("offers the note dialog only while the ITSM is on", async () => {
+  it("offers the note dialog in every ITSM mode, also when ITSM is off", async () => {
     listTicketLinks.mockReset().mockResolvedValue([LINK]);
-    itsmStatus.mockReset().mockResolvedValue({ mode: "off" });
-    const first = wrap(<LinkedTickets ticketId={7} />);
-    await screen.findByTestId("linked-ticket-9");
-    await waitFor(() => expect(itsmStatus).toHaveBeenCalled());
-    expect(screen.queryByTestId("linked-note-open")).toBeNull();
-    first.unmount();
-    itsmStatus.mockReset().mockResolvedValue({ mode: "znuny_readthrough" });
     wrap(<LinkedTickets ticketId={7} />);
     fireEvent.click(await screen.findByTestId("linked-note-open"));
     expect(await screen.findByTestId("linked-note-dialog")).toBeTruthy();
   });
 
+  it("hides remove and note without rw on the ticket", async () => {
+    listTicketLinks.mockReset().mockResolvedValue([LINK]);
+    wrap(<LinkedTickets ticketId={7} canWrite={false} />);
+    await screen.findByTestId("linked-ticket-9");
+    expect(screen.queryByTestId("linked-ticket-remove-9")).toBeNull();
+    expect(screen.queryByTestId("linked-note-open")).toBeNull();
+    expect(screen.getByTestId("link-graph-toggle")).toBeTruthy();
+  });
+
+  it("offers the graph for a ticket with only CI links", async () => {
+    listTicketLinks.mockReset().mockResolvedValue([]);
+    ticketItsm.mockResolvedValue({ enabled: true, mode: "znuny_readthrough", ci_count: 2 });
+    wrap(<LinkedTickets ticketId={7} />);
+    expect(await screen.findByTestId("link-graph-toggle")).toBeTruthy();
+    expect(screen.queryByTestId("linked-note-open")).toBeNull();
+  });
+
   it("toggles the link graph", async () => {
     listTicketLinks.mockReset().mockResolvedValue([LINK]);
-    itsmStatus.mockReset().mockResolvedValue({ mode: "off" });
     linkGraph.mockReset().mockResolvedValue({ root: "ticket:7", truncated: false, nodes: [], edges: [] });
     wrap(<LinkedTickets ticketId={7} />);
     fireEvent.click(await screen.findByTestId("link-graph-toggle"));

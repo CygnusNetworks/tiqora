@@ -138,6 +138,8 @@ describe("MajorIncidentPanel", () => {
     await screen.findByTestId("major-summary");
     expect(screen.queryByTestId("major-update-form")).toBeNull();
     expect(screen.queryByTestId("major-end")).toBeNull();
+    // ended: it can be declared again (the backend starts a new run)
+    expect(screen.getByTestId("major-declare")).toBeTruthy();
     cleanup();
     ticketItsm.mockResolvedValue(makeItsm({ role: "major_incident", major_incident: major() }));
     get.mockResolvedValue(major());

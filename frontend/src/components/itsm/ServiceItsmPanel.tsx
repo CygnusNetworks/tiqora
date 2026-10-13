@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { CiStateBadge } from "@/components/itsm/CiStateBadge";
 import { ciDetailHref } from "@/lib/itsmRoutes";
 import { itsmApi, itsmKeys, type CiSource } from "@/lib/itsmApi";
+import { RouterAnchor } from "@/components/ui/RouterAnchor";
 
 /**
  * ITSM facts of one service in the service view: live incident state, owner, type, criticality,
@@ -77,9 +78,9 @@ export function ServiceItsmPanel({ serviceId }: { serviceId: number }) {
           <ul className="divide-y divide-hairline" data-testid="service-itsm-cis">
             {cis.map((ci) => (
               <li key={ci.ref} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-sm" data-testid={`service-ci-${ci.id}`}>
-                <a href={ciDetailHref(ci.source as CiSource, ci.id)} className="font-mono text-xs text-accent hover:underline">
+                <RouterAnchor href={ciDetailHref(ci.source as CiSource, ci.id)} className="font-mono text-xs text-accent hover:underline">
                   {ci.number}
-                </a>
+                </RouterAnchor>
                 <span className="min-w-0 flex-1 truncate text-ink">{ci.name}</span>
                 <span className="text-xs text-muted">{ci.class_name}</span>
                 <CiStateBadge state={ci.incident_state} />

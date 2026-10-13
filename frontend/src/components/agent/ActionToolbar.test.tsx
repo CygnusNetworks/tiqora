@@ -455,6 +455,22 @@ describe("LinkDialog", () => {
     );
   });
 
+  it("defaults to the first offered type when the admin hid Normal", async () => {
+    linkTypes.mockReset().mockResolvedValue([
+      { name: "ParentChild", pointed: true, source_label: "Übergeordnet", target_label: "Untergeordnet", propagation: "none", origin: "znuny", source_name: null, target_name: null },
+    ]);
+    searchTickets.mockReset().mockResolvedValue([{ ticket_id: 4711, tn: "2026092610000038", title: "x" }]);
+    createTicketLink.mockReset().mockResolvedValue(undefined);
+    wrap(<LinkDialog ticketId={7} onClose={() => {}} />);
+    await waitFor(() => expect(screen.getByTestId("link-type-select").textContent).toContain("Übergeordnet / Untergeordnet"));
+    const input = screen.getByTestId("link-dialog").querySelector("input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "2026092610000038" } });
+    fireEvent.click(screen.getByRole("button", { name: /speichern|save/i }));
+    await waitFor(() =>
+      expect(createTicketLink).toHaveBeenCalledWith(7, { target_ticket_id: 4711, link_type: "ParentChild" }),
+    );
+  });
+
   it("resolves a typed ticket number to the internal id before linking", async () => {
     searchTickets.mockReset().mockResolvedValue([
       { ticket_id: 4711, tn: "2026092610000038", title: "x" },

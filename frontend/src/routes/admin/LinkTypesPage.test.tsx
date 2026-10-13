@@ -132,4 +132,16 @@ describe("LinkTypesPage", () => {
     fireEvent.click(screen.getByTestId("link-types-sync"));
     expect(await screen.findByTestId("link-types-sync-done")).toHaveTextContent("2");
   });
+
+  it("shows a failed sync", async () => {
+    renderPage();
+    await screen.findByTestId("link-type-row-Normal");
+    request.mockImplementation((async (method: string, path: string) => {
+      if (method === "POST") throw new ApiError(500, { detail: "boom" }, path);
+      return reads(method, path);
+    }) as never);
+    fireEvent.click(screen.getByTestId("link-types-sync"));
+    expect(await screen.findByTestId("link-types-sync-error")).toHaveTextContent(i18n.t("itsm.errors.generic"));
+    expect(screen.queryByTestId("link-types-sync-done")).toBeNull();
+  });
 });

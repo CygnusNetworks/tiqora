@@ -18,6 +18,7 @@ const { listReferenceServices, listTickets, status, service, serviceCis, search 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => vi.fn(),
   useSearch: () => search.current,
+  useRouter: () => null,
   Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
 }));
 vi.mock("@/lib/api", async () => {

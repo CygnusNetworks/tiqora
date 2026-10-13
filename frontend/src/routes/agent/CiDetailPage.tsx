@@ -10,6 +10,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { safeHref } from "@/lib/ciDisplay";
 import { formatDateTime } from "@/lib/format";
 import { itsmApi, itsmErrorCode, itsmErrorKey, itsmKeys, type CiSource } from "@/lib/itsmApi";
+import { RouterAnchor } from "@/components/ui/RouterAnchor";
 
 const VERSIONS_LIMIT = 50;
 
@@ -43,9 +44,9 @@ export function CiDetailPage() {
 
   const shell = (children: React.ReactNode) => (
     <div className="mx-auto w-full max-w-5xl space-y-4 px-4 py-6" data-testid="ci-detail-page" data-ci={`${source}:${ciId}`}>
-      <a href="/agent/itsm/cis" className="text-xs text-accent hover:underline" data-testid="ci-detail-back">
+      <RouterAnchor href="/agent/itsm/cis" className="text-xs text-accent hover:underline" data-testid="ci-detail-back">
         {t("itsm.ci.back")}
-      </a>
+      </RouterAnchor>
       {children}
     </div>
   );
@@ -180,9 +181,9 @@ export function CiDetailPage() {
                 className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-sm"
                 data-testid={`ci-ticket-${l.other_ticket_id}`}
               >
-                <a href={`/agent/tickets/${l.other_ticket_id}`} className="font-mono text-xs text-accent hover:underline">
+                <RouterAnchor href={`/agent/tickets/${l.other_ticket_id}`} className="font-mono text-xs text-accent hover:underline">
                   {l.other_tn ?? `#${l.other_ticket_id}`}
-                </a>
+                </RouterAnchor>
                 <span className="min-w-0 flex-1 truncate text-ink">{l.other_title}</span>
                 {l.other_state && <span className="text-xs text-muted">{l.other_state}</span>}
                 <span className="text-xs text-muted">{l.link_type}</span>

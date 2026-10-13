@@ -248,7 +248,17 @@ export function ItsmPage() {
   const errorText = useErrorText();
   return (
     <div className="mx-auto max-w-5xl space-y-4 p-4" data-testid="admin-itsm-page">
-      <h1 className="font-display text-xl font-semibold text-ink">{t("admin.itsm.title")}</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <h1 className="font-display text-xl font-semibold text-ink">{t("admin.itsm.title")}</h1>
+        <Link
+          to="/admin/settings/$section"
+          params={{ section: "itsm" }}
+          className="text-sm text-accent hover:underline"
+          data-testid="admin-itsm-settings"
+        >
+          {t("admin.itsm.settingsLink")}
+        </Link>
+      </div>
       {admin.isPending && <Spinner />}
       {admin.isError && (
         <p role="alert" className="text-sm text-danger">

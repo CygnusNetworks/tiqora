@@ -488,7 +488,8 @@
       "saved": "Saved",
       "saveError": "The fields could not be saved.",
       "yes": "Yes",
-      "no": "No"
+      "no": "No",
+      "noFields": "This screen has no fields you can edit."
     },
     "noTitle": "(без назви)",
     "articles": "статті",
@@ -5088,6 +5089,7 @@
     },
     "itsm": {
       "title": "ITSM",
+      "settingsLink": "ITSM settings",
       "linkTypes": {
         "title": "Link types",
         "editTitle": "Link type {{name}}",
@@ -5138,7 +5140,7 @@
         "title": "ITSM mode",
         "names": {
           "off": "Off",
-          "znuny_readthrough": "Znuny leads the ITSM (read-through)",
+          "znuny_readthrough": "Znuny leads the ITSM (read only)",
           "tiqora": "Tiqora leads the ITSM"
         },
         "sources": {
@@ -5159,7 +5161,7 @@
         "importLink": "Open the ITSM import",
         "switchTo": {
           "off": "Switch ITSM off",
-          "znuny_readthrough": "Let Znuny lead (read-through)",
+          "znuny_readthrough": "Let Znuny lead (read only)",
           "tiqora": "Let Tiqora lead"
         },
         "transitionRefused": "This change is not possible: {{reason}}",

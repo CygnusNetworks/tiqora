@@ -488,7 +488,8 @@
       "saved": "Gespeichert",
       "saveError": "Die Felder konnten nicht gespeichert werden.",
       "yes": "Ja",
-      "no": "Nein"
+      "no": "Nein",
+      "noFields": "In dieser Maske gibt es keine Felder, die Sie bearbeiten können."
     },
     "noTitle": "(kein Titel)",
     "articles": "Artikel",
@@ -5096,6 +5097,7 @@
     },
     "itsm": {
       "title": "ITSM",
+      "settingsLink": "ITSM-Einstellungen",
       "linkTypes": {
         "title": "Verknüpfungstypen",
         "editTitle": "Verknüpfungstyp {{name}}",
@@ -5146,7 +5148,7 @@
         "title": "ITSM-Modus",
         "names": {
           "off": "Aus",
-          "znuny_readthrough": "Znuny führt das ITSM (Durchlesen)",
+          "znuny_readthrough": "Znuny führt das ITSM (nur lesen)",
           "tiqora": "Tiqora führt das ITSM"
         },
         "sources": {
@@ -5167,7 +5169,7 @@
         "importLink": "ITSM-Import öffnen",
         "switchTo": {
           "off": "ITSM ausschalten",
-          "znuny_readthrough": "Znuny führen lassen (Durchlesen)",
+          "znuny_readthrough": "Znuny führen lassen (nur lesen)",
           "tiqora": "Tiqora führen lassen"
         },
         "transitionRefused": "Dieser Wechsel ist nicht möglich: {{reason}}",
