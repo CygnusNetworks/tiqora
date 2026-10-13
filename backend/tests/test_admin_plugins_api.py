@@ -635,6 +635,24 @@ async def test_table_capabilities_listed(
     assert tables == ["tqp_tables_note", "tqp_tables_tag"]
 
 
+async def test_image_plugin_table_capabilities_listed(
+    fixture_plugins: Installer,
+    admin_client: AsyncClient,
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    # image branch: tables come from the migrations dir of the installed files
+    fixture_plugins("tq_fixture_tables", plugin_id="org.example.tables")
+    (p,) = discover_plugins()
+    async with factory() as s:
+        await store.sync_discovered(s, [p], auto_enable=True, now=T0)
+        await s.commit()
+    body = (await admin_client.get(BASE)).json()
+    plugin = _by_id(body, "org.example.tables")
+    assert plugin["signature_status"] is None
+    tables = [c["value"] for c in plugin["capabilities"] if c["kind"] == "table"]
+    assert tables == ["tqp_tables_note"]
+
+
 async def test_restart_required_message_mentions_restart_button(
     fixture_plugins: Installer, admin_client: AsyncClient, seeded_runtime: None
 ) -> None:

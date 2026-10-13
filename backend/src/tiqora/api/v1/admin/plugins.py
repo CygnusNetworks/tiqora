@@ -211,7 +211,24 @@ def _status_message(
     return None
 
 
-_TRUST_LEVELS: Final = ("official", "verified_publisher", "local", "unsigned", "invalid")
+_TrustLevel = Literal["official", "verified_publisher", "local", "unsigned", "invalid"]
+_TRUST_LEVELS: Final[tuple[_TrustLevel, ...]] = (
+    "official",
+    "verified_publisher",
+    "local",
+    "unsigned",
+    "invalid",
+)
+
+
+def _signature_status(plugin_id: str, row: TiqoraPlugin | None) -> _TrustLevel:
+    """Trust level of a runtime package; unknown or missing data reads as unsigned."""
+    value = row.signature_status if row is not None else None
+    for level in _TRUST_LEVELS:
+        if value == level:
+            return level
+    log.warning("plugin_signature_status_unknown", plugin=plugin_id, value=value)
+    return "unsigned"
 
 
 def _image_tables(found: DiscoveredPlugin | None) -> list[str]:
@@ -376,13 +393,7 @@ def _build_one(
         capabilities=capabilities,
         contributions=contributions,
         settings_section=settings_section,
-        signature_status=(
-            row.signature_status  # type: ignore[arg-type]  # checked against _TRUST_LEVELS
-            if runtime_source and row is not None and row.signature_status in _TRUST_LEVELS
-            else "unsigned"
-            if runtime_source
-            else None
-        ),
+        signature_status=_signature_status(plugin_id, row) if runtime_source else None,
         signer=row.signer if runtime_source and row is not None else None,
         can_uninstall=runtime_source
         or (row is not None and row.source == "image" and found is None),
