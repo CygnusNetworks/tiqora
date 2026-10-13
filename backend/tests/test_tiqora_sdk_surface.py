@@ -10,6 +10,7 @@ from tiqora.plugins.channels import CHANNEL_DRIVERS
 from tiqora.plugins.customer_sources import CUSTOMER_SOURCES
 from tiqora.plugins.df_types import DYNAMIC_FIELD_TYPES
 from tiqora.plugins.events import EVENT_SUBSCRIBERS
+from tiqora.plugins.gi_points import GI_MAPPINGS, GI_OPERATIONS
 from tiqora.plugins.mail_filters import INBOUND_MAIL_FILTERS, OUTBOUND_MAIL_FILTERS
 from tiqora.plugins.mcp import MCP_TOOLS
 from tiqora.plugins.number_generators import TICKET_NUMBER_GENERATORS
@@ -108,6 +109,17 @@ SUBMODULES: dict[str, set[str]] = {
         "verify_shared_secret",
     },
     "tiqora_sdk.auth": {"AuthContext", "PasswordCheck", "PasswordAuthenticate"},
+    "tiqora_sdk.gi": {
+        "GiPrincipal",
+        "GiOperationContext",
+        "GiOperationRun",
+        "InvokerContext",
+        "InvokerResponse",
+        "InvokerPrepare",
+        "InvokerHandle",
+        "Mapper",
+        "MappingError",
+    },
     "tiqora_sdk.customers": {
         "CustomerLookup",
         "CustomerSearch",
@@ -158,6 +170,8 @@ def test_registry_protocol_matches_registrar() -> None:
             "channel",
             "password_provider",
             "customer_source",
+            "gi_operation",
+            "gi_mapping",
         }
     )
 
@@ -189,6 +203,8 @@ def test_phase1_points_are_sdk_stable() -> None:
             CHANNEL_DRIVERS,
             AUTH_PROVIDERS,
             CUSTOMER_SOURCES,
+            GI_OPERATIONS,
+            GI_MAPPINGS,
         )
     )
     assert CHANNELS.sdk_stable is False

@@ -68,6 +68,10 @@ def build_mapper(mapping_config: Any, *, huge_xml: bool = False) -> Mapper:
             "Got MappingConfig with Data, but Data is no hash ref with content!"
         )
     factory = MAPPER_FACTORIES.get(mapping_type)
+    if factory is None:  # core types always win; then mappings of loaded plugins (D14)
+        from tiqora.plugins.gi_points import plugin_mapper_factory
+
+        factory = plugin_mapper_factory(mapping_type)
     if factory is None:
         raise MappingConfigError(f"Mapping type '{mapping_type}' is not supported by Tiqora")
     return factory(config, huge_xml)

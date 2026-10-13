@@ -19,6 +19,7 @@ from fastapi import APIRouter
 from fastapi.routing import APIRoute
 from pydantic import BaseModel
 
+from tiqora.api.compat.mapping import Mapper
 from tiqora.extensions.registry import ExtensionPoint
 from tiqora.jobs.registry import JOB_HANDLERS, JobHandler
 from tiqora.plugins.auth_providers import (
@@ -50,6 +51,14 @@ from tiqora.plugins.df_types import (
     DynamicFieldType,
 )
 from tiqora.plugins.events import EVENT_SUBSCRIBERS, EventHandler, EventSubscriber
+from tiqora.plugins.gi_points import (
+    GI_MAPPINGS,
+    GI_OPERATIONS,
+    MAX_OPERATION_TIMEOUT,
+    GiMapping,
+    GiOperation,
+    GiOperationRun,
+)
 from tiqora.plugins.mail_filters import (
     INBOUND_MAIL_FILTERS,
     OUTBOUND_MAIL_FILTERS,
@@ -58,7 +67,7 @@ from tiqora.plugins.mail_filters import (
 )
 from tiqora.plugins.manifest import PluginManifest
 from tiqora.plugins.mcp import CORE_MCP_TOOL_NAMES, MCP_TOOLS, McpTool
-from tiqora.plugins.naming import CAMEL_NAME_RE, TAG_NAME_RE, channel_key, qualified
+from tiqora.plugins.naming import CAMEL_NAME_RE, PLUGIN_PREFIX, TAG_NAME_RE, channel_key, qualified
 from tiqora.plugins.notification_transports import (
     MAX_TRANSPORT_TIMEOUT,
     MIN_TRANSPORT_TIMEOUT,
@@ -1010,6 +1019,71 @@ class PluginRegistrar:
         )
         self._stage(CHANNEL_DRIVERS, item, check=check)
         return key
+
+    def gi_operation(self, name: str, run: GiOperationRun, *, timeout_seconds: int = 30) -> str:
+        """Stage the GenericInterface operation ``Plugin_<short_id>::<name>`` (D14); returns it.
+
+        Admins select it as the ``Type`` of a webservice operation. ``run`` is ``async def (ctx:
+        GiOperationContext, data: dict) -> dict`` and answers ``{"Success": 1, "Data": {...}}``,
+        ``{"Success": 0, "ErrorCode": ..., "ErrorMessage": ...}`` or the error dict
+        ``ctx.authenticate`` returned. An exception, a timeout or a non-dict answer is Znuny's
+        fault ``OperationObject returned an error, cancelling Request``.
+        """
+        qname = f"{PLUGIN_PREFIX}{self._manifest.short_id}::{name}"
+
+        def check() -> None:
+            if not isinstance(name, str) or not CAMEL_NAME_RE.fullmatch(name):
+                raise RegistrationRejected(
+                    f"Ungültiger Name „{name}“ für die Operation: "
+                    "2 bis 41 Zeichen, A-Z, a-z und 0-9, beginnt mit einem Großbuchstaben"
+                )
+            _require_async(run, f"Die Operation „{name}“")
+            if (
+                isinstance(timeout_seconds, bool)
+                or not isinstance(timeout_seconds, int)
+                or not 1 <= timeout_seconds <= MAX_OPERATION_TIMEOUT
+            ):
+                raise RegistrationRejected(
+                    f"Das Zeitlimit der Operation „{name}“ muss zwischen 1 und "
+                    f"{MAX_OPERATION_TIMEOUT} Sekunden liegen"
+                )
+
+        item = GiOperation(
+            type=qname,
+            plugin_id=self.plugin_id,
+            run=run,
+            timeout_seconds=timeout_seconds,
+            context=self._context,
+        )
+        self._stage(GI_OPERATIONS, item, check=check)
+        return qname
+
+    def gi_mapping(self, name: str, factory: Callable[[dict[str, Any] | None], Mapper]) -> str:
+        """Stage the GenericInterface mapping type ``Plugin_<short_id>_<name>`` (D14); returns it.
+
+        ``factory(config)`` gets the ``Config`` of the mapping and returns an object with
+        ``map(data, data_include=None)``. Mappers are pure, fast and synchronous (they run in a
+        worker thread without a time limit); raise ``MappingError`` to fail the call.
+        """
+        qname = qualified(self._manifest.short_id, name) if isinstance(name, str) else ""
+
+        def check() -> None:
+            if not isinstance(name, str) or not CAMEL_NAME_RE.fullmatch(name):
+                raise RegistrationRejected(
+                    f"Ungültiger Name „{name}“ für die Zuordnung: "
+                    "2 bis 41 Zeichen, A-Z, a-z und 0-9, beginnt mit einem Großbuchstaben"
+                )
+            if not callable(factory) or is_async_callable(factory):
+                raise RegistrationRejected(
+                    f"Die Fabrik der Zuordnung „{name}“ muss eine gewöhnliche Funktion sein "
+                    "(def, nicht async def): Zuordnungen laufen synchron in einem Hilfsthread"
+                )
+
+        item = GiMapping(
+            type=qname, plugin_id=self.plugin_id, factory=factory, context=self._context
+        )
+        self._stage(GI_MAPPINGS, item, check=check)
+        return qname
 
 
 _NUMBER_REASONS: Final = {

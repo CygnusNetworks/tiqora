@@ -27,6 +27,8 @@ extension_points = [
   "core.channels.drivers",
   "core.auth.password_providers",
   "core.customers.sources",
+  "core.gi.operations",
+  "core.gi.mappings",
   "core.http.routes",
   "core.http.public_routes",
 ]

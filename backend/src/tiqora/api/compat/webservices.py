@@ -8,6 +8,7 @@ Mappers are built once per registry snapshot; one broken webservice never takes 
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import hashlib
 import re
 from collections.abc import Sequence
@@ -64,12 +65,14 @@ class RouteMapping:
 class OperationConfig:
     name: str
     type: str
-    handler: str | None  # OPERATION_TYPES.get(type)
+    handler: str | None  # OPERATION_TYPES.get(type), or "plugin:<type>" for a plugin operation
     mapping_inbound: Mapper | None
     mapping_outbound: Mapper | None
     mapping_error: str | None  # MappingConfigError text when a mapper could not be built
     include_ticket_data: bool
     raw: dict[str, Any]
+    webservice_id: int = 0  # set by parse_webservice (plugin operations report them)
+    webservice: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,6 +141,13 @@ def _build_mapper(config: Any, direction: str, huge_xml: bool, errors: list[str]
         return None
 
 
+def _plugin_handler(op_type: str) -> str | None:
+    """``plugin:<type>`` when a loaded plugin registered the type (core types are checked first)."""
+    from tiqora.plugins.gi_points import PLUGIN_HANDLER_PREFIX, is_registered_operation
+
+    return PLUGIN_HANDLER_PREFIX + op_type if is_registered_operation(op_type) else None
+
+
 def _parse_operation(name: str, config: dict[str, Any], huge_xml: bool) -> OperationConfig:
     errors: list[str] = []
     op_type = config.get("Type")
@@ -147,7 +157,7 @@ def _parse_operation(name: str, config: dict[str, Any], huge_xml: bool) -> Opera
     return OperationConfig(
         name=name,
         type=op_type,
-        handler=OPERATION_TYPES.get(op_type),
+        handler=OPERATION_TYPES.get(op_type) or _plugin_handler(op_type),
         mapping_inbound=inbound,
         mapping_outbound=outbound,
         mapping_error="; ".join(errors) if errors else None,
@@ -170,7 +180,11 @@ def parse_webservice(
     )
     namespace = transport_config.get("NameSpace")
     operations = {
-        str(op_name): _parse_operation(str(op_name), op_config, huge_xml)
+        str(op_name): dataclasses.replace(
+            _parse_operation(str(op_name), op_config, huge_xml),
+            webservice_id=ws_id,
+            webservice=name,
+        )
         for op_name, op_config in _dict(provider.get("Operation")).items()
         if isinstance(op_config, dict)
     }

@@ -23,6 +23,7 @@ from tiqora_sdk.channels import (
 )
 from tiqora_sdk.customers import CustomerSourceContext, ExternalCompany, ExternalCustomer
 from tiqora_sdk.fields import DfBaseType
+from tiqora_sdk.gi import GiOperationContext, GiPrincipal
 from tiqora_sdk.hooks import (
     HookContext,
     OperationVetoed,
@@ -515,6 +516,49 @@ def _register_customer_source(registry: PluginRegistry) -> None:
     )
 
 
+async def _contract_get(ctx: GiOperationContext, data: dict[str, Any]) -> dict[str, Any]:
+    behaviour.CALLS.append(("gi.op", (ctx.webservice, ctx.operation, dict(data))))
+    mode = behaviour.MODE.get("gi.op", "ok")
+    if mode == "raise":
+        raise RuntimeError("kaputt")
+    if mode == "hang":
+        await asyncio.sleep(30)
+    if mode == "nondict":
+        return ["nicht", "ok"]  # type: ignore[return-value]
+    principal = await ctx.authenticate(data)
+    if not isinstance(principal, GiPrincipal):
+        return principal
+    return {"Success": 1, "Data": {"Contract": "V-1", "UserID": principal.user_id}}
+
+
+class _UpperMapper:
+    def map(self, data: Any, data_include: Any = None) -> Any:
+        if behaviour.MODE.get("gi.map") == "raise":
+            raise RuntimeError("kaputt")
+        return _upper(data)
+
+
+def _upper(value: Any) -> Any:
+    if isinstance(value, str):
+        return value.upper()
+    if isinstance(value, dict):
+        return {k: _upper(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_upper(v) for v in value]
+    return value
+
+
+def _upper_factory(config: dict[str, Any] | None) -> _UpperMapper:
+    if behaviour.MODE.get("gi.map") == "factory_raise":
+        raise RuntimeError("Konfiguration kaputt")
+    return _UpperMapper()
+
+
+def _register_gi(registry: PluginRegistry) -> None:
+    registry.gi_operation("ContractGet", _contract_get, timeout_seconds=1)
+    registry.gi_mapping("Upper", _upper_factory)
+
+
 class PointsPlugin:
     def register(self, registry: PluginRegistry) -> None:
         # Each task of the plugin-points plan adds its ``_register_<point>(registry)`` call here.
@@ -529,6 +573,7 @@ class PointsPlugin:
         _register_channels(registry)
         _register_auth(registry)
         _register_customer_source(registry)
+        _register_gi(registry)
 
 
 plugin = PointsPlugin()

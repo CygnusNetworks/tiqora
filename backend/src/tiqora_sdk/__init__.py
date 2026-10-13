@@ -33,10 +33,12 @@ if _t.TYPE_CHECKING:
     from fastapi import APIRouter
     from pydantic import BaseModel
 
+    from tiqora.api.compat.mapping import Mapper
     from tiqora.plugins.auth_providers import PasswordAuthenticate
     from tiqora.plugins.channels import ChannelCapabilities, ChannelSend
     from tiqora.plugins.customer_sources import CustomerLookup, CustomerSearch
     from tiqora.plugins.df_types import DfBaseType, DfDisplay, DfValidate
+    from tiqora.plugins.gi_points import GiOperationRun
     from tiqora.plugins.mail_filters import MailFilterStage
     from tiqora.plugins.notification_transports import TransportSend
     from tiqora.plugins.number_generators import NumberBuild
@@ -212,6 +214,12 @@ class PluginRegistry(_t.Protocol):
         materialize_on_inbound: bool = False,
         timeout_seconds: int = 3,
     ) -> None: ...
+
+    def gi_operation(self, name: str, run: GiOperationRun, *, timeout_seconds: int = 30) -> str: ...
+
+    def gi_mapping(
+        self, name: str, factory: _abc.Callable[[dict[str, _t.Any] | None], Mapper]
+    ) -> str: ...
 
 
 class Plugin(_t.Protocol):

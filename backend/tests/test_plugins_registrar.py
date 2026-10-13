@@ -57,6 +57,8 @@ ALL_POINTS = [
     "core.http.public_routes",
     "core.auth.password_providers",
     "core.customers.sources",
+    "core.gi.operations",
+    "core.gi.mappings",
 ]
 
 
@@ -508,3 +510,59 @@ def test_customer_source_staged(registrar: PluginRegistrar) -> None:
     assert point.key == "core.customers.sources"
     assert item.key == "org.example.hello:cs" and item.timeout_seconds == 3
     assert item.materialize_on_inbound is True and item.by_email is _cs_lookup
+
+
+def test_gi_operation_registers_qualified_type(registrar: PluginRegistrar) -> None:
+    async def run(ctx: Any, data: dict[str, Any]) -> dict[str, Any]:
+        return {"Success": 1}
+
+    assert registrar.gi_operation("Echo", run, timeout_seconds=45) == "Plugin_hello::Echo"
+    ((point, item),) = registrar.staged
+    assert point.key == "core.gi.operations"
+    assert (item.type, item.timeout_seconds, item.plugin_id) == (
+        "Plugin_hello::Echo",
+        45,
+        "org.example.hello",
+    )
+
+
+@pytest.mark.parametrize("timeout", [0, 46, True, 1.5])
+def test_gi_operation_timeout_bounds(registrar: PluginRegistrar, timeout: Any) -> None:
+    async def run(ctx: Any, data: dict[str, Any]) -> dict[str, Any]:
+        return {}
+
+    with pytest.raises(RegistrationRejected, match="Zeitlimit"):
+        registrar.gi_operation("Echo", run, timeout_seconds=timeout)
+    assert registrar.staged == ()
+
+
+def test_gi_operation_must_be_async(registrar: PluginRegistrar) -> None:
+    def run(ctx: Any, data: dict[str, Any]) -> dict[str, Any]:
+        return {}
+
+    with pytest.raises(RegistrationRejected, match="async"):
+        registrar.gi_operation("Echo", run)  # type: ignore[arg-type]
+
+
+def test_gi_mapping_registers_and_rejects_async(registrar: PluginRegistrar) -> None:
+    def factory(config: dict[str, Any] | None) -> Any:
+        return object()
+
+    async def bad(config: dict[str, Any] | None) -> Any:
+        return object()
+
+    assert registrar.gi_mapping("Upper", factory) == "Plugin_hello_Upper"
+    with pytest.raises(RegistrationRejected, match="gewöhnliche Funktion"):
+        registrar.gi_mapping("Other", bad)  # type: ignore[arg-type]
+    with pytest.raises(RegistrationRejected, match="bereits registriert"):
+        registrar.gi_mapping("Upper", factory)
+
+
+def test_gi_points_need_manifest_declaration() -> None:
+    async def run(ctx: Any, data: dict[str, Any]) -> dict[str, Any]:
+        return {}
+
+    with pytest.raises(RegistrationRejected, match="core.gi.operations"):
+        _registrar(points=[]).gi_operation("Echo", run)
+    with pytest.raises(RegistrationRejected, match="core.gi.mappings"):
+        _registrar(points=[]).gi_mapping("Echo", lambda config: object())  # type: ignore[arg-type,return-value]
