@@ -531,6 +531,33 @@ Service `Action=AgentITSMServiceZoom;ServiceID=<id>`. Anlegen, Bearbeiten und L�
 `itsm-configitem`, Zoom, Suche und Historie nicht (dort gilt die Klassengruppe je CI). *Folge:*
 `ItsmSettings.znuny_agent_url` (leer oder `http(s)`) plus `index.pl?` plus das Muster ergibt den Deep Link in Mode A.
 
+## Mode A gegen Znuny: Golden-Abgleich (`tests/golden/test_itsm_mode_a.py`)
+
+Der Golden-Test vergleicht den Mode-A-Adapter mit dem echten Znuny-Code der Peers `znuny-6.5-itsm`
+(ITSMCore 6.5.5, ITSMConfigurationManagement 6.5.4) und `znuny-7.3-itsm` (7.3.3 / 7.3.5) auf
+derselben Datenbank: CI-Suche, -Detail und -Versionen gegen `ConfigItemSearchExtended`,
+`ConfigItemGet` und `VersionGet`, Verknüpfungen in beide Richtungen gegen `LinkAdd`/`LinkDelete`
+(Zeilen in `link_relation` und Ticket-Historie), die 25 Zellen der Prioritätsmatrix gegen
+`PriorityAllocationGet`, den Vorfallstatus eines Service gegen `ServiceGet(IncidentState => 1)` und
+dass Mode A keine ITSM-Tabelle verändert. Beide Linien liefern dasselbe Ergebnis: **kein
+versionsabhängiger Unterschied**. Die Quelldateien der beiden Linien sind für die hier relevanten
+Module gleich (`diff` von `Kernel/System/LinkObject/ITSMConfigItem.pm` in 6.5.4 und 7.3.5: identisch).
+
+Bewusste Unterschiede zwischen Tiqora und Znuny (jeweils im Test festgenagelt, damit eine Änderung
+auffällt):
+
+| Unterschied | Znuny | Tiqora (Mode A) | Quelle |
+|---|---|---|---|
+| CI-Historie bei Verknüpfung | schreibt `configitem_history` `LinkAdd` / `LinkDelete` (Inhalt `<Ticket-ID>%%Ticket`) | schreibt nichts, Mode A ändert keine ITSM-Tabelle; die Ticket-Historie (`CILinkAdd` / `CILinkDelete`) ist gleich | `LinkObject/ITSMConfigItem.pm::LinkAddPost` / `LinkDeletePost`, `ITSMConfigItem/Event/DoHistory.pm` |
+| `CurInciStateRecalc` bei Verknüpfung | rechnet den gespeicherten Vorfallstatus des CIs neu | rechnet nicht; für Ticket-CI-Verknüpfungen ohne Wirkung, weil nur CI-CI-Verknüpfungen den Status speisen (Verhalten 5) | `LinkObject/ITSMConfigItem.pm` |
+| Ticket-Typ `RfC` | legt ITSMChangeManagement an | legt Tiqora nicht an; das Einrichten kennt eigene Typen `Change` und `Change::Task` (Gruppe `change`) | `seed_definitions.py`, `setup.py` |
+| Gruppen `itsm-*`, History-Typen `CILinkAdd` / `CILinkDelete` | legen die Pakete an | legt Tiqora nicht an (nur Mode A mit installierten Paketen schreibt sie) | `setup.py` |
+
+Voraussetzung, kein Unterschied: Znuny cached Verknüpfungslisten (`LinkObject`). Was Tiqora in
+`link_relation` schreibt, sieht Znuny erst nach dem Lauf des TiqoraSync-Add-ons (es leert den Cache
+anhand von `tiqora_cache_invalidation`); der Golden-Test startet es nach jedem Tiqora-Schreibvorgang
+wie die Daemon-Aufgabe.
+
 ## Vermessung wiederholen
 
 Siehe `backend/tests/fixtures/znuny-itsm/README.md`: `itsm_survey.py <peer> --out <ordner> --verify`

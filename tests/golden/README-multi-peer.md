@@ -183,6 +183,24 @@ cd backend && GOLDEN=1 GOLDEN_PEER=znuny-6.5-itsm uv run python -m pytest -q -m 
   exist, seed results (`ConfigItemSearchExtended`, `LinkList`), seed idempotence, and on a plain
   peer no ITSM tables or packages.
 
+- `test_itsm_mode_a.py` (Task 28): Mode A parity on `znuny-6.5-itsm` and `znuny-7.3-itsm`
+  (detection, CI search / detail / versions vs `ConfigItemSearchExtended` / `ConfigItemGet` /
+  `VersionGet`, ticket-CI links both ways, link and ticket-history parity with `LinkAdd` /
+  `LinkDelete`, the documented `configitem_history` difference, the 25 matrix cells, service
+  incident state, "Mode A writes no ITSM table") plus the setup cases. The "ITSM peer + plain
+  peer" case is split in two (the toolkit runs one peer per session):
+  `test_setup_on_itsm_peer_is_noop` runs on an ITSM peer, `test_setup_on_plain_peer_equals_itsm_packages`
+  and `test_znuny_reads_tiqora_seeded_dynamic_fields` on a plain peer (`GOLDEN_PEER=znuny-6.5` or
+  `znuny-7.3`); each is skipped on the other kind. Tiqora's writes reach Znuny's cached reads only
+  through the TiqoraSync add-on, so the module copies `TiqoraSync.pm` into the peer for its run and
+  calls `Run()` after Tiqora writes (as the daemon cron task does). The module's own data is the
+  service `itsm28-svc` (child `itsm28-kid`) and the CIs `itsm28-a|b|c.example.org`; every ticket
+  and link a test creates is removed again, the plain-peer cases delete the rows setup created.
+  `conftest.py` resolves the schema profile of an ITSM peer through its base peer
+  (`znuny-6.5-itsm` is no profile id). Results (2026-10-13): all cases passed on `znuny-6.5-itsm`
+  and `znuny-7.3-itsm` (13 cases, 11 run on an ITSM peer), the two plain cases on `znuny-6.5` and
+  `znuny-7.3`; differences between Tiqora and Znuny are listed in `docs/itsm-import.md`.
+
 Package sources (`https://download.znuny.org/releases/itsm/`):
 
 | Peer | Packages | Source |

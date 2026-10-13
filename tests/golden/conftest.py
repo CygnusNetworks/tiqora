@@ -146,7 +146,9 @@ async def _golden_legacy_profile(golden_db_url: str) -> None:
             profile = await ensure_legacy_schema_supported(
                 session,
                 allow_unknown=True,
-                profile_override=override or os.environ.get("GOLDEN_PEER", ""),
+                # ITSM peers (``znuny-6.5-itsm``) are no schema profile of their own: use the
+                # profile of the base peer (``peers.yaml``: schema_profile).
+                profile_override=override or resolve_peer(_peer_id())["GOLDEN_SCHEMA_PROFILE"],
                 dialect_hint="mysql",
             )
         print(
