@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { pluginPointsApi } from "@/lib/pluginPointsApi";
+import { isPluginChannelName } from "@/lib/articleChannel";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -50,18 +51,6 @@ const inputCls =
 
 type Field = "to" | "cc" | "bcc";
 
-/** Channels the core knows by name; anything else may be a plugin channel. */
-const CORE_CHANNEL_NAMES = new Set([
-  "Email",
-  "Phone",
-  "Internal",
-  "Chat",
-  "WebChat",
-  "Telegram",
-  "WhatsApp",
-  "SMS",
-]);
-
 /**
  * Modal reply composer for a single article. Prefilled from the backend
  * reply-draft endpoint. Recipients are edited as Apple-Mail-style chips (To
@@ -107,15 +96,21 @@ export function ReplyDialog({
   // Plugin channels (D18): the channel's limits come from `GET /channels/plugin`,
   // matched on the article's channel name. Core channels never ask.
   const { t } = useTranslation();
+  // A `Plugin_…` article is answered on its plugin channel or not at all: never by
+  // e-mail, even when the channel cannot be resolved (its handle may look like an address).
+  const isPlugin = isPluginChannelName(channelName);
   const pluginChannelsQ = useQuery({
     queryKey: ["channels", "plugin"],
     queryFn: async ({ signal }) => (await pluginPointsApi.pluginChannels(signal)) ?? [],
-    enabled: open && Boolean(channelName) && !CORE_CHANNEL_NAMES.has(channelName ?? ""),
+    enabled: open && isPlugin,
     staleTime: 60_000,
   });
-  const pluginChannel =
-    (pluginChannelsQ.data ?? []).find((c) => c.name === channelName) ?? null;
-  const isPlugin = pluginChannel !== null;
+  const pluginChannel = isPlugin
+    ? ((pluginChannelsQ.data ?? []).find((c) => c.name === channelName) ?? null)
+    : null;
+  // Only active plugins are listed: switched off, quarantined or a failed request.
+  const pluginUnavailable = isPlugin && !pluginChannelsQ.isLoading && pluginChannel === null;
+  const pluginCannotReply = pluginChannel?.can_reply === false;
   // An ended web chat is answered by e-mail to the address the visitor left
   // (the chat's own article address is a `.invalid` placeholder).
   const isWebchat = channelName === "WebChat";
@@ -137,6 +132,7 @@ export function ReplyDialog({
   const refineReview = useRefineReview(setBody);
   const clearReview = refineReview.clear;
   const { review: reviewOpen, currentReviewText } = refineReview;
+  const [reviewLength, setReviewLength] = useState(0);
   const [templateId, setTemplateId] = useState("");
   // Collected while writing, recorded after the article is created.
   const [mentions, setMentions] = useState<PickedMention[]>([]);
@@ -437,7 +433,13 @@ export function ReplyDialog({
         subject: isTelegram ? "" : subject,
         body: text,
         content_type: "text/plain; charset=utf-8",
-        channel: isTelegram ? "telegram" : isPlugin ? pluginChannel.key : "email",
+        // Unresolved plugin channel: Send is blocked; should it get here anyway, the
+        // lower-cased name is the channel key and the backend refuses it (422).
+        channel: isTelegram
+          ? "telegram"
+          : isPlugin
+            ? (pluginChannel?.key ?? (channelName ?? "").toLowerCase())
+            : "email",
         is_visible_for_customer: true,
         // Telegram has no addresses to send — the gateway routes by the
         // ticket's linked telegram_contact, not by header.
@@ -558,7 +560,10 @@ export function ReplyDialog({
   );
   const pluginHandle = draftQ.data?.to_address?.trim() ?? "";
   const maxLength = pluginChannel?.capabilities.max_length ?? null;
-  const tooLong = maxLength !== null && body.length > maxLength;
+  // While a refine review is open, what goes out is its current selection, not `body`.
+  const outgoingLength = reviewOpen ? reviewLength : body.length;
+  const tooLong = maxLength !== null && outgoingLength > maxLength;
+  const pluginNoHandle = pluginChannel !== null && !pluginCannotReply && pluginHandle.length === 0;
 
   // Nothing ever goes to the reserved `.invalid` TLD.
   const hasInvalidTld = [...to, ...cc, ...bcc].some((r) => isInvalidTldAddress(r.email));
@@ -567,6 +572,8 @@ export function ReplyDialog({
     body.trim().length > 0 &&
     !tooLong &&
     (isTelegram || (isPlugin ? pluginHandle.length > 0 : to.length > 0)) &&
+    !pluginUnavailable &&
+    !pluginCannotReply &&
     !hasInvalidTld &&
     !sendMutation.isPending &&
     !attachments.encoding &&
@@ -715,13 +722,24 @@ export function ReplyDialog({
               {t("ticket.replyViaTelegram")}
             </p>
           ) : isPlugin ? (
-            <p
-              className="rounded border border-hairline bg-surface-subtle/60 px-2 py-1 text-xs text-muted"
-              data-testid="reply-plugin-channel"
-            >
-              {pluginChannel.label}
-              {pluginHandle && <span className="ml-1 font-mono">{pluginHandle}</span>}
-            </p>
+            <>
+              <p
+                className="rounded border border-hairline bg-surface-subtle/60 px-2 py-1 text-xs text-muted"
+                data-testid="reply-plugin-channel"
+              >
+                {pluginChannel?.label ?? channelName}
+                {pluginHandle && <span className="ml-1 font-mono">{pluginHandle}</span>}
+              </p>
+              {(pluginUnavailable || pluginCannotReply || pluginNoHandle) && (
+                <p className="text-xs text-danger" role="alert" data-testid="reply-plugin-blocked">
+                  {pluginUnavailable
+                    ? t("ticket.replyPluginChannelUnavailable")
+                    : pluginCannotReply
+                      ? t("ticket.replyPluginChannelCannotReply", { label: pluginChannel?.label ?? "" })
+                      : t("ticket.replyPluginChannelNoHandle")}
+                </p>
+              )}
+            </>
           ) : (
             <>
               {hasInvalidTld && (
@@ -840,7 +858,7 @@ export function ReplyDialog({
               </div>
             </>
           )}
-          {!isTelegram && (!isPlugin || pluginChannel.capabilities.subject) && (
+          {!isTelegram && (!isPlugin || pluginChannel?.capabilities.subject === true) && (
             <label className="block text-xs text-muted">
               {t("ticket.replySubject")}
               <input
@@ -872,7 +890,7 @@ export function ReplyDialog({
           <ComposerEditorFrame
             testIdPrefix="reply"
             attachments={attachments}
-            canAttach={!isPlugin || pluginChannel.capabilities.attachments}
+            canAttach={!isPlugin || pluginChannel?.capabilities.attachments === true}
             timeUnits={timeUnits}
             onTimeUnitsChange={setTimeUnits}
             locked={extrasFailed.length > 0}
@@ -911,7 +929,11 @@ export function ReplyDialog({
                 toneLabel={t(toneLabelKey(refineReview.review.tone))}
                 onAccept={refineReview.accept}
                 onDiscard={refineReview.discard}
-                onGroupsChange={refineReview.onGroupsChange}
+                onGroupsChange={(text) => {
+                  refineReview.onGroupsChange(text);
+                  // the selection lives in a ref; mirror its length so the counter re-renders
+                  setReviewLength(text.length);
+                }}
                 className="min-h-[19rem]"
               />
             ) : (
@@ -937,7 +959,7 @@ export function ReplyDialog({
               role={tooLong ? "alert" : undefined}
               data-testid="reply-plugin-counter"
             >
-              {body.length} / {maxLength}
+              {outgoingLength} / {maxLength}
               {tooLong && (
                 <span className="ml-2" data-testid="reply-plugin-too-long">
                   {t("ticket.replyPluginChannelTooLong", {

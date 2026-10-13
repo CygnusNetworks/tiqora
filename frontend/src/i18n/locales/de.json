@@ -596,6 +596,9 @@
     "replyPluginChannel": "Antwort über {{label}}",
     "replyPluginChannelTooLong": "Die Nachricht ist zu lang für {{label}} (höchstens {{max}} Zeichen).",
     "replyPluginChannelNoAttachments": "{{label}} kann keine Anhänge übertragen.",
+    "replyPluginChannelUnavailable": "Dieser Kanal ist derzeit nicht verfügbar: Die Erweiterung ist ausgeschaltet oder konnte nicht geladen werden. Die Antwort kann nicht gesendet werden.",
+    "replyPluginChannelCannotReply": "Über {{label}} kann nicht geantwortet werden.",
+    "replyPluginChannelNoHandle": "Die Nachricht hat auf diesem Kanal keinen Absender; es gibt keinen Empfänger für die Antwort.",
     "forward": "Weiterleiten",
     "bounce": "Umleiten",
     "splitAction": "Ticket teilen",
@@ -2631,7 +2634,10 @@
       "yearsInFuture": "Jahre in der Zukunft",
       "pluginType": "Art aus Erweiterung",
       "pluginTypeHint": "Wird in Tiqora geprüft; in Znuny erscheint das Feld als „{{base}}“.",
-      "pluginTypeNone": "Keine (Standardart)"
+      "pluginTypeNone": "Keine (Standardart)",
+      "pluginTypesLoadError": "Die Feldarten der Erweiterungen konnten nicht geladen werden.",
+      "pluginTypeStored": "Art aus Erweiterung: {{type}}",
+      "pluginTypeInactive": "Die Erweiterung ist derzeit nicht aktiv; das Feld verhält sich wie „{{base}}“."
     },
     "postmasterFilters": {
       "title_plural": "Postmaster-Filter",
@@ -3897,7 +3903,8 @@
       },
       "transports": "Versandwege",
       "transportEmail": "E-Mail",
-      "transportsEmptyHint": "Wählen Sie mindestens einen Versandweg aus. Um eine Benachrichtigung zu stoppen, schalten Sie sie stattdessen ab."
+      "transportsEmptyHint": "Wählen Sie mindestens einen Versandweg aus. Um eine Benachrichtigung zu stoppen, schalten Sie sie stattdessen ab.",
+      "transportsLoadError": "Die Versandwege der Erweiterungen konnten nicht geladen werden; angezeigt werden nur die gespeicherten."
     },
     "tar": {
       "title": "Ticket-Attributbeziehungen",
@@ -4865,7 +4872,8 @@
         "active": "Wird für neue Tickets verwendet",
         "example": "Beispiel: {{example}}",
         "znunyNote": "Tickets, die Znuny parallel anlegt, bekommen weiter Nummern nach dem Znuny-Schema ({{generator}}). Antworten auf beide Arten von Nummern werden erkannt.",
-        "reset": "Znuny-Schema verwenden"
+        "reset": "Znuny-Schema verwenden",
+        "loadError": "Die Ticketnummer-Schemata dieser Erweiterung konnten nicht geladen werden."
       }
     },
     "dashboardTemplates": {

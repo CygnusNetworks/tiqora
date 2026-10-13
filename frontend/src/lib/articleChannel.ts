@@ -45,6 +45,17 @@ export function channelNameOf(
  */
 export const CONVERSATIONAL_CHANNEL_NAMES = new Set<string>(["Chat", "WebChat", "WhatsApp", "SMS", "Telegram"]);
 
+/**
+ * Every channel a plugin registers is named `Plugin_<short_id>_<Name>` (backend
+ * `plugins/naming.qualified`), so the prefix alone tells a plugin channel from a core one —
+ * also when the plugin is switched off and no longer listed by `GET /channels/plugin`.
+ */
+export const PLUGIN_CHANNEL_PREFIX = "Plugin_";
+
+export function isPluginChannelName(channelName: string | null | undefined): boolean {
+  return Boolean(channelName?.startsWith(PLUGIN_CHANNEL_PREFIX));
+}
+
 export function isConversationalChannel(channelName: string): boolean {
   return CONVERSATIONAL_CHANNEL_NAMES.has(channelName);
 }

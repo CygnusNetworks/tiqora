@@ -596,6 +596,9 @@
     "replyPluginChannel": "Reply via {{label}}",
     "replyPluginChannelTooLong": "The message is too long for {{label}} (at most {{max}} characters).",
     "replyPluginChannelNoAttachments": "{{label}} cannot carry attachments.",
+    "replyPluginChannelUnavailable": "This channel is currently unavailable: its extension is switched off or could not be loaded. The reply cannot be sent.",
+    "replyPluginChannelCannotReply": "Replies cannot be sent over {{label}}.",
+    "replyPluginChannelNoHandle": "The message has no sender on this channel, so there is no recipient for the reply.",
     "forward": "به جلو",
     "bounce": "پرش",
     "splitAction": "تقسیم",
@@ -2631,7 +2634,10 @@
       "yearsInFuture": "سالهای آینده",
       "pluginType": "Kind from extension",
       "pluginTypeHint": "Checked in Tiqora; in Znuny the field appears as “{{base}}”.",
-      "pluginTypeNone": "None (standard kind)"
+      "pluginTypeNone": "None (standard kind)",
+      "pluginTypesLoadError": "The field kinds offered by extensions could not be loaded.",
+      "pluginTypeStored": "Kind from extension: {{type}}",
+      "pluginTypeInactive": "The extension is not active right now; the field behaves like “{{base}}”."
     },
     "postmasterFilters": {
       "title_plural": "فیلترهای پست مستر",
@@ -3889,7 +3895,8 @@
       },
       "transports": "Delivery channels",
       "transportEmail": "E-mail",
-      "transportsEmptyHint": "Select at least one delivery channel. To stop a notification, switch it off instead."
+      "transportsEmptyHint": "Select at least one delivery channel. To stop a notification, switch it off instead.",
+      "transportsLoadError": "The delivery channels offered by extensions could not be loaded; only the stored ones are shown."
     },
     "tar": {
       "title": "روابط ویژگی‌های تیکت",
@@ -4857,7 +4864,8 @@
         "active": "Used for new tickets",
         "example": "Example: {{example}}",
         "znunyNote": "Tickets that Znuny creates in parallel keep getting numbers in the Znuny scheme ({{generator}}). Replies to both kinds of numbers are recognised.",
-        "reset": "Use Znuny scheme"
+        "reset": "Use Znuny scheme",
+        "loadError": "The ticket number schemes of this extension could not be loaded."
       }
     },
     "dashboardTemplates": {

@@ -1278,6 +1278,84 @@ describe("ReplyDialog plugin channels", () => {
     expect(screen.queryByTestId("reply-plugin-channel")).toBeNull();
   });
 
+  describe("never falls back to e-mail when the channel cannot be resolved", () => {
+    beforeEach(() => {
+      // an address-shaped handle (XMPP, Matrix, mail bridge) must not become an e-mail recipient
+      getReplyDraft.mockResolvedValue({ ...baseDraft, to_address: "a@b.example", body: "> quoted" });
+    });
+
+    async function expectBlocked(notice: string) {
+      await waitFor(() => expect(screen.getByTestId("reply-plugin-channel")).toBeTruthy());
+      await waitFor(() => expect(request).toHaveBeenCalledWith("GET", "/api/v1/channels/plugin", expect.anything()));
+      await new Promise((r) => setTimeout(r, 20)); // let the seed run
+      // no e-mail composer: no recipient field or chips, no quoted original
+      expect(screen.queryByTestId("reply-to")).toBeNull();
+      expect(screen.queryByTestId("reply-to-chip")).toBeNull();
+      expect(screen.queryByTestId("reply-toggle-cc")).toBeNull();
+      expect((screen.getByTestId("reply-body") as HTMLTextAreaElement).value).toBe("");
+      expect(screen.getByTestId("reply-plugin-blocked").textContent).toBe(notice);
+      fireEvent.change(screen.getByTestId("reply-body"), { target: { value: "Hallo" } });
+      const sendButton = screen.getByTestId("reply-send") as HTMLButtonElement;
+      expect(sendButton.disabled).toBe(true);
+      fireEvent.click(sendButton);
+      await new Promise((r) => setTimeout(r, 20));
+      expect(createArticle).not.toHaveBeenCalled();
+    }
+
+    it("blocks when the plugin is not listed (switched off or quarantined)", async () => {
+      request.mockImplementation(async (_m: string, path: string) =>
+        path === "/api/v1/channels/plugin" ? [] : undefined,
+      );
+      open();
+      await expectBlocked(i18n.t("ticket.replyPluginChannelUnavailable"));
+    });
+
+    it("blocks when the channel list cannot be loaded", async () => {
+      request.mockImplementation(async (_m: string, path: string) => {
+        if (path === "/api/v1/channels/plugin") throw new ApiError(500, "kaputt", path);
+        return undefined;
+      });
+      open();
+      await expectBlocked(i18n.t("ticket.replyPluginChannelUnavailable"));
+    });
+
+    it("blocks when the channel cannot reply", async () => {
+      request.mockImplementation(async (_m: string, path: string) =>
+        path === "/api/v1/channels/plugin" ? [{ ...chat, can_reply: false }] : undefined,
+      );
+      open();
+      await expectBlocked(i18n.t("ticket.replyPluginChannelCannotReply", { label: "Chat (Test)" }));
+    });
+  });
+
+  it("measures the refined text while the review is open", async () => {
+    refineAvailability.mockReset().mockResolvedValue({ available: true });
+    refine.mockReset().mockResolvedValue({ sections: [{ id: 0, text: "viel zu lang geworden" }] });
+    open();
+    await waitFor(() => expect(screen.getByTestId("reply-plugin-channel")).toBeTruthy());
+    fireEvent.change(screen.getByTestId("reply-body"), { target: { value: "kurz" } });
+    expect(screen.getByTestId("reply-plugin-counter").textContent).toContain("4 / 10");
+    await waitFor(() => expect(screen.getByTestId("reply-refine-button")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("reply-refine-button"));
+    await screen.findByTestId("refine-review");
+    // what Send would send is the review's text (21 characters), not the 4 of the body
+    expect(screen.getByTestId("reply-plugin-counter").textContent).toContain("21 / 10");
+    expect(screen.getByTestId("reply-plugin-too-long")).toBeTruthy();
+    expect((screen.getByTestId("reply-send") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("says why Send is off when the message has no sender handle", async () => {
+    getReplyDraft.mockResolvedValue({ ...baseDraft, to_address: "", body: "> quoted" });
+    open();
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-plugin-blocked").textContent).toBe(
+        i18n.t("ticket.replyPluginChannelNoHandle"),
+      ),
+    );
+    fireEvent.change(screen.getByTestId("reply-body"), { target: { value: "Hallo" } });
+    expect((screen.getByTestId("reply-send") as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it("offers attachments and the subject when the channel carries them", async () => {
     request.mockImplementation(async (_m: string, path: string) =>
       path === "/api/v1/channels/plugin"
