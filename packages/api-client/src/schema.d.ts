@@ -15835,7 +15835,7 @@ export interface components {
             /** Attributes */
             attributes?: {
                 [key: string]: unknown;
-            };
+            } | null;
             /** Change Note */
             change_note?: string | null;
             /** Deployment State Id */

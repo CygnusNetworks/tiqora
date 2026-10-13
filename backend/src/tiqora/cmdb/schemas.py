@@ -328,7 +328,8 @@ class CiUpdateIn(BaseModel):
     name: str = Field(min_length=1, max_length=250)
     deployment_state_id: int = Field(ge=1)
     incident_state_id: int = Field(ge=1)
-    attributes: dict[str, Any] = Field(default_factory=dict)
+    #: the full attribute set; absent or ``null`` keeps the current values (D11)
+    attributes: dict[str, Any] | None = None
     change_note: str | None = Field(None, max_length=500)
     #: confirm that attribute keys the class definition no longer knows are lost
     drop_unknown: bool = False

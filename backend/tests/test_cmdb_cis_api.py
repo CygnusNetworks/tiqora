@@ -101,6 +101,27 @@ async def test_put_stale_is_409(cmdb_db: CmdbWorld) -> None:
     assert stale.json()["detail"]["code"] == "conflict"
 
 
+async def test_put_without_attributes_keeps_the_values(cmdb_db: CmdbWorld) -> None:
+    # D11: neither attributes nor attributes_patch means "keep"; an API client that only
+    # changes the name must not wipe the attribute values (and the search index)
+    cid, dep, inc = await _world(cmdb_db)
+    async with client_for(cmdb_db, USER_A) as c:
+        ci = (await c.post("/api/v1/cmdb/cis", json=_new_ci_body(cid, dep, inc))).json()
+        body = _put_body(ci, name="cmdb4-renamed")
+        del body["attributes"]
+        r = await c.put(f"/api/v1/cmdb/cis/{ci['id']}", json=body)
+        assert r.status_code == 200, r.text
+        saved = r.json()
+        assert saved["changed"] is True and saved["ci"]["name"] == "cmdb4-renamed"
+        assert saved["ci"]["current_version"]["attributes"] == {"Vendor": [{"v": "Example"}]}
+        null = _put_body(saved["ci"], name="cmdb4-renamed-2", attributes=None)
+        r2 = await c.put(f"/api/v1/cmdb/cis/{ci['id']}", json=null)
+        assert r2.status_code == 200, r2.text
+        assert r2.json()["ci"]["current_version"]["attributes"] == {"Vendor": [{"v": "Example"}]}
+        found = await c.post("/api/v1/cmdb/cis/search", json={"q": "Exam"})
+        assert [i["id"] for i in found.json()["items"]] == [ci["id"]]
+
+
 async def test_put_invalid_values_is_422_with_paths(cmdb_db: CmdbWorld) -> None:
     cid, dep, inc = await _world(cmdb_db)
     async with client_for(cmdb_db, USER_A) as c:

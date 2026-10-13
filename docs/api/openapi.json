@@ -10937,9 +10937,16 @@
       "CiUpdateIn": {
         "properties": {
           "attributes": {
-            "additionalProperties": true,
-            "title": "Attributes",
-            "type": "object"
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attributes"
           },
           "change_note": {
             "anyOf": [
