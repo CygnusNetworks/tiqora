@@ -380,9 +380,32 @@ def test_to_znuny_definition_inverts_the_schema(schema_for_nic: dict[str, Any]) 
     assert nic["Input"] == {"Type": "Text", "Required": 1}
     dhcp = nic["Sub"][0]
     assert dhcp["Input"] == {"Type": "GeneralCatalog", "Class": "ITSM::ConfigItem::YesNo"}
-    assert dhcp["CountMin"] == 1
+    # CMDB-PM-I1: IPoverDHCP has CountMin 1 but no Input.Required, so the stored schema has
+    # count_min 0 (the row is still rendered: CountDefault 1) and the inverse says CountMin 0.
+    assert (dhcp["CountMin"], dhcp["CountMax"], dhcp["CountDefault"]) == (0, 1, 1)
     # parsing the inverse gives the same schema again
     assert _schema(back) == schema_for_nic
+
+
+@pytest.mark.parametrize(
+    ("count_min", "required", "expected"),
+    [(None, 1, 1), (None, 0, 0), (1, 0, 0), (2, 1, 2), (0, 1, 0)],
+    ids=["required-default", "optional-default", "optional-explicit", "required-2", "required-0"],
+)
+def test_count_min_survives_the_round_trip_only_for_required_inputs(
+    count_min: int | None, required: int, expected: int
+) -> None:
+    """The importer's schema and its Znuny inverse follow the CMDB rule: a CountMin (explicit or
+    Znuny's default 1) binds only with ``Input.Required``; an optional input gets 0."""
+    attr: dict[str, Any] = {"Key": "Vendor", "Name": "Vendor", "CountMax": 3}
+    attr["Input"] = {"Type": "Text", "Required": 1} if required else {"Type": "Text"}
+    if count_min is not None:
+        attr["CountMin"] = count_min
+    schema = _schema([attr])
+    assert schema["attributes"][0]["count_min"] == expected
+    [back] = to_znuny_definition(schema)
+    assert back["CountMin"] == expected
+    assert _schema([back]) == schema
 
 
 def test_reverse_type_map_covers_every_attribute_type() -> None:
