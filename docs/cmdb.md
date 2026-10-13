@@ -104,7 +104,8 @@ erhalten. Beim **interaktiven Speichern** eines ganzen CIs (Formular oder API mi
 Attributliste) meldet Tiqora solche Werte als „unbekannt“ und lässt Sie wählen: behalten oder
 verwerfen. Teil-Änderungen (`attributes_patch`), reine Statuswechsel, Massenbearbeitung, Import
 und Prozess-Aktionen reichen unbekannte Werte unverändert durch und erzeugen deswegen keine
-Version. So bricht eine Klassenänderung keine Automatik.
+Version. So bricht eine Klassenänderung keine Automatik. Ein `PUT /api/v1/cmdb/cis/{id}` ohne
+`attributes` (oder mit `null`) lässt die Attributwerte unverändert und ändert nur Name und Status.
 
 ## Suche und gespeicherte Suchen
 
@@ -150,7 +151,11 @@ Störungen laufen). Überschreitet der Bereich die Obergrenze (`propagation_node
 5000) oder die Tiefe 50, schreibt Tiqora nichts halb und stößt stattdessen den Job
 `core.cmdb_propagation` an. Hat jemand die Weitergabe eines Linktyps geändert, rechnet
 ein Admin alle Zustände mit `POST /api/v1/admin/cmdb/propagation/recompute` neu (Job
-`core.cmdb_propagation`, Abfrage über `/api/v1/jobs`). Eine Schaltfläche dafür gibt es noch nicht.
+`core.cmdb_propagation`, Abfrage über `/api/v1/jobs`) – in der Oberfläche über
+**Vorfallstatus neu berechnen** auf der Seite *Admin → CMDB-Klassen*. Ändert ein Admin im Katalog
+die Funktion oder Gültigkeit eines Vorfallstatus, startet diese Neuberechnung von selbst. Den
+letzten gültigen Vorfallstatus mit der Funktion `warning` lässt Tiqora nicht entfernen (`409`
+`last_warning_state`): ohne ihn ließe sich kein abgeleiteter Zustand mehr berechnen.
 
 **Services** bekommen aus den CIs, die sie tragen, einen Vorfallstatus: der schlimmste
 Status gewinnt, einschließlich `incident`.

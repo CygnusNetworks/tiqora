@@ -46,13 +46,13 @@ from tiqora.db.tiqora.models import (
 from tiqora.filters import Filter, FilterError
 from tiqora.jobs.context import JobContext, JobFailed
 from tiqora.jobs.registry import JobHandler
+from tiqora.reporting.export import FORMULA_PREFIXES
 
 ENTRY_CAP: Final = 10
 MAX_ROWS: Final = 200_000
 PROGRESS_EVERY_ROWS: Final = 500
 _CHUNK: Final = 500
 _INT32: Final = 2**31 - 1
-_FORMULA_PREFIXES: Final = ("=", "+", "-", "@", "\t", "\r")
 FIXED_HEADER: Final = ("number", "name", "class", "deployment_state", "incident_state")
 _NAME_COLUMNS: Final[dict[str, Any]] = {
     "service": (Service.id, Service.name),
@@ -95,7 +95,7 @@ class _Names:
 
 
 def _guard(text: str) -> str:
-    return "'" + text if text.startswith(_FORMULA_PREFIXES) else text
+    return "'" + text if text.startswith(FORMULA_PREFIXES) else text
 
 
 def _chunks(items: Sequence[Any], size: int = _CHUNK) -> Iterator[Sequence[Any]]:

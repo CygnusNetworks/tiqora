@@ -16,7 +16,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
@@ -24,7 +24,7 @@ from typing import Any, Final
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import or_, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.cmdb.definition import INT_ID_TYPES, AttributeDef
@@ -378,6 +378,15 @@ def _chunks(items: list[Any]) -> list[list[Any]]:
     return [items[i : i + _CHUNK] for i in range(0, len(items), _CHUNK)]
 
 
+def casefree_in(col: Any, values: Sequence[str], dialect: str) -> ColumnElement[bool]:
+    """``col IN values`` ignoring case on both dialects. MariaDB's collation already ignores
+    case (and keeps the index usable); PostgreSQL compares ``lower()`` on both sides."""
+    if dialect == "postgresql":
+        return func.lower(col).in_(sorted({v.lower() for v in values}))
+    result: ColumnElement[bool] = col.in_(list(values))
+    return result
+
+
 async def check_references(
     session: AsyncSession,
     refs: Mapping[str, Mapping[int | str, str]],
@@ -406,8 +415,11 @@ async def check_references(
             strs = sorted(v for v in values if isinstance(v, str))
             col = CustomerUser.login if t == "customer_user" else CustomerCompany.customer_id
             got: dict[int | str, Any] = {}
+            dialect = (await session.connection()).dialect.name
             for part in _chunks(strs):
-                for (val,) in (await session.execute(select(col).where(col.in_(part)))).all():
+                for (val,) in (
+                    await session.execute(select(col).where(casefree_in(col, part, dialect)))
+                ).all():
                     got[str(val).casefold()] = None
             known[t] = got
             continue

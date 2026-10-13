@@ -84967,7 +84967,7 @@
     },
     "/api/v1/cmdb/companies/lookup": {
       "get": {
-        "description": "Valid customer companies by name (contains) or customer id (prefix).",
+        "description": "Valid customer companies by name (contains) or customer id (prefix).\n\nIt feeds the ``customer_company`` attribute input, so it needs ``rw`` on at least one\nclass (this lookup does not go through the customer directory grant, D10).",
         "operationId": "lookup_companies_api_v1_cmdb_companies_lookup_get",
         "parameters": [
           {

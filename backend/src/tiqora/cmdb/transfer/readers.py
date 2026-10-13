@@ -17,12 +17,12 @@ from typing import Any, Final, Literal
 from openpyxl import load_workbook
 
 from tiqora.cmdb.transfer.mapping import ImportOptions
+from tiqora.reporting.export import FORMULA_PREFIXES
 
 Cell = str | datetime | int | float | None
 _BOM: Final = b"\xef\xbb\xbf"
 #: guard against zip bombs: a 25 MB upload must not unpack to more than this
 _MAX_UNPACKED: Final = 400 * 1024 * 1024
-_FORMULA_PREFIXES: Final = ("=", "+", "-", "@", "\t", "\r")
 
 
 class ReadError(ValueError):
@@ -34,7 +34,7 @@ def unguard(text: str) -> str:
 
     Only an apostrophe in front of ``= + - @ TAB CR`` is removed, nothing else.
     """
-    if len(text) > 1 and text[0] == "'" and text[1] in _FORMULA_PREFIXES:
+    if len(text) > 1 and text[0] == "'" and text[1] in FORMULA_PREFIXES:
         return text[1:]
     return text
 

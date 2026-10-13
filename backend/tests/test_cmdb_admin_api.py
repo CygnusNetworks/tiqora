@@ -331,3 +331,53 @@ async def test_agent_catalog_lists_valid_items(cmdb_db: CmdbWorld) -> None:
         keys = [i["item_key"] for i in r.json()]
         assert keys == ["operational", "warning", "incident"]
         assert (await c.get(f"{AGENT}/catalog")).status_code == 422
+
+
+async def test_incident_state_changes_recompute_and_keep_a_warning_state(
+    cmdb_db: CmdbWorld,
+) -> None:
+    from tiqora.db.tiqora.models import TiqoraJob
+
+    def jobs() -> int:
+        sql = "SELECT COUNT(*) FROM tiqora_job WHERE kind = 'core.cmdb_propagation'"
+        return int(cmdb_db.sql(sql)[0][0])
+
+    async with client_for(cmdb_db, USER_ADMIN) as c:
+        items = (
+            await c.get(f"{ADMIN}/catalog", params={"catalog_class": "ITSM::Core::IncidentState"})
+        ).json()
+        by_key = {i["item_key"]: i for i in items}
+        warning, incident = by_key["warning"], by_key["incident"]
+
+        def body(item: dict[str, Any], **over: Any) -> dict[str, Any]:
+            keys = ("catalog_class", "item_key", "name", "functionality", "position", "valid")
+            return {**{k: item[k] for k in keys}, **over}
+
+        try:
+            # the last valid warning state can be neither invalidated nor repurposed
+            for over in ({"valid": False}, {"functionality": "incident"}):
+                r = await c.put(f"{ADMIN}/catalog/{warning['id']}", json=body(warning, **over))
+                assert r.status_code == 409, r.text
+                assert r.json()["detail"]["code"] == "last_warning_state"
+            # a rename changes no derived state: no recompute
+            r = await c.put(
+                f"{ADMIN}/catalog/{incident['id']}", json=body(incident, name="Störung")
+            )
+            assert r.status_code == 200 and jobs() == 0
+            # a functionality change does: the full recompute is queued
+            r = await c.put(
+                f"{ADMIN}/catalog/{incident['id']}",
+                json=body(incident, functionality="warning"),
+            )
+            assert r.status_code == 200 and jobs() == 1
+            # with a second warning state the first may go
+            r = await c.put(f"{ADMIN}/catalog/{warning['id']}", json=body(warning, valid=False))
+            assert r.status_code == 200, r.text
+        finally:
+            for item in (warning, incident):
+                await c.put(f"{ADMIN}/catalog/{item['id']}", json=body(item))
+    async with cmdb_db.factory() as s:
+        queued = (
+            await s.execute(select(TiqoraJob).where(TiqoraJob.kind == "core.cmdb_propagation"))
+        ).scalars()
+        assert {j.dedupe_key for j in queued} == {"all"}

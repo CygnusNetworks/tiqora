@@ -321,6 +321,16 @@ async def test_filter_fields_route(cmdb_db: CmdbWorld) -> None:
 
 async def test_companies_lookup(cmdb_db: CmdbWorld) -> None:
     async with client_for(cmdb_db, USER_A) as c:
+        # no class the user may write to (no class at all yet): no company directory either
+        none = await c.get("/api/v1/cmdb/companies/lookup", params={"q": "cmdb4"})
+        assert none.status_code == 403
+    async with cmdb_db.factory() as s:
+        await make_class(s)
+        await make_class(s, key="cmdb4ro", group_id=GROUP_RO)
+    async with client_for(cmdb_db, USER_B) as c:  # ro on a class only
+        ro = await c.get("/api/v1/cmdb/companies/lookup", params={"q": "cmdb4"})
+        assert ro.status_code == 403
+    async with client_for(cmdb_db, USER_A) as c:
         by_name = await c.get("/api/v1/cmdb/companies/lookup", params={"q": "CO-B EXAMPLE"})
         assert by_name.status_code == 200, by_name.text
         assert [o["id"] for o in by_name.json()] == ["cmdb4-co-b"]

@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.api.deps import CurrentUser, DbSession
 from tiqora.cmdb.access import CmdbAccess, load_access
 from tiqora.cmdb.attachments import AttachmentInUse
-from tiqora.cmdb.catalog import CatalogItemExists, CatalogMisconfigured
+from tiqora.cmdb.catalog import CatalogItemExists, CatalogMisconfigured, LastWarningState
 from tiqora.cmdb.classes import (
     ClassConflict,
     ClassKeyInvalid,
@@ -95,6 +95,15 @@ def cmdb_http_error(exc: Exception) -> HTTPException:
         return HTTPException(
             status.HTTP_409_CONFLICT,
             {"code": "catalog_item_exists", "message": "Diesen Eintrag gibt es schon."},
+        )
+    if isinstance(exc, LastWarningState):
+        return HTTPException(
+            status.HTTP_409_CONFLICT,
+            {
+                "code": "last_warning_state",
+                "message": "Mindestens ein gültiger Vorfallstatus mit der Funktion "
+                "„warning“ muss bleiben.",
+            },
         )
     if isinstance(exc, CatalogMisconfigured):
         return HTTPException(

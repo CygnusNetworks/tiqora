@@ -10,11 +10,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.deps import CurrentUser, DbSession
 from tiqora.api.v1.cmdb.deps import Ctx, cmdb_http_error
-from tiqora.cmdb.access import load_access, readable_class_ids, require_class_access
+from tiqora.cmdb.access import (
+    load_access,
+    readable_class_ids,
+    require_class_access,
+    writable_class_ids,
+)
 from tiqora.cmdb.catalog import CatalogItem, CatalogService
 from tiqora.cmdb.classes import ClassRecord, ClassService, DefinitionNotFound, DefinitionRecord
 from tiqora.cmdb.definition import iter_attribute_paths
-from tiqora.cmdb.errors import CmdbError
+from tiqora.cmdb.errors import CmdbError, CmdbForbidden
 from tiqora.cmdb.gate import current_itsm_mode
 from tiqora.cmdb.schemas import (
     CatalogItemOut,
@@ -241,7 +246,12 @@ async def lookup_companies(
     q: Annotated[str, Query(min_length=1, max_length=100)],
     limit: Annotated[int, Query(ge=1, le=50)] = 20,
 ) -> list[CmdbNamedRefOut]:
-    """Valid customer companies by name (contains) or customer id (prefix)."""
+    """Valid customer companies by name (contains) or customer id (prefix).
+
+    It feeds the ``customer_company`` attribute input, so it needs ``rw`` on at least one
+    class (this lookup does not go through the customer directory grant, D10)."""
+    if not await writable_class_ids(ctx.session, ctx.access):
+        raise cmdb_http_error(CmdbForbidden("no writable cmdb class"))
     needle = like_escape(q.strip().lower())
     rows = await ctx.session.execute(
         select(CustomerCompany.customer_id, CustomerCompany.name)

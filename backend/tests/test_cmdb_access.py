@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from sqlalchemy import create_engine, inspect
 
@@ -24,7 +26,12 @@ from tiqora.cmdb.access import (
     writable_class_ids,
 )
 from tiqora.cmdb.errors import CmdbForbidden, CmdbNotFound
-from tiqora.cmdb.gate import CmdbUnavailable, current_itsm_mode, require_tiqora_cmdb
+from tiqora.cmdb.gate import (
+    CmdbUnavailable,
+    current_itsm_mode,
+    require_tiqora_cmdb,
+    reset_mode_cache,
+)
 from tiqora.cmdb.settings import CMDB_SECTION, CmdbSettings, load_cmdb_settings
 from tiqora.extensions import get_registry
 from tiqora.settings_sections.section import SETTINGS_SECTIONS
@@ -145,10 +152,12 @@ async def test_mode_seam_detects_znuny_itsm_marker_tables(cmdb_db: CmdbWorld) ->
     if {"general_catalog", "cip_allocate"} & existing:
         pytest.skip("Znuny ITSM tables already present in the test schema")
     cmdb_db.sql("CREATE TABLE general_catalog (id INT)")
+    reset_mode_cache()
     try:
         async with cmdb_db.factory() as s:  # only one marker table: still Mode B
             assert await current_itsm_mode(s) == "tiqora"
         cmdb_db.sql("CREATE TABLE cip_allocate (id INT)")
+        reset_mode_cache()
         try:
             async with cmdb_db.factory() as s:
                 assert await current_itsm_mode(s) == "znuny_readthrough"
@@ -159,6 +168,28 @@ async def test_mode_seam_detects_znuny_itsm_marker_tables(cmdb_db: CmdbWorld) ->
             cmdb_db.sql("DROP TABLE cip_allocate")
     finally:
         cmdb_db.sql("DROP TABLE general_catalog")
+        reset_mode_cache()
+
+
+async def test_mode_seam_caches_the_marker_table_check(
+    cmdb_db: CmdbWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tiqora.cmdb import gate
+
+    calls: list[int] = []
+    real = gate._znuny_itsm_installed
+
+    def counting(conn: Any) -> bool:
+        calls.append(1)
+        return real(conn)
+
+    monkeypatch.setattr(gate, "_znuny_itsm_installed", counting)
+    reset_mode_cache()
+    for _ in range(3):
+        async with cmdb_db.factory() as s:
+            assert await current_itsm_mode(s) == "tiqora"
+    assert len(calls) == 1
+    reset_mode_cache()
 
 
 async def test_settings_defaults(cmdb_db: CmdbWorld) -> None:

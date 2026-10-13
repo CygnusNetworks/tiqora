@@ -257,3 +257,56 @@ async def test_bulk_over_5000_is_422(cmdb_db: CmdbWorld) -> None:
     assert too_many.status_code == 422
     assert nothing.status_code == 422
     assert unknown_state.status_code == 422
+
+
+async def test_bulk_reports_a_database_error_per_ci_and_goes_on(
+    cmdb_db: CmdbWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sqlalchemy.exc import IntegrityError
+
+    async with cmdb_db.factory() as s:
+        cid = await make_class(s)
+        a = await make_ci(s, cid, "cmdb4-b1")
+        b = await make_ci(s, cid, "cmdb4-b2")
+    real = bulk_mod.CiService.update
+
+    async def flaky(self: Any, access: Any, ci_id: int, **kw: Any) -> Any:
+        if ci_id == a:
+            raise IntegrityError("UPDATE tiqora_cmdb_ci", {}, Exception("duplicate"))
+        return await real(self, access, ci_id, **kw)
+
+    monkeypatch.setattr(bulk_mod.CiService, "update", flaky)
+    st = await _states(cmdb_db)
+    job = await _bulk(cmdb_db, {"ci_ids": [a, b], "deployment_state_id": st["maintenance"]})
+    res = await _job(cmdb_db, job)
+    assert res["status"] == "succeeded", res
+    assert res["result"] == {"updated": 1, "skipped": 1}
+    report = _csv_rows(_file(cmdb_db, job, "report.csv"))
+    assert [(r["status"], r["message"]) for r in report] == [
+        ("error", "Datenbankfehler beim Speichern"),
+        ("updated", ""),
+    ]
+
+
+async def test_export_and_bulk_quota_is_429(cmdb_db: CmdbWorld) -> None:
+    from tiqora.api.v1.cmdb.transfer import MAX_ACTIVE_BULKS_PER_USER, MAX_ACTIVE_EXPORTS_PER_USER
+
+    async with cmdb_db.factory() as s:
+        cid = await make_class(s)
+        ci = await make_ci(s, cid, "cmdb4-q1")
+    st = await _states(cmdb_db)
+    for _ in range(MAX_ACTIVE_EXPORTS_PER_USER):
+        await _export(cmdb_db, cid)
+    for _ in range(MAX_ACTIVE_BULKS_PER_USER):
+        await _bulk(cmdb_db, {"ci_ids": [ci], "deployment_state_id": st["maintenance"]})
+    async with client_for(cmdb_db, USER_A) as c:
+        export = await c.post(
+            "/api/v1/cmdb/export-jobs", json={"class_id": cid, "file_format": "csv"}
+        )
+        bulk = await c.post(
+            "/api/v1/cmdb/bulk-jobs",
+            json={"ci_ids": [ci], "deployment_state_id": st["maintenance"]},
+        )
+    for r in (export, bulk):
+        assert r.status_code == 429, r.text
+        assert r.json()["detail"]["code"] == "too_many_jobs"

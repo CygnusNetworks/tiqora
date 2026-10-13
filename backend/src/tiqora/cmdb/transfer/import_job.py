@@ -57,6 +57,7 @@ from tiqora.cmdb.transfer.readers import Cell, ReadError, read_rows
 from tiqora.cmdb.values import (
     ValueIssue,
     canonical_json,
+    casefree_in,
     check_references,
     collect_reference_paths,
     normalize_values,
@@ -72,6 +73,7 @@ from tiqora.db.tiqora.models import (
 from tiqora.jobs.context import JobContext, JobFailed
 from tiqora.jobs.registry import JobHandler
 from tiqora.jobs.service import get_job_file, list_job_files
+from tiqora.reporting.export import FORMULA_PREFIXES
 
 INPUT_PREFIX: Final = "input-"
 REPORT_NAME: Final = "report.csv"
@@ -79,7 +81,6 @@ WRITE_BATCH: Final = 200
 MAX_ROWS: Final = 200_000
 _CHUNK: Final = 500
 _NAME_MAX: Final = 250
-_FORMULA_PREFIXES: Final = ("=", "+", "-", "@", "\t", "\r")
 DEFAULT_DEPLOYMENT_KEY: Final = "production"
 DEFAULT_INCIDENT_KEY: Final = "operational"
 NOT_WRITTEN: Final = "nicht geschrieben (Abbruch)"
@@ -381,7 +382,7 @@ class RowPlan:
 
 
 def _guard(text: str) -> str:
-    return "'" + text if text.startswith(_FORMULA_PREFIXES) else text
+    return "'" + text if text.startswith(FORMULA_PREFIXES) else text
 
 
 def _chunks(items: Sequence[Any], size: int = _CHUNK) -> list[Sequence[Any]]:
@@ -537,10 +538,12 @@ class _Importer:
                 select(TiqoraCmdbCi.id).where(TiqoraCmdbCi.number.in_(list(part)))
             )
             ci_ids.update(int(i) for i in res.scalars().all())
+        dialect = (await self.s.connection()).dialect.name
         for part in _chunks(sorted(by_name)):
             res = await self.s.execute(
                 select(TiqoraCmdbCi.id).where(
-                    TiqoraCmdbCi.class_id == self.p.class_id, TiqoraCmdbCi.name.in_(list(part))
+                    TiqoraCmdbCi.class_id == self.p.class_id,
+                    casefree_in(TiqoraCmdbCi.name, part, dialect),
                 )
             )
             ci_ids.update(int(i) for i in res.scalars().all())

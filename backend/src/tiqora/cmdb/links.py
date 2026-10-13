@@ -170,6 +170,16 @@ class LinkTypeService:
 # --- links -----------------------------------------------------------------------------
 
 
+async def signal_ticket_link(
+    session: AsyncSession, event: Literal["LinkAdd", "LinkDelete"], ticket_id: int, ci_key: str
+) -> None:
+    """Outbox event + ticket cache signal for a ticket↔CI link change (assumption 7)."""
+    await _emit_event(
+        session, event, ticket_id, {"target_object": _CI_TICKET_PAYLOAD, "target_key": ci_key}
+    )
+    await invalidate_ticket_cache(session, ticket_id)
+
+
 class LinkService:
     def __init__(self, session: AsyncSession) -> None:
         self._s = session
@@ -259,19 +269,6 @@ class LinkService:
         for e in ends:
             out.setdefault(e, _Resolved(False, e.key))
         return out
-
-    async def _class_group_ids(self, class_ids: set[int]) -> dict[int, int]:
-        if not class_ids:
-            return {}
-        rows = (
-            await self._s.execute(
-                text("SELECT id, group_id FROM tiqora_cmdb_class WHERE id IN :ids").bindparams(
-                    bindparam("ids", expanding=True)
-                ),
-                {"ids": sorted(class_ids)},
-            )
-        ).all()
-        return {int(i): int(g) for i, g in rows}
 
     async def _check_write_ends(
         self,
@@ -445,14 +442,7 @@ class LinkService:
                 )
         for end, other in ((source, target), (target, source)):
             if end.kind == "ticket" and end.key.isdigit() and other.kind == "ci":
-                tid = int(end.key)
-                await _emit_event(
-                    self._s,
-                    event,
-                    tid,
-                    {"target_object": _CI_TICKET_PAYLOAD, "target_key": other.key},
-                )
-                await invalidate_ticket_cache(self._s, tid)
+                await signal_ticket_link(self._s, event, int(end.key), other.key)
         if propagates and all(e.kind == "ci" and e.key.isdigit() for e in ends):
             hook = _recompute_hook
             if hook is not None:
@@ -670,4 +660,5 @@ __all__ = [
     "LinkService",
     "LinkTypeService",
     "UnknownLinkType",
+    "signal_ticket_link",
 ]

@@ -20,7 +20,7 @@ router = APIRouter()
 def content_disposition(filename: str) -> str:
     """``attachment`` with an ASCII fallback and the RFC 5987 ``filename*``."""
     ascii_name = filename.encode("ascii", "ignore").decode("ascii")
-    ascii_name = "".join(c for c in ascii_name if c not in '"\;' and c.isprintable()).strip()
+    ascii_name = "".join(c for c in ascii_name if c not in '"\\;' and c.isprintable()).strip()
     return f"attachment; filename=\"{ascii_name or 'datei'}\"; filename*=UTF-8''{quote(filename)}"
 
 

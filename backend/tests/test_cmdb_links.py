@@ -482,3 +482,28 @@ async def test_service_level_errors_are_domain_errors(cmdb_db: CmdbWorld) -> Non
 def test_api_key_area_cmdb_maps_paths() -> None:
     assert path_to_area("/api/v1/cmdb/links") == "cmdb"
     assert path_to_area("/api/v1/cmdb/link-types") == "cmdb"
+
+
+async def test_deleting_a_ci_signals_its_ticket_links(cmdb_db: CmdbWorld) -> None:
+    # assumption 7: a ticket↔CI link that goes with a deleted CI is a LinkDelete for the ticket
+    from tiqora.cmdb.service import CiService
+
+    async with cmdb_db.factory() as s:
+        ci_id = await make_ci(s, await make_class(s), "cmdb4-a")
+        await LinkService(s).add(
+            system_access(USER_A),
+            source=LinkEnd("ci", str(ci_id)),
+            target=LinkEnd("ticket", str(TICKET_OPEN)),
+            link_type_key="RelevantTo",
+            enforce_permissions=False,
+        )
+        await s.commit()
+        await CiService(s).delete(system_access(USER_A), ci_id, enforce_permissions=False)
+        await s.commit()
+        payload = {"target_object": "ITSMConfigItem", "target_key": str(ci_id)}
+        assert await _outbox(s, TICKET_OPEN) == [("LinkAdd", payload), ("LinkDelete", payload)]
+        cache = await s.execute(
+            text("SELECT COUNT(*) FROM tiqora_cache_invalidation WHERE ticket_id = :t"),
+            {"t": TICKET_OPEN},
+        )
+        assert int(cache.scalar_one()) == 2

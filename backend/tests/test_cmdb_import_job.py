@@ -260,6 +260,35 @@ async def test_rerun_is_idempotent(cmdb_db: CmdbWorld) -> None:
     assert await _ci_count(cmdb_db, cid) == 2
 
 
+async def test_rerun_matches_names_and_references_ignoring_case(cmdb_db: CmdbWorld) -> None:
+    # both dialects: PostgreSQL compares case-sensitively unless the query lowers both sides
+    cid = await _class(cmdb_db)
+    mapping = [
+        {"column": "name", "target": "name"},
+        {"column": "owner", "target": "attr:Owner"},
+    ]
+    opts = {"identifiers": ["name"]}
+    first = await _run_and_get(
+        cmdb_db,
+        await _upload(
+            cmdb_db,
+            USER_A,
+            cid,
+            _csv([["cmdb4-Case", CUSTOMER_A]], ["name", "owner"]),
+            mapping,
+            options=opts,
+        ),
+    )
+    assert first["result"]["created"] == 1, first
+    rerun = _csv([["CMDB4-CASE", CUSTOMER_A.upper()]], ["name", "owner"])
+    second = await _run_and_get(
+        cmdb_db, await _upload(cmdb_db, USER_A, cid, rerun, mapping, options=opts)
+    )
+    assert second["status"] == "succeeded", second
+    assert second["result"]["created"] == 0 and second["result"]["errors"] == 0, second
+    assert await _ci_count(cmdb_db, cid) == 1
+
+
 async def test_update_by_number_with_empty_cells_keep_and_clear(cmdb_db: CmdbWorld) -> None:
     cid = await _class(cmdb_db)
     async with cmdb_db.factory() as s:
@@ -658,3 +687,22 @@ async def test_import_with_a_saved_template(cmdb_db: CmdbWorld) -> None:
     assert res["status"] == "succeeded" and res["result"]["created"] == 1, res
     ci, _, _ = _ci_by_name(cmdb_db, "cmdb4-t1")
     assert (await _ci_values(cmdb_db, ci))["Vendor"] == [{"v": "Example"}]
+
+
+async def test_import_quota_is_429(cmdb_db: CmdbWorld) -> None:
+    from tiqora.api.v1.cmdb.transfer import MAX_ACTIVE_IMPORTS_PER_USER
+
+    cid = await _class(cmdb_db)
+    data = _csv([["", "cmdb4-q", "Production", "A", "eth0", "192.0.2.1"]])
+    opts = {"identifiers": ["name"]}
+    for _ in range(MAX_ACTIVE_IMPORTS_PER_USER):
+        await _upload(cmdb_db, USER_A, cid, data, MAPPING, options=opts, dry_run=True)
+    req = {"dry_run": True, "options": opts, "class_id": cid, "mapping": MAPPING}
+    async with client_for(cmdb_db, USER_A) as c:
+        r = await c.post(
+            "/api/v1/cmdb/import-jobs",
+            files={"file": ("cmdb4.csv", data, "application/octet-stream")},
+            data={"request": json.dumps(req)},
+        )
+    assert r.status_code == 429, r.text
+    assert r.json()["detail"]["code"] == "too_many_imports"

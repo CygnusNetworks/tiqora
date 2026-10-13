@@ -8,7 +8,8 @@ a site migrates from Mode A to Mode B only through the importer.
 
 from __future__ import annotations
 
-from typing import get_args
+import time
+from typing import Final, get_args
 
 from sqlalchemy import inspect, select
 from sqlalchemy.engine import Connection
@@ -19,6 +20,15 @@ from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.itsm.mode import SETTING_MODE, ZNUNY_ITSM_MARKER_TABLES, ItsmMode
 
 _MODES: frozenset[str] = frozenset(get_args(ItsmMode))
+#: the marker-table check runs on every gated request while ``itsm.mode`` is unset, so its
+#: result is kept per database for a while (a Znuny ITSM install does not come and go)
+_MARKER_TTL: Final = 300.0
+_marker_cache: dict[str, tuple[float, bool]] = {}
+
+
+def reset_mode_cache() -> None:
+    """Forget the cached marker-table checks (tests that create or drop the tables)."""
+    _marker_cache.clear()
 
 
 class CmdbUnavailable(CmdbError):
@@ -45,7 +55,14 @@ async def current_itsm_mode(session: AsyncSession) -> ItsmMode:
         mode: ItsmMode = stored.strip()  # type: ignore[assignment]
         return mode
     conn = await session.connection()
-    installed = await conn.run_sync(_znuny_itsm_installed)
+    key = conn.engine.url.render_as_string(hide_password=True)
+    now = time.monotonic()
+    hit = _marker_cache.get(key)
+    if hit is not None and now - hit[0] < _MARKER_TTL:
+        installed = hit[1]
+    else:
+        installed = await conn.run_sync(_znuny_itsm_installed)
+        _marker_cache[key] = (now, installed)
     return "znuny_readthrough" if installed else "tiqora"
 
 
@@ -55,4 +72,4 @@ async def require_tiqora_cmdb(session: AsyncSession) -> None:
         raise CmdbUnavailable(mode)
 
 
-__all__ = ["CmdbUnavailable", "current_itsm_mode", "require_tiqora_cmdb"]
+__all__ = ["CmdbUnavailable", "current_itsm_mode", "require_tiqora_cmdb", "reset_mode_cache"]

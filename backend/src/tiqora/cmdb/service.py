@@ -17,6 +17,7 @@ from tiqora.cmdb.classes import ClassService
 from tiqora.cmdb.definition import AttributeDef, iter_attribute_paths, parse_definition_json
 from tiqora.cmdb.errors import CmdbError, CmdbNotFound
 from tiqora.cmdb.index import write_index
+from tiqora.cmdb.links import signal_ticket_link
 from tiqora.cmdb.numbering import NumberExhausted, next_ci_number
 from tiqora.cmdb.seed import DEPLOYMENT_STATE, INCIDENT_STATE
 from tiqora.cmdb.settings import CmdbSettings
@@ -904,10 +905,13 @@ class CiService:
             )
         ).all()
         neighbours: set[int] = set()
+        tickets: set[int] = set()
         for sk, skey, tk, tkey in links:
             for kind, other in ((sk, skey), (tk, tkey)):
                 if kind == "ci" and str(other).isdigit() and int(other) != ci_id:
                     neighbours.add(int(other))
+                elif kind == "ticket" and str(other).isdigit():
+                    tickets.add(int(other))
         for stmt in (
             delete(TiqoraItsmLink).where(
                 or_(
@@ -923,6 +927,8 @@ class CiService:
         ):
             await self._s.execute(stmt.execution_options(synchronize_session=False))
         self._s.expunge(row)
+        for ticket_id in sorted(tickets):
+            await signal_ticket_link(self._s, "LinkDelete", ticket_id, key)
         await self._recompute(sorted(neighbours))
 
 

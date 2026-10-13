@@ -20,6 +20,10 @@ class CatalogMisconfigured(CmdbError):
     """A required catalog item (e.g. the incident state with functionality ``warning``) is gone."""
 
 
+class LastWarningState(CatalogMisconfigured):
+    """The change would leave no valid incident state with functionality ``warning``."""
+
+
 class CatalogItemExists(CmdbError):
     """``(catalog_class, item_key)`` is taken."""
 
@@ -142,6 +146,36 @@ class CatalogService:
         row.changed_at = utc_now()
         await self._s.flush()
         return _item(row)
+
+    async def check_keeps_warning_state(
+        self, item_id: int, *, functionality: str | None, valid: bool
+    ) -> None:
+        """Raise ``LastWarningState`` when giving item ``item_id`` this functionality and
+        validity would leave no valid ``warning`` incident state (every recompute and CI save
+        would then fail). Used by the admin editor; the Znuny importer may pass through such a
+        state on its way to the imported catalog."""
+        row = await self._s.get(TiqoraCmdbCatalog, item_id)
+        if row is None:
+            raise CmdbNotFound(f"catalog item {item_id}")
+        is_warning = row.valid and row.functionality == "warning"
+        if row.catalog_class != INCIDENT_STATE or not is_warning:
+            return
+        if valid and functionality == "warning":
+            return
+        other = (
+            await self._s.execute(
+                select(TiqoraCmdbCatalog.id)
+                .where(
+                    TiqoraCmdbCatalog.catalog_class == INCIDENT_STATE,
+                    TiqoraCmdbCatalog.functionality == "warning",
+                    TiqoraCmdbCatalog.valid.is_(True),
+                    TiqoraCmdbCatalog.id != item_id,
+                )
+                .limit(1)
+            )
+        ).first()
+        if other is None:
+            raise LastWarningState(f"catalog item {item_id} is the last valid warning state")
 
     async def state_ids_by_functionality(self, catalog_class: str) -> dict[str, list[int]]:
         """Ids per functionality, invalid items included (CIs may still carry them)."""

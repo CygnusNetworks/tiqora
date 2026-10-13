@@ -106,10 +106,6 @@ async def _service_names(session: AsyncSession, ids: Iterable[int]) -> dict[int,
     return out
 
 
-def _digits(keys: Iterable[object]) -> list[int]:
-    return sorted({int(str(k)) for k in keys if str(k).isdigit()})
-
-
 # --- impact graph ---------------------------------------------------------------------------
 
 

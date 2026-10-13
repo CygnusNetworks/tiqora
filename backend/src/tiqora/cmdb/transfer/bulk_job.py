@@ -21,8 +21,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
+import structlog
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.cmdb.access import load_access, writable_class_ids
@@ -36,13 +38,15 @@ from tiqora.cmdb.settings import load_cmdb_settings
 from tiqora.db.tiqora.models import TiqoraCmdbCatalog, TiqoraCmdbCi
 from tiqora.jobs.context import JobContext, JobFailed
 from tiqora.jobs.registry import JobHandler
+from tiqora.reporting.export import FORMULA_PREFIXES
+
+logger = structlog.get_logger(__name__)
 
 REPORT_NAME: Final = "report.csv"
 COMMIT_EVERY: Final = 100
 MAX_CIS: Final = 5000
 DEFAULT_NOTE: Final = "Sammelbearbeitung"
 _CHUNK: Final = 500
-_FORMULA_PREFIXES: Final = ("=", "+", "-", "@", "\t", "\r")
 
 
 class CmdbBulkPayload(BaseModel):
@@ -89,7 +93,7 @@ async def invalid_state_ids(
 
 
 def _guard(text: str) -> str:
-    return "'" + text if text.startswith(_FORMULA_PREFIXES) else text
+    return "'" + text if text.startswith(FORMULA_PREFIXES) else text
 
 
 def _report(outcomes: Sequence[_Outcome]) -> bytes:
@@ -174,6 +178,12 @@ async def run_cmdb_bulk(ctx: JobContext, payload: CmdbBulkPayload) -> dict[str, 
                             )
                 except CmdbError as exc:
                     outcomes.append(_Outcome(ci_id, found[0], "error", _error_text(exc)))
+                except SQLAlchemyError:
+                    # the savepoint is rolled back: report this CI and go on with the next one
+                    logger.warning("cmdb_bulk_ci_db_error", ci_id=ci_id, exc_info=True)
+                    outcomes.append(
+                        _Outcome(ci_id, found[0], "error", "Datenbankfehler beim Speichern")
+                    )
                 else:
                     outcomes.append(_Outcome(ci_id, found[0], "updated"))
                     updated.append(ci_id)

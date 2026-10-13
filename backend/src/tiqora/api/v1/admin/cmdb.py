@@ -55,7 +55,7 @@ from tiqora.cmdb.schemas import (
     DefinitionIssueOut,
     DefinitionValidateIn,
 )
-from tiqora.cmdb.seed import DEFAULT_CATALOG_ROWS, seed_defaults
+from tiqora.cmdb.seed import DEFAULT_CATALOG_ROWS, INCIDENT_STATE, seed_defaults
 from tiqora.cmdb.templates import CLASS_TEMPLATES
 from tiqora.cmdb.views import create_cmdb_views, views_present
 from tiqora.cmdb.znuny_definition import DefinitionParseError, parse_znuny_definition
@@ -210,6 +210,9 @@ async def update_catalog_item(
                     "message": "Klasse und Schlüssel eines Eintrags lassen sich nicht ändern.",
                 },
             )
+        await svc.check_keeps_warning_state(
+            item_id, functionality=body.functionality, valid=body.valid
+        )
         item = await svc.update(
             item_id,
             name=body.name,
@@ -217,6 +220,11 @@ async def update_catalog_item(
             position=body.position,
             valid=body.valid,
         )
+        # derived incident states depend on functionality and validity: recompute them all
+        if current.catalog_class == INCIDENT_STATE and (
+            (current.functionality, current.valid) != (item.functionality, item.valid)
+        ):
+            await enqueue_full_recompute(session, user_id=admin.id)
     except CmdbError as exc:
         _raise(exc)
     await session.commit()

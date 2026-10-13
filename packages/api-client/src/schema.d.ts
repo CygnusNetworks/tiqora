@@ -7494,6 +7494,9 @@ export interface paths {
         /**
          * Lookup Companies
          * @description Valid customer companies by name (contains) or customer id (prefix).
+         *
+         *     It feeds the ``customer_company`` attribute input, so it needs ``rw`` on at least one
+         *     class (this lookup does not go through the customer directory grant, D10).
          */
         get: operations["lookup_companies_api_v1_cmdb_companies_lookup_get"];
         put?: never;
