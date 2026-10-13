@@ -30,6 +30,7 @@ export function ComposerEditorFrame({
   timeUnits,
   onTimeUnitsChange,
   locked = false,
+  canAttach = true,
   testIdPrefix,
 }: {
   children: ReactNode;
@@ -43,6 +44,8 @@ export function ComposerEditorFrame({
   onTimeUnitsChange: (value: string) => void;
   /** After the message went out: no more files in or out. */
   locked?: boolean;
+  /** False hides the attach button (a plugin channel that cannot carry files). */
+  canAttach?: boolean;
   testIdPrefix: string;
 }) {
   const { t } = useTranslation();
@@ -61,7 +64,7 @@ export function ComposerEditorFrame({
         )}
         data-testid={`${testIdPrefix}-editor`}
         onDragOver={(e) => {
-          if (locked || !e.dataTransfer.types.includes("Files")) return;
+          if (locked || !canAttach || !e.dataTransfer.types.includes("Files")) return;
           e.preventDefault();
           setDragOver(true);
         }}
@@ -69,7 +72,7 @@ export function ComposerEditorFrame({
           if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false);
         }}
         onDrop={(e) => {
-          if (locked || e.dataTransfer.files.length === 0) return;
+          if (locked || !canAttach || e.dataTransfer.files.length === 0) return;
           e.preventDefault();
           setDragOver(false);
           attachments.add(e.dataTransfer.files);
@@ -109,29 +112,33 @@ export function ComposerEditorFrame({
         )}
         <div className="flex flex-wrap items-center gap-2 border-t border-hairline bg-surface px-2 py-1.5">
           {refine}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            data-testid={`${testIdPrefix}-attach`}
-            disabled={locked}
-            title={t("ticket.telegram.composer.attach")}
-            onClick={() => fileRef.current?.click()}
-          >
-            <span aria-hidden>📎</span> {t("newTicket.attachFile")}
-          </Button>
-          <input
-            ref={fileRef}
-            type="file"
-            multiple
-            className="hidden"
-            data-testid={`${testIdPrefix}-attach-input`}
-            onChange={(e) => {
-              if (e.target.files) attachments.add(e.target.files);
-              // Same file again must fire onChange after a removal.
-              e.target.value = "";
-            }}
-          />
+          {canAttach && (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                data-testid={`${testIdPrefix}-attach`}
+                disabled={locked}
+                title={t("ticket.telegram.composer.attach")}
+                onClick={() => fileRef.current?.click()}
+              >
+                <span aria-hidden>📎</span> {t("newTicket.attachFile")}
+              </Button>
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                className="hidden"
+                data-testid={`${testIdPrefix}-attach-input`}
+                onChange={(e) => {
+                  if (e.target.files) attachments.add(e.target.files);
+                  // Same file again must fire onChange after a removal.
+                  e.target.value = "";
+                }}
+              />
+            </>
+          )}
           <span className="ml-auto">
             <ComposerTimeChip
               value={timeUnits}

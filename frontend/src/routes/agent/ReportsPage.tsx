@@ -13,6 +13,7 @@ import { RunState } from "@/components/reports/RunState";
 import { ReportView } from "@/components/reports/ReportView";
 import { cellLabel, formatMeasure, OTHER_KEY, toSeries } from "@/components/reports/reportFormat";
 import { useReportRun } from "@/components/reports/useReportRun";
+import { usePluginReportTexts } from "@/components/reports/usePluginReportTexts";
 import { Badge } from "@/components/ui/Badge";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/Menu";
@@ -351,6 +352,8 @@ function ReportsPageContent() {
     },
   });
   const reports = useMemo(() => (catalogueQ.data?.reports ?? []).filter(isBuiltinReport), [catalogueQ.data]);
+  // Texts of plugin reports (`plugin.<id>:…`) load on demand.
+  usePluginReportTexts(reports);
   const savedReports = useMemo(
     () => (catalogueQ.data?.reports ?? []).filter((r) => r.kind === "saved" && r.id != null),
     [catalogueQ.data],

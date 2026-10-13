@@ -92,6 +92,16 @@
     "serviceHint": "サービスに割り当てられたチケットを一覧表示します。",
     "pickService": "サービスを選択…"
   },
+  "customers": {
+    "external": {
+      "title": "From customer directory",
+      "source": "from {{label}}",
+      "import": "Import",
+      "imported": "Customer imported",
+      "conflict": "This email address already belongs to another customer.",
+      "error": "The customer could not be imported."
+    }
+  },
   "customerCentre": {
     "title": "顧客情報",
     "open": "顧客情報",
@@ -583,6 +593,9 @@
     "reply": "返信",
     "replyAll": "全員に返信",
     "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
+    "replyPluginChannel": "Reply via {{label}}",
+    "replyPluginChannelTooLong": "The message is too long for {{label}} (at most {{max}} characters).",
+    "replyPluginChannelNoAttachments": "{{label}} cannot carry attachments.",
     "forward": "進む",
     "bounce": "バウンス",
     "splitAction": "分割",

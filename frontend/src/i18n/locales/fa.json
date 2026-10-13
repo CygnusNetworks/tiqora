@@ -92,6 +92,16 @@
     "serviceHint": "فهرست تیکت‌های مرتبط با یک خدمت.",
     "pickService": "یک خدمت انتخاب کنید…"
   },
+  "customers": {
+    "external": {
+      "title": "From customer directory",
+      "source": "from {{label}}",
+      "import": "Import",
+      "imported": "Customer imported",
+      "conflict": "This email address already belongs to another customer.",
+      "error": "The customer could not be imported."
+    }
+  },
   "customerCentre": {
     "title": "اطلاعات مشتری",
     "open": "اطلاعات مشتری",
@@ -583,6 +593,9 @@
     "reply": "پاسخ دهید",
     "replyAll": "به همه پاسخ دهید",
     "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
+    "replyPluginChannel": "Reply via {{label}}",
+    "replyPluginChannelTooLong": "The message is too long for {{label}} (at most {{max}} characters).",
+    "replyPluginChannelNoAttachments": "{{label}} cannot carry attachments.",
     "forward": "به جلو",
     "bounce": "پرش",
     "splitAction": "تقسیم",

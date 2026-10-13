@@ -92,6 +92,16 @@
     "serviceHint": "Листа тикета додељених услузи.",
     "pickService": "Изаберите услугу…"
   },
+  "customers": {
+    "external": {
+      "title": "From customer directory",
+      "source": "from {{label}}",
+      "import": "Import",
+      "imported": "Customer imported",
+      "conflict": "This email address already belongs to another customer.",
+      "error": "The customer could not be imported."
+    }
+  },
   "customerCentre": {
     "title": "Подаци о клијенту",
     "open": "Клијент",
@@ -583,6 +593,9 @@
     "reply": "Одговори",
     "replyAll": "Одговори свима",
     "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
+    "replyPluginChannel": "Reply via {{label}}",
+    "replyPluginChannelTooLong": "The message is too long for {{label}} (at most {{max}} characters).",
+    "replyPluginChannelNoAttachments": "{{label}} cannot carry attachments.",
     "forward": "Проследи",
     "bounce": "Преусмери",
     "splitAction": "Подели",

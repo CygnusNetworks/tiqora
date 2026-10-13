@@ -92,6 +92,16 @@
     "serviceHint": "Tickets eines Services anzeigen.",
     "pickService": "Service wählen…"
   },
+  "customers": {
+    "external": {
+      "title": "Aus Kundenverzeichnis",
+      "source": "aus {{label}}",
+      "import": "Übernehmen",
+      "imported": "Kunde übernommen",
+      "conflict": "Diese E-Mail-Adresse gehört schon zu einem anderen Kunden.",
+      "error": "Der Kunde konnte nicht übernommen werden."
+    }
+  },
   "customerCentre": {
     "title": "Kundeninformationen",
     "open": "Kunde",
@@ -583,6 +593,9 @@
     "reply": "Antworten",
     "replyAll": "Allen antworten",
     "replyAllNoOthers": "Keine weiteren Empfänger – „Antworten“ erreicht bereits alle.",
+    "replyPluginChannel": "Antwort über {{label}}",
+    "replyPluginChannelTooLong": "Die Nachricht ist zu lang für {{label}} (höchstens {{max}} Zeichen).",
+    "replyPluginChannelNoAttachments": "{{label}} kann keine Anhänge übertragen.",
     "forward": "Weiterleiten",
     "bounce": "Umleiten",
     "splitAction": "Ticket teilen",

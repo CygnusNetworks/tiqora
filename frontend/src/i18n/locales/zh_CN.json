@@ -92,6 +92,16 @@
     "serviceHint": "列出分配给某服务的工单。",
     "pickService": "选择服务…"
   },
+  "customers": {
+    "external": {
+      "title": "From customer directory",
+      "source": "from {{label}}",
+      "import": "Import",
+      "imported": "Customer imported",
+      "conflict": "This email address already belongs to another customer.",
+      "error": "The customer could not be imported."
+    }
+  },
   "customerCentre": {
     "title": "客户信息",
     "open": "客户信息",
@@ -583,6 +593,9 @@
     "reply": "回复",
     "replyAll": "全部回复",
     "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
+    "replyPluginChannel": "Reply via {{label}}",
+    "replyPluginChannelTooLong": "The message is too long for {{label}} (at most {{max}} characters).",
+    "replyPluginChannelNoAttachments": "{{label}} cannot carry attachments.",
     "forward": "转发",
     "bounce": "退回",
     "splitAction": "拆分",

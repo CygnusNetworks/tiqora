@@ -17,6 +17,7 @@ import {
   toRunIn,
   type ReportFilterState,
 } from "@/components/reports/reportFilter";
+import { usePluginReportTexts } from "@/components/reports/usePluginReportTexts";
 import { ReportParameterControls } from "@/components/reports/ReportParameterControls";
 import { ReportsAccessGate } from "@/components/reports/ReportsAccessGate";
 import { ReportView } from "@/components/reports/ReportView";
@@ -55,6 +56,7 @@ function ReportViewPageContent() {
     retry: false,
   });
   const report = reportQ.data;
+  usePluginReportTexts(useMemo(() => [report], [report]));
   const definition = report?.definition ?? undefined;
   const state = useMemo(() => filterFromSearch(search, definition), [search, definition]);
   const body = useMemo(

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, ApiError, type CustomerRef } from "@/lib/api";
+import { pluginPointsApi } from "@/lib/pluginPointsApi";
 import { useAuth } from "@/auth/AuthContext";
 import { flattenQueues } from "@/components/agent/QueueTree";
 import { Button } from "@/components/ui/Button";
@@ -184,6 +185,10 @@ export function NewTicketPage() {
   const [customerQuery, setCustomerQuery] = useState("");
   const [skipCustomer, setSkipCustomer] = useState(false);
   const debouncedCustomerQuery = useDebouncedValue(customerQuery, 250);
+  // Plugin customer directories are slower and rate-limited: asked only after a
+  // longer pause and from three characters on (D13).
+  const externalCustomerQuery = useDebouncedValue(customerQuery, 400);
+  const [externalError, setExternalError] = useState<string | null>(null);
 
   const [queue, setQueue] = useState<number | "">(queueId ?? "");
   // Owner choices follow the chosen queue (Znuny: members with owner/rw on its group, then the
@@ -269,6 +274,36 @@ export function NewTicketPage() {
     queryKey: ["reference", "customer-search", debouncedCustomerQuery],
     queryFn: () => api.searchReferenceCustomers({ q: debouncedCustomerQuery }),
     enabled: !customer && debouncedCustomerQuery.trim().length >= 2,
+  });
+
+  const externalQ = useQuery({
+    queryKey: ["reference", "customer-search", "external", externalCustomerQuery.trim()],
+    queryFn: ({ signal }) =>
+      api.customerQuickSearch({ q: externalCustomerQuery.trim(), limit: 8, external: true }, signal),
+    enabled: !customer && externalCustomerQuery.trim().length >= 3,
+    select: (r) => r.external ?? [],
+    retry: false,
+  });
+  const importExternalM = useMutation({
+    mutationFn: (hit: { source: string; login: string }) =>
+      pluginPointsApi.externalCustomerImport(hit.source, hit.login),
+    onSuccess: (c) => {
+      setExternalError(null);
+      selectCustomer({
+        login: c.login,
+        email: c.email,
+        customer_id: c.customer_id,
+        full_name: `${c.first_name} ${c.last_name}`.trim() || c.login,
+      });
+    },
+    onError: (err) =>
+      setExternalError(
+        err instanceof ApiError && err.status === 409
+          ? t("customers.external.conflict")
+          : err instanceof ApiError && err.message && !err.message.startsWith("HTTP ")
+            ? err.message
+            : t("customers.external.error"),
+      ),
   });
 
   const composeContextQ = useQuery({
@@ -759,6 +794,48 @@ export function NewTicketPage() {
                           )}
                         </button>
                       ))
+                    )}
+                  </div>
+                )}
+                {(externalQ.data ?? []).length > 0 && debouncedCustomerQuery.trim().length >= 2 && (
+                  <div
+                    className="mt-2 max-h-56 overflow-auto rounded border border-hairline"
+                    data-testid="new-ticket-customer-external"
+                  >
+                    <p className="border-b border-hairline bg-surface-subtle px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-muted">
+                      {t("customers.external.title")}
+                    </p>
+                    {(externalQ.data ?? []).map((x) => (
+                      <div
+                        key={`${x.source}:${x.login}`}
+                        className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-ink"
+                        data-testid={`new-ticket-customer-external-${x.login}`}
+                      >
+                        <span className="min-w-0 flex-1 truncate">
+                          <span className="font-medium">
+                            {`${x.first_name} ${x.last_name}`.trim() || x.login}
+                          </span>{" "}
+                          <span className="text-muted">{x.email}</span>
+                        </span>
+                        <Badge tone="muted" className="shrink-0">
+                          {t("customers.external.source", { label: x.source_label })}
+                        </Badge>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          disabled={importExternalM.isPending}
+                          data-testid={`new-ticket-customer-import-${x.login}`}
+                          onClick={() => importExternalM.mutate({ source: x.source, login: x.login })}
+                        >
+                          {t("customers.external.import")}
+                        </Button>
+                      </div>
+                    ))}
+                    {externalError && (
+                      <p className="px-3 py-1 text-xs text-danger" role="alert" data-testid="new-ticket-customer-external-error">
+                        {externalError}
+                      </p>
                     )}
                   </div>
                 )}

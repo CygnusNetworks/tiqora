@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { pluginPointsApi } from "@/lib/pluginPointsApi";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -49,6 +50,18 @@ const inputCls =
 
 type Field = "to" | "cc" | "bcc";
 
+/** Channels the core knows by name; anything else may be a plugin channel. */
+const CORE_CHANNEL_NAMES = new Set([
+  "Email",
+  "Phone",
+  "Internal",
+  "Chat",
+  "WebChat",
+  "Telegram",
+  "WhatsApp",
+  "SMS",
+]);
+
 /**
  * Modal reply composer for a single article. Prefilled from the backend
  * reply-draft endpoint. Recipients are edited as Apple-Mail-style chips (To
@@ -91,10 +104,21 @@ export function ReplyDialog({
   channelName?: string;
 }) {
   const isTelegram = channelName === "Telegram";
+  // Plugin channels (D18): the channel's limits come from `GET /channels/plugin`,
+  // matched on the article's channel name. Core channels never ask.
+  const { t } = useTranslation();
+  const pluginChannelsQ = useQuery({
+    queryKey: ["channels", "plugin"],
+    queryFn: async ({ signal }) => (await pluginPointsApi.pluginChannels(signal)) ?? [],
+    enabled: open && Boolean(channelName) && !CORE_CHANNEL_NAMES.has(channelName ?? ""),
+    staleTime: 60_000,
+  });
+  const pluginChannel =
+    (pluginChannelsQ.data ?? []).find((c) => c.name === channelName) ?? null;
+  const isPlugin = pluginChannel !== null;
   // An ended web chat is answered by e-mail to the address the visitor left
   // (the chat's own article address is a `.invalid` placeholder).
   const isWebchat = channelName === "WebChat";
-  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { confirm, dialog: confirmDialog } = useConfirm();
 
@@ -215,6 +239,8 @@ export function ReplyDialog({
     if (!draftsLoaded) return;
     // The visitor's address decides the recipient — wait for it.
     if (chatLoading) return;
+    // Whether this is a plugin channel decides the seed (no quote) — wait too.
+    if (pluginChannelsQ.isLoading) return;
     // `initialDraft` is an object literal at the call site (AiPanel), so it
     // changes identity on every parent render — seed once per actual target
     // instead, or an unrelated re-render would wipe whatever is being typed.
@@ -225,17 +251,21 @@ export function ReplyDialog({
     // address; the typed one (when there is one) replaces it.
     const mailable = (list: Recipient[]) =>
       isWebchat ? list.filter((r) => !isInvalidTldAddress(r.email)) : list;
-    const serverTo =
-      isWebchat && visitorEmail.includes("@") && !isInvalidTldAddress(visitorEmail)
+    const serverTo = isPlugin
+      ? []
+      : isWebchat && visitorEmail.includes("@") && !isInvalidTldAddress(visitorEmail)
         ? [{ name: "", email: visitorEmail }]
         : mailable(parseRecipientList(d.to_address));
     const serverCc = mailable(parseRecipientList(d.cc));
     const serverSubject = initialDraft?.subject ?? d.subject;
     // Answer on top (blank, or the AI draft's text), blank line, then the
-    // quoted original.
-    const serverBody = initialDraft
-      ? `${initialDraft.body}\n\n${d.body}`
-      : `\n\n${d.body}`;
+    // quoted original. A plugin channel is chat-like: no quoted original (it
+    // would count against the channel's length limit).
+    const serverBody = isPlugin
+      ? (initialDraft?.body ?? "")
+      : initialDraft
+        ? `${initialDraft.body}\n\n${d.body}`
+        : `\n\n${d.body}`;
     baselineRef.current = {
       subject: serverSubject,
       body: serverBody,
@@ -263,6 +293,8 @@ export function ReplyDialog({
     draftQ.data,
     draftsLoaded,
     chatLoading,
+    pluginChannelsQ.isLoading,
+    isPlugin,
     isWebchat,
     visitorEmail,
     initialDraft,
@@ -392,7 +424,7 @@ export function ReplyDialog({
     to: joinRecipients(to),
     cc: joinRecipients(cc),
     bcc: joinRecipients(bcc),
-    enabled: open && !isTelegram,
+    enabled: open && !isTelegram && !isPlugin,
   });
 
   const sendMutation = useMutation({
@@ -405,20 +437,22 @@ export function ReplyDialog({
         subject: isTelegram ? "" : subject,
         body: text,
         content_type: "text/plain; charset=utf-8",
-        channel: isTelegram ? "telegram" : "email",
+        channel: isTelegram ? "telegram" : isPlugin ? pluginChannel.key : "email",
         is_visible_for_customer: true,
         // Telegram has no addresses to send — the gateway routes by the
         // ticket's linked telegram_contact, not by header.
-        to_address: isTelegram ? null : joinRecipients(to),
-        cc: isTelegram ? null : joinRecipients(cc),
-        bcc: isTelegram ? null : joinRecipients(bcc),
-        reply_to: isTelegram ? null : replyTo.trim() || null,
+        // A plugin channel answers to the handle of the replied article
+        // (the inbound sender), not to an e-mail address.
+        to_address: isTelegram ? null : isPlugin ? pluginHandle || null : joinRecipients(to),
+        cc: isTelegram || isPlugin ? null : joinRecipients(cc),
+        bcc: isTelegram || isPlugin ? null : joinRecipients(bcc),
+        reply_to: isTelegram || isPlugin ? null : replyTo.trim() || null,
         // Threading headers from the reply-draft endpoint so the outbound
         // Message-ID chain matches Znuny follow-up detection.
-        in_reply_to: isTelegram ? null : (draftQ.data?.in_reply_to ?? null),
-        references: isTelegram ? null : (draftQ.data?.references ?? null),
+        in_reply_to: isTelegram || isPlugin ? null : (draftQ.data?.in_reply_to ?? null),
+        references: isTelegram || isPlugin ? null : (draftQ.data?.references ?? null),
         ai_draft_id: aiDraftId,
-        email_security: isTelegram ? null : security.payload,
+        email_security: isTelegram || isPlugin ? null : security.payload,
         ...(attachments.payload.length > 0 ? { attachments: attachments.payload } : {}),
         ...nextStatePayload(nextState, pendingDate),
       });
@@ -514,21 +548,30 @@ export function ReplyDialog({
   };
 
   const title = useMemo(
-    () => (replyAll ? t("ticket.replyAll") : t("ticket.replyDialogTitle")),
-    [replyAll, t],
+    () =>
+      pluginChannel
+        ? t("ticket.replyPluginChannel", { label: pluginChannel.label })
+        : replyAll
+          ? t("ticket.replyAll")
+          : t("ticket.replyDialogTitle"),
+    [replyAll, t, pluginChannel],
   );
+  const pluginHandle = draftQ.data?.to_address?.trim() ?? "";
+  const maxLength = pluginChannel?.capabilities.max_length ?? null;
+  const tooLong = maxLength !== null && body.length > maxLength;
 
   // Nothing ever goes to the reserved `.invalid` TLD.
   const hasInvalidTld = [...to, ...cc, ...bcc].some((r) => isInvalidTldAddress(r.email));
   const noVisitorEmail = isWebchat && !chatLoading && to.length === 0;
   const canSend =
     body.trim().length > 0 &&
-    (isTelegram || to.length > 0) &&
+    !tooLong &&
+    (isTelegram || (isPlugin ? pluginHandle.length > 0 : to.length > 0)) &&
     !hasInvalidTld &&
     !sendMutation.isPending &&
     !attachments.encoding &&
     ticketLock.lockedBy === null &&
-    (isTelegram || !security.blocked);
+    (isTelegram || isPlugin || !security.blocked);
 
   // Wide on large viewports (~80+ mono chars in the body); full-width on mobile.
   // Dialog base is max-w-md; this className overrides via cn().
@@ -671,6 +714,14 @@ export function ReplyDialog({
             >
               {t("ticket.replyViaTelegram")}
             </p>
+          ) : isPlugin ? (
+            <p
+              className="rounded border border-hairline bg-surface-subtle/60 px-2 py-1 text-xs text-muted"
+              data-testid="reply-plugin-channel"
+            >
+              {pluginChannel.label}
+              {pluginHandle && <span className="ml-1 font-mono">{pluginHandle}</span>}
+            </p>
           ) : (
             <>
               {hasInvalidTld && (
@@ -789,7 +840,7 @@ export function ReplyDialog({
               </div>
             </>
           )}
-          {!isTelegram && (
+          {!isTelegram && (!isPlugin || pluginChannel.capabilities.subject) && (
             <label className="block text-xs text-muted">
               {t("ticket.replySubject")}
               <input
@@ -821,12 +872,13 @@ export function ReplyDialog({
           <ComposerEditorFrame
             testIdPrefix="reply"
             attachments={attachments}
+            canAttach={!isPlugin || pluginChannel.capabilities.attachments}
             timeUnits={timeUnits}
             onTimeUnitsChange={setTimeUnits}
             locked={extrasFailed.length > 0}
             // Telegram never appends a signature.
             signature={
-              isTelegram || !draftQ.data
+              isTelegram || isPlugin || !draftQ.data
                 ? null
                 : { text: draftQ.data.signature, isHtml: draftQ.data.signature_is_html }
             }
@@ -879,7 +931,26 @@ export function ReplyDialog({
               />
             )}
           </ComposerEditorFrame>
-          {!isTelegram && <EmailSecurityControl security={security} testId="reply-security" />}
+          {maxLength !== null && (
+            <p
+              className={cn("text-xs", tooLong ? "text-danger" : "text-muted")}
+              role={tooLong ? "alert" : undefined}
+              data-testid="reply-plugin-counter"
+            >
+              {body.length} / {maxLength}
+              {tooLong && (
+                <span className="ml-2" data-testid="reply-plugin-too-long">
+                  {t("ticket.replyPluginChannelTooLong", {
+                    label: pluginChannel?.label ?? "",
+                    max: maxLength,
+                  })}
+                </span>
+              )}
+            </p>
+          )}
+          {!isTelegram && !isPlugin && (
+            <EmailSecurityControl security={security} testId="reply-security" />
+          )}
           {sendMutation.isError && (
             <p className="text-xs text-danger" data-testid="reply-send-error">
               {sendMutation.error instanceof ApiError && sendMutation.error.status === 413

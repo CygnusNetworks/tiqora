@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { usePluginReportTexts } from "@/components/reports/usePluginReportTexts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -347,11 +348,19 @@ export function ReportBuilderPage() {
     enabled: allowed,
   });
   const report = reportQ.data;
+  // A copy of a plugin report starts from its translated name: wait for the texts.
+  const pluginTexts = usePluginReportTexts(useMemo(() => [report], [report]));
+  const [textsSeen, setTextsSeen] = useState(false);
+  useEffect(() => {
+    if (!pluginTexts.loading) setTextsSeen(true);
+  }, [pluginTexts.loading]);
+  // Sticky: a later language change must not unmount the editor.
+  const textsReady = textsSeen || !pluginTexts.loading;
   const start = useMemo(
     () => (baseKey === undefined || report ? startFrom(mode, report, t) : null),
     // the start is taken once per loaded report; a language change must not reset the editor
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mode, report],
+    [mode, report, textsReady],
   );
 
   if (!allowed) {
@@ -361,7 +370,7 @@ export function ReportBuilderPage() {
       </Notice>
     );
   }
-  if (builtinEdit || (baseKey !== undefined && reportQ.isPending) || sourcesQ.isPending) {
+  if (builtinEdit || (baseKey !== undefined && reportQ.isPending) || sourcesQ.isPending || !textsReady) {
     return (
       <div className="flex justify-center py-16">
         <Spinner />

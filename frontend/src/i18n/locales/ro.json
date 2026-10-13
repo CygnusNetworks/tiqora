@@ -92,6 +92,16 @@
     "serviceHint": "Listează tichetele asociate unui serviciu.",
     "pickService": "Selectați un serviciu…"
   },
+  "customers": {
+    "external": {
+      "title": "From customer directory",
+      "source": "from {{label}}",
+      "import": "Import",
+      "imported": "Customer imported",
+      "conflict": "This email address already belongs to another customer.",
+      "error": "The customer could not be imported."
+    }
+  },
   "customerCentre": {
     "title": "Informații client",
     "open": "Info client",
@@ -583,6 +593,9 @@
     "reply": "Răspunde",
     "replyAll": "Raspunde tuturor",
     "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
+    "replyPluginChannel": "Reply via {{label}}",
+    "replyPluginChannelTooLong": "The message is too long for {{label}} (at most {{max}} characters).",
+    "replyPluginChannelNoAttachments": "{{label}} cannot carry attachments.",
     "forward": "Înainte",
     "bounce": "Redirecționează",
     "splitAction": "Împarte",

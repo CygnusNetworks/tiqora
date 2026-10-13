@@ -92,6 +92,16 @@
     "serviceHint": "Liệt kê ticket gán cho một dịch vụ.",
     "pickService": "Chọn dịch vụ…"
   },
+  "customers": {
+    "external": {
+      "title": "From customer directory",
+      "source": "from {{label}}",
+      "import": "Import",
+      "imported": "Customer imported",
+      "conflict": "This email address already belongs to another customer.",
+      "error": "The customer could not be imported."
+    }
+  },
   "customerCentre": {
     "title": "Thông tin khách hàng",
     "open": "TT khách hàng",
@@ -583,6 +593,9 @@
     "reply": "trả lời",
     "replyAll": "Trả lời tất cả",
     "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
+    "replyPluginChannel": "Reply via {{label}}",
+    "replyPluginChannelTooLong": "The message is too long for {{label}} (at most {{max}} characters).",
+    "replyPluginChannelNoAttachments": "{{label}} cannot carry attachments.",
     "forward": "Chuyển tiếp",
     "bounce": "Trả lại",
     "splitAction": "Tách",

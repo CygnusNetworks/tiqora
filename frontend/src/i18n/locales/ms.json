@@ -92,6 +92,16 @@
     "serviceHint": "Senaraikan tiket yang ditetapkan kepada perkhidmatan.",
     "pickService": "Pilih perkhidmatan…"
   },
+  "customers": {
+    "external": {
+      "title": "From customer directory",
+      "source": "from {{label}}",
+      "import": "Import",
+      "imported": "Customer imported",
+      "conflict": "This email address already belongs to another customer.",
+      "error": "The customer could not be imported."
+    }
+  },
   "customerCentre": {
     "title": "Maklumat pelanggan",
     "open": "Info pelanggan",
@@ -583,6 +593,9 @@
     "reply": "Balas",
     "replyAll": "Balas semua",
     "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
+    "replyPluginChannel": "Reply via {{label}}",
+    "replyPluginChannelTooLong": "The message is too long for {{label}} (at most {{max}} characters).",
+    "replyPluginChannelNoAttachments": "{{label}} cannot carry attachments.",
     "forward": "ke hadapan",
     "bounce": "melantun",
     "splitAction": "Pisahkan",

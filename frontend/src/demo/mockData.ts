@@ -2189,6 +2189,8 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/admin/plugins/number-generators")) return demoNumberGenerators;
   if (p.endsWith("/api/v1/admin/notification-events/transports")) return demoNotificationTransports;
   if (p.endsWith("/api/v1/admin/dynamic-fields/plugin-types")) return demoDfPluginTypes;
+  // No plugin channels in the demo: replies stay on e-mail.
+  if (p.endsWith("/api/v1/channels/plugin")) return [];
   if (p.endsWith("/api/v1/plugins/org.example.demo/assets/1.0.0/i18n/de.json")) return demoPluginTexts.de;
   if (p.endsWith("/api/v1/plugins/org.example.demo/assets/1.0.0/i18n/en.json")) return demoPluginTexts.en;
   const wcData = resolveWebchatData(p, method);

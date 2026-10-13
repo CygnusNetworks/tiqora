@@ -92,6 +92,16 @@
     "serviceHint": "Lister les tickets associés à un service.",
     "pickService": "Choisir un service…"
   },
+  "customers": {
+    "external": {
+      "title": "From customer directory",
+      "source": "from {{label}}",
+      "import": "Import",
+      "imported": "Customer imported",
+      "conflict": "This email address already belongs to another customer.",
+      "error": "The customer could not be imported."
+    }
+  },
   "customerCentre": {
     "title": "Informations client",
     "open": "Infos client",
@@ -583,6 +593,9 @@
     "reply": "Répondre",
     "replyAll": "Répondre à tous",
     "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
+    "replyPluginChannel": "Reply via {{label}}",
+    "replyPluginChannelTooLong": "The message is too long for {{label}} (at most {{max}} characters).",
+    "replyPluginChannelNoAttachments": "{{label}} cannot carry attachments.",
     "forward": "Avant",
     "bounce": "Rebond",
     "splitAction": "Diviser",

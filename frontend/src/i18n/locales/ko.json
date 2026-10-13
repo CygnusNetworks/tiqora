@@ -92,6 +92,16 @@
     "serviceHint": "서비스에 배정된 티켓을 표시합니다.",
     "pickService": "서비스 선택…"
   },
+  "customers": {
+    "external": {
+      "title": "From customer directory",
+      "source": "from {{label}}",
+      "import": "Import",
+      "imported": "Customer imported",
+      "conflict": "This email address already belongs to another customer.",
+      "error": "The customer could not be imported."
+    }
+  },
   "customerCentre": {
     "title": "고객 정보",
     "open": "고객 정보",
@@ -583,6 +593,9 @@
     "reply": "답장하다",
     "replyAll": "모두 답장",
     "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
+    "replyPluginChannel": "Reply via {{label}}",
+    "replyPluginChannelTooLong": "The message is too long for {{label}} (at most {{max}} characters).",
+    "replyPluginChannelNoAttachments": "{{label}} cannot carry attachments.",
     "forward": "앞으로",
     "bounce": "바운스",
     "splitAction": "분할",

@@ -12,6 +12,8 @@ const {
   listReferencePriorities,
   listReferenceStates,
   searchReferenceCustomers,
+  customerQuickSearch,
+  externalCustomerImport,
   getComposeContext,
   createTicket,
   createArticle,
@@ -31,6 +33,8 @@ const {
   listReferencePriorities: vi.fn(),
   listReferenceStates: vi.fn(),
   searchReferenceCustomers: vi.fn(),
+  customerQuickSearch: vi.fn(),
+  externalCustomerImport: vi.fn(),
   getComposeContext: vi.fn(),
   createTicket: vi.fn(),
   createArticle: vi.fn(),
@@ -45,6 +49,8 @@ const {
   screenDynamicFields: vi.fn(),
   fieldOptionsFetch: vi.fn(),
 }));
+
+vi.mock("@/lib/pluginPointsApi", () => ({ pluginPointsApi: { externalCustomerImport } }));
 
 vi.mock("@/lib/fieldOptionsApi", () => ({ fieldOptionsApi: { fetch: fieldOptionsFetch } }));
 
@@ -113,6 +119,7 @@ vi.mock("@/lib/api", async () => {
       listReferencePriorities,
       listReferenceStates,
       searchReferenceCustomers,
+      customerQuickSearch,
       getComposeContext,
       createTicket,
       createArticle,
@@ -181,6 +188,8 @@ async function pickCustomer() {
 }
 
 beforeEach(() => {
+    customerQuickSearch.mockReset().mockResolvedValue({ companies: [], contacts: [], external: [] });
+    externalCustomerImport.mockReset();
     // The server scopes owner/responsible to the queue; without one the list is empty.
     fieldOptionsFetch.mockReset().mockImplementation(
       async (body: { fields: string[]; context?: { queue_id?: number } }) => ({
@@ -197,6 +206,69 @@ beforeEach(() => {
 });
 
 describe("NewTicketPage", () => {
+  const extHit = {
+    source: "org.example.points:directory",
+    source_label: "Testverzeichnis",
+    login: "pp55-ext1",
+    email: "ext1@example.org",
+    first_name: "Erika",
+    last_name: "Extern",
+    company_name: null,
+  };
+
+  async function searchExternal() {
+    customerQuickSearch.mockResolvedValue({ companies: [], contacts: [], external: [extHit] });
+    searchReferenceCustomers.mockResolvedValue([]);
+    await renderReady();
+    fireEvent.change(screen.getByTestId("new-ticket-customer-search"), {
+      target: { value: "extern" },
+    });
+    return screen.findByTestId("new-ticket-customer-import-pp55-ext1");
+  }
+
+  it("offers external customers and imports one", async () => {
+    externalCustomerImport.mockResolvedValue({
+      login: "pp55-ext1",
+      email: "ext1@example.org",
+      customer_id: "pp55-ext1",
+      first_name: "Erika",
+      last_name: "Extern",
+    });
+    const button = await searchExternal();
+    expect(customerQuickSearch).toHaveBeenCalledWith(
+      expect.objectContaining({ q: "extern", external: true }),
+      expect.anything(),
+    );
+    const section = screen.getByTestId("new-ticket-customer-external");
+    expect(section.textContent).toContain(i18n.t("customers.external.title"));
+    expect(section.textContent).toContain(i18n.t("customers.external.source", { label: "Testverzeichnis" }));
+    expect(button.textContent).toBe(i18n.t("customers.external.import"));
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(externalCustomerImport).toHaveBeenCalledWith("org.example.points:directory", "pp55-ext1"),
+    );
+    // selected in the form: the search is replaced by the chosen customer
+    await waitFor(() => expect(screen.getByTestId("new-ticket-customer-clear")).toBeInTheDocument());
+    expect(screen.queryByTestId("new-ticket-customer-external")).toBeNull();
+    expect(screen.getAllByText(/Erika Extern/).length).toBeGreaterThan(0);
+  });
+
+  it("says so when the e-mail address belongs to another customer", async () => {
+    externalCustomerImport.mockRejectedValue(new ApiError(409, "conflict", "/api/v1/customers/external-import"));
+    fireEvent.click(await searchExternal());
+    const err = await screen.findByTestId("new-ticket-customer-external-error");
+    expect(err.textContent).toBe(i18n.t("customers.external.conflict"));
+    expect(screen.queryByTestId("new-ticket-customer-clear")).toBeNull();
+  });
+
+  it("does not ask the directories below three characters", async () => {
+    await renderReady();
+    fireEvent.change(screen.getByTestId("new-ticket-customer-search"), { target: { value: "ab" } });
+    await waitFor(() => expect(searchReferenceCustomers).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 600));
+    expect(customerQuickSearch).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     navigate.mockReset();
     listQueues.mockReset().mockResolvedValue([queue]);
