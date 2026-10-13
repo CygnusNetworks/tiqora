@@ -36,7 +36,11 @@ from tiqora.plugins.inspect import (
     short_id_owners,
 )
 from tiqora.plugins.package import PackageError, read_tqplugin
-from tiqora.plugins.repositories import build_key_ring_named, with_repository_signer
+from tiqora.plugins.repositories import (
+    build_key_ring_named,
+    ring_for_source,
+    with_repository_signer,
+)
 from tiqora.plugins.restart import (
     BUSY_MESSAGE,
     RestartStatusOut,
@@ -161,9 +165,14 @@ async def _evaluate(
 
 
 async def _context(
-    session: AsyncSession, settings: Settings
+    session: AsyncSession,
+    settings: Settings,
+    *,
+    source: str = "upload",
+    repository_id: int | None = None,
 ) -> tuple[KeyRing, dict[int, str], dict[str, InstalledPlugin], frozenset[str], dict[str, str]]:
     ring, names = await build_key_ring_named(session, settings)
+    ring, names = ring_for_source(ring, names, source=source, repository_id=repository_id)
     installed, images = await installed_state(session, settings)
     owners = await short_id_owners(session)
     await session.rollback()  # end the read transaction before CPU work
@@ -231,11 +240,13 @@ async def get_package(
     row = await packages_store.get_package(session, sha256)
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Paket nicht gefunden")
-    source, uploaded_at = row.source, row.uploaded_at
+    source, uploaded_at, repository_id = row.source, row.uploaded_at, row.repository_id
     data = await packages_store.get_package_data(session, sha256)
     if data is None:  # pragma: no cover - deferred column of an existing row
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Paket nicht gefunden")
-    ring, names, installed, images, owners = await _context(session, settings)
+    ring, names, installed, images, owners = await _context(
+        session, settings, source=source, repository_id=repository_id
+    )
     try:
         report, _manifest = await _evaluate(data, settings, ring, installed, images, owners)
     except PackageError as exc:
@@ -303,7 +314,10 @@ async def install_package(
     if problem is not None:
         await session.rollback()
         raise HTTPException(status.HTTP_409_CONFLICT, problem)
-    ring, names, installed, images, owners = await _context(session, settings)
+    source, repository_id = row.source, row.repository_id
+    ring, names, installed, images, owners = await _context(
+        session, settings, source=source, repository_id=repository_id
+    )
     try:
         report, _manifest = await _evaluate(data, settings, ring, installed, images, owners)
     except PackageError as exc:

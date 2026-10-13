@@ -45,6 +45,7 @@ from tiqora.plugins.repositories import (
     build_key_ring_named,
     download_package,
     refresh_repository,
+    ring_for_source,
     with_repository_signer,
 )
 from tiqora.plugins.restart import request_restart, utcnow
@@ -104,9 +105,9 @@ def refresh_dedupe_key(repository_id: int) -> str:
     return f"repo:{repository_id}"
 
 
-def fetch_dedupe_key(repository_id: int, plugin_id: str) -> str:
-    """One download per repository and plugin at a time (shared by the endpoint and the job)."""
-    return f"fetch:{repository_id}:{plugin_id}"
+def fetch_dedupe_key(repository_id: int, plugin_id: str, version: str) -> str:
+    """One download per repository, plugin and release at a time (endpoint and job share it)."""
+    return f"fetch:{repository_id}:{plugin_id}:{version}"
 
 
 def dedupe_key(plugin_id: str) -> str:
@@ -294,6 +295,7 @@ async def run_plugin_install(ctx: JobContext, payload: PluginInstallPayload) -> 
             raise JobFailed(MISSING_PACKAGE_MESSAGE)
         source, repository_id = stored.source, stored.repository_id
         ring, names = await build_key_ring_named(session, settings)
+        ring, names = ring_for_source(ring, names, source=source, repository_id=repository_id)
         installed, images = await installed_state(session, settings)
         owners = await load_short_id_owners(session)
         await session.rollback()

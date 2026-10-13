@@ -102,6 +102,22 @@ async def build_key_ring_named(
     return ring, names
 
 
+def ring_for_source(
+    ring: KeyRing, names: dict[int, str], *, source: str, repository_id: int | None
+) -> tuple[KeyRing, dict[int, str]]:
+    """F10: a package that came from a repository is judged by that repository's keys only.
+
+    Other sources (upload) keep the full ring. A repository package whose repository is gone
+    (``repository_id`` None) gets no publisher keys at all.
+    """
+    if source != "repository":
+        return ring, names
+    narrowed = replace(
+        ring, publishers=[p for p in ring.publishers if p.repository_id == repository_id]
+    )
+    return narrowed, {rid: name for rid, name in names.items() if rid == repository_id}
+
+
 async def build_key_ring(session: AsyncSession, settings: Settings) -> KeyRing:
     return (await build_key_ring_named(session, settings))[0]
 
@@ -857,10 +873,7 @@ async def download_package(
             raise FetchError(problem)
         ring, names = await build_key_ring_named(session, settings)
         # F10: a repository download is judged by its own publisher keys only
-        ring = replace(
-            ring, publishers=[p for p in ring.publishers if p.repository_id == repository_id]
-        )
-        names = {rid: name for rid, name in names.items() if rid == repository_id}
+        ring, names = ring_for_source(ring, names, source="repository", repository_id=repository_id)
         installed, images = await installed_state(session, settings)
         owners = await short_id_owners(session)
         await session.rollback()

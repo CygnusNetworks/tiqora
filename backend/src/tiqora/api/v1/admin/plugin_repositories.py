@@ -290,7 +290,7 @@ async def download_from_repository(
             repository_id=repo_id, plugin_id=body.plugin_id, version=body.version
         ),
         created_by=admin.id,
-        dedupe_key=install_jobs.fetch_dedupe_key(repo_id, body.plugin_id),
+        dedupe_key=install_jobs.fetch_dedupe_key(repo_id, body.plugin_id, body.version),
     )
     await session.commit()
     return JobAccepted(job_id=job.id, status="running" if job.status == "running" else "queued")

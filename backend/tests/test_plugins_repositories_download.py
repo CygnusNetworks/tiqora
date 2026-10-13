@@ -334,7 +334,7 @@ async def test_download_package_must_match_the_index_entry(
     assert await _packages(factory) == []
 
 
-async def test_download_uses_only_the_source_repositorys_keys(
+async def test_download_conflicting_publisher_claim_is_unsigned(
     factory: async_sessionmaker[AsyncSession], tmp_path: Path
 ) -> None:
     # repository A (no key for this package's signer) is verified; B lists the signer's key
@@ -349,10 +349,75 @@ async def test_download_uses_only_the_source_repositorys_keys(
     rid_b = await _add_repo(factory, URL_B, name="plg62280 b")
     await _refresh(factory, rid_b, served_b, tmp_path)
     result = await _download(factory, rid_a, served_a, tmp_path)
-    # A vouches only for OTHER_KEY_ID: the package is not "verified" through B's key
+    # A claims org.example with OTHER_KEY_ID only: the conflicting claim leaves it unsigned
     assert result.installable is False
     row = (await _packages(factory))[0]
     assert row.signature_status == "unsigned" and row.repository_id == rid_a
+
+
+async def _two_repos_other_publisher(
+    factory: async_sessionmaker[AsyncSession], tmp_path: Path
+) -> tuple[int, Served, str]:
+    """A is verified but claims another publisher; B vouches for the signer of the package."""
+    data = package_bytes(tmp_path, "1.1.0")  # signed with KEY_ID, manifest publisher org.example
+    a_index = make_index(
+        [_version("1.1.0", data)], publisher_id="org.aaa", key_id=OTHER_KEY_ID, public_key=OTHER_PUB
+    )
+    served_a = Served(signed_files(a_index, {f"/packages/{PLUGIN}-1.1.0.tqplugin": data}))
+    rid_a = await _add_repo(factory)
+    await _refresh(factory, rid_a, served_a, tmp_path)
+    raw_b = json.dumps(make_index([_version("1.1.0", data)])).encode()
+    served_b = Served({"/index.json": raw_b, "/index.json.sig": sign_bytes(PRIVATE, raw_b)})
+    rid_b = await _add_repo(factory, URL_B, name="plg62280 b")
+    await _refresh(factory, rid_b, served_b, tmp_path)
+    return rid_a, served_a, hashlib.sha256(data).hexdigest()
+
+
+async def test_download_uses_only_the_source_repositorys_keys(
+    factory: async_sessionmaker[AsyncSession], tmp_path: Path
+) -> None:
+    rid_a, served_a, _sha = await _two_repos_other_publisher(factory, tmp_path)
+    result = await _download(factory, rid_a, served_a, tmp_path)
+    # B vouches for the signer, but the package came from A, whose keys do not cover it
+    assert result.installable is False
+    row = (await _packages(factory))[0]
+    assert row.signature_status == "unsigned" and row.repository_id == rid_a
+
+
+async def test_repository_package_is_judged_by_its_source_everywhere(
+    factory: async_sessionmaker[AsyncSession], tmp_path: Path
+) -> None:
+    rid_a, served_a, sha = await _two_repos_other_publisher(factory, tmp_path)
+    settings = _settings(tmp_path)
+    await _download(factory, rid_a, served_a, tmp_path)
+    # the install dialog (GET) agrees with the fetch job
+    async with _client(factory, settings) as c:
+        got = await c.get(f"/api/v1/admin/plugins/packages/{sha}")
+    assert got.status_code == 200, got.text
+    assert got.json()["installable"] is False
+    assert got.json()["trust"] != "verified_publisher"
+    # the install job refuses it too
+    ctx = JobContext(
+        job_id=1,
+        kind=install_jobs.PLUGIN_INSTALL_KIND,
+        created_by=1,
+        settings=settings,
+        session_factory=factory,
+    )
+    with pytest.raises(JobFailed):
+        await install_jobs.run_plugin_install(
+            ctx, install_jobs.PluginInstallPayload(package_sha256=sha)
+        )
+    # the same bytes uploaded by hand keep the full ring: B's key verifies them
+    async with factory() as s:
+        row = await s.get(TiqoraPluginPackage, sha)
+        assert row is not None
+        row.source, row.repository_id = "upload", None
+        await s.commit()
+    async with _client(factory, settings) as c:
+        again = await c.get(f"/api/v1/admin/plugins/packages/{sha}")
+    assert again.json()["installable"] is True
+    assert again.json()["trust"] == "verified_publisher"
 
 
 async def test_download_unverified_index_cannot_name_a_foreign_host(
@@ -455,7 +520,9 @@ async def test_download_endpoint_enqueues_job_and_validates(
         first = await c.post(base, json=body)
         assert first.status_code == 202, first.text
         again = await c.post(base, json=body)
-        assert again.json()["job_id"] == first.json()["job_id"]  # dedupe fetch:<repo>:<plugin>
+        assert (
+            again.json()["job_id"] == first.json()["job_id"]
+        )  # dedupe fetch:<repo>:<plugin>:<version>
         unknown = await c.post(base, json={**body, "version": "9.9.9"})
         assert unknown.status_code == 404
         assert unknown.json()["detail"] == "Version nicht in der Paketquelle"
@@ -465,7 +532,7 @@ async def test_download_endpoint_enqueues_job_and_validates(
         job = await s.get(TiqoraJob, first.json()["job_id"])
         assert job is not None
         assert job.kind == "core.plugin_fetch"
-        assert job.dedupe_key == f"fetch:{rid}:{PLUGIN}"
+        assert job.dedupe_key == f"fetch:{rid}:{PLUGIN}:1.1.0"
         assert json.loads(job.payload) == {
             "repository_id": rid,
             "plugin_id": PLUGIN,
@@ -678,3 +745,9 @@ async def test_available_updates_without_repositories_or_plugins(
     assert await _updates(factory, tmp_path) == {}
     await _install_row(factory, repository_id=None)
     assert await _updates(factory, tmp_path) == {}
+
+
+def test_fetch_dedupe_key_separates_releases() -> None:
+    assert install_jobs.fetch_dedupe_key(1, PLUGIN, "1.1.0") != install_jobs.fetch_dedupe_key(
+        1, PLUGIN, "1.2.0"
+    )
