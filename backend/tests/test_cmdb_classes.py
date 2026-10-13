@@ -335,6 +335,52 @@ async def test_reindex_walks_again_when_the_definition_moves_mid_run(
     assert calls == [[a], [b]]
 
 
+async def test_reindex_walks_a_third_time_when_the_definition_moves_twice(
+    cmdb_db: CmdbWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ruling CMDB-PM-I3 / m5: a change during the second walk also joined this job, so the job
+    walks up to three times; a definition still moving after that is logged as a warning."""
+    import structlog
+
+    from tiqora.cmdb import reindex
+
+    async with cmdb_db.factory() as s:
+        cid = await make_class(s, key="cmdb4mid")
+        a = await make_ci(s, cid, "cmdb4-mid-a")
+        b = await make_ci(s, cid, "cmdb4-mid-b")
+    attrs = parse_attrs(SERVER_ATTRS)
+    real = reindex.rebuild_index
+    calls: list[list[int]] = []
+    change_on: set[int] = {0, 2}  # first batch of walk 1 and of walk 2
+
+    async def rebuild_then_change(session: Any, ci_ids: Any) -> int:
+        n = await real(session, ci_ids)
+        if len(calls) in change_on:
+            async with cmdb_db.factory() as other:
+                await ClassService(other).add_definition(
+                    cid, attrs, comment=None, user_id=USER_ADMIN
+                )
+                await other.commit()
+        calls.append(list(ci_ids))
+        return n
+
+    monkeypatch.setattr(reindex, "rebuild_index", rebuild_then_change)
+    with structlog.testing.capture_logs() as logs:
+        assert await reindex.reindex_class(cmdb_db.factory, cid, batch=1) == 6
+    assert calls == [[a], [b]] * 3
+    assert not [e for e in logs if e["log_level"] == "warning"]
+
+    # the definition moves during every walk: three walks, then a warning
+    calls.clear()
+    change_on.add(4)  # first batch of walk 3 as well
+    with structlog.testing.capture_logs() as logs:
+        assert await reindex.reindex_class(cmdb_db.factory, cid, batch=1) == 6
+    assert calls == [[a], [b]] * 3
+    warnings = [e for e in logs if e["log_level"] == "warning"]
+    assert [e["event"] for e in warnings] == ["cmdb_reindex_definition_still_moving"]
+    assert warnings[0]["class_id"] == cid
+
+
 async def test_searchable_change_reindexes_existing_cis(cmdb_db: CmdbWorld) -> None:
     """F10 end to end: Model becomes searchable, the job runs, old CIs are found."""
     from tiqora.cmdb.access import load_access

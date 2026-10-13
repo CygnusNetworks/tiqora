@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Any, Final, Literal
 
+import yaml
 from pydantic import ValidationError
 
 from tiqora.cmdb.definition import KEY_RE, AttributeDef, AttributeOptions
@@ -145,15 +146,20 @@ def _convert(attr: AttrDef, prefix: str, res: DefinitionImportResult) -> Attribu
         if conv is not None:
             sub.append(conv)
 
+    required = perl_truthy(inp.get("Required"))
     try:
         return AttributeDef(
             key=key,
             name=attr.name[:200],
             type=mapped,  # type: ignore[arg-type]
-            required=perl_truthy(inp.get("Required")),
+            required=required,
             searchable=attr.searchable and mapped not in ("group", "attachment"),
-            # Znuny's _DefinitionPrepare already clamped the counts (CountMin defaults to 1)
-            count_min=attr.count_min,
+            # Znuny's _DefinitionPrepare already clamped the counts (CountMin defaults to 1).
+            # In Znuny CountMin is the number of input rows shown and Input.Required decides
+            # whether a value is mandatory; Tiqora's count_min is "values required", so it
+            # takes CountMin only for required inputs (ruling CMDB-PM-I1). count_default keeps
+            # the rows Znuny shows.
+            count_min=attr.count_min if required else 0,
             count_max=attr.count_max,
             count_default=attr.count_default,
             options=options,
@@ -166,20 +172,77 @@ def _convert(attr: AttrDef, prefix: str, res: DefinitionImportResult) -> Attribu
         return None
 
 
+#: the ITSM core's English ``DefinitionError`` texts -> German text for the dialog (m3)
+_GERMAN: Final[tuple[tuple[re.Pattern[str], str], ...]] = (
+    (
+        re.compile(r"invalid attribute Key (?P<key>.*) \(no whitespace, ASCII only\)$"),
+        "Der Schlüssel {key} ist ungültig (keine Leerzeichen, nur ASCII-Zeichen).",
+    ),
+    (re.compile(r"attribute without a Key$"), "Ein Attribut hat keinen Schlüssel (Key)."),
+    (
+        re.compile(r"an attribute must be a mapping$"),
+        "Jedes Attribut muss eine Zuordnung (Key, Name, Input …) sein.",
+    ),
+    (
+        re.compile(r"a class definition must be a list of attributes$"),
+        "Die Definition muss eine Liste von Attributen sein.",
+    ),
+    (
+        re.compile(r"(?P<what>CountMin|CountMax|CountDefault) is not an integer: (?P<value>.*)$"),
+        "{what} ist keine ganze Zahl: {value}.",
+    ),
+    (re.compile(r"YAML aliases are not supported"), "YAML-Aliase (& und *) sind nicht erlaubt."),
+    (
+        re.compile(r"(YAML|attribute) nesting depth exceeds (?P<n>\d+)$"),
+        "Die Definition ist zu tief verschachtelt (höchstens {n} Ebenen).",
+    ),
+    (
+        re.compile(r"too many YAML nodes"),
+        "Die Definition ist zu umfangreich (zu viele Elemente).",
+    ),
+    (
+        re.compile(r"definition larger than (?P<n>\d+) characters$"),
+        "Die Definition ist zu groß (höchstens {n} Zeichen).",
+    ),
+    (re.compile(r"invalid Perl definition:"), "Das Perl-Datenformat ist ungültig."),
+)
+
+
+def _german_reason(exc: DefinitionError, *, line_offset: int) -> str:
+    """German text for a parser error; the English detail never reaches the dialog."""
+    message = str(exc)
+    for pattern, template in _GERMAN:
+        m = pattern.match(message)
+        if m is not None:
+            return template.format(**m.groupdict())
+    mark = getattr(exc.__cause__, "problem_mark", None)
+    if isinstance(exc.__cause__, yaml.YAMLError) and mark is not None:
+        return f"Ungültiges YAML in Zeile {int(mark.line) + 1 - line_offset}."
+    return "Der Text ist keine gültige Klassendefinition."
+
+
 def parse_znuny_definition(text: str, fmt: Literal["yaml", "perl"]) -> DefinitionImportResult:
     """Map a Znuny definition to Tiqora attributes; unknown types become warnings, not errors."""
     source = text
+    line_offset = 0
     if fmt == "yaml":
         stripped = text.lstrip()
         # pasted YAML without the document marker is still YAML (not Znuny's legacy-Perl marker)
-        source = stripped if stripped.startswith("---") else "---\n" + text
+        if stripped.startswith("---"):
+            source = stripped
+            # YAML reports lines of ``source``: count the blank lines cut in front of the marker
+            line_offset = -text[: len(text) - len(stripped)].count("\n")
+        else:
+            source = "---\n" + text
+            line_offset = 1
     try:
         prepared = parse_definition(source, fmt)
     except DefinitionError as exc:
         label = "YAML" if fmt == "yaml" else "Perl"
         # chain the Perl parser's error when there is one: the API reports its ``position``
         cause = exc.__cause__ if isinstance(exc.__cause__, PerlDataError) else exc
-        raise DefinitionParseError(f"{label}-Definition nicht lesbar: {exc}") from cause
+        reason = _german_reason(exc, line_offset=line_offset)
+        raise DefinitionParseError(f"{label}-Definition nicht lesbar: {reason}") from cause
     res = DefinitionImportResult(attributes=[])
     for item in prepared:
         attr = _convert(item, "", res)

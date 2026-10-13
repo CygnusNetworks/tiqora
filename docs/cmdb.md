@@ -73,6 +73,9 @@ Aus Znuny übernehmen Sie eine vorhandene Klassendefinition mit **Definition imp
 Tiqora nicht abbilden kann, wird als Hinweis aufgelistet). Gelesen wird die Definition mit
 demselben Parser wie im Modus A und im ITSM-Import, also nach Znunys eigenen Regeln: fehlt
 `CountMin`, gilt 1; Schlüssel mit Leerzeichen oder Umlauten lehnt schon Znuny ab, ebenso hier.
+`CountMin` ist in Znuny die Zahl der angezeigten Eingabezeilen, Pflicht ist ein Wert nur mit
+`Required`; Tiqora übernimmt `CountMin` daher nur für Pflichtattribute als Mindestzahl der
+Werte, alle anderen Attribute bleiben optional und zeigen trotzdem die Zeilen wie in Znuny.
 Verweise auf andere CIs (`CI`, `CISimple`) übernehmen die Klasse aus `CIClassName`. Der Umfang
 ist begrenzt (1 MiB, 64 Ebenen, keine YAML-Aliase), damit eine manipulierte Datei nichts
 anrichten kann.
@@ -140,6 +143,9 @@ eines Tickets sieht nur, wer das Ticket lesen darf.
 
 Jeder Linktyp hat eine **Weitergabe**: `none`, `source`, `target` oder `both`. `source` heißt:
 Das **Quell**-CI der Verknüpfung bekommt die Warnung, wenn das **Ziel**-CI in Störung ist.
+Ungerichtete Linktypen (Quell- und Zielname gleich, etwa `ConnectedTo`) haben keine Quelle und
+kein Ziel; hier gilt wie in Znuny: Mit `source` oder `both` bekommt jeder Nachbar die Warnung,
+mit `target` keiner.
 
 *Beispiel.* `web-01.example.org` **hängt ab von** `db-01.example.org` (Linktyp `DependsOn`,
 Quelle ist `web-01`). Setzen Sie `db-01` auf den Vorfallstatus
@@ -155,7 +161,9 @@ Störungen laufen). Überschreitet der Bereich die Obergrenze (`propagation_node
 5000) oder die Tiefe 50, schreibt Tiqora nichts halb und stößt stattdessen den Job
 `core.cmdb_propagation` an. Ändert ein Admin unter *Admin → ITSM → Linktypen* die
 Weitergabe, die Richtung oder die Gültigkeit eines Linktyps (auch über „Aus Znuny
-aktualisieren“), stößt Tiqora in Modus B denselben Job von selbst an. Von Hand rechnet ein
+aktualisieren“), stößt Tiqora in Modus B denselben Job von selbst an. Läuft der Job dabei
+schon, prüft er am Ende, ob sich Linktypen oder Vorfallstatus geändert haben, und rechnet dann
+noch einmal (höchstens drei Durchläufe). Von Hand rechnet ein
 Admin alle Zustände mit `POST /api/v1/admin/cmdb/propagation/recompute` neu (Job
 `core.cmdb_propagation`, Abfrage über `/api/v1/jobs`) – in der Oberfläche über
 **Vorfallstatus neu berechnen** auf der Seite *Admin → CMDB-Klassen*. Ändert ein Admin im Katalog

@@ -253,25 +253,36 @@ async def _redact_ticket_titles(
     """Anonymise mode: ``LinkAdd``/``LinkDelete`` lines naming one of these tickets as
     ``<tn> <title>`` become ``ticket <tn> [gelöscht]`` (the ticket's title is anonymised too).
 
-    One scan over the ticket link lines, matched on the exact number in Python."""
-    wanted = {n.strip() for n in numbers if n and n.strip()}
+    The lines are filtered in SQL per chunk of ticket numbers (``: ticket <tn> ``, so only lines
+    with a title), then matched on the exact number in Python (m4: the pass runs inside the
+    erasure request and must not load every ticket link line of the CMDB)."""
+    wanted = sorted({n.strip() for n in numbers if n and n.strip()})
     if not wanted:
         return 0
-    rows = (
-        await session.execute(
-            select(TiqoraCmdbCiHistory.id, TiqoraCmdbCiHistory.detail).where(
-                TiqoraCmdbCiHistory.event.in_(["LinkAdd", "LinkDelete"]),
-                TiqoraCmdbCiHistory.detail.contains(": ticket ", autoescape=True),
+    rows: dict[int, str] = {}
+    for i in range(0, len(wanted), _CHUNK):
+        for hid, hdetail in (
+            await session.execute(
+                select(TiqoraCmdbCiHistory.id, TiqoraCmdbCiHistory.detail).where(
+                    TiqoraCmdbCiHistory.event.in_(["LinkAdd", "LinkDelete"]),
+                    or_(
+                        *[
+                            TiqoraCmdbCiHistory.detail.contains(f": ticket {tn} ", autoescape=True)
+                            for tn in wanted[i : i + _CHUNK]
+                        ]
+                    ),
+                )
             )
-        )
-    ).all()
+        ).all():
+            rows[int(hid)] = str(hdetail)
+    wanted_set = set(wanted)
     n = 0
-    for hid, hdetail in rows:
+    for hid, hdetail in sorted(rows.items()):
         detail = str(hdetail)
         prefix, sep, rest_all = detail.partition(": ")
         kind, _, rest = rest_all.partition(" ")
         tn, has_title, _title = rest.partition(" ")
-        if not sep or kind != "ticket" or tn not in wanted or not has_title:
+        if not sep or kind != "ticket" or tn not in wanted_set or not has_title:
             continue
         redacted = f"{prefix}: ticket {tn} {REDACTED_LINK}"
         if detail == redacted:

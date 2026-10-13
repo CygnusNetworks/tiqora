@@ -23,6 +23,7 @@ from tests._cmdb_helpers import (
     client_for,
     make_ci,
     make_class,
+    make_link_type,
 )
 from tiqora.cmdb.access import load_access
 from tiqora.cmdb.errors import CmdbError, CmdbNotFound
@@ -213,6 +214,27 @@ async def test_affected_service_only_when_type_propagates_toward_it(cmdb_db: Cmd
         await _link_kind(s, ("service", SERVICE_ID_2), ("ci", app), "ConnectedTo")  # does not
         out = await affected(s, await load_access(s, USER_A), app, settings=CmdbSettings())
     assert [x.id for x in out.services] == [str(SERVICE_ID)] and out.service_count == 1
+
+
+async def test_affected_service_follows_znuny_rule_for_unpointed_types(cmdb_db: CmdbWorld) -> None:
+    """Ruling CMDB-PM-I2: the service end reads the type reversed (``counts_for_service``); an
+    unpointed type matches only ``Source``, so ``target`` reaches the service, ``source`` not --
+    also for a link stored with the service as source (a type made unpointed later, or imported)."""
+    async with cmdb_db.factory() as s:
+        await make_link_type(s, "Cmdb4PeerSrc", "source")
+        await make_link_type(s, "Cmdb4PeerTgt", "target")
+        cid = await make_class(s)
+        app = await make_ci(s, cid, "cmdb4-app")
+        await _link_kind(s, ("service", SERVICE_ID), ("ci", app), "Cmdb4PeerSrc")
+        await _link_kind(s, ("service", SERVICE_ID_2), ("ci", app), "Cmdb4PeerTgt")
+    cmdb_db.sql(
+        "UPDATE tiqora_itsm_link_type SET pointed = :p"
+        " WHERE name IN ('Cmdb4PeerSrc', 'Cmdb4PeerTgt')",
+        p=False,
+    )
+    async with cmdb_db.factory() as s:
+        out = await affected(s, await load_access(s, USER_A), app, settings=CmdbSettings())
+    assert [x.id for x in out.services] == [str(SERVICE_ID_2)]
 
 
 async def test_affected_cap_marks_truncated(cmdb_db: CmdbWorld) -> None:

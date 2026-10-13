@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from tiqora.cmdb.definition import iter_attribute_paths, validate_definition
+from tiqora.cmdb.values import normalize_values
 from tiqora.cmdb.znuny_definition import DefinitionParseError, parse_znuny_definition
 
 FIXTURES = Path(__file__).parent / "fixtures" / "cmdb"
@@ -87,7 +88,9 @@ def test_stock_znuny_definitions_import_without_loss(line: str) -> None:
     assert by_path["Owner"].type == "customer_user"
     assert by_path["NIC.IPAddress"].count_max == 20
     assert (by_path["NIC.IPAddress"].count_min, by_path["NIC.IPAddress"].count_default) == (0, 0)
-    assert by_path["Note"].count_min == 0 and by_path["Vendor"].count_min == 1
+    # CountMin is absent for Vendor, but Vendor is not Required: optional (ruling CMDB-PM-I1)
+    assert by_path["Note"].count_min == 0 and by_path["Vendor"].count_min == 0
+    assert by_path["Vendor"].count_default == 1  # Znuny still shows one input row
     assert res.warnings == []
     assert res.catalog_classes_used == {
         "ITSM::ConfigItem::Computer::Type",
@@ -150,13 +153,37 @@ def test_perl_truthy_flags() -> None:
 
 
 def test_count_defaults_follow_znuny() -> None:
-    """Znuny's ``_DefinitionPrepare`` (survey question 7): CountMin 1 when absent, 0 stays."""
+    """Ruling CMDB-PM-I1: Znuny's ``CountMin`` (``_DefinitionPrepare``: 1 when absent, survey
+    question 7) is the number of input rows shown; ``Input.Required`` decides whether a value
+    is mandatory. So Tiqora's ``count_min`` takes ``CountMin`` only for required inputs."""
     a = parse_znuny_definition("[ { Key => 'A', Name => 'A' } ]", "perl").attributes[0]
-    assert (a.count_min, a.count_max, a.count_default) == (1, 1, 1)
+    assert (a.required, a.count_min, a.count_max, a.count_default) == (False, 0, 1, 1)
+    r = parse_znuny_definition(
+        "[ { Key => 'R', Input => { Type => 'Text', Required => 1 } } ]", "perl"
+    ).attributes[0]
+    assert (r.required, r.count_min, r.count_max, r.count_default) == (True, 1, 1, 1)
+    r0 = parse_znuny_definition(
+        "[ { Key => 'R', CountMin => 0, Input => { Type => 'Text', Required => 1 } } ]", "perl"
+    ).attributes[0]
+    assert (r0.required, r0.count_min, r0.count_default) == (True, 0, 1)
     b = parse_znuny_definition(
         "[ { Key => 'B', CountMin => 0, CountMax => 0, CountDefault => 5 } ]", "perl"
     ).attributes[0]
     assert (b.count_min, b.count_max, b.count_default) == (0, 1, 1)
+    c = parse_znuny_definition(
+        "[ { Key => 'C', CountMin => 2, CountMax => 3 } ]", "perl"
+    ).attributes[0]
+    assert (c.count_min, c.count_max, c.count_default) == (0, 3, 2)
+
+
+@pytest.mark.parametrize("line", ["itsm-6", "itsm-7"])
+def test_imported_stock_class_accepts_only_vendor(line: str) -> None:
+    """The stock Computer class: a CI with only Vendor filled is valid, the optional
+    attributes without ``CountMin`` are not mandatory (13 ``too_few`` before CMDB-PM-I1)."""
+    res = parse_znuny_definition(SURVEY.joinpath(line, "22_Computer.yml").read_text(), "yaml")
+    values, issues = normalize_values(res.attributes, {"Vendor": [{"v": "Example"}]})
+    assert issues == []
+    assert values == {"Vendor": [{"v": "Example"}]}
 
 
 def test_keys_znuny_rejects_fail_the_import() -> None:
@@ -208,3 +235,75 @@ def test_sub_that_is_not_a_list_is_dropped() -> None:
     grp = parse_znuny_definition("- Key: G\n  Input:\n    Type: Dummy\n  Sub: x\n", "yaml")
     assert grp.attributes[0].type == "text"
     assert grp.warnings == ["Gruppe ohne Unterattribute bei G: als Text übernommen"]
+
+
+@pytest.mark.parametrize(
+    ("text", "fmt", "message"),
+    [
+        (
+            "- Key: Serial Number\n",
+            "yaml",
+            "YAML-Definition nicht lesbar: Der Schlüssel 'Serial Number' ist ungültig "
+            "(keine Leerzeichen, nur ASCII-Zeichen).",
+        ),
+        (
+            "- Name: no key\n",
+            "yaml",
+            "YAML-Definition nicht lesbar: Ein Attribut hat keinen Schlüssel (Key).",
+        ),
+        (
+            "Foo: bar\n",
+            "yaml",
+            "YAML-Definition nicht lesbar: Die Definition muss eine Liste von Attributen sein.",
+        ),
+        (
+            "- a: &x [1]\n- b: *x\n",
+            "yaml",
+            "YAML-Definition nicht lesbar: YAML-Aliase (& und *) sind nicht erlaubt.",
+        ),
+        (
+            "[" * 100000,
+            "yaml",
+            "YAML-Definition nicht lesbar: Die Definition ist zu tief verschachtelt "
+            "(höchstens 64 Ebenen).",
+        ),
+        (
+            "- Key: A\n  CountMax: viele\n",
+            "yaml",
+            "YAML-Definition nicht lesbar: CountMax ist keine ganze Zahl: 'viele'.",
+        ),
+        (
+            "- Foo\n",
+            "yaml",
+            "YAML-Definition nicht lesbar: Jedes Attribut muss eine Zuordnung "
+            "(Key, Name, Input …) sein.",
+        ),
+        (
+            "x" * 1_048_577,
+            "perl",
+            "Perl-Definition nicht lesbar: Die Definition ist zu groß (höchstens 1048576 Zeichen).",
+        ),
+        (
+            "[ { Key => system('id') } ]",
+            "perl",
+            "Perl-Definition nicht lesbar: Das Perl-Datenformat ist ungültig.",
+        ),
+    ],
+)
+def test_parse_errors_are_german(text: str, fmt: str, message: str) -> None:
+    """m3: the dialog shows German text only, never the parser's English detail."""
+    with pytest.raises(DefinitionParseError) as err:
+        parse_znuny_definition(text, fmt)  # type: ignore[arg-type]
+    assert str(err.value) == message
+
+
+def test_yaml_syntax_error_names_the_line() -> None:
+    with pytest.raises(DefinitionParseError) as err:
+        parse_znuny_definition("- Key: A\n- Key: [B\n", "yaml")
+    assert str(err.value) == "YAML-Definition nicht lesbar: Ungültiges YAML in Zeile 3."
+
+
+def test_perl_error_keeps_the_position_for_the_api() -> None:
+    with pytest.raises(DefinitionParseError) as err:
+        parse_znuny_definition("[ { Key => system('id') } ]", "perl")
+    assert isinstance(getattr(err.value.__cause__, "position", None), int)

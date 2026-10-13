@@ -91,6 +91,12 @@ describe("cmdbMock", () => {
     expect((get(store, "/api/v1/cmdb/import-templates", "class_id=2")?.body as unknown[]).length).toBe(0);
   });
 
+  it("declares DependsOn with the backend default propagation (both)", () => {
+    const store = createDemoCmdb();
+    const types = get(store, "/api/v1/cmdb/link-types")?.body as { name: string; propagation: string }[];
+    expect(types.find((t) => t.name === "DependsOn")?.propagation).toBe("both");
+  });
+
   it("returns undefined for unknown routes", () => {
     expect(get(createDemoCmdb(), "/api/v1/other")).toBeUndefined();
   });
