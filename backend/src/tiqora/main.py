@@ -15,6 +15,7 @@ from tiqora.cli.bootstrap import add_bootstrap_subparser
 from tiqora.cli.crypto import add_crypto_subparser
 from tiqora.cli.dev import add_dev_subparser
 from tiqora.cli.gdpr import add_gdpr_subparser
+from tiqora.cli.itsm import add_itsm_subparser
 from tiqora.cli.migrate import add_migrate_subparser, run_migrate
 from tiqora.cli.openapi import add_openapi_subparser
 from tiqora.cli.ownership import add_ownership_subparser
@@ -54,6 +55,7 @@ def main(argv: list[str] | None = None) -> None:
     add_api_key_subparser(sub)
     add_openapi_subparser(sub)
     add_ai_subparser(sub)
+    add_itsm_subparser(sub)
 
     index_p = sub.add_parser("index", help="Search index maintenance")
     index_sub = index_p.add_subparsers(dest="index_command")
@@ -168,10 +170,10 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(exit_code)
     elif command == "openapi":
         sys.exit(args.func(args))
-    elif command == "ai":
+    elif command in ("ai", "itsm"):
         func = getattr(args, "func", None)
         if func is None:
-            sub.choices["ai"].print_help()
+            sub.choices[command].print_help()
             sys.exit(2)
         exit_code = asyncio.run(func(args))
         sys.exit(exit_code)

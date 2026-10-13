@@ -6273,7 +6273,9 @@
         "cmdb_bulk": "Edit CMDB items in bulk",
         "cmdb_archive": "Archive old CMDB versions",
         "cmdb_reindex": "Rebuild CMDB search",
-        "itsm_linked_articles": "Note to linked tickets"
+        "itsm_linked_articles": "Note to linked tickets",
+        "itsm_import": "Import Znuny ITSM data",
+        "itsm_switch": "Switch ITSM to Tiqora"
       },
       "gi_mail": "Send email from a web service request"
     },
