@@ -865,6 +865,20 @@ class ModeAReader:
         self._source: ImportSource = (
             source_override if source_override is not None else ZnunyAdapterSource(session)
         )
+        # loaded once per reader: a GI ConfigItemGet asks for up to 500 CIs with one reader
+        # (``get_mode_a_reader`` builds a fresh one per request)
+        self._catalog: list[ZnunyCatalogItem] | None = None
+        self._definitions: list[ZnunyClassDefinition] | None = None
+
+    async def _catalog_items(self) -> list[ZnunyCatalogItem]:
+        if self._catalog is None:
+            self._catalog = await self._source.catalog_items()
+        return self._catalog
+
+    async def _class_definitions(self) -> list[ZnunyClassDefinition]:
+        if self._definitions is None:
+            self._definitions = await self._source.class_definitions()
+        return self._definitions
 
     async def get_ci(self, znuny_id: int, *, user_id: int) -> CiView | None:
         """``None`` for an unknown CI, a class without ``ro`` for ``user_id`` or no version."""
@@ -873,7 +887,7 @@ class ModeAReader:
         if not cis:
             return None
         ci = cis[0]
-        catalog = {c.id: c for c in await source.catalog_items()}
+        catalog = {c.id: c for c in await self._catalog_items()}
         cls = catalog.get(ci.class_id)
         if cls is None or cls.permission_group is None:
             return None
@@ -888,7 +902,7 @@ class ModeAReader:
             return None
         current = next((v for v in versions if v.id == ci.last_version_id), versions[-1])
         definition = next(
-            (d for d in await source.class_definitions() if d.id == current.definition_id), None
+            (d for d in await self._class_definitions() if d.id == current.definition_id), None
         )
         if definition is None:
             return None
@@ -970,7 +984,7 @@ class ModeAReader:
 
     async def catalog_names(self) -> dict[int, str]:
         """Znuny general-catalog id -> name (``GeneralCatalog`` attribute values)."""
-        return {c.id: c.name for c in await self._source.catalog_items()}
+        return {c.id: c.name for c in await self._catalog_items()}
 
 
 def get_mode_a_reader(session: AsyncSession) -> ModeAReader:

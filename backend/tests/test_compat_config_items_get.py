@@ -401,6 +401,37 @@ async def test_get_in_mode_a_with_the_real_reader_on_a_fake_source(
     assert none.json()["Error"]["ErrorCode"] == "ConfigItemGet.AccessDenied"
 
 
+async def test_get_in_mode_a_loads_catalog_and_definitions_once_per_request(
+    cmdb_db: CmdbWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Up to 500 ids per call: Znuny's catalog and class definitions are read once, not per id."""
+    set_mode(cmdb_db, "znuny_readthrough")
+    source = sample_source()
+    source.catalog = [
+        dataclasses.replace(i, permission_group=GROUP_RO) if i.permission_group else i
+        for i in sample_catalog()
+    ]
+    calls = {"catalog": 0, "definitions": 0}
+    catalog_items, class_definitions = source.catalog_items, source.class_definitions
+
+    async def counted_catalog() -> Any:
+        calls["catalog"] += 1
+        return await catalog_items()
+
+    async def counted_definitions() -> Any:
+        calls["definitions"] += 1
+        return await class_definitions()
+
+    monkeypatch.setattr(source, "catalog_items", counted_catalog)
+    monkeypatch.setattr(source, "class_definitions", counted_definitions)
+    monkeypatch.setattr(facades, "source_override", source)
+    async with _client(cmdb_db) as client:
+        r = await client.get("/znuny-compat/ConfigItem/1,2,3", params=_auth())
+    assert r.status_code == 200, r.text
+    assert [i["ConfigItemID"] for i in r.json()["ConfigItem"]] == [1, 2, 3]
+    assert calls == {"catalog": 1, "definitions": 1}
+
+
 async def test_get_with_attachments_base64(cmdb_db: CmdbWorld) -> None:
     set_mode(cmdb_db, "tiqora")
     ci_id = await _seed_ci(cmdb_db)

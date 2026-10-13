@@ -241,6 +241,7 @@ async def _gi_lookups(
     *,
     mode: Mode = "tiqora",
     cixml: Any = None,
+    mode_a: facades.ModeAReader | None = None,
 ) -> GiLookups:
     """Catalog names/ids for the ``GeneralCatalog`` classes of ``definition``.
 
@@ -250,7 +251,7 @@ async def _gi_lookups(
     names: dict[int, str] = {}
     ids: dict[tuple[str, str], int] = {}
     if mode == "znuny_readthrough":
-        names = await facades.get_mode_a_reader(session).catalog_names()
+        names = await (mode_a or facades.get_mode_a_reader(session)).catalog_names()
         return _Lookups(names, ids)
     catalog = CatalogService(session)
     for cls in sorted(_catalog_classes(definition)):
@@ -294,11 +295,11 @@ def _split_ids(raw: Any) -> list[Any] | None:
 
 
 async def _attachments(
-    session: AsyncSession, view: CiView, mode: Mode
+    session: AsyncSession, view: CiView, mode: Mode, mode_a: facades.ModeAReader | None = None
 ) -> list[dict[str, Any]] | str:
     """``Attachment`` of one item: a list, or ``''`` when there is none (Znuny)."""
     if mode == "znuny_readthrough":
-        files = await facades.get_mode_a_reader(session).attachment_contents(view.id)
+        files = await (mode_a or facades.get_mode_a_reader(session)).attachment_contents(view.id)
     else:
         files = await facades.cmdb_attachment_contents(
             session, view.id, [a[0] for a in view.attachments]
@@ -327,11 +328,16 @@ async def _attachments(
 
 
 async def _item_bundle(
-    session: AsyncSession, view: CiView, mode: Mode, *, with_attachments: bool
+    session: AsyncSession,
+    view: CiView,
+    mode: Mode,
+    *,
+    with_attachments: bool,
+    mode_a: facades.ModeAReader | None = None,
 ) -> dict[str, Any]:
     """One entry of the ``ConfigItem`` answer (``ConfigItemGet.pm`` ``$ConfigItemBundle``)."""
     definition = to_znuny_definition(view.schema)
-    lookups = await _gi_lookups(session, definition, mode=mode)
+    lookups = await _gi_lookups(session, definition, mode=mode, mode_a=mode_a)
     xml_data = attributes_to_xmldata(view.attributes, view.schema)
     bundle: dict[str, Any] = {
         "VersionID": view.version_id,
@@ -358,7 +364,7 @@ async def _item_bundle(
         "CIXMLData": xmldata_to_cixml(xml_data, definition, lookups=lookups),
     }
     if with_attachments:
-        bundle["Attachment"] = await _attachments(session, view, mode)
+        bundle["Attachment"] = await _attachments(session, view, mode, mode_a)
     return bundle
 
 
@@ -369,12 +375,14 @@ async def _load_view(
     ci_id: int | None,
     user_id: int,
     visible: set[int],
+    mode_a: facades.ModeAReader | None = None,
 ) -> CiView | None:
     """The CI when ``user_id`` may read its class, else ``None`` (also unknown ids)."""
     if ci_id is None or user_id == 0:
         return None
     if mode == "znuny_readthrough":
-        return await facades.get_mode_a_reader(session).get_ci(ci_id, user_id=user_id)
+        reader = mode_a or facades.get_mode_a_reader(session)
+        return await reader.get_ci(ci_id, user_id=user_id)
     view = await ports.reader.get_ci(ci_id)
     return view if view is not None and view.class_id in visible else None
 
@@ -413,13 +421,19 @@ async def op_config_item_get(
     visible: set[int] = set()
     if mode == "tiqora" and user_id != 0:
         visible = await ports.reader.visible_class_ids(user_id, await _permission_type(session, op))
+    # one Mode-A reader for the whole request: it loads Znuny's catalog and class definitions once
+    mode_a = facades.get_mode_a_reader(session) if mode == "znuny_readthrough" else None
     items: list[dict[str, Any]] = []
     for raw_id in id_list:
-        view = await _load_view(session, ports, mode, _parse_id(raw_id), user_id, visible)
+        view = await _load_view(session, ports, mode, _parse_id(raw_id), user_id, visible, mode_a)
         if view is None:  # unknown id and missing right look the same (ItemClassGroupCheck)
             return denied(op)
         try:
-            items.append(await _item_bundle(session, view, mode, with_attachments=with_attachments))
+            items.append(
+                await _item_bundle(
+                    session, view, mode, with_attachments=with_attachments, mode_a=mode_a
+                )
+            )
         except ValueError as exc:  # a stored value the CIXMLData conversion refuses
             logger.warning("gi_config_item_get_unconvertible", ci_id=view.id, error=str(exc))
             return _err(f"{op}.InvalidParameter", f"{op}: Could not get ConfigItem data")
