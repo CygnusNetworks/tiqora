@@ -1409,7 +1409,10 @@ attempts count. Notes:
   provider names such an account (a mapped login), its answer is skipped and the
   chain goes on with the next provider, whose answer is checked the same way
   (naming the same account again is refused again). A disabled provider or a
-  deprovisioned (`DELETE`d) mapping does not block.
+  deprovisioned (`DELETE`d) mapping does not block. There is no admin delete
+  for a single mapping: the way back to passwords is clearing
+  `require_mfa_claim` or disabling the provider (both affect every account of
+  that provider); deleting the provider drops all its mappings.
 
 ### Customer sources
 

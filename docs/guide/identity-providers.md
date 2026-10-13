@@ -476,6 +476,17 @@ Ein abgeschalteter Anbieter oder eine gelöste Zuordnung sperrt die Kennwortanme
 *Bereitstellung* (SCIM) des Anbieters gerade an ist, spielt keine Rolle. Konten anderer Anbieter und
 Konten ohne SCIM-Zuordnung melden sich mit Kennwort an wie bisher.
 
+**Ausweg, wenn der Anmeldedienst ausfällt**: Eine einzelne SCIM-Zuordnung lässt sich in der Verwaltung
+nicht löschen. Die Kennwortanmeldung kommt nur für alle Konten eines Anbieters zurück:
+
+* Schalter *Zweiten Faktor vom Anmeldedienst verlangen* ausschalten (Tab *Sitzung*): die Konten melden
+  sich wieder mit Kennwort an, die Anmeldung über den Anmeldedienst bleibt möglich, aber ohne Nachweis.
+* den Anbieter abschalten (Schalter *Aktiv*): Kennwortanmeldung wieder möglich, die Anmeldung über diesen
+  Anmeldedienst ist bis zum Wiedereinschalten gesperrt.
+* den Anbieter löschen: entfernt auch alle seine SCIM-Zuordnungen; nur, wenn Sie ihn nicht mehr brauchen.
+
+Schalten Sie den Schalter danach wieder ein, gilt die Sperre sofort wieder.
+
 ## Sitzungsdauer
 
 Im Tab *Sitzung* kann jeder Anbieter die Sitzungsdauer seiner Anmeldungen **verkürzen**:
