@@ -399,8 +399,7 @@ verloren gehen.
 2. **Dialog "Erweiterung installieren".** Er zeigt Name, Version, Herausgeber,
    Vertrauensstufe (unten), die Änderungen gegenüber der installierten Version,
    "Was diese Erweiterung angibt" (Erweiterungspunkte, aufgerufene Hosts,
-   Oberflächenstellen, neue Tabellen) sowie **Hinweise** und **Gründe, die die
-   Installation verhindern**. Die Angaben beschreiben, was die Erweiterung von
+   Oberflächenstellen, neue Tabellen) sowie **Hinweise** und **Kann nicht installiert werden**. Die Angaben beschreiben, was die Erweiterung von
    sich sagt. Sie sind keine Absicherung: Es gibt keine Sandbox (Abschnitt 1).
 3. **Installieren.** Ein Hintergrund-Job speichert das Paket, passt die
    Datenbank an (Migrationen der Erweiterung, siehe unten) und schaltet die
@@ -461,11 +460,11 @@ Eine Erweiterung kann eigene Tabellen mit dem Präfix `tqp_<Kurzname>_` anlegen.
 Der Kurzname (`short_id`) steht im Manifest und wird im Dialog genannt. Er ist
 die gesamte Trennung zwischen Erweiterungen: Tiqora verweigert eine Erweiterung,
 deren Kurzname schon von einer anderen Kennung benutzt wird oder deren
-Tabellen („Daten behalten") einer anderen Kennung gehören.
+Tabellen („Daten behalten“) einer anderen Kennung gehören.
 
 - Die Änderungen laufen beim Installieren in einem eigenen Prozess (mit
-  Zeitlimit, `TIQORA_PLUGINS_MIGRATE_TIMEOUT_SECONDS`) und beim Start von `api`
-  (`tiqora migrate upgrade`). Ein Fehler hält den Start nie auf: Die
+  festem Zeitlimit von 15 Minuten) und beim Start von `api`
+  (`tiqora migrate upgrade`; Zeitlimit dort `TIQORA_PLUGINS_MIGRATE_TIMEOUT_SECONDS`). Ein Fehler hält den Start nie auf: Die
   Erweiterung erscheint als "Fehler" mit "Fehler bei der Datenbank-Anpassung"
   und wird nicht geladen. Einen Fehler für dieselbe Version versucht Tiqora
   beim Start nicht noch einmal; "Erneut versuchen" oder eine neue Version tut es.
@@ -486,10 +485,13 @@ Tabellen („Daten behalten") einer anderen Kennung gehören.
 
 - **Daten behalten:** Tabellen und Einstellungen bleiben. Installieren Sie
   dieselbe Erweiterung später wieder (in derselben oder einer neueren
-  Version), sind die Daten wieder da. Eine *andere* Erweiterung mit demselben Kurznamen wird abgewiesen.
+  Version), sind die Daten wieder da. Eine *ältere* Version wird hier nicht
+  vorab abgelehnt: Ihre Datenbank-Änderung scheitert mit dem Hinweis, dass die
+  Tabellen von einer neueren Version stammen; installieren Sie dann mindestens
+  die zuletzt installierte Version. Eine *andere* Erweiterung mit demselben Kurznamen wird abgewiesen.
 - **Daten löschen:** Tiqora legt zuerst eine **Sicherung** (gepackte
   JSON-Zeilen aller Tabellen der Erweiterung, `…-daten-<Datum>.jsonl.gz`) an
-  und löscht danach die Tabellen mit dem Präfix und nichts sonst. Ist die
+  und löscht danach die Tabellen mit dem Präfix, die Einstellungen der Erweiterung und nichts sonst. Ist die
   Sicherung (unkomprimiert) größer als 200 MB, bricht der Job ab und löscht nichts. **Die Sicherung wird N Tage
   aufbewahrt** (Einstellung "Aufbewahrung" der Jobs, Standard 14 Tage) und ist
   im Ergebnis des Jobs herunterladbar. Danach ist sie weg: Laden Sie sie
@@ -529,15 +531,16 @@ meldet nichts nach außen, bis Sie eine einrichten.
   Link-Local nicht.
 - **Herunterladen** prüft die Prüfsumme (`sha256`) und die Größe aus der Liste
   und danach alles wie bei einem Upload. Ein Download wird nur anhand der
-  Schlüssel *seiner* Paketquelle bewertet.
+  Herausgeber-Schlüssel *seiner* Paketquelle bewertet; die offiziellen und die
+  lokal vertrauten Schlüssel (`TIQORA_PLUGINS_TRUSTED_KEYS`) gelten immer.
 - **Aktualisierungs-Hinweise** ("Aktualisierung verfügbar") erscheinen für die
   höchste verträgliche, nicht zurückgezogene (`yanked`) Version. Sie kommen nur
   aus der Paketquelle, aus der die Erweiterung installiert wurde, oder aus einer
   anderen, wenn die Version mit demselben Schlüssel signiert ist wie die
   installierte. Behaupten zwei signierte Listen dieselbe Herausgeber-Kennung
   mit verschiedenen Schlüsseln, gilt der Herausgeber in beiden als nicht
-  verifiziert. Für Image-Erweiterungen zeigt Tiqora nur den Hinweis "bitte das
-  Image neu bauen".
+  verifiziert. Für Image-Erweiterungen zeigt Tiqora nur den Hinweis, dass die
+  Erweiterung im Image eingebaut ist und ein neues Tiqora-Image nötig ist.
 - **Tab "Verfügbar"** durchsucht die gespeicherten Listen nach Name, Kennung,
   Beschreibung und Herausgeber und filtert nach Kategorie und Paketquelle.
   Symbole und Bildschirmfotos aus Listen werden in dieser Version nicht
@@ -1718,8 +1721,8 @@ own prefix, so that Tiqora can export and drop exactly those tables when an
 admin removes the plugin with "Daten löschen".
 
 **Naming.** `short_id` is the manifest field (a letter, then lowercase letters
-and digits, 2 to 16 characters in total). Tables are `tqp_<short_id>_<name>` (at most 63 characters, the
-PostgreSQL limit). Indexes, constraints, PostgreSQL types and sequences carry
+and digits, 2 to 16 characters in total). Tables are `tqp_<short_id>_<name>` (keep them to 63 characters, the
+PostgreSQL limit; Tiqora does not enforce it and PostgreSQL truncates silently). Indexes, constraints, PostgreSQL types and sequences carry
 the same prefix too (PostgreSQL names them per schema, not per table). The
 version table is `tqp_<short_id>_alembic_version`, managed by Tiqora. Use a
 naming convention on your `MetaData` so that generated names stay inside the
@@ -1928,7 +1931,7 @@ shows as "Nicht kompatibel" and is not loaded.
 
 # Teil 3: Grenzen der Ausbaustufen
 
-Was die Ausbaustufen 1 und 2a bewusst nicht können (auf Deutsch, in einfachen Worten):
+Was die Ausbaustufen 1, 2a und 2b bewusst nicht können (auf Deutsch, in einfachen Worten):
 
 - **Nachinstallieren im Betrieb hat Grenzen.** Pakete (`.tqplugin`) lassen sich
   in der Verwaltung installieren, aktualisieren und entfernen (Abschnitt 7).

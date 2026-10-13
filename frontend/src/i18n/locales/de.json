@@ -4772,7 +4772,7 @@
       }
     },
     "plugins": {
-      "description": "Erweiterungen ergänzen Tiqora um zusätzliche Funktionen. Sie werden mit dem Tiqora-Image ausgeliefert; hier schalten Sie sie ein oder aus.",
+      "description": "Erweiterungen ergänzen Tiqora um zusätzliche Funktionen. Sie werden mit dem Tiqora-Image ausgeliefert oder hier als Paket installiert; hier schalten Sie sie auch ein oder aus.",
       "trustNote": "Erweiterungen laufen innerhalb von Tiqora mit vollem Zugriff. Die Angaben unten zeigen, was eine Erweiterung vorgibt zu tun – das ist keine Absicherung. Schalten Sie nur Erweiterungen ein, denen Sie vertrauen.",
       "loadError": "Die Erweiterungen konnten nicht geladen werden.",
       "actionError": "Die Änderung konnte nicht gespeichert werden.",

@@ -4772,7 +4772,7 @@
       }
     },
     "plugins": {
-      "description": "Extensions add functions to Tiqora. They ship with the Tiqora image; here you switch them on or off.",
+      "description": "Extensions add functions to Tiqora. They ship with the Tiqora image or you install them here as a package; here you also switch them on or off.",
       "trustNote": "Extensions run inside Tiqora with full access. The information below shows what an extension claims to do - it is not a safeguard. Only switch on extensions you trust.",
       "loadError": "The extensions could not be loaded.",
       "actionError": "The change could not be saved.",

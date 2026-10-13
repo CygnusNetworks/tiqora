@@ -357,6 +357,28 @@ def test_failed_revision_rolls_back_the_whole_run_on_postgres(
     assert _titled_x(engine) == 0
 
 
+def test_older_package_after_kept_data_gets_a_german_error(
+    db: tuple[Engine, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    engine, url = db
+    plugin = _discover(
+        tmp_path,
+        monkeypatch,
+        "tq_fixture_tables",
+        plugin_id="org.example.tables",
+        extra={"0002_good.py": _GOOD},
+    )
+    assert upgrade_plugin(plugin, database_url=url) == "tables_0002"
+    assert plugin.package_dir is not None
+    (plugin.package_dir / "migrations" / "0002_good.py").unlink()  # an older package returns
+    with pytest.raises(PluginMigrationError) as err:
+        upgrade_plugin(plugin, database_url=url)
+    assert "neueren Version" in str(err.value)
+    assert "„tables_0002“" in str(err.value)
+    assert "Alembic" not in str(err.value) and "locate" not in str(err.value)
+    assert _version(engine) == "tables_0002"  # nothing was touched
+
+
 def test_plugin_without_migrations_returns_none(
     db: tuple[Engine, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

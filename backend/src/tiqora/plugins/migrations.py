@@ -425,6 +425,20 @@ def _failing_revision(script: ScriptDirectory, cfg: Config, *, upward: bool) -> 
     return order[pos] if pos < len(order) else order[-1]
 
 
+_UNKNOWN_REVISION = re.compile(r"Can't locate revision identified by '([^']+)'")
+
+
+def _unknown_revision(exc: BaseException) -> str | None:
+    """The stored revision Alembic cannot find in the shipped scripts (older package), if any."""
+    seen: BaseException | None = exc
+    while seen is not None:
+        m = _UNKNOWN_REVISION.search(str(seen))
+        if m is not None:
+            return m.group(1)
+        seen = seen.__cause__
+    return None
+
+
 def _run(
     plugin: DiscoveredPlugin,
     database_url: str,
@@ -441,6 +455,12 @@ def _run(
     try:
         step(cfg)
     except Exception as exc:
+        stored = _unknown_revision(exc)
+        if stored is not None:
+            raise PluginMigrationError(
+                f"Die Tabellen der Erweiterung stammen von einer neueren Version (Revision "
+                f"„{stored}“). Bitte installieren Sie mindestens die zuletzt installierte Version."
+            ) from exc
         failing = _failing_revision(script, cfg, upward=upward)
         cause: BaseException = exc
         while not isinstance(cause, PluginMigrationError) and cause.__cause__ is not None:
