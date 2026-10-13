@@ -3135,6 +3135,25 @@ class TicketWriteService:
                 user_id, ticket_id, new_state_id, new_state_type, pending_time
             )
 
+    async def check_state_change_hooks(
+        self,
+        user_id: int,
+        ticket_id: int,
+        new_state_id: int,
+        pending_time: datetime | None = None,
+    ) -> None:
+        """Run only the plugins' ``ticket.state_change`` before-hooks for this change.
+
+        A veto raises ``OperationVetoed``; the caller then passes ``hooks_checked=True`` to
+        :meth:`change_state`. For callers that did their own checks and must hear a veto
+        before an earlier write of the same unit (the ITSM linked-articles job writes the
+        article first, R16). :meth:`validate_state_change` is the variant with all checks.
+        """
+        new_state_type = await _state_type_name(self._session, new_state_id)
+        await self._hook_state_change(
+            user_id, ticket_id, new_state_id, new_state_type, pending_time
+        )
+
     async def _hook_state_change(
         self,
         user_id: int,

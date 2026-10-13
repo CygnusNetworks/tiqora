@@ -185,7 +185,12 @@ abgeleiteten Vorfallstatus im Hintergrund neu (Job `core.cmdb_propagation`, sieh
 Hintergrund mit Fortschritt; je Ticket in einer eigenen Transaktion. Voraussetzungen: `rw` auf dem
 Quellticket, die Ziele müssen weiterhin verknüpft sein (sonst 422, ohne die Ids zu nennen). Pro Ziel
 wird nochmals geprüft: ohne Schreibrecht wird übersprungen („keine Schreibberechtigung“), ebenso bei
-fehlender Verknüpfung oder Kundenadresse. Höchstens so viele Tickets, wie die Einstellung erlaubt
+fehlender Verknüpfung oder Kundenadresse. Lehnt eine Erweiterung (Sync-Hook für Artikel oder
+Statuswechsel, siehe [plugins.md](plugins.md)) ein Ziel ab, wird nur dieses Ticket übersprungen („von
+einer Erweiterung abgelehnt“, mit dem Text der Erweiterung); der Statuswechsel wird vor dem Artikel
+geprüft, damit keine Antwort hinausgeht, deren Ticket dann nicht geschrieben wird. Eine abgelehnte
+Notiz bei der Aktualisierung einer Großstörung beantwortet die Schnittstelle mit 422 und dem Text der
+Erweiterung. Höchstens so viele Tickets, wie die Einstellung erlaubt
 (Vorgabe 200). Ein Neustart nach dem Schreiben sendet nichts doppelt: Der Fortschritt je Ziel wird in
 derselben Transaktion wie der Artikel gespeichert (`tiqora_itsm_bulk_target`).
 

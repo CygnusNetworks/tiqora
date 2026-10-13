@@ -74,4 +74,28 @@ describe("LinkedNoteDialog", () => {
     expect(skipped.textContent).toContain("2026070100010");
     expect(skipped.textContent).toMatch(/Schreibberechtigung|write access/);
   });
+
+  it("names a plugin veto with its reason", async () => {
+    linkedArticles.mockResolvedValue({ job_id: 56, status: "queued" });
+    jobGet.mockResolvedValue({
+      id: 56, status: "succeeded", progress_done: 2, progress_total: 2, progress_message: null,
+      cancel_requested: false, error: null, files: [],
+      result: {
+        done: [9],
+        skipped: [{ ticket_id: 10, reason: "vetoed", detail: "Vertragsnummer fehlt" }],
+      },
+    });
+    wrap();
+    fireEvent.change(screen.getByTestId("linked-note-subject"), { target: { value: "Update" } });
+    const editor = screen.getByTestId("linked-note-body");
+    editor.innerHTML = "Text";
+    fireEvent.input(editor);
+    const submit = screen.getByTestId("linked-note-submit") as HTMLButtonElement;
+    await waitFor(() => expect(submit.disabled).toBe(false));
+    fireEvent.click(submit);
+    const skipped = await screen.findByTestId("linked-note-skipped");
+    expect(skipped.textContent).toContain("2026070100010");
+    expect(skipped.textContent).toMatch(/von einer Erweiterung abgelehnt|refused by an extension/);
+    expect(skipped.textContent).toContain("(Vertragsnummer fehlt)");
+  });
 });

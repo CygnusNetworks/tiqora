@@ -68,6 +68,10 @@ def _sync_handler(operation: SyncOperation) -> SyncHandler:
         mode = behaviour.MODE.get(f"hook.{operation}", "ok")
         if mode == "veto":
             raise OperationVetoed("Vertragsnummer fehlt")
+        if mode == "veto_listed":  # only the tickets in behaviour.VETO_TICKETS
+            ticket_id = op.ticket.id if hasattr(op, "ticket") else getattr(op, "ticket_id", None)
+            if ticket_id in behaviour.VETO_TICKETS:
+                raise OperationVetoed(f"Ticket {ticket_id}: Vertragsnummer fehlt")
         if mode == "hang":
             await asyncio.sleep(30)
         if mode == "raise":

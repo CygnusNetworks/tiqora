@@ -1132,7 +1132,11 @@ not go through `TicketWriteService`, the derived writes of the ITSM features
 the plugin channel `ingest`. Agent-side writes through `TicketWriteService`
 (web UI, API, MCP write tools, plugin writes with `as_agent=<id>`, chat end and
 triage accept) are hooked. A bulk job that writes through the service treats
-`OperationVetoed` as a per-ticket skip.
+`OperationVetoed` as a per-ticket skip: the ITSM "note to linked tickets" job
+(also used by major-incident updates and "close incidents with workaround")
+records the target as skipped with reason `vetoed` and the veto text, runs the
+`ticket.state_change` hooks before the article, and goes on with the next
+ticket. A vetoed major-incident update note answers 422 with the veto text.
 
 ### Write services and `as_agent`
 

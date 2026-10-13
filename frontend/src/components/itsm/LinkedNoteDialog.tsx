@@ -12,7 +12,7 @@ import { itsmApi } from "@/lib/itsmApi";
 
 export type LinkedTarget = { id: number; tn: string; title: string };
 
-type SkippedEntry = { ticket_id: number; reason: string };
+type SkippedEntry = { ticket_id: number; reason: string; detail?: string | null };
 
 const inputCls =
   "mt-1 w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink focus:border-accent";
@@ -40,6 +40,8 @@ function JobResult({ result, targets }: { result: Record<string, unknown> | null
               <li key={s.ticket_id}>
                 {name(s.ticket_id)}:{" "}
                 {t(`itsm.linkedNote.reasons.${s.reason}`, { defaultValue: t("itsm.linkedNote.reasons.error") })}
+                {/* a plugin's veto text (German, written for agents) says why */}
+                {s.reason === "vetoed" && s.detail ? ` (${s.detail})` : null}
               </li>
             ))}
           </ul>

@@ -3,7 +3,8 @@
 Used by "note to linked tickets" (``POST /tickets/{id}/linked-articles``), major-incident
 updates and "close incidents with workaround". The job writes through
 :class:`~tiqora.domain.ticket_write_service.TicketWriteService`, so history, events and
-(after the plugin merge) sync hooks come from the write services.
+the plugins' sync before-hooks come from the write services (R16: a veto skips that one
+target with reason ``vetoed`` and the veto text as detail; nothing of it is written or sent).
 
 Per target ticket, in its own transaction: re-check that it is still linked to the source
 and that the acting user holds ``rw`` and ``note`` on its queue, write the article (a reply
@@ -38,7 +39,7 @@ logger = structlog.get_logger(__name__)
 
 LINKED_ARTICLES_KIND = "core.itsm_linked_articles"
 CHECKPOINT = "first_write"
-SkipReason = Literal["no_rw", "not_linked", "no_customer_address", "error"]
+SkipReason = Literal["no_rw", "not_linked", "no_customer_address", "vetoed", "error"]
 DEFAULT_CLOSE_SUBJECT = "Geschlossen mit Workaround"
 
 
@@ -201,6 +202,7 @@ async def _write_one(
         TicketAccessDenied,
         TicketWriteService,
     )
+    from tiqora.plugins.sync_hooks import OperationVetoed
     from tiqora.znuny.sysconfig import SysConfig
 
     ticket = (
@@ -257,11 +259,17 @@ async def _write_one(
         await ctx.checkpoint(CHECKPOINT, session=session)
     writer = TicketWriteService(session, ctx.session_factory, SysConfig(session))
     try:
+        if state_id is not None:
+            # R16 / F1 order: a state veto must come before the article (a reply is sent)
+            await writer.check_state_change_hooks(user_id, ticket_id, state_id)
         await writer.add_article(user_id, ticket_id, article)
         if state_id is not None:
-            await writer.change_state(user_id, ticket_id, state_id)
+            await writer.change_state(user_id, ticket_id, state_id, hooks_checked=True)
     except TicketAccessDenied as exc:
         raise _Skip("no_rw") from exc
+    except OperationVetoed as exc:
+        # R16: a plugin's sync hook refused this ticket; skip it, the job goes on
+        raise _Skip("vetoed", str(exc)) from exc
 
 
 async def run_linked_articles(ctx: JobContext, payload: LinkedArticlesPayload) -> dict[str, Any]:

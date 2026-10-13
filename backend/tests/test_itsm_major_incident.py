@@ -450,3 +450,31 @@ async def test_off_returns_409(request: pytest.FixtureRequest, dialect: str) -> 
         for call in calls:
             got = await call
             assert got.status_code == 409 and got.json()["detail"] == {"code": "itsm_off"}
+
+
+async def test_vetoed_update_note_is_422_and_stores_nothing(
+    w: World, tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R16: the update note goes through TicketWriteService.add_article, so a plugin's
+    ``article.create`` veto refuses it (422 with the German text), not a 500."""
+    from tests._plugin_points import boot_points_plugin, points_behaviour
+    from tiqora.plugins.sync_hooks import SyncBreaker
+
+    await w.link(M, L1)
+    await w.declare(summary="Ausfall")
+    SyncBreaker.reset_for_tests()
+    SyncBreaker.persistence = False
+    boot_points_plugin(tmp_path, monkeypatch)
+    try:
+        points_behaviour().MODE["hook.article.create"] = "veto"
+        got = await w.client.post(
+            w.url(tail="/updates"), json={"mode": "note", "body_html": "<p>Stand</p>"}
+        )
+        assert got.status_code == 422 and got.json()["detail"] == "Vertragsnummer fehlt"
+        assert await w.articles(M) == 0
+        updates = select(func.count()).select_from(TiqoraItsmMajorIncidentUpdate)
+        assert (await w.session.execute(updates)).scalar_one() == 0
+        jobs = select(func.count()).select_from(TiqoraJob)
+        assert (await w.session.execute(jobs)).scalar_one() == 0
+    finally:
+        SyncBreaker.reset_for_tests()

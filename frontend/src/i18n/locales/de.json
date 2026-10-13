@@ -8721,6 +8721,7 @@
         "no_rw": "keine Schreibberechtigung",
         "not_linked": "nicht mehr verknüpft",
         "no_customer_address": "keine Kundenadresse",
+        "vetoed": "von einer Erweiterung abgelehnt",
         "error": "Fehler"
       }
     },

@@ -700,10 +700,16 @@ async def post_close_incidents(
 
 @contextmanager
 def _major_errors() -> Iterator[None]:
+    from tiqora.plugins.sync_hooks import OperationVetoed
+
     try:
         yield
     except MajorIncidentError as exc:
         raise HTTPException(exc.http_status, detail=exc.detail) from exc
+    except OperationVetoed as exc:
+        # a plugin's sync hook refused the update note (German text for the agent); nothing
+        # is stored, as on the ticket routes
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
 
 def _major_out(view: MajorIncidentView) -> MajorIncidentOut:

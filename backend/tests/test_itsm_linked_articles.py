@@ -10,7 +10,7 @@ configured, so the reply is stored, not sent.
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Any
@@ -421,3 +421,81 @@ async def test_result_lists_done_and_skipped(w: World) -> None:
     result = await result_from_table(w.session, job_id)
     assert sorted(result.done) == [T_C, T_D]
     assert [s["ticket_id"] for s in result.skipped] == [T_B]
+
+
+# --- R16: plugin sync hooks (vetoes) in the bulk job ------------------------------------------
+
+
+@pytest.fixture
+def hooks(w: World, tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
+    """The points fixture plugin with one sync before-hook per operation (``MODE`` switches)."""
+    from tests._plugin_points import boot_points_plugin, points_behaviour
+    from tiqora.plugins.sync_hooks import SyncBreaker
+
+    _ = w
+    SyncBreaker.reset_for_tests()
+    SyncBreaker.persistence = False
+    boot_points_plugin(tmp_path, monkeypatch)
+    yield points_behaviour()
+    SyncBreaker.reset_for_tests()
+
+
+def _hook_tickets(behaviour: Any, operation: str) -> list[int]:
+    out: list[int] = []
+    for name, op in behaviour.CALLS:
+        if name == f"hook.{operation}":
+            out.append(int(op.ticket.id if hasattr(op, "ticket") else op.ticket_id))
+    return out
+
+
+async def test_vetoed_target_is_skipped_with_reason_vetoed(w: World, hooks: Any) -> None:
+    """R16: a veto is a per-ticket skip (reason ``vetoed``, the veto text as detail); the job
+    goes on with the next target."""
+    hooks.MODE["hook.article.create"] = "veto_listed"
+    hooks.VETO_TICKETS.add(T_C)
+    job_id, payload = await w.start_job()
+    before = await w.history(T_C)
+    out = await run_linked_articles(w.ctx(job_id), payload)
+    assert out["done"] == [T_D]
+    assert out["skipped"] == [
+        {"ticket_id": T_C, "reason": "vetoed", "detail": f"Ticket {T_C}: Vertragsnummer fehlt"}
+    ]
+    assert await w.articles(T_C) == [] and await w.history(T_C) == before
+    assert len(await w.articles(T_D)) == 1
+    assert _hook_tickets(hooks, "article.create") == [T_C, T_D]
+    rows = (
+        await w.session.execute(
+            select(TiqoraItsmBulkTarget).where(TiqoraItsmBulkTarget.job_id == job_id)
+        )
+    ).scalars()
+    assert {r.ticket_id: (r.status, r.reason) for r in rows} == {
+        T_C: ("skipped", "vetoed"),
+        T_D: ("done", None),
+    }
+
+
+async def test_state_veto_comes_before_the_reply_is_sent(
+    w: World, hooks: Any, mail_spy: list[int]
+) -> None:
+    """Reply + state: the state hook runs first, so a vetoed state change sends no e-mail."""
+    hooks.MODE["hook.ticket.state_change"] = "veto_listed"
+    hooks.VETO_TICKETS.add(T_D)
+    job_id, payload = await w.start_job(w.body(mode="reply", target_ticket_ids=[T_D]))
+    payload = payload.model_copy(update={"set_state_name": "closed successful"})
+    state_before = await w.state_of(T_D)
+    out = await run_linked_articles(w.ctx(job_id), payload)
+    assert out["done"] == [] and out["skipped"][0]["reason"] == "vetoed"
+    assert mail_spy == [] and await w.articles(T_D) == []
+    assert await w.state_of(T_D) == state_before
+    assert _hook_tickets(hooks, "article.create") == []  # refused before the article
+
+
+async def test_state_hook_fires_once_per_target(w: World, hooks: Any) -> None:
+    """The pre-flight replaces change_state's own hook call (hooks_checked), no double call."""
+    job_id, payload = await w.start_job(w.body(target_ticket_ids=[T_C]))
+    payload = payload.model_copy(update={"set_state_name": "closed successful"})
+    out = await run_linked_articles(w.ctx(job_id), payload)
+    assert out["done"] == [T_C]
+    assert await w.state_of(T_C) == "closed successful"
+    assert _hook_tickets(hooks, "ticket.state_change") == [T_C]
+    assert _hook_tickets(hooks, "article.create") == [T_C]
