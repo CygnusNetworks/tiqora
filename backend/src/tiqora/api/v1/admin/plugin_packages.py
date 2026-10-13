@@ -25,8 +25,9 @@ from tiqora.config import Settings
 from tiqora.db.tiqora.models import TiqoraRestart
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.domain.schemas import UtcDateTime
-from tiqora.jobs.service import utc_now
-from tiqora.plugins import packages_store
+from tiqora.jobs.schemas import JobAccepted
+from tiqora.jobs.service import enqueue_job, find_active_job, utc_now
+from tiqora.plugins import install_jobs, packages_store
 from tiqora.plugins.inspect import (
     InstalledPlugin,
     PackageReport,
@@ -116,12 +117,9 @@ def _package_out(
 
 def _runtime_problem(settings: Settings) -> str | None:
     """German reason why nothing can be installed here, or None."""
-    from tiqora.plugins.runtime import plugins_dir_status
+    from tiqora.plugins.runtime import runtime_dir_problem
 
-    status_ = plugins_dir_status(settings)
-    if not status_.usable or not status_.writable:
-        return status_.reason or "Installation zur Laufzeit ist nicht möglich"
-    return None
+    return runtime_dir_problem(settings)
 
 
 # F4: one inspection at a time per process, off the event loop.
@@ -265,6 +263,69 @@ async def delete_package(sha256: str, admin: AdminUser, session: DbSession) -> R
         )
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class PluginInstallIn(BaseModel):
+    enable: bool = True
+    restart: bool = True
+
+
+ACTIVE_JOB_MESSAGE: Final = (
+    "Für diese Erweiterung läuft bereits eine Installation oder Deinstallation"
+)
+
+
+async def active_plugin_job(session: AsyncSession, plugin_id: str) -> bool:
+    """F21: an install or an uninstall of ``plugin_id`` is queued or running."""
+    key = install_jobs.dedupe_key(plugin_id)
+    for kind in (install_jobs.PLUGIN_INSTALL_KIND, install_jobs.PLUGIN_UNINSTALL_KIND):
+        if await find_active_job(session, kind=kind, dedupe_key=key) is not None:
+            return True
+    return False
+
+
+@router.post(
+    "/packages/{sha256}/install",
+    response_model=JobAccepted,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def install_package(
+    sha256: str, body: PluginInstallIn, admin: WebAdmin, session: DbSession, settings: AppSettings
+) -> JobAccepted:
+    """Queue the installation; the UI polls ``GET /jobs/{id}``."""
+    row = await packages_store.get_package(session, sha256)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Paket nicht gefunden")
+    data = await packages_store.get_package_data(session, sha256)
+    if data is None:  # pragma: no cover - deferred column of an existing row
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Paket nicht gefunden")
+    problem = _runtime_problem(settings)
+    if problem is not None:
+        await session.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, problem)
+    ring, names, installed, images, owners = await _context(session, settings)
+    try:
+        report, _manifest = await _evaluate(data, settings, ring, installed, images, owners)
+    except PackageError as exc:
+        raise HTTPException(422, str(exc)) from None
+    report = with_repository_signer(report, ring, names)
+    if not report.installable:
+        raise HTTPException(status.HTTP_409_CONFLICT, "; ".join(report.problems))
+    if await active_plugin_job(session, report.plugin_id):
+        await session.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, ACTIVE_JOB_MESSAGE)
+    job = await enqueue_job(
+        session,
+        kind=install_jobs.PLUGIN_INSTALL_KIND,
+        payload=install_jobs.PluginInstallPayload(
+            package_sha256=sha256, enable=body.enable, restart=body.restart
+        ),
+        created_by=admin.id,
+        dedupe_key=install_jobs.dedupe_key(report.plugin_id),
+    )
+    await session.commit()
+    log.info("plugin_install_queued", plugin=report.plugin_id, version=report.version, job=job.id)
+    return JobAccepted(job_id=job.id, status="running" if job.status == "running" else "queued")
 
 
 class RestartIn(BaseModel):

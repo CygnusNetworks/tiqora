@@ -91,6 +91,14 @@ def plugins_dir_status(settings: Settings) -> DirStatus:
     return status
 
 
+def runtime_dir_problem(settings: Settings) -> str | None:
+    """German reason why nothing can be installed in this process, or ``None``."""
+    status = plugins_dir_status(settings)
+    if not status.usable or not status.writable:
+        return status.reason or "Installation zur Laufzeit ist nicht möglich"
+    return None
+
+
 def _safe(part: str, what: str) -> str:
     if not _SAFE_PART.match(part) or ".." in part:
         raise PackageError(f"Unzulässiger Wert für {what}")

@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from importlib.metadata import Distribution, EntryPoint, distributions, entry_points
 from pathlib import Path
@@ -178,8 +178,16 @@ def core_constraints(dists: Iterable[Distribution] | None = None) -> list[str]:
     return [f"{name}=={seen[name]}" for name in sorted(seen)]
 
 
-def _plugin_entry_point(plugin_id: str, value: str) -> EntryPoint | None:
-    for ep in entry_points(group=ENTRY_POINT_GROUP, name=plugin_id):
+def _plugin_entry_point(
+    plugin_id: str, value: str, candidates: Iterable[EntryPoint] | None = None
+) -> EntryPoint | None:
+    """The entry point of ``plugin_id``; ``candidates`` replaces the process-wide lookup."""
+    found = (
+        entry_points(group=ENTRY_POINT_GROUP, name=plugin_id)
+        if candidates is None
+        else [ep for ep in candidates if ep.name == plugin_id]
+    )
+    for ep in found:
         if ep.value == value:
             return ep
     return None
@@ -202,14 +210,37 @@ async def verify_installed_plugins(
     import_check: bool,
     strict: bool,
     timeout: float,  # noqa: ASYNC109  (mirrors run_in_daemon_thread)
+    extra_paths: Sequence[Path] = (),
+    only: str | None = None,
 ) -> list[str]:
-    """One German line per problem, prefixed with the plugin id; empty when all is well."""
+    """One German line per problem, prefixed with the plugin id; empty when all is well.
+
+    ``extra_paths`` (site directories of unpacked packages) replaces the process-wide entry
+    point lookup: only the distributions in those directories are checked (the caller puts
+    them on ``sys.path`` when ``import_check`` is set). ``only`` restricts the check to one
+    plugin id; an id that is not there is a problem of its own.
+    """
     from tiqora.plugins.compat import check_compat, release_core_version
     from tiqora.plugins.loader import run_in_daemon_thread
 
     problems: list[str] = []
     core = release_core_version()
-    for plugin in discover_plugins():
+    candidates: list[EntryPoint] | None = None
+    if extra_paths:
+        candidates = [
+            ep
+            for dist in distributions(path=[str(p) for p in extra_paths])
+            for ep in dist.entry_points
+            if ep.group == ENTRY_POINT_GROUP
+        ]
+        found = discover_plugins(entry_points_=candidates)
+    else:
+        found = discover_plugins()
+    if only is not None:
+        found = [d for d in found if d.plugin_id == only]
+        if not found:
+            return [f"Erweiterung {only} nicht im Paket gefunden"]
+    for plugin in found:
         pid = plugin.plugin_id
         if plugin.problem is not None:
             problems.append(f"{pid}: {plugin.problem}")
@@ -225,7 +256,7 @@ async def verify_installed_plugins(
             )
             if needs_i18n and "en" not in plugin.locales:
                 problems.append(f"{pid}: i18n/en.json fehlt")
-        ep = _plugin_entry_point(pid, plugin.entry)
+        ep = _plugin_entry_point(pid, plugin.entry, candidates)
         if ep is None:
             problems.append(f"{pid}: Einstiegspunkt nicht gefunden")
             continue

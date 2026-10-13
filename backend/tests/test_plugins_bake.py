@@ -216,6 +216,85 @@ def test_cli_verify_exit_code(fixture_plugins) -> None:  # type: ignore[no-untyp
     assert exc.value.code == 1
 
 
+def _site(tmp_path: Path, **wheel_kw) -> Path:  # type: ignore[no-untyped-def]
+    """A freshly unpacked package, as the install job hands it to ``verify --path``."""
+    from tests.plugins.package_builder import build_wheel
+    from tiqora.plugins.package import unpack_wheel
+
+    wheel = build_wheel(tmp_path, "tq_fixture_tables", plugin_id="org.example.tables", **wheel_kw)
+    site = tmp_path / "site"
+    unpack_wheel(wheel.read_bytes(), site)
+    return site
+
+
+@pytest.fixture
+def clean_imports(monkeypatch: pytest.MonkeyPatch):  # type: ignore[no-untyped-def]
+    """``verify --path`` puts the site on sys.path and imports the plugin in this process."""
+    from tiqora.plugins.discovery import clear_discovery_cache
+
+    def purge() -> None:
+        for name in [m for m in sys.modules if m.startswith("tq_fixture_tables")]:
+            del sys.modules[name]
+        clear_discovery_cache()
+
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    purge()
+    yield
+    purge()
+
+
+def _verify(*args: str) -> int:
+    with pytest.raises(SystemExit) as exc:
+        main(["plugins", "verify", *args])
+    return int(exc.value.code or 0)
+
+
+def test_cli_verify_path_only(tmp_path: Path, clean_imports, capsys) -> None:  # type: ignore[no-untyped-def]
+    site = _site(tmp_path)
+    code = _verify("--import", "--strict", "--path", str(site), "--only", "org.example.tables")
+    assert code == 0 and capsys.readouterr().err == ""
+    # the new site came first on sys.path of this (child) process
+    assert sys.path[0] == str(site.resolve())
+
+
+def test_cli_verify_path_reports_a_broken_plugin(  # type: ignore[no-untyped-def]
+    tmp_path: Path, clean_imports, capsys
+) -> None:
+    site = _site(
+        tmp_path, extra_members={"tq_fixture_tables/__init__.py": b"raise RuntimeError('kaputt')\n"}
+    )
+    code = _verify("--import", "--strict", "--path", str(site), "--only", "org.example.tables")
+    err = capsys.readouterr().err
+    assert code == 1
+    assert err.startswith("org.example.tables: Import fehlgeschlagen") and "kaputt" in err
+
+
+def test_cli_verify_only_unknown_id(tmp_path: Path, clean_imports, capsys) -> None:  # type: ignore[no-untyped-def]
+    site = _site(tmp_path)
+    code = _verify("--path", str(site), "--only", "org.example.other")
+    assert code == 1
+    assert (
+        capsys.readouterr().err.strip() == "Erweiterung org.example.other nicht im Paket gefunden"
+    )
+
+
+async def test_verify_extra_paths_ignore_the_installed_plugins(  # type: ignore[no-untyped-def]
+    fixture_plugins, tmp_path: Path, clean_imports
+) -> None:
+    fixture_plugins()  # org.example.hello is "installed" and healthy
+    broken = _site(
+        tmp_path, extra_members={"tq_fixture_tables/migrations/0001_init.py": b"x = 1\n"}
+    )
+    problems = await verify_installed_plugins(
+        import_check=False, strict=False, timeout=5, extra_paths=[broken]
+    )
+    # only the unpacked package is looked at; the installed hello plugin plays no part
+    assert problems == []
+    assert await verify_installed_plugins(
+        import_check=False, strict=False, timeout=5, extra_paths=[broken], only="org.example.hello"
+    ) == ["Erweiterung org.example.hello nicht im Paket gefunden"]
+
+
 def test_cli_bake_error_exit_code(tmp_path: Path, capsys) -> None:  # type: ignore[no-untyped-def]
     txt = _txt(tmp_path, "crm @ git+https://git.example.org/crm.git\n")
     with pytest.raises(SystemExit) as exc:

@@ -4047,6 +4047,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/plugins/packages/{sha256}/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Install Package
+         * @description Queue the installation; the UI polls ``GET /jobs/{id}``.
+         */
+        post: operations["install_package_api_v1_admin_plugins_packages__sha256__install_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/plugins/restart": {
         parameters: {
             query?: never;
@@ -19750,6 +19770,19 @@ export interface components {
             total_failures: number;
             /** Tripped */
             tripped: boolean;
+        };
+        /** PluginInstallIn */
+        PluginInstallIn: {
+            /**
+             * Enable
+             * @default true
+             */
+            enable: boolean;
+            /**
+             * Restart
+             * @default true
+             */
+            restart: boolean;
         };
         /** PluginPackageOut */
         PluginPackageOut: {
@@ -35677,6 +35710,45 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    install_package_api_v1_admin_plugins_packages__sha256__install_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                sha256: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginInstallIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
             };
             /** @description Validation Error */
             422: {

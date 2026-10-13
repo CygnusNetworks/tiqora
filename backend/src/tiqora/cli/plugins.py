@@ -33,6 +33,13 @@ def add_plugins_subparser(sub: argparse._SubParsersAction) -> None:  # type: ign
         "--strict", action="store_true", help="fail when a plugin requires tiqora/tiqora-sdk"
     )
     verify_p.add_argument("--timeout", type=float, default=DEFAULT_IMPORT_TIMEOUT)
+    verify_p.add_argument(
+        "--path",
+        type=Path,
+        default=None,
+        help="site directory of a freshly unpacked package (no activation of installed ones)",
+    )
+    verify_p.add_argument("--only", default=None, help="check this plugin id only")
     verify_p.set_defaults(func=_cmd_verify)
 
     constraints_p = plugins_sub.add_parser(
@@ -154,9 +161,22 @@ async def _cmd_list(args: argparse.Namespace) -> int:
 
 
 async def _cmd_verify(args: argparse.Namespace) -> int:
-    await _activate_installed()
+    extra: list[Path] = []
+    if args.path is not None:
+        # no activation: the installed version must not be on sys.path next to the new one;
+        # the new site comes first so that it is the code that gets imported (this process is
+        # a short-lived child)
+        site = args.path.resolve()
+        extra.append(site)
+        sys.path.insert(0, str(site))
+    else:
+        await _activate_installed()
     problems = await verify_installed_plugins(
-        import_check=args.import_check, strict=args.strict, timeout=args.timeout
+        import_check=args.import_check,
+        strict=args.strict,
+        timeout=args.timeout,
+        extra_paths=extra,
+        only=args.only,
     )
     for line in problems:
         print(line, file=sys.stderr)  # noqa: T201 — CLI output
@@ -364,7 +384,9 @@ async def _cmd_migrate(args: argparse.Namespace) -> int:
     if error is not None:
         _err(error)
         return 1
-    print(f"Erweiterung {plugin.plugin_id}: Datenbank aktuell ({version})")  # noqa: T201
+    # the install job reads the head from this line (the plugin's row may not exist yet)
+    stand = f", Stand {head}" if head else ""
+    print(f"Erweiterung {plugin.plugin_id}: Datenbank aktuell ({version}){stand}")  # noqa: T201
     return 0
 
 

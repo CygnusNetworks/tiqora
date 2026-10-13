@@ -55,7 +55,11 @@ MAIL_LANE = "mail"
 # Slots per lane other than "default" (which uses jobs.max_concurrency); unlisted lanes get 1.
 # "gi": GenericInterface invokers (2 slots); "gi_sync": invokers with Asynchronous: 0, one slot
 # so they run strictly in id order (the GI job handlers in tiqora.gi.jobs).
-LANE_SLOTS: Mapping[str, int] = MappingProxyType({MAIL_LANE: 1, "gi": 2, "gi_sync": 1})
+# "plugins": install, uninstall, fetch and repository refresh of plugin packages - strictly one
+# plugin operation at a time (tiqora.plugins.install_jobs).
+LANE_SLOTS: Mapping[str, int] = MappingProxyType(
+    {MAIL_LANE: 1, "gi": 2, "gi_sync": 1, "plugins": 1}
+)
 
 
 def lane_slots(lane: str, default_slots: int) -> int:

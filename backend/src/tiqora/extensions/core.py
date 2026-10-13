@@ -31,6 +31,7 @@ def register_core(registry: Registry) -> None:
     from tiqora.jobs.handlers.gi_mail import GI_MAIL_JOB
     from tiqora.jobs.handlers.ticket_export import TICKET_EXPORT_JOB
     from tiqora.jobs.registry import JOB_HANDLERS
+    from tiqora.plugins.install_jobs import PLUGIN_INSTALL_JOB
     from tiqora.reporting.backfill import REPORT_BACKFILL_JOB
     from tiqora.reporting.delivery import REPORT_DELIVERY_JOB
     from tiqora.reporting.jobs import REPORT_EXPORT_JOB, REPORT_RUN_JOB
@@ -43,6 +44,7 @@ def register_core(registry: Registry) -> None:
     registry.add(JOB_HANDLERS, REPORT_RUN_JOB)
     registry.add(JOB_HANDLERS, REPORT_EXPORT_JOB)
     registry.add(JOB_HANDLERS, REPORT_DELIVERY_JOB)
+    registry.add(JOB_HANDLERS, PLUGIN_INSTALL_JOB)
 
     from tiqora.reporting.semantic import REPORT_SOURCES
     from tiqora.reporting.sources import core_report_sources
