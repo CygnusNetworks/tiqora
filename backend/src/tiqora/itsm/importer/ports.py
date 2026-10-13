@@ -135,6 +135,20 @@ class CiView:
     changed_at: datetime
     #: (attachment id, filename, content type, size in bytes)
     attachments: list[tuple[int, str, str, int]]
+    # --- fields of the GI ``ConfigItemGet`` answer (Task 21); defaults keep older callers valid
+    #: the version's author (Znuny ``CreateBy``); None: not known, the CI's last change is used
+    changed_by: int | None = None
+    definition_id: int | None = None
+    #: general-catalog ``Functionality`` of the version's states (``DeplStateType`` etc.)
+    deployment_functionality: str | None = None
+    incident_functionality: str | None = None
+    #: the CI's *current* states (``CurDeplState`` ...); None: same as the version's
+    cur_deployment_state: str | None = None
+    cur_deployment_functionality: str | None = None
+    cur_incident_state: str | None = None
+    cur_incident_functionality: str | None = None
+    #: id of the CI's last version (``LastVersionID``); None: same as ``version_id``
+    last_version_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

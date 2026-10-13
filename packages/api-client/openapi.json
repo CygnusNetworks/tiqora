@@ -116982,6 +116982,177 @@
         ]
       }
     },
+    "/znuny-compat/ConfigItem": {
+      "post": {
+        "operationId": "canonical_config_item_create_znuny_compat_ConfigItem_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Canonical Config Item Create",
+        "tags": [
+          "znuny-compat"
+        ]
+      }
+    },
+    "/znuny-compat/ConfigItem/{config_item_id}": {
+      "delete": {
+        "operationId": "canonical_config_item_delete_znuny_compat_ConfigItem__config_item_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_item_id",
+            "required": true,
+            "schema": {
+              "title": "Config Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Canonical Config Item Delete",
+        "tags": [
+          "znuny-compat"
+        ]
+      },
+      "get": {
+        "operationId": "canonical_config_item_get_znuny_compat_ConfigItem__config_item_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_item_id",
+            "required": true,
+            "schema": {
+              "title": "Config Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Canonical Config Item Get",
+        "tags": [
+          "znuny-compat"
+        ]
+      },
+      "patch": {
+        "operationId": "canonical_config_item_update_znuny_compat_ConfigItem__config_item_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "config_item_id",
+            "required": true,
+            "schema": {
+              "title": "Config Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Canonical Config Item Update",
+        "tags": [
+          "znuny-compat"
+        ]
+      }
+    },
+    "/znuny-compat/ConfigItemSearch": {
+      "get": {
+        "operationId": "canonical_config_item_search_znuny_compat_ConfigItemSearch_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Canonical Config Item Search",
+        "tags": [
+          "znuny-compat"
+        ]
+      },
+      "post": {
+        "operationId": "canonical_config_item_search_post_znuny_compat_ConfigItemSearch_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Canonical Config Item Search Post",
+        "tags": [
+          "znuny-compat"
+        ]
+      }
+    },
     "/znuny-compat/OutOfOffice": {
       "post": {
         "operationId": "canonical_out_of_office_znuny_compat_OutOfOffice_post",

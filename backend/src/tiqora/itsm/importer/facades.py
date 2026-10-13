@@ -111,15 +111,20 @@ from tiqora.itsm.znuny_adapter.reader import (
     ZnunyItsmReader,
     reader_for_info,
 )
+from tiqora.itsm.znuny_format.definition import definition_format, parse_definition_with_issues
+from tiqora.itsm.znuny_format.xmldata import xmldata_to_attributes
 
 #: author recorded when Znuny stored no creator (the root agent)
 _ROOT_USER = 1
 _SEARCH_PAGE = 200
 
-#: the only two test hooks (Task 12): a replacement source for the pipeline, and the answer of
-#: ``ItsmModeFacade.znuny_itsm_present``; production code never sets them
+#: the only test hooks (Task 12): a replacement source for the pipeline, and the answer of
+#: ``ItsmModeFacade.znuny_itsm_present``; Task 21 adds ``mode_a_override``; production code never
+#: sets them
 source_override: ImportSource | None = None
 znuny_present_override: bool | None = None
+#: Task 21 (GI in Mode A): a replacement :class:`ModeAReader`; tests only
+mode_a_override: ModeAReader | None = None
 
 
 def _author(value: int | None) -> int:
@@ -512,6 +517,8 @@ class CmdbServiceReader:
                 name, attributes = rec.name, rec.attributes
                 dep_id, inc_id = rec.deployment_state_id, rec.incident_state_id
                 vid = rec.current_version_id
+                cur_inc_id = rec.cur_incident_state_id
+                changed_by: int | None = rec.changed_by
                 if definition_id is None:
                     def_version, attrs = 0, []
                 else:
@@ -522,9 +529,10 @@ class CmdbServiceReader:
                 name, attributes = v.name, v.attributes
                 dep_id, inc_id = v.deployment_state_id, v.incident_state_id
                 vid, def_version, attrs = v.id, v.definition_version, v.definition_attrs
+                definition_id, cur_inc_id, changed_by = v.definition_id, inc_id, v.created_by
         except CmdbNotFound:
             return None
-        names = await self._catalog_names({dep_id, inc_id})
+        info = await self._catalog_info({dep_id, inc_id, cur_inc_id})
         attachments = (
             await self._s.execute(
                 select(
@@ -544,9 +552,9 @@ class CmdbServiceReader:
             class_id=rec.class_id,
             class_key=cls.class_key,
             class_name=cls.name,
-            deployment_state=names.get(dep_id, ""),
+            deployment_state=info.get(dep_id, ("", None))[0],
             deployment_state_id=dep_id,
-            incident_state=names.get(inc_id, ""),
+            incident_state=info.get(inc_id, ("", None))[0],
             incident_state_id=inc_id,
             version_id=vid,
             definition_version=def_version,
@@ -556,15 +564,25 @@ class CmdbServiceReader:
             created_by=rec.created_by,
             changed_at=rec.changed_at,
             attachments=[(int(a), str(f), str(c), int(s)) for a, f, c, s in attachments],
+            changed_by=changed_by,
+            definition_id=definition_id,
+            deployment_functionality=info.get(dep_id, ("", None))[1],
+            incident_functionality=info.get(inc_id, ("", None))[1],
+            cur_deployment_state=info.get(dep_id, ("", None))[0],
+            cur_deployment_functionality=info.get(dep_id, ("", None))[1],
+            cur_incident_state=info.get(cur_inc_id, ("", None))[0],
+            cur_incident_functionality=info.get(cur_inc_id, ("", None))[1],
+            last_version_id=rec.current_version_id,
         )
 
-    async def _catalog_names(self, ids: set[int]) -> dict[int, str]:
+    async def _catalog_info(self, ids: set[int]) -> dict[int, tuple[str, str | None]]:
+        """Catalog id -> (name, functionality)."""
         rows = await self._s.execute(
-            select(TiqoraCmdbCatalog.id, TiqoraCmdbCatalog.name).where(
-                TiqoraCmdbCatalog.id.in_(sorted(ids))
-            )
+            select(
+                TiqoraCmdbCatalog.id, TiqoraCmdbCatalog.name, TiqoraCmdbCatalog.functionality
+            ).where(TiqoraCmdbCatalog.id.in_(sorted(ids)))
         )
-        return {int(i): str(n) for i, n in rows.all()}
+        return {int(i): (str(n), f) for i, n, f in rows.all()}
 
     async def ci_id_by_number(self, number: str) -> int | None:
         found = (
@@ -779,6 +797,137 @@ async def import_service_meta(session: AsyncSession, row: ServiceItsmRow, *, use
         else current.min_minutes_between_incidents,
     )
     await save_service_meta(session, row.service_id, data, user_id=user_id, import_mode=True)
+
+
+# --- GI reads (Task 21) -----------------------------------------------------------------------
+
+
+async def cmdb_attachment_contents(
+    session: AsyncSession, ci_id: int, attachment_ids: Sequence[int]
+) -> list[tuple[str, str, bytes]]:
+    """(filename, content type, bytes) of the given attachments of a Tiqora CI, in the order
+    given. Used by GI ``ConfigItemGet`` after the caller proved class permission."""
+    if not attachment_ids:
+        return []
+    rows = (
+        await session.execute(
+            select(
+                TiqoraCmdbAttachment.id,
+                TiqoraCmdbAttachment.filename,
+                TiqoraCmdbAttachment.content_type,
+                TiqoraCmdbAttachment.content,
+            ).where(
+                TiqoraCmdbAttachment.ci_id == ci_id,
+                TiqoraCmdbAttachment.id.in_(list(attachment_ids)),
+            )
+        )
+    ).all()
+    by_id = {int(i): (str(f), str(c), bytes(b)) for i, f, c, b in rows}
+    return [by_id[i] for i in attachment_ids if i in by_id]
+
+
+class _IdentityResolver:
+    """Mode A keeps Znuny ids: catalog and CI references stay what Znuny stored."""
+
+    def ci(self, znuny_ci_id: str) -> int | None:
+        return int(znuny_ci_id) if znuny_ci_id.isdigit() else None
+
+    def catalog(self, znuny_gc_id: str) -> int | None:
+        return int(znuny_gc_id) if znuny_gc_id.isdigit() else None
+
+
+class ModeAReader:
+    """Znuny's own CMDB as a :class:`CiView` (GI ``ConfigItemGet`` in Mode A).
+
+    The class-group permission is Znuny's ``ItemClassGroupCheck``: the user holds ``ro`` (``rw``
+    counts) on the group in the class's ``Permission`` preference. Ids in the view (catalog,
+    referenced CIs) are Znuny ids. Attachment bytes come from ``virtual_fs``.
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._s = session
+        self._source: ImportSource = (
+            source_override if source_override is not None else ZnunyAdapterSource(session)
+        )
+
+    async def get_ci(self, znuny_id: int, *, user_id: int) -> CiView | None:
+        """``None`` for an unknown CI, a class without ``ro`` for ``user_id`` or no version."""
+        source = self._source
+        cis = await source.cis([znuny_id])
+        if not cis:
+            return None
+        ci = cis[0]
+        catalog = {c.id: c for c in await source.catalog_items()}
+        cls = catalog.get(ci.class_id)
+        if cls is None or cls.permission_group is None:
+            return None
+        from tiqora.permissions.engine import PermissionEngine
+
+        if cls.permission_group not in await PermissionEngine(self._s).groups_for_permission(
+            user_id, "ro"
+        ):
+            return None
+        versions = (await source.versions([znuny_id])).get(znuny_id) or []
+        if not versions:
+            return None
+        current = next((v for v in versions if v.id == ci.last_version_id), versions[-1])
+        definition = next(
+            (d for d in await source.class_definitions() if d.id == current.definition_id), None
+        )
+        if definition is None:
+            return None
+        parsed = parse_definition_with_issues(definition.raw, definition_format(definition.raw))
+        schema = _schema(parsed.result.attributes)
+        attributes, _issues = xmldata_to_attributes(current.xml_data, schema, _IdentityResolver())
+
+        def state(state_id: int | None) -> tuple[str, str | None]:
+            item = catalog.get(state_id or 0)
+            return (item.name, item.functionality) if item is not None else ("", None)
+
+        dep, inc = state(current.deployment_state_id), state(current.incident_state_id)
+        cur_dep, cur_inc = state(ci.deployment_state_id), state(ci.incident_state_id)
+        attachments = await source.attachments([znuny_id], with_data=False)
+        return CiView(
+            id=ci.id,
+            number=ci.number,
+            name=current.name,
+            class_id=ci.class_id,
+            class_key=str(ci.class_id),
+            class_name=cls.name,
+            deployment_state=dep[0],
+            deployment_state_id=current.deployment_state_id or 0,
+            incident_state=inc[0],
+            incident_state_id=current.incident_state_id or 0,
+            version_id=current.id,
+            definition_version=definition.version,
+            attributes=attributes,
+            schema=schema,
+            created_at=ci.created_at,
+            created_by=ci.created_by,
+            changed_at=current.created_at,
+            attachments=[(0, a.filename, a.content_type, a.size) for a in attachments],
+            changed_by=current.created_by,
+            definition_id=current.definition_id,
+            deployment_functionality=dep[1],
+            incident_functionality=inc[1],
+            cur_deployment_state=cur_dep[0],
+            cur_deployment_functionality=cur_dep[1],
+            cur_incident_state=cur_inc[0],
+            cur_incident_functionality=cur_inc[1],
+            last_version_id=ci.last_version_id,
+        )
+
+    async def attachment_contents(self, znuny_id: int) -> list[tuple[str, str, bytes]]:
+        found = await self._source.attachments([znuny_id], with_data=True)
+        return [(a.filename, a.content_type, a.data or b"") for a in found]
+
+    async def catalog_names(self) -> dict[int, str]:
+        """Znuny general-catalog id -> name (``GeneralCatalog`` attribute values)."""
+        return {c.id: c.name for c in await self._source.catalog_items()}
+
+
+def get_mode_a_reader(session: AsyncSession) -> ModeAReader:
+    return mode_a_override if mode_a_override is not None else ModeAReader(session)
 
 
 def get_ports(session: AsyncSession) -> Ports:

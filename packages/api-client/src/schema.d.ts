@@ -12916,6 +12916,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/znuny-compat/ConfigItem": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Canonical Config Item Create */
+        post: operations["canonical_config_item_create_znuny_compat_ConfigItem_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/znuny-compat/ConfigItem/{config_item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Canonical Config Item Get */
+        get: operations["canonical_config_item_get_znuny_compat_ConfigItem__config_item_id__get"];
+        put?: never;
+        post?: never;
+        /** Canonical Config Item Delete */
+        delete: operations["canonical_config_item_delete_znuny_compat_ConfigItem__config_item_id__delete"];
+        options?: never;
+        head?: never;
+        /** Canonical Config Item Update */
+        patch: operations["canonical_config_item_update_znuny_compat_ConfigItem__config_item_id__patch"];
+        trace?: never;
+    };
+    "/znuny-compat/ConfigItemSearch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Canonical Config Item Search */
+        get: operations["canonical_config_item_search_znuny_compat_ConfigItemSearch_get"];
+        put?: never;
+        /** Canonical Config Item Search Post */
+        post: operations["canonical_config_item_search_post_znuny_compat_ConfigItemSearch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/znuny-compat/OutOfOffice": {
         parameters: {
             query?: never;
@@ -60517,6 +60571,159 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    canonical_config_item_create_znuny_compat_ConfigItem_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    canonical_config_item_get_znuny_compat_ConfigItem__config_item_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                config_item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    canonical_config_item_delete_znuny_compat_ConfigItem__config_item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                config_item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    canonical_config_item_update_znuny_compat_ConfigItem__config_item_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                config_item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    canonical_config_item_search_znuny_compat_ConfigItemSearch_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    canonical_config_item_search_post_znuny_compat_ConfigItemSearch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

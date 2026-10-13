@@ -355,8 +355,9 @@ async def test_soap_unsupported_operation_returns_fault_501(mariadb_znuny_url: s
     client, engine = await _client_for(mariadb_znuny_url)
 
     async with client:
-        # Custom OPM-only operation name — not in the supported core set.
-        body = _soap_body("ConfigItemCreate", "<Name>x</Name>")
+        # Custom OPM-only operation name (FAQ package) — not in the supported set.
+        # (ConfigItemCreate used to be the example; ConfigItem* is supported since Task 21.)
+        body = _soap_body("FAQGet", "<ItemID>1</ItemID>")
         resp = await client.post(
             "/znuny-compat/soap/GenericTicketConnectorSOAP",
             content=body,
