@@ -13,6 +13,8 @@ import {
 } from "../../src/demo/savedMock";
 import { createDemoSchedules, demoZnunyApply, resolveSchedules, type DemoSchedules } from "../../src/demo/schedulesMock";
 import { filterDebugEntries, resolveGiData } from "../../src/demo/giMock";
+import { resolveItsmData } from "../../src/demo/itsmMock";
+import { DEMO_ITSM_MODE_KEY, type DemoItsmMode } from "../../src/demo/itsmMode";
 import type { ProcessDialogFormData, TicketProcessState } from "../../src/lib/processApi";
 import type { ReportItem, SavedReportIn, SavedReportUpdateIn } from "../../src/lib/reportsApi";
 import type {
@@ -1164,6 +1166,17 @@ export async function mockApi(page: Page) {
       const gi = resolveGiData(path, method);
       if (gi !== undefined) {
         await json(route, method === "POST" ? 202 : 200, gi);
+        return;
+      }
+    }
+
+    // ITSM core (Mode A demo data; the mode comes from the page's localStorage, default "tiqora")
+    if (method === "GET" && /\/api\/v1\/(itsm\/|tickets\/\d+\/(cis|itsm|link-graph|problem|major-incident)$)/.test(path)) {
+      const stored = await page.evaluate((key) => localStorage.getItem(key), DEMO_ITSM_MODE_KEY).catch(() => null);
+      const mode: DemoItsmMode = stored === "off" || stored === "znuny_readthrough" ? stored : "tiqora";
+      const itsm = resolveItsmData(path, method, url.search, mode);
+      if (itsm !== undefined) {
+        await json(route, 200, itsm);
         return;
       }
     }

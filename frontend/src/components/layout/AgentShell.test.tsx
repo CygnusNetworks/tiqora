@@ -89,6 +89,23 @@ vi.mock("@/lib/webchatApi", async () => {
   };
 });
 
+const { itsmStatus } = vi.hoisted(() => ({ itsmStatus: vi.fn() }));
+vi.mock("@/lib/itsmApi", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/itsmApi")>("@/lib/itsmApi");
+  return { ...actual, itsmApi: { ...actual.itsmApi, status: itsmStatus } };
+});
+
+const statusOf = (mode: string, ciSource: "znuny" | "tiqora" | null) => ({
+  mode,
+  source: "auto",
+  setup_complete: true,
+  ci_available: ciSource !== null,
+  ci_read_only: ciSource === "znuny",
+  ci_source: ciSource,
+  unavailable_code: null,
+  znuny: { core_installed: true, cmdb_installed: true, profile: null, packages: {} },
+});
+
 async function renderShell(initialEntry = "/agent") {
   const rootRoute = createRootRoute({
     component: () => (
@@ -107,6 +124,7 @@ async function renderShell(initialEntry = "/agent") {
     "/agent/reports",
     "/agent/search",
     "/agent/customers",
+    "/agent/itsm/cis",
   ];
   const childRoutes = childPaths.map((path) =>
     createRoute({
@@ -148,6 +166,7 @@ describe("AgentShell sidebar", () => {
     listSearches.mockReset().mockResolvedValue([]);
     searchCounts.mockReset().mockResolvedValue({ counts: {} });
     chatTopics.mockReset().mockResolvedValue([]);
+    itsmStatus.mockReset().mockResolvedValue(statusOf("off", null));
     window.localStorage.clear();
     authFlags.canUseDirectory = false;
     void i18n.changeLanguage("de");
@@ -185,6 +204,33 @@ describe("AgentShell sidebar", () => {
     await renderShell();
     expect(await screen.findByTestId("chat-inbox-trigger-desktop")).toBeInTheDocument();
     expect(screen.getByTestId("chat-inbox-trigger-mobile")).toBeInTheDocument();
+  });
+
+  it("shows the CMDB entry only for the Znuny read-through CIs", async () => {
+    itsmStatus.mockResolvedValue(statusOf("znuny_readthrough", "znuny"));
+    await renderShell();
+    const link = await screen.findByTestId("agent-nav-cmdb");
+    expect(link).toHaveAttribute("href", "/agent/itsm/cis");
+    expect(link).toHaveTextContent("CMDB");
+  });
+
+  it.each([
+    ["Tiqora CMDB (Mode B)", statusOf("tiqora", "tiqora")],
+    ["ITSM off", statusOf("off", null)],
+  ])("hides the CMDB entry for %s", async (_name, status) => {
+    itsmStatus.mockResolvedValue(status);
+    await renderShell();
+    await screen.findByTestId("agent-sidebar-nav");
+    await waitFor(() => expect(itsmStatus).toHaveBeenCalled());
+    expect(screen.queryByTestId("agent-nav-cmdb")).toBeNull();
+  });
+
+  it("hides the CMDB entry when the status call fails", async () => {
+    itsmStatus.mockRejectedValue(new Error("boom"));
+    await renderShell();
+    await screen.findByTestId("agent-sidebar-nav");
+    await waitFor(() => expect(itsmStatus).toHaveBeenCalled());
+    expect(screen.queryByTestId("agent-nav-cmdb")).toBeNull();
   });
 
   it("shows the customer directory only with its permission", async () => {

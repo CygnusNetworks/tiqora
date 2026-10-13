@@ -2186,7 +2186,9 @@
       "plugins": "Erweiterungen",
       "dashboardTemplates": "Dashboard-Vorlagen",
       "webservices": "Webservices",
-      "dashboardKioskLinks": "Wallboard-Links"
+      "dashboardKioskLinks": "Wallboard-Links",
+      "itsm": "ITSM",
+      "itsmLinkTypes": "Verknüpfungstypen"
     },
     "table": {
       "id": "ID",
@@ -3819,7 +3821,10 @@
       "plugins": "Installierte Erweiterungen ein- und ausschalten, Zustand prüfen und einstellen.",
       "dashboardTemplates": "Startseiten je Rolle als Vorlage festlegen, optional verbindlich.",
       "webservices": "Webservices (GenericInterface) einsehen, ausgehende Aufrufe prüfen und Zielfreigaben verwalten.",
-      "dashboardKioskLinks": "Links für Wallboards ohne Anmeldung erstellen, prüfen und widerrufen."
+      "dashboardKioskLinks": "Links für Wallboards ohne Anmeldung erstellen, prüfen und widerrufen.",
+      "itsm": "ITSM-Modus, Einrichtung, Prioritätsmatrix und Services",
+      "itsmLinkTypes": "Verknüpfungstypen zwischen Tickets, Konfigurationselementen und Services",
+      "settingsItsm": "Ticket-Typen, Workaround-Status, Grenzwerte und Znuny-Adresse für das ITSM"
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -4279,6 +4284,79 @@
           "deploy_from_tiqora": {
             "label": "Prozesse und ACLs in Tiqora bereitstellen (Znuny läuft nicht mehr)",
             "help": "Nur einschalten, wenn Znuny nicht mehr parallel läuft. Sonst zeigt Znuny weiter den alten Stand an."
+          }
+        }
+      },
+      "itsm": {
+        "title": "ITSM",
+        "fields": {
+          "incident_type": {
+            "label": "Ticket-Typ Störung",
+            "help": "Ticket-Typ von Störungen (Incidents)."
+          },
+          "major_incident_type": {
+            "label": "Ticket-Typ Großstörung",
+            "help": "Ticket-Typ, der eine Großstörung kennzeichnet."
+          },
+          "service_request_type": {
+            "label": "Ticket-Typ Serviceanfrage",
+            "help": "Ticket-Typ von Serviceanfragen."
+          },
+          "problem_type": {
+            "label": "Ticket-Typ Problem",
+            "help": "Ticket-Typ von Problem-Tickets."
+          },
+          "change_type": {
+            "label": "Ticket-Typ Änderung",
+            "help": "Ticket-Typ von Änderungen."
+          },
+          "change_task_type": {
+            "label": "Ticket-Typ Änderungsaufgabe",
+            "help": "Ticket-Typ von Änderungsaufgaben."
+          },
+          "workaround_state": {
+            "label": "Status „Geschlossen mit Workaround“",
+            "help": "Ticket-Status, der beim Schließen von Störungen mit Workaround gesetzt wird."
+          },
+          "criticality_field": {
+            "label": "Feld Kritikalität",
+            "help": "Name des Dynamischen Felds mit der Kritikalität."
+          },
+          "impact_field": {
+            "label": "Feld Auswirkung",
+            "help": "Name des Dynamischen Felds mit der Auswirkung."
+          },
+          "priority_matrix_enabled": {
+            "label": "Prioritätsmatrix",
+            "help": "Priorität aus Kritikalität und Auswirkung setzen, sobald sich eines von beiden ändert."
+          },
+          "ci_ticket_link_type": {
+            "label": "Verknüpfungstyp für betroffene CIs",
+            "help": "Verknüpfungstyp, wenn ein Konfigurationselement mit einem Ticket verknüpft wird."
+          },
+          "problem_link_type": {
+            "label": "Verknüpfungstyp für Probleme",
+            "help": "Verknüpfungstyp zwischen einem Problem und seinen Störungen."
+          },
+          "known_error_kb_category_id": {
+            "label": "Wissensdatenbank-Kategorie für bekannte Fehler",
+            "help": "Kategorie-ID für Artikel zu bekannten Fehlern. 0 schaltet die Schaltfläche aus."
+          },
+          "min_minutes_between_incidents": {
+            "label": "Minuten zwischen Störungen",
+            "help": "Vorgabe für Services ohne eigenen Wert. 0 schaltet die Warnung aus."
+          },
+          "linked_articles_max_tickets": {
+            "label": "Höchstzahl Tickets pro Notiz",
+            "help": "Obergrenze für Notizen an verknüpfte Tickets."
+          },
+          "major_incident_customer_reply": {
+            "label": "Kundenantwort bei Großstörungen",
+            "help": "Erlaubt, Großstörungs-Aktualisierungen per E-Mail an die Kunden verknüpfter Tickets zu senden."
+          },
+          "znuny_agent_url": {
+            "label": "Znuny-Agentenadresse",
+            "help": "Adresse der Znuny-Agentenoberfläche für „In Znuny bearbeiten“. Leer: aus der Znuny-Konfiguration ableiten. Muss mit http:// oder https:// beginnen."
           }
         }
       }
@@ -5011,6 +5089,12 @@
       "deleteTitle": "Link „{{name}}“ löschen?",
       "deleteMessage": "Der widerrufene Link wird aus der Liste entfernt.",
       "actionFailed": "Das hat nicht geklappt. Bitte versuchen Sie es erneut."
+    },
+    "itsm": {
+      "title": "ITSM",
+      "linkTypes": {
+        "title": "Verknüpfungstypen"
+      }
     }
   },
   "kb": {
@@ -7486,6 +7570,24 @@
       "skipped_other": "{{count}} übersprungen",
       "nothingDone": "Es wurde nichts übernommen.",
       "whereToFind": "Sie finden die Suchen unter „Alle gespeicherten Suchen…“ in der Seitenleiste."
+    }
+  },
+  "itsm": {
+    "ci": {
+      "title": "Konfigurationselemente",
+      "detailTitle": "Konfigurationselement",
+      "attributes": "Attribute",
+      "noAttributes": "Dieses Konfigurationselement hat keine Attribute.",
+      "empty": "Keine Konfigurationselemente gefunden.",
+      "openInZnuny": "In Znuny bearbeiten"
+    },
+    "errors": {
+      "itsm_off": "Das ITSM ist ausgeschaltet.",
+      "unsupported_znuny_itsm_version": "Die installierte Znuny-ITSM-Version wird nicht unterstützt.",
+      "znuny_itsm_missing": "Die Znuny-ITSM-Tabellen wurden nicht gefunden.",
+      "cmdb_not_installed": "Die Znuny-CMDB ist nicht installiert.",
+      "search_too_broad": "Die Suche ist zu allgemein. Bitte schränken Sie sie ein.",
+      "generic": "Die ITSM-Daten konnten nicht geladen werden."
     }
   }
 }

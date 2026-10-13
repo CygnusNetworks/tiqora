@@ -115,6 +115,10 @@ import { AutoResponsesPage } from "@/routes/admin/AutoResponsesPage";
 import { DynamicFieldsPage } from "@/routes/admin/DynamicFieldsPage";
 import { WebhooksPage } from "@/routes/admin/WebhooksPage";
 import { WebservicesPage } from "@/routes/admin/WebservicesPage";
+import { ItsmPage } from "@/routes/admin/ItsmPage";
+import { LinkTypesPage } from "@/routes/admin/LinkTypesPage";
+import { CiListPage } from "@/routes/agent/CiListPage";
+import { CiDetailPage } from "@/routes/agent/CiDetailPage";
 import { WebserviceDetailPage } from "@/routes/admin/WebserviceDetailPage";
 import { WEBSERVICE_TABS, type WebserviceTab } from "@/lib/webservicesApi";
 import { MailOutboundPage } from "@/routes/admin/MailOutboundPage";
@@ -597,6 +601,19 @@ const agentSearchViewRoute = createRoute({
   component: SavedSearchPage,
 });
 
+// Static segment before the param route: "cis" is never read as a CI source.
+const agentItsmCisRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/itsm/cis",
+  component: CiListPage,
+});
+
+const agentItsmCiDetailRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/itsm/cis/$source/$ciId",
+  component: CiDetailPage,
+});
+
 const agentCalendarRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/calendar",
@@ -1035,6 +1052,18 @@ const adminWebserviceDetailRoute = createRoute({
   component: WebserviceDetailPage,
 });
 
+const adminItsmRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/itsm",
+  component: ItsmPage,
+});
+
+const adminItsmLinkTypesRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/itsm/link-types",
+  component: LinkTypesPage,
+});
+
 const adminApiKeysRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/api-keys",
@@ -1323,6 +1352,8 @@ const routeTree = rootRoute.addChildren([
     agentSearchNewRoute,
     agentSearchEditRoute,
     agentSearchViewRoute,
+    agentItsmCisRoute,
+    agentItsmCiDetailRoute,
     agentCalendarRoute,
     agentTemplatesRoute,
     agentServicesRoute,
@@ -1377,6 +1408,8 @@ const routeTree = rootRoute.addChildren([
     adminDynamicFieldsRoute,
     adminWebhooksRoute,
     adminWebservicesRoute,
+    adminItsmRoute,
+    adminItsmLinkTypesRoute,
     adminWebserviceDetailRoute,
     adminApiKeysRoute,
     adminMailOutboundRoute,

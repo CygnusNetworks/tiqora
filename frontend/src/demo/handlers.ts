@@ -9,6 +9,7 @@ import {
 } from "./mockData";
 import { demoDashboards, resolve as resolveDashboards } from "./dashboardsMock";
 import { resolveKiosk } from "./kioskMock";
+import { resolveItsmData } from "./itsmMock";
 import { resolve as resolveSchedules } from "./schedulesMock";
 import { setDemoFactsBuilding } from "./reportsMock";
 import { demoReportFile, resolveSavedRequest } from "./savedMock";
@@ -115,6 +116,12 @@ function kioskResponse(request: Request): Response | undefined {
 }
 
 export const handlers = [
+  // ITSM: the CI list and service lookups filter on the query string, which resolveData never sees.
+  http.get("*/api/v1/itsm/*", ({ request }) => {
+    const url = new URL(request.url);
+    const out = resolveItsmData(url.pathname, "GET", url.search);
+    return out === undefined ? HttpResponse.json({}, { status: 404 }) : HttpResponse.json(out as never);
+  }),
   http.all("*/api/v1/report-schedules*", async ({ request }) => (await schedulesResponse(request)) ?? HttpResponse.json([])),
   http.get("*/api/v1/report-runs/*", async ({ request }) => (await schedulesResponse(request)) ?? new HttpResponse(null, { status: 404 })),
   http.all("*/api/v1/reports/import/znuny*", async ({ request }) => (await schedulesResponse(request)) ?? HttpResponse.json({})),
