@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { usePluginReportTexts } from "@/components/reports/usePluginReportTexts";
+import { labelKeysOf, usePluginReportTexts } from "@/components/reports/usePluginReportTexts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -349,7 +349,11 @@ export function ReportBuilderPage() {
   });
   const report = reportQ.data;
   // A copy of a plugin report starts from its translated name: wait for the texts.
-  const pluginTexts = usePluginReportTexts(useMemo(() => [report], [report]));
+  // Also the labels of every source (fields panel, preview): a plugin source must not show raw keys.
+  const pluginTexts = usePluginReportTexts(
+    useMemo(() => [report], [report]),
+    useMemo(() => labelKeysOf(sourcesQ.data), [sourcesQ.data]),
+  );
   const [textsSeen, setTextsSeen] = useState(false);
   // Not while the report is still pending: `loading` is false then only because no plugin key is known yet.
   // A failed load settles too, so the load error shows instead of an endless spinner.

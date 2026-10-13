@@ -32,6 +32,7 @@ import { reportErrorMessage, reportsApi } from "@/lib/reportsApi";
 import { reportSchedulesApi, type ReportSchedule } from "@/lib/reportSchedulesApi";
 import { displayTimeZone } from "@/lib/timeZone";
 import type { ReportScheduleNewSearch } from "./reportScheduleSearch";
+import { usePluginReportTexts } from "@/components/reports/usePluginReportTexts";
 
 function Card({ title, id, children }: { title: string; id: string; children: ReactNode }) {
   return (
@@ -151,6 +152,7 @@ function ScheduleEditor({
   const shownErrors = shown ? errors : {};
   const recurrenceErr = shown ? recurrenceErrors(form.recurrence) : {};
   const catalogue = catalogueQ.data?.reports ?? [];
+  usePluginReportTexts(catalogue);
 
   return (
     <form

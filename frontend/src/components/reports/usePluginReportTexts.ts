@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { pluginsApi } from "@/lib/pluginsApi";
 import { ensurePluginI18n } from "@/plugins/i18n";
+import { isPluginSafeMode } from "@/plugins/safeMode";
 
 /** The plugin behind a text key `plugin.<id>:<key>` (null for core keys). */
 export function pluginIdOfKey(key: string | null | undefined): string | null {
@@ -12,29 +13,54 @@ export function pluginIdOfKey(key: string | null | undefined): string | null {
 }
 
 type KeyedReport = { title_key?: string | null; description_key?: string | null } | null | undefined;
+type TextKey = string | null | undefined;
+
+const NO_KEYS: readonly TextKey[] = [];
+
+/**
+ * Every `label_key` in a report source, result or definition (source, dimensions, measures,
+ * filter fields, parameters, result columns), wherever it sits in the object.
+ */
+export function labelKeysOf(value: unknown, out: string[] = []): string[] {
+  if (Array.isArray(value)) {
+    for (const v of value) labelKeysOf(v, out);
+  } else if (value && typeof value === "object") {
+    for (const [k, v] of Object.entries(value)) {
+      if (k === "label_key" && typeof v === "string") out.push(v);
+      else if (v && typeof v === "object") labelKeysOf(v, out);
+    }
+  }
+  return out;
+}
 
 /**
  * Plugin reports carry texts in the plugin's own i18n namespace, which is only
- * loaded on demand. Loads the files of every plugin the given reports belong to
- * (the plugin objects come from the cached `GET /plugins/frontend`) and re-renders
- * the caller once they are there; until then `t()` renders the key's fallback.
- * `loading` is true while a needed file is still on its way. Core reports never
- * trigger a request.
+ * loaded on demand. Loads the files of every plugin the given reports belong to —
+ * their titles and descriptions, plus any `labelKeys` (source, dimension, measure and
+ * column labels, see {@link labelKeysOf}) — (the plugin objects come from the cached
+ * `GET /plugins/frontend`) and re-renders the caller once they are there; until then
+ * `t()` renders the key's fallback. `loading` is true while a needed file is still on
+ * its way. Core keys never trigger a request, and neither does browser safe mode
+ * (`?plugins=off`), which loads nothing from plugins.
  */
-export function usePluginReportTexts(reports: readonly KeyedReport[]): { loading: boolean } {
+export function usePluginReportTexts(
+  reports: readonly KeyedReport[],
+  labelKeys: readonly TextKey[] = NO_KEYS,
+): { loading: boolean } {
   const { i18n } = useTranslation();
   const lang = i18n.language;
+  const safeMode = isPluginSafeMode();
   const idsKey = useMemo(() => {
     const ids = new Set<string>();
-    for (const r of reports) {
-      for (const k of [r?.title_key, r?.description_key]) {
-        const id = pluginIdOfKey(k);
-        if (id) ids.add(id);
-      }
+    const keys: TextKey[] = [...labelKeys];
+    for (const r of reports) keys.push(r?.title_key, r?.description_key);
+    for (const k of keys) {
+      const id = pluginIdOfKey(k);
+      if (id) ids.add(id);
     }
     return [...ids].sort().join("\n");
-  }, [reports]);
-  const ids = useMemo(() => (idsKey ? idsKey.split("\n") : []), [idsKey]);
+  }, [reports, labelKeys]);
+  const ids = useMemo(() => (idsKey && !safeMode ? idsKey.split("\n") : []), [idsKey, safeMode]);
 
   const pluginsQ = useQuery({
     queryKey: ["plugins", "frontend"],

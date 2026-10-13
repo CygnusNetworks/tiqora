@@ -17,7 +17,7 @@ import {
   toRunIn,
   type ReportFilterState,
 } from "@/components/reports/reportFilter";
-import { usePluginReportTexts } from "@/components/reports/usePluginReportTexts";
+import { labelKeysOf, usePluginReportTexts } from "@/components/reports/usePluginReportTexts";
 import { ReportParameterControls } from "@/components/reports/ReportParameterControls";
 import { ReportsAccessGate } from "@/components/reports/ReportsAccessGate";
 import { ReportView } from "@/components/reports/ReportView";
@@ -56,7 +56,6 @@ function ReportViewPageContent() {
     retry: false,
   });
   const report = reportQ.data;
-  usePluginReportTexts(useMemo(() => [report], [report]));
   const definition = report?.definition ?? undefined;
   const state = useMemo(() => filterFromSearch(search, definition), [search, definition]);
   const body = useMemo(
@@ -84,6 +83,11 @@ function ReportViewPageContent() {
     enabled: hasParams,
   });
   const source = sourcesQ.data?.find((s) => s.key === definition?.source);
+  // Titles plus the source's labels (parameter controls); ReportView loads the column labels.
+  usePluginReportTexts(
+    useMemo(() => [report], [report]),
+    useMemo(() => labelKeysOf(source), [source]),
+  );
 
   const onChange = (next: ReportFilterState) => {
     void navigate({

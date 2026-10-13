@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from "react";
+import { useId, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { BarChart } from "@/components/agent/stats/BarChart";
 import { DonutChart } from "@/components/agent/stats/DonutChart";
@@ -20,6 +20,7 @@ import { cn } from "@/lib/cn";
 import type { ReportCell, ReportColumn, ReportDefinition, ReportResult } from "@/lib/reportsApi";
 import { PivotTable } from "./PivotTable";
 import { ReportTable } from "./ReportTable";
+import { usePluginReportTexts } from "./usePluginReportTexts";
 import { ADDITIVE_AGGS, useMeasureAggs } from "./useMeasureAggs";
 import { cellLabel, formatMeasure, toSeries } from "./reportFormat";
 
@@ -131,6 +132,8 @@ function KpiRow({
  * a "Tabelle anzeigen" button below it: the exact numbers, and the keyboard
  * route for the dense charts whose marks are not tab stops.
  */
+const NO_REPORTS: readonly never[] = [];
+
 export function ReportView({
   report,
   result,
@@ -156,6 +159,8 @@ export function ReportView({
 }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.resolvedLanguage ?? i18n.language ?? "de";
+  // Column labels of a plugin source: load the plugin's texts and re-render once they are in.
+  usePluginReportTexts(NO_REPORTS, useMemo(() => result.columns.map((c) => c.label_key), [result]));
   const [showTable, setShowTable] = useState(false);
   const regionId = useId();
   const { definition } = report;
