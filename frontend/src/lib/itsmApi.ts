@@ -72,6 +72,9 @@ export const itsmKeys = {
   linkTypes: (pair: LinkPair) => ["itsm", "link-types", pair] as const,
   matrix: () => ["itsm", "priority-matrix"] as const,
   service: (id: number) => ["itsm", "services", id] as const,
+  serviceCis: (id: number) => ["itsm", "services", id, "cis"] as const,
+  prioritySuggestion: (criticality: string | null, impact: string | null) =>
+    ["itsm", "priority-suggestion", criticality, impact] as const,
   serviceStates: (ids: readonly number[]) => ["itsm", "services", "incident-states", ids] as const,
   recentIncident: (serviceId: number, excludeTicketId?: number | null) =>
     ["itsm", "services", serviceId, "recent-incident", excludeTicketId ?? null] as const,
@@ -151,6 +154,9 @@ export const itsmApi = {
   },
   service(serviceId: number, signal?: AbortSignal) {
     return api.request<ServiceItsm>("GET", `${BASE}/services/${serviceId}`, { signal });
+  },
+  serviceCis(serviceId: number, limit?: number, signal?: AbortSignal) {
+    return api.request<CiSummary[]>("GET", `${BASE}/services/${serviceId}/cis`, { query: { limit }, signal });
   },
   serviceIncidentStates(ids: readonly number[], signal?: AbortSignal) {
     return api.request<Record<string, ServiceIncidentState>>("GET", `${BASE}/services/incident-states`, {

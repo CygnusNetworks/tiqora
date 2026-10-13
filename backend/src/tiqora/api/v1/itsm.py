@@ -873,6 +873,20 @@ async def get_service(
     return service_out(info, default_minutes=cfg.min_minutes_between_incidents)
 
 
+@router.get("/services/{service_id}/cis", response_model=list[CiSummaryOut])
+async def get_service_cis(
+    service_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+) -> list[CiSummaryOut]:
+    """The configuration items allocated to a service (readable classes only)."""
+    provider = await _enabled_provider(session)
+    with _ci_errors():
+        found = await provider.service_cis(session, service_id, user_id=user.id, limit=limit)
+    return [_summary(c) for c in found]
+
+
 @router.get("/services/{service_id}/recent-incident", response_model=RecentIncidentOut | None)
 async def get_recent_incident(
     service_id: int,

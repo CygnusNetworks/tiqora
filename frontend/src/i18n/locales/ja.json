@@ -7712,7 +7712,42 @@
       "attributes": "Attributes",
       "noAttributes": "This configuration item has no attributes.",
       "empty": "No configuration items found.",
-      "openInZnuny": "Edit in Znuny"
+      "openInZnuny": "Edit in Znuny",
+      "searchLabel": "Search configuration items",
+      "searchPlaceholder": "Number, name or attribute value",
+      "searchHint": "Attribute values are searched from 3 characters; shorter input only matches number and name.",
+      "classLabel": "Class",
+      "allClasses": "All classes",
+      "deploymentLabel": "Deployment state",
+      "allDeployment": "All deployment states",
+      "incidentLabel": "Incident state",
+      "allIncident": "All incident states",
+      "colNumber": "Number",
+      "colName": "Name",
+      "colClass": "Class",
+      "colDeployment": "Deployment",
+      "colIncident": "Incident",
+      "total": "{{count}} configuration item(s)",
+      "range": "{{from}}–{{to}} of {{total}}",
+      "prev": "Previous",
+      "next": "Next",
+      "truncated": "More matches exist. Narrow the search.",
+      "loadError": "The configuration items could not be loaded.",
+      "notFound": "This configuration item does not exist or you may not see it.",
+      "back": "All configuration items",
+      "readOnly": "Read-only view of the Znuny CMDB",
+      "deployment": "Deployment",
+      "incident": "Incident",
+      "versions": "Versions",
+      "noVersions": "No versions.",
+      "versionCurrent": "Current version",
+      "viewVersion": "View version",
+      "viewingVersion": "Viewing version {{seq}} from {{date}}",
+      "showCurrent": "Show current version",
+      "versionShown": "Shown",
+      "versionBy": "by {{name}}",
+      "tickets": "Linked tickets",
+      "noTickets": "No tickets linked."
     },
     "errors": {
       "itsm_off": "The ITSM is switched off.",
@@ -7863,6 +7898,22 @@
         "ended": "Ended",
         "targets": "{{count}} ticket(s)"
       }
+    },
+    "service": {
+      "title": "ITSM",
+      "incidentState": "Incident state",
+      "owner": "Owner",
+      "type": "Type",
+      "criticality": "Criticality",
+      "description": "Description",
+      "cis": "Configuration items",
+      "noCis": "No configuration items allocated.",
+      "loadError": "The ITSM data of this service could not be loaded.",
+      "noOwner": "No owner"
+    },
+    "newTicket": {
+      "recentIncident": "This service already had an incident {{minutes}} minutes ago: #{{tn}} {{title}}. Is it the same problem?",
+      "openTicket": "Open ticket"
     }
   }
 }

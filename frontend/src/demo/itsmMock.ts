@@ -299,6 +299,7 @@ export function resolveItsmData(
     return out;
   }
   if (/\/api\/v1\/itsm\/services\/\d+\/recent-incident$/.test(path)) return null;
+  if (/\/api\/v1\/itsm\/services\/\d+\/cis$/.test(path)) return demoCis.slice(0, 2);
   if (/\/api\/v1\/itsm\/services\/\d+$/.test(path)) return SERVICE;
 
   const t = path.match(/\/api\/v1\/tickets\/(\d+)\/(cis|itsm|link-graph|problem|major-incident)$/);

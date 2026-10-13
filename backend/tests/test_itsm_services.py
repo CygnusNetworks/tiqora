@@ -306,6 +306,21 @@ async def test_incident_state_via_provider(with_fake: World) -> None:
     assert got[str(S_OTHER)]["state"]["functionality"] == "operational"
 
 
+async def test_service_cis_lists_the_allocated_cis(with_fake: World) -> None:
+    got = await with_fake.client.get(f"{API}/services/{S_PLAIN}/cis")
+    assert got.status_code == 200, got.text
+    assert [c["id"] for c in got.json()] == [11, 12]
+    assert [c["name"] for c in got.json()] == ["fake-web-01", "fake-web-02"]
+    assert [
+        c["id"] for c in (await with_fake.client.get(f"{API}/services/{S_OTHER}/cis")).json()
+    ] == [11]
+    capped = await with_fake.client.get(f"{API}/services/{S_PLAIN}/cis", params={"limit": 1})
+    assert len(capped.json()) == 1
+    assert (
+        await with_fake.client.get(f"{API}/services/{S_PLAIN}/cis", params={"limit": 0})
+    ).status_code == 422
+
+
 async def test_incident_states_batch_limit(with_fake: World) -> None:
     ok = await with_fake.client.get(
         f"{API}/services/incident-states", params={"ids": list(range(1, 201))}

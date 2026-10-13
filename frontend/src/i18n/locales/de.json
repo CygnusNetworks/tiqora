@@ -7712,7 +7712,42 @@
       "attributes": "Attribute",
       "noAttributes": "Dieses Konfigurationselement hat keine Attribute.",
       "empty": "Keine Konfigurationselemente gefunden.",
-      "openInZnuny": "In Znuny bearbeiten"
+      "openInZnuny": "In Znuny bearbeiten",
+      "searchLabel": "Konfigurationselemente suchen",
+      "searchPlaceholder": "Nummer, Name oder Attributwert",
+      "searchHint": "Attributwerte werden ab 3 Zeichen durchsucht; kürzere Eingaben treffen nur Nummer und Name.",
+      "classLabel": "Klasse",
+      "allClasses": "Alle Klassen",
+      "deploymentLabel": "Verwendungsstatus",
+      "allDeployment": "Alle Verwendungsstatus",
+      "incidentLabel": "Vorfallstatus",
+      "allIncident": "Alle Vorfallstatus",
+      "colNumber": "Nummer",
+      "colName": "Name",
+      "colClass": "Klasse",
+      "colDeployment": "Verwendung",
+      "colIncident": "Vorfall",
+      "total": "{{count}} Konfigurationselement(e)",
+      "range": "{{from}}–{{to}} von {{total}}",
+      "prev": "Zurück",
+      "next": "Weiter",
+      "truncated": "Es gibt weitere Treffer. Bitte die Suche eingrenzen.",
+      "loadError": "Die Konfigurationselemente konnten nicht geladen werden.",
+      "notFound": "Dieses Konfigurationselement existiert nicht oder ist für Sie nicht sichtbar.",
+      "back": "Alle Konfigurationselemente",
+      "readOnly": "Nur-Lese-Ansicht der Znuny-CMDB",
+      "deployment": "Verwendung",
+      "incident": "Vorfall",
+      "versions": "Versionen",
+      "noVersions": "Keine Versionen.",
+      "versionCurrent": "Aktuelle Version",
+      "viewVersion": "Version ansehen",
+      "viewingVersion": "Version {{seq}} vom {{date}} wird angezeigt",
+      "showCurrent": "Aktuelle Version anzeigen",
+      "versionShown": "Angezeigt",
+      "versionBy": "von {{name}}",
+      "tickets": "Verknüpfte Tickets",
+      "noTickets": "Keine Tickets verknüpft."
     },
     "errors": {
       "itsm_off": "Das ITSM ist ausgeschaltet.",
@@ -7863,6 +7898,22 @@
         "ended": "Beendet",
         "targets": "{{count}} Ticket(s)"
       }
+    },
+    "service": {
+      "title": "ITSM",
+      "incidentState": "Vorfallstatus",
+      "owner": "Verantwortlich",
+      "type": "Typ",
+      "criticality": "Kritikalität",
+      "description": "Beschreibung",
+      "cis": "Konfigurationselemente",
+      "noCis": "Keine Konfigurationselemente zugeordnet.",
+      "loadError": "Die ITSM-Daten dieses Services konnten nicht geladen werden.",
+      "noOwner": "Kein Verantwortlicher"
+    },
+    "newTicket": {
+      "recentIncident": "Für diesen Service gab es bereits vor {{minutes}} Minuten einen Vorfall: #{{tn}} {{title}}. Handelt es sich um dasselbe Problem?",
+      "openTicket": "Ticket öffnen"
     }
   }
 }

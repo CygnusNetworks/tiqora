@@ -8040,6 +8040,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/itsm/services/{service_id}/cis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Service Cis
+         * @description The configuration items allocated to a service (readable classes only).
+         */
+        get: operations["get_service_cis_api_v1_itsm_services__service_id__cis_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/itsm/services/{service_id}/recent-incident": {
         parameters: {
             query?: never;
@@ -47209,6 +47229,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ServiceItsmOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_service_cis_api_v1_itsm_services__service_id__cis_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                service_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CiSummaryOut"][];
                 };
             };
             /** @description Validation Error */

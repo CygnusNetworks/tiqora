@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { DEMO_ITSM_MODE_KEY } from "./itsmMode";
 import { resolveItsmData } from "./itsmMock";
 import { resolveData } from "./mockData";
-import type { CiDetail, CiPage, ItsmStatus, Problem, TicketItsm } from "@/lib/itsmApi";
+import type { CiDetail, CiPage, CiSummary, ItsmStatus, Problem, TicketItsm } from "@/lib/itsmApi";
 
 afterEach(() => localStorage.removeItem(DEMO_ITSM_MODE_KEY));
 
@@ -50,5 +50,10 @@ describe("itsm demo mock (Mode A data)", () => {
   it("uses example.org data only", () => {
     const text = JSON.stringify(resolveItsmData("/api/v1/itsm/cis/znuny/201", "GET"));
     expect(text).not.toMatch(/@(?!example\.org)/);
+  });
+
+  it("returns the CIs of a service", () => {
+    const list = resolveItsmData("/api/v1/itsm/services/1/cis", "GET") as CiSummary[];
+    expect(list.map((c) => c.ref)).toEqual(["znuny:201", "znuny:202"]);
   });
 });
