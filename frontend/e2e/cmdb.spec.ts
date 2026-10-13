@@ -41,6 +41,12 @@ for (const vp of VIEWPORTS) {
       await expect(page.getByTestId("ci-number")).toContainText("SRV-0001");
     });
 
+    test("the ITSM CI link of a Tiqora CI lands on the CMDB detail page", async ({ page }) => {
+      await page.goto("/agent/itsm/cis/tiqora/1");
+      await page.waitForURL(/\/agent\/cmdb\/1$/);
+      await expect(page.getByTestId("ci-name")).toContainText("web-01");
+    });
+
     test("shows versions and a diff, then edits a value and saves", async ({ page }) => {
       await page.goto("/agent/cmdb/1?tab=versions");
       await expect(page.getByTestId("ci-versions")).toBeVisible();

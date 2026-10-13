@@ -626,9 +626,15 @@ const agentItsmCisRoute = createRoute({
   component: CiListPage,
 });
 
+// Tiqora CIs (Mode B) live in the CMDB: /agent/itsm/cis/tiqora/<id> is only a stable alias.
 const agentItsmCiDetailRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/itsm/cis/$source/$ciId",
+  beforeLoad: ({ params }) => {
+    if (params.source === "tiqora") {
+      throw redirect({ to: "/agent/cmdb/$ciId", params: { ciId: params.ciId }, replace: true });
+    }
+  },
   component: CiDetailPage,
 });
 
