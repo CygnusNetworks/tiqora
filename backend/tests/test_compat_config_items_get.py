@@ -537,7 +537,7 @@ async def test_get_catalog_attribute_is_returned_by_name(cmdb_db: CmdbWorld) -> 
 
 
 async def test_write_and_search_operations_answer_per_mode(cmdb_db: CmdbWorld) -> None:
-    """The three write operations exist as routes and honour the mode gate (Delete: Task 24)."""
+    """The three write operations exist as routes and honour the mode gate."""
     routes = (
         ("POST", "/znuny-compat/ConfigItem", "ConfigItemCreate"),
         ("PATCH", "/znuny-compat/ConfigItem/1", "ConfigItemUpdate"),
@@ -554,7 +554,11 @@ async def test_write_and_search_operations_answer_per_mode(cmdb_db: CmdbWorld) -
                     assert r.json()["Error"]["ErrorMessage"] == (
                         "Die CMDB wird in Znuny geführt (Modus A)"
                     )
-                elif mode == "tiqora" and op != "ConfigItemDelete":
+                elif mode == "tiqora" and op == "ConfigItemDelete":
+                    # Delete exists since Task 24: CI 1 is unknown, which looks like a missing right
+                    assert code == "ConfigItemDelete.AccessDenied", (mode, op)
+                    assert r.status_code == 403
+                elif mode == "tiqora":
                     # Create/Update exist since Task 23: no ConfigItem in the request
                     assert code == f"{op}.MissingParameter", (mode, op)
                 else:

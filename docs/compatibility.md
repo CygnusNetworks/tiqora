@@ -21,6 +21,16 @@ can migrate gradually.
 | `TicketHistoryGet` | Agent-only ticket history dump |
 | `TimeAccountingGet` | Accounted time rows (`time_accounting`) for a user/date range |
 | `OutOfOffice` | Set agent out-of-office preferences (admin group) |
+| `ConfigItemGet` | CI with its current version (ITSM mode `tiqora`: implemented on the Tiqora CMDB; Mode A: read from Znuny's tables; `off`: `Operation.NotImplemented`) |
+| `ConfigItemSearch` | Search CIs of one class (Tiqora CMDB / Mode A read-through; `off`: not implemented). `PreviousVersionSearch` and bounds: [ConfigItemSearch](#configitemsearch) |
+| `ConfigItemCreate` | Create a CI (implemented on the Tiqora CMDB; Mode A: `NotAvailable`; `off`: not implemented) |
+| `ConfigItemUpdate` | New CI version (implemented on the Tiqora CMDB; Mode A: `NotAvailable`; `off`: not implemented) |
+| `ConfigItemDelete` | Delete CIs (implemented on the Tiqora CMDB; Mode A: `NotAvailable`; `off`: not implemented) |
+
+The five `ConfigItem*` operations follow ITSMConfigurationManagement 6.5.4 and 7.3.5, which are identical
+for these operations, so the answer shape does not depend on the Znuny version you migrate from. Notes per
+operation below ([ConfigItemSearch](#configitemsearch), [ConfigItemCreate / ConfigItemUpdate](#configitemcreate--configitemupdate),
+[ConfigItemDelete](#configitemdelete)); transports are the same two as for tickets, SOAP included.
 
 Both transports Znuny documents for these operations are supported:
 the REST-style `HTTP::REST` connector, and `HTTP::SOAP` (see
@@ -181,6 +191,11 @@ core operations including the gotchas above with seeded MariaDB data.
 | GET | `/znuny-compat/Ticket/History/{ticket_id}` | TicketHistoryGet |
 | GET | `/znuny-compat/TimeAccountingGet` | TimeAccountingGet |
 | POST | `/znuny-compat/OutOfOffice` | OutOfOffice |
+| POST | `/znuny-compat/ConfigItem` | ConfigItemCreate |
+| GET | `/znuny-compat/ConfigItem/{id}` | ConfigItemGet |
+| PATCH | `/znuny-compat/ConfigItem/{id}` | ConfigItemUpdate |
+| DELETE | `/znuny-compat/ConfigItem/{id}` | ConfigItemDelete |
+| GET, POST | `/znuny-compat/ConfigItemSearch` | ConfigItemSearch |
 | POST | `/znuny-compat/admin/reload` | Refresh the webservice registry now (admin only) |
 
 ### Dynamic routes (from `gi_webservice_config`)
@@ -570,6 +585,20 @@ for both operations (Znuny gives no version id).
 | Keys outside the definition | Dropped (Znuny stores them in XML) |
 | `Attachment` | One hash or a list; `Content` is base64, at most **50 MB** decoded per file (`InvalidParameter`), `ContentType` kept; every file is checked before anything is written, a write error rolls the whole call back |
 | Permission on update | Decided by the class of the item; a caller without any `rw` class learns nothing about ids |
+
+### ConfigItemDelete
+
+`ConfigItemDelete` (ITSMConfigurationManagement 6.5.4 and 7.3.5, identical) deletes the Tiqora CMDB items
+named by `ConfigItemID`, a comma separated string, a list or a single number (at most 500). Mode A answers
+`ConfigItemDelete.NotAvailable` ("Die CMDB wird in Znuny geführt (Modus A)"), mode `off`
+`Operation.NotImplemented`. The answer is `{"ConfigItemID": [..]}` with the ids as the caller sent them.
+
+| Topic | Behaviour |
+|-------|-----------|
+| Permission | `rw` on the group of the item's class (Znuny: `GenericInterface::Operation::ConfigItemDelete###Permission`); an unknown id and a missing right both answer `AccessDenied` ("Can not delete configuration item!") |
+| Partial failure (verbatim from `ConfigItemDelete.pm`) | The ids are processed in order, each in its own transaction. The first `AccessDenied` or `DeleteError` ends the call with that error; ids deleted before it **stay deleted**, later ids are not touched. There is no all-or-nothing mode |
+| Links, history, attachments | Removed with the item (CMDB semantics); neighbours' derived incident states are recomputed |
+| Import map | The importer's id map (`tiqora_itsm_import_map`) is not touched: running the Znuny import again would recreate a deleted item. After the switch the importer refuses to run, so this only matters before it |
 
 ### TicketCreate / TicketUpdate
 

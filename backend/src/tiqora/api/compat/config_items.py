@@ -4,8 +4,7 @@ Port of ``Kernel/GenericInterface/Operation/ConfigItem/*.pm`` of ITSMConfigurati
 and 7.3.5 (the two versions are identical for ``ConfigItemGet``; notes with file and line
 references in ``backend/tests/fixtures/itsm/gi_shapes.md``). This module is the common layer
 (mode gate, authentication, class-group permission, ``GiLookups``) plus ``ConfigItemGet``,
-``ConfigItemSearch``, ``ConfigItemCreate`` and ``ConfigItemUpdate``; ``ConfigItemDelete`` answers
-``Operation.NotImplemented`` until Task 24.
+``ConfigItemSearch``, ``ConfigItemCreate``, ``ConfigItemUpdate`` and ``ConfigItemDelete``.
 
 ``ConfigItemCreate`` / ``ConfigItemUpdate`` (Task 23) write through cmdb's own ``CiService``
 (numbering, history, class-group check, index and incident propagation are its job) and
@@ -437,26 +436,6 @@ async def op_config_item_get(
     if not items:
         return _err(f"{op}.NoConfigItemData", f"{op}: Could not get ConfigItem data")
     return {"ConfigItem": items}
-
-
-# --------------------------------------------------------------------------- not yet built
-
-
-async def _not_implemented(
-    op: str,
-    data: dict[str, Any],
-    session: AsyncSession,
-    session_store: SessionStore,
-    request: Any | None,
-    settings: Settings | None,
-) -> dict[str, Any]:
-    auth = await _agent_auth(op, data, session, session_store, request, settings)
-    if isinstance(auth, dict):
-        return auth
-    _ports, mode = await _gi_ports(session)
-    if (gate := _mode_error(op, mode)) is not None:
-        return gate
-    return _err("Operation.NotImplemented", f"{op}: not implemented yet")
 
 
 # --------------------------------------------------------------------------- ConfigItemSearch
@@ -1081,9 +1060,63 @@ async def op_config_item_delete(
     request: Any | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
-    return await _not_implemented(
-        "ConfigItemDelete", data, session, session_store, request, settings
-    )
+    """``ConfigItemDelete``: the items of ``ConfigItemID`` (comma list or array), one by one.
+
+    Port of ``ConfigItemDelete.pm`` (6.5.4 and 7.3.5, identical): every item is deleted in its
+    own transaction, in the order given. A missing right (an unknown id looks the same) answers
+    ``AccessDenied`` and a failing delete ``DeleteError``; both stop the loop, and the items
+    deleted before stay deleted (no rollback, like Znuny). Success is
+    ``{"ConfigItemID": [deleted ids as given]}``. Links go with the item (cmdb semantics); the
+    importer's id map is not touched, a re-import would recreate the item.
+    """
+    op = "ConfigItemDelete"
+    auth = await _agent_auth(op, data, session, session_store, request, settings)
+    if isinstance(auth, dict):
+        return auth
+    user_id, _login = auth
+    ports, mode = await _gi_ports(session)
+    if (gate := _mode_error(op, mode)) is not None:
+        return gate
+
+    raw = data.get("ConfigItemID")
+    if not (perl_truthy(raw) if not isinstance(raw, list | dict) else True):
+        return _err(f"{op}.MissingParameter", f"{op}: ConfigItemID parameter is missing!")
+    id_list = _split_ids(raw)
+    if id_list is None:
+        return _err(f"{op}.WrongStructure", f"{op}: Structure for ConfigItemID is not correct!")
+    if len(id_list) > MAX_GET_IDS:
+        return _err(
+            f"{op}.InvalidParameter",
+            f"{op}: At most {MAX_GET_IDS} ConfigItemID values are allowed!",
+        )
+
+    writable: set[int] = set()
+    if user_id != 0:
+        writable = await ports.reader.visible_class_ids(
+            user_id, await _permission_type(session, op)
+        )
+    deleted: list[Any] = []
+    for raw_id in id_list:
+        ci_id = _parse_id(raw_id)
+        view = await ports.reader.get_ci(ci_id) if ci_id is not None and writable else None
+        if view is None or view.class_id not in writable:  # unknown id == missing right
+            return denied(op)
+        try:
+            await CiService(session).delete(await load_access(session, user_id), view.id)
+            await session.commit()
+        except (CmdbForbidden, CmdbNotFound):
+            await session.rollback()
+            return denied(op)
+        except Exception:
+            await session.rollback()
+            logger.warning("gi_config_item_delete_failed", ci_id=view.id, exc_info=True)
+            return _err(
+                f"{op}.DeleteError",
+                f"{op}: Could not delete ConfigItem ID {raw_id}"
+                " in Kernel::GenericInterface::Operation::ConfigItem::ConfigItemDelete::Run()",
+            )
+        deleted.append(raw_id)
+    return {"ConfigItemID": deleted}
 
 
 __all__ = [
