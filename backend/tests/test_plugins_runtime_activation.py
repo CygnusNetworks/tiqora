@@ -214,7 +214,8 @@ async def test_read_only_without_directory_reports_it(
     off = rt_settings.model_copy(update={"plugins_runtime_install": False})
     act = await activate_runtime_plugins(off, factory)
     assert act.site_dirs == {}
-    assert "schreibgeschützt" in act.problems[PID] and off.plugins_dir in act.problems[PID]
+    assert "abgeschaltet" in act.problems[PID]  # the real reason, not "schreibgeschützt"
+    assert "schreibgeschützt" not in act.problems[PID]
 
 
 async def test_materialize_false_reports_next_start(
@@ -385,3 +386,38 @@ async def test_admin_list_shows_activation_problem_as_invalid(
         resp = await client.get("/api/v1/admin/plugins")
     entry = next(p for p in resp.json()["plugins"] if p["id"] == PID)
     assert entry["status"] == "invalid" and entry["status_message"] == NEXT_START_TEXT
+
+
+async def test_admin_list_after_update_without_restart(
+    factory: async_sessionmaker[AsyncSession], rt_settings: Settings, tmp_path: Path
+) -> None:
+    """F1: the install job leaves a COMPLETE 1.1.0 dir next to the active 1.0.0 one."""
+    data1, sha1 = _package(tmp_path, version="1.0.0")
+    data2, sha2 = _package(tmp_path, version="1.1.0")
+    await _install_row(factory, sha1, data=data1)
+    first = await activate_runtime_plugins(rt_settings, factory)  # boot
+    # D9 step 2 + row update, as the install job does, while the process keeps running
+    new_site = materialize(rt_settings, PID, "1.1.0", sha2, data2)
+    assert new_site.parent.joinpath("COMPLETE").exists()
+    await _install_row(factory, sha2, version="1.1.0", data=data2)
+
+    async def _db() -> Any:
+        async with factory() as session:
+            yield session
+
+    app = create_app(rt_settings)
+    app.dependency_overrides[get_db] = _db
+    app.dependency_overrides[get_admin_user] = lambda: ADMIN
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get("/api/v1/admin/plugins")
+    assert resp.status_code == 200
+    entries = [p for p in resp.json()["plugins"] if p["id"] == PID]
+    assert len(entries) == 1
+    entry = entries[0]
+    assert "mehrfach installiert" not in (entry["status_message"] or "")
+    assert entry["status"] != "invalid"
+    assert entry["source"] == "upload"
+    root = str(Path(rt_settings.plugins_dir) / PID)
+    assert [p for p in sys.path if p.startswith(root)] == [str(first.site_dirs[PID])]
+    row = await _row(factory)
+    assert row.source == "upload" and row.package_sha256 == sha2 and row.version == "1.1.0"

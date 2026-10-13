@@ -165,8 +165,9 @@ def activate_paths(site_dirs: Iterable[Path]) -> list[Path]:
         if entry not in sys.path:
             sys.path.append(entry)
             added.append(site)
-    importlib.invalidate_caches()
-    clear_discovery_cache()
+    if added:
+        importlib.invalidate_caches()
+        clear_discovery_cache()
     return added
 
 
@@ -290,6 +291,7 @@ async def activate_runtime_plugins_in(
         rows = await packages_store.installed_runtime_rows(session)
     except Exception as exc:
         if is_missing_table_error(exc):
+            await session.rollback()  # PostgreSQL: the failed statement aborted the transaction
             return RuntimeActivation()
         raise
     if not rows:
@@ -304,8 +306,8 @@ async def activate_runtime_plugins_in(
         if sha is None:
             continue
         if row.id in images:  # Assumption 5: the image wins
-            log.warning("plugin_runtime_package_shadowed", plugin=row.id)
-            if not status_only:
+            if not status_only:  # CLI status runs stay quiet (stdout carries --json)
+                log.warning("plugin_runtime_package_shadowed", plugin=row.id)
                 row.source = "image"
                 row.package_sha256 = None
                 row.repository_id = None
@@ -322,8 +324,7 @@ async def activate_runtime_plugins_in(
             site_dirs[row.id] = vdir / "site"
             continue
         if not status.writable:
-            where = settings.plugins_dir
-            problems[row.id] = f"Paketdateien fehlen im Verzeichnis {where} (schreibgeschützt)"
+            problems[row.id] = f"Paketdateien fehlen: {status.reason}"
             continue
         if not materialize:
             problems[row.id] = NEXT_START_TEXT
