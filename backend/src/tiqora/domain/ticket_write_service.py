@@ -69,6 +69,7 @@ from tiqora.znuny.history import (
     add_archive_flag_update,
     add_article_history,
     add_customer_update,
+    add_initial_type,
     add_lock,
     add_merged,
     add_move,
@@ -483,6 +484,18 @@ async def create_ticket(
     title = (replace_non_bmp(params.title) or "")[:255]
     responsible_id = params.responsible_id if params.responsible_id is not None else 1
     type_id = params.type_id if params.type_id is not None else 1
+    if params.type_id is None:
+        # Ticket.pm::TicketCreate: no Type/TypeID -> Ticket::Type::Default if that type
+        # exists, else TypeID 1.
+        default_type = await sysconfig.get_str("Ticket::Type::Default", "")
+        if default_type:
+            hit = (
+                await session.execute(
+                    text("SELECT id FROM ticket_type WHERE name = :n LIMIT 1"), {"n": default_type}
+                )
+            ).first()
+            if hit is not None:
+                type_id = int(hit[0])
 
     await session.execute(
         text(
@@ -541,6 +554,36 @@ async def create_ticket(
         user_id=user_id,
         queue_id=params.queue_id,
     )
+
+    # Initial Service/SLA/Type history (Ticket.pm::TicketCreate): written right after
+    # NewTicket, in the order Service, SLA, Type, only when the sysconfig is on. Prod
+    # has both off, so the default create path is unchanged.
+    if await sysconfig.get_bool("Ticket::Service"):
+        svc_name = await _lookup_name_or_null(session, "service", params.service_id)
+        await add_service_update(
+            session,
+            ticket_id=ticket_id,
+            new_service=svc_name,
+            new_service_id=params.service_id or "",
+            old_service="NULL",
+            old_service_id="",
+            user_id=user_id,
+        )
+        sla_name = await _lookup_name_or_null(session, "sla", params.sla_id)
+        await add_sla_update(
+            session,
+            ticket_id=ticket_id,
+            new_sla=sla_name,
+            new_sla_id=params.sla_id or "",
+            old_sla="NULL",
+            old_sla_id="",
+            user_id=user_id,
+        )
+    if await sysconfig.get_bool("Ticket::Type"):
+        type_name = await _lookup_name_or_null(session, "ticket_type", type_id)
+        await add_initial_type(
+            session, ticket_id=ticket_id, type_name=type_name, type_id=type_id, user_id=user_id
+        )
 
     # Customer data history: Znuny TicketCreate calls TicketCustomerSet when
     # CustomerID/CustomerUser is given, writing a CustomerUpdate row with BOTH
