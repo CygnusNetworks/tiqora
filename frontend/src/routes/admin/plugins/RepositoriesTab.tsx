@@ -138,6 +138,7 @@ export function RepositoriesTab() {
   const [editing, setEditing] = useState<PluginRepository | "new" | null>(null);
   const [deleting, setDeleting] = useState<PluginRepository | null>(null);
   const [refreshing, setRefreshing] = useState<{ repoId: number; jobId: number } | null>(null);
+  const [finishedJobId, setFinishedJobId] = useState<number | null>(null);
   const reload = () => void qc.invalidateQueries({ queryKey: ["admin", "plugins"] });
 
   const refreshM = useMutation({
@@ -185,7 +186,7 @@ export function RepositoriesTab() {
       ) : (
         <ul className="list-none space-y-3">
           {repos.map((r) => {
-            const busy = refreshing?.repoId === r.id || (refreshM.isPending && refreshM.variables === r.id);
+            const busy = (refreshing?.repoId === r.id && finishedJobId !== refreshing.jobId) || (refreshM.isPending && refreshM.variables === r.id);
             return (
               <li key={r.id} className="rounded-xl border border-hairline bg-surface p-4" data-testid={`repository-row-${r.id}`}>
                 <div className="flex flex-wrap items-start gap-3">
@@ -248,9 +249,11 @@ export function RepositoriesTab() {
                 {refreshing?.repoId === r.id && (
                   <div className="mt-3">
                     <RefreshProgress
+                      key={refreshing.jobId}
                       repoId={r.id}
                       jobId={refreshing.jobId}
                       onDone={() => {
+                        setFinishedJobId(refreshing.jobId);
                         reload();
                       }}
                     />

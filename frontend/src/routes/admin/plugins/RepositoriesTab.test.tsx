@@ -135,6 +135,16 @@ describe("RepositoriesTab", () => {
     await waitFor(() => expect(repositories.mock.calls.length).toBeGreaterThan(before));
   });
 
+  it("enables the check button again once the check job has ended", async () => {
+    refreshRepository.mockResolvedValue({ job_id: 8, status: "queued" });
+    jobState = job({ status: "failed" });
+    renderTab();
+    await screen.findByText("Beispiel-Paketquelle");
+    fireEvent.click(screen.getByTestId("repository-check-1"));
+    await screen.findByTestId("repository-progress-1");
+    await waitFor(() => expect(screen.getByTestId("repository-check-1")).not.toBeDisabled());
+  });
+
   it("shows the last error and verification state", async () => {
     repositories.mockResolvedValue([
       repository({ id: 1, verified: true }),
