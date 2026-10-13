@@ -66,7 +66,7 @@ export function LinkedTickets({
       className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[12.5px]"
       data-testid="linked-tickets"
     >
-      <span className="text-muted">{t("ticket.links.label")}</span>
+      {links.length > 0 && <span className="text-muted">{t("ticket.links.label")}</span>}
       {links.map((l) => (
         <span key={`${l.other_ticket_id}-${l.link_type}`} className="inline-flex min-w-0 max-w-full items-center gap-0.5">
         <Link

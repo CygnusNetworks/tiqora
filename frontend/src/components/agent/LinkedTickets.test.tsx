@@ -128,6 +128,8 @@ describe("LinkedTickets", () => {
     wrap(<LinkedTickets ticketId={7} />);
     expect(await screen.findByTestId("link-graph-toggle")).toBeTruthy();
     expect(screen.queryByTestId("linked-note-open")).toBeNull();
+    // no "Linked tickets" label without ticket chips
+    expect(screen.getByTestId("linked-tickets").textContent).not.toContain(i18n.t("ticket.links.label"));
   });
 
   it("toggles the link graph", async () => {
