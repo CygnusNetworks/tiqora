@@ -130,3 +130,32 @@ def test_static_warnings_scan_budget() -> None:
     big = b"x = 1\n" + b"#" * MAX_SCAN_BYTES
     out = static_warnings({"tq_x/big.py": big}, short_id="hello")
     assert len(out) == 1 and "gekürzt" in out[0]
+
+
+def test_core_names_not_exempt_for_own_dist() -> None:
+    assert collision_problems(["tiqora"], {"tiqora": ["tiqora"]}, own_dist="tiqora") != []
+    assert collision_problems(["fastapi"], {"fastapi": ["fastapi"]}, own_dist="fastapi") != []
+    assert collision_problems(["json"], {}, own_dist="json") != []
+
+
+def test_znuny_tables_beyond_legacy_metadata_are_flagged() -> None:
+    for table in ("notification_event", "system_data", "scheduler_task"):
+        src = f'q = "UPDATE {table} SET x = 1"'.encode()
+        w = static_warnings({"a.py": src}, short_id="abc")
+        assert any(table in x for x in w), table
+
+
+def test_explicit_empty_installed_is_not_live_process() -> None:
+    assert requirement_problems(["httpx"], {}) != []
+
+
+def test_sql_variants_and_table_name_keyword() -> None:
+    for sql in (
+        "TRUNCATE TABLE ticket",
+        "REPLACE INTO ticket (a)",
+        "INSERT IGNORE INTO ticket",
+        "DELETE FROM otrs.ticket",
+    ):
+        assert static_warnings({"a.py": f'q = "{sql}"'.encode()}, short_id="abc"), sql
+    src = b'op.create_table(table_name="ticket")'
+    assert migration_tables({"x/migrations/1.py": src}) == ["ticket"]

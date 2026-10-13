@@ -8,10 +8,11 @@ contents (only names).
 from __future__ import annotations
 
 import ast
+import functools
 import re
 import sys
 from collections.abc import Iterable, Mapping, Sequence
-from importlib import metadata
+from importlib import metadata, resources
 from typing import Final
 
 from packaging.requirements import InvalidRequirement, Requirement
@@ -22,12 +23,15 @@ from packaging.version import InvalidVersion, Version
 _CORE_DISTS: Final = frozenset({"tiqora", "tiqora-sdk"})
 #: import names a plugin must never ship, even if the metadata lookup misses them
 _CORE_MODULES: Final = ("tiqora", "tiqora_sdk")
+#: import names never exempt from the collision check, not even for ``own_dist``
+_PROTECTED_MODULES: Final = (*_CORE_MODULES, "fastapi")
 #: total source bytes the static scan reads; the rest is skipped with one warning
 MAX_SCAN_BYTES: Final = 2 * 1024 * 1024
 
 _SQL_RE: Final = re.compile(
-    r"\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM|ALTER\s+TABLE|DROP\s+TABLE|CREATE\s+TABLE)\s+"
-    r"(?:IF\s+(?:NOT\s+)?EXISTS\s+)?[`\"\[]?(\w+)",
+    r"\b(?:INSERT\s+(?:IGNORE\s+)?INTO|REPLACE\s+INTO|UPDATE|DELETE\s+FROM|ALTER\s+TABLE"
+    r"|DROP\s+TABLE|CREATE\s+TABLE|TRUNCATE(?:\s+TABLE)?)\s+"
+    r"(?:IF\s+(?:NOT\s+)?EXISTS\s+)?(?:[`\"\[]?\w+[`\"\]]?\s*\.\s*)?[`\"\[]?(\w+)",
     re.IGNORECASE,
 )
 
@@ -46,7 +50,10 @@ def requirement_problems(
     requires_dist: Sequence[str], installed: Mapping[str, str] | None = None
 ) -> list[str]:
     """Problems for ``Requires-Dist`` lines that this Tiqora cannot satisfy."""
-    have = {canonicalize_name(k): v for k, v in (installed or installed_versions()).items()}
+    have = {
+        canonicalize_name(k): v
+        for k, v in (installed_versions() if installed is None else installed).items()
+    }
     problems: list[str] = []
     for line in requires_dist:
         try:
@@ -94,16 +101,15 @@ def collision_problems(
         if top == "tqp":
             continue
         dists = [canonicalize_name(d) for d in owners.get(top, ())]
-        if own is not None and dists and all(d == own for d in dists):
-            continue
+        # stdlib and core names are never exempt, whatever ``own_dist`` says
         if top in sys.stdlib_module_names:
             problems.append(f"Python-Modul „{top}“ gibt es in Tiqora schon (Standardbibliothek)")
-        elif dists:
-            problems.append(f"Python-Modul „{top}“ gibt es in Tiqora schon (Paket {dists[0]})")
-        elif top in _CORE_MODULES:
+        elif top in _PROTECTED_MODULES:
             problems.append(
                 f"Python-Modul „{top}“ gibt es in Tiqora schon (Paket {top.replace('_', '-')})"
             )
+        elif dists and not (own is not None and all(d == own for d in dists)):
+            problems.append(f"Python-Modul „{top}“ gibt es in Tiqora schon (Paket {dists[0]})")
     return problems
 
 
@@ -121,17 +127,16 @@ def _is_migration(path: str) -> bool:
 
 def _create_table_names(tree: ast.AST) -> Iterable[str]:
     for node in ast.walk(tree):
-        if not isinstance(node, ast.Call) or not node.args:
+        if not isinstance(node, ast.Call):
             continue
         func = node.func
         name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
-        first = node.args[0]
-        if (
-            name == "create_table"
-            and isinstance(first, ast.Constant)
-            and isinstance(first.value, str)
-        ):
-            yield first.value
+        if name != "create_table":
+            continue
+        cands = list(node.args[:1]) + [k.value for k in node.keywords if k.arg == "table_name"]
+        for first in cands[:1]:
+            if isinstance(first, ast.Constant) and isinstance(first.value, str):
+                yield first.value
 
 
 def migration_tables(files: Mapping[str, bytes]) -> list[str]:
@@ -156,12 +161,19 @@ def prefix_problems(files: Mapping[str, bytes], short_id: str) -> list[str]:
     ]
 
 
+_CREATE_TABLE_RE: Final = re.compile(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?(\w+)", re.I)
+
+
+@functools.cache
 def znuny_table_names() -> frozenset[str]:
-    """Table names of the Znuny read-path models (``LegacyBase.metadata``)."""
+    """Znuny table names: ``LegacyBase.metadata`` plus the packaged bootstrap schema."""
     import tiqora.db.legacy  # noqa: F401  (registers every legacy model)
     from tiqora.db.legacy.base import LegacyBase
 
-    return frozenset(LegacyBase.metadata.tables)
+    names = {n.lower() for n in LegacyBase.metadata.tables}
+    ddl = resources.files("tiqora.bootstrap").joinpath("schema", "schema.mysql.sql")
+    names.update(m.lower() for m in _CREATE_TABLE_RE.findall(ddl.read_text(encoding="utf-8")))
+    return frozenset(n for n in names if not n.startswith(("tiqora_", "tqp_")))
 
 
 def _dotted(node: ast.AST, aliases: Mapping[str, str]) -> str | None:
