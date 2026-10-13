@@ -237,7 +237,8 @@
     "kerberosReauthNow": "Jetzt anmelden",
     "ssoFailed": "SSO fehlgeschlagen — bitte per Passwort anmelden.",
     "stepUp": {
-      "hint": "Ihr Anmeldedienst hat keinen zweiten Faktor bestätigt. Bitte bestätigen Sie ihn hier, um die Anmeldung abzuschließen."
+      "hint": "Ihr Anmeldedienst hat keinen zweiten Faktor bestätigt. Bitte bestätigen Sie ihn hier, um die Anmeldung abzuschließen.",
+      "expired": "Die Anmeldung ist abgelaufen. Bitte melden Sie sich erneut an."
     },
     "mustEnroll": {
       "title": "Zwei-Faktor-Authentifizierung einrichten",
@@ -269,7 +270,7 @@
       "saml_invalid": "Die Antwort des Anmeldedienstes war ungültig. Bitte erneut versuchen.",
       "oidc_failed": "Die Anmeldung beim Anmeldedienst ist fehlgeschlagen. Bitte erneut versuchen.",
       "idp_error": "Der Anmeldedienst hat die Anmeldung abgelehnt.",
-      "mfa_required": "Ihr Anmeldedienst hat keine Anmeldung mit zweitem Faktor bestätigt. Bitte melden Sie sich dort mit zweitem Faktor an oder richten Sie in Tiqora einen zweiten Faktor ein."
+      "mfa_required": "Ihr Anmeldedienst hat keine Anmeldung mit zweitem Faktor bestätigt. Bitte melden Sie sich dort mit zweitem Faktor an. Falls das nicht möglich ist, wenden Sie sich an Ihre Administration."
     },
     "loggedOut": "Sie wurden abgemeldet."
   },
@@ -4762,7 +4763,8 @@
           "users": "Konten",
           "active": "davon aktiv",
           "groups": "Gruppen",
-          "pending": "Rollenabgleich offen"
+          "pending": "Rollenabgleich offen",
+          "lastActivity": "Letzte Aktivität"
         },
         "accounts": {
           "title": "Bereitgestellte Konten",
@@ -4774,14 +4776,15 @@
           "login": "Konto",
           "userName": "Benutzername",
           "externalId": "Kennung beim Anmeldedienst",
-          "changed": "Geändert"
+          "changed": "Geändert",
+          "showDeleted": "Gelöschte anzeigen"
         },
         "groups": {
           "title": "Gruppen vom Anmeldedienst",
           "empty": "Noch keine Gruppen übertragen.",
           "name": "Name",
           "members": "Mitglieder",
-          "rulesHint": "Gruppen wirken über Regeln mit dem Attribut scim:groups im Reiter „Rollen“."
+          "rulesHint": "Gruppen wirken über Regeln mit dem Attribut scim:groups im Reiter „Rollen aus dem Anmeldedienst“."
         },
         "events": {
           "title": "Protokoll",
@@ -4819,13 +4822,14 @@
         "envReadOnly": "Dieser Anbieter stammt aus Umgebungsvariablen. Sitzungseinstellungen setzen einen im Adminbereich angelegten Anbieter voraus; legen Sie ihn im Adminbereich neu an.",
         "loadError": "Die Einstellungen konnten nicht geladen werden.",
         "requireMfa": "Zweiten Faktor vom Anmeldedienst verlangen",
-        "requireMfaHelp": "Anmeldungen ohne Nachweis eines zweiten Faktors vom Anmeldedienst werden nicht als vertrauenswürdig behandelt. Entra ID meldet ihn als amr \"mfa\", Okta als amr \"mfa\" oder \"otp\", Keycloak als acr \"2\" oder höher (mit Step-up-Flows).",
+        "requireMfaHelp": "Anmeldungen ohne Nachweis eines zweiten Faktors vom Anmeldedienst werden nicht als vertrauenswürdig behandelt. Entra ID meldet ihn als amr \"mfa\", Okta als amr \"mfa\" oder \"otp\", Keycloak als acr \"2\" (mit Step-up-Flows). Verglichen wird genau: Tragen Sie jede zulässige Stufe ein, zum Beispiel 2 und 3.",
         "fallback": {
           "title": "Ohne Bestätigung",
-          "local_second_factor": "Ohne Bestätigung: zweiten Faktor in Tiqora abfragen",
+          "local_second_factor": "Zweiten Faktor in Tiqora abfragen",
           "reject": "Anmeldung ablehnen",
           "local_second_factor_or_enroll": "In Tiqora abfragen oder Einrichtung eines Faktors erlauben",
-          "enrollHelp": "Ermöglicht Ersteinrichtung ohne Nachweis. Wer nur das Kennwort des Anmeldedienstes kennt, kann dann einen Faktor registrieren."
+          "enrollHelp": "Ermöglicht Ersteinrichtung ohne Nachweis. Wer nur das Kennwort des Anmeldedienstes kennt, kann dann einen Faktor registrieren.",
+          "localHelp": "Personen ohne eingerichteten zweiten Faktor werden abgelehnt."
         },
         "oidcAmr": "amr-Werte",
         "oidcAmrHelp": "Methoden, die als zweiter Faktor gelten, zum Beispiel mfa, otp, hwk. Entra ID: mfa. Okta: mfa, otp. Keycloak: meist stattdessen acr.",

@@ -35,6 +35,7 @@ export function Dialog({
   className,
   role = "dialog",
   closeLabel,
+  dismissible = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -55,6 +56,9 @@ export function Dialog({
   role?: "dialog" | "alertdialog";
   /** Accessible name of the ✕ button (default: "Zurück"). */
   closeLabel?: string;
+  /** `false`: Escape and a backdrop click do not close (only the ✕ and the
+   * dialog's own buttons do) — for content that must not be lost by accident. */
+  dismissible?: boolean;
 }) {
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -66,6 +70,8 @@ export function Dialog({
   // the caret mid-typing.
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const dismissibleRef = useRef(dismissible);
+  dismissibleRef.current = dismissible;
 
   useEffect(() => {
     if (!open) return;
@@ -92,7 +98,7 @@ export function Dialog({
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onCloseRef.current();
+        if (dismissibleRef.current) onCloseRef.current();
         return;
       }
       if (e.key !== "Tab") return;
@@ -139,7 +145,7 @@ export function Dialog({
         tabIndex={-1}
         className="absolute inset-0 bg-black/50 backdrop-blur-[2px] motion-safe:animate-[dialog-fade_120ms_ease-out]"
         aria-label={t("common.back")}
-        onClick={onClose}
+        onClick={dismissible ? onClose : undefined}
       />
       <div
         ref={panelRef}

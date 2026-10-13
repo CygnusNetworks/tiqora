@@ -237,7 +237,8 @@
     "kerberosReauthNow": "Ingia sasa",
     "ssoFailed": "SSO imeshindwa - tafadhali ingia kwa kutumia nenosiri lako.",
     "stepUp": {
-      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in."
+      "hint": "Your sign-in service did not confirm a second factor. Please confirm it here to finish signing in.",
+      "expired": "The sign-in has expired. Please sign in again."
     },
     "mustEnroll": {
       "title": "Sanidi uthibitishaji wa vipengele viwili",
@@ -269,7 +270,7 @@
       "saml_invalid": "The response of the sign-in service was invalid. Please try again.",
       "oidc_failed": "Signing in with the sign-in service failed. Please try again.",
       "idp_error": "The sign-in service rejected the sign-in.",
-      "mfa_required": "Your sign-in service did not confirm a sign-in with a second factor. Please sign in there with a second factor, or set up a second factor in Tiqora."
+      "mfa_required": "Your sign-in service did not confirm a sign-in with a second factor. Please sign in there with a second factor. If that is not possible, contact your administrator."
     },
     "loggedOut": "You have been signed out."
   },
@@ -4754,7 +4755,8 @@
           "users": "Accounts",
           "active": "of which active",
           "groups": "Groups",
-          "pending": "Role sync pending"
+          "pending": "Role sync pending",
+          "lastActivity": "Last activity"
         },
         "accounts": {
           "title": "Provisioned accounts",
@@ -4766,14 +4768,15 @@
           "login": "Account",
           "userName": "User name",
           "externalId": "ID at the identity provider",
-          "changed": "Changed"
+          "changed": "Changed",
+          "showDeleted": "Show deleted"
         },
         "groups": {
           "title": "Groups from the identity provider",
           "empty": "No groups pushed yet.",
           "name": "Name",
           "members": "Members",
-          "rulesHint": "Groups take effect through rules with the attribute scim:groups on the \"Roles\" tab."
+          "rulesHint": "Groups take effect through rules with the attribute scim:groups on the \"Roles from the sign-in service\" tab."
         },
         "events": {
           "title": "Log",
@@ -4811,13 +4814,14 @@
         "envReadOnly": "This provider comes from environment variables. Session settings need a provider created here in the admin area; recreate it to use them.",
         "loadError": "The settings could not be loaded.",
         "requireMfa": "Require a second factor from the sign-in service",
-        "requireMfaHelp": "Sign-ins without proof of a second factor from the sign-in service are not trusted. Entra ID reports it as amr \"mfa\", Okta as amr \"mfa\" or \"otp\", Keycloak as acr \"2\" or higher (with step-up flows).",
+        "requireMfaHelp": "Sign-ins without proof of a second factor from the sign-in service are not trusted. Entra ID reports it as amr \"mfa\", Okta as amr \"mfa\" or \"otp\", Keycloak as acr \"2\" (with step-up flows). Values are compared exactly: list every accepted level, for example 2 and 3.",
         "fallback": {
           "title": "Without proof",
-          "local_second_factor": "Without proof: ask for the second factor in Tiqora",
+          "local_second_factor": "Ask for the second factor in Tiqora",
           "reject": "Reject the sign-in",
           "local_second_factor_or_enroll": "Ask in Tiqora, or let users set up a second factor",
-          "enrollHelp": "Allows first-time setup without proof. Anyone who knows only the password of the sign-in service can then register a factor."
+          "enrollHelp": "Allows first-time setup without proof. Anyone who knows only the password of the sign-in service can then register a factor.",
+          "localHelp": "People without a second factor set up in Tiqora are refused."
         },
         "oidcAmr": "amr values",
         "oidcAmrHelp": "Methods that count as a second factor, for example mfa, otp, hwk. Entra ID: mfa. Okta: mfa, otp. Keycloak: usually acr instead.",

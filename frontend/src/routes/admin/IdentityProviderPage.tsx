@@ -48,8 +48,13 @@ export function IdentityProviderPage() {
     queryFn: ({ signal }) => identityApi.capabilities(signal),
   });
 
-  const tab: IdentityProviderTab = search.test ? "test" : (search.tab ?? "connection");
   const provider = providerQ.data;
+  // LDAP has no provisioning or session tab: a link to one opens the connection tab.
+  const offered = TABS.filter(
+    (id) => (id !== "provisioning" && id !== "session") || provider?.kind !== "ldap",
+  );
+  const wanted: IdentityProviderTab = search.test ? "test" : (search.tab ?? "connection");
+  const tab: IdentityProviderTab = offered.includes(wanted) ? wanted : "connection";
   useEffect(() => {
     setVisited((cur) => (cur.has(tab) ? cur : new Set(cur).add(tab)));
   }, [tab]);
@@ -94,7 +99,7 @@ export function IdentityProviderPage() {
       </div>
 
       <Tabs
-        items={TABS.filter((id) => (id !== "provisioning" && id !== "session") || provider.kind !== "ldap").map((id) => ({ id, label: t(`admin.identity.tabs.${id}`) }))}
+        items={offered.map((id) => ({ id, label: t(`admin.identity.tabs.${id}`) }))}
         value={tab}
         onChange={(next) =>
           navigate({

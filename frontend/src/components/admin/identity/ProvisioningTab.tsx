@@ -71,13 +71,18 @@ export function ProvisioningTab({
   const [search, setSearch] = useState("");
   const q = useDebounced(search.trim(), 250);
   const [accountOffset, setAccountOffset] = useState(0);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [groupOffset, setGroupOffset] = useState(0);
 
   const statusQ = useQuery({ queryKey: [...key, "status"], queryFn: ({ signal }) => identityApi.getScimStatus(id, signal) });
   const accountsQ = useQuery({
-    queryKey: [...key, "accounts", q, accountOffset],
+    queryKey: [...key, "accounts", q, accountOffset, showDeleted],
     queryFn: ({ signal }) =>
-      identityApi.listScimAccounts(id, { offset: accountOffset, limit: PAGE, q: q || undefined }, signal),
+      identityApi.listScimAccounts(
+        id,
+        { offset: accountOffset, limit: PAGE, q: q || undefined, include_deleted: showDeleted || undefined },
+        signal,
+      ),
     enabled: statusQ.data?.available === true,
   });
   const groupsQ = useQuery({
@@ -207,6 +212,14 @@ export function ProvisioningTab({
               </dd>
             </div>
           ))}
+          <div className="flex items-baseline gap-1.5">
+            <dt className="text-xs text-muted">{t("admin.identity.scim.counts.lastActivity")}</dt>
+            <dd data-testid="scim-last-activity" className="font-medium text-ink">
+              {status.last_activity_at
+                ? formatDateTime(status.last_activity_at, locale)
+                : t("admin.identity.scim.tokens.never")}
+            </dd>
+          </div>
         </dl>
       </section>
 
@@ -283,18 +296,32 @@ export function ProvisioningTab({
       <section className="space-y-3 rounded-lg border border-hairline bg-surface p-4" data-testid="scim-accounts">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-ink">{t("admin.identity.scim.accounts.title")}</h2>
-          <input
-            type="search"
-            data-testid="scim-accounts-search"
-            aria-label={t("admin.identity.scim.accounts.search")}
-            placeholder={t("admin.identity.scim.accounts.search")}
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setAccountOffset(0);
-            }}
-            className="w-56 rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-accent"
-          />
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-1.5 text-xs text-muted">
+              <input
+                type="checkbox"
+                data-testid="scim-accounts-show-deleted"
+                checked={showDeleted}
+                onChange={(e) => {
+                  setShowDeleted(e.target.checked);
+                  setAccountOffset(0);
+                }}
+              />
+              {t("admin.identity.scim.accounts.showDeleted")}
+            </label>
+            <input
+              type="search"
+              data-testid="scim-accounts-search"
+              aria-label={t("admin.identity.scim.accounts.search")}
+              placeholder={t("admin.identity.scim.accounts.search")}
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setAccountOffset(0);
+              }}
+              className="w-56 rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </div>
         </div>
         {accountsQ.isLoading && <Spinner />}
         {accountsQ.isError && (
@@ -324,7 +351,7 @@ export function ProvisioningTab({
                 {accountsQ.data.items.map((a) => (
                   <tr key={a.scim_id} className="border-t border-hairline" data-testid="scim-account-row">
                     <td className="px-3 py-2 text-ink">{a.login ?? "—"}</td>
-                    <td className="px-3 py-2 text-ink">{t(`admin.identity.scim.kinds.${a.user_kind}`)}</td>
+                    <td className="px-3 py-2 text-ink">{t(`admin.identity.links.kinds.${a.user_kind}`)}</td>
                     <td className="break-all px-3 py-2 text-ink">{a.user_name}</td>
                     <td className="break-all px-3 py-2 font-mono text-[12.5px] text-muted">{a.external_id ?? "—"}</td>
                     <td className="px-3 py-2">
@@ -352,6 +379,11 @@ export function ProvisioningTab({
         <h2 className="text-sm font-semibold text-ink">{t("admin.identity.scim.groups.title")}</h2>
         <p className="text-xs text-muted">{t("admin.identity.scim.groups.rulesHint")}</p>
         {groupsQ.isLoading && <Spinner />}
+        {groupsQ.isError && (
+          <p role="alert" className="text-sm text-danger">
+            {apiErrorMessage(groupsQ.error, t("admin.identity.scim.loadError"))}
+          </p>
+        )}
         {groupsQ.data && groupsQ.data.items.length === 0 && (
           <p data-testid="scim-groups-empty" className="text-sm text-muted">
             {t("admin.identity.scim.groups.empty")}

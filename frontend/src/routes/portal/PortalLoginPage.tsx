@@ -61,7 +61,8 @@ export function PortalLoginPage() {
   useEffect(() => {
     if (!stepUp || stepUpChecked.current) return;
     stepUpChecked.current = true;
-    void refreshPending();
+    // Nothing pending any more (expired): the normal form says so.
+    void refreshPending().then((state) => setExpired(state === "none"));
   }, [stepUp, refreshPending]);
 
   const onSubmit = async (e: FormEvent) => {

@@ -110,7 +110,7 @@ export function SessionTab({
   const useGlobal = idleSeconds === null && absSeconds === null;
   const isOidc = provider.kind === "oidc";
   const errors = saveM.isError ? providerFieldErrors(saveM.error).common : {};
-  const errorFor = (key: string) => errors[key] ?? errors[`mfa_policy.${key}`];
+  const errorFor = (key: string) => errors[key];
 
   const set = <K extends PolicyKey>(key: K, value: PolicyForm[K]) => setPolicy((cur) => ({ ...cur, [key]: value }));
 
@@ -148,6 +148,9 @@ export function SessionTab({
 
   return (
     <form
+      // The component checks the ranges itself; native step checks would block
+      // stored lifetimes that are not whole minutes / quarter hours.
+      noValidate
       className="space-y-4"
       data-testid="identity-session"
       onSubmit={(e) => {
@@ -188,6 +191,11 @@ export function SessionTab({
                     />
                     <span>
                       {t(`admin.identity.session.fallback.${f}`)}
+                      {f === "local_second_factor" && (
+                        <span className="block text-xs text-muted" data-testid="session-fallback-default-help">
+                          {t("admin.identity.session.fallback.localHelp")}
+                        </span>
+                      )}
                       {f === "local_second_factor_or_enroll" && (
                         <span className="block text-xs text-muted">
                           {t("admin.identity.session.fallback.enrollHelp")}

@@ -119,6 +119,10 @@ describe("PortalLoginPage", () => {
     expect(await screen.findByTestId("portal-login-form")).toBeInTheDocument();
     await waitFor(() => expect(pendingLogin).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId("sso-step-up-hint")).toBeNull();
+    // the pending login expired: the form says so instead of appearing without a word
+    expect(await screen.findByTestId("portal-2fa-expired")).toHaveTextContent(
+      i18n.t("portal.login.twoFactorExpired"),
+    );
   });
 
   it("renders one button per identity provider linking to the portal SSO start", async () => {

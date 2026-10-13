@@ -52,6 +52,8 @@ export function ScimTokenDialog({
   const nameValid = name.trim().length > 0;
 
   const createM = useMutation({
+    // The raw token must not outlive the dialog in the MutationCache.
+    gcTime: 0,
     mutationFn: () =>
       identityApi.createScimToken(providerId, { name: name.trim(), user_kind: kind, expires_in_days: daysNum }),
     onSuccess: (res) => {
@@ -76,6 +78,8 @@ export function ScimTokenDialog({
     <Dialog
       open={open}
       onClose={close}
+      // While the one-time token is shown, Escape or a stray backdrop click must not discard it.
+      dismissible={!token}
       title={t(token ? "admin.identity.scim.tokens.createdTitle" : "admin.identity.scim.tokens.create")}
       footer={
         token ? (

@@ -108,19 +108,21 @@ describe("SessionTab", () => {
     expect(screen.getByText(/Ersteinrichtung ohne Nachweis/)).toBeInTheDocument();
   });
 
-  it("shows server errors per field", async () => {
-    update.mockRejectedValue(
-      new ApiError(
-        422,
-        { detail: { message: "invalid", errors: { "mfa_policy.oidc_request_acr_values": "Ungültiger Wert." } } },
-        "/x",
-      ),
-    );
+  it("explains that the default refuses people without a second factor", async () => {
     wrap(<SessionTab provider={oidc} onSaved={vi.fn()} />);
-    fireEvent.change(await screen.findByTestId("session-oidc-request-acr"), { target: { value: "bad" } });
+    const help = await screen.findByTestId("session-fallback-default-help");
+    expect(help).toHaveTextContent("Personen ohne eingerichteten zweiten Faktor werden abgelehnt.");
+    const label = screen.getByTestId("session-fallback-local_second_factor").closest("label");
+    expect(label?.textContent).not.toMatch(/Ohne Bestätigung:/);
+  });
+
+  it("saves a stored lifetime that is not a whole quarter hour", async () => {
+    // 3000 s = 0.8333 h: a native step check (step 0.25) would block the submit.
+    const odd = makeProvider({ id: 5, kind: "oidc", require_mfa_claim: true, session_idle_seconds: 1830, session_absolute_seconds: 3000 });
+    wrap(<SessionTab provider={odd} onSaved={vi.fn()} />);
+    fireEvent.click(await screen.findByTestId("session-fallback-reject"));
     fireEvent.click(screen.getByTestId("session-save"));
-    expect(await screen.findByText("Ungültiger Wert.")).toBeInTheDocument();
-    expect(screen.queryByTestId("session-save-error")).toBeNull();
+    await waitFor(() => expect(update).toHaveBeenCalledWith(5, { mfa_policy: { fallback: "reject" } }));
   });
 
   it("shows the backend's single mfa_policy error", async () => {

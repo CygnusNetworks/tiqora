@@ -111,10 +111,12 @@ export function LoginPage() {
   // what the session cookie is waiting for, once per mount.
   const stepUp = search.sso_step_up === "1";
   const stepUpChecked = useRef(false);
+  // The pending login expired (or was never there): say so above the normal form.
+  const [stepUpExpired, setStepUpExpired] = useState(false);
   useEffect(() => {
     if (!stepUp || stepUpChecked.current) return;
     stepUpChecked.current = true;
-    void refreshPending();
+    void refreshPending().then((state) => setStepUpExpired(state === "none"));
   }, [stepUp, refreshPending]);
 
   // Seamless SSO re-auth: when an expired session bounced the agent here (a
@@ -141,6 +143,9 @@ export function LoginPage() {
 
   useEffect(() => {
     if (autoSsoTriggered.current) return;
+    // Back from a single sign-on step-up: the second factor is asked for here,
+    // never a Kerberos handshake (pending2fa is still false until /auth/pending answers).
+    if (stepUp) return;
     if (isLoading || isAuthenticated || pending2fa || mustEnroll2fa) return;
     if (ssoErrorFlag || !spnegoEnabled) return;
     if (!isSafeNextPath(search.next)) return;
@@ -152,6 +157,7 @@ export function LoginPage() {
     reauthNextRef.current = search.next;
     setKerberosReauthSeconds(KERBEROS_REAUTH_DELAY_S);
   }, [
+    stepUp,
     isLoading,
     isAuthenticated,
     pending2fa,
@@ -160,6 +166,11 @@ export function LoginPage() {
     spnegoEnabled,
     search.next,
   ]);
+
+  // A second-factor step that appears while the countdown runs cancels it.
+  useEffect(() => {
+    if (pending2fa || mustEnroll2fa) setKerberosReauthSeconds(null);
+  }, [pending2fa, mustEnroll2fa]);
 
   // Tick the countdown once per second; redirect when it hits zero.
   useEffect(() => {
@@ -561,6 +572,15 @@ export function LoginPage() {
             data-testid="logged-out-note"
           >
             {t("auth.loggedOut")}
+          </p>
+        )}
+        {stepUpExpired && !ssoErrorMessageKey && (
+          <p
+            className="mt-3 rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-sm text-muted"
+            role="status"
+            data-testid="sso-step-up-expired"
+          >
+            {t("auth.stepUp.expired")}
           </p>
         )}
         {ssoErrorMessageKey && (

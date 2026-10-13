@@ -1968,7 +1968,8 @@ function identityDetail(id: number) {
     },
     session_idle_seconds: null,
     session_absolute_seconds: null,
-    scim_enabled: false,
+    // Matches demoScimStatus.enabled (the provisioning tab shows a working log).
+    scim_enabled: row.kind !== "ldap",
     scim_adopt_existing: false,
     // Same shapes as backend identity/urls.py provider_urls().
     endpoints: {

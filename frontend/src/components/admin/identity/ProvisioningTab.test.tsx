@@ -121,6 +121,31 @@ describe("ProvisioningTab", () => {
     expect(screen.queryByTestId("scim-token-value")).toBeNull();
   });
 
+  it("keeps the token on Escape and backdrop and drops it from the mutation cache after Fertig", async () => {
+    createToken.mockResolvedValue({ token: "tqscim_secretvalue", record: token });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <I18nextProvider i18n={i18n}>
+          <ProvisioningTab provider={provider} onSaved={vi.fn()} />
+        </I18nextProvider>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByTestId("scim-token-new"));
+    fireEvent.change(screen.getByTestId("scim-token-name"), { target: { value: "Okta" } });
+    fireEvent.click(screen.getByTestId("scim-token-submit"));
+    await screen.findByTestId("scim-token-value");
+    fireEvent.keyDown(document, { key: "Escape" });
+    const backdrop = document.querySelector("button.absolute.inset-0");
+    expect(backdrop).not.toBeNull();
+    fireEvent.click(backdrop!);
+    expect(screen.getByTestId("scim-token-value")).toHaveTextContent("tqscim_secretvalue");
+    fireEvent.click(screen.getByTestId("scim-token-close"));
+    await waitFor(() => expect(screen.queryByTestId("scim-token-value")).toBeNull());
+    const cached = () => JSON.stringify(qc.getMutationCache().getAll().map((m) => m.state.data ?? null));
+    await waitFor(() => expect(cached()).not.toContain("tqscim_secretvalue"));
+  });
+
   it("offers only the kinds in the provider audience", async () => {
     await openDialog();
     fireEvent.click(await screen.findByTestId("scim-token-kind"));
@@ -254,6 +279,46 @@ describe("ProvisioningTab", () => {
     expect(row).toHaveTextContent("Deaktiviert");
     expect(await screen.findByTestId("scim-group-row")).toHaveTextContent("support");
     expect(screen.getByTestId("scim-groups")).toHaveTextContent("scim:groups");
+    // one account row: the singular kind label; the hint names the real tab
+    expect(within(row).getAllByRole("cell")[1]).toHaveTextContent(/^Agent$/);
+    expect(screen.getByTestId("scim-groups")).toHaveTextContent("Rollen aus dem Anmeldedienst");
+  });
+
+  it("shows an error when the groups cannot be loaded", async () => {
+    listGroups.mockRejectedValue(new Error("boom"));
+    wrap(<ProvisioningTab provider={provider} onSaved={vi.fn()} />);
+    expect(await within(await screen.findByTestId("scim-groups")).findByRole("alert")).toBeInTheDocument();
+  });
+
+  it("can show deleted accounts and the last activity", async () => {
+    getStatus.mockResolvedValue(status({ last_activity_at: "2026-10-12T07:15:00Z" }));
+    listAccounts.mockImplementation(async (_id: number, params: { include_deleted?: boolean }) =>
+      params.include_deleted
+        ? {
+            total: 1,
+            items: [
+              {
+                scim_id: "d",
+                user_kind: "customer",
+                user_id: 12,
+                login: null,
+                user_name: "gone@example.org",
+                external_id: null,
+                active: false,
+                deleted: true,
+                changed: "2026-10-10T09:00:00Z",
+              },
+            ],
+          }
+        : { total: 0, items: [] },
+    );
+    wrap(<ProvisioningTab provider={provider} onSaved={vi.fn()} />);
+    expect(await screen.findByTestId("scim-last-activity")).not.toHaveTextContent("nie");
+    fireEvent.click(await screen.findByTestId("scim-accounts-show-deleted"));
+    const row = await screen.findByTestId("scim-account-row");
+    expect(row).toHaveTextContent("Gelöscht");
+    expect(row).toHaveTextContent("Kunde");
+    expect(listAccounts).toHaveBeenLastCalledWith(5, expect.objectContaining({ include_deleted: true }), expect.anything());
   });
 
   it("searches accounts with the typed text and resets paging", async () => {
