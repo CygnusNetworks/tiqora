@@ -19,7 +19,7 @@ import pytest
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Engine
 
-from tests._schema_reset import reset_tiqora_schema
+from tests._schema_reset import delete_migration_seed_rows, reset_tiqora_schema
 from tests.plugins.helpers import install_fixture_plugin
 from tiqora.cli import migrate as migrate_cli
 from tiqora.cli.migrate import add_migrate_subparser, run_migrate
@@ -131,10 +131,11 @@ def sync_url(request: pytest.FixtureRequest) -> Iterator[str]:
         get_settings.cache_clear()
         engine = create_engine(url)
         _drop_plugin_tables(engine)
-        with engine.begin() as conn:  # rows the core migrations seeded (strict leak check)
-            for table in ("tiqora_plugin", "tiqora_alembic_version", "tiqora_report_state"):
+        with engine.begin() as conn:  # rows this module and the core migrations wrote
+            for table in ("tiqora_plugin", "tiqora_alembic_version"):
                 conn.execute(text(f"DELETE FROM {table}"))
         engine.dispose()
+        delete_migration_seed_rows(url)  # report state row, CMDB general catalog (0079)
 
 
 @pytest.fixture
