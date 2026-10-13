@@ -37,7 +37,6 @@ from tiqora.db.tiqora.models import (
 from tiqora.extensions import get_registry
 from tiqora.itsm.importer import facades, jobs
 from tiqora.itsm.importer.jobs import (
-    ALREADY_SWITCHED,
     IMPORT_DEDUPE_KEY,
     IMPORT_JOB_KIND,
     ITSM_IMPORT_JOB,
@@ -52,6 +51,7 @@ from tiqora.itsm.importer.jobs import (
 )
 from tiqora.itsm.importer.pipeline import STEP_ORDER
 from tiqora.itsm.importer.report import ImportReport
+from tiqora.itsm.importer.switch import ALREADY_SWITCHED
 from tiqora.itsm.mode import SETTING_SWITCH, SETTING_ZNUNY_READONLY
 from tiqora.jobs.context import JobCancelled, JobFailed
 from tiqora.jobs.registry import JOB_HANDLERS, lane_slots
@@ -211,10 +211,6 @@ async def test_second_start_is_refused_while_active(world: _World) -> None:
         for kind in ("dry_run", "import", "switch"):
             with pytest.raises(ImportBusy):
                 await start_run(s, kind=kind, user_id=56304)  # type: ignore[arg-type]
-        await s.rollback()
-        # a rollback is two setting writes and does not wait for an import
-        rollback = await start_run(s, kind="rollback", user_id=56304)
-        assert rollback.kind == "rollback" and rollback.status == "running"
         await s.rollback()
     # a running switch job blocks as well
     async with world.factory() as s:

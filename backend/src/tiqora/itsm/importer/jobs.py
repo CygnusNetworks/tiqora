@@ -20,7 +20,6 @@ from typing import Any, Final, Literal
 
 from pydantic import BaseModel
 from sqlalchemy import select, update
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.db.tiqora.models import TiqoraItsmImportRun, TiqoraJob, TiqoraSettings
@@ -28,17 +27,15 @@ from tiqora.itsm.importer import facades
 from tiqora.itsm.importer.pipeline import ImportBlocked, run_import
 from tiqora.itsm.importer.report import ImportReport
 from tiqora.itsm.importer.switch import (
-    ALREADY_SWITCHED as ALREADY_SWITCHED,
-)
-from tiqora.itsm.importer.switch import (
     SwitchBlocked,
     check_can_import,
     check_can_switch,
+    lock_import_start,
 )
-from tiqora.itsm.mode import SETTING_ZNUNY_READONLY
+from tiqora.itsm.mode import SETTING_ZNUNY_READONLY, get_switch_info
 from tiqora.jobs.context import JobCancelled, JobContext, JobFailed
 from tiqora.jobs.registry import JobHandler
-from tiqora.jobs.service import find_active_job, utc_now
+from tiqora.jobs.service import TERMINAL_STATUSES, find_active_job, utc_now
 
 IMPORT_JOB_KIND: Final = "core.itsm_import"
 SWITCH_JOB_KIND: Final = "core.itsm_switch"
@@ -48,17 +45,18 @@ CSV_NAME: Final = "itsm-import-bericht.csv"
 SWITCH_INTERRUPTED: Final = "Die Umstellung wurde unterbrochen; Znuny ist wieder beschreibbar."
 IMPORT_INTERRUPTED: Final = "Der Import wurde unterbrochen."
 MESSAGE_MAX: Final = 500
+STALE_RUN: Final = (
+    "Der Lauf wurde nicht abgeschlossen: Seine Hintergrundaufgabe ist beendet oder nicht mehr "
+    "vorhanden."
+)
 
-RunKind = Literal["dry_run", "import", "switch", "rollback"]
+#: what :func:`start_run` starts (a rollback is no job; ``switch.rollback`` writes its own row)
+RunKind = Literal["dry_run", "import", "switch"]
 RunStatus = Literal["running", "done", "failed", "cancelled"]
 
 
 class ImportBusy(Exception):
     """An import or switch job is active (API -> 409, CLI -> exit 1)."""
-
-
-#: the ITSM data is already kept in Tiqora (or another precondition fails); German message
-ImportNotAllowed = SwitchBlocked
 
 
 class ItsmImportPayload(BaseModel):
@@ -75,21 +73,6 @@ class ItsmSwitchPayload(BaseModel):
     edits_stopped: bool = False
     #: "Umstellen ohne CI-Daten": Znuny ITSM release the importer cannot read (itsm1 F19)
     without_ci_data: bool = False
-
-
-async def _lock_import_start(session: AsyncSession) -> None:
-    """Lock the importer-owned ``itsm.znuny_readonly`` row, creating it ("0") when absent."""
-    try:
-        async with session.begin_nested():
-            session.add(TiqoraSettings(key=SETTING_ZNUNY_READONLY, value="0"))
-            await session.flush()
-    except IntegrityError:
-        pass  # another start inserted it first
-    await session.execute(
-        select(TiqoraSettings.key)
-        .where(TiqoraSettings.key == SETTING_ZNUNY_READONLY)
-        .with_for_update()
-    )
 
 
 async def bind_run_to_job(session: AsyncSession, run: TiqoraItsmImportRun, job: TiqoraJob) -> None:
@@ -109,20 +92,18 @@ async def bind_run_to_job(session: AsyncSession, run: TiqoraItsmImportRun, job: 
 async def start_run(session: AsyncSession, *, kind: RunKind, user_id: int) -> TiqoraItsmImportRun:
     """Create the ``running`` run row (flush only; the caller enqueues the job and commits).
 
-    The first three kinds are refused with :class:`ImportBusy` while an import or switch job is
-    active. Two starts are serialised by a row lock on ``itsm.znuny_readonly`` (inserted when
-    absent; the importer owns that key, so the row always exists to lock) and the active-job
-    check is a locking read: on MariaDB a plain read would use the REPEATABLE READ snapshot of
-    the session's first read and miss the other start's committed job. A caller that enqueues
-    the job must pass it to :func:`bind_run_to_job`.
+    Refused with :class:`ImportBusy` while an import or switch job is active. Two starts are
+    serialised by a row lock on ``itsm.znuny_readonly`` (:func:`switch.lock_import_start`) and the
+    active-job check is a locking read: on MariaDB a plain read would use the REPEATABLE READ
+    snapshot of the session's first read and miss the other start's committed job. A caller that
+    enqueues the job must pass it to :func:`bind_run_to_job`.
     """
-    if kind != "rollback":
-        await _lock_import_start(session)
-        for job_kind in (IMPORT_JOB_KIND, SWITCH_JOB_KIND):
-            if await find_active_job(
-                session, kind=job_kind, dedupe_key=IMPORT_DEDUPE_KEY, for_update=True
-            ):
-                raise ImportBusy("Ein ITSM-Import oder eine Umstellung läuft bereits.")
+    await lock_import_start(session)
+    for job_kind in (IMPORT_JOB_KIND, SWITCH_JOB_KIND):
+        if await find_active_job(
+            session, kind=job_kind, dedupe_key=IMPORT_DEDUPE_KEY, for_update=True
+        ):
+            raise ImportBusy("Ein ITSM-Import oder eine Umstellung läuft bereits.")
     run = TiqoraItsmImportRun(
         kind=kind,
         status="running",
@@ -214,7 +195,7 @@ async def run_itsm_import_job(ctx: JobContext, payload: Any) -> dict[str, Any]:
     except JobCancelled:
         await finish_run(factory, payload.run_id, status="cancelled", report=None, message=None)
         raise
-    except (ImportBlocked, ImportNotAllowed) as exc:
+    except (ImportBlocked, SwitchBlocked) as exc:
         await finish_run(factory, payload.run_id, status="failed", report=None, message=str(exc))
         raise JobFailed(str(exc)) from exc
     except Exception as exc:
@@ -236,6 +217,39 @@ async def _import_interrupted(ctx: JobContext, payload: Any) -> None:
     )
 
 
+async def _switched_by_run(factory: async_sessionmaker[AsyncSession], run_id: int) -> bool:
+    """Is the ITSM switched to Tiqora by this run (``itsm.switch.run_id``)?"""
+    async with factory() as session:
+        if not await facades.get_ports(session).mode.is_switched():
+            return False
+        info = await get_switch_info(session)
+    return info is not None and info.get("run_id") == run_id
+
+
+async def stale_run_statuses(
+    session: AsyncSession, runs: list[TiqoraItsmImportRun]
+) -> dict[int, RunStatus]:
+    """``running`` runs whose job ended without settling them, with the status to show instead.
+
+    That happens when a queued job is cancelled (no handler runs) or an interrupted job is
+    requeued with a cancel request (the interrupt hook does not run). The rows are only shown
+    differently; a GET never writes.
+    """
+    open_runs = {r.id: r.job_id for r in runs if r.status == "running" and r.job_id is not None}
+    if not open_runs:
+        return {}
+    rows = await session.execute(
+        select(TiqoraJob.id, TiqoraJob.status).where(TiqoraJob.id.in_(set(open_runs.values())))
+    )
+    job_status = {int(i): str(st) for i, st in rows.all()}
+    out: dict[int, RunStatus] = {}
+    for run_id, job_id in open_runs.items():
+        st = job_status.get(job_id)
+        if st is None or st in TERMINAL_STATUSES:
+            out[run_id] = "cancelled" if st == "cancelled" else "failed"
+    return out
+
+
 async def run_itsm_switch_job(ctx: JobContext, payload: Any) -> dict[str, Any] | None:
     """Final import under the read-only flag, then itsm1's switch in one transaction (D7, R6).
 
@@ -254,6 +268,10 @@ async def run_itsm_switch_job(ctx: JobContext, payload: Any) -> dict[str, Any] |
                 ignore_job_id=ctx.job_id,
             )
     except SwitchBlocked as exc:
+        if await _switched_by_run(factory, payload.run_id):
+            # a requeued attempt after the switch committed (crash before finish_run)
+            await finish_run(factory, payload.run_id, status="done", report=None, message=None)
+            return {"run_id": payload.run_id, "issues": 0}
         await finish_run(factory, payload.run_id, status="failed", report=None, message=exc.message)
         raise JobFailed(exc.message) from exc
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -10,6 +11,7 @@ from pydantic import BaseModel, Field
 from tiqora.db.tiqora.models import TiqoraItsmImportRun
 from tiqora.domain.schemas import UtcDateTime
 from tiqora.itsm.importer.issue_codes import ISSUE_CODES
+from tiqora.itsm.importer.jobs import STALE_RUN
 from tiqora.itsm.importer.switch import ImportStatus
 
 
@@ -98,8 +100,15 @@ def _summary(run: TiqoraItsmImportRun) -> dict[str, Any]:
     return raw if isinstance(raw, dict) else {}
 
 
-def run_out(run: TiqoraItsmImportRun, names: dict[int, str]) -> ItsmImportRunOut:
+def run_out(
+    run: TiqoraItsmImportRun,
+    names: dict[int, str],
+    stale: Mapping[int, str] | None = None,
+) -> ItsmImportRunOut:
+    """``stale``: run id -> status to show for a ``running`` run whose job already ended
+    (:func:`~tiqora.itsm.importer.jobs.stale_run_statuses`)."""
     summary = _summary(run)
+    shown_status = (stale or {}).get(run.id)
     steps = {
         str(name): ItsmImportStepCountsOut(
             **{k: int(v) for k, v in counts.items() if k in _COUNT_KEYS}
@@ -122,13 +131,13 @@ def run_out(run: TiqoraItsmImportRun, names: dict[int, str]) -> ItsmImportRunOut
     return ItsmImportRunOut(
         id=run.id,
         kind=run.kind,  # type: ignore[arg-type]
-        status=run.status,  # type: ignore[arg-type]
+        status=shown_status or run.status,  # type: ignore[arg-type]
         started_at=run.started_at,
         finished_at=run.finished_at,
         started_by_name=names.get(run.started_by),
         job_id=run.job_id,
         profile=run.profile,
-        message=run.message,
+        message=STALE_RUN if shown_status is not None and not run.message else run.message,
         steps=steps,
         issues=issues,
         issue_count=count if isinstance(count, int) else len(issues),
@@ -138,7 +147,9 @@ def run_out(run: TiqoraItsmImportRun, names: dict[int, str]) -> ItsmImportRunOut
 _COUNT_KEYS = frozenset(ItsmImportStepCountsOut.model_fields)
 
 
-def status_out(status: ImportStatus, names: dict[int, str]) -> ItsmImportStatusOut:
+def status_out(
+    status: ImportStatus, names: dict[int, str], stale: Mapping[int, str] | None = None
+) -> ItsmImportStatusOut:
     switched = (
         ItsmImportSwitchInfoOut(
             switched_at=status.switched.switched_at,
@@ -157,7 +168,7 @@ def status_out(status: ImportStatus, names: dict[int, str]) -> ItsmImportStatusO
         profile=status.profile,
         switched=switched,
         readonly_flag=status.readonly_flag,
-        last_run=run_out(status.last_run, names) if status.last_run is not None else None,
+        last_run=run_out(status.last_run, names, stale) if status.last_run is not None else None,
         active_job_id=status.active_job_id,
         can_import=status.can_import,
         can_switch=status.can_switch,

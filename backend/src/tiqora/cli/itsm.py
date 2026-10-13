@@ -75,7 +75,6 @@ async def _cmd_import(args: argparse.Namespace) -> int:
     from tiqora.db.tiqora.models import TiqoraItsmImportRun, TiqoraJob
     from tiqora.itsm.importer.facades import get_ports
     from tiqora.itsm.importer.jobs import (
-        ALREADY_SWITCHED,
         IMPORT_DEDUPE_KEY,
         IMPORT_JOB_KIND,
         ImportBusy,
@@ -83,6 +82,7 @@ async def _cmd_import(args: argparse.Namespace) -> int:
         bind_run_to_job,
         start_run,
     )
+    from tiqora.itsm.importer.switch import ALREADY_SWITCHED
     from tiqora.jobs.service import TERMINAL_STATUSES, enqueue_job
 
     factory = get_session_factory()

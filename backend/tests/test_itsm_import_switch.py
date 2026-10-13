@@ -250,6 +250,93 @@ async def test_switch_without_ci_data_needs_no_import(
     assert await _ci_count(world) == 0
 
 
+async def test_switch_without_ci_data_refused_when_znuny_is_readable(
+    world: _World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A readable release goes through the import; skipping it would switch without any data."""
+    await _mode_a(world, monkeypatch)
+    async with world.factory() as s:
+        with pytest.raises(SwitchBlocked, match="nur möglich"):
+            await check_can_switch(
+                s, addon_installed=True, edits_stopped=False, without_ci_data=True
+            )
+    # the switch job re-checks it as well
+    with pytest.raises(JobFailed, match="nur möglich"):
+        await _run_switch(world, user_id=56333, addon_installed=True, without_ci_data=True)
+    assert await _get(world, MODE_KEY) == "znuny_readthrough"
+
+
+async def test_requeued_switch_after_a_committed_switch_ends_done(
+    world: _World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The worker died after switch_to_tiqora committed: the next attempt settles the run."""
+    await _mode_a(world, monkeypatch)
+    await _done_import(world, 56341)
+    async with world.factory() as s:
+        run = await start_run(s, kind="switch", user_id=56341)
+        run_id = run.id
+        await s.commit()
+    await _put(
+        world,
+        SWITCH_KEY,
+        json.dumps({"switched_at": "2026-10-12T08:00:00", "by": 56341, "run_id": run_id}),
+    )
+    await _put(world, MODE_KEY, "tiqora")
+    await _put(world, READONLY_KEY, "1")
+    reset_mode_cache()
+    payload = ItsmSwitchPayload(user_id=56341, run_id=run_id, addon_installed=True)
+    async with world.factory() as s:
+        job = await enqueue_job(
+            s, kind=SWITCH_JOB_KIND, payload=payload, created_by=56341, dedupe_key=IMPORT_DEDUPE_KEY
+        )
+        job_id = job.id
+        await s.commit()
+    try:
+        result = await call_handler(
+            world.factory, job_id, jobs.run_itsm_switch_job, payload, SWITCH_JOB_KIND
+        )
+    finally:
+        async with world.factory() as s:
+            await s.execute(update(TiqoraJob).where(TiqoraJob.id == job_id).values(status="failed"))
+            await s.commit()
+    assert result == {"run_id": run_id, "issues": 0}
+    assert (await _run_row(world, run_id)).status == "done"
+    assert await _get(world, READONLY_KEY) == "1"  # the switch stands
+
+
+async def test_rollback_and_release_take_the_start_lock(
+    world: _World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both check for an active job behind the same row lock as a start (no start slips in)."""
+    from tiqora.itsm.importer import switch
+
+    locked: list[str] = []
+    real_lock = switch.lock_import_start
+
+    async def spy(session: AsyncSession) -> None:
+        locked.append("lock")
+        await real_lock(session)
+
+    monkeypatch.setattr(switch, "lock_import_start", spy)
+    await _mode_a(world, monkeypatch)
+    await _put(world, READONLY_KEY, "1")
+    async with world.factory() as s:
+        await switch.release_readonly(s)
+        await s.commit()
+    assert locked == ["lock"] and await _get(world, READONLY_KEY) == "0"
+    await _put(
+        world,
+        SWITCH_KEY,
+        json.dumps({"switched_at": "2026-10-12T08:00:00", "by": 56342, "run_id": 1}),
+    )
+    await _put(world, MODE_KEY, "tiqora")
+    reset_mode_cache()
+    async with world.factory() as s:
+        await rollback(s, user_id=56342)
+        await s.commit()
+    assert locked == ["lock", "lock"] and await _get(world, SWITCH_KEY) is None
+
+
 async def test_switch_without_addon_requires_edits_stopped(
     world: _World, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -14,7 +14,7 @@ from datetime import timedelta
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import create_engine, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -30,8 +30,9 @@ from tiqora.db.tiqora.models import TiqoraItsmImportRun, TiqoraJob, TiqoraSettin
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.itsm.importer import facades
 from tiqora.itsm.importer.issue_codes import ISSUE_CODES
+from tiqora.itsm.importer.jobs import ItsmImportPayload
 from tiqora.itsm.importer.switch import MODE_KEY, READONLY_KEY, SWITCH_KEY
-from tiqora.jobs.service import utc_now
+from tiqora.jobs.service import enqueue_job, utc_now
 
 pytestmark = pytest.mark.db
 
@@ -395,12 +396,67 @@ async def test_switch_without_ci_data_needs_no_done_import(
     admin: _Api, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     await _mode_a(admin, monkeypatch)
+    monkeypatch.setattr(facades, "source_override", sample_source(profile=None))
     resp = await admin.client.post(
         f"{BASE}/switch",
         json={"confirm": "UMSTELLEN", "addon_installed": True, "without_ci_data": True},
     )
     assert resp.status_code == 202
     assert json.loads((await _jobs(admin))[0].payload)["without_ci_data"] is True
+
+
+async def test_switch_without_ci_data_refused_on_a_readable_release(
+    admin: _Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Server-side guard: the option skips the import, so only an unreadable release may use it."""
+    await _mode_a(admin, monkeypatch)
+    await _add_run(admin)  # a done import: everything else would let the switch start
+    resp = await admin.client.post(
+        f"{BASE}/switch",
+        json={"confirm": "UMSTELLEN", "addon_installed": True, "without_ci_data": True},
+    )
+    assert resp.status_code == 409
+    assert "ohne CI-Daten" in resp.json()["detail"]
+    assert await _jobs(admin) == []
+    assert await _get(admin, READONLY_KEY) in (None, "0")
+
+
+async def test_running_run_of_an_ended_job_is_shown_settled(admin: _Api) -> None:
+    """A queued job cancelled before a worker claimed it never runs the handler."""
+    gone = await _add_run(admin, status="running", user_id=NAMED_USER)
+    cancelled = await _add_run(admin, status="running", user_id=NAMED_USER, age_minutes=1)
+    live = await _add_run(admin, status="running", user_id=NAMED_USER, age_minutes=2)
+    async with admin.factory() as s:
+        job_ids = []
+        for job_status in ("cancelled", "running"):
+            job = await enqueue_job(
+                s,
+                kind="core.itsm_import",
+                payload=ItsmImportPayload(user_id=NAMED_USER, dry_run=True, run_id=0),
+                created_by=NAMED_USER,
+            )
+            job.status = job_status
+            job_ids.append(job.id)
+        await s.execute(
+            update(TiqoraItsmImportRun)
+            .where(TiqoraItsmImportRun.id == gone)
+            .values(job_id=max(job_ids) + 1000)  # purged job
+        )
+        for run_id, job_id in ((cancelled, job_ids[0]), (live, job_ids[1])):
+            await s.execute(
+                update(TiqoraItsmImportRun)
+                .where(TiqoraItsmImportRun.id == run_id)
+                .values(job_id=job_id)
+            )
+        await s.commit()
+    runs = {r["id"]: r for r in (await admin.client.get(f"{BASE}/runs")).json()}
+    assert runs[gone]["status"] == "failed" and "nicht abgeschlossen" in runs[gone]["message"]
+    assert runs[cancelled]["status"] == "cancelled"
+    assert runs[live]["status"] == "running" and runs[live]["message"] is None
+    one = (await admin.client.get(f"{BASE}/runs/{cancelled}")).json()
+    assert one["status"] == "cancelled"
+    status = (await admin.client.get(f"{BASE}/status")).json()
+    assert status["last_run"]["id"] == gone and status["last_run"]["status"] == "failed"
 
 
 async def test_runs_list_newest_first_with_started_by_name(admin: _Api, sync_url: str) -> None:

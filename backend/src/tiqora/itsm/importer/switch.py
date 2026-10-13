@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 from typing import Final
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.tiqora.models import TiqoraItsmImportRun, TiqoraSettings
@@ -54,6 +55,10 @@ EDITS_NOT_STOPPED: Final = (
 READONLY_STUCK: Final = (
     "Znuny ist für Konfigurationselemente gesperrt, obwohl keine Umstellung läuft. "
     "Heben Sie die Sperre auf."
+)
+WITHOUT_CI_DATA_REFUSED: Final = (
+    "„Umstellen ohne CI-Daten“ ist nur möglich, wenn Tiqora die Znuny-ITSM-Version nicht lesen "
+    "kann. Führen Sie einen Import durch und stellen Sie dann um."
 )
 
 
@@ -120,9 +125,30 @@ async def _put_setting(session: AsyncSession, key: str, value: str) -> None:
         row.value = value
 
 
-async def _active_job_id(session: AsyncSession) -> int | None:
+async def lock_import_start(session: AsyncSession) -> None:
+    """Lock the importer-owned ``itsm.znuny_readonly`` row, creating it ("0") when absent.
+
+    Serialises every start of an import or switch with rollback and "Sperre aufheben": whoever
+    holds the lock sees the others' committed jobs (with a locking read, see ``_active_job_id``).
+    """
+    try:
+        async with session.begin_nested():
+            session.add(TiqoraSettings(key=READONLY_KEY, value="0"))
+            await session.flush()
+    except IntegrityError:
+        pass  # another start inserted it first
+    await session.execute(
+        select(TiqoraSettings.key).where(TiqoraSettings.key == READONLY_KEY).with_for_update()
+    )
+
+
+async def _active_job_id(session: AsyncSession, *, for_update: bool = False) -> int | None:
+    """``for_update``: a locking read, which on MariaDB sees jobs committed after the session's
+    snapshot (needed behind :func:`lock_import_start`)."""
     for kind in _JOB_KINDS:
-        job = await find_active_job(session, kind=kind, dedupe_key=_DEDUPE_KEY)
+        job = await find_active_job(
+            session, kind=kind, dedupe_key=_DEDUPE_KEY, for_update=for_update
+        )
         if job is not None:
             return job.id
     return None
@@ -169,6 +195,9 @@ async def _switch_denial(
         return ALREADY_SWITCHED
     if not await mode.znuny_itsm_present():
         return NOT_PRESENT
+    if without_ci_data and await facades.get_ports(session).source.profile() is not None:
+        # a readable Znuny ITSM goes through the import; this path would skip it entirely
+        return WITHOUT_CI_DATA_REFUSED
     if await mode.effective_mode() != "znuny_readthrough":
         return WRONG_MODE
     active = await _active_job_id(session)
@@ -190,7 +219,8 @@ async def check_can_switch(
     """Preconditions of D7 (the API checks them, the switch job re-checks them).
 
     ``without_ci_data`` is the explicit "Umstellen ohne CI-Daten" path for Znuny ITSM releases
-    the importer cannot read (itsm1 F19): no successful import is required then.
+    the importer cannot read (itsm1 F19): no successful import is required then, and it is
+    refused when the release is readable (the import path applies).
     ``ignore_job_id`` is the calling switch job itself.
     """
     reason = await _switch_denial(
@@ -208,9 +238,10 @@ async def rollback(session: AsyncSession, *, user_id: int) -> None:
     Flush only; the caller commits.
     """
     ports = facades.get_ports(session)
+    await lock_import_start(session)
     if not await ports.mode.is_switched():
         raise SwitchBlocked(NOT_SWITCHED)
-    if await _active_job_id(session) is not None:
+    if await _active_job_id(session, for_update=True) is not None:
         raise SwitchBlocked(BUSY)
     now = utc_now()
     run = TiqoraItsmImportRun(
@@ -312,9 +343,10 @@ async def release_readonly(session: AsyncSession) -> None:
     Refused while a job is active (it owns the flag) and after the switch (the flag is then
     meant to stay set).
     """
+    await lock_import_start(session)
     if await facades.get_ports(session).mode.is_switched():
         raise SwitchBlocked(ALREADY_SWITCHED)
-    if await _active_job_id(session) is not None:
+    if await _active_job_id(session, for_update=True) is not None:
         raise SwitchBlocked(BUSY)
     await _put_setting(session, READONLY_KEY, "0")
     await session.flush()

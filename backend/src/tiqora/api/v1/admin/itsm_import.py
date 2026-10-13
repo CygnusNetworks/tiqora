@@ -25,6 +25,7 @@ from tiqora.itsm.importer.jobs import (
     ItsmSwitchPayload,
     RunKind,
     bind_run_to_job,
+    stale_run_statuses,
     start_run,
 )
 from tiqora.itsm.importer.schemas import (
@@ -71,7 +72,8 @@ async def _user_names(session: AsyncSession, ids: set[int]) -> dict[int, str]:
 async def _status(session: AsyncSession) -> ItsmImportStatusOut:
     st = await import_status(session)
     ids = {st.last_run.started_by} if st.last_run is not None else set()
-    return status_out(st, await _user_names(session, ids))
+    stale = await stale_run_statuses(session, [st.last_run] if st.last_run is not None else [])
+    return status_out(st, await _user_names(session, ids), stale)
 
 
 async def _start_import_run(session: AsyncSession, kind: RunKind, user_id: int) -> JobAccepted:
@@ -134,7 +136,8 @@ async def list_runs(
         .all()
     )
     names = await _user_names(session, {r.started_by for r in rows})
-    return [run_out(r, names) for r in rows]
+    stale = await stale_run_statuses(session, list(rows))
+    return [run_out(r, names, stale) for r in rows]
 
 
 @router.get("/runs/{run_id}", response_model=ItsmImportRunOut)
@@ -142,7 +145,8 @@ async def get_run(run_id: int, _admin: AdminUser, session: DbSession) -> ItsmImp
     run = await session.get(TiqoraItsmImportRun, run_id)
     if run is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=RUN_NOT_FOUND)
-    return run_out(run, await _user_names(session, {run.started_by}))
+    stale = await stale_run_statuses(session, [run])
+    return run_out(run, await _user_names(session, {run.started_by}), stale)
 
 
 @router.post("/switch", status_code=status.HTTP_202_ACCEPTED, response_model=JobAccepted)
