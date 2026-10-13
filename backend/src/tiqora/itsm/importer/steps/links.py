@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.cmdb.links import LinkInvalid, UnknownLinkType
 from tiqora.itsm.importer.mapstore import MapStore, fingerprint
 from tiqora.itsm.importer.ports import CmdbWritePort, ZnunyLink
-from tiqora.itsm.importer.steps import StepContext
+from tiqora.itsm.importer.steps import StepContext, mark_unfinished
 from tiqora.itsm.importer.steps.cis import _ci_targets
 from tiqora.itsm.importer.steps.classes import ClassMaps
 
@@ -183,3 +183,7 @@ async def _links_page(
             ctx.report.count(STEP, "unchanged")
         else:
             ctx.report.count(STEP, "created" if hit is None else "updated")
+            # a new CI-CI link changes the incident propagation of both ends
+            await mark_unfinished(
+                ctx, store, {int(end[1]) for end in (source, target) if end[0] == "ci"}
+            )

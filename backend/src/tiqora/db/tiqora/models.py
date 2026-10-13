@@ -2578,7 +2578,7 @@ class TiqoraItsmImportMap(TiqoraBase):
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    # catalog|class|definition|ci|version|link|attachment
+    # catalog|class|definition|ci|version|link|attachment|priority_matrix|service_meta|finish
     source_kind: Mapped[str] = mapped_column(String(20), nullable=False)
     source_id: Mapped[str] = mapped_column(String(255), nullable=False)
     target_id: Mapped[int] = mapped_column(BigInteger, nullable=False)  # links: 0

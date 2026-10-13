@@ -28,7 +28,7 @@ from tiqora.db.tiqora.models import TiqoraCmdbCi, TiqoraCmdbCiVersion
 from tiqora.itsm.importer.facades import CmdbServiceWriter
 from tiqora.itsm.importer.mapstore import MapEntry, MapStore, fingerprint
 from tiqora.itsm.importer.ports import CmdbWritePort, ZnunyCi, ZnunyCiVersion
-from tiqora.itsm.importer.steps import StepContext
+from tiqora.itsm.importer.steps import StepContext, mark_unfinished
 from tiqora.itsm.importer.steps.classes import ClassMaps, DefinitionTarget
 from tiqora.itsm.znuny_format.xmldata import RefResolver, xmldata_to_attributes
 
@@ -322,8 +322,7 @@ async def _pass2_page(
             ctx, session, writer, store, maps, catalog_ids, defaults, resolver, ci, tid, new
         ):
             ctx.report.count(STEP_PASS2, "updated" if mapped else "created")
-            if not ctx.dry_run:
-                ctx.touched_ci_ids.add(tid)
+            await mark_unfinished(ctx, store, {tid})
         else:
             ctx.report.count(STEP_PASS2, "skipped")
 

@@ -4,7 +4,9 @@
 Every start (API or CLI) first creates the ``tiqora_itsm_import_run`` row (:func:`start_run`),
 then enqueues the job with the run id in its payload. The handler only moves that row through
 ``running`` -> ``done`` / ``failed`` / ``cancelled``; it never calls ``ctx.checkpoint`` because
-every importer step is idempotent (a requeued claim resumes without duplicates).
+every importer step is idempotent (a requeued claim resumes without duplicates). CIs whose run
+ended before ``incident_states`` stay marked unfinished in the map (kind ``finish``) and are
+finished by the next run, requeued or new.
 
 Import and switch share the dedupe key :data:`IMPORT_DEDUPE_KEY` and the lane ``itsm_import``
 (one slot): they never run at the same time, and a second start is refused with

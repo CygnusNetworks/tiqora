@@ -31,14 +31,21 @@ from tests._itsm_import_fixtures import (
 from tests._itsm_mode_helpers import profile_packages
 from tests._sysconfig_rows import set_sysconfig_rows
 from tiqora.db.tiqora.base import TiqoraBase
-from tiqora.db.tiqora.models import TiqoraCmdbCatalog, TiqoraCmdbCi, TiqoraItsmImportMap
-from tiqora.itsm.importer import facades
+from tiqora.db.tiqora.models import (
+    TiqoraCmdbCatalog,
+    TiqoraCmdbCi,
+    TiqoraCmdbCiAttr,
+    TiqoraItsmImportMap,
+)
+from tiqora.itsm.importer import facades, pipeline
 from tiqora.itsm.importer.facades import ItsmModeFacade
 from tiqora.itsm.importer.pipeline import STEP_ORDER, ImportBlocked, run_import
 from tiqora.itsm.importer.report import ImportReport
+from tiqora.itsm.importer.steps import KIND_FINISH
 from tiqora.itsm.models import TiqoraItsmLinkType, TiqoraItsmPriorityMatrix, TiqoraItsmServiceMeta
 from tiqora.itsm.znuny_adapter.detect import clear_detect_cache
 from tiqora.itsm.znuny_adapter.reader import CipRow, ServiceItsmRow
+from tiqora.jobs.context import JobCancelled
 
 pytestmark = pytest.mark.db
 
@@ -386,6 +393,62 @@ async def test_incident_states_recomputed_for_touched_cis(world: _World, monkeyp
     assert own[numbers[4]] == "Operational"
     inc = report.steps["incident_states"]
     assert inc.updated >= 1 and inc.updated + inc.unchanged == 10
+
+
+async def _derived_incident(w: _World, numbers: list[str]) -> dict[str, str]:
+    async with w.factory() as s:
+        rows = await s.execute(
+            select(TiqoraCmdbCi.number, TiqoraCmdbCatalog.name)
+            .join(TiqoraCmdbCatalog, TiqoraCmdbCatalog.id == TiqoraCmdbCi.cur_incident_state_id)
+            .where(TiqoraCmdbCi.number.in_(numbers))
+        )
+        return {str(n): str(name) for n, name in rows.all()}
+
+
+async def test_run_after_an_interrupted_run_finishes_its_cis(world: _World, monkeypatch) -> None:
+    """A run that ends after ``cis_pass2`` leaves CIs without index and derived state; the next
+    run (requeue or a fresh start) finishes them although their versions are unchanged."""
+    src = _source()
+    last = src.version_rows[5][-1]
+    src.version_rows[5][-1] = dataclasses.replace(last, incident_state_id=GC_INCIDENT)
+    src.ci_rows = [
+        dataclasses.replace(c, incident_state_id=GC_INCIDENT) if c.id == 5 else c
+        for c in src.ci_rows
+    ]
+    numbers = {i: next(c.number for c in src.ci_rows if c.id == i) for i in (4, 5)}
+
+    async def cancelled(*_args: Any) -> None:
+        raise JobCancelled()
+
+    with monkeypatch.context() as m:
+        m.setattr(pipeline, "run_links", cancelled)
+        with pytest.raises(JobCancelled):
+            await _run(world, src, monkeypatch)
+    assert await _ci_count(world) == 10
+    assert await _scalar(world, select(func.count()).select_from(TiqoraCmdbCiAttr)) == 0
+    pending = select(func.count()).where(TiqoraItsmImportMap.source_kind == KIND_FINISH)
+    assert await _scalar(world, pending) == 10
+
+    again = await _run(world, src, monkeypatch)
+    assert again.steps["cis_pass2"].unchanged == 10  # nothing new to import ...
+    inc = again.steps["incident_states"]
+    assert inc.updated + inc.unchanged == 10  # ... but the CIs of the first run are finished
+    async with world.factory() as s:
+        indexed = {
+            int(i) for i in (await s.execute(select(TiqoraCmdbCiAttr.ci_id).distinct())).scalars()
+        }
+        ci_ids = set((await s.execute(select(TiqoraCmdbCi.id))).scalars())
+    assert indexed == ci_ids  # every CI has a Vendor, a searchable attribute
+    # CI 4 DependsOn CI 5: the link came with the second run and propagates the incident
+    assert await _derived_incident(world, list(numbers.values())) == {
+        numbers[4]: "Warning",
+        numbers[5]: "Incident",
+    }
+    assert await _scalar(world, pending) == 0
+
+    third = await _run(world, src, monkeypatch)
+    inc = third.steps["incident_states"]
+    assert inc.updated + inc.unchanged == 0  # finished CIs are not finished again
 
 
 async def test_znuny_present_override_is_the_only_mode_hook(monkeypatch) -> None:

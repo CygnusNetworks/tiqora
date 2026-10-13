@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.tiqora.models import TiqoraItsmImportMap
@@ -134,3 +134,19 @@ class MapStore:
         ids = set(rows)
         ids.update(sid for (k, sid) in self._overlay if k == kind)
         return sorted(ids)
+
+    async def delete_many(self, kind: str, source_ids: Sequence[str]) -> None:
+        """Drop map rows (flush only); a read-only store only forgets its overlay entries."""
+        ids = list(dict.fromkeys(source_ids))
+        for sid in ids:
+            self._overlay.pop((kind, sid), None)
+        if self._read_only:
+            return
+        for start in range(0, len(ids), CHUNK):
+            await self._session.execute(
+                delete(TiqoraItsmImportMap).where(
+                    TiqoraItsmImportMap.source_kind == kind,
+                    TiqoraItsmImportMap.source_id.in_(ids[start : start + CHUNK]),
+                )
+            )
+        await self._session.flush()

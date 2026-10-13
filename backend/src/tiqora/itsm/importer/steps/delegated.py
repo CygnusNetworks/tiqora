@@ -6,7 +6,8 @@ of ``service``) through itsm1's import functions (facades); they work without th
 dry run only counts the source rows (``skipped``). ``changes`` counts Change Management objects
 and reports that they are not imported (phase 3). ``deleted_in_znuny`` only reports: a CI that was
 imported and is gone from Znuny stays in Tiqora. ``incident_states`` runs cmdb's ``finish_import``
-(search index, class counters, derived incident states) for the CIs that got versions in this run.
+(search index, class counters, derived incident states) for every CI marked unfinished (map kind
+``finish``): new versions or new CI links of this run or of an earlier run that ended early.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from sqlalchemy import select
 from tiqora.db.tiqora.models import TiqoraCmdbCi
 from tiqora.itsm.importer import facades
 from tiqora.itsm.importer.mapstore import fingerprint
-from tiqora.itsm.importer.steps import StepContext
+from tiqora.itsm.importer.steps import KIND_FINISH, StepContext
 from tiqora.itsm.znuny_adapter.catalog import chunks
 
 STEP_MATRIX = "priority_matrix"
@@ -165,18 +166,28 @@ async def run_deleted_in_znuny(ctx: StepContext) -> None:
 
 
 async def run_incident_states(ctx: StepContext) -> None:
-    """Finish the import for every CI that got versions: index, counters, derived states."""
+    """Finish the import for every unfinished CI: index, counters, derived states.
+
+    Unfinished are the CIs of this run's new versions and new CI links, and those an earlier run
+    left behind when it ended before this step (map kind ``finish``). Each batch is finished and
+    unmarked in one transaction.
+    """
     ctx.report.start_step(STEP_INCIDENT)
-    touched = sorted(ctx.touched_ci_ids)
+    if ctx.dry_run:
+        await ctx.progress(0, 0, STEP_INCIDENT)
+        return
+    async with ctx.session_factory() as session:
+        marked = await ctx.mapstore_for(session).all_source_ids(KIND_FINISH)
+    pending = sorted(ctx.touched_ci_ids | {int(i) for i in marked if i.isdigit()})
     done = 0
-    if not ctx.dry_run:
-        for part in chunks(touched, FINISH_BATCH):
-            await ctx.check_cancelled()
-            async with ctx.session_factory() as session:
-                changed = await ctx.writer_for(session).finish_import(list(part))
-                await session.commit()
-            ctx.report.count(STEP_INCIDENT, "updated", changed)
-            ctx.report.count(STEP_INCIDENT, "unchanged", len(part) - changed)
-            done += len(part)
-            await ctx.progress(done, len(touched), STEP_INCIDENT)
-    await ctx.progress(len(touched), len(touched), STEP_INCIDENT)
+    for part in chunks(pending, FINISH_BATCH):
+        await ctx.check_cancelled()
+        async with ctx.session_factory() as session:
+            changed = await ctx.writer_for(session).finish_import(list(part))
+            await ctx.mapstore_for(session).delete_many(KIND_FINISH, [str(i) for i in part])
+            await session.commit()
+        ctx.report.count(STEP_INCIDENT, "updated", changed)
+        ctx.report.count(STEP_INCIDENT, "unchanged", len(part) - changed)
+        done += len(part)
+        await ctx.progress(done, len(pending), STEP_INCIDENT)
+    await ctx.progress(len(pending), len(pending), STEP_INCIDENT)
