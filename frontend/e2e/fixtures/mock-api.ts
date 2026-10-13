@@ -15,6 +15,7 @@ import {
 import { createDemoSchedules, demoZnunyApply, resolveSchedules, type DemoSchedules } from "../../src/demo/schedulesMock";
 import { filterDebugEntries, resolveGiData } from "../../src/demo/giMock";
 import { resolveItsmData } from "../../src/demo/itsmMock";
+import { resolveItsmImport } from "../../src/demo/itsmImportMock";
 import { DEMO_ITSM_MODE_KEY, type DemoItsmMode } from "../../src/demo/itsmMode";
 import { itsmStoreReply, resetItsmStore } from "./itsm-store";
 import type { ProcessDialogFormData, TicketProcessState } from "../../src/lib/processApi";
@@ -1219,6 +1220,12 @@ export async function mockApi(page: Page) {
     // resolver answers the rest (read-only Mode A data). The mode comes from the page's localStorage
     // (default "tiqora").
     if (/\/api\/v1\/(itsm\/|admin\/itsm|admin\/priorities|jobs\/|tickets\/(search$|\d+\/(cis|itsm|links|link-graph|problem|major-incident|linked-articles)))/.test(path)) {
+      // the ITSM import page (admin/itsm/import/*, its demo job): the demo resolver, read and write
+      const imported = resolveItsmImport(path, method);
+      if (imported !== undefined) {
+        await json(route, 200, imported);
+        return;
+      }
       const stored = await page.evaluate((key) => localStorage.getItem(key), DEMO_ITSM_MODE_KEY).catch(() => null);
       const mode: DemoItsmMode = stored === "off" || stored === "znuny_readthrough" ? stored : "tiqora";
       const hasBody = method !== "GET" && method !== "DELETE" && req.postData() !== null;

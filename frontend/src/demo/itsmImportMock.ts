@@ -15,7 +15,7 @@ const DRY_RUN: ImportRunOut = {
   started_at: "2026-10-12T09:00:00Z",
   finished_at: "2026-10-12T09:01:10Z",
   started_by_name: "admin@example.org",
-  job_id: null,
+  job_id: DEMO_ITSM_IMPORT_JOB_ID,
   profile: "ITSM 6.5",
   message: null,
   issue_count: 1,
@@ -48,7 +48,7 @@ const JOB: Job = {
   cancel_requested: false,
   error: null,
   result: null,
-  files: [],
+  files: [{ id: 1, name: "itsm-import-bericht.csv", content_type: "text/csv; charset=utf-8", size_bytes: 2048 }],
   created_by: 1,
   created_at: "2026-10-12T09:00:00Z",
   started_at: "2026-10-12T09:00:00Z",
@@ -71,6 +71,7 @@ const MODE_A_STATUS: ImportStatus = {
 };
 
 const SWITCHED_AT = "2026-10-12T10:00:00Z";
+/** The switch's final import: everything was there already, two CIs got a new version. */
 const SWITCH_RUN: ImportRunOut = {
   ...DRY_RUN,
   id: 2,
@@ -79,6 +80,14 @@ const SWITCH_RUN: ImportRunOut = {
   finished_at: "2026-10-12T10:02:00Z",
   issue_count: 0,
   issues: [],
+  steps: {
+    catalog: { created: 0, updated: 0, unchanged: 12, skipped: 0, problems: 0 },
+    classes: { created: 0, updated: 0, unchanged: 3, skipped: 0, problems: 0 },
+    cis_pass1: { created: 0, updated: 0, unchanged: 41, skipped: 0, problems: 0 },
+    cis_pass2: { created: 0, updated: 2, unchanged: 39, skipped: 0, problems: 0 },
+    links: { created: 0, updated: 0, unchanged: 58, skipped: 0, problems: 0 },
+    incident_states: { created: 0, updated: 1, unchanged: 1, skipped: 0, problems: 0 },
+  },
 };
 
 /** Switched to Tiqora, with 3 CIs changed in Znuny since (drift warning). */
